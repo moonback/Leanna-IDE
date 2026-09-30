@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Server, Cpu, MemoryStick, CheckCircle2, AlertCircle, XCircle,
   RefreshCw, Clock, Loader2, Puzzle,
-  Zap,
+  Zap, X,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         <div className="flex items-center gap-1">
           <button
             onClick={load}
-            className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
             title="Rafraîchir"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
@@ -333,10 +333,10 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <X size={14} style={{ color: 'var(--text-dimmed)' }} />
             </button>
           )}
         </div>

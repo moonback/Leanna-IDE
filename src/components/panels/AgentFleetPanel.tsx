@@ -12,6 +12,7 @@ import {
   Users, Radio, BarChart3, RefreshCw, Loader2, X,
   AlertTriangle, ArrowRight, Zap, FlaskConical, FileText,
   Shield, Eye, Building2, Mail, Inbox, Bell, BellOff, Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAgentNotifications } from '../../hooks/useAgentNotifications.js';
 
@@ -305,7 +306,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         <div className="flex-1" />
         <button
           onClick={handleToggleNotifications}
-          className="p-1.5 rounded-md hover:bg-white/8 transition"
+          className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition"
           title={notificationsEnabled ? 'Désactiver notifications' : 'Activer notifications'}
         >
           {notificationsEnabled
@@ -314,7 +315,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         </button>
         <button
           onClick={refresh}
-          className="p-1.5 rounded-md hover:bg-white/8 transition"
+          className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition"
           title="Rafraîchir"
         >
           {loading ? <Loader2 size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} /> : <RefreshCw size={11} style={{ color: 'var(--text-muted)' }} />}
@@ -386,7 +387,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
           {onClose && (
             <button
               onClick={onClose}
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Fermer"
             >
@@ -442,7 +443,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-lg transition hover:bg-white/10"
+                className="w-7 h-7 flex items-center justify-center rounded-lg transition hover:bg-[var(--bg-active)]"
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Fermer"
               >
@@ -512,7 +513,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
         <div className="text-xs mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
           {agent.runningTasks > 0 && <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" />{agent.runningTasks} en cours</span>}
           {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={8} />{agent.queuedTasks} en queue</span>}
-          {agent.delegationSuccess > 0 && <span style={{ color: 'var(--color-success)' }}>✓ {agent.delegationSuccess}</span>}
+          {agent.delegationSuccess > 0 && <span className="flex items-center gap-1" style={{ color: 'var(--color-success)' }}><CheckCircle2 size={8} /> {agent.delegationSuccess}</span>}
         </div>
       </div>
     </div>
@@ -534,7 +535,7 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
   const time = new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg hover:bg-white/5 transition">
+    <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition">
       <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}>
         <Radio size={9} style={{ color }} />
@@ -602,7 +603,7 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Dead-letter detail */}
       {deadLetterEntries.length > 0 && (
         <div className="rounded-xl p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 15%, transparent)' }}>
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-error)' }}>⚠️ Messages non délivrés</p>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}><AlertTriangle size={12} /> Messages non délivrés</p>
           {deadLetterEntries.map(([role, count]) => (
             <div key={role} className="flex items-center justify-between py-1 text-xs">
               <span style={{ color: 'var(--text-muted)' }}>{role}</span>

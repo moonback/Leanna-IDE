@@ -3,7 +3,7 @@ import {
   Plug, Plus, Trash2, RefreshCw, Power, PowerOff,
   Terminal, Globe, AlertCircle, CheckCircle2, Loader2, Wrench,
   ChevronDown, ChevronRight, X, Activity, Clock,
-  Zap, TrendingUp, Search, Store
+  Zap, TrendingUp, Search, Store, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { McpDirectory } from './McpDirectory.js';
@@ -930,8 +930,8 @@ export function McpPanel() {
                         {stats.calls}
                       </span>
                       {stats.errors > 0 && (
-                        <span style={{ color: theme.error }}>
-                          ✗ {stats.errors}
+                        <span className="inline-flex items-center gap-1" style={{ color: theme.error }}>
+                          <X size={10} /> {stats.errors}
                         </span>
                       )}
                       <span style={{ color: theme.textFaint }}>
@@ -960,8 +960,8 @@ export function McpPanel() {
                       borderTop: idx > 0 ? `1px solid ${theme.border}` : undefined,
                     }}
                   >
-                    <span style={{ color: m.success ? theme.success : theme.error, width: 12 }}>
-                      {m.success ? '✓' : '✗'}
+                    <span className="inline-flex items-center" style={{ color: m.success ? theme.success : theme.error, width: 12 }}>
+                      {m.success ? <Check size={10} /> : <X size={10} />}
                     </span>
                     <span className="truncate flex-1" style={{ color: theme.accent, fontWeight: 500 }}>
                       {m.toolName}

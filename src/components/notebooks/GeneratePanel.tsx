@@ -17,7 +17,9 @@ import {
   Loader2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
   FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
+  Folder, AlertTriangle, Smartphone, Monitor, Square,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 import { SlidePreviewModal } from './SlidePreviewModal.js';
 import { useToast } from '../ui/Toast.js';
@@ -167,7 +169,7 @@ function renderGeneratedContent(content: string): JSX.Element {
 
               <button
                 onClick={() => navigator.clipboard.writeText(codeContent)}
-                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-white/10"
+                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-[var(--bg-active)]"
                 style={{ color: 'var(--text-muted)' }}
                 title="Copier"
               >
@@ -454,7 +456,7 @@ function renderInfographicContent(content: string): JSX.Element {
               color: 'var(--text-dimmed)',
             }}
           >
-            📁 {filePath.split('/').pop()}
+            <span className="inline-flex items-center gap-1"><Folder size={12} /> {filePath.split('/').pop()}</span>
           </span>
         )}
         {sizeKB > 0 && (
@@ -1291,7 +1293,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                                     t.id === task.id ? { ...t, status: 'pending', progress: 0 } : t
                                   ));
                                 }}
-                                className="p-1 rounded hover:bg-white/5 transition-colors"
+                                className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
                                 title="Réessayer"
                               >
                                 <RefreshCw className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} />
@@ -1303,7 +1305,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                                   // Annuler cette tâche
                                   setGenerationQueue(prev => prev.filter(t => t.id !== task.id));
                                 }}
-                                className="p-1 rounded hover:bg-white/5 transition-colors"
+                                className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
                                 title="Annuler"
                               >
                                 <X className="w-2.5 h-2.5" style={{ color: 'var(--color-error)' }} />
@@ -1337,7 +1339,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 {sources.map(src => (
                   <label
                     key={src.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -1448,7 +1450,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                   whileTap={sources.length > 0 ? { scale: 0.98 } : {}}
                   transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
                   className={`group relative w-full flex flex-col items-center gap-1 p-1.5 rounded-lg text-center disabled:opacity-40 transition-all duration-200 ${
-                    isActive ? 'ring-1' : 'hover:bg-white/5'
+                    isActive ? 'ring-1' : 'hover:bg-[var(--bg-hover)]'
                   }`}
                   style={{
                     border: '1px solid',
@@ -1574,7 +1576,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={() => handleImportToWorkspace(selectedDoc)}
-                  className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                  className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
                   title="Importer dans le workspace"
                 >
@@ -1583,7 +1585,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 <button
                   onClick={handleRegenerate}
                   disabled={sources.length === 0}
-                  className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95 disabled:opacity-30"
+                  className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95 disabled:opacity-30"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Régénérer"
                 >
@@ -1591,7 +1593,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </button>
                 <button
                   onClick={() => handleExportMd(selectedDoc)}
-                  className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                  className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Exporter en Markdown"
                 >
@@ -1599,7 +1601,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </button>
                 <button
                   onClick={() => handleCopy(selectedDoc.content)}
-                  className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                  className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Copier"
                 >
@@ -1608,7 +1610,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 {!SLIDE_EXCLUDED_TYPES.has(selectedDoc.type) && (
                   <button
                     onClick={() => setShowSlideModal(true)}
-                    className="p-2 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+                    className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                     style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, transparent)', color: 'var(--accent-primary)' }}
                     title="Générer une présentation Reveal.js"
                   >
@@ -1654,21 +1656,24 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
 
             {/* Feature highlights */}
             <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
-              {[
-                { emoji: '⚡', label: 'Streaming', sub: 'Temps réel' },
-                { emoji: '🎯', label: 'Sources', sub: 'Ciblé' },
-                { emoji: '📝', label: 'Custom', sub: 'Instructions' },
-              ].map(f => (
+              {([
+                { icon: Zap, label: 'Streaming', sub: 'Temps réel' },
+                { icon: Target, label: 'Sources', sub: 'Ciblé' },
+                { icon: PenLine, label: 'Custom', sub: 'Instructions' },
+              ] as { icon: LucideIcon; label: string; sub: string }[]).map(f => {
+                const FIcon = f.icon;
+                return (
                 <div
                   key={f.label}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl"
                   style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-base">{f.emoji}</span>
+                  <span className="inline-flex items-center"><FIcon size={16} style={{ color: 'var(--text-muted)' }} /></span>
                   <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>
                   <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{f.sub}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {sources.length === 0 && (
@@ -1676,7 +1681,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 className="text-xs px-4 py-2 rounded-full"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)' }}
               >
-                ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
+                <span className="inline-flex items-center gap-1.5"><AlertTriangle size={13} /> Ajoutez des sources dans l'onglet Sources pour commencer</span>
               </p>
             )}
           </div>
@@ -1724,7 +1729,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </div>
                 <button
                   onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
-                  className="p-2 rounded-lg transition-all hover:bg-white/5 active:scale-95"
+                  className="p-2 rounded-lg transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ color: 'var(--text-muted)' }}
                   autoFocus
                 >
@@ -1751,7 +1756,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                     {!loadingSuggestions && (
                       <button
                         onClick={loadSuggestions}
-                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
+                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                         style={{ border: '1px solid var(--border-base)', color: 'var(--color-warning)' }}
                         title="Demander de nouvelles suggestions"
                       >
@@ -1876,7 +1881,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </p>
                 <button
                   onClick={() => { setShowReportModal(false); reportModalTriggerRef.current?.focus(); }}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5"
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -1922,7 +1927,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </div>
                 <button
                   onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
-                  className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                   style={{ color: 'var(--text-muted)' }}
                   autoFocus
                 >
@@ -1938,10 +1943,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
                   <div className="flex gap-2">
                     {([
-                      { key: 'portrait' as const, label: 'Portrait', icon: '📱' },
-                      { key: 'landscape' as const, label: 'Paysage', icon: '🖥️' },
-                      { key: 'square' as const, label: 'Carré', icon: '⬜' },
-                    ]).map(opt => (
+                      { key: 'portrait' as const, label: 'Portrait', icon: Smartphone },
+                      { key: 'landscape' as const, label: 'Paysage', icon: Monitor },
+                      { key: 'square' as const, label: 'Carré', icon: Square },
+                    ]).map(opt => {
+                      const OIcon = opt.icon;
+                      return (
                       <button
                         key={opt.key}
                         onClick={() => setInfraOrientation(opt.key)}
@@ -1952,10 +1959,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                           border: `1.5px solid ${infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
-                        <span className="text-lg">{opt.icon}</span>
+                        <span className="inline-flex items-center"><OIcon size={18} /></span>
                         {opt.label}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2087,7 +2095,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
               <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
                 <button
                   onClick={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
-                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-white/5"
+                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler

@@ -4,7 +4,12 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Loader2, X, RefreshCw, Tag } from 'lucide-react';
+import {
+  FileText, Loader2, X, RefreshCw, Tag,
+  FileType, FileCode, Globe, Youtube, Music, FileText as FileDoc,
+  Image as ImageIcon, Paperclip, Download, Bot,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 
@@ -26,10 +31,16 @@ interface Props {
   onClose: () => void;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
-  html: '🌍', youtube: '📺', audio: '🎵', docx: '📘', image: '🖼️',
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  pdf: FileType, text: FileText, markdown: FileCode, url: Globe,
+  html: Globe, youtube: Youtube, audio: Music, docx: FileDoc, image: ImageIcon,
 };
+
+function TypeIcon({ type, size = 20 }: { type: string; size?: number }) {
+  const Icon = TYPE_ICONS[type] || Paperclip;
+  const color = TYPE_COLORS[type] || 'var(--text-muted)';
+  return <Icon size={size} style={{ color }} />;
+}
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
@@ -87,8 +98,8 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
         className="flex items-center gap-3 px-5 py-4 border-b flex-shrink-0"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
       >
-        <span className="text-xl flex-shrink-0">
-          {TYPE_ICONS[source?.type || ''] || '📎'}
+        <span className="flex-shrink-0 inline-flex items-center">
+          <TypeIcon type={source?.type || ''} size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -137,7 +148,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   color: viewMode === 'visual' ? 'white' : 'var(--text-muted)',
                 }}
               >
-                🌍 Visuel
+                <span className="inline-flex items-center gap-1"><Globe size={12} /> Visuel</span>
               </button>
               <button
                 onClick={() => setViewMode('text')}
@@ -147,20 +158,20 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   color: viewMode === 'text' ? 'white' : 'var(--text-muted)',
                 }}
               >
-                📄 Texte
+                <span className="inline-flex items-center gap-1"><FileText size={12} /> Texte</span>
               </button>
             </div>
           )}
           <button
             onClick={fetchContent}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Recharger le contenu"
           >
             <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Fermer"
           >
             <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -236,15 +247,15 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   border: '1px solid var(--color-success)40',
                 }}
               >
-                📥 Télécharger l'image
+                <span className="inline-flex items-center gap-1.5"><Download size={13} /> Télécharger l'image</span>
               </button>
             </div>
 
             {/* AI description */}
             {content && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
-                  🤖 Description IA
+                <p className="text-xs font-semibold uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
+                  <Bot size={13} /> Description IA
                 </p>
                 <div
                   className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"

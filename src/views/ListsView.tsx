@@ -157,12 +157,12 @@ export default function ListsView() {
           <>
             <div className="hidden items-center gap-1.5 rounded-lg border px-3 py-2 sm:flex" style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}>
               <Layers3 className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{snippets.length} snippet{snippets.length > 1 ? 's' : ''}</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{snippets.length} snippet{snippets.length > 1 ? 's' : ''}</span>
             </div>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[10px] font-semibold shadow-sm transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition-opacity hover:opacity-90"
               style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -200,7 +200,7 @@ export default function ListsView() {
                   value={searchTerm}
                   onChange={event => setSearchTerm(event.target.value)}
                   placeholder="Rechercher un snippet..."
-                  className="w-full rounded-lg border py-2 pl-8 pr-3 text-[10px] outline-none transition-colors focus:border-[var(--accent-primary)]"
+                  className="w-full rounded-lg border py-2 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-primary)]"
                   style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                 />
               </div>
@@ -220,17 +220,17 @@ export default function ListsView() {
                   >
                     <div className="flex items-center gap-2">
                       <FileCode className="h-3.5 w-3.5 flex-shrink-0" style={{ color: selected?.name === snippet.name ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium">{snippet.name}</span>
-                      <span className="rounded-full px-1.5 py-0.5 text-[9px]" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{snippet.count}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{snippet.name}</span>
+                      <span className="rounded-full px-1.5 py-0.5 text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{snippet.count}</span>
                     </div>
-                    <div className="mt-1 flex items-center gap-1 pl-5 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                    <div className="mt-1 flex items-center gap-1 pl-5 text-xs" style={{ color: 'var(--text-muted)' }}>
                       <Clock3 className="h-2.5 w-2.5" />
                       {new Date(snippet.updatedAt).toLocaleDateString('fr-FR')}
                     </div>
                   </button>
                 ))}
                 {filteredSnippets.length === 0 && (
-                  <div className="rounded-xl border border-dashed px-3 py-6 text-center text-[10px]" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', borderColor: 'var(--border-base)' }}>
+                  <div className="rounded-xl border border-dashed px-3 py-6 text-center text-xs" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', borderColor: 'var(--border-base)' }}>
                     {snippets.length === 0 ? 'Aucun snippet trouvé. Crée ton premier snippet.' : 'Aucun résultat pour cette recherche.'}
                   </div>
                 )}
@@ -268,7 +268,7 @@ export default function ListsView() {
                     <FileCode className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                   <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Aucun snippet sélectionné</p>
-                  <p className="mt-1 max-w-xs text-[10px]" style={{ color: 'var(--text-muted)' }}>Choisis un élément dans la bibliothèque pour afficher son contenu ici.</p>
+                  <p className="mt-1 max-w-xs text-xs" style={{ color: 'var(--text-muted)' }}>Choisis un élément dans la bibliothèque pour afficher son contenu ici.</p>
                 </div>
               ) : (
                 <div className="space-y-4">

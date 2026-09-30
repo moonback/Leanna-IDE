@@ -19,11 +19,11 @@ import {
   BrainCircuit,
   LayoutList,
   FileText,
-  BookOpen,
+  NotebookPen,
   Menu,
   FolderOpen,
   BarChart2,
-  Activity,
+  Gauge,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -31,6 +31,7 @@ import { useTheme } from '../context/ThemeContext.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { SidebarSection, SidebarSeparator } from './ide/sidebar/SidebarSection.js';
 import { SidebarItem } from './ide/sidebar/SidebarItem.js';
+import { AgentsSidebarButton } from './ide/sidebar/AgentsSidebarButton.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
 // @ts-ignore - Assets handled by bundler
 import logoDark from '../../assets/images/icon-sombre.png';
@@ -504,8 +505,21 @@ function IDEToolsSections({
     return section.label || '';
   };
 
+  const showAgents = Boolean(stateRecord['showAgents']);
+  const onToggleAgents = actionsRecord['onToggleAgents'];
+
   return (
     <div className="w-full flex flex-col gap-0 pt-2">
+      {/* Agents — accès direct permanent (fonction phare), avec badge d'activité */}
+      {assistantConnected && onToggleAgents && (
+        <>
+          <div className="group relative w-full">
+            <AgentsSidebarButton active={showAgents} onClick={onToggleAgents} />
+            <div className="sidebar-tooltip">Agents · Missions · Flotte</div>
+          </div>
+          <SidebarSeparator thin className="sidebar-separator-medium-opacity my-0.5" />
+        </>
+      )}
       {sidebarSections.map((section, idx) => (
         <motion.div
           key={section.id}
@@ -587,9 +601,9 @@ function GlobalNavSection({
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },
     { id: 'documents', path: '/documents', icon: FileText, label: 'Documents', active: currentPath === '/documents', onClick: () => navigate('/documents') },
-    { id: 'notebooks', path: '/notebooks', icon: BookOpen, label: 'Notebooks', active: showNotebooks, onClick: onToggleNotebooks },
+    { id: 'notebooks', path: '/notebooks', icon: NotebookPen, label: 'Notebooks', active: showNotebooks, onClick: onToggleNotebooks },
     { id: 'observability', path: '/observability', icon: BarChart2, label: 'Coûts & Tokens', active: currentPath === '/observability', onClick: () => navigate('/observability') },
-    { id: 'autonomy', path: '/autonomy', icon: Activity, label: 'Autonomie', active: currentPath === '/autonomy', onClick: () => navigate('/autonomy') },
+    { id: 'autonomy', path: '/autonomy', icon: Gauge, label: 'Autonomie', active: currentPath === '/autonomy', onClick: () => navigate('/autonomy') },
   ];
 
   const anyActive = subItems.some(item =>

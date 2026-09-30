@@ -158,7 +158,7 @@ export function IconButton({
         >
           <span>{tooltip}</span>
           {shortcut && (
-            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono font-bold tracking-wider">
+            <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-active)] text-xs font-mono font-bold tracking-wider">
               {shortcut}
             </kbd>
           )}

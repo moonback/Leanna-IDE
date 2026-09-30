@@ -67,7 +67,7 @@ const SORT_LABELS: Record<string, string> = {
 
 const TRUST_CONFIG: Record<SecurityTrustLevel, { label: string; color: string; Icon: React.FC<any> }> = {
   verified:   { label: 'Certifié Leanna', color: 'var(--color-success)', Icon: ShieldCheck },
-  community:  { label: 'Communautaire',   color: '#3b82f6',              Icon: Shield },
+  community:  { label: 'Communautaire',   color: 'var(--color-info)',    Icon: Shield },
   unreviewed: { label: 'Non vérifié',     color: 'var(--text-dimmed)',   Icon: ShieldOff },
   flagged:    { label: 'Signalé',         color: 'var(--color-error)',   Icon: ShieldAlert },
 };
@@ -190,7 +190,7 @@ function PackageCard({ pkg, onSelect, onInstall, onUninstall, installing }: {
               {pkg.name}
             </span>
             {pkg.verified && <BadgeCheck size={11} style={{ color: 'var(--color-success)', flexShrink: 0 }} />}
-            {pkg.featured && <Flame size={11} style={{ color: '#f59e0b', flexShrink: 0 }} />}
+            {pkg.featured && <Flame size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />}
           </div>
 
           {/* Auteur + version + type */}
@@ -294,7 +294,7 @@ function PackageDetail({ pkg, onBack, onInstall, onUninstall, installing, onDown
       <div className="flex items-center gap-2 px-4 py-3 border-b flex-shrink-0"
         style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
         <button onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-white/8 transition-colors flex-shrink-0"
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0"
           style={{ color: 'var(--text-muted)' }}>
           <ArrowLeft size={15} />
         </button>
@@ -317,11 +317,11 @@ function PackageDetail({ pkg, onBack, onInstall, onUninstall, installing, onDown
         {/* Actions rapides */}
         <div className="flex items-center gap-1">
           <button onClick={() => onShare(pkg.id)} title="Copier le lien"
-            className="p-1.5 rounded-lg hover:bg-white/8" style={{ color: 'var(--text-dimmed)' }}>
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)]" style={{ color: 'var(--text-dimmed)' }}>
             <Share2 size={13} />
           </button>
           <button onClick={() => onDownload(pkg.id)} title="Télécharger JSON"
-            className="p-1.5 rounded-lg hover:bg-white/8" style={{ color: 'var(--text-dimmed)' }}>
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)]" style={{ color: 'var(--text-dimmed)' }}>
             <Download size={13} />
           </button>
           <button
@@ -540,7 +540,7 @@ function PackageDetail({ pkg, onBack, onInstall, onUninstall, installing, onDown
                     transition-all hover:scale-105 disabled:opacity-40"
                   style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}>
                   {submitting
-                    ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ? <span className="w-3 h-3 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
                     : <Send size={12} />}
                   Publier
                 </button>
@@ -756,7 +756,7 @@ function PublishForm({ onDone }: { onDone: () => void }) {
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl font-semibold
               hover:scale-105 disabled:opacity-40 transition-all"
             style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}>
-            {busy ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            {busy ? <span className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
               : <Upload size={14} />}
             Publier dans le Marketplace
           </button>
@@ -884,7 +884,7 @@ function PublishForm({ onDone }: { onDone: () => void }) {
           hover:scale-105 disabled:opacity-40 transition-all"
         style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}>
         {busy
-          ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ? <span className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
           : <Shield size={14} />}
         Analyser la sécurité
       </button>
@@ -1107,7 +1107,7 @@ export function MarketplacePanel({ onClose }: MarketplacePanelProps) {
               <div className="flex-1" />
               <button
                 onClick={() => { initMarketplaceStore(); toast.info('Actualisé'); }}
-                className="p-2.5 hover:bg-white/8 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}
+                className="p-2.5 hover:bg-[var(--bg-hover)] flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}
                 title="Actualiser (⟳)">
                 <RefreshCw size={11} className={state.loading ? 'animate-spin' : ''} />
               </button>
@@ -1257,13 +1257,13 @@ export function MarketplacePanel({ onClose }: MarketplacePanelProps) {
                     <div className="flex items-center justify-center gap-2 p-2 border-t flex-shrink-0"
                       style={{ borderColor: 'var(--border-base)' }}>
                       <button onClick={() => setPage(state.page - 1)} disabled={state.page <= 1}
-                        className="p-1 rounded hover:bg-white/8 disabled:opacity-30"
+                        className="p-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30"
                         style={{ color: 'var(--text-muted)' }}><ChevronLeft size={14} /></button>
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {state.page}/{state.totalPages}
                       </span>
                       <button onClick={() => setPage(state.page + 1)} disabled={state.page >= state.totalPages}
-                        className="p-1 rounded hover:bg-white/8 disabled:opacity-30"
+                        className="p-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30"
                         style={{ color: 'var(--text-muted)' }}><ChevronRight size={14} /></button>
                     </div>
                   )}

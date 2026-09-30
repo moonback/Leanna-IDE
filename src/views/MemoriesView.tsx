@@ -66,11 +66,11 @@ export default function MemoriesView() {
         description="Les informations importantes retenues par Leanna"
         actions={
           <>
-            <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{memories.length} {memories.length === 1 ? 'entrée' : 'entrées'}</span>
+            <span className="hidden text-xs sm:inline" style={{ color: 'var(--text-muted)' }}>{memories.length} {memories.length === 1 ? 'entrée' : 'entrées'}</span>
             <button
               type="button"
               onClick={load}
-              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              className="rounded-lg p-2 transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Rafraîchir les souvenirs"
             >

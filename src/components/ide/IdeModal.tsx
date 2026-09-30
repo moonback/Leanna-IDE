@@ -83,7 +83,7 @@ export function IdeModal({ mode, onConfirm, onCancel }: IdeModalProps) {
             {headerIcon()}
             <span className="text-sm font-semibold">{headerTitle()}</span>
           </div>
-          <button onClick={onCancel} className="rounded-md p-1 transition hover:bg-white/10" aria-label="Fermer">
+          <button onClick={onCancel} className="rounded-md p-1 transition hover:bg-[var(--bg-active)]" aria-label="Fermer">
             <X size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
@@ -104,7 +104,7 @@ export function IdeModal({ mode, onConfirm, onCancel }: IdeModalProps) {
               <p className="mt-2 text-xs text-red-400">Cette action est irréversible.</p>
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" onClick={onCancel}
-                  className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-white/10"
+                  className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-[var(--bg-active)]"
                   style={{ borderColor: 'var(--border-base)' }}>
                   Annuler
                 </button>
@@ -148,7 +148,7 @@ export function IdeModal({ mode, onConfirm, onCancel }: IdeModalProps) {
               />
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" onClick={onCancel}
-                  className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-white/10"
+                  className="rounded-lg border px-3 py-1.5 text-sm transition hover:bg-[var(--bg-active)]"
                   style={{ borderColor: 'var(--border-base)' }}>
                   Annuler
                 </button>

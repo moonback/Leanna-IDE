@@ -98,7 +98,7 @@ export function ImagePreview({ filePath }: Props) {
         </p>
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-white/5"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
         >
           <Download className="w-3 h-3" />

@@ -171,7 +171,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
           Recherche
         </span>
-        <button onClick={onClose} className="rounded p-1 hover:bg-white/10">
+        <button onClick={onClose} className="rounded p-1 hover:bg-[var(--bg-active)]">
           <X size={13} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
@@ -196,7 +196,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
             style={{ color: 'var(--text-primary)' }}
           />
           {query && (
-            <button onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-white/10">
+            <button onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-[var(--bg-active)]">
               <X size={11} style={{ color: 'var(--text-muted)' }} />
             </button>
           )}
@@ -207,7 +207,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
               content="Respecter la casse"
               as="button"
               onClick={() => setCaseSensitive(v => !v)}
-              className={`rounded p-1 text-xs transition ${caseSensitive ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-white/10'}`}
+              className={`rounded p-1 text-xs transition ${caseSensitive ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-[var(--bg-active)]'}`}
               style={{ color: caseSensitive ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
               <CaseSensitive size={12} />
@@ -216,7 +216,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
               content="Expression régulière"
               as="button"
               onClick={() => setUseRegex(v => !v)}
-              className={`rounded p-1 text-xs transition ${useRegex ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-white/10'}`}
+              className={`rounded p-1 text-xs transition ${useRegex ? 'bg-[var(--accent-primary)]/30' : 'hover:bg-[var(--bg-active)]'}`}
               style={{ color: useRegex ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
               <Regex size={12} />
@@ -241,7 +241,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
           <div key={group.file}>
             {/* File header */}
             <button
-              className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-white/10"
+              className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-[var(--bg-active)]"
               onClick={() => toggleGroup(group.file)}
             >
               {group.expanded
@@ -264,7 +264,7 @@ export function GlobalSearch({ onOpenFile, onClose }: GlobalSearchProps) {
             {group.expanded && group.matches.map((match, mi) => (
               <button
                 key={mi}
-                className="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-white/10"
+                className="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-[var(--bg-active)]"
                 style={{ paddingLeft: '28px' }}
                 onClick={() => onOpenFile(match.file, match.line, match.column)}
               >

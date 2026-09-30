@@ -156,7 +156,7 @@ export function TemplateSelectorModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-white/10 text-[var(--text-muted)] hover:text-white transition-colors"
+              className="p-2 rounded-lg hover:bg-[var(--bg-active)] text-[var(--text-muted)] hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -188,7 +188,7 @@ export function TemplateSelectorModal({
                     className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all ${
                       selectedCategory === cat
                         ? 'bg-[var(--accent-primary)] text-white'
-                        : 'bg-white/5 hover:bg-white/10 text-[var(--text-muted)]'
+                        : 'bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] text-[var(--text-muted)]'
                     }`}
                   >
                     {cat}
@@ -208,7 +208,7 @@ export function TemplateSelectorModal({
                       className={`w-full text-left p-3 rounded-xl border transition-all flex flex-col gap-1.5 ${
                         isActive
                           ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)]/40 shadow-sm'
-                          : 'border-[var(--border-base)] bg-white/5 hover:bg-white/10'
+                          : 'border-[var(--border-base)] bg-[var(--bg-hover)] hover:bg-[var(--bg-active)]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -216,7 +216,7 @@ export function TemplateSelectorModal({
                           <IconComp className="w-4 h-4 text-[var(--accent-primary)]" />
                           <span className="text-xs font-semibold text-[var(--text-primary)]">{template.title}</span>
                         </div>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] font-mono">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-active)] text-[var(--text-muted)] font-mono">
                           {template.badge}
                         </span>
                       </div>
@@ -239,7 +239,7 @@ export function TemplateSelectorModal({
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === 'variables'
                         ? 'bg-[var(--accent-primary)] text-white'
-                        : 'bg-white/5 text-[var(--text-muted)] hover:bg-white/10'
+                        : 'bg-[var(--bg-hover)] text-[var(--text-muted)] hover:bg-[var(--bg-active)]'
                     }`}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -250,7 +250,7 @@ export function TemplateSelectorModal({
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === 'preview'
                         ? 'bg-[var(--accent-primary)] text-white'
-                        : 'bg-white/5 text-[var(--text-muted)] hover:bg-white/10'
+                        : 'bg-[var(--bg-hover)] text-[var(--text-muted)] hover:bg-[var(--bg-active)]'
                     }`}
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -261,7 +261,7 @@ export function TemplateSelectorModal({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleCopy}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 border text-[var(--text-primary)] transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] border text-[var(--text-primary)] transition-all"
                     style={{ borderColor: 'var(--border-base)' }}
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -269,7 +269,7 @@ export function TemplateSelectorModal({
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 border text-[var(--text-primary)] transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] border text-[var(--text-primary)] transition-all"
                     style={{ borderColor: 'var(--border-base)' }}
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -316,7 +316,7 @@ export function TemplateSelectorModal({
                 <div className="flex items-center gap-3">
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:bg-white/5 transition-all"
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all"
                   >
                     Annuler
                   </button>

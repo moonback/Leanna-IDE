@@ -99,7 +99,7 @@ function CountBadge({ value, color }: { value: number; color: string }) {
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.6, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-      className="min-w-[15px] h-[15px] flex items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none px-1"
+      className="min-w-[15px] h-[15px] flex items-center justify-center rounded-full text-xs font-bold tabular-nums leading-none px-1"
       style={{ backgroundColor: color, color: 'var(--bg-base)', boxShadow: `0 0 8px ${color}` }}
     >
       {value > 99 ? '99+' : value}
@@ -158,7 +158,7 @@ function ToolsMenuRow({ item }: { item: ToolsMenuItem }) {
             {label}
           </div>
           {description && (
-            <div className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
               {description}
             </div>
           )}
@@ -837,24 +837,8 @@ export const StatusBar = memo(function StatusBar({
 
           <Divider />
 
-          {/* AI Model — compact, clickable */}
-          <button
-            type="button"
-            onClick={() => onToggleModelPicker?.()}
-            className={PILL}
-            style={{ color: 'var(--text-secondary)' }}
-            title="Changer de modèle IA"
-          >
-            <BrainCircuit size={13} style={{ color: 'var(--accent-primary)' }} />
-            <span className="truncate max-w-[110px]">
-              {profile.textProvider === 'openrouter'
-                ? profile.openrouterModel.split('/').pop()
-                : 'Gemini Live'}
-            </span>
-          </button>
-
-          
-
+          {/* MCP status — état de connexion des serveurs MCP (reste à gauche
+              car c'est un indicateur d'état, pas une action). */}
           <button
             type="button"
             onClick={onToggleMcp}
@@ -936,6 +920,23 @@ export const StatusBar = memo(function StatusBar({
 
           <Divider />
 
+          {/* AI Model — déplacé à droite (avec les tokens) : ce sont les deux
+              informations "sortie IA" que l'utilisateur consulte le plus. */}
+          <button
+            type="button"
+            onClick={() => onToggleModelPicker?.()}
+            className={PILL}
+            style={{ color: 'var(--text-secondary)' }}
+            title="Changer de modèle IA"
+          >
+            <BrainCircuit size={13} style={{ color: 'var(--accent-primary)' }} />
+            <span className="truncate max-w-[110px]">
+              {profile.textProvider === 'openrouter'
+                ? profile.openrouterModel.split('/').pop()
+                : 'Gemini Live'}
+            </span>
+          </button>
+
           {/* Tokens — clickable */}
           <button
             type="button"
@@ -982,7 +983,7 @@ export const StatusBar = memo(function StatusBar({
           <button
             type="button"
             onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))}
-            className="flex items-center gap-1 px-2 h-[22px] rounded-md font-mono text-[11px] leading-none transition-all duration-200 hover:bg-[var(--accent-subtle)] active:scale-95"
+            className="flex items-center gap-1 px-2 h-[22px] rounded-md font-mono text-xs leading-none transition-all duration-200 hover:bg-[var(--accent-subtle)] active:scale-95"
             style={{ color: 'var(--text-dimmed)' }}
             title="Palette de commandes"
           >
@@ -1100,7 +1101,7 @@ export const StatusBar = memo(function StatusBar({
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden space-y-1.5"
                   >
-                    <div className="flex items-center justify-between text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                    <div className="flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                       <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
                         <LoaderCircle size={11} className="animate-spin" />
                         {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}

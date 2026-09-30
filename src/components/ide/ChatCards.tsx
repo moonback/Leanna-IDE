@@ -62,7 +62,7 @@ export function FileCard({ path, action, linesAdded, linesRemoved, onClick }: Fi
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
       className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-left group
-                 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
+                 hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
       style={cardStyles}
     >
       <FileText
@@ -131,7 +131,7 @@ export function CommandCard({ command, output, exitCode, onCopy }: CommandCardPr
     >
       <div
         className="flex items-center gap-3 px-4 py-2.5 cursor-pointer
-                   hover:bg-white/5 transition-colors"
+                   hover:bg-[var(--bg-hover)] transition-colors"
         style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
         onClick={() => output && setExpanded((v) => !v)}
       >
@@ -160,8 +160,8 @@ export function CommandCard({ command, output, exitCode, onCopy }: CommandCardPr
                 e.stopPropagation();
                 onCopy();
               }}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors
-                         focus:outline-none focus:ring-1 focus:ring-white/20"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors
+                         focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
               aria-label="Copier la commande"
             >
               <Copy size={12} style={{ color: textStyles.muted }} />
@@ -260,7 +260,7 @@ export function DiffCard({ filePath, additions, deletions, onAccept, onReject, o
             <button
               onClick={onView}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                         hover:bg-white/8 transition-colors focus:outline-none focus:ring-1 focus:ring-white/20"
+                         hover:bg-[var(--bg-hover)] transition-colors focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]"
               style={{ color: textStyles.accent }}
             >
               <Eye size={12} />
@@ -357,7 +357,7 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
     >
       <div
         className="flex items-center gap-3 px-4 py-2.5 cursor-pointer
-                   hover:bg-white/5 transition-colors"
+                   hover:bg-[var(--bg-hover)] transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
         <GitBranch size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
@@ -400,7 +400,7 @@ export function ChangesSummary({ files, onAcceptAll, onRejectAll, onViewFile }: 
             return (
               <div
                 key={f.path}
-                className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 transition-colors
+                className="flex items-center gap-3 px-4 py-2 hover:bg-[var(--bg-hover)] transition-colors
                            cursor-pointer border-b last:border-0"
                 style={{ borderColor: 'var(--border-base)' }}
                 onClick={() => onViewFile?.(f.path)}

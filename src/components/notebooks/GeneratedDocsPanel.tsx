@@ -291,7 +291,7 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedDoc(null)}
-                className="text-xs px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-full hover:bg-[var(--bg-hover)] transition-colors"
                 style={{ color: 'var(--text-muted)' }}
               >
                 ← Retour

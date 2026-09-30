@@ -233,7 +233,7 @@ export function SelfRootSection() {
                         </span>
                         {isActive && (
                           <span
-                            className="text-[10px] font-bold px-1.5 py-0.2 rounded"
+                            className="text-xs font-bold px-1.5 py-0.2 rounded"
                             style={{
                               backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
                               color: 'var(--color-success)',
@@ -244,7 +244,7 @@ export function SelfRootSection() {
                         )}
                         {ws.isGit && (
                           <span
-                            className="flex items-center gap-1 text-[10px] font-mono px-1 rounded"
+                            className="flex items-center gap-1 text-xs font-mono px-1 rounded"
                             style={{
                               backgroundColor: 'var(--bg-panel)',
                               border: '1px solid var(--border-base)',
@@ -256,7 +256,7 @@ export function SelfRootSection() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
+                      <p className="text-xs font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
                         {ws.path}
                       </p>
                     </div>
@@ -391,7 +391,7 @@ export function SelfRootSection() {
               </span>
               <button
                 onClick={fetchStatus}
-                className="flex items-center gap-1 text-[11px] font-medium transition-colors hover:opacity-80"
+                className="flex items-center gap-1 text-xs font-medium transition-colors hover:opacity-80"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
@@ -428,7 +428,7 @@ export function SelfRootSection() {
             <Lock className="w-3.5 h-3.5 text-blue-400" />
             Garde-fous de sécurité actifs
           </div>
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             • <strong>Isolation Sandbox</strong> : validation tsc et isolation totale avant application.<br />
             • <strong>Protection critique</strong> : confirmation obligatoire pour <code>server.ts</code>, <code>.env</code>, etc.<br />
             • <strong>Symlink Guard</strong> : blocage automatique de toute tentative de sortie de périmètre.
@@ -472,11 +472,11 @@ export function SelfRootSection() {
 
               <div className="rounded-xl p-3 mb-4 space-y-2 border text-xs" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-base)' }}>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-muted block">Projet actuel :</span>
+                  <span className="text-xs uppercase font-bold text-muted block">Projet actuel :</span>
                   <span className="font-mono text-dimmed break-all">{status?.rootPath || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-primary block">Nouveau projet :</span>
+                  <span className="text-xs uppercase font-bold text-primary block">Nouveau projet :</span>
                   <span className="font-mono font-bold text-primary break-all">{pendingPath}</span>
                 </div>
               </div>

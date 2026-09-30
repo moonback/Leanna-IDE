@@ -352,7 +352,7 @@ export function TokenDetailModal({ onClose, docked = false }: TokenDetailModalPr
             <button
               type="button"
               onClick={onClose}
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10 flex-shrink-0"
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)] flex-shrink-0"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Fermer"
             >

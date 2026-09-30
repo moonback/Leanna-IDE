@@ -42,7 +42,7 @@ export function MentionDropdown({ suggestions, selectedIndex, onSelect, onHover,
     >
       {/* Header */}
       <div
-        className="sticky top-0 z-10 px-3 py-2 text-[10px] uppercase font-semibold tracking-widest flex items-center gap-1.5"
+        className="sticky top-0 z-10 px-3 py-2 text-xs uppercase font-semibold tracking-widest flex items-center gap-1.5"
         style={{
           color: 'var(--text-dimmed)',
           borderBottom: '1px solid var(--border-base)',
@@ -91,12 +91,12 @@ export function MentionDropdown({ suggestions, selectedIndex, onSelect, onHover,
               <span className="text-xs font-medium block truncate" style={{ color: 'var(--text-primary)' }}>
                 <HighlightMatch text={item.name} query={query} />
               </span>
-              <span className="text-[11px] block truncate font-mono" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs block truncate font-mono" style={{ color: 'var(--text-dimmed)' }}>
                 {item.path}
               </span>
             </div>
             <span
-              className="text-[9px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0"
+              className="text-xs uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0"
               style={{
                 backgroundColor: isDir
                   ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)'

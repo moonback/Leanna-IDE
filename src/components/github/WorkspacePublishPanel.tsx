@@ -68,11 +68,11 @@ export function WorkspacePublishPanel({ onPublished }: { onPublished: () => void
             <UploadCloud size={16} style={{ color: 'var(--accent-primary)' }} />
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Publier le workspace réel</h2>
           </div>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
             {status?.branch ? `Branche ${status.branch}` : 'Vérification du dépôt…'}
           </p>
         </div>
-        <button onClick={loadStatus} disabled={loading} className="rounded-lg p-2 hover:bg-white/10 disabled:opacity-50" title="Actualiser le statut" aria-label="Actualiser le statut">
+        <button onClick={loadStatus} disabled={loading} className="rounded-lg p-2 hover:bg-[var(--bg-active)] disabled:opacity-50" title="Actualiser le statut" aria-label="Actualiser le statut">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
@@ -80,7 +80,7 @@ export function WorkspacePublishPanel({ onPublished }: { onPublished: () => void
       {status && !status.clean && (
         <div className="mt-3 grid gap-1 max-h-28 overflow-y-auto custom-scrollbar">
           {status.files.map((file) => (
-            <div key={`${file.index}${file.worktree}${file.path}`} className="flex items-center gap-2 rounded-md px-2 py-1 text-[10px] font-mono" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
+            <div key={`${file.index}${file.worktree}${file.path}`} className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-mono" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
               <span className="w-5 font-bold" style={{ color: file.worktree === 'D' ? '#f85149' : 'var(--accent-primary)' }}>{file.index}{file.worktree}</span>
               <span className="truncate" style={{ color: 'var(--text-muted)' }}>{file.path}</span>
             </div>
@@ -88,7 +88,7 @@ export function WorkspacePublishPanel({ onPublished }: { onPublished: () => void
         </div>
       )}
 
-      {status?.clean && <div className="mt-3 flex items-center gap-2 text-[11px]" style={{ color: '#3fb950' }}><CheckCircle2 size={14} /> Workspace propre</div>}
+      {status?.clean && <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: '#3fb950' }}><CheckCircle2 size={14} /> Workspace propre</div>}
 
       {!status?.clean && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -103,8 +103,8 @@ export function WorkspacePublishPanel({ onPublished }: { onPublished: () => void
         {publishing === 'push' ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Push vers GitHub
       </button>
 
-      {notice && <p className="mt-2 text-[11px]" style={{ color: '#3fb950' }}>{notice}</p>}
-      {error && <p className="mt-2 text-[11px]" style={{ color: '#f87171' }}>{error}</p>}
+      {notice && <p className="mt-2 text-xs" style={{ color: '#3fb950' }}>{notice}</p>}
+      {error && <p className="mt-2 text-xs" style={{ color: '#f87171' }}>{error}</p>}
     </section>
   );
 }

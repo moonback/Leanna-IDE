@@ -145,7 +145,7 @@ export function ActivityFeed({ steps, connected }: ActivityFeedProps) {
     <div className="flex flex-col overflow-hidden flex-shrink-0" style={{ borderTop: '1px solid var(--border-base)' }}>
       {/* Header */}
       <button
-        className="flex items-center gap-2 px-3 py-2 w-full text-left select-none hover:bg-white/5 transition"
+        className="flex items-center gap-2 px-3 py-2 w-full text-left select-none hover:bg-[var(--bg-hover)] transition"
         onClick={() => setExpanded(v => !v)}
         aria-expanded={expanded}
         aria-label={expanded ? 'Masquer l\'activité' : 'Afficher l\'activité'}
@@ -198,7 +198,7 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
     <motion.div
       initial={{ opacity: 0, x: -4 }}
       animate={{ opacity: 1, x: 0 }}
-      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 transition group"
+      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-hover)] transition group"
     >
       <div
         className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"

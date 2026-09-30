@@ -87,7 +87,7 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
         as="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={!connected || uploading}
-        className="p-1.5 rounded-lg transition-all disabled:opacity-30 hover:bg-white/10"
+        className="p-1.5 rounded-lg transition-all disabled:opacity-30 hover:bg-[var(--bg-active)]"
       >
         {uploading ? (
           <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
@@ -147,7 +147,7 @@ export function DocumentUpload({ connected, onDocumentAnalyzed }: DocumentUpload
                 </span>
                 <button
                   onClick={() => setShowResult(false)}
-                  className="p-0.5 rounded hover:bg-white/10 transition"
+                  className="p-0.5 rounded hover:bg-[var(--bg-active)] transition"
                 >
                   <X size={11} style={{ color: 'var(--text-muted)' }} />
                 </button>

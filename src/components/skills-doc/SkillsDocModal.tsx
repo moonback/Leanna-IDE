@@ -56,7 +56,7 @@ export function SkillsDocModal({ isOpen, onClose, initialToolName }: SkillsDocMo
                 <div>
                   <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     Documentation interactive des Skills & Outils
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       Auto-générée
                     </span>
                   </h2>
@@ -69,7 +69,7 @@ export function SkillsDocModal({ isOpen, onClose, initialToolName }: SkillsDocMo
               <div className="flex items-center gap-2">
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-xl border hover:bg-white/5 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl border hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Fermer (Échap)"
                 >

@@ -609,7 +609,7 @@ export function GitHubRepositoryImportModal({
                   <h2 id="github-modal-title" className="text-base font-semibold text-[var(--text-primary)]">
                     Importer un dépôt GitHub
                   </h2>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                     Sources & Codebase
                   </span>
                 </div>
@@ -638,7 +638,7 @@ export function GitHubRepositoryImportModal({
                     <ShieldCheck size={14} />
                   )}
                   <span className="font-medium">@{githubUser.login}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
+                  <span className="text-xs px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
                     Privé & Public
                   </span>
                 </button>
@@ -655,7 +655,7 @@ export function GitHubRepositoryImportModal({
 
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 title="Fermer"
               >
                 <X size={18} />
@@ -681,7 +681,7 @@ export function GitHubRepositoryImportModal({
                     <FolderGit2 size={13} />
                     <span>Mes Projets</span>
                     {myRepos.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">
+                      <span className="text-xs px-1.5 py-0.2 rounded-full bg-[var(--bg-active)]">
                         {myRepos.length}
                       </span>
                     )}
@@ -739,13 +739,13 @@ export function GitHubRepositoryImportModal({
 
                     {/* Visibilité filter chips */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[11px]">
+                      <div className="flex items-center gap-1.5 text-xs">
                         <button
                           onClick={() => setMyReposFilter('all')}
                           className={`px-2 py-0.5 rounded-md border transition-colors ${
                             myReposFilter === 'all'
-                              ? 'bg-white/10 text-[var(--text-primary)] border-white/20'
-                              : 'text-[var(--text-muted)] border-transparent hover:bg-white/5'
+                              ? 'bg-[var(--bg-active)] text-[var(--text-primary)] border-[var(--border-strong)]'
+                              : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-hover)]'
                           }`}
                         >
                           Tous ({myRepos.length})
@@ -755,7 +755,7 @@ export function GitHubRepositoryImportModal({
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors ${
                             myReposFilter === 'private'
                               ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                              : 'text-[var(--text-muted)] border-transparent hover:bg-white/5'
+                              : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-hover)]'
                           }`}
                         >
                           <Lock size={10} />
@@ -766,7 +766,7 @@ export function GitHubRepositoryImportModal({
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors ${
                             myReposFilter === 'public'
                               ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                              : 'text-[var(--text-muted)] border-transparent hover:bg-white/5'
+                              : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-hover)]'
                           }`}
                         >
                           <Globe size={10} />
@@ -777,7 +777,7 @@ export function GitHubRepositoryImportModal({
                       <button
                         onClick={loadMyRepos}
                         disabled={myReposLoading}
-                        className="p-1 rounded hover:bg-white/5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         title="Actualiser la liste"
                       >
                         <RefreshCw size={12} className={myReposLoading ? 'animate-spin' : ''} />
@@ -833,12 +833,12 @@ export function GitHubRepositoryImportModal({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 mb-1">
                                   {repo.private ? (
-                                    <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 flex-shrink-0">
+                                    <span className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 flex-shrink-0">
                                       <Lock size={9} />
                                       Privé
                                     </span>
                                   ) : (
-                                    <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25 flex-shrink-0">
+                                    <span className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25 flex-shrink-0">
                                       <Globe size={9} />
                                       Public
                                     </span>
@@ -848,11 +848,11 @@ export function GitHubRepositoryImportModal({
                                   </h3>
                                 </div>
 
-                                <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 mb-2">
+                                <p className="text-xs text-[var(--text-muted)] line-clamp-1 mb-2">
                                   {repo.description || 'Aucune description'}
                                 </p>
 
-                                <div className="flex items-center gap-3 text-[10px] text-[var(--text-dimmed)]">
+                                <div className="flex items-center gap-3 text-xs text-[var(--text-dimmed)]">
                                   <div className="flex items-center gap-1">
                                     <span
                                       className="w-2 h-2 rounded-full"
@@ -909,7 +909,7 @@ export function GitHubRepositoryImportModal({
                     </div>
 
                     {searchError && (
-                      <p className="mt-2 text-[11px] text-red-400 flex items-center gap-1.5">
+                      <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
                         <AlertCircle size={12} />
                         {searchError}
                       </p>
@@ -948,10 +948,10 @@ export function GitHubRepositoryImportModal({
                               <h3 className="font-semibold text-xs text-[var(--text-primary)] truncate mb-1">
                                 {repo.full_name}
                               </h3>
-                              <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 mb-2">
+                              <p className="text-xs text-[var(--text-muted)] line-clamp-1 mb-2">
                                 {repo.description || 'Aucune description'}
                               </p>
-                              <div className="flex items-center gap-3 text-[10px] text-[var(--text-dimmed)]">
+                              <div className="flex items-center gap-3 text-xs text-[var(--text-dimmed)]">
                                 <span className="flex items-center gap-1">
                                   <span
                                     className="w-2 h-2 rounded-full"
@@ -990,7 +990,7 @@ export function GitHubRepositoryImportModal({
                       <label className="text-xs font-semibold text-[var(--text-primary)] block mb-1.5">
                         URL du dépôt ou identifiant direct
                       </label>
-                      <p className="text-[11px] text-[var(--text-muted)] mb-3">
+                      <p className="text-xs text-[var(--text-muted)] mb-3">
                         Entrez l'URL complète ou la notation <code className="px-1 py-0.5 rounded bg-[var(--bg-input)]">owner/repo</code>. Fonctionne avec les dépôts <strong>publics et privés</strong>.
                       </p>
                       <div className="flex gap-2">
@@ -1028,7 +1028,7 @@ export function GitHubRepositoryImportModal({
                         <Lock size={13} className="text-amber-400" />
                         <span>Dépôts privés pris en charge</span>
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                         Si le dépôt est privé, Jarvis utilise votre token GitHub configuré avec le scope <code>repo</code> pour analyser l'arborescence et récupérer les fichiers en toute sécurité.
                       </p>
                     </div>
@@ -1053,13 +1053,13 @@ export function GitHubRepositoryImportModal({
                   <div className="grid grid-cols-2 gap-3 max-w-md w-full text-left text-xs">
                     <div className="p-3 rounded-xl bg-[var(--bg-base)] border border-[var(--border-base)]">
                       <span className="font-semibold block text-[var(--text-primary)] mb-1">🔒 Dépôts Privés</span>
-                      <span className="text-[11px] text-[var(--text-muted)]">
+                      <span className="text-xs text-[var(--text-muted)]">
                         Accès authentifié à votre code propriétaire via votre token personnel.
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-[var(--bg-base)] border border-[var(--border-base)]">
                       <span className="font-semibold block text-[var(--text-primary)] mb-1">⚡ Ingestion IA</span>
-                      <span className="text-[11px] text-[var(--text-muted)]">
+                      <span className="text-xs text-[var(--text-muted)]">
                         Indexation vectorielle et citations précises dans le Notebook sélectionné.
                       </span>
                     </div>
@@ -1076,12 +1076,12 @@ export function GitHubRepositoryImportModal({
                             {selectedRepo.full_name}
                           </h3>
                           {selectedRepo.private ? (
-                            <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
                               <Lock size={10} />
                               Dépôt Privé
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
                               <Globe size={10} />
                               Dépôt Public
                             </span>
@@ -1184,7 +1184,7 @@ export function GitHubRepositoryImportModal({
                             <button
                               key={preset.name}
                               onClick={() => setFileExtensions(preset.extensions)}
-                              className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                              className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
                                 isActive
                                   ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-sm'
                                   : 'bg-[var(--bg-input)] border-[var(--border-input)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -1282,7 +1282,7 @@ export function GitHubRepositoryImportModal({
                         <span className="flex-1">{ingestionError}</span>
                         <button
                           onClick={() => setIngestionError(null)}
-                          className="text-[10px] underline hover:opacity-80"
+                          className="text-xs underline hover:opacity-80"
                         >
                           Fermer
                         </button>
@@ -1298,7 +1298,7 @@ export function GitHubRepositoryImportModal({
                         <button
                           onClick={onClose}
                           disabled={ingesting}
-                          className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors"
+                          className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           Annuler
                         </button>

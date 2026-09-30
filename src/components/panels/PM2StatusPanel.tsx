@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Server, Cpu, MemoryStick, Clock, RefreshCw, Loader2, AlertCircle,
   Play, Square, Repeat, Trash2, FileText, ChevronDown, ChevronRight,
-  HardDrive, Power, Boxes,
+  HardDrive, Power, Boxes, X,
 } from 'lucide-react';
 import { pm2Api, type Pm2AppStatus, type Pm2StatusResponse } from '../../services/pm2Api.js';
 
@@ -183,7 +183,7 @@ export function PM2StatusPanel({ onClose }: PM2StatusPanelProps) {
         <div className="flex items-center gap-1">
           <button
             onClick={loadStatus}
-            className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
             title="Rafraîchir"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} style={{ color: 'var(--text-muted)' }} />
@@ -240,10 +240,10 @@ export function PM2StatusPanel({ onClose }: PM2StatusPanelProps) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/5 transition flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <X size={14} style={{ color: 'var(--text-dimmed)' }} />
             </button>
           )}
         </div>
@@ -437,7 +437,7 @@ function MiniStat({
     >
       <div className="flex items-center gap-1.5">
         <span style={{ color, display: 'flex' }}>{icon}</span>
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
           {label}
         </span>
       </div>
@@ -478,7 +478,7 @@ function AppCard({
     >
       <button
         onClick={onToggle}
-        className="w-full px-3 py-2.5 text-left flex items-start gap-2 hover:bg-white/5 transition"
+        className="w-full px-3 py-2.5 text-left flex items-start gap-2 hover:bg-[var(--bg-hover)] transition"
       >
         <span className="mt-0.5" style={{ color: 'var(--text-muted)' }}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -489,17 +489,17 @@ function AppCard({
               {app.name}
             </span>
             <span
-              className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider"
+              className="px-2 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider"
               style={{ backgroundColor: `color-mix(in srgb, ${col} 12%, transparent)`, color: col, border: `1px solid color-mix(in srgb, ${col} 20%, transparent)` }}
             >
               {app.status}
             </span>
             {app.mode && (
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono" style={{ backgroundColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              <span className="px-2 py-0.5 rounded-lg text-xs font-mono" style={{ backgroundColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
                 {app.mode}
               </span>
             )}
-            <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
               #{app.id} · {app.instances} × worker
             </span>
           </div>
@@ -578,7 +578,7 @@ function AppCard({
           <FileText size={12} />
           {expanded ? 'Masquer logs' : 'Voir logs'}
         </button>
-        <div className="ml-auto text-[10px] font-mono text-right" style={{ color: 'var(--text-dimmed)' }}>
+        <div className="ml-auto text-xs font-mono text-right" style={{ color: 'var(--text-dimmed)' }}>
           {app.nodeVersion && <div>Node {app.nodeVersion}</div>}
           {app.pid ? <div>PID {app.pid}</div> : null}
         </div>
@@ -599,7 +599,7 @@ function AppCard({
             </div>
             <button
               onClick={onRefreshLogs}
-              className="h-6 px-2 rounded-md text-[10px] font-semibold flex items-center gap-1"
+              className="h-6 px-2 rounded-md text-xs font-semibold flex items-center gap-1"
               style={{
                 backgroundColor: 'var(--border-base)',
                 color: 'var(--text-primary)',
@@ -631,7 +631,7 @@ function AppCard({
 
           {logsState && logsState.entries.length > 0 && (
             <pre
-              className="text-[11px] leading-relaxed font-mono max-h-72 overflow-auto custom-scrollbar p-2 rounded-lg whitespace-pre-wrap break-words"
+              className="text-xs leading-relaxed font-mono max-h-72 overflow-auto custom-scrollbar p-2 rounded-lg whitespace-pre-wrap break-words"
               style={{ backgroundColor: 'color-mix(in srgb, var(--bg-primary) 80%, transparent)', color: 'var(--text-muted)' }}
             >
               {logsState.entries.join('\n')}
@@ -639,13 +639,13 @@ function AppCard({
           )}
 
           {app.execPath && (
-            <div className="mt-2 flex items-start gap-2 text-[10px] font-mono">
+            <div className="mt-2 flex items-start gap-2 text-xs font-mono">
               <span style={{ color: 'var(--text-dimmed)' }}>entry:</span>
               <span className="truncate" style={{ color: 'var(--text-muted)' }}>{app.execPath}</span>
             </div>
           )}
           {app.cwd && (
-            <div className="flex items-start gap-2 text-[10px] font-mono">
+            <div className="flex items-start gap-2 text-xs font-mono">
               <span style={{ color: 'var(--text-dimmed)' }}>cwd:</span>
               <span className="truncate" style={{ color: 'var(--text-muted)' }}>{app.cwd}</span>
             </div>
@@ -668,7 +668,7 @@ function MetricRow({
     <div className="flex items-center justify-between gap-1">
       <div className="flex items-center gap-1 min-w-0">
         <span style={{ color: 'var(--text-dimmed)', display: 'flex' }}>{icon}</span>
-        <span className="text-[10px] uppercase tracking-wider font-bold truncate" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs uppercase tracking-wider font-bold truncate" style={{ color: 'var(--text-dimmed)' }}>
           {label}
         </span>
       </div>

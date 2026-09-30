@@ -311,31 +311,31 @@ export function HierarchicalMemorySection() {
                   <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
                     Court-terme
                   </h3>
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
                     RAM Volatile (Session)
                   </span>
                 </div>
               </div>
               <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
+                className="rounded-full px-2 py-0.5 text-xs font-mono font-bold"
                 style={{ backgroundColor: TIER_COLORS.session.bg, color: TIER_COLORS.session.text }}
               >
                 {stats?.session.count ?? 0}
               </span>
             </div>
 
-            <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               Éphémère et ultra-rapide. Retient les faits récents, le scratchpad et le contexte de conversation avec éviction LRU et TTL.
             </p>
 
             <div className="mt-4 pt-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                 Capacité : {stats?.session.capacity ?? 500} max
               </span>
               <button
                 type="button"
                 onClick={() => handleClearTier('session')}
-                className="text-[10px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+                className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
               >
                 <Trash2 className="h-3 w-3" /> Vider
               </button>
@@ -362,31 +362,31 @@ export function HierarchicalMemorySection() {
                   <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
                     Moyen-terme
                   </h3>
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
                     .project-memory.json
                   </span>
                 </div>
               </div>
               <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
+                className="rounded-full px-2 py-0.5 text-xs font-mono font-bold"
                 style={{ backgroundColor: TIER_COLORS.project.bg, color: TIER_COLORS.project.text }}
               >
                 {stats?.project.count ?? 0} faits
               </span>
             </div>
 
-            <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               Persisté dans le repo local. Architecture, conventions de style, décisions techniques et patterns avec recherche BM25.
             </p>
 
             <div className="mt-4 pt-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                 Index BM25 actif
               </span>
               <button
                 type="button"
                 onClick={() => handleClearTier('project')}
-                className="text-[10px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+                className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
               >
                 <Trash2 className="h-3 w-3" /> Vider
               </button>
@@ -413,13 +413,13 @@ export function HierarchicalMemorySection() {
                   <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
                     Long-terme
                   </h3>
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
                     Supabase + Embeddings
                   </span>
                 </div>
               </div>
               <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
+                className="rounded-full px-2 py-0.5 text-xs font-mono font-bold"
                 style={{
                   backgroundColor: isLongtermConnected ? TIER_COLORS.longterm.bg : 'color-mix(in srgb, var(--color-error) 12%, transparent)',
                   color: isLongtermConnected ? TIER_COLORS.longterm.text : 'var(--color-error)',
@@ -429,19 +429,19 @@ export function HierarchicalMemorySection() {
               </span>
             </div>
 
-            <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               Stockage cloud pérenne. Préférences utilisateur, profils et connaissances durables vectorisées (Gemini embedding 768d).
             </p>
 
             <div className="mt-4 pt-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-mono" style={{ color: isLongtermConnected ? 'var(--color-success)' : 'var(--text-muted)' }}>
+              <span className="text-xs font-mono" style={{ color: isLongtermConnected ? 'var(--color-success)' : 'var(--text-muted)' }}>
                 {isLongtermConnected ? '● Connecté (Cloud)' : '○ Non configuré'}
               </span>
               {isLongtermConnected && (
                 <button
                   type="button"
                   onClick={() => handleClearTier('longterm')}
-                  className="text-[10px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+                  className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
                 >
                   <Trash2 className="h-3 w-3" /> Vider
                 </button>
@@ -575,7 +575,7 @@ export function HierarchicalMemorySection() {
                 <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                   Aucune mémoire trouvée
                 </p>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                   {searchQuery ? "Aucun résultat ne correspond à votre requête." : "Ce palier ne contient aucune entrée pour le moment."}
                 </p>
               </div>
@@ -601,7 +601,7 @@ export function HierarchicalMemorySection() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span
-                        className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                        className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider"
                         style={{ backgroundColor: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}
                       >
                         <Icon className="h-2.5 w-2.5" />
@@ -610,7 +610,7 @@ export function HierarchicalMemorySection() {
 
                       {item.category && (
                         <span
-                          className="rounded-md px-2 py-0.5 text-[10px] font-mono font-medium"
+                          className="rounded-md px-2 py-0.5 text-xs font-mono font-medium"
                           style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}
                         >
                           {item.category}
@@ -618,7 +618,7 @@ export function HierarchicalMemorySection() {
                       )}
 
                       {item.confidence && (
-                        <span className="text-[10px] font-mono text-emerald-400">
+                        <span className="text-xs font-mono text-emerald-400">
                           {Math.round(item.confidence * 100)}% conf
                         </span>
                       )}
@@ -632,7 +632,7 @@ export function HierarchicalMemorySection() {
                             type="button"
                             title="Promouvoir vers Projet (Moyen-terme)"
                             onClick={() => handlePromote(item.id, 'session', 'project')}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-all hover:scale-105"
+                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:scale-105"
                             style={{
                               backgroundColor: TIER_COLORS.project.bg,
                               color: TIER_COLORS.project.text,
@@ -648,7 +648,7 @@ export function HierarchicalMemorySection() {
                               type="button"
                               title="Promouvoir vers Supabase (Long-terme)"
                               onClick={() => handlePromote(item.id, 'session', 'longterm')}
-                              className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-all hover:scale-105"
+                              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:scale-105"
                               style={{
                                 backgroundColor: TIER_COLORS.longterm.bg,
                                 color: TIER_COLORS.longterm.text,
@@ -667,7 +667,7 @@ export function HierarchicalMemorySection() {
                           type="button"
                           title="Promouvoir vers Supabase (Long-terme)"
                           onClick={() => handlePromote(item.id, 'project', 'longterm')}
-                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-all hover:scale-105"
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:scale-105"
                           style={{
                             backgroundColor: TIER_COLORS.longterm.bg,
                             color: TIER_COLORS.longterm.text,
@@ -701,7 +701,7 @@ export function HierarchicalMemorySection() {
                       {item.tags.map((t) => (
                         <span
                           key={t}
-                          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono"
+                          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-mono"
                           style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-dimmed)' }}
                         >
                           <Tag className="h-2.5 w-2.5 opacity-60" />
@@ -710,7 +710,7 @@ export function HierarchicalMemorySection() {
                       ))}
                     </div>
 
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                       {formatDate(item.updatedAt || item.createdAt)}
                     </span>
                   </div>
@@ -779,7 +779,7 @@ export function HierarchicalMemorySection() {
                           }}
                         >
                           <Icon className="h-4 w-4" />
-                          <span className="text-[11px] capitalize">{tier}</span>
+                          <span className="text-xs capitalize">{tier}</span>
                         </button>
                       );
                     })}

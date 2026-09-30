@@ -3,7 +3,7 @@
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { UserProfileProvider } from './context/UserProfileContext.js';
 import { ToastProvider } from './components/ui/Toast.js';
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog.js';
@@ -19,7 +19,7 @@ import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { UnifiedSidebar } from './components/UnifiedSidebar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
@@ -32,6 +32,13 @@ const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
+// Bundled fonts for identical rendering across platforms (Windows/macOS/Linux).
+// Inter (variable weight axis) for UI, JetBrains Mono for code.
+import '@fontsource-variable/inter/wght.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/600.css';
+import '@fontsource/jetbrains-mono/700.css';
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
@@ -357,12 +364,12 @@ function ScreenShareIndicator() {
       </div>
 
       {/* Label */}
-      <span className="text-[12px] font-medium tracking-wide text-blue-900">
+      <span className="text-xs font-medium tracking-wide text-blue-900">
         Écran partagé
       </span>
 
       {/* Frame counter */}
-      <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-600">
+      <span className="text-xs font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-600">
         {frameCount}
       </span>
 
@@ -372,7 +379,7 @@ function ScreenShareIndicator() {
       {/* Switch source button */}
       <button
         onClick={openSourcePicker}
-        className="text-[11px] text-blue-600 hover:text-blue-800 transition-colors px-2 py-1 rounded-lg hover:bg-blue-100"
+        className="text-xs text-blue-600 hover:text-blue-800 transition-colors px-2 py-1 rounded-lg hover:bg-blue-100"
         title="Changer de source"
       >
         ⇄ Source
@@ -381,10 +388,10 @@ function ScreenShareIndicator() {
       {/* Stop button */}
       <button
         onClick={stopScreenShare}
-        className="text-[11px] text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+        className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
         title="Arrêter le partage"
       >
-        ✕
+        <X size={14} />
       </button>
     </div>
   );
@@ -421,7 +428,7 @@ function ScreenShareSourcePicker() {
                 alt={src.name}
                 className="w-full rounded-lg object-cover aspect-video"
               />
-              <span className="text-[11px] truncate w-full text-center" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs truncate w-full text-center" style={{ color: 'var(--text-muted)' }}>
                 {src.name}
               </span>
             </button>
@@ -439,7 +446,7 @@ function LoadingFallback() {
     <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-        <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
       </div>
     </div>
   );
@@ -643,18 +650,24 @@ const appRoot = appWindow.__leannaReactRoot ?? (appWindow.__leannaReactRoot = cr
 
 appRoot.render(
   <StrictMode>
-    <RootErrorBoundary>
-      <UserProfileProvider>
-        <ToastProvider>
-          <ConfirmDialogProvider>
-            <BrowserRouter>
-              <AuthGate>
-                <Layout />
-              </AuthGate>
-            </BrowserRouter>
-          </ConfirmDialogProvider>
-        </ToastProvider>
-      </UserProfileProvider>
-    </RootErrorBoundary>
+    {/* reducedMotion="user" : Framer Motion désactive automatiquement les
+        animations de transform/layout (scale, rotate, translate) quand l'OS
+        demande une motion réduite — couvre globalement les boucles décoratives
+        sans devoir garder chaque site à la main. */}
+    <MotionConfig reducedMotion="user">
+      <RootErrorBoundary>
+        <UserProfileProvider>
+          <ToastProvider>
+            <ConfirmDialogProvider>
+              <BrowserRouter>
+                <AuthGate>
+                  <Layout />
+                </AuthGate>
+              </BrowserRouter>
+            </ConfirmDialogProvider>
+          </ToastProvider>
+        </UserProfileProvider>
+      </RootErrorBoundary>
+    </MotionConfig>
   </StrictMode>,
 );

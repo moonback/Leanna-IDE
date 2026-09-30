@@ -311,7 +311,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
 
           <button
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Rechercher"
           >
@@ -322,7 +322,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
           <div className="relative">
             <button
               onClick={() => setShowTemplates(!showTemplates)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
               title="Modèles"
             >
@@ -362,7 +362,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
 
           <button
             onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-white/5"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)]"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Tri"
           >
@@ -373,7 +373,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
           {notes.length > 0 && (
             <button
               onClick={handleExportAll}
-              className="p-1.5 rounded-full border transition-all hover:bg-white/5 active:scale-95"
+              className="p-1.5 rounded-full border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
               title="Exporter"
             >
@@ -444,7 +444,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   />
                   <button
                     onClick={() => setShowSearchModal(false)}
-                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
                   >
                     <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                   </button>
@@ -466,7 +466,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                           setShowSearchModal(false);
                           startEdit(note);
                         }}
-                        className="w-full text-left p-3 rounded-xl hover:bg-white/5 transition-colors border"
+                        className="w-full text-left p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-colors border"
                         style={{ borderColor: 'var(--border-base)' }}
                       >
                         <div className="flex items-center gap-2">
@@ -525,7 +525,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                       {editingId ? 'Modifier la note' : 'Nouvelle note'}
                     </p>
                   </div>
-                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-[var(--bg-active)] transition-colors">
                     <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                   </button>
                 </div>
@@ -563,7 +563,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   </button>
                   <button
                     onClick={cancelForm}
-                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-white/5"
+                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-[var(--bg-hover)]"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -660,14 +660,14 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => handleTogglePin(note.id, note.pinned)}
-                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                       title={note.pinned ? 'Désépingler' : 'Épingler'}
                     >
                       <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                     </button>
                     <button
                       onClick={() => startEdit(note)}
-                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                       title="Modifier"
                     >
                       <Edit3 className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />

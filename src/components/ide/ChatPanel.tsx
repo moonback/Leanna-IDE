@@ -5,13 +5,14 @@ import {
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
   ChevronDown, Download, MessageSquare, MoreVertical, ArrowDown,
   Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
+  FileText, Terminal, FlaskConical,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
-import { ActivityFeed } from './ActivityFeed.js';
-import { MultiAgentIndicator } from './MultiAgentIndicator.js';
+import { UnifiedTimeline } from './UnifiedTimeline.js';
+import { InlineApproval } from './InlineApproval.js';
 import { MentionDropdown } from './MentionDropdown.js';
 import { SlashCommandDropdown } from './SlashCommandDropdown.js';
 import { useFileMention } from '../../hooks/useFileMention.js';
@@ -273,7 +274,7 @@ const ChatMessage = memo(function ChatMessage({
           className={`flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
         >
           <span
-            className="text-[10px] font-mono tracking-wide"
+            className="text-xs font-mono tracking-wide"
             style={{ color: 'var(--text-dimmed)' }}
           >
             {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -283,7 +284,7 @@ const ChatMessage = memo(function ChatMessage({
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1 rounded-md transition-colors hover:bg-white/10"
+            className="p-1 rounded-md transition-colors hover:bg-[var(--bg-active)]"
             title="Copier le message"
             aria-label="Copier le message"
           >
@@ -298,7 +299,7 @@ const ChatMessage = memo(function ChatMessage({
             <button
               type="button"
               onClick={onRetry}
-              className="p-1 rounded-md transition-colors hover:bg-white/10"
+              className="p-1 rounded-md transition-colors hover:bg-[var(--bg-active)]"
               title="Régénérer la réponse"
               aria-label="Régénérer la réponse"
             >
@@ -312,8 +313,8 @@ const ChatMessage = memo(function ChatMessage({
           <div className="mt-2 text-left w-full">
             <button
               type="button"
-              className="flex w-full items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] transition-all
-                         hover:bg-white/5 hover:border-[color-mix(in_srgb,var(--accent-primary)_30%,transparent)]"
+              className="flex w-full items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs transition-all
+                         hover:bg-[var(--bg-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_30%,transparent)]"
               style={{
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-base)',
@@ -331,12 +332,12 @@ const ChatMessage = memo(function ChatMessage({
               </span>
               <span className="font-medium">Sources</span>
               <span
-                className="rounded-full px-1.5 py-px font-mono text-[9px] ml-0.5"
+                className="rounded-full px-1.5 py-px font-mono text-xs ml-0.5"
                 style={{ color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}
               >
                 {visibleSources.length}
               </span>
-              <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
                 {showSources ? 'Masquer' : 'Voir'}
               </span>
               <ChevronDown
@@ -364,7 +365,7 @@ const ChatMessage = memo(function ChatMessage({
                     {visibleSources.map(source => (
                       <div
                         key={source.id}
-                        className="flex items-center gap-1.5 px-2.5 py-2 min-w-0 transition-colors hover:bg-white/5"
+                        className="flex items-center gap-1.5 px-2.5 py-2 min-w-0 transition-colors hover:bg-[var(--bg-hover)]"
                       >
                         <span
                           className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded"
@@ -374,14 +375,14 @@ const ChatMessage = memo(function ChatMessage({
                         </span>
                         <div className="min-w-0 flex-1">
                           <div
-                            className="font-mono text-[11px] truncate"
+                            className="font-mono text-xs truncate"
                             title={source.path}
                             style={{ color: 'var(--text-primary)' }}
                           >
                             {source.path}
                           </div>
                           <div
-                            className="flex items-center gap-1.5 text-[9px] truncate"
+                            className="flex items-center gap-1.5 text-xs truncate"
                             style={{ color: 'var(--text-dimmed)' }}
                           >
                             {source.lines && (
@@ -397,7 +398,7 @@ const ChatMessage = memo(function ChatMessage({
                         </div>
                         <button
                           type="button"
-                          className="p-1 rounded transition-opacity opacity-50 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
+                          className="p-1 rounded transition-opacity opacity-50 hover:opacity-100 hover:bg-[var(--bg-active)] flex-shrink-0"
                           aria-label={`Exclure ${source.path} du contexte`}
                           title="Exclure du contexte"
                           onClick={() => {
@@ -432,15 +433,26 @@ function setCursorPosition(textarea: HTMLTextAreaElement, pos: number): void {
 
 // ─── Input area ───────────────────────────────────────────────────────────────
 
+// Suggestions de départ — chips contextuelles affichées au-dessus du champ
+// quand le chat est connecté et vide. Envoient directement une invite ;
+// l'assistant reçoit déjà le contexte éditeur (fichier ouvert, sélection).
+const SUGGESTION_CHIPS: { label: string; prompt: string; icon: typeof Send }[] = [
+  { label: 'Expliquer ce fichier', prompt: 'Explique le fichier actuellement ouvert.', icon: FileText },
+  { label: "Corriger l'erreur du terminal", prompt: 'Analyse la dernière erreur du terminal et propose un correctif.', icon: Terminal },
+  { label: 'Résumer le projet', prompt: 'Donne-moi un résumé de la structure et du rôle de ce projet.', icon: Sparkles },
+  { label: 'Écrire des tests', prompt: 'Propose des tests pour le fichier actuellement ouvert.', icon: FlaskConical },
+];
+
 interface InputAreaProps {
   connected: boolean;
+  onConnect?: () => void;
   isBusy: boolean;
   onSend: (text: string) => void;
   onDocumentAnalyzed: (result: DocumentResult) => void;
   onToast: (msg: string, icon?: React.ReactNode) => void;
 }
 
-function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast }: InputAreaProps) {
+function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -594,6 +606,24 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
           />
         )}
 
+      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide */}
+      {connected && !isBusy && input.length === 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {SUGGESTION_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => onSend(chip.prompt)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:bg-[var(--accent-subtle)]"
+              style={{ border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+            >
+              <chip.icon size={11} style={{ color: 'var(--accent-primary)' }} />
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input container — overflow-hidden only here for border-radius */}
       <div
         className="flex flex-col transition-[border-color,box-shadow] duration-200 rounded-xl overflow-hidden"
@@ -605,6 +635,19 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
             : 'inset 0 1px 2px rgba(0,0,0,0.15)',
         }}
       >
+
+        {/* Bandeau de connexion — remplace le placeholder "impasse" par une action */}
+        {!connected && onConnect && (
+          <button
+            type="button"
+            onClick={onConnect}
+            className="flex items-center gap-2 px-3 py-2 border-b text-sm font-medium transition-colors hover:bg-[var(--accent-subtle)]"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
+          >
+            <Power size={14} />
+            <span>Se connecter à l'assistant pour commencer</span>
+          </button>
+        )}
 
         {/* Textarea row */}
         <div className="flex items-end gap-2 px-3 py-2">
@@ -624,7 +667,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
               setCursorPos(e.target.selectionStart ?? 0);
             }}
             onBlur={() => setIsFocused(false)}
-            placeholder={connected ? 'Message… (@fichier, /commande)' : 'Connectez-vous d\'abord…'}
+            placeholder={connected ? 'Message… (@fichier, /commande)' : 'Connectez-vous pour écrire à l\'assistant'}
             disabled={!canSend}
             rows={1}
             className="flex-1 bg-transparent text-sm resize-none outline-none
@@ -674,7 +717,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
         >
           <span
             id="chat-input-hints"
-            className="text-[10px] tracking-wide"
+            className="text-xs tracking-wide"
             style={{ color: 'var(--text-dimmed)' }}
           >
             <kbd className="font-mono">Enter</kbd> envoyer &nbsp;·&nbsp;
@@ -687,7 +730,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
             {/* Char counter */}
             {input.length > 0 && (
               <span
-                className="text-[10px] font-mono transition-colors"
+                className="text-xs font-mono transition-colors"
                 style={{
                   color: overLimit
                     ? 'var(--color-error)'
@@ -703,7 +746,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
             {/* Status dots */}
             {connected && (
               <span
-                className="text-[10px] flex items-center gap-1.5"
+                className="text-xs flex items-center gap-1.5"
                 style={{ color: isBusy ? 'var(--accent-primary)' : 'var(--color-success)' }}
               >
                 <BreathingDots
@@ -910,7 +953,7 @@ export function ChatPanel({
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
-    activity, isBusy, muted, toggleMute,
+    activity, isBusy, muted, toggleMute, reasoning,
   } = useLiveAPIContext();
   const { profile } = useProfile();
 
@@ -1271,7 +1314,7 @@ export function ChatPanel({
               </span>
               {transcript.length > 0 && (
                 <span
-                  className="flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded-full flex-shrink-0"
+                  className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded-full flex-shrink-0"
                   style={{
                     color: 'var(--text-dimmed)',
                     backgroundColor: 'color-mix(in srgb, var(--text-dimmed) 10%, transparent)',
@@ -1294,7 +1337,7 @@ export function ChatPanel({
                   : isBusy ? 'Réflexion…' : connected ? 'En ligne' : 'Hors ligne';
                 return (
                   <span
-                    className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
                     style={{
                       color: statusColor,
                       backgroundColor: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
@@ -1334,7 +1377,7 @@ export function ChatPanel({
                 <motion.button
                   onClick={handleToggleMute}
                   whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                  className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                  className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
                   title={muted ? 'Activer le micro' : 'Désactiver le micro'}
                   aria-label={muted ? 'Activer le micro' : 'Désactiver le micro'}
                 >
@@ -1349,7 +1392,7 @@ export function ChatPanel({
               <motion.button
                 onClick={() => setShowInput((s: boolean) => !s)}
                 whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
                 title={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
                 aria-label={showInput ? 'Masquer la saisie' : 'Afficher la saisie'}
                 aria-pressed={showInput}
@@ -1368,7 +1411,7 @@ export function ChatPanel({
               <motion.button
                 onClick={() => setShowMenu(v => !v)}
                 whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
                 title="Plus d'options"
                 aria-label="Plus d'options"
                 aria-expanded={showMenu}
@@ -1396,7 +1439,7 @@ export function ChatPanel({
                     {transcript.length > 0 && (
                       <>
                         <div className="px-3 pt-2 pb-1">
-                          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                             Conversation
                           </span>
                         </div>
@@ -1416,7 +1459,7 @@ export function ChatPanel({
                     )}
 
                     <div className="px-3 pt-1 pb-1">
-                      <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                         Affichage
                       </span>
                     </div>
@@ -1471,7 +1514,7 @@ export function ChatPanel({
               <motion.button
                 onClick={onClose}
                 whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                className="p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
                 title="Fermer (Ctrl+Shift+C)"
                 aria-label="Fermer le panneau"
               >
@@ -1481,16 +1524,10 @@ export function ChatPanel({
           </div>
         </div>
 
-        {/* ── Active agents / missions band ───────────────────────────────── */}
-        {!minimized && activity.length > 0 && (
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0 overflow-x-auto custom-scrollbar"
-            style={{
-              borderBottom: '1px solid var(--border-base)',
-              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
-            }}
-          >
-            <MultiAgentIndicator steps={activity} />
+        {/* ── Timeline d'activité unifiée (Planification → Écriture → Vérification) ── */}
+        {!minimized && connected && (activity.length > 0 || reasoning?.active) && (
+          <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
+            <UnifiedTimeline steps={activity} reasoning={reasoning} connected={connected} />
           </div>
         )}
 
@@ -1635,13 +1672,16 @@ export function ChatPanel({
                           <span className="text-sm truncate ml-1" style={{ color: 'var(--text-muted)' }}>
                             {msg.displayText ?? msg.text}
                           </span>
-                          <span className="text-[10px] flex-shrink-0 ml-auto" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs flex-shrink-0 ml-auto" style={{ color: 'var(--text-dimmed)' }}>
                             en attente
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
+
+                  {/* Approbation d'édition critique — carte inline non bloquante */}
+                  <InlineApproval sendMessage={sendRawMessage} />
 
                   <div />
                 </div>
@@ -1672,13 +1712,11 @@ export function ChatPanel({
               </AnimatePresence>
             </div>
 
-            {/* Activity feed */}
-            <ActivityFeed steps={activity} connected={connected} />
-
             {/* Input area */}
             {showInput && (
               <InputArea
                 connected={connected}
+                onConnect={handleToggleConnect}
                 isBusy={isBusy}
                 onSend={handleSend}
                 onDocumentAnalyzed={handleDocumentAnalyzed}
@@ -1709,7 +1747,7 @@ function MenuButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 w-full px-3 py-2 text-sm transition-colors text-left hover:bg-white/8"
+      className="flex items-center gap-3 w-full px-3 py-2 text-sm transition-colors text-left hover:bg-[var(--bg-hover)]"
       style={{ color: danger ? 'var(--color-error)' : 'var(--text-primary)' }}
     >
       {icon}

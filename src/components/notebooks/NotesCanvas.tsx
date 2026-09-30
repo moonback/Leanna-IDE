@@ -179,7 +179,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
       >
         <button
           onClick={() => setZoom(prev => Math.min(2.5, prev + 0.2))}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <ZoomIn className="w-3.5 h-3.5" />
@@ -189,7 +189,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
         </span>
         <button
           onClick={() => setZoom(prev => Math.max(0.3, prev - 0.2))}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <ZoomOut className="w-3.5 h-3.5" />
@@ -197,7 +197,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
         <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
         <button
           onClick={resetView}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <Maximize2 className="w-3.5 h-3.5" />

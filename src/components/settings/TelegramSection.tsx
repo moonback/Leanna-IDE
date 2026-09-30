@@ -291,7 +291,7 @@ export function TelegramSection() {
           <div className="flex items-center gap-3">
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
-                isRunning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-muted'
+                isRunning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-hover)] text-muted'
               }`}
             >
               <Bot className="h-6 w-6" />
@@ -342,7 +342,7 @@ export function TelegramSection() {
               <button
                 onClick={handleTestMessage}
                 disabled={testSending}
-                className="flex items-center gap-1.5 rounded-lg border border-border-base bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-border-base bg-[var(--bg-hover)] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[var(--bg-active)] disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
                 {testSending ? 'Envoi...' : 'Tester'}
@@ -420,7 +420,7 @@ export function TelegramSection() {
           <button
             onClick={() => handleSaveConfig({ chatId: defaultChatId })}
             disabled={actionLoading}
-            className="rounded-lg border border-border-base bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10"
+            className="rounded-lg border border-border-base bg-[var(--bg-hover)] px-3 py-2 text-xs font-medium text-white transition hover:bg-[var(--bg-active)]"
           >
             Appliquer
           </button>
@@ -447,7 +447,7 @@ export function TelegramSection() {
             <button
               onClick={handleAddUser}
               disabled={!newUserInput.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/15 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--bg-active)] px-3 py-2 text-xs font-medium text-white transition hover:bg-[var(--bg-active)] disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" />
               Ajouter
@@ -467,7 +467,7 @@ export function TelegramSection() {
               allowedUsers.map((user) => (
                 <span
                   key={user}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-base bg-white/5 px-2.5 py-1 text-xs font-mono text-white"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-base bg-[var(--bg-hover)] px-2.5 py-1 text-xs font-mono text-white"
                 >
                   <Shield className="h-3 w-3 text-emerald-400" />
                   {user}
@@ -489,7 +489,7 @@ export function TelegramSection() {
       <div className="mt-4 rounded-xl border border-border-base bg-white/[0.02]">
         <button
           onClick={() => setShowGuide(!showGuide)}
-          className="flex w-full items-center justify-between p-3.5 text-left text-xs font-semibold text-white transition hover:bg-white/5"
+          className="flex w-full items-center justify-between p-3.5 text-left text-xs font-semibold text-white transition hover:bg-[var(--bg-hover)]"
         >
           <div className="flex items-center gap-2 text-accent-primary">
             <HelpCircle className="h-4 w-4" />
@@ -517,11 +517,11 @@ export function TelegramSection() {
                   >
                     @BotFather <ExternalLink className="h-3 w-3" />
                   </a>
-                  . Envoyez la commande <code className="rounded bg-white/10 px-1 py-0.5 text-white">/newbot</code>, choisissez un nom et un pseudo pour votre bot.
+                  . Envoyez la commande <code className="rounded bg-[var(--bg-active)] px-1 py-0.5 text-white">/newbot</code>, choisissez un nom et un pseudo pour votre bot.
                 </li>
                 <li>
                   <strong className="text-white">Copier le Token :</strong> @BotFather vous répond avec un token d'API du type{' '}
-                  <code className="rounded bg-white/10 px-1 py-0.5 text-white">123456789:ABCdef...</code>. Collez-le dans le champ ci-dessus et cliquez sur <em>Sauvegarder le Token</em>.
+                  <code className="rounded bg-[var(--bg-active)] px-1 py-0.5 text-white">123456789:ABCdef...</code>. Collez-le dans le champ ci-dessus et cliquez sur <em>Sauvegarder le Token</em>.
                 </li>
                 <li>
                   <strong className="text-white">Démarrer le Bot :</strong> Cliquez sur le bouton vert <em>Démarrer le Bot</em> ci-dessus. Le statut passe à <em>Connecté</em>.
@@ -540,7 +540,7 @@ export function TelegramSection() {
                 </li>
                 <li>
                   <strong className="text-white">Parler à votre bot :</strong> Ouvrez votre nouveau bot sur Telegram et appuyez sur{' '}
-                  <code className="rounded bg-white/10 px-1 py-0.5 text-white">/start</code>. Vous pouvez maintenant lui poser des questions, lancer des missions d'agents (<code className="rounded bg-white/10 px-1 py-0.5 text-white">/agent</code>) ou exécuter des commandes (<code className="rounded bg-white/10 px-1 py-0.5 text-white">/cmd</code>) !
+                  <code className="rounded bg-[var(--bg-active)] px-1 py-0.5 text-white">/start</code>. Vous pouvez maintenant lui poser des questions, lancer des missions d'agents (<code className="rounded bg-[var(--bg-active)] px-1 py-0.5 text-white">/agent</code>) ou exécuter des commandes (<code className="rounded bg-[var(--bg-active)] px-1 py-0.5 text-white">/cmd</code>) !
                 </li>
               </ol>
             </motion.div>

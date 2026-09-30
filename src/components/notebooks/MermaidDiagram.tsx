@@ -150,17 +150,17 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
           <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30">
+          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] disabled:opacity-30">
             <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
           <span className="w-10 text-center text-xs font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
-          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-white/5 disabled:opacity-30">
+          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] disabled:opacity-30">
             <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
-          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-white/5">
+          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
             <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
-          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-white/5">
+          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
             {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />}
           </Tooltip>
         </div>

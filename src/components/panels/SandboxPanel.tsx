@@ -330,7 +330,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             {status?.path && (
               <span className="flex min-w-0 items-center gap-1.5" title={status.path}>
                 <FolderOpen size={11} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />
-                <span className="truncate font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="truncate font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                   {status.path}
                 </span>
               </span>
@@ -338,7 +338,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             {status?.lastSync && (
               <span className="flex items-center gap-1.5">
                 <Clock size={11} style={{ color: 'var(--text-dimmed)' }} />
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {new Date(status.lastSync).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
                 </span>
               </span>
@@ -530,7 +530,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                   transition={spring}
                   className="space-y-1.5 overflow-hidden px-2.5 pt-2"
                 >
-                  <div className="flex items-center justify-between text-[11px] font-medium">
+                  <div className="flex items-center justify-between text-xs font-medium">
                     <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
                       <Loader2 size={11} className="animate-spin" />
                       {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}
@@ -605,7 +605,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 function StatePill({ color, label, active }: { color: string; label: string; active: boolean }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
       style={{
         color,
         backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
@@ -655,7 +655,7 @@ function PrimaryAction({ icon, label, hint, color, badge, busy, onClick, spring 
           <span className="text-sm font-semibold" style={{ color }}>{label}</span>
           {badge !== undefined && (
             <span
-              className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+              className="rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums"
               style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, transparent)`, color }}
             >
               {badge}
@@ -694,7 +694,7 @@ function SectionCard({ title, count, countColor, open, onToggle, spring, childre
         <span className="flex items-center gap-2">
           {count !== undefined && (
             <span
-              className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+              className="rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums"
               style={{
                 color: countColor ?? 'var(--text-muted)',
                 backgroundColor: `color-mix(in srgb, ${countColor ?? 'var(--text-muted)'} 14%, transparent)`,
@@ -751,7 +751,7 @@ function CodeInputRow({ inputRef, value, onChange, onConfirm, onCancel, label, i
         className="mt-1 space-y-2 rounded-lg border p-2.5"
         style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-warning-subtle)' }}
       >
-        <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'var(--color-warning)' }}>
+        <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--color-warning)' }}>
           {icon}
           {label}
         </span>

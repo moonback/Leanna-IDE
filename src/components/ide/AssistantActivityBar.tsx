@@ -302,7 +302,7 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
             {/* Controls */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
               <button
-                className="p-1 rounded-full transition-colors hover:bg-white/10"
+                className="p-1 rounded-full transition-colors hover:bg-[var(--bg-active)]"
                 aria-label={expanded ? 'Réduire' : 'Développer'}
                 onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
               >
@@ -313,7 +313,7 @@ export function AssistantActivityBar({ steps, connected, inline = false }: Assis
               </button>
               {!inline && (
                 <button
-                  className="p-1 rounded-full transition-colors hover:bg-white/10"
+                  className="p-1 rounded-full transition-colors hover:bg-[var(--bg-active)]"
                   aria-label="Fermer"
                   onClick={e => { e.stopPropagation(); setVisible(false); setExpanded(false); }}
                 >

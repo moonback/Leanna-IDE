@@ -584,7 +584,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 style={{ color: 'var(--text-primary)' }}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-white/10 flex-shrink-0" aria-label="Effacer la recherche">
+                <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-[var(--bg-active)] flex-shrink-0" aria-label="Effacer la recherche">
                   <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
                 </button>
               )}
@@ -671,7 +671,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleToggleSelect(source.id); }}
-                        className={`flex-shrink-0 p-0.5 rounded-lg hover:bg-white/10 transition-opacity ${hasSelection || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`flex-shrink-0 p-0.5 rounded-lg hover:bg-[var(--bg-active)] transition-opacity ${hasSelection || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         aria-label={isSelected ? 'Désélectionner' : 'Sélectionner'}
                       >
                         {isSelected ? (
@@ -931,7 +931,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             aria-label="Rechercher dans les sources"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-white/10">
+            <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-[var(--bg-active)]">
               <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
             </button>
           )}
@@ -1342,7 +1342,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                     <motion.button
                       {...tapScale}
                       onClick={() => handleTogglePreview(source.id)}
-                      className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                       title="Voir le contenu"
                       aria-label="Voir le contenu"
                     >

@@ -12,6 +12,7 @@ import {
   Zap,
   Folder,
   HardDrive,
+  Circle,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { ASTCallGraphExplorer } from './ASTCallGraphExplorer.js';
@@ -228,7 +229,7 @@ export function KnowledgeHealthDashboard() {
           <button
             onClick={fetchHealth}
             disabled={loading}
-            className="p-2.5 rounded-xl border transition-colors hover:bg-white/5"
+            className="p-2.5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Rafraîchir les métriques"
           >
@@ -308,7 +309,7 @@ export function KnowledgeHealthDashboard() {
           </div>
           {/* Progress bar */}
           <div className="space-y-1 pt-1">
-            <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1.5 w-full rounded-full bg-[var(--bg-hover)] overflow-hidden">
               <div
                 className="h-full rounded-full transition-all bg-gradient-to-r from-cyan-500 to-blue-500"
                 style={{ width: `${Math.min(100, (pm.totalFacts / pm.maxFacts) * 100)}%` }}
@@ -361,7 +362,7 @@ export function KnowledgeHealthDashboard() {
             </div>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               {docsData?.extractor?.watching ? (
-                <span className="text-emerald-400">⚡ Extraction temps réel active</span>
+                <span className="text-emerald-400 inline-flex items-center gap-1"><Zap size={12} /> Extraction temps réel active</span>
               ) : (
                 <span className="text-amber-400">En attente d'activation</span>
               )}
@@ -388,8 +389,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'overview'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Vue d'Ensemble
@@ -409,8 +410,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('memory')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'memory'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Project Memory ({pm.totalFacts})
@@ -419,8 +420,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('documents')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'documents'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Documents ({docsData?.documentCount ?? 0})
@@ -589,7 +590,11 @@ export function KnowledgeHealthDashboard() {
                 Formats supportés : <code>.md</code> <code>.txt</code> <code>.rst</code> <code>.adoc</code> <code>.tex</code> <code>.yaml</code> <code>.csv</code>
               </span>
               <span className="ml-auto">
-                {docsData?.extractor?.watching ? '🟢 Surveillance active' : '🔴 Surveillance inactive'}
+                {docsData?.extractor?.watching ? (
+                  <span className="inline-flex items-center gap-1"><Circle size={9} fill="var(--color-success)" style={{ color: 'var(--color-success)' }} /> Surveillance active</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1"><Circle size={9} fill="var(--color-error)" style={{ color: 'var(--color-error)' }} /> Surveillance inactive</span>
+                )}
               </span>
             </div>
           </div>

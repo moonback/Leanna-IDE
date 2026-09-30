@@ -209,7 +209,7 @@ export function CommandPalette({
               aria-autocomplete="list"
             />
             {query && (
-              <Tooltip content="Effacer" as="button" onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-white/10" aria-label="Effacer la recherche">
+              <Tooltip content="Effacer" as="button" onClick={() => setQuery('')} className="rounded p-0.5 hover:bg-[var(--bg-active)]" aria-label="Effacer la recherche">
                 <X size={12} style={{ color: 'var(--text-muted)' }} />
               </Tooltip>
             )}
@@ -230,7 +230,7 @@ export function CommandPalette({
                 key={file.path}
                 role="option"
                 aria-selected={i === selectedIndex}
-                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${i === selectedIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${i === selectedIndex ? 'bg-[var(--bg-active)]' : 'hover:bg-[var(--bg-hover)]'}`}
                 onClick={() => handleSelect(i)}
                 onMouseEnter={() => setSelectedIndex(i)}
               >
@@ -264,7 +264,7 @@ export function CommandPalette({
                       key={cmd.id}
                       role="option"
                       aria-selected={i === selectedIndex}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${i === selectedIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${i === selectedIndex ? 'bg-[var(--bg-active)]' : 'hover:bg-[var(--bg-hover)]'}`}
                       onClick={() => handleSelect(i)}
                       onMouseEnter={() => setSelectedIndex(i)}
                     >

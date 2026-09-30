@@ -335,7 +335,7 @@ const FileList = memo(function FileList({
                   </span>
                 </div>
                 <span
-                  className="hidden shrink-0 text-[10px] font-medium uppercase tracking-wide sm:block"
+                  className="hidden shrink-0 text-xs font-medium uppercase tracking-wide sm:block"
                   style={{ color: iconColor }}
                 >
                   {file.status === 'added' ? 'Ajouté' : file.status === 'deleted' ? 'Supprimé' : 'Modifié'}
@@ -835,7 +835,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
           {/* Mode toggle */}
           <button
             onClick={() => setDiffMode((prev) => (prev === 'side-by-side' ? 'unified' : 'side-by-side'))}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
             title={`Mode: ${diffMode === 'side-by-side' ? 'Côte à côte' : 'Unifié'} (M)`}
           >
@@ -849,7 +849,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               <button
                 onClick={goPrevChunk}
                 disabled={currentChunkIdx === 0}
-                className="p-1.5 rounded hover:bg-white/5 transition disabled:opacity-30"
+                className="p-1.5 rounded hover:bg-[var(--bg-hover)] transition disabled:opacity-30"
                 title="Changement précédent (P)"
               >
                 <ChevronUp size={12} style={{ color: 'var(--text-muted)' }} />
@@ -860,7 +860,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
               <button
                 onClick={goNextChunk}
                 disabled={currentChunkIdx >= totalChunks - 1}
-                className="p-1.5 rounded hover:bg-white/5 transition disabled:opacity-30"
+                className="p-1.5 rounded hover:bg-[var(--bg-hover)] transition disabled:opacity-30"
                 title="Changement suivant (N)"
               >
                 <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
@@ -902,21 +902,21 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
 
           <button
             onClick={loadDiffs}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Rafraîchir"
           >
             <RefreshCcw size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={() => setShowShortcuts((prev) => !prev)}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Raccourcis clavier (?)"
           >
             <Keyboard size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title={embedded ? 'Retour aux contrôles du sandbox (Escape)' : 'Fermer (Escape)'}
             aria-label={embedded ? 'Retour aux contrôles du sandbox' : 'Fermer'}
           >
@@ -941,35 +941,35 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
             <div className="space-y-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
               <div className="flex justify-between gap-6">
                 <span>Accepter fichier</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">A</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">A</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Rejeter fichier</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">R</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">R</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Changement suivant</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">N</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">N</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Changement précédent</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">P</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">P</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Fichier suivant</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">Ctrl+↓</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">Ctrl+↓</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Fichier précédent</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">Ctrl+↑</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">Ctrl+↑</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Basculer mode</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">M</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">M</kbd>
               </div>
               <div className="flex justify-between gap-6">
                 <span>Fermer</span>
-                <kbd className="font-mono px-1.5 py-0.5 rounded bg-white/5">Esc</kbd>
+                <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-hover)]">Esc</kbd>
               </div>
             </div>
           </motion.div>

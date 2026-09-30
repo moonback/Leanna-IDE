@@ -154,7 +154,7 @@ export function ContextMenu({ target, x, y, activeFilePath, clipboardEntry, assi
               <div className="my-1 border-t" style={{ borderColor: 'var(--border-base)' }} />
             )}
             <button
-              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition hover:bg-white/10"
+              className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition hover:bg-[var(--bg-active)]"
               style={{
                 color: action.danger ? 'var(--color-error)' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
                 opacity: disabled ? 0.4 : 1,

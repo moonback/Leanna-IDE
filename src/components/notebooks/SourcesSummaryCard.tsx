@@ -168,14 +168,14 @@ export function SourcesSummaryCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span
-              className="text-[12px] font-semibold tracking-wide"
+              className="text-xs font-semibold tracking-wide"
               style={{ color: 'var(--text-primary)' }}
             >
               Résumé IA
             </span>
 
             <span
-              className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+              className="rounded-full px-1.5 py-0.5 text-xs font-medium"
               style={{
                 color: 'var(--text-muted)',
                 background:
@@ -187,7 +187,7 @@ export function SourcesSummaryCard({
           </div>
 
           <p
-            className="mt-0.5 truncate text-[10px]"
+            className="mt-0.5 truncate text-xs"
             style={{ color: 'var(--text-dimmed)' }}
           >
             Synthèse automatique de votre documentation
@@ -212,7 +212,7 @@ export function SourcesSummaryCard({
                 style={{ color: 'var(--accent-primary)' }}
               />
               <span
-                className="text-[10px]"
+                className="text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Mise à jour
@@ -302,13 +302,13 @@ export function SourcesSummaryCard({
 
                   <div className="text-center">
                     <p
-                      className="text-[11px] font-medium"
+                      className="text-xs font-medium"
                       style={{ color: 'var(--text-secondary)' }}
                     >
                       Génération du résumé
                     </p>
                     <p
-                      className="mt-0.5 text-[10px]"
+                      className="mt-0.5 text-xs"
                       style={{ color: 'var(--text-dimmed)' }}
                     >
                       Analyse de vos {sourcesCount} sources...
@@ -335,13 +335,13 @@ export function SourcesSummaryCard({
 
                   <div className="min-w-0">
                     <p
-                      className="text-[10px] font-medium"
+                      className="text-xs font-medium"
                       style={{ color: 'var(--color-error)' }}
                     >
                       Impossible de générer le résumé
                     </p>
                     <p
-                      className="mt-0.5 text-[10px] leading-relaxed"
+                      className="mt-0.5 text-xs leading-relaxed"
                       style={{ color: 'var(--text-muted)' }}
                     >
                       {error}
@@ -355,7 +355,7 @@ export function SourcesSummaryCard({
                 <div
                   className="
                     sources-summary-content
-                    text-[12px]
+                    text-xs
                     leading-[1.75]
                   "
                   style={{
@@ -385,7 +385,7 @@ export function SourcesSummaryCard({
                   />
 
                   <span
-                    className="text-[10px]"
+                    className="text-xs"
                     style={{ color: 'var(--text-dimmed)' }}
                   >
                     Actualisation du résumé...
@@ -408,7 +408,7 @@ export function SourcesSummaryCard({
                   />
 
                   <span
-                    className="text-[9px]"
+                    className="text-xs"
                     style={{ color: 'var(--text-dimmed)' }}
                   >
                     Résumé basé sur {sourcesCount} source
@@ -416,7 +416,7 @@ export function SourcesSummaryCard({
                   </span>
 
                   <span
-                    className="ml-auto text-[9px]"
+                    className="ml-auto text-xs"
                     style={{ color: 'var(--text-dimmed)' }}
                   >
                     IA
