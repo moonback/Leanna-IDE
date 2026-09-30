@@ -131,37 +131,28 @@ test("verify_run_script rejects unauthorized scripts", async () => {
   assert.ok(result.error, "should return an error for unauthorized script");
 });
 
-test("verify_run_script accepts build script", async () => {
-  const result = await verifySkill.handleToolCall("verify_run_script", {
-    script: "build",
-  });
-  assert.ok(result, "result should not be null");
-  assert.ok("status" in result, "should have status");
-  assert.ok(["success", "failed"].includes(result.status));
+// NOTE: We deliberately do NOT execute the "build" or "test" scripts here.
+// `verify_run_script` shells out to `npm run <script>`. Running "test" would
+// re-invoke `npm test` (the very suite currently running), recursively
+// spawning the whole suite again and never terminating. Running "build" spawns
+// vite/esbuild and is far too slow for a unit test. We instead validate the
+// authorization/schema contract, which is the logic actually owned by the skill.
+test("verify_run_script accepts the authorized script names via schema", () => {
+  const schema = verifySkill.inputSchemas!["verify_run_script"];
+  for (const script of ["build", "lint", "typecheck", "test"]) {
+    assert.doesNotThrow(() => schema.parse({ script }), `${script} should be accepted`);
+  }
 });
 
-test("verify_run_script accepts lint script", async () => {
-  const result = await verifySkill.handleToolCall("verify_run_script", {
-    script: "lint",
-  });
-  assert.ok(result, "result should not be null");
-  assert.ok("status" in result, "should have status");
-  assert.ok(["success", "failed"].includes(result.status));
+test("verify_run_script schema rejects arbitrary script names", () => {
+  const schema = verifySkill.inputSchemas!["verify_run_script"];
+  assert.throws(() => schema.parse({ script: "rm-rf" }), "arbitrary scripts must be rejected");
 });
 
 test("unknown tool name returns an error", async () => {
   const result = await verifySkill.handleToolCall("verify_unknown", {});
   assert.ok(result.error, "should return an error for unknown tool");
   assert.match(result.error, /unknown tool|inconnu/i);
-});
-
-test("verify_run_script accepts test script", async () => {
-  const result = await verifySkill.handleToolCall("verify_run_script", {
-    script: "test",
-  });
-  assert.ok(result, "result should not be null");
-  assert.ok("status" in result, "should have status");
-  assert.ok(["success", "failed"].includes(result.status));
 });
 
 // ─── Tests pour le lint ──────────────────────────────────────────────────────

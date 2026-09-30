@@ -963,6 +963,19 @@ export const verifySkill: Skill = {
         if (!ALLOWED_SCRIPTS.has(validated.script)) {
           return { error: `Script non autorisé: ${validated.script}. Scripts autorisés: ${Array.from(ALLOWED_SCRIPTS).join(", ")}` };
         }
+        // Garde anti-récursion : si on est déjà à l'intérieur d'un run `node --test`
+        // (npm test), relancer `npm run test` réexécuterait toute la suite, qui
+        // relancerait ce skill, etc. — récursion infinie de sous-process qui ne
+        // se termine jamais. On refuse explicitement ce cas.
+        if (validated.script === "test" && process.env.NODE_TEST_CONTEXT) {
+          return {
+            status: "failed",
+            ok: false,
+            exitCode: null,
+            error: "verify_run_script('test') refusé : déjà en cours d'exécution dans une suite de tests (récursion évitée).",
+            message: "Exécution récursive de `npm test` bloquée.",
+          };
+        }
         const result = await runAllowed("npm-run", [validated.script]);
         return {
           status: result.ok ? "success" : "failed",

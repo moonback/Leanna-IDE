@@ -183,9 +183,13 @@ export async function withGeminiRetry<T>(
   const retries = maxRetries ?? Math.max(enabledCount, 2);
   let lastError: any = null;
 
-  // (Audit §1) Timeout global pour éviter un blocage indéfini
+  // (Audit §1) Timeout global pour éviter un blocage indéfini.
+  // Le handle est conservé pour être nettoyé une fois la course terminée :
+  // sans clearTimeout, ce timer de 120s garde la boucle d'événements vivante
+  // (ex: node --test ne rend jamais la main après la fin des tests).
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`withGeminiRetry timeout après ${timeoutMs}ms`)), timeoutMs);
+    timeoutHandle = setTimeout(() => reject(new Error(`withGeminiRetry timeout après ${timeoutMs}ms`)), timeoutMs);
   });
 
   const execute = async (): Promise<T> => {
@@ -228,7 +232,11 @@ export async function withGeminiRetry<T>(
     throw lastError || new Error("Toutes les clés API ont été rate-limited. Réessayez plus tard.");
   };
 
-  return Promise.race([execute(), timeoutPromise]);
+  try {
+    return await Promise.race([execute(), timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
 }
 
 // NOTE: loadGeminiKeys() is called explicitly from server.ts at startup.
