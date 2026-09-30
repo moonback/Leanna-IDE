@@ -606,23 +606,58 @@ function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, o
           />
         )}
 
-      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide */}
-      {connected && !isBusy && input.length === 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {SUGGESTION_CHIPS.map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={() => onSend(chip.prompt)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:bg-[var(--accent-subtle)]"
-              style={{ border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide.
+          Les 4 chips tiennent sur une seule ligne : icône dans une pastille au repos,
+          le label se révèle au survol. */}
+      <AnimatePresence>
+        {connected && !isBusy && input.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="mb-2.5"
+          >
+            <div
+              className="flex items-center gap-1 mb-1.5 px-0.5 text-xs font-medium uppercase tracking-wider"
+              style={{ color: 'var(--text-dimmed)' }}
             >
-              <chip.icon size={11} style={{ color: 'var(--accent-primary)' }} />
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      )}
+              <Sparkles size={10} style={{ color: 'var(--accent-primary)' }} />
+              Suggestions
+            </div>
+            <div className="flex flex-nowrap items-center gap-1.5">
+              {SUGGESTION_CHIPS.map((chip, i) => (
+                <motion.button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => onSend(chip.prompt)}
+                  title={chip.label}
+                  aria-label={chip.label}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.18, delay: i * 0.04, ease: 'easeOut' }}
+                  whileTap={{ scale: 0.94 }}
+                  className="group/chip flex items-center gap-1.5 pl-1 pr-1 py-1 rounded-full text-xs font-medium flex-shrink-0
+                             transition-[background-color,border-color,box-shadow,padding] duration-200
+                             hover:border-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]
+                             hover:bg-[var(--accent-subtle)] hover:pr-2.5 hover:shadow-[0_2px_10px_var(--accent-glow)]"
+                  style={{ border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+                >
+                  <span
+                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' }}
+                  >
+                    <chip.icon size={12} style={{ color: 'var(--accent-primary)' }} />
+                  </span>
+                  <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/chip:max-w-[160px] group-hover/chip:opacity-100">
+                    {chip.label}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input container — overflow-hidden only here for border-radius */}
       <div
