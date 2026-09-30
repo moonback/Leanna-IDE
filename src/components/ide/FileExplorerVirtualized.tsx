@@ -12,7 +12,7 @@ import React, {
 import {
   Folder, FolderOpen, Plus, RefreshCcw, ChevronRight, ChevronDown, ChevronUp,
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
-  Eye, EyeOff, FolderInput, ShieldOff,
+  Eye, EyeOff, FolderInput, ShieldOff, CheckCircle2,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
 import { LeannaIgnoreModal } from './LeannaIgnoreModal.js';
@@ -1633,7 +1633,7 @@ const FileExplorer = memo(function FileExplorer({
                     </Pill>
                   ) : (
                     <Pill color="var(--color-success)" title={LABELS.allValidated} className="ml-auto">
-                      ✓ Validé
+                      <span className="inline-flex items-center gap-1"><CheckCircle2 size={11} /> Validé</span>
                     </Pill>
                   )}
                 </button>

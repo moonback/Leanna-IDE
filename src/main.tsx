@@ -3,7 +3,7 @@
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { UserProfileProvider } from './context/UserProfileContext.js';
 import { ToastProvider } from './components/ui/Toast.js';
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog.js';
@@ -19,7 +19,7 @@ import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { UnifiedSidebar } from './components/UnifiedSidebar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
@@ -391,7 +391,7 @@ function ScreenShareIndicator() {
         className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
         title="Arrêter le partage"
       >
-        ✕
+        <X size={14} />
       </button>
     </div>
   );
@@ -650,18 +650,24 @@ const appRoot = appWindow.__leannaReactRoot ?? (appWindow.__leannaReactRoot = cr
 
 appRoot.render(
   <StrictMode>
-    <RootErrorBoundary>
-      <UserProfileProvider>
-        <ToastProvider>
-          <ConfirmDialogProvider>
-            <BrowserRouter>
-              <AuthGate>
-                <Layout />
-              </AuthGate>
-            </BrowserRouter>
-          </ConfirmDialogProvider>
-        </ToastProvider>
-      </UserProfileProvider>
-    </RootErrorBoundary>
+    {/* reducedMotion="user" : Framer Motion désactive automatiquement les
+        animations de transform/layout (scale, rotate, translate) quand l'OS
+        demande une motion réduite — couvre globalement les boucles décoratives
+        sans devoir garder chaque site à la main. */}
+    <MotionConfig reducedMotion="user">
+      <RootErrorBoundary>
+        <UserProfileProvider>
+          <ToastProvider>
+            <ConfirmDialogProvider>
+              <BrowserRouter>
+                <AuthGate>
+                  <Layout />
+                </AuthGate>
+              </BrowserRouter>
+            </ConfirmDialogProvider>
+          </ToastProvider>
+        </UserProfileProvider>
+      </RootErrorBoundary>
+    </MotionConfig>
   </StrictMode>,
 );

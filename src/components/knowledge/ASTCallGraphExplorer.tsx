@@ -12,6 +12,8 @@ import {
   CornerDownRight,
   Sparkles,
   Filter,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 
@@ -441,8 +443,12 @@ export function ASTCallGraphExplorer() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs font-mono text-muted">
-                              Ligne {c.sourceLine} {c.isResolved ? '• ✅ Résolu' : '• ⚠️ Externe'}
+                            <p className="text-xs font-mono text-muted inline-flex items-center gap-1">
+                              Ligne {c.sourceLine} • {c.isResolved ? (
+                                <span className="inline-flex items-center gap-1"><CheckCircle2 size={11} /> Résolu</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1"><AlertTriangle size={11} /> Externe</span>
+                              )}
                             </p>
                           </div>
                         ))
@@ -475,8 +481,10 @@ export function ASTCallGraphExplorer() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs font-mono text-muted">
-                              Ligne {c.sourceLine} {c.calleeObject === 'this' ? '• Intra-Classe' : c.isResolved ? '• ✅ Résolu' : ''}
+                            <p className="text-xs font-mono text-muted inline-flex items-center gap-1">
+                              Ligne {c.sourceLine} {c.calleeObject === 'this' ? '• Intra-Classe' : c.isResolved ? (
+                                <span className="inline-flex items-center gap-1">• <CheckCircle2 size={11} /> Résolu</span>
+                              ) : ''}
                             </p>
                           </div>
                         ))

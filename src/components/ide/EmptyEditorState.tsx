@@ -12,10 +12,6 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
-// @ts-ignore - Asset handled by bundler
-import bgVideo from '../../../assets/video.mp4';
-// @ts-ignore - Asset handled by bundler
-import bgVideoActive from '../../../assets/video2.mp4';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -95,8 +91,8 @@ const Kbd = React.memo(function Kbd({
         color: 'var(--text-muted)',
         backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
         border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         borderRadius: '4px',
       }}
     >
@@ -111,12 +107,14 @@ const CompactActionCard = React.memo(function CompactActionCard({
   description,
   shortcut,
   onClick,
+  reduceMotion = false,
 }: {
   icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
   title: string;
   description: string;
   shortcut?: string;
   onClick?: () => void;
+  reduceMotion?: boolean;
 }) {
   return (
     <motion.button
@@ -126,23 +124,23 @@ const CompactActionCard = React.memo(function CompactActionCard({
       style={{
         backgroundColor: 'color-mix(in srgb, var(--surface) 45%, transparent)',
         border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
-        backdropFilter: 'blur(16px) saturate(140%)',
-        WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent), 0 8px 24px color-mix(in srgb, #000 18%, transparent)',
         minHeight: '96px',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
       aria-describedby={`action-desc-${title.replace(/\s/g, '')}`}
-      whileHover={{
+      whileHover={reduceMotion ? { borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)' } : {
         y: -4,
         scale: 1.02,
         boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 30px color-mix(in srgb, #000 24%, transparent)',
         borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)',
       }}
-      whileTap={{ scale: 0.95 }}
-      initial={{ opacity: 0, y: 10 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: reduceMotion ? 0.15 : 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       {/* Hover glow effect */}
       <div
@@ -158,10 +156,10 @@ const CompactActionCard = React.memo(function CompactActionCard({
         style={{
           backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
           border: '1px solid color-mix(in srgb, #fff 14%, transparent)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
         }}
-        whileHover={{ scale: 1.1, rotate: 5 }}
+        whileHover={reduceMotion ? undefined : { scale: 1.1, rotate: 5 }}
         transition={{ duration: 0.2 }}
       >
         <Icon size={16} style={{ color: 'var(--primary)' }} />
@@ -282,8 +280,8 @@ function GlobalStyles() {
       .ai-quicklink:hover {
         color: var(--primary);
         background-color: color-mix(in srgb, var(--surface-soft) 55%, transparent);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
       }
 
       @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -409,7 +407,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const ctaText = connected
     ? 'Session vocale et texte en cours'
     : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA';
-  const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered);
+  const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered && !prefersReducedMotion);
 
   const gitInfo = useGitInfo();
 
@@ -483,28 +481,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     >
       <GlobalStyles />
 
-      {/* ── Vidéo de fond (video2 quand l'assistant est connecté, sinon video par défaut) ── */}
-      <video
-        key={connected ? 'active' : 'default'}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        src={connected ? bgVideoActive : bgVideo}
-        autoPlay
-        loop
-        muted
-        playsInline
-        aria-hidden="true"
-        style={{ zIndex: 0 }}
-      />
-      {/* Voile léger + dégradé pour garder le contenu lisible sans masquer la vidéo */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 45%, transparent) 0%, color-mix(in srgb, var(--bg) 25%, transparent) 50%, color-mix(in srgb, var(--bg) 55%, transparent) 100%)',
-          zIndex: 0,
-        }}
-      />
-
-      {/* ── Fond subtil : dégradé bleu très léger en haut seulement ── */}
+      {/* ── Fond statique : dégradé bleu très léger en haut seulement ──
+          (les vidéos de fond ont été retirées — trop coûteuses en GPU ;
+           la vidéo reste réservée au splash de démarrage.) ── */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -547,7 +526,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             <div className="flex-1" />
             <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
               <span 
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0 ai-status-dot"
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ai-status-dot' : ''}`}
                 style={{
                   backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
                   boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,
@@ -585,8 +564,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             style={{
               backgroundColor: 'color-mix(in srgb, var(--surface) 40%, transparent)',
               border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
-              backdropFilter: 'blur(22px) saturate(150%)',
-              WebkitBackdropFilter: 'blur(22px) saturate(150%)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
               height: '112px',
               minHeight: '112px',
               maxWidth: '600px',
@@ -595,12 +574,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             }}
             {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
-            whileHover={{
+            whileHover={prefersReducedMotion ? { borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)' } : {
               scale: 1.02,
               boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 16px 40px color-mix(in srgb, #000 26%, transparent)',
               borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)',
             }}
-            whileTap={{ scale: 0.98 }}
+            whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
           >
             {/* Gradient background overlay for depth */}
             <div
@@ -615,14 +594,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               style={{
                 backgroundColor: 'color-mix(in srgb, var(--surface-soft) 50%, transparent)',
                 border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
+                backdropFilter: 'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
               }}
             >
-              {/* Animated icon container */}
+              {/* Icône — animation d'oscillation seulement si motion non réduite */}
               <motion.div
-                animate={{ rotate: [0, 10, -5, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                animate={prefersReducedMotion ? undefined : { rotate: [0, 10, -5, 0] }}
+                transition={prefersReducedMotion ? undefined : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <Sparkles size={20} style={{ color: 'var(--primary)' }} />
               </motion.div>
@@ -688,18 +667,21 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               title="Nouveau fichier"
               description="Ctrl+N"
               onClick={onCreateFile}
+              reduceMotion={!!prefersReducedMotion}
             />
             <CompactActionCard
               icon={Search}
               title="Rechercher"
               description="Ctrl+P"
               onClick={onOpenSearch}
+              reduceMotion={!!prefersReducedMotion}
             />
             <CompactActionCard
               icon={BookOpen}
               title="Notebooks"
               description="Sources et résumés"
               onClick={onOpenNotebooks}
+              reduceMotion={!!prefersReducedMotion}
             />
           </motion.div>
 
@@ -735,8 +717,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       color: geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--text-muted)',
                       backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
                       border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
-                      backdropFilter: 'blur(6px)',
-                      WebkitBackdropFilter: 'blur(6px)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
                     }}
                     title={geminiStatus === 'invalid'
                       ? 'API key not valid. Please pass a valid API key.'

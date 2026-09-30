@@ -32,6 +32,7 @@ import {
   Loader2,
   SlidersHorizontal,
   List,
+  X,
 } from 'lucide-react';
 
 // ─── Map des icônes de skills ──────────────────────────────────────────────────
@@ -494,7 +495,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs hover:opacity-80"
               style={{ color: 'var(--text-muted)' }}
             >
-              ✕
+              <X size={12} />
             </button>
           )}
         </div>

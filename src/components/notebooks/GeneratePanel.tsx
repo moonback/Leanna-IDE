@@ -17,7 +17,9 @@ import {
   Loader2, Copy, CheckCircle2, Download, RefreshCw,
   Filter, PenLine, Brain, Target, BookOpen, FolderInput,
   FileBarChart, Lightbulb, Zap, X, ArrowRight, ArrowLeft, Presentation,
+  Folder, AlertTriangle, Smartphone, Monitor, Square,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 import { SlidePreviewModal } from './SlidePreviewModal.js';
 import { useToast } from '../ui/Toast.js';
@@ -454,7 +456,7 @@ function renderInfographicContent(content: string): JSX.Element {
               color: 'var(--text-dimmed)',
             }}
           >
-            📁 {filePath.split('/').pop()}
+            <span className="inline-flex items-center gap-1"><Folder size={12} /> {filePath.split('/').pop()}</span>
           </span>
         )}
         {sizeKB > 0 && (
@@ -1654,21 +1656,24 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
 
             {/* Feature highlights */}
             <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
-              {[
-                { emoji: '⚡', label: 'Streaming', sub: 'Temps réel' },
-                { emoji: '🎯', label: 'Sources', sub: 'Ciblé' },
-                { emoji: '📝', label: 'Custom', sub: 'Instructions' },
-              ].map(f => (
+              {([
+                { icon: Zap, label: 'Streaming', sub: 'Temps réel' },
+                { icon: Target, label: 'Sources', sub: 'Ciblé' },
+                { icon: PenLine, label: 'Custom', sub: 'Instructions' },
+              ] as { icon: LucideIcon; label: string; sub: string }[]).map(f => {
+                const FIcon = f.icon;
+                return (
                 <div
                   key={f.label}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl"
                   style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
                 >
-                  <span className="text-base">{f.emoji}</span>
+                  <span className="inline-flex items-center"><FIcon size={16} style={{ color: 'var(--text-muted)' }} /></span>
                   <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>
                   <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{f.sub}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {sources.length === 0 && (
@@ -1676,7 +1681,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 className="text-xs px-4 py-2 rounded-full"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)' }}
               >
-                ⚠️ Ajoutez des sources dans l'onglet Sources pour commencer
+                <span className="inline-flex items-center gap-1.5"><AlertTriangle size={13} /> Ajoutez des sources dans l'onglet Sources pour commencer</span>
               </p>
             )}
           </div>
@@ -1938,10 +1943,12 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Choisissez une orientation</p>
                   <div className="flex gap-2">
                     {([
-                      { key: 'portrait' as const, label: 'Portrait', icon: '📱' },
-                      { key: 'landscape' as const, label: 'Paysage', icon: '🖥️' },
-                      { key: 'square' as const, label: 'Carré', icon: '⬜' },
-                    ]).map(opt => (
+                      { key: 'portrait' as const, label: 'Portrait', icon: Smartphone },
+                      { key: 'landscape' as const, label: 'Paysage', icon: Monitor },
+                      { key: 'square' as const, label: 'Carré', icon: Square },
+                    ]).map(opt => {
+                      const OIcon = opt.icon;
+                      return (
                       <button
                         key={opt.key}
                         onClick={() => setInfraOrientation(opt.key)}
@@ -1952,10 +1959,11 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                           border: `1.5px solid ${infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
                         }}
                       >
-                        <span className="text-lg">{opt.icon}</span>
+                        <span className="inline-flex items-center"><OIcon size={18} /></span>
                         {opt.label}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

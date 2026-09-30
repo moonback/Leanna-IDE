@@ -12,6 +12,7 @@ import {
   Users, Radio, BarChart3, RefreshCw, Loader2, X,
   AlertTriangle, ArrowRight, Zap, FlaskConical, FileText,
   Shield, Eye, Building2, Mail, Inbox, Bell, BellOff, Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAgentNotifications } from '../../hooks/useAgentNotifications.js';
 
@@ -512,7 +513,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
         <div className="text-xs mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
           {agent.runningTasks > 0 && <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" />{agent.runningTasks} en cours</span>}
           {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={8} />{agent.queuedTasks} en queue</span>}
-          {agent.delegationSuccess > 0 && <span style={{ color: 'var(--color-success)' }}>✓ {agent.delegationSuccess}</span>}
+          {agent.delegationSuccess > 0 && <span className="flex items-center gap-1" style={{ color: 'var(--color-success)' }}><CheckCircle2 size={8} /> {agent.delegationSuccess}</span>}
         </div>
       </div>
     </div>
@@ -602,7 +603,7 @@ function MetricsView({ metrics }: { metrics: BusMetrics }) {
       {/* Dead-letter detail */}
       {deadLetterEntries.length > 0 && (
         <div className="rounded-xl p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 15%, transparent)' }}>
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-error)' }}>⚠️ Messages non délivrés</p>
+          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}><AlertTriangle size={12} /> Messages non délivrés</p>
           {deadLetterEntries.map(([role, count]) => (
             <div key={role} className="flex items-center justify-between py-1 text-xs">
               <span style={{ color: 'var(--text-muted)' }}>{role}</span>

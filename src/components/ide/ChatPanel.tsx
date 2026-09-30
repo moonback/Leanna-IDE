@@ -5,13 +5,14 @@ import {
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
   ChevronDown, Download, MessageSquare, MoreVertical, ArrowDown,
   Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
+  FileText, Terminal, FlaskConical,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
-import { ActivityFeed } from './ActivityFeed.js';
-import { MultiAgentIndicator } from './MultiAgentIndicator.js';
+import { UnifiedTimeline } from './UnifiedTimeline.js';
+import { InlineApproval } from './InlineApproval.js';
 import { MentionDropdown } from './MentionDropdown.js';
 import { SlashCommandDropdown } from './SlashCommandDropdown.js';
 import { useFileMention } from '../../hooks/useFileMention.js';
@@ -432,15 +433,26 @@ function setCursorPosition(textarea: HTMLTextAreaElement, pos: number): void {
 
 // ─── Input area ───────────────────────────────────────────────────────────────
 
+// Suggestions de départ — chips contextuelles affichées au-dessus du champ
+// quand le chat est connecté et vide. Envoient directement une invite ;
+// l'assistant reçoit déjà le contexte éditeur (fichier ouvert, sélection).
+const SUGGESTION_CHIPS: { label: string; prompt: string; icon: typeof Send }[] = [
+  { label: 'Expliquer ce fichier', prompt: 'Explique le fichier actuellement ouvert.', icon: FileText },
+  { label: "Corriger l'erreur du terminal", prompt: 'Analyse la dernière erreur du terminal et propose un correctif.', icon: Terminal },
+  { label: 'Résumer le projet', prompt: 'Donne-moi un résumé de la structure et du rôle de ce projet.', icon: Sparkles },
+  { label: 'Écrire des tests', prompt: 'Propose des tests pour le fichier actuellement ouvert.', icon: FlaskConical },
+];
+
 interface InputAreaProps {
   connected: boolean;
+  onConnect?: () => void;
   isBusy: boolean;
   onSend: (text: string) => void;
   onDocumentAnalyzed: (result: DocumentResult) => void;
   onToast: (msg: string, icon?: React.ReactNode) => void;
 }
 
-function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast }: InputAreaProps) {
+function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -594,6 +606,24 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
           />
         )}
 
+      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide */}
+      {connected && !isBusy && input.length === 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {SUGGESTION_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => onSend(chip.prompt)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:bg-[var(--accent-subtle)]"
+              style={{ border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+            >
+              <chip.icon size={11} style={{ color: 'var(--accent-primary)' }} />
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input container — overflow-hidden only here for border-radius */}
       <div
         className="flex flex-col transition-[border-color,box-shadow] duration-200 rounded-xl overflow-hidden"
@@ -605,6 +635,19 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
             : 'inset 0 1px 2px rgba(0,0,0,0.15)',
         }}
       >
+
+        {/* Bandeau de connexion — remplace le placeholder "impasse" par une action */}
+        {!connected && onConnect && (
+          <button
+            type="button"
+            onClick={onConnect}
+            className="flex items-center gap-2 px-3 py-2 border-b text-sm font-medium transition-colors hover:bg-[var(--accent-subtle)]"
+            style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
+          >
+            <Power size={14} />
+            <span>Se connecter à l'assistant pour commencer</span>
+          </button>
+        )}
 
         {/* Textarea row */}
         <div className="flex items-end gap-2 px-3 py-2">
@@ -624,7 +667,7 @@ function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _on
               setCursorPos(e.target.selectionStart ?? 0);
             }}
             onBlur={() => setIsFocused(false)}
-            placeholder={connected ? 'Message… (@fichier, /commande)' : 'Connectez-vous d\'abord…'}
+            placeholder={connected ? 'Message… (@fichier, /commande)' : 'Connectez-vous pour écrire à l\'assistant'}
             disabled={!canSend}
             rows={1}
             className="flex-1 bg-transparent text-sm resize-none outline-none
@@ -910,7 +953,7 @@ export function ChatPanel({
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
-    activity, isBusy, muted, toggleMute,
+    activity, isBusy, muted, toggleMute, reasoning,
   } = useLiveAPIContext();
   const { profile } = useProfile();
 
@@ -1481,16 +1524,10 @@ export function ChatPanel({
           </div>
         </div>
 
-        {/* ── Active agents / missions band ───────────────────────────────── */}
-        {!minimized && activity.length > 0 && (
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0 overflow-x-auto custom-scrollbar"
-            style={{
-              borderBottom: '1px solid var(--border-base)',
-              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
-            }}
-          >
-            <MultiAgentIndicator steps={activity} />
+        {/* ── Timeline d'activité unifiée (Planification → Écriture → Vérification) ── */}
+        {!minimized && connected && (activity.length > 0 || reasoning?.active) && (
+          <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
+            <UnifiedTimeline steps={activity} reasoning={reasoning} connected={connected} />
           </div>
         )}
 
@@ -1643,6 +1680,9 @@ export function ChatPanel({
                     </div>
                   )}
 
+                  {/* Approbation d'édition critique — carte inline non bloquante */}
+                  <InlineApproval sendMessage={sendRawMessage} />
+
                   <div />
                 </div>
               </div>
@@ -1672,13 +1712,11 @@ export function ChatPanel({
               </AnimatePresence>
             </div>
 
-            {/* Activity feed */}
-            <ActivityFeed steps={activity} connected={connected} />
-
             {/* Input area */}
             {showInput && (
               <InputArea
                 connected={connected}
+                onConnect={handleToggleConnect}
                 isBusy={isBusy}
                 onSend={handleSend}
                 onDocumentAnalyzed={handleDocumentAnalyzed}

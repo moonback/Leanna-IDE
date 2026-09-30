@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -271,7 +271,7 @@ export default function SettingsView() {
                             backgroundColor: 'color-mix(in srgb, #10b981 12%, transparent)',
                             color: '#10b981',
                           }}>
-                          🔒
+                          <Lock size={12} />
                         </span>
                       )}
                     </button>

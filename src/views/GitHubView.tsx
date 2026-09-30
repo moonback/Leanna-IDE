@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   Github, GitPullRequest, AlertCircle,
-  ExternalLink, RefreshCw, Loader2, GitCommit,
+  ExternalLink, RefreshCw, Loader2, GitCommit, X, MessageSquare,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
@@ -464,7 +464,7 @@ export default function GitHubView() {
                             title="Fermer"
                             aria-label="Fermer le détail"
                           >
-                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+                            <X size={12} style={{ color: 'var(--text-dimmed)' }} />
                           </button>
                         </div>
                       </div>
@@ -534,7 +534,7 @@ export default function GitHubView() {
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
                       <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
-                      {issue.comments > 0 && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>💬 {issue.comments}</span>}
+                      {issue.comments > 0 && <span className="text-xs inline-flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}><MessageSquare size={11} /> {issue.comments}</span>}
                     </div>
                     {issue.labels.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">

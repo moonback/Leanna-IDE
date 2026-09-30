@@ -34,6 +34,9 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
 
   useEffect(() => {
     function handleConfirmEvent(e: CustomEvent<ConfirmRequest>) {
+      // Si l'approbation inline (dans le chat) est active, elle prend le relais :
+      // on n'affiche pas la modale bloquante pour éviter une double demande.
+      if ((window as unknown as { __leannaInlineApprovalActive?: boolean }).__leannaInlineApprovalActive) return;
       setPending(e.detail);
       setTimeLeft(Math.ceil(e.detail.timeoutMs / 1000));
     }

@@ -12,6 +12,7 @@ import {
   Zap,
   Folder,
   HardDrive,
+  Circle,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { ASTCallGraphExplorer } from './ASTCallGraphExplorer.js';
@@ -361,7 +362,7 @@ export function KnowledgeHealthDashboard() {
             </div>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               {docsData?.extractor?.watching ? (
-                <span className="text-emerald-400">⚡ Extraction temps réel active</span>
+                <span className="text-emerald-400 inline-flex items-center gap-1"><Zap size={12} /> Extraction temps réel active</span>
               ) : (
                 <span className="text-amber-400">En attente d'activation</span>
               )}
@@ -589,7 +590,11 @@ export function KnowledgeHealthDashboard() {
                 Formats supportés : <code>.md</code> <code>.txt</code> <code>.rst</code> <code>.adoc</code> <code>.tex</code> <code>.yaml</code> <code>.csv</code>
               </span>
               <span className="ml-auto">
-                {docsData?.extractor?.watching ? '🟢 Surveillance active' : '🔴 Surveillance inactive'}
+                {docsData?.extractor?.watching ? (
+                  <span className="inline-flex items-center gap-1"><Circle size={9} fill="var(--color-success)" style={{ color: 'var(--color-success)' }} /> Surveillance active</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1"><Circle size={9} fill="var(--color-error)" style={{ color: 'var(--color-error)' }} /> Surveillance inactive</span>
+                )}
               </span>
             </div>
           </div>

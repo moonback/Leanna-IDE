@@ -14,7 +14,9 @@ import {
   FileText, Upload, Search, Brain, Link2, BarChart3,
   Trash2, RefreshCw, Plus, Clock,
   Loader2, X, Globe, FileType, CheckCircle2, AlertCircle,
+  FileCode, Image as ImageIcon, Paperclip, Lightbulb, Package, Eye,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 
@@ -133,10 +135,18 @@ function timeAgo(dateStr: string): string {
   return 'maintenant';
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  pdf: '📕', docx: '📘', txt: '📄', markdown: '📝',
-  html: '🌐', url: '🔗', image: '🖼️', other: '📎',
+// Icônes Lucide par type de document (remplace les emojis pour un rendu
+// cohérent multi-OS).
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  pdf: FileType, docx: FileText, txt: FileText, markdown: FileCode,
+  html: Globe, url: Link2, image: ImageIcon, other: Paperclip,
 };
+
+/** Rend l'icône du type donné (avec repli sur « other »). */
+function TypeIcon({ type, size = 14 }: { type: string; size?: number }) {
+  const Icon = TYPE_ICONS[type] || Paperclip;
+  return <Icon size={size} style={{ color: 'var(--text-muted)' }} />;
+}
 
 // Neutral fallback for tag/relation swatches when a category has no palette
 // entry. Kept as a hex (not a CSS var) because it is concatenated with a hex
@@ -582,7 +592,7 @@ function DocumentsTab() {
                 >
                   {/* Header */}
                   <div className="flex items-start gap-2">
-                    <span className="text-base flex-shrink-0">{TYPE_ICONS[doc.type] || '📎'}</span>
+                    <span className="flex-shrink-0"><TypeIcon type={doc.type} size={16} /></span>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                         {doc.title}
@@ -650,8 +660,8 @@ function DocumentsTab() {
               <>
                 <div className="flex items-center gap-2 pt-2">
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    📄 Documents du Workspace ({workspaceDocuments.length})
+                  <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <FileText size={12} /> Documents du Workspace ({workspaceDocuments.length})
                   </span>
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
                 </div>
@@ -663,7 +673,7 @@ function DocumentsTab() {
                       style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
                     >
                       <div className="flex items-start gap-2">
-                        <span className="text-base flex-shrink-0">📝</span>
+                        <span className="flex-shrink-0"><FileCode size={16} style={{ color: 'var(--text-muted)' }} /></span>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                             {doc.fileName}
@@ -934,9 +944,11 @@ function MemoryTab() {
                     {fact.category}
                   </span>
                   {/* Indicateur de source */}
-                  <span className="text-xs px-1.5 py-0.5 rounded-full"
+                  <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1"
                     style={{ backgroundColor: fact.source === 'project' ? 'var(--bg-base)' : 'transparent', color: 'var(--text-dimmed)' }}>
-                    {fact.source === 'project' ? '📦 Projet' : '📄 Document'}
+                    {fact.source === 'project'
+                      ? <><Package size={10} /> Projet</>
+                      : <><FileText size={10} /> Document</>}
                   </span>
                   {/* Badge "vérifié" pour les faits documents */}
                   {fact.verified && (
@@ -956,7 +968,7 @@ function MemoryTab() {
                   {/* Afficher usageCount pour les faits projet */}
                   {fact.source === 'project' && fact.usageCount !== undefined && fact.usageCount > 0 && (
                     <span className="text-xs flex items-center gap-0.5" style={{ color: 'var(--text-dimmed)' }}>
-                      👁️ {fact.usageCount}
+                      <Eye size={11} /> {fact.usageCount}
                     </span>
                   )}
                   <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
@@ -1282,7 +1294,7 @@ function StatsTab() {
                 .map(([type, count]) => (
                   <div key={type} className="flex items-center justify-between">
                     <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                      {TYPE_ICONS[type.split('/')[1] || type] || '📎'} {type}
+                      <TypeIcon type={type.split('/')[1] || type} size={13} /> {type}
                     </span>
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>
                   </div>
@@ -1345,8 +1357,8 @@ function StatsTab() {
 
       {totalDocuments === 0 && totalFacts === 0 && (
         <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
-          <p className="text-sm text-blue-200">
-            💡 <strong>Astuce</strong> : Upload des documents via l'onglet <strong>Documents</strong> pour les voir apparaître ici.<br />
+          <p className="text-sm text-blue-200 flex items-center justify-center gap-1.5 flex-wrap">
+            <Lightbulb size={14} className="flex-shrink-0" /> <strong>Astuce</strong> : Upload des documents via l'onglet <strong>Documents</strong> pour les voir apparaître ici.<br />
             Les documents du workspace sont auto-extraits et les agents ajoutent des faits projet automatiquement.
           </p>
         </div>

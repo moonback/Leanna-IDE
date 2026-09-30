@@ -1143,8 +1143,8 @@ function MissionCard({
               {/* Metrics row */}
               <div className="flex items-center gap-3 pt-2 pb-1">
                 <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
-                  Actions: <span style={{ color: 'var(--color-success)' }}>{mission.metrics.successfulActions}✓</span>
-                  {' '}<span style={{ color: 'var(--color-error)' }}>{mission.metrics.failedActions}✗</span>
+                  Actions: <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-success)' }}>{mission.metrics.successfulActions}<CheckCircle2 size={11} /></span>
+                  {' '}<span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-error)' }}>{mission.metrics.failedActions}<XCircle size={11} /></span>
                   {' '}/ {mission.metrics.totalActions}
                 </span>
               </div>

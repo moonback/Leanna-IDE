@@ -12,8 +12,9 @@ import {
   MessageCircle, ArrowDown, GitCompare, Zap, StickyNote, Volume2, Square,
   Copy, Check, RefreshCw, Pencil, StopCircle, ThumbsUp, ThumbsDown,
   Filter, X, MessageSquarePlus, ChevronDown, FolderOpen, Folder, FileDown,
-  ExternalLink,
+  ExternalLink, Bot, GraduationCap, Palette,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
 
@@ -941,13 +942,13 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
   // ─── Personalities / Tone ─────────────────────────────────────────────────
 
-  const personalities = useMemo(() => [
-    { id: 'default', label: 'Standard', emoji: '🤖', desc: 'Réponses équilibrées et claires' },
-    { id: 'academic', label: 'Académique', emoji: '🎓', desc: 'Ton formel, citations, rigueur scientifique' },
-    { id: 'simple', label: 'Vulgarisateur', emoji: '💡', desc: 'Explications simples, analogies, accessible' },
-    { id: 'concise', label: 'Concis', emoji: '⚡', desc: 'Réponses courtes et directes, bullet points' },
-    { id: 'detailed', label: 'Détaillé', emoji: '📖', desc: 'Analyses approfondies, exemples multiples' },
-    { id: 'creative', label: 'Créatif', emoji: '🎨', desc: 'Ton engageant, métaphores, storytelling' },
+  const personalities = useMemo<{ id: string; label: string; icon: LucideIcon; desc: string }[]>(() => [
+    { id: 'default', label: 'Standard', icon: Bot, desc: 'Réponses équilibrées et claires' },
+    { id: 'academic', label: 'Académique', icon: GraduationCap, desc: 'Ton formel, citations, rigueur scientifique' },
+    { id: 'simple', label: 'Vulgarisateur', icon: Lightbulb, desc: 'Explications simples, analogies, accessible' },
+    { id: 'concise', label: 'Concis', icon: Zap, desc: 'Réponses courtes et directes, bullet points' },
+    { id: 'detailed', label: 'Détaillé', icon: BookOpen, desc: 'Analyses approfondies, exemples multiples' },
+    { id: 'creative', label: 'Créatif', icon: Palette, desc: 'Ton engageant, métaphores, storytelling' },
   ], []);
 
   const currentPersonality = personalities.find(p => p.id === personality) || personalities[0];
@@ -2416,7 +2417,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-smfont-medium transition-all hover:bg-[var(--accent-subtle)]"
                 style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
               >
-                <span>{currentPersonality.emoji}</span>
+                {(() => { const PIcon = currentPersonality.icon; return <span className="inline-flex items-center"><PIcon size={13} /></span>; })()}
                 <span>{currentPersonality.label}</span>
               </button>
 
@@ -2439,7 +2440,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
                         onClick={() => { setPersonality(p.id); setShowPersonalityMenu(false); }}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--accent-subtle)] ${personality === p.id ? 'bg-[var(--accent-subtle)]' : ''}`}
                       >
-                        <span className="text-sm">{p.emoji}</span>
+                        {(() => { const PIcon = p.icon; return <span className="inline-flex items-center"><PIcon size={14} style={{ color: 'var(--text-muted)' }} /></span>; })()}
                         <div className="min-w-0 flex-1">
                           <p className="text-smfont-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                             {p.label}

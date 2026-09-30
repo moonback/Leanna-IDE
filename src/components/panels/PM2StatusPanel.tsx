@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Server, Cpu, MemoryStick, Clock, RefreshCw, Loader2, AlertCircle,
   Play, Square, Repeat, Trash2, FileText, ChevronDown, ChevronRight,
-  HardDrive, Power, Boxes,
+  HardDrive, Power, Boxes, X,
 } from 'lucide-react';
 import { pm2Api, type Pm2AppStatus, type Pm2StatusResponse } from '../../services/pm2Api.js';
 
@@ -243,7 +243,7 @@ export function PM2StatusPanel({ onClose }: PM2StatusPanelProps) {
               className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <X size={14} style={{ color: 'var(--text-dimmed)' }} />
             </button>
           )}
         </div>

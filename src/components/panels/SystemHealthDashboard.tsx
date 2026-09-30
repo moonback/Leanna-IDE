@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Server, Cpu, MemoryStick, CheckCircle2, AlertCircle, XCircle,
   RefreshCw, Clock, Loader2, Puzzle,
-  Zap,
+  Zap, X,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
               className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition flex items-center justify-center"
               title="Fermer"
             >
-              <span className="text-sm leading-none" style={{ color: 'var(--text-dimmed)' }}>✕</span>
+              <X size={14} style={{ color: 'var(--text-dimmed)' }} />
             </button>
           )}
         </div>

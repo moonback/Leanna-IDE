@@ -25,6 +25,9 @@ import { NotebookPickerModal } from '../components/ide/NotebookPickerModal.js';
 import { CommandPalette } from '../components/ide/CommandPalette.js';
 import { GlobalSearch } from '../components/ide/GlobalSearch.js';
 import { StatusBar } from '../components/ide/StatusBar.js';
+import { RightDock } from '../components/ide/RightDock.js';
+import { BottomDock } from '../components/ide/BottomDock.js';
+import { ExplorerDock, getExplorerWidth } from '../components/ide/ExplorerDock.js';
 import { TelegramStatusModal } from '../components/ide/TelegramStatusModal.js';
 import { ModelPickerModal } from '../components/ide/ModelPickerModal.js';
 import { TokenDetailModal } from '../components/ide/TokenDetailModal.js';
@@ -162,6 +165,7 @@ export default function IdeView() {
 
   // UI State
   const [showExplorer, setShowExplorer] = useState(true);
+  const [explorerWidth, setExplorerWidth] = useState(() => getExplorerWidth());
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState<'files' | 'commands' | null>(null);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
@@ -222,6 +226,50 @@ export default function IdeView() {
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
   const [richDocument, setRichDocument] = useState<RichDocument | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
+
+  // ── Zone droite unifiée : un seul panneau à la fois (mutual exclusion) ──────
+  // Auparavant les panneaux droits (recherche, MCP, vision, suivi, missions,
+  // agents, flotte, telegram, modèle, tokens) étaient des booléens indépendants
+  // qui s'empilaient et écrasaient l'éditeur. `openRightPanel` garantit qu'ouvrir
+  // un panneau ferme tous les autres — « un panneau remplace l'autre dans sa zone ».
+  type RightPanelName =
+    | 'search' | 'mcp' | 'vision' | 'skillsMonitor' | 'missions'
+    | 'agents' | 'fleet' | 'telegram' | 'modelPicker' | 'tokenDetail';
+
+  const openRightPanel = useCallback((target: RightPanelName | null) => {
+    setShowGlobalSearch(target === 'search');
+    setShowMcp(target === 'mcp');
+    setVisionEnabled(target === 'vision');
+    setShowSkillsMonitor(target === 'skillsMonitor');
+    setShowMissions(target === 'missions');
+    setShowAgents(target === 'agents');
+    setShowFleet(target === 'fleet');
+    setShowTelegram(target === 'telegram');
+    setShowModelPicker(target === 'modelPicker');
+    setShowTokenDetail(target === 'tokenDetail');
+  }, []);
+
+  // Toggle: si le panneau ciblé est déjà ouvert, on ferme toute la zone droite ;
+  // sinon on l'ouvre (ce qui ferme automatiquement le panneau précédent).
+  const toggleRightPanel = useCallback((target: RightPanelName, isOpen: boolean) => {
+    openRightPanel(isOpen ? null : target);
+  }, [openRightPanel]);
+
+  const closeRightPanel = useCallback(() => openRightPanel(null), [openRightPanel]);
+
+  // ── Zone basse : Terminal et Logs partagent la même zone (mutuellement exclusifs) ──
+  const toggleTerminal = useCallback(() => {
+    setShowTerminal(v => {
+      if (!v) setShowAssistantLogs(false); // ouvrir le terminal ferme les logs
+      return !v;
+    });
+  }, []);
+  const toggleLogs = useCallback(() => {
+    setShowAssistantLogs(v => {
+      if (!v) setShowTerminal(false); // ouvrir les logs ferme le terminal
+      return !v;
+    });
+  }, []);
 
   // Auto-close assistant-dependent panels when assistant is disconnected
   useEffect(() => {
@@ -415,7 +463,7 @@ export default function IdeView() {
 
   // ── Ouvrir la vue des missions (déclenché par MissionCreatedPrompt) ─────────
   useEffect(() => {
-    const handleOpenMissions = () => setShowMissions(true);
+    const handleOpenMissions = () => openRightPanel('missions');
     window.addEventListener('Leanna-open-missions', handleOpenMissions);
     return () => window.removeEventListener('Leanna-open-missions', handleOpenMissions);
   }, []);
@@ -461,7 +509,7 @@ export default function IdeView() {
 
   // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
-    const handleOpenAgents = () => setShowAgents(true);
+    const handleOpenAgents = () => openRightPanel('agents');
     window.addEventListener('Leanna-open-agents-panel', handleOpenAgents);
 
     return () => {
@@ -657,7 +705,7 @@ export default function IdeView() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
-        setShowGlobalSearch(true);
+        openRightPanel('search');
       }
       // ── Self-IDE shortcuts ────────────────────────────────────────────
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
@@ -684,7 +732,7 @@ export default function IdeView() {
       // Terminal toggle (Ctrl+`)
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault();
-        setShowTerminal(v => !v);
+        toggleTerminal();
       }
       // Browser/Preview toggle (Ctrl+Shift+B)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
@@ -875,19 +923,19 @@ export default function IdeView() {
         screenShareEnabled={screenShareEnabled}
         mode={mode}
         onToggleExplorer={() => setShowExplorer(v => !v)}
-        onToggleSearch={() => setShowGlobalSearch(v => !v)}
+        onToggleSearch={() => toggleRightPanel('search', showGlobalSearch)}
         onToggleRunMenu={() => setShowRunMenu(v => !v)}
         onToggleSandbox={toggleSandbox}
         onToggleGitHub={() => setShowGitHub(v => !v)}
         onToggleWorkflow={() => setShowWorkflow(v => !v)}
-        onToggleSkillsMonitor={() => setShowSkillsMonitor(v => !v)}
+        onToggleSkillsMonitor={() => toggleRightPanel('skillsMonitor', showSkillsMonitor)}
         onToggleChat={() => setShowChat(v => !v)}
-        onToggleAgents={() => setShowAgents(v => !v)}
+        onToggleAgents={() => toggleRightPanel('agents', showAgents)}
         onToggleAgentBuilder={() => setShowAgentBuilder(v => !v)}
         onToggleMarketplace={() => setShowMarketplace(v => !v)}
         onToggleSkillsDoc={() => setShowSkillsDoc(v => !v)}
-        onToggleFleet={() => setShowFleet(v => !v)}
-        onToggleMissions={() => setShowMissions(v => !v)}
+        onToggleFleet={() => toggleRightPanel('fleet', showFleet)}
+        onToggleMissions={() => toggleRightPanel('missions', showMissions)}
         onToggleKnowledge={() => {
           setShowKnowledge(v => !v);
           if (!showKnowledge) { setShowHistory(false); setShowAutomation(false); setShowNotebooks(false); setShowMemory(false); }
@@ -907,9 +955,9 @@ export default function IdeView() {
         }}
         onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
         onTogglePM2={() => setShowPM2(v => !v)}
-        onToggleMcp={() => setShowMcp(v => !v)}
+        onToggleMcp={() => toggleRightPanel('mcp', showMcp)}
         onToggleBrowser={() => openUrlInNewTab(BROWSER_HOME_URL)}
-        onToggleVision={() => setVisionEnabled(v => !v)}
+        onToggleVision={() => toggleRightPanel('vision', visionEnabled)}
         onToggleScreenShare={toggleScreenShare}
         onToggleMode={() => {
           const next = mode === 'full' ? 'ask' : 'full';
@@ -941,36 +989,41 @@ export default function IdeView() {
           if (!showMemory) { setShowHistory(false); setShowAutomation(false); setShowKnowledge(false); setShowNotebooks(false); }
         }}
         showTerminal={showTerminal}
-        onToggleTerminal={() => setShowTerminal(v => !v)}
+        onToggleTerminal={toggleTerminal}
       />
 
-      {/* File Explorer */}
+      {/* File Explorer — redimensionnable, largeur persistée (ExplorerDock) */}
       {showExplorer && (
-        <FileExplorer
-          tree={fileSystem.tree}
-          workspaceTree={fileSystem.workspaceTree}
-          diffPaths={fileSystem.diffPaths}
-          expandedDirs={fileSystem.expandedDirs}
-          loading={fileSystem.loading}
-          currentDir={fileSystem.currentDir}
-          onOpenFile={openFileAt}
-          onOpenFileDiff={(path) => openSandboxDiff(path)}
-          onToggleDirectory={fileSystem.toggleDirectory}
-          onLoadDirectory={fileSystem.loadDirectory}
-          onLoadWorkspaceDirectory={fileSystem.loadWorkspaceDirectory}
-          onContextMenu={(e, entry) => {
-            e.preventDefault();
-            setContextMenu({
-              target: { kind: entry.type === 'file' ? 'file' : 'folder', path: entry.path, name: entry.name },
-              x: e.clientX,
-              y: e.clientY,
-            });
-          }}
-          onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
-          onRefresh={() => { fileSystem.loadTree(); fileSystem.loadWorkspaceTree(); fileSystem.loadDiff(); }}
-          onNavigate={fileSystem.setCurrentDir}
-          onMoveEntry={fileSystem.moveEntry}
-        />
+        <ExplorerDock width={explorerWidth} onWidthChange={setExplorerWidth}>
+          {(width) => (
+            <FileExplorer
+              width={width}
+              tree={fileSystem.tree}
+              workspaceTree={fileSystem.workspaceTree}
+              diffPaths={fileSystem.diffPaths}
+              expandedDirs={fileSystem.expandedDirs}
+              loading={fileSystem.loading}
+              currentDir={fileSystem.currentDir}
+              onOpenFile={openFileAt}
+              onOpenFileDiff={(path) => openSandboxDiff(path)}
+              onToggleDirectory={fileSystem.toggleDirectory}
+              onLoadDirectory={fileSystem.loadDirectory}
+              onLoadWorkspaceDirectory={fileSystem.loadWorkspaceDirectory}
+              onContextMenu={(e, entry) => {
+                e.preventDefault();
+                setContextMenu({
+                  target: { kind: entry.type === 'file' ? 'file' : 'folder', path: entry.path, name: entry.name },
+                  x: e.clientX,
+                  y: e.clientY,
+                });
+              }}
+              onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
+              onRefresh={() => { fileSystem.loadTree(); fileSystem.loadWorkspaceTree(); fileSystem.loadDiff(); }}
+              onNavigate={fileSystem.setCurrentDir}
+              onMoveEntry={fileSystem.moveEntry}
+            />
+          )}
+        </ExplorerDock>
       )}
 
       {/* Editor Area */}
@@ -1150,7 +1203,7 @@ export default function IdeView() {
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
                                                   onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={openSettings}
-                                                  onOpenSearch={() => setShowGlobalSearch(true)}
+                                                  onOpenSearch={() => openRightPanel('search')}
                                                   onOpenChat={() => {
                                                     setChatDocked(true);
                                                     setShowChat(true);
@@ -1163,130 +1216,67 @@ export default function IdeView() {
                       )}
                     </div>
 
-            {/* Global Search Panel */}
-            {showGlobalSearch && (
-              <div
-                className="border-l"
-                style={{ width: '320px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-              >
-                <GlobalSearch onOpenFile={openFileAt} onClose={() => setShowGlobalSearch(false)} />
-              </div>
-            )}
-
-            {/* Workflow Panel */}
+            {/* Workflow Panel — panneau autonome (hors zone droite unifiée) */}
             {showWorkflow && (
               <WorkflowPanel onClose={() => setShowWorkflow(false)} />
             )}
 
-            {/* MCP Panel */}
-                        {showMcp && (
-                          <div className="border-l flex flex-col min-h-0" style={{ width: 320, borderColor: 'var(--border-base)' }}>
-                            <McpPanel />
-                          </div>
-                        )}
+            {/* System Health Dashboard — panneau autonome */}
+            {showSystemHealth && (
+              <SystemHealthDashboard onClose={() => setShowSystemHealth(false)} />
+            )}
 
-                        {/* Browser Panel — rendu en zone principale (plein écran) */}
+            {/* PM2 Status Panel — panneau autonome */}
+            {showPM2 && (
+              <PM2StatusPanel onClose={() => setShowPM2(false)} />
+            )}
 
-                        {/* System Health Dashboard */}
-                        {showSystemHealth && (
-                          <SystemHealthDashboard onClose={() => setShowSystemHealth(false)} />
-                        )}
-
-                        {/* PM2 Status Panel */}
-                        {showPM2 && (
-                          <PM2StatusPanel onClose={() => setShowPM2(false)} />
-                        )}
-
-                        {/* Vision Panel */}
-                        {visionEnabled && (
-                          <div
-                            className="border-l flex flex-col min-h-0"
-                            style={{ width: '260px', minWidth: '260px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-                          >
-                            <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement de la vision…</div></div>}>
-                              <VisionPanel connected={connected} onFrame={sendVideoFrame} />
-                            </Suspense>
-                          </div>
-                        )}
-
-            {/* Live Skills Monitor */}
-            {showSkillsMonitor && connected && (
-              <div
-                className="border-l flex flex-col min-h-0 overflow-hidden"
-                style={{ width: '280px', minWidth: '280px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-              >
-                <div className="flex-shrink-0 overflow-y-auto" style={{ maxHeight: '60%' }}>
-                  <LiveSkillsMonitor />
+            {/* ─── Zone droite unifiée : un seul panneau à la fois, redimensionnable ─── */}
+            <RightDock
+              open={
+                showGlobalSearch || showMcp || visionEnabled ||
+                (showSkillsMonitor && connected) || showMissions || showAgents ||
+                showFleet || showTelegram || showModelPicker || showTokenDetail
+              }
+            >
+              {showGlobalSearch && (
+                <GlobalSearch onOpenFile={openFileAt} onClose={closeRightPanel} />
+              )}
+              {showMcp && (
+                <div className="flex flex-col min-h-0 flex-1"><McpPanel /></div>
+              )}
+              {visionEnabled && (
+                <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement de la vision…</div></div>}>
+                  <VisionPanel connected={connected} onFrame={sendVideoFrame} />
+                </Suspense>
+              )}
+              {showSkillsMonitor && connected && (
+                <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+                  <div className="flex-shrink-0 overflow-y-auto" style={{ maxHeight: '60%' }}>
+                    <LiveSkillsMonitor />
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-hidden" />
                 </div>
-                <div className="flex-1 min-h-0 overflow-hidden" />
-              </div>
-            )}
-
-            {/* Chat/Agent Panel — moved to overlay below */}
-
-            {/* Agents Panel — now rendered as modal overlay below */}
-
-            {/* Agent Fleet Panel — rendered as modal overlay below */}
-
-            {/* Missions Panel */}
-            {showMissions && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <MissionPanel inline onClose={() => setShowMissions(false)} />
-              </div>
-            )}
-
-            {/* Agents Panel — docké comme le panneau Missions */}
-            {showAgents && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <AgentPanel docked onClose={() => setShowAgents(false)} />
-              </div>
-            )}
-
-            {/* Agent Fleet Panel — docké comme le panneau Missions */}
-            {showFleet && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <AgentFleetPanel docked onClose={() => setShowFleet(false)} />
-              </div>
-            )}
-
-            {/* Bot Telegram — docké comme le panneau Missions */}
-            {showTelegram && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <TelegramStatusModal docked status={null} onClose={() => setShowTelegram(false)} />
-              </div>
-            )}
-
-            {/* Sélecteur de modèle IA — docké comme le panneau Missions */}
-            {showModelPicker && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <ModelPickerModal docked onClose={() => setShowModelPicker(false)} />
-              </div>
-            )}
-
-            {/* Détails Tokens & Contexte — docké comme le panneau Missions */}
-            {showTokenDetail && (
-              <div
-                className="border-l flex flex-col min-h-0"
-                style={{ width: 340, borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <TokenDetailModal docked onClose={() => setShowTokenDetail(false)} />
-              </div>
-            )}
+              )}
+              {showMissions && (
+                <MissionPanel inline onClose={closeRightPanel} />
+              )}
+              {showAgents && (
+                <AgentPanel docked onClose={closeRightPanel} />
+              )}
+              {showFleet && (
+                <AgentFleetPanel docked onClose={closeRightPanel} />
+              )}
+              {showTelegram && (
+                <TelegramStatusModal docked status={null} onClose={closeRightPanel} />
+              )}
+              {showModelPicker && (
+                <ModelPickerModal docked onClose={closeRightPanel} />
+              )}
+              {showTokenDetail && (
+                <TokenDetailModal docked onClose={closeRightPanel} />
+              )}
+            </RightDock>
           </div>
         </div>
 
@@ -1302,15 +1292,15 @@ export default function IdeView() {
           dirty={activeFile?.dirty}
           assistantBusy={assistantWorking}
           onToggleSandbox={toggleSandbox}
-          onToggleMcp={() => setShowMcp(v => !v)}
-          onToggleAgents={() => setShowAgents(v => !v)}
-          onToggleFleet={() => setShowFleet(v => !v)}
-          onToggleLogs={() => setShowAssistantLogs(v => !v)}
+          onToggleMcp={() => toggleRightPanel('mcp', showMcp)}
+          onToggleAgents={() => toggleRightPanel('agents', showAgents)}
+          onToggleFleet={() => toggleRightPanel('fleet', showFleet)}
+          onToggleLogs={toggleLogs}
           onToggleGitHub={() => setShowGitHub(v => !v)}
-          onToggleMissions={() => setShowMissions(v => !v)}
-          onToggleTelegram={() => setShowTelegram(v => !v)}
-          onToggleModelPicker={() => setShowModelPicker(v => !v)}
-          onToggleTokenDetail={() => setShowTokenDetail(v => !v)}
+          onToggleMissions={() => toggleRightPanel('missions', showMissions)}
+          onToggleTelegram={() => toggleRightPanel('telegram', showTelegram)}
+          onToggleModelPicker={() => toggleRightPanel('modelPicker', showModelPicker)}
+          onToggleTokenDetail={() => toggleRightPanel('tokenDetail', showTokenDetail)}
         />
       </div>
 
@@ -1377,8 +1367,8 @@ export default function IdeView() {
 
       {/* Agent/Mission Activity Overlay — always visible when working */}
       <AgentActivityOverlay
-        onOpenAgents={() => setShowAgents(true)}
-        onOpenMissions={() => setShowMissions(true)}
+        onOpenAgents={() => openRightPanel('agents')}
+        onOpenMissions={() => openRightPanel('missions')}
         isChatOpen={showChat}
       />
 
@@ -1394,9 +1384,11 @@ export default function IdeView() {
         />
       )}
 
-      {/* Assistant Logs — modal overlay */}
+      {/* Assistant Logs — dockés dans la zone basse (comme le terminal) */}
       {showAssistantLogs && (
-        <AssistantLogsPanel onClose={() => setShowAssistantLogs(false)} />
+        <BottomDock showExplorer={showExplorer} explorerWidth={explorerWidth}>
+          <AssistantLogsPanel docked onClose={() => setShowAssistantLogs(false)} />
+        </BottomDock>
       )}
 
       {/* Agent Builder Panel — modal overlay */}
@@ -1429,6 +1421,7 @@ export default function IdeView() {
             setBrowserUrl(url);
           }}
           showExplorer={showExplorer}
+          explorerWidth={explorerWidth}
           devServerPort={ideSettings.devServerPort}
           initialCwd={fileSystem.activePath ? fileSystem.activePath.replace(/[\\/][^\\/]+$/, '') : ''}
         />

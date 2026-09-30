@@ -5,6 +5,7 @@ import {
   Bot, Sparkles, Wand2, ChevronRight, ChevronDown,
   Palette, Brain, Wrench, Zap, Settings2,
   RotateCcw, Check, AlertTriangle,
+  Search, FileText, FlaskConical, Building2,
 } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
 import {
@@ -795,7 +796,8 @@ function TabPrompt({ draft, updateDraft }: { draft: CustomAgentDraft; updateDraf
   const templates = [
     {
       id: 'reviewer',
-      label: '🔍 Code Reviewer',
+      icon: Search,
+      label: 'Code Reviewer',
       prompt: `Tu es un expert en revue de code. Tu analyses le code pour trouver :
 - Bugs potentiels et edge cases
 - Violations des bonnes pratiques
@@ -807,7 +809,8 @@ Sois constructif et propose des corrections concrètes.`,
     },
     {
       id: 'optimizer',
-      label: '⚡ Optimiseur',
+      icon: Zap,
+      label: 'Optimiseur',
       prompt: `Tu es un spécialiste de l'optimisation de code. Tu cherches à :
 - Réduire la complexité algorithmique
 - Minimiser les allocations mémoire
@@ -819,7 +822,8 @@ Mesure toujours l'impact avant/après.`,
     },
     {
       id: 'doc-writer',
-      label: '📝 Documentaliste',
+      icon: FileText,
+      label: 'Documentaliste',
       prompt: `Tu es un rédacteur technique expert. Tu produis :
 - Documentation API claire et complète
 - Guides d'utilisation accessibles
@@ -831,7 +835,8 @@ Adapte le niveau technique au public cible.`,
     },
     {
       id: 'tester',
-      label: '🧪 Testeur',
+      icon: FlaskConical,
+      label: 'Testeur',
       prompt: `Tu es un expert en tests logiciels. Tu crées :
 - Tests unitaires exhaustifs
 - Tests d'intégration robustes
@@ -843,7 +848,8 @@ Vise une couverture > 90% et des tests maintenables.`,
     },
     {
       id: 'architect',
-      label: '🏗️ Architecte',
+      icon: Building2,
+      label: 'Architecte',
       prompt: `Tu es un architecte logiciel senior. Tu évalues :
 - La séparation des responsabilités
 - Les patterns de conception appropriés
@@ -881,7 +887,9 @@ Propose des améliorations structurelles justifiées.`,
             className="overflow-hidden"
           >
             <div className="grid grid-cols-2 gap-2 pb-3">
-              {templates.map(t => (
+              {templates.map(t => {
+                const TIcon = t.icon;
+                return (
                 <button
                   key={t.id}
                   onClick={() => {
@@ -895,9 +903,10 @@ Propose des améliorations structurelles justifiées.`,
                     color: 'var(--text-primary)',
                   }}
                 >
-                  <span className="font-semibold">{t.label}</span>
+                  <span className="font-semibold inline-flex items-center gap-1.5"><TIcon size={12} style={{ color: 'var(--text-muted)' }} /> {t.label}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         )}

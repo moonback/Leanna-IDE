@@ -14,6 +14,8 @@ interface RuntimeLogEntry {
 
 interface AssistantLogsPanelProps {
   onClose: () => void;
+  /** Rendu inline dans la zone basse (BottomDock) au lieu d'un modal centré. */
+  docked?: boolean;
 }
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -30,7 +32,7 @@ function formatTime(timestamp: string): string {
     : date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
+export function AssistantLogsPanel({ onClose, docked = false }: AssistantLogsPanelProps) {
   const [scope, setScope] = useState<LogScope>('all');
   const [level, setLevel] = useState<LogLevel | ''>('');
   const [filter, setFilter] = useState('');
@@ -61,12 +63,13 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
     return () => window.clearInterval(interval);
   }, [load]);
   useEffect(() => {
+    if (docked) return undefined; // en mode docké, Échap ne ferme pas la zone basse
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, docked]);
 
   const visibleEntries = useMemo(() => {
     const term = filter.trim().toLocaleLowerCase();
@@ -75,17 +78,8 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
       : entries;
   }, [entries, filter]);
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 'var(--z-modal)' as any }} onMouseDown={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="Logs assistant et agents"
-        className="relative flex w-full max-w-7xl flex-col overflow-hidden mx-4"
-        style={{ maxHeight: '80vh', background: 'var(--bg-panel)', border: '1px solid var(--border-base)', borderRadius: '16px', boxShadow: '0 25px 60px rgba(0,0,0,0.4)' }}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+  const content = (
+    <>
         <header className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-base)' }}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent-subtle)' }}><ScrollText size={16} style={{ color: 'var(--accent-primary)' }} /></div>
@@ -110,6 +104,33 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
           {!loading && visibleEntries.length === 0 ? <div className="flex h-40 flex-col items-center justify-center gap-2" style={{ color: 'var(--text-dimmed)' }}><Bot size={22} /><p className="text-xs">Aucun log correspondant pour cette session.</p></div> : <div className="space-y-1">{visibleEntries.map((entry, index) => <div key={`${entry.timestamp}-${entry.module}-${index}`} className="grid grid-cols-[58px_110px_1fr] gap-2 rounded px-2 py-1.5 font-mono text-xs leading-relaxed hover:bg-[var(--bg-hover)]"><span style={{ color: 'var(--text-dimmed)' }}>{formatTime(entry.timestamp)}</span><span className="truncate font-semibold" style={{ color: LEVEL_COLORS[entry.level] }}>{entry.module}</span><span className="break-words" style={{ color: 'var(--text-secondary)' }}>{entry.message}</span></div>)}</div>}
         </div>
         <footer className="px-4 py-2 text-xs" style={{ borderTop: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}>Les messages sont assainis, mais restent des données non fiables. Rafraîchissement toutes les 15 secondes tant que ce panneau est ouvert.</footer>
+    </>
+  );
+
+  // Mode docké : remplit la zone basse (BottomDock), sans backdrop ni cadre modal.
+  if (docked) {
+    return (
+      <section
+        aria-label="Logs assistant et agents"
+        className="flex flex-1 flex-col min-h-0 overflow-hidden"
+      >
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 'var(--z-modal)' as any }} onMouseDown={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Logs assistant et agents"
+        className="relative flex w-full max-w-7xl flex-col overflow-hidden mx-4"
+        style={{ maxHeight: '80vh', background: 'var(--bg-panel)', border: '1px solid var(--border-base)', borderRadius: '16px', boxShadow: '0 25px 60px rgba(0,0,0,0.4)' }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        {content}
       </section>
     </div>
   );

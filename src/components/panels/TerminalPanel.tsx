@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, memo, forwardRef, useImperativeHandle } from 'react';
-import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command, Folder, Box } from 'lucide-react';
+import { X, Terminal, Maximize, Minimize, Plus, ChevronDown, ChevronLeft, ChevronRight, Search, Trash2, Pencil, Copy, Check, AlertCircle, Server, Command, Folder, Box, Clock } from 'lucide-react';
 import { useTerminal } from '../../hooks/useTerminal.js';
 import { motion, AnimatePresence } from 'motion/react';
 import { ideApi } from '../../services/ideApi.js';
@@ -13,6 +13,8 @@ interface TerminalPanelProps {
   onToggleDock?: () => void;
   onOpenBrowser?: (url: string) => void;
   showExplorer?: boolean;
+  /** Largeur actuelle de l'explorateur (px) pour aligner le terminal docké. */
+  explorerWidth?: number;
   devServerPort?: number;
   initialCwd?: string;
 }
@@ -853,7 +855,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
           color: isConnected ? 'var(--color-success)' : isConnecting ? 'var(--color-warning)' : 'var(--color-error)',
           fontSize: 'var(--text-sm)',
         }}>
-          {isConnected ? '✓' : isConnecting ? '⏳' : '✗'}
+          {isConnected ? <Check size={13} /> : isConnecting ? <Clock size={13} /> : <X size={13} />}
         </span>
         <input
           ref={inputRef}
@@ -905,7 +907,7 @@ const TerminalTabPanel: React.FC<TerminalTabPanelProps> = memo(({ tab, isActive,
 });
 
 // Composant principal
-const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer, devServerPort, initialCwd }, ref) => {
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onClose, isDocked, onOpenBrowser, showExplorer, explorerWidth = 260, devServerPort, initialCwd }, ref) => {
   const [tabs, setTabs] = useState<TerminalTab[]>([{ id: '1', title: 'Terminal 1', shell: 'PowerShell', cwd: initialCwd ?? '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1208,13 +1210,13 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
         display: 'flex',
         flexDirection: 'column',
         height: isMinimized ? 'auto' : isFullscreen ? '100vh' : isDocked ? '40vh' : '60vh',
-        width: isFullscreen ? '100vw' : isMinimized ? (showExplorer ? 'calc(100vw - 316px)' : 'calc(100vw - 56px)') : isDocked ? (showExplorer ? 'calc(100vw - 316px)' : 'calc(100vw - 56px)') : '70vw',
+        width: isFullscreen ? '100vw' : isMinimized ? (showExplorer ? `calc(100vw - ${56 + explorerWidth}px)` : 'calc(100vw - 56px)') : isDocked ? (showExplorer ? `calc(100vw - ${56 + explorerWidth}px)` : 'calc(100vw - 56px)') : '70vw',
         minHeight: isMinimized ? '0' : isDocked ? '200px' : '400px',
         maxHeight: isMinimized ? '40px' : isFullscreen ? 'none' : isDocked ? '70vh' : '80vh',
         position: 'fixed',
         top: isFullscreen ? 0 : isMinimized ? undefined : isDocked ? undefined : '50%',
         right: isFullscreen ? 0 : isMinimized ? '0' : isDocked ? '0' : undefined,
-        left: isFullscreen ? 0 : isMinimized ? (showExplorer ? '316px' : '56px') : isDocked ? (showExplorer ? '316px' : '56px') : '50%',
+        left: isFullscreen ? 0 : isMinimized ? (showExplorer ? `${56 + explorerWidth}px` : '56px') : isDocked ? (showExplorer ? `${56 + explorerWidth}px` : '56px') : '50%',
         bottom: isFullscreen ? 0 : isMinimized ? '0' : isDocked ? '0' : undefined,
         zIndex: 'var(--z-terminal)' as any,
         boxShadow: isFullscreen ? 'none' : isMinimized ? '0 4px 12px rgba(0, 0, 0, 0.3)' : isDocked ? '0 -4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
@@ -1450,7 +1452,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                         >
                           <span>{shell.label}</span>
                           {isActive && (
-                            <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓</span>
+                            <span style={{ marginLeft: 'auto', color: 'var(--color-success)', display: 'inline-flex' }}><Check size={13} /></span>
                           )}
                         </button>
                       );
@@ -1547,7 +1549,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(({ onC
                             {mode.icon}
                             <span>{mode.label}</span>
                             {isActive && (
-                              <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓</span>
+                              <span style={{ marginLeft: 'auto', color: 'var(--color-success)', display: 'inline-flex' }}><Check size={13} /></span>
                             )}
                           </button>
                         );
