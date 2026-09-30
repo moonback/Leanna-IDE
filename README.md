@@ -70,6 +70,7 @@
 * [Structure du dépôt](#structure-du-dépôt)
 * [Installation](#installation)
 * [Configuration](#configuration)
+* [Édition des variables d'environnement dans l'interface](#édition-des-variables-denvironnement-dans-linterface)
 * [Développement](#développement)
 * [Tests](#tests)
 * [Build et packaging](#build-et-packaging)
@@ -1546,7 +1547,8 @@ L'interface inclut des composants pour :
 * les notebooks ;
 * les journaux ;
 * l'observabilité ;
-* les paramètres.
+* les paramètres ;
+* l'édition des variables d'environnement (`.env`).
 
 Les zones frontend pertinentes incluent :
 
@@ -2501,6 +2503,60 @@ TELEGRAM_BOT_TOKEN=""
 ```env
 GITHUB_TOKEN=""
 ```
+
+---
+
+# Édition des variables d'environnement dans l'interface
+
+En plus de l'édition manuelle du fichier `.env`, Leanna expose un éditeur de variables d'environnement directement dans l'interface.
+
+Il est accessible depuis :
+
+```text
+Paramètres → Sécurité & Connaissances → Variables .env
+```
+
+## Objectif
+
+L'éditeur lit le fichier `.env` actif (ou `.env.local` s'il existe), regroupe les variables par **catégorie** à partir des en-têtes de section du fichier, et propose un champ de saisie adapté au type de chaque variable :
+
+```text
+secret   → champ masqué
+boolean  → interrupteur
+number   → champ numérique
+select   → liste déroulante (ex. LOG_LEVEL, LEANNA_AUTONOMY_MODE, Leanna_PERMISSION_MODE)
+text     → champ texte
+```
+
+Les variables modifiées sont mises en attente et appliquées en lot via une barre de sauvegarde.
+
+## Traitement des secrets
+
+Les clés sensibles (jetons, clés API, secrets) ne sont **jamais renvoyées en clair** par l'API de liste. Le serveur n'envoie qu'un indicateur de présence et un aperçu masqué (par exemple `AIza••••wXyz`).
+
+À l'écriture, les valeurs sensibles sont **chiffrées au repos** via la clé maître (`Leanna_MASTER_KEY`), de la même manière que le reste des secrets de l'application.
+
+## Révéler / déchiffrer une valeur
+
+Chaque secret dispose d'un bouton permettant d'afficher sa valeur **déchiffrée** à la demande. La révélation :
+
+* déclenche un appel serveur dédié qui déchiffre uniquement la clé demandée ;
+* affiche la valeur en clair dans le champ, avec un avertissement de visibilité à l'écran ;
+* est réinitialisée automatiquement au rechargement, à la sauvegarde et à l'annulation.
+
+## Points de terminaison
+
+```text
+GET  /api/env               Liste les variables groupées par section (secrets masqués)
+GET  /api/env/reveal/:key   Renvoie la valeur déchiffrée d'une seule clé (sur demande explicite)
+POST /api/env               Met à jour une ou plusieurs variables (secrets chiffrés à l'écriture)
+```
+
+Ces points de terminaison sont soumis à l'authentification API comme le reste de `/api`. L'écriture est bornée aux clés déjà présentes dans le `.env`, afin d'éviter l'injection de clés arbitraires.
+
+## Note de sécurité
+
+L'éditeur peut modifier des variables qui affectent la sécurité et le comportement du serveur (hôte d'écoute, permissions, autonomie, jetons). Certaines valeurs (ports, hôtes, verrous Redis) nécessitent un redémarrage du serveur pour être prises en compte. Traitez cet écran avec la même prudence qu'une édition directe du fichier `.env`.
 
 ---
 
