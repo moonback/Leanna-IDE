@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-790%20passing-brightgreen?logo=vitest" alt="Tests 790 passing" />
+  <img src="https://img.shields.io/badge/Tests-848%20passing-brightgreen?logo=vitest" alt="Tests 848 passing" />
 
 [![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
@@ -49,6 +49,7 @@
 * [Apprentissage et fiabilité](#apprentissage-et-fiabilité)
 * [Vérification et récupération](#vérification-et-récupération)
 * [Architecture de sécurité](#architecture-de-sécurité)
+* [Safety Gate Jev](#safety-gate-jev)
 * [Permissions](#permissions)
 * [Modes d'autonomie](#modes-dautonomie)
 * [Bac à sable et exécution sûre](#bac-à-sable-et-exécution-sûre)
@@ -1130,6 +1131,110 @@ promptInjectionGuard
 safeguards
 checkpoint
 confirmationBridge
+```
+
+---
+
+# Safety Gate Jev
+
+Le **Safety Gate Jev** est une couche de sécurité sémantique qui évalue **chaque
+action à effet de bord** de l'agent (écriture de fichier, suppression, commande
+shell, `push` git, appel réseau…) **avant son exécution**, et peut la bloquer.
+
+Contrairement aux contrôles déterministes (chemins interdits, `.leannaignore`,
+bac à sable), qui répondent à la question « cette action touche-t-elle une zone
+protégée ? », le Safety Gate répond à la question « cette action est-elle
+**risquée** dans son intention ? ». Il s'appuie sur le modèle de décision **Jev**
+(TypeSafe, via OpenRouter) auquel on pose des questions **typées** dont on route
+les probabilités, au lieu de demander un « OUI/NON » libre à parser.
+
+## Où il se branche
+
+Le garde s'insère au point de passage unique des outils (`ToolRegistry`), via un
+adaptateur, sur le même patron que la garde d'idempotence :
+
+```text
+Appel d'outil
+      │
+      ▼
+JevSafetyGate  (pré-filtre + jugement Jev)
+      │
+      ▼
+ToolRegistry → Exécution
+```
+
+Composants pertinents :
+
+```text
+server/core/JevSafetyGate.ts     (adaptateur ToolRegistry ↔ Jev)
+server/utils/jevGating.ts        (politique de gating + seuils)
+server/utils/jevDecisions.ts     (questions typées posées à Jev)
+scripts/jev-gate-calibrate.ts    (calibration des seuils)
+```
+
+## Pré-filtre : Jev n'est appelé que si nécessaire
+
+Pour éviter des appels réseau inutiles et des faux positifs, le garde **ne
+consulte Jev que** pour les actions réellement à risque système :
+
+* les outils dont le nom correspond à une opération sensible (fichiers, shell,
+  `push` distant), **ou**
+* les appels portant effectivement un chemin, une commande ou une URL.
+
+Les outils sur l'état interne de l'application (mémoire, mission, lecture) passent
+sans appel ni jugement.
+
+## Décision
+
+Jev renvoie des probabilités sur des catégories de risque typées
+(`destructive_data`, `security_control`, `production_or_infra`, `exfiltration`, ou
+`none`) ainsi qu'une probabilité d'irréversibilité. Une politique **pure**
+(`decideGate`) traduit ces probabilités en une action :
+
+```text
+Risque net et confiant   → block   (bloqué)
+Risque probable / incertain ou action irréversible → review
+Action ordinaire réversible → allow
+```
+
+Comme la politique est pure et déterministe, les seuils sont **rejouables** sur
+des jugements déjà payés — d'où le script de calibration.
+
+## Modes
+
+Le comportement est piloté par la variable d'environnement
+`LEANNA_SAFETY_GATE` :
+
+```text
+off       désactivé (défaut) — comportement strictement inchangé
+audit     évalue et journalise les verdicts SANS jamais bloquer
+enforce   bloque les actions jugées risquées
+```
+
+En mode `enforce`, le garde est **fail-closed** : en cas de panne, d'erreur ou
+d'absence de clé OpenRouter, l'action est mise en revue (donc bloquée) plutôt que
+laissée passer.
+
+## Configuration
+
+```env
+# off | audit | enforce
+LEANNA_SAFETY_GATE="off"
+```
+
+Le garde réutilise la même `OPENROUTER_API_KEY` que le reste de l'application.
+
+## Calibration des seuils
+
+Les seuils de décision (`GATE_THRESHOLDS`) peuvent être calibrés sur un jeu
+d'exemples labellisés. Chaque exemple est jugé une seule fois par Jev, puis
+différents seuils candidats sont rejoués sur ces réponses sans nouvel appel
+réseau :
+
+```bash
+npm run jev:calibrate
+# ou en ciblant un modèle
+npx tsx scripts/jev-gate-calibrate.ts --model typesafe/jev-latest
 ```
 
 ---
