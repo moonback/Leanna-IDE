@@ -46,7 +46,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const resetCodeRef = useRef<HTMLInputElement>(null);
   const hasFetched = useRef(false);
-  const [showModifiedFiles, setShowModifiedFiles] = useState(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
   // Progression de la réinitialisation du sandbox (0 → 100).
   const [resetProgress, setResetProgress] = useState(0);
@@ -237,11 +236,23 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
 
   return (
     <motion.div
-      className="flex flex-col gap-3.5 p-4 sm:gap-4"
+      className="grid grid-cols-1 gap-3.5 p-4 sm:gap-4 lg:grid-cols-2 lg:items-start"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
     >
+      {/* ═══════════════════════════════════════════════════════
+          COLONNE GAUCHE — Actions recommandées
+          ═══════════════════════════════════════════════════════ */}
+      <div className="flex min-w-0 flex-col gap-3.5 sm:gap-4">
+        <div
+          className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Sparkles size={12} style={{ color: 'var(--accent-primary)' }} />
+          Actions recommandées
+        </div>
+
       {/* ═══════════════════════════════════════════════════════
           HERO — État du sandbox
           ═══════════════════════════════════════════════════════ */}
@@ -400,169 +411,6 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          FICHIERS MODIFIÉS
-          ═══════════════════════════════════════════════════════ */}
-      {isActive && status && status.modifiedFiles.length > 0 && (
-        <SectionCard
-          title="Fichiers modifiés"
-          count={status.modifiedFiles.length}
-          countColor="var(--color-info)"
-          open={showModifiedFiles}
-          onToggle={() => setShowModifiedFiles(v => !v)}
-          spring={spring}
-        >
-          <div className="custom-scrollbar max-h-52 space-y-0.5 overflow-y-auto px-1.5 pb-1.5">
-            {status.modifiedFiles.map(f => (
-              <button
-                key={f}
-                onClick={() => onOpenDiff(f)}
-                className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-all hover:bg-[var(--bg-hover)]"
-              >
-                <FileCode2 size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                <span
-                  className="flex-1 truncate font-mono text-xs transition-colors group-hover:text-[var(--text-primary)]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {f}
-                </span>
-                <GitCompareArrows
-                  size={11}
-                  className="opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{ color: 'var(--text-dimmed)' }}
-                />
-              </button>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════
-          ACTIONS AVANCÉES
-          ═══════════════════════════════════════════════════════ */}
-      {status?.exists && (
-        <SectionCard
-          title="Actions avancées"
-          open={showAdvancedActions}
-          onToggle={() => setShowAdvancedActions(v => !v)}
-          spring={spring}
-        >
-          <div className="flex flex-col gap-0.5 p-1.5">
-            {isActive && modCount > 0 && (
-              <ActionRow
-                icon={<Upload size={13} />}
-                label="Synchroniser tout"
-                color="var(--color-success)"
-                onClick={() => doAction('sync')}
-                busy={busy === 'sync'}
-                tooltip="Appliquer toutes les modifications au repo principal"
-                transition={hoverSpring}
-              />
-            )}
-            {isActive && modCount > 0 && (
-              <ActionRow
-                icon={<Trash2 size={13} />}
-                label="Tout rejeter"
-                color="var(--color-error)"
-                onClick={() => doAction('discard')}
-                busy={busy === 'discard'}
-                tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
-                transition={hoverSpring}
-              />
-            )}
-            {isActive && (
-              <ActionRow
-                icon={<Lock size={13} />}
-                label="Désactiver"
-                color="var(--color-warning)"
-                onClick={handleDeactivate}
-                busy={busy === 'deactivate'}
-                tooltip="Entrez un code à 6 chiffres pour désactiver le sandbox"
-                transition={hoverSpring}
-              />
-            )}
-            <ActionRow
-              icon={<RotateCcw size={13} />}
-              label="Réinitialiser le sandbox"
-              color="var(--color-warning)"
-              onClick={handleReset}
-              busy={busy === 'reset'}
-              tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
-              transition={hoverSpring}
-            />
-
-            {/* Champs de code sécurité — déactivation / réinitialisation */}
-            <AnimatePresence>
-              {showCodeInput && isActive && (
-                <CodeInputRow
-                  key="deactivate-code"
-                  inputRef={codeInputRef}
-                  value={securityCode}
-                  onChange={v => setSecurityCode(v)}
-                  onConfirm={handleDeactivate}
-                  onCancel={() => { setShowCodeInput(false); setSecurityCode(''); }}
-                  label="Confirmer la désactivation"
-                  icon={<ShieldOff size={12} />}
-                  spring={spring}
-                />
-              )}
-              {showResetCodeInput && status?.exists && (
-                <CodeInputRow
-                  key="reset-code"
-                  inputRef={resetCodeRef}
-                  value={resetCode}
-                  onChange={v => setResetCode(v)}
-                  onConfirm={handleReset}
-                  onCancel={() => { setShowResetCodeInput(false); setResetCode(''); }}
-                  label="Confirmer la réinitialisation"
-                  icon={<RotateCcw size={12} />}
-                  spring={spring}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Barre de progression de la réinitialisation */}
-            <AnimatePresence>
-              {busy === 'reset' && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={spring}
-                  className="space-y-1.5 overflow-hidden px-2.5 pt-2"
-                >
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
-                      <Loader2 size={11} className="animate-spin" />
-                      {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}
-                    </span>
-                    <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                      {Math.round(resetProgress)}%
-                    </span>
-                  </div>
-                  <div
-                    className="h-1.5 w-full overflow-hidden rounded-full"
-                    style={{ backgroundColor: 'var(--bg-input)' }}
-                    role="progressbar"
-                    aria-valuenow={Math.round(resetProgress)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Progression de la réinitialisation du sandbox"
-                  >
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: 'var(--color-warning)' }}
-                      animate={{ width: `${resetProgress}%` }}
-                      transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 120, damping: 20 }}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </SectionCard>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════
           FEEDBACK
           ═══════════════════════════════════════════════════════ */}
       <AnimatePresence>
@@ -596,6 +444,205 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════
+          COLONNE DROITE — Fichiers modifiés
+          ═══════════════════════════════════════════════════════ */}
+      <div className="flex min-w-0 flex-col gap-3.5 sm:gap-4">
+        <div
+          className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <FileCode2 size={12} style={{ color: 'var(--color-info)' }} />
+          Fichiers modifiés
+          {isActive && status && status.modifiedFiles.length > 0 && (
+            <span
+              className="rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums normal-case"
+              style={{
+                color: 'var(--color-info)',
+                backgroundColor: 'color-mix(in srgb, var(--color-info) 14%, transparent)',
+              }}
+            >
+              {status.modifiedFiles.length}
+            </span>
+          )}
+        </div>
+
+        {isActive && status && status.modifiedFiles.length > 0 ? (
+          <div
+            className="overflow-hidden rounded-xl border"
+            style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+          >
+            <div className="custom-scrollbar max-h-[28rem] space-y-0.5 overflow-y-auto p-1.5">
+              {status.modifiedFiles.map(f => (
+                <button
+                  key={f}
+                  onClick={() => onOpenDiff(f)}
+                  className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-all hover:bg-[var(--bg-hover)]"
+                >
+                  <FileCode2 size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                  <span
+                    className="flex-1 truncate font-mono text-xs transition-colors group-hover:text-[var(--text-primary)]"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {f}
+                  </span>
+                  <GitCompareArrows
+                    size={11}
+                    className="opacity-0 transition-opacity group-hover:opacity-100"
+                    style={{ color: 'var(--text-dimmed)' }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="flex flex-col items-center justify-center gap-2 rounded-xl border px-4 py-10 text-center"
+            style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-input)' }}
+          >
+            <FileCode2 size={20} style={{ color: 'var(--text-dimmed)' }} />
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {isActive
+                ? 'Aucun fichier modifié pour le moment.'
+                : status?.exists
+                  ? 'Activez le sandbox pour suivre les modifications.'
+                  : 'Initialisez le sandbox pour commencer.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════
+          ACTIONS AVANCÉES — pleine largeur, sous les deux colonnes
+          ═══════════════════════════════════════════════════════ */}
+      {status?.exists && (
+        <div className="lg:col-span-2">
+          <SectionCard
+            title="Actions avancées"
+            open={showAdvancedActions}
+            onToggle={() => setShowAdvancedActions(v => !v)}
+            spring={spring}
+          >
+            <div className="flex flex-col gap-1.5 p-1.5">
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {isActive && modCount > 0 && (
+                  <ActionRow
+                    icon={<Upload size={13} />}
+                    label="Synchroniser tout"
+                    color="var(--color-success)"
+                    onClick={() => doAction('sync')}
+                    busy={busy === 'sync'}
+                    tooltip="Appliquer toutes les modifications au repo principal"
+                    transition={hoverSpring}
+                  />
+                )}
+                {isActive && modCount > 0 && (
+                  <ActionRow
+                    icon={<Trash2 size={13} />}
+                    label="Tout rejeter"
+                    color="var(--color-error)"
+                    onClick={() => doAction('discard')}
+                    busy={busy === 'discard'}
+                    tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
+                    transition={hoverSpring}
+                  />
+                )}
+                {isActive && (
+                  <ActionRow
+                    icon={<Lock size={13} />}
+                    label="Désactiver"
+                    color="var(--color-warning)"
+                    onClick={handleDeactivate}
+                    busy={busy === 'deactivate'}
+                    tooltip="Entrez un code à 6 chiffres pour désactiver le sandbox"
+                    transition={hoverSpring}
+                  />
+                )}
+                <ActionRow
+                  icon={<RotateCcw size={13} />}
+                  label="Réinitialiser le sandbox"
+                  color="var(--color-warning)"
+                  onClick={handleReset}
+                  busy={busy === 'reset'}
+                  tooltip="Écraser le sandbox avec une copie fraîche du code source (code requis)"
+                  transition={hoverSpring}
+                />
+              </div>
+
+              {/* Champs de code sécurité — déactivation / réinitialisation */}
+              <AnimatePresence>
+                {showCodeInput && isActive && (
+                  <CodeInputRow
+                    key="deactivate-code"
+                    inputRef={codeInputRef}
+                    value={securityCode}
+                    onChange={v => setSecurityCode(v)}
+                    onConfirm={handleDeactivate}
+                    onCancel={() => { setShowCodeInput(false); setSecurityCode(''); }}
+                    label="Confirmer la désactivation"
+                    icon={<ShieldOff size={12} />}
+                    spring={spring}
+                  />
+                )}
+                {showResetCodeInput && status?.exists && (
+                  <CodeInputRow
+                    key="reset-code"
+                    inputRef={resetCodeRef}
+                    value={resetCode}
+                    onChange={v => setResetCode(v)}
+                    onConfirm={handleReset}
+                    onCancel={() => { setShowResetCodeInput(false); setResetCode(''); }}
+                    label="Confirmer la réinitialisation"
+                    icon={<RotateCcw size={12} />}
+                    spring={spring}
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Barre de progression de la réinitialisation */}
+              <AnimatePresence>
+                {busy === 'reset' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={spring}
+                    className="space-y-1.5 overflow-hidden px-2.5 pt-2"
+                  >
+                    <div className="flex items-center justify-between text-xs font-medium">
+                      <span className="flex items-center gap-1.5" style={{ color: 'var(--color-warning)' }}>
+                        <Loader2 size={11} className="animate-spin" />
+                        {resetProgress >= 100 ? 'Réinitialisation terminée' : 'Réinitialisation en cours…'}
+                      </span>
+                      <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                        {Math.round(resetProgress)}%
+                      </span>
+                    </div>
+                    <div
+                      className="h-1.5 w-full overflow-hidden rounded-full"
+                      style={{ backgroundColor: 'var(--bg-input)' }}
+                      role="progressbar"
+                      aria-valuenow={Math.round(resetProgress)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Progression de la réinitialisation du sandbox"
+                    >
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: 'var(--color-warning)' }}
+                        animate={{ width: `${resetProgress}%` }}
+                        transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 120, damping: 20 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </SectionCard>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -812,17 +859,30 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, transition }: {
       whileTap={{ scale: 0.97 }}
       whileHover={{ x: 2 }}
       transition={transition}
-      className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-50"
+      className="group flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-50"
       title={tooltip}
     >
       <div
-        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-transform duration-150 group-hover:scale-110"
+        className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-transform duration-150 group-hover:scale-110"
         style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`, color }}
       >
         {busy ? <Loader2 size={12} className="animate-spin" /> : icon}
       </div>
-      <span className="text-xs font-medium transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-medium transition-colors group-hover:text-[var(--text-primary)]" style={{ color: 'var(--text-secondary)' }}>
+          {label}
+        </span>
+        {/* Description révélée au survol — hint contextuel en clair */}
+        <span className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr]">
+          <span className="overflow-hidden">
+            <span
+              className="mt-0.5 block text-[11px] leading-snug opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {tooltip}
+            </span>
+          </span>
+        </span>
       </span>
     </motion.button>
   );
