@@ -229,6 +229,12 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
       `journalisées ; un rejeu après crash est bloqué.`
     );
   }
+  if (kernel.safetyGateMode !== "off") {
+    console.log(
+      `[Bootstrap] 🛡️  Safety gate Jev ${kernel.safetyGateMode === "enforce" ? "ACTIVÉ (enforce)" : "en AUDIT"} — ` +
+      `les actions à effet de bord sont évaluées avant exécution.`
+    );
+  }
 
   return { runtime, skillManager, prompts, agentic, kernel };
 }
@@ -296,6 +302,9 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   });
   if (kernel.idempotencyEnabled) {
     console.log(`[Bootstrap] 🔒 Idempotence P0 ACTIVÉE (mode synchrone).`);
+  }
+  if (kernel.safetyGateMode !== "off") {
+    console.log(`[Bootstrap] 🛡️  Safety gate Jev ${kernel.safetyGateMode} (mode synchrone).`);
   }
 
   return { runtime, skillManager, prompts, agentic, kernel };

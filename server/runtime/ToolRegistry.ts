@@ -93,6 +93,12 @@ export interface ToolRegistryConfig {
    * la garde n'est pas configurée.
    */
   idempotency?: IdempotencyGuard;
+  /**
+   * Garde de sécurité pré-exécution optionnel (jugement Jev). Si fourni, chaque
+   * appel d'outil À EFFET DE BORD passe par lui AVANT exécution ; une action
+   * jugée risquée est bloquée. Aucun impact si non configuré.
+   */
+  safetyGate?: SafetyGate;
 }
 
 /**
@@ -119,6 +125,39 @@ export interface IdempotencyGuard {
     | { decision: "block"; reason: string };
 }
 
+/**
+ * Contrat minimal d'un garde de sécurité PRÉ-EXÉCUTION, implémenté par un
+ * adaptateur (voir `server/core/SafetyGate.ts`). Volontairement défini ici pour
+ * garder `ToolRegistry` indépendant de l'implémentation du jugement (Jev).
+ *
+ * Appelé APRÈS les permissions et AVANT le dry-run/idempotence, uniquement pour
+ * les outils à effet de bord. Retourne :
+ *   - `{ decision: "allow" }`  : exécuter normalement ;
+ *   - `{ decision: "block", reason }` : refuser (lève `SafetyGateBlockedError`).
+ * Un `"review"` de la couche de jugement est traité comme un blocage assorti
+ * du motif, l'exécution automatique restant fail-closed.
+ */
+export interface SafetyGate {
+  evaluate(
+    tool: string,
+    args: Record<string, unknown>,
+    permissions: ToolPermission[] | undefined,
+    agentId: string | undefined
+  ): Promise<{ decision: "allow" } | { decision: "block"; reason: string }>;
+}
+
+/** Erreur levée quand le garde de sécurité refuse une action. */
+export class SafetyGateBlockedError extends Error {
+  readonly toolName: string;
+  readonly reason: string;
+  constructor(toolName: string, reason: string) {
+    super(`[safety-gate] "${toolName}" bloqué : ${reason}`);
+    this.name = "SafetyGateBlockedError";
+    this.toolName = toolName;
+    this.reason = reason;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ToolRegistry
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -134,6 +173,7 @@ export class ToolRegistry {
   private permissionPolicy: PermissionPolicy;
   private dryRun: DryRunController;
   private idempotency?: IdempotencyGuard;
+  private safetyGate?: SafetyGate;
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
@@ -143,11 +183,17 @@ export class ToolRegistry {
       config.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: config.eventBus });
     this.dryRun = config.dryRun ?? new DryRunController({ eventBus: config.eventBus });
     this.idempotency = config.idempotency;
+    this.safetyGate = config.safetyGate;
   }
 
   /** Branche (ou remplace) la garde d'idempotence après construction. */
   setIdempotencyGuard(guard: IdempotencyGuard | undefined): void {
     this.idempotency = guard;
+  }
+
+  /** Branche (ou remplace) le garde de sécurité pré-exécution après construction. */
+  setSafetyGate(gate: SafetyGate | undefined): void {
+    this.safetyGate = gate;
   }
 
   /** Retourne la politique de permissions appliquée au runtime. */
@@ -332,6 +378,28 @@ export class ToolRegistry {
     // Vérification additionnelle des permissions de l'appelant (le cas échéant).
     if (entry.definition.permissions?.length) {
       this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
+    }
+
+    // ── Garde de sécurité pré-exécution (jugement Jev) ──────────────────────
+    // Placé APRÈS les permissions (on n'évalue pas une action déjà refusée) et
+    // AVANT le dry-run/idempotence (on veut juger l'action réelle, pas une
+    // simulation). Uniquement pour les outils à effet de bord : un outil de
+    // lecture ne peut rien casser. Fail-closed : le gate bloque en cas de doute.
+    if (
+      this.safetyGate &&
+      this.dryRun.hasSideEffect(entry.definition.permissions) &&
+      !(options.dryRun ?? this.dryRun.isEnabled())
+    ) {
+      const verdict = await this.safetyGate.evaluate(
+        name,
+        args,
+        entry.definition.permissions,
+        options.agentId
+      );
+      if (verdict.decision === "block") {
+        this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs: 0, success: false });
+        throw new SafetyGateBlockedError(name, verdict.reason);
+      }
     }
 
     // Dry-run global : intercepte les outils à effet de bord avant toute

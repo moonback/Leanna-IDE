@@ -17,6 +17,7 @@
 import type { ToolRegistry } from "../runtime/ToolRegistry.js";
 import { ExecutionLedger } from "./ExecutionLedger.js";
 import { LedgerGuard } from "./LedgerGuard.js";
+import { JevSafetyGate, safetyGateModeFromEnv, type SafetyGateMode } from "./JevSafetyGate.js";
 import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
@@ -50,6 +51,10 @@ export interface CoreKernel {
   supervisor: LeannaSupervisor;
   /** Indique si la garde d'idempotence a été branchée au ToolRegistry. */
   idempotencyEnabled: boolean;
+  /** Garde de sécurité Jev (undefined si mode "off" ou pas de registry). */
+  safetyGate?: JevSafetyGate;
+  /** Mode effectif du garde de sécurité. */
+  safetyGateMode: SafetyGateMode;
   /**
    * Exécute une mission agentique SOUS GOUVERNANCE : état durable, snapshot/
    * rollback, preuve (la preuve prime sur la narration) et récupération. C'est
@@ -72,6 +77,14 @@ export interface CoreKernelOptions {
    * lue depuis `LEANNA_IDEMPOTENCY`.
    */
   enableIdempotency?: boolean;
+  /**
+   * Force le mode du garde de sécurité Jev. Par défaut, lu depuis
+   * `LEANNA_SAFETY_GATE` (off | audit | enforce).
+   */
+  safetyGateMode?: SafetyGateMode;
+  /** Clé/modèle OpenRouter passés au garde Jev (sinon repli sur l'env). */
+  safetyGateApiKey?: string;
+  safetyGateModel?: string;
   /** Environnement (tests). */
   env?: NodeJS.ProcessEnv;
   /**
@@ -107,6 +120,18 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
     idempotencyEnabled = true;
   }
 
+  // Garde de sécurité Jev : branché sur le ToolRegistry uniquement si le mode
+  // n'est pas "off". Fail-closed intégré dans jevGating (erreur → review).
+  const safetyGateMode = options.safetyGateMode ?? safetyGateModeFromEnv(env);
+  let safetyGate: JevSafetyGate | undefined;
+  if (safetyGateMode !== "off" && options.registry) {
+    safetyGate = new JevSafetyGate(safetyGateMode, {
+      apiKey: options.safetyGateApiKey,
+      model: options.safetyGateModel,
+    });
+    options.registry.setSafetyGate(safetyGate);
+  }
+
   const runSupervisedAgenticMission = async (
     runtime: AgenticLike,
     params: SupervisedAgenticMissionParams
@@ -120,6 +145,7 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
     // Rend les clés d'idempotence stables pour cette mission (si la garde est
     // branchée). On restaure le contexte précédent en fin d'exécution.
     guard.setContext({ missionId });
+    safetyGate?.setContext({ missionId });
     try {
       return await supervisor.runMission({
         missionId,
@@ -129,6 +155,7 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
       });
     } finally {
       guard.clearContext();
+      safetyGate?.clearContext();
     }
   };
 
@@ -140,6 +167,8 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
     missionStore,
     supervisor,
     idempotencyEnabled,
+    safetyGate,
+    safetyGateMode,
     runSupervisedAgenticMission,
   };
 }

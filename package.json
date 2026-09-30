@@ -24,7 +24,8 @@
     "dist:win": "npm run build && electron-builder --win",
     "ui:audit": "node scripts/ui-audit.mjs",
     "brain:smoke": "node scripts/brain-smoke.mjs",
-    "test:missions": "node scripts/test-agent-missions.mjs"
+    "test:missions": "node scripts/test-agent-missions.mjs",
+    "jev:calibrate": "tsx scripts/jev-gate-calibrate.ts"
   },
   "build": {
     "appId": "com.Leanna.os",
