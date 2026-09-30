@@ -178,7 +178,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
           <button
             onClick={loadSavedContent}
             disabled={loading}
-            className="flex items-center gap-1.5 px-2 py-1.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2 py-1.5 text-xs transition hover:bg-[var(--bg-active)] disabled:opacity-50"
             title="Actualiser"
             style={{ borderRadius: 'var(--radius-md)' }}
           >
@@ -187,7 +187,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
           
           <button
             onClick={onClose}
-            className="p-1.5 transition hover:bg-white/10"
+            className="p-1.5 transition hover:bg-[var(--bg-active)]"
             title="Fermer (Escape)"
             style={{ borderRadius: 'var(--radius-md)' }}
           >
@@ -213,7 +213,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
             <div className="text-red-400">Erreur : {error}</div>
             <button
               onClick={loadSavedContent}
-              className="rounded border px-3 py-1.5 text-sm transition hover:bg-white/10"
+              className="rounded border px-3 py-1.5 text-sm transition hover:bg-[var(--bg-active)]"
               style={{ borderColor: 'var(--border-base)' }}
               title="Réessayer le chargement"
             >

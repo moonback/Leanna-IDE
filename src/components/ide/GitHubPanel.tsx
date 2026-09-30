@@ -155,7 +155,7 @@ function FilterDropdown({ value, options, onChange }: {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-white/8"
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-[var(--bg-hover)]"
         style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
       >
         <Filter size={10} />
@@ -172,7 +172,7 @@ function FilterDropdown({ value, options, onChange }: {
           >
             {options.map(opt => (
               <button key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/8"
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)]"
                 style={{ color: opt.value === value ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                 {opt.label}
               </button>
@@ -230,11 +230,11 @@ function CommitDetailPanel({ commit, loading, repoUrl, onClose }: {
             {repoUrl && (
               <Tooltip content="Voir sur GitHub" as="button"
                 onClick={() => openExternal(`${repoUrl}/commit/${commit.hash}`)}
-                className="p-1.5 rounded-md hover:bg-white/8">
+                className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
                 <ExternalLink size={13} style={{ color: 'var(--accent-primary)' }} />
               </Tooltip>
             )}
-            <Tooltip content="Fermer" as="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-white/8">
+            <Tooltip content="Fermer" as="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
               <X size={13} style={{ color: 'var(--text-dimmed)' }} />
             </Tooltip>
           </div>
@@ -242,14 +242,14 @@ function CommitDetailPanel({ commit, loading, repoUrl, onClose }: {
 
         {/* Meta */}
         <div className="flex flex-wrap gap-3 mb-3">
-          <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-md"
+          <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-md"
             style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(14,165,233,0.2)' }}>
             {commit.hash.slice(0, 10)}
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
             <User size={11} /> {commit.author}
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
             <Calendar size={11} />
             {new Date(commit.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
           </span>
@@ -258,19 +258,19 @@ function CommitDetailPanel({ commit, loading, repoUrl, onClose }: {
         {/* Stats */}
         <div className="flex gap-2 flex-wrap">
           {added > 0 && (
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={{ backgroundColor: 'rgba(63,185,80,0.12)', color: '#3fb950', border: '1px solid rgba(63,185,80,0.2)' }}>
               +{added} ajouté{added > 1 ? 's' : ''}
             </span>
           )}
           {modified > 0 && (
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={{ backgroundColor: 'rgba(14,165,233,0.12)', color: 'var(--accent-primary)', border: '1px solid rgba(14,165,233,0.2)' }}>
               ~{modified} modifié{modified > 1 ? 's' : ''}
             </span>
           )}
           {deleted > 0 && (
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
               style={{ backgroundColor: 'rgba(248,81,73,0.12)', color: '#f85149', border: '1px solid rgba(248,81,73,0.2)' }}>
               -{deleted} supprimé{deleted > 1 ? 's' : ''}
             </span>
@@ -280,7 +280,7 @@ function CommitDetailPanel({ commit, loading, repoUrl, onClose }: {
 
       {/* Files list */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>
+        <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>
           {commit.files.length} fichier{commit.files.length !== 1 ? 's' : ''}
         </p>
         <div className="grid gap-0.5">
@@ -289,11 +289,11 @@ function CommitDetailPanel({ commit, loading, repoUrl, onClose }: {
             return (
               <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
                 style={{ backgroundColor: 'rgba(255,255,255,0.025)' }}>
-                <span className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                <span className="w-4 h-4 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{ backgroundColor: cfg.bg, color: cfg.color }}>
                   {file.status}
                 </span>
-                <span className="text-[11px] font-mono truncate" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-xs font-mono truncate" style={{ color: 'var(--text-primary)' }}>
                   {file.path}
                 </span>
               </div>
@@ -525,12 +525,12 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Tooltip content="Rafraîchir" as="button" onClick={refresh} className="p-1.5 rounded-md hover:bg-white/8">
+          <Tooltip content="Rafraîchir" as="button" onClick={refresh} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
             {loading
               ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
               : <RefreshCw size={14} style={{ color: 'var(--text-muted)' }} />}
           </Tooltip>
-          <Tooltip content="Fermer" as="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-white/8">
+          <Tooltip content="Fermer" as="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
             <X size={14} style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
         </div>
@@ -548,7 +548,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
             }}>
             {icon} {label}
             {badge !== undefined && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full leading-none"
                 style={{
                   backgroundColor: key === 'notifications' ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.15)',
                   color:           key === 'notifications' ? '#f87171'              : 'var(--accent-primary)',
@@ -609,7 +609,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="px-3 py-2 border-b flex-shrink-0 flex items-center justify-between"
               style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                 {commits.length} commit{commits.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -628,7 +628,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                   return (
                     <button key={commit.hash}
                       onClick={() => active ? setSelectedCommit(null) : fetchCommitDetail(commit.hash)}
-                      className="w-full text-left flex items-start gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-white/5"
+                      className="w-full text-left flex items-start gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-[var(--bg-hover)]"
                       style={{
                         border: '1px solid',
                         borderColor: active ? 'rgba(14,165,233,0.4)' : 'transparent',
@@ -643,12 +643,12 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                           {commit.message.length > 64 ? commit.message.slice(0, 64) + '…' : commit.message}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-[10px] font-mono px-1 py-0.5 rounded"
+                          <span className="text-xs font-mono px-1 py-0.5 rounded"
                             style={{ backgroundColor: 'rgba(14,165,233,0.08)', color: 'var(--accent-primary)' }}>
                             {commit.shortHash}
                           </span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{commit.author}</span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(commit.date)}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{commit.author}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(commit.date)}</span>
                         </div>
                       </div>
                     </button>
@@ -710,7 +710,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                           setRepoOwner(o); setRepoName(n); setRepoUrl(repo.html_url);
                         }
                       }}
-                      className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                      className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                       style={{
                         border: '1px solid',
                         borderColor: active ? 'rgba(14,165,233,0.4)' : 'transparent',
@@ -723,19 +723,19 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{repo.full_name}</p>
                         {repo.description && (
-                          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{repo.description}</p>
+                          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{repo.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1">
                           {repo.language && (
-                            <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: langColor(repo.language) }} />
                               {repo.language}
                             </span>
                           )}
-                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="flex items-center gap-0.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                             <Star size={9} /> {repo.stars}
                           </span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(repo.updated_at)}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(repo.updated_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -751,7 +751,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="px-3 py-2 border-b flex items-center justify-between flex-shrink-0"
               style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-bold uppercase tracking-wider truncate" style={{ color: 'var(--text-dimmed)' }}>
                 {repoOwner && repoName ? `${repoOwner}/${repoName}` : 'Aucun repo'}
               </span>
               <FilterDropdown value={issueFilter}
@@ -774,7 +774,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                     return (
                       <button key={issue.number}
                         onClick={() => setSelectedIssue(active ? null : issue)}
-                        className="w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                        className="w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                         style={{
                           border: '1px solid',
                           borderColor: active ? 'rgba(14,165,233,0.4)' : 'transparent',
@@ -788,10 +788,10 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                             <span style={{ color: 'var(--text-dimmed)' }}>#{issue.number}</span> {issue.title}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
-                            <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
                             {issue.comments > 0 && (
-                              <span className="flex items-center gap-0.5 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                              <span className="flex items-center gap-0.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                                 <MessageSquare size={9} /> {issue.comments}
                               </span>
                             )}
@@ -811,7 +811,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="px-3 py-2 border-b flex items-center justify-between flex-shrink-0"
               style={{ borderColor: 'var(--border-base)' }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-bold uppercase tracking-wider truncate" style={{ color: 'var(--text-dimmed)' }}>
                 {repoOwner && repoName ? `${repoOwner}/${repoName}` : 'Aucun repo'}
               </span>
               <FilterDropdown value={prFilter}
@@ -834,7 +834,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                     return (
                       <button key={pr.number}
                         onClick={() => setSelectedPR(active ? null : pr)}
-                        className="w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                        className="w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                         style={{
                           border: '1px solid',
                           borderColor: active ? 'rgba(14,165,233,0.4)' : 'transparent',
@@ -849,13 +849,13 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                               <span style={{ color: 'var(--text-dimmed)' }}>#{pr.number}</span> {pr.title}
                             </p>
                             {pr.draft && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                              <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
                                 style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>draft</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
-                            <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
+                            <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                               {pr.head.length > 14 ? pr.head.slice(0, 14) + '…' : pr.head} → {pr.base}
                             </span>
                           </div>
@@ -874,8 +874,8 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
               {unreadCount > 0
-                ? <span className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</span>
-                : <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>Notifications</span>}
+                ? <span className="text-xs font-semibold" style={{ color: '#f87171' }}>{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</span>
+                : <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Notifications</span>}
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {loading && notifications.length === 0 && (
@@ -889,7 +889,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
               <div className="p-2 grid gap-0.5">
                 {notifications.map(n => (
                   <div key={n.id}
-                    className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                    className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                     style={{ border: '1px solid', borderColor: n.unread ? 'rgba(239,68,68,0.12)' : 'transparent' }}>
                     <Bell size={12} className="mt-0.5 flex-shrink-0"
                       style={{ color: n.unread ? '#f87171' : 'var(--text-dimmed)' }} />
@@ -897,10 +897,10 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                       <p className="text-xs font-medium truncate"
                         style={{ color: n.unread ? 'var(--text-primary)' : 'var(--text-muted)' }}>{n.title}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                        <span className="text-xs px-1.5 py-0.5 rounded-full"
                           style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-dimmed)' }}>{n.type}</span>
-                        <span className="text-[10px] truncate" style={{ color: 'var(--text-dimmed)' }}>{n.repo}</span>
-                        <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(n.updated_at)}</span>
+                        <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{n.repo}</span>
+                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(n.updated_at)}</span>
                       </div>
                     </div>
                     {n.unread && <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: '#f87171' }} />}
@@ -966,7 +966,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                 </div>
                 <div className="flex-1 flex items-center justify-center gap-4 px-6">
                   <button onClick={() => { setTab('issues'); fetchIssues(); }}
-                    className="flex flex-col items-center gap-3 p-8 rounded-2xl hover:bg-white/5 transition-colors"
+                    className="flex flex-col items-center gap-3 p-8 rounded-2xl hover:bg-[var(--bg-hover)] transition-colors"
                     style={{ border: '1px solid var(--border-base)', minWidth: 160 }}>
                     <AlertCircle size={28} style={{ color: '#3fb950' }} />
                     <div className="text-center">
@@ -975,7 +975,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                     </div>
                   </button>
                   <button onClick={() => { setTab('prs'); fetchPRs(); }}
-                    className="flex flex-col items-center gap-3 p-8 rounded-2xl hover:bg-white/5 transition-colors"
+                    className="flex flex-col items-center gap-3 p-8 rounded-2xl hover:bg-[var(--bg-hover)] transition-colors"
                     style={{ border: '1px solid var(--border-base)', minWidth: 160 }}>
                     <GitPullRequest size={28} style={{ color: 'var(--accent-primary)' }} />
                     <div className="text-center">
@@ -1074,7 +1074,7 @@ export function GitHubPanel({ onClose, fullWidth = false }: GitHubPanelProps) {
                           {selectedPR.title}
                         </h2>
                         {selectedPR.draft && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold mt-1 inline-block"
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block"
                             style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>Draft</span>
                         )}
                       </div>

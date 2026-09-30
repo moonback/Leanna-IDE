@@ -666,7 +666,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
         {onClose && (
           <button
             onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-white/10"
+            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-[var(--bg-active)]"
             style={{ color: 'var(--text-muted)' }}
             aria-label="Fermer"
             title="Fermer le panneau"
@@ -936,7 +936,7 @@ function MissionControlButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center justify-center w-6 h-6 rounded-md transition disabled:opacity-40 cursor-pointer hover:bg-white/10"
+      className="flex items-center justify-center w-6 h-6 rounded-md transition disabled:opacity-40 cursor-pointer hover:bg-[var(--bg-active)]"
       style={{ color }}
     >
       {icon}
@@ -1013,7 +1013,7 @@ function MissionCard({
       <div
         role="button"
         tabIndex={0}
-        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left cursor-pointer hover:bg-white/5 transition"
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       >
@@ -1224,7 +1224,7 @@ function GoalCard({
       }}
     >
       <button
-        className="w-full flex items-center gap-2 px-2 py-1.5 text-left cursor-pointer hover:bg-white/5 transition"
+        className="w-full flex items-center gap-2 px-2 py-1.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}
       >
         <div className="flex-shrink-0">{statusIcon(goal.status, 10)}</div>
@@ -1264,7 +1264,7 @@ function GoalCard({
 
 function ActionRow({ action }: { action: ActionEntry }) {
   return (
-    <div className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white/5">
+    <div className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)]">
       <div className="flex-shrink-0">{statusIcon(action.status, 9)}</div>
       <Zap size={9} style={{ color: 'var(--accent-primary)' }} className="flex-shrink-0" />
       <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-muted)' }} title={action.skill}>

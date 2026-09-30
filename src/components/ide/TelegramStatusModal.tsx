@@ -432,7 +432,7 @@ function TelegramDockedPanel({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
           style={{ color: 'var(--text-muted)' }}
           aria-label="Actualiser le statut"
         >
@@ -441,7 +441,7 @@ function TelegramDockedPanel({
         <button
           type="button"
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
           style={{ color: 'var(--text-muted)' }}
           aria-label="Fermer"
         >
@@ -678,7 +678,7 @@ function InfoRow({
           <button
             type="button"
             onClick={onCopy}
-            className="w-5 h-5 flex items-center justify-center rounded transition-colors hover:bg-white/10 flex-shrink-0"
+            className="w-5 h-5 flex items-center justify-center rounded transition-colors hover:bg-[var(--bg-active)] flex-shrink-0"
             style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
             aria-label={`Copier ${label}`}
           >

@@ -63,7 +63,7 @@ export const SelfEditBanner = React.memo(function SelfEditBanner({
               {onRollback && (
                 <button
                   onClick={onRollback}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors hover:bg-white/10"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors hover:bg-[var(--bg-active)]"
                   style={{ color: 'var(--color-warning)' }}
                   title="Annuler ce changement"
                 >
@@ -74,7 +74,7 @@ export const SelfEditBanner = React.memo(function SelfEditBanner({
               {onAccept && (
                 <button
                   onClick={onAccept}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors hover:bg-white/10"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors hover:bg-[var(--bg-active)]"
                   style={{ color: 'var(--color-success)' }}
                   title="Accepter le changement"
                 >

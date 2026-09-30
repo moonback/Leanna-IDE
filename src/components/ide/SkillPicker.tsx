@@ -151,7 +151,7 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
         {/* Badge nombre de skills actifs */}
         {activeCount > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full flex items-center justify-center text-[8px] font-bold font-mono leading-none"
+            className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full flex items-center justify-center text-xs font-bold font-mono leading-none"
             style={{
               backgroundColor: 'var(--accent-primary)',
               color: '#0a1628',
@@ -196,7 +196,7 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
               >
                 <Sparkles size={11} style={{ color: 'var(--accent-secondary)' }} />
                 <span
-                  className="text-[10px] uppercase font-semibold tracking-widest flex-1"
+                  className="text-xs uppercase font-semibold tracking-widest flex-1"
                   style={{ color: 'var(--text-dimmed)' }}
                 >
                   Skills custom
@@ -204,7 +204,7 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
                 <button
                   type="button"
                   onClick={() => reload()}
-                  className="p-1 rounded-md transition-colors hover:bg-white/10"
+                  className="p-1 rounded-md transition-colors hover:bg-[var(--bg-active)]"
                   title="Rafraîchir"
                   aria-label="Rafraîchir la liste"
                 >
@@ -235,7 +235,7 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
                     <button
                       type="button"
                       onClick={() => setQuery('')}
-                      className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                      className="p-0.5 rounded hover:bg-[var(--bg-active)] transition-colors"
                       aria-label="Effacer la recherche"
                     >
                       <X size={10} style={{ color: 'var(--text-dimmed)' }} />
@@ -256,12 +256,12 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
                 ) : error ? (
                   <div className="flex flex-col items-center gap-1.5 py-6 px-4 text-center">
                     <X size={16} style={{ color: 'var(--color-error)' }} />
-                    <span className="text-[11px]" style={{ color: 'var(--color-error)' }}>{error}</span>
+                    <span className="text-xs" style={{ color: 'var(--color-error)' }}>{error}</span>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-6 px-4 text-center">
                     <Code2 size={18} className="opacity-30" style={{ color: 'var(--text-muted)' }} />
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       {skills.length === 0
                         ? 'Aucun skill custom activé. Créez-en dans les Réglages.'
                         : 'Aucun résultat pour cette recherche.'}
@@ -293,14 +293,14 @@ export function SkillPicker({ onSelect, disabled = false }: SkillPickerProps) {
                               {skill.name}
                             </span>
                             <span
-                              className="text-[8px] uppercase px-1 py-px rounded font-semibold tracking-wide flex-shrink-0"
+                              className="text-xs uppercase px-1 py-px rounded font-semibold tracking-wide flex-shrink-0"
                               style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
                             >
                               {skill.category}
                             </span>
                           </div>
                           {skill.description && (
-                            <span className="text-[11px] block truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                            <span className="text-xs block truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
                               {skill.description}
                             </span>
                           )}

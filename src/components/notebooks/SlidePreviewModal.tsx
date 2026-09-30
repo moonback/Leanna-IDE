@@ -244,7 +244,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X className="w-4 h-4" />
@@ -404,7 +404,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={handleOpenTab}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                           style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                           title="Ouvrir en plein écran dans un nouvel onglet"
                         >
@@ -440,7 +440,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   <>
                     <button
                       onClick={handleDownload}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                       style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                       title="Télécharger le fichier HTML"
                     >
@@ -449,7 +449,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                     </button>
                     <button
                       onClick={handleOpenTab}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-white/5 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                       style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
                       title="Ouvrir dans un nouvel onglet"
                     >
@@ -464,7 +464,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-white/5"
+                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Fermer

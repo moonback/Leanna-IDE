@@ -766,7 +766,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                     {/* Speed button */}
                     <button
                       onClick={cycleSpeed}
-                      className="px-2.5 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-white/5 active:scale-95"
+                      className="px-2.5 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                       style={{ color: 'var(--color-success)', border: '1px solid var(--color-success)30' }}
                       title="Changer la vitesse"
                     >
@@ -790,7 +790,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={cycleSpeed}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Vitesse de lecture"
                 >
@@ -798,7 +798,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
                 </button>
                 <button
                   onClick={handleDownloadScript}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-white/5 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                   title="Télécharger le script"
                 >

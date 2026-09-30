@@ -153,14 +153,14 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           )}
           <button
             onClick={fetchContent}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Recharger le contenu"
           >
             <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
             title="Fermer"
           >
             <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />

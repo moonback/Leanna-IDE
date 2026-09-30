@@ -332,7 +332,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
         {/* Export CSV */}
         <button
           onClick={handleCsvExport}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
           title="Exporter en CSV"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
         >
@@ -798,7 +798,7 @@ function TextRenderer({ block }: { block: TextBlock }) {
         <div className="flex-1" />
         <button
           onClick={copy}
-          className="p-1 rounded hover:bg-white/10 transition-colors"
+          className="p-1 rounded hover:bg-[var(--bg-active)] transition-colors"
           title={copied ? 'Copié !' : 'Copier'}
           style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
@@ -840,7 +840,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
         )}
         <button
           onClick={copy}
-          className="p-1 rounded hover:bg-white/10 transition-colors"
+          className="p-1 rounded hover:bg-[var(--bg-active)] transition-colors"
           title={copied ? 'Copié !' : 'Copier le code'}
           style={{ color: copied ? 'var(--color-success)' : 'var(--text-dimmed)' }}
         >
@@ -1128,7 +1128,7 @@ function RichBlock({ block, index }: { block: RichBlock; index: number }) {
       {/* En-tête */}
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-white/5 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors"
         style={{ borderBottom: collapsed ? 'none' : '1px solid var(--border-subtle)' }}
       >
         <span
@@ -1234,7 +1234,7 @@ function SaveModal({
           </div>
           <button
             onClick={onCancel}
-            className="ml-auto p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="ml-auto p-1 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
             style={{ color: 'var(--text-dimmed)' }}
           >
             <X size={14} />
@@ -1294,7 +1294,7 @@ function SaveModal({
             <button
               onClick={onCancel}
               disabled={status === 'saving'}
-              className="px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/10"
+              className="px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
             >
               Annuler
@@ -1433,7 +1433,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
         <div className="flex items-center gap-1">
           <button
             onClick={() => setAllCollapsed((c) => !c)}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
             style={{ color: 'var(--text-muted)' }}
             title={allCollapsed ? 'Tout déplier' : 'Tout replier'}
           >
@@ -1443,7 +1443,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
           {onSaveToWorkspace && (
             <button
               onClick={handleOpenSaveModal}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
               style={{ color: 'var(--text-muted)' }}
               title="Enregistrer dans le workspace"
             >
@@ -1453,7 +1453,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
           {/* Export JSON local */}
           <button
             onClick={handleExportJson}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
             style={{ color: 'var(--text-muted)' }}
             title="Télécharger en JSON"
           >
@@ -1462,7 +1462,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
               style={{ color: 'var(--text-muted)' }}
               title="Fermer"
             >

@@ -305,7 +305,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         <div className="flex-1" />
         <button
           onClick={handleToggleNotifications}
-          className="p-1.5 rounded-md hover:bg-white/8 transition"
+          className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition"
           title={notificationsEnabled ? 'Désactiver notifications' : 'Activer notifications'}
         >
           {notificationsEnabled
@@ -314,7 +314,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         </button>
         <button
           onClick={refresh}
-          className="p-1.5 rounded-md hover:bg-white/8 transition"
+          className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition"
           title="Rafraîchir"
         >
           {loading ? <Loader2 size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} /> : <RefreshCw size={11} style={{ color: 'var(--text-muted)' }} />}
@@ -386,7 +386,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
           {onClose && (
             <button
               onClick={onClose}
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Fermer"
             >
@@ -442,7 +442,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-lg transition hover:bg-white/10"
+                className="w-7 h-7 flex items-center justify-center rounded-lg transition hover:bg-[var(--bg-active)]"
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Fermer"
               >
@@ -534,7 +534,7 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
   const time = new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg hover:bg-white/5 transition">
+    <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition">
       <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}>
         <Radio size={9} style={{ color }} />

@@ -176,7 +176,7 @@ function VoiceLatencyBadge({ getLatencyStats }: { getLatencyStats: () => { avg: 
       <span className="font-bold" style={{ color }}>
         {stats.last}ms
       </span>
-      <span className="opacity-60 text-[10px]" style={{ color }}>
+      <span className="opacity-60 text-xs" style={{ color }}>
         (⌀{stats.avg}ms)
       </span>
     </div>
@@ -329,7 +329,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
           {onClose && (
             <button
               onClick={onClose}
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Fermer"
             >
@@ -385,7 +385,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+                className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)]"
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Fermer"
               >
@@ -568,7 +568,7 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
         border: `1px solid ${isActive ? `${meta.color}30` : 'var(--border-base)'}`,
       }}>
       {/* Header */}
-      <button className="w-full flex items-center gap-2 px-2.5 py-2 text-left cursor-pointer hover:bg-white/5 transition"
+      <button className="w-full flex items-center gap-2 px-2.5 py-2 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}>
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 relative"
           style={{ backgroundColor: `${meta.color}18` }}>
@@ -643,7 +643,7 @@ function ToolActivityRow({ activity, color }: { activity: ToolActivityEntry; col
     : '';
 
   return (
-    <div className="flex items-start gap-1.5 px-2 py-1.5 rounded hover:bg-white/5 group">
+    <div className="flex items-start gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--bg-hover)] group">
       <div className="flex-shrink-0 mt-0.5">
         {activity.status === 'running' ?
           <Loader2 size={9} className="animate-spin" style={{ color }} /> :
@@ -727,7 +727,7 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
         backgroundColor: isRunning ? `${meta.color}08` : 'var(--bg-input)',
         border: `1px solid ${isRunning ? `${meta.color}30` : 'var(--border-base)'}`,
       }}>
-      <button className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-white/5 transition"
+      <button className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}>
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${meta.color}18` }}>

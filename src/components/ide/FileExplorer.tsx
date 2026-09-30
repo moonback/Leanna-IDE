@@ -306,7 +306,7 @@ const FileExplorer = memo(function FileExplorer({
             <span className="w-3.5" />
           )}
 
-          <div className="flex items-center gap-1.5 flex-1 min-w-0 hover:bg-white/5 transition-colors">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 hover:bg-[var(--bg-hover)] transition-colors">
             {entry.type === 'directory' ? (
               isDragTarget ? (
                 <FolderOpen size={13} style={{ color: 'var(--accent-primary)' }} />
@@ -448,23 +448,23 @@ const FileExplorer = memo(function FileExplorer({
 
       {/* Breadcrumb */}
       <div className="border-b px-3.5 py-1.5" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
-        <Tooltip content="Rechercher" as="button" onClick={toggleSearch} className="rounded p-1 hover:bg-white/5 transition"
+        <Tooltip content="Rechercher" as="button" onClick={toggleSearch} className="rounded p-1 hover:bg-[var(--bg-hover)] transition"
           style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
             <Search size={12} />
         </Tooltip>
           {/* Sort cycling */}
           <button
             onClick={() => setSortMode(nextSort)}
-            className="rounded p-1 hover:bg-white/5 transition"
+            className="rounded p-1 hover:bg-[var(--bg-hover)] transition"
             title={sortLabel(sortMode)}
             style={{ color: sortMode !== 'name-asc' ? 'var(--accent-primary)' : 'var(--text-muted)' }}
           >
             <SortIcon mode={sortMode} />
           </button>
-          <Tooltip content="Nouveau fichier" as="button" onClick={onCreateFile} className="rounded p-1 hover:bg-white/5 transition">
+          <Tooltip content="Nouveau fichier" as="button" onClick={onCreateFile} className="rounded p-1 hover:bg-[var(--bg-hover)] transition">
             <Plus size={12} style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
-          <Tooltip content="Actualiser" as="button" onClick={onRefresh} className="rounded p-1 hover:bg-white/5 transition">
+          <Tooltip content="Actualiser" as="button" onClick={onRefresh} className="rounded p-1 hover:bg-[var(--bg-hover)] transition">
             <RefreshCw size={12} style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
       </div>

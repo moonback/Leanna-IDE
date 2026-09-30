@@ -200,7 +200,7 @@ export function ASTCallGraphExplorer() {
         <div className="flex items-center gap-3 z-10">
           <button
             onClick={() => { fetchStats(); searchFunctions(); }}
-            className="p-2.5 rounded-xl border transition-colors hover:bg-white/5"
+            className="p-2.5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Rafraîchir"
           >
@@ -316,7 +316,7 @@ export function ASTCallGraphExplorer() {
                       className={`w-full text-left p-3 rounded-xl border transition-all flex items-start justify-between gap-2 ${
                         isSelected
                           ? 'border-cyan-500/50 bg-cyan-500/10 shadow-sm'
-                          : 'hover:border-white/20 hover:bg-white/5 border-transparent'
+                          : 'hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] border-transparent'
                       }`}
                       style={{ backgroundColor: isSelected ? undefined : 'var(--bg-base)' }}
                     >
@@ -325,22 +325,22 @@ export function ASTCallGraphExplorer() {
                           <span className="font-mono text-xs font-bold truncate text-cyan-300">
                             {fn.name}
                           </span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] uppercase font-mono bg-white/5 text-muted">
+                          <span className="px-1.5 py-0.2 rounded text-xs uppercase font-mono bg-[var(--bg-hover)] text-muted">
                             {fn.type}
                           </span>
                           {fn.modifiers?.includes('async') && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-purple-500/20 text-purple-300">
+                            <span className="px-1.5 py-0.2 rounded text-xs font-mono bg-purple-500/20 text-purple-300">
                               async
                             </span>
                           )}
                           {fn.modifiers?.includes('arrow') && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-blue-500/20 text-blue-300">
+                            <span className="px-1.5 py-0.2 rounded text-xs font-mono bg-blue-500/20 text-blue-300">
                               arrow
                             </span>
                           )}
                         </div>
 
-                        <p className="text-[11px] font-mono truncate text-muted mt-1">
+                        <p className="text-xs font-mono truncate text-muted mt-1">
                           {fn.filePath}:{fn.lineStart}{fn.lineEnd ? `-${fn.lineEnd}` : ''}
                         </p>
                       </div>
@@ -436,12 +436,12 @@ export function ASTCallGraphExplorer() {
                                 {c.callerId}
                               </span>
                               {c.isAwait && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300">
+                                <span className="px-1.5 py-0.2 rounded text-xs font-mono bg-amber-500/20 text-amber-300">
                                   await
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-mono text-muted">
+                            <p className="text-xs font-mono text-muted">
                               Ligne {c.sourceLine} {c.isResolved ? '• ✅ Résolu' : '• ⚠️ Externe'}
                             </p>
                           </div>
@@ -470,12 +470,12 @@ export function ASTCallGraphExplorer() {
                                 {c.calleeObject ? `${c.calleeObject}.${c.calleeName}()` : `${c.calleeName}()`}
                               </span>
                               {c.isAwait && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300">
+                                <span className="px-1.5 py-0.2 rounded text-xs font-mono bg-amber-500/20 text-amber-300">
                                   await
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-mono text-muted">
+                            <p className="text-xs font-mono text-muted">
                               Ligne {c.sourceLine} {c.calleeObject === 'this' ? '• Intra-Classe' : c.isResolved ? '• ✅ Résolu' : ''}
                             </p>
                           </div>
@@ -493,7 +493,7 @@ export function ASTCallGraphExplorer() {
                       Arborescence d'Exécution Récursive
                     </span>
                     {chain?.maxDepthReached && (
-                      <span className="text-[10px] text-amber-400">Profondeur max (3) atteinte</span>
+                      <span className="text-xs text-amber-400">Profondeur max (3) atteinte</span>
                     )}
                   </div>
 
@@ -503,19 +503,19 @@ export function ASTCallGraphExplorer() {
                         <div
                           key={node.id}
                           className={`p-3 rounded-xl border font-mono text-xs flex items-center justify-between gap-3 ${
-                            i === 0 ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200' : 'bg-black/20 border-white/5 text-muted'
+                            i === 0 ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200' : 'bg-black/20 border-[var(--border-base)] text-muted'
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-muted">
+                            <span className="w-5 h-5 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-xs text-muted">
                               {i + 1}
                             </span>
                             <span className="font-bold">{node.functionName}()</span>
                             {node.className && (
-                              <span className="text-muted text-[11px]">in {node.className}</span>
+                              <span className="text-muted text-xs">in {node.className}</span>
                             )}
                           </div>
-                          <span className="text-[11px] opacity-70 truncate max-w-[200px]">{node.filePath}</span>
+                          <span className="text-xs opacity-70 truncate max-w-[200px]">{node.filePath}</span>
                         </div>
                       ))}
                     </div>

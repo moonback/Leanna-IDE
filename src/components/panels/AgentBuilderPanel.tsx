@@ -261,7 +261,7 @@ export function AgentBuilderPanel({ onClose }: AgentBuilderPanelProps) {
               {agents.length} agent{agents.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
             style={{ color: 'var(--text-muted)' }}>
             <X size={16} />
           </button>
@@ -356,13 +356,13 @@ function AgentListView({
         </button>
         <div className="flex-1" />
         <button onClick={onImport}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
           <Upload size={11} /> Importer
         </button>
         {agents.length > 0 && (
           <button onClick={onExport}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/8"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
             <Download size={11} /> Exporter
           </button>
@@ -403,7 +403,7 @@ function AgentListView({
           >
             {aiGenerating ? (
               <>
-                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-3 h-3 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
                 Génération...
               </>
             ) : (
@@ -514,7 +514,7 @@ function AgentCard({
               Oui
             </button>
             <button onClick={onCancelDelete}
-              className="px-2 py-1 rounded text-xs font-semibold bg-white/10 hover:bg-white/20"
+              className="px-2 py-1 rounded text-xs font-semibold bg-[var(--bg-active)] hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}>
               Non
             </button>
@@ -544,7 +544,7 @@ function AgentCard({
             {agent.description || 'Aucune description'}
           </p>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs px-1.5 py-0.5 rounded bg-white/5"
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-muted)' }}>
               {agent.tools.length} outil{agent.tools.length !== 1 ? 's' : ''}
             </span>
@@ -560,7 +560,7 @@ function AgentCard({
         {/* Actions */}
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}>
-          <Tooltip content="Dupliquer" as="button" onClick={onDuplicate} className="p-1 rounded hover:bg-white/10"
+          <Tooltip content="Dupliquer" as="button" onClick={onDuplicate} className="p-1 rounded hover:bg-[var(--bg-active)]"
             style={{ color: 'var(--text-muted)' }}>
             <Copy size={12} />
           </Tooltip>
@@ -610,7 +610,7 @@ function AgentEditorView({
       <div className="flex items-center gap-1 px-5 py-2 border-b overflow-x-auto"
         style={{ borderColor: 'var(--border-base)' }}>
         <button onClick={onCancel}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium mr-2 transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium mr-2 transition-colors hover:bg-[var(--bg-hover)]"
           style={{ color: 'var(--text-muted)' }}>
           <RotateCcw size={11} /> Retour
         </button>
@@ -864,7 +864,7 @@ Propose des améliorations structurelles justifiées.`,
         </label>
         <button
           onClick={() => setShowTemplates(!showTemplates)}
-          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors hover:bg-white/8"
+          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
           style={{ color: 'var(--accent-primary)' }}
         >
           <Sparkles size={11} /> Modèles

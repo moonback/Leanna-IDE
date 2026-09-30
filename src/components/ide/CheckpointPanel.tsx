@@ -77,7 +77,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
           <button
             onClick={handleValidate}
             disabled={validating}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition hover:bg-white/5"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition hover:bg-[var(--bg-hover)]"
             style={{ color: 'var(--color-success)' }}
             title="Valider le build (tsc)"
           >
@@ -86,7 +86,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
           </button>
           <button
             onClick={fetchCheckpoints}
-            className="p-1 rounded hover:bg-white/5 transition"
+            className="p-1 rounded hover:bg-[var(--bg-hover)] transition"
             title="Actualiser"
           >
             <RefreshCcw size={11} style={{ color: 'var(--text-muted)' }} />
@@ -157,7 +157,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
             {checkpoints.map((cp) => (
               <div
                 key={cp.hash}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-white/5 transition group"
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition group"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -174,7 +174,7 @@ export const CheckpointPanel = React.memo(function CheckpointPanel() {
                 </div>
                 <button
                   onClick={() => handleRollback(cp.hash)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 transition"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[var(--bg-active)] transition"
                   title={`Rollback vers ${cp.hash.slice(0, 8)}`}
                 >
                   <RotateCcw size={11} style={{ color: 'var(--color-warning)' }} />

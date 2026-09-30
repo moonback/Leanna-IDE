@@ -1475,7 +1475,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         <div className="relative flex-1 min-w-0">
           <button
             onClick={() => setShowThreadList(!showThreadList)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-smfont-medium transition-all hover:bg-white/5 max-w-[250px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-smfont-medium transition-all hover:bg-[var(--bg-hover)] max-w-[250px]"
             style={{ color: 'var(--text-primary)' }}
           >
             <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />

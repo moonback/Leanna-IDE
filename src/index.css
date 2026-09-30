@@ -2,8 +2,8 @@
 @import "./styles/layers.css";
 @theme {
   /* Typography */
---font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
---font-mono: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+--font-sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+--font-mono: "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
 
 /* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
 --text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
@@ -28,10 +28,10 @@
      md: Button/Input/Badge · lg: Card/Panel · xl: Popover/Dropdown/Tooltip · 2xl: Modal/Dialog */
   --radius-xs:   4px;
   --radius-sm:   6px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   12px;
-  --radius-2xl:  16px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  24px;
   --radius-full: 9999px;
 
   /* Spacing scale (4px base) */
@@ -144,7 +144,7 @@
   --text-primary:   #f4f4f6;
   --text-secondary: #c4c4cc;
   --text-muted:     #8a8a95;
-  --text-dimmed:    #5c5c66;
+  --text-dimmed:    #8b8b96;  /* WCAG AA: ~5.4:1 on #0a0a0c (was #5c5c66 ~2.9:1) */
 
   /* Accent — soft indigo-blue. Modern, professional, easy on the eyes. */
   --accent-primary:  #6ea8fe;
@@ -243,7 +243,7 @@
   --text-primary:   #111827;
   --text-secondary: #374151;
   --text-muted:     #6b7280;
-  --text-dimmed:    #9ca3af;
+  --text-dimmed:    #70757e;  /* WCAG AA: ~4.5:1 on #ffffff (was #9ca3af ~2.6:1) */
 
   /* Accent — franc blue for legible contrast, warm orange as secondary. */
   --accent-primary:  #2563eb;
@@ -359,7 +359,7 @@
   --text-primary:   #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted:     #94a3b8;
-  --text-dimmed:    #64748b;
+  --text-dimmed:    #8592a6;  /* WCAG AA: ~5.6:1 on #060814 (was #64748b ~4.6:1) */
 
   --accent-primary:  #00f0ff;
   --accent-hover:    #38bdf8;
@@ -453,7 +453,7 @@
   --text-primary:   #433422;
   --text-secondary: #5c4731;
   --text-muted:     #85694b;
-  --text-dimmed:    #a88c6b;
+  --text-dimmed:    #7d6444;  /* WCAG AA: ~4.7:1 on #fbf0d9 (was #a88c6b ~2.8:1) */
 
   --accent-primary:  #b58900;
   --accent-hover:    #cb4b16;
@@ -1010,7 +1010,7 @@ button {
 .feedback-banner {
   border-radius: var(--radius-lg);
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
 }
 .feedback-banner.success {
@@ -1037,7 +1037,7 @@ button {
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 600;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-strong);
@@ -1066,7 +1066,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-family: var(--font-mono);
   color: var(--text-dimmed);
   opacity: 0.7;
@@ -1078,7 +1078,7 @@ button {
   color: var(--accent-primary);
 }
 .cmdK-hint .kbd {
-  font-size: 9px;
+  font-size: var(--text-xs);
   padding: 0 4px;
 }
 
@@ -1345,7 +1345,7 @@ button {
   padding: 0.6em 0.8em;
   margin: 0.5em 0;
   overflow-x: auto;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .chat-markdown pre code {
   background: transparent;
@@ -1379,7 +1379,7 @@ button {
   border-collapse: collapse;
   width: 100%;
   margin: 0.4em 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .chat-markdown th,
 .chat-markdown td {
@@ -1812,7 +1812,7 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   overflow: hidden;
 }
@@ -1978,7 +1978,7 @@ button {
   letter-spacing: 0.01em;
 }
 .notebook-eyebrow {
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2113,13 +2113,13 @@ button {
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-accent-surface);
   color: var(--notebook-accent);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   padding: 3px 10px;
 }
 .notebook-count {
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .notebook-actions {
   display: flex;

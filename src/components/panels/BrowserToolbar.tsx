@@ -71,7 +71,7 @@ export function BrowserToolbar({
             </span>
           )}
         </div>
-        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-white/10 transition flex-shrink-0" title="Fermer le navigateur" aria-label="Fermer le navigateur">
+        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-active)] transition flex-shrink-0" title="Fermer le navigateur" aria-label="Fermer le navigateur">
           <X size={13} style={{ color: 'var(--text-muted)' }} />
         </button>
       </div>
@@ -111,7 +111,7 @@ export function BrowserToolbar({
 
 function ToolbarButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="p-1.5 rounded transition hover:bg-white/10 disabled:opacity-30" title={label} aria-label={label}>
+    <button type="button" onClick={onClick} disabled={disabled} className="p-1.5 rounded transition hover:bg-[var(--bg-active)] disabled:opacity-30" title={label} aria-label={label}>
       <span style={{ color: 'var(--text-muted)' }}>{children}</span>
     </button>
   );

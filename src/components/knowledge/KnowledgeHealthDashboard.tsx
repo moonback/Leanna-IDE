@@ -228,7 +228,7 @@ export function KnowledgeHealthDashboard() {
           <button
             onClick={fetchHealth}
             disabled={loading}
-            className="p-2.5 rounded-xl border transition-colors hover:bg-white/5"
+            className="p-2.5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
             style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
             title="Rafraîchir les métriques"
           >
@@ -308,7 +308,7 @@ export function KnowledgeHealthDashboard() {
           </div>
           {/* Progress bar */}
           <div className="space-y-1 pt-1">
-            <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1.5 w-full rounded-full bg-[var(--bg-hover)] overflow-hidden">
               <div
                 className="h-full rounded-full transition-all bg-gradient-to-r from-cyan-500 to-blue-500"
                 style={{ width: `${Math.min(100, (pm.totalFacts / pm.maxFacts) * 100)}%` }}
@@ -388,8 +388,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'overview'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Vue d'Ensemble
@@ -409,8 +409,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('memory')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'memory'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Project Memory ({pm.totalFacts})
@@ -419,8 +419,8 @@ export function KnowledgeHealthDashboard() {
             onClick={() => setActiveTab('documents')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'documents'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-muted hover:text-white hover:bg-white/5'
+                ? 'bg-[var(--bg-active)] text-white shadow-sm'
+                : 'text-muted hover:text-white hover:bg-[var(--bg-hover)]'
             }`}
           >
             Documents ({docsData?.documentCount ?? 0})

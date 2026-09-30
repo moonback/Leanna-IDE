@@ -579,7 +579,7 @@ export function StartupProjectModal() {
                 <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-secondary)' }} />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
                   Workspace manager
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -587,7 +587,7 @@ export function StartupProjectModal() {
                     Choisir un workspace
                   </h2>
                   <span
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
                     style={{
                       backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
                       color: 'var(--color-success)',
@@ -741,7 +741,7 @@ export function StartupProjectModal() {
                               </span>
                               {isActive && (
                                 <span
-                                  className="text-[10px] font-bold px-1.5 py-0.2 rounded"
+                                  className="text-xs font-bold px-1.5 py-0.2 rounded"
                                   style={{
                                     backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
                                     color: 'var(--color-success)',
@@ -752,7 +752,7 @@ export function StartupProjectModal() {
                               )}
                               {ws.isGit && (
                                 <span
-                                  className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded"
+                                  className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.2 rounded"
                                   style={{
                                     backgroundColor: 'var(--bg-panel)',
                                     border: '1px solid var(--border-base)',
@@ -765,7 +765,7 @@ export function StartupProjectModal() {
                               )}
                               {ws.name?.startsWith('FTP:') && (
                                 <span
-                                  className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded"
+                                  className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.2 rounded"
                                   style={{
                                     backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
                                     border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
@@ -777,14 +777,14 @@ export function StartupProjectModal() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
+                            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
                               {ws.path}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 pl-2 flex-shrink-0">
-                          <span className="text-[10px] flex items-center gap-1 opacity-60 hidden sm:flex" style={{ color: 'var(--text-muted)' }}>
+                          <span className="text-xs flex items-center gap-1 opacity-60 hidden sm:flex" style={{ color: 'var(--text-muted)' }}>
                             <Clock className="w-3 h-3" />
                             {formatDate(ws.lastOpened)}
                           </span>
@@ -907,7 +907,7 @@ export function StartupProjectModal() {
                         transition={INLINE_BANNER_TRANSITION}
                       >
                         <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                          URL du site associé <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
+                          URL du site associé <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
                         </label>
                         <div className="relative">
                           <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
@@ -1006,7 +1006,7 @@ export function StartupProjectModal() {
                   <div>
                     <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
                       Dossier de destination{' '}
-                      <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                      <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
                         (optionnel — défaut: ~/Documents/Leanna-Projects)
                       </span>
                     </label>
@@ -1045,7 +1045,7 @@ export function StartupProjectModal() {
                       style={{ borderColor: 'var(--border-base)', backgroundColor: '#111' }}
                     >
                       <Terminal className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                      <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
                         git clone
                       </span>
                       {cloneStatus === 'cloning' && (
@@ -1059,7 +1059,7 @@ export function StartupProjectModal() {
                       )}
                     </div>
                     {/* Logs scrollables */}
-                    <div className="max-h-48 overflow-y-auto p-3 space-y-0.5 font-mono text-[11px] leading-relaxed">
+                    <div className="max-h-48 overflow-y-auto p-3 space-y-0.5 font-mono text-xs leading-relaxed">
                       {cloneLogs.map((log, i) => (
                         <div
                           key={i}
@@ -1105,7 +1105,7 @@ export function StartupProjectModal() {
                 {/* ── Saved FTP servers ── */}
                 {savedFtpServers.length > 0 && ftpStatus === 'idle' && (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                       Serveurs enregistrés
                     </p>
                     {savedFtpServers.map(srv => (
@@ -1130,14 +1130,14 @@ export function StartupProjectModal() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{srv.name}</p>
-                            <p className="text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>
                               {srv.user}@{srv.host}:{srv.port}{srv.remotePath !== '/' ? srv.remotePath : ''}
                               {srv.secure ? ' · FTPS' : ''}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <span className="text-[10px] opacity-50 hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+                          <span className="text-xs opacity-50 hidden sm:block" style={{ color: 'var(--text-muted)' }}>
                             {new Date(srv.lastConnected).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                           </span>
                           <button
@@ -1293,7 +1293,7 @@ export function StartupProjectModal() {
                 {/* Download log terminal */}
                 {(ftpStatus === 'downloading' || ftpStatus === 'error' || ftpStatus === 'done') && (
                   <div
-                    className="rounded-xl p-3 font-mono text-[11px] overflow-y-auto space-y-0.5"
+                    className="rounded-xl p-3 font-mono text-xs overflow-y-auto space-y-0.5"
                     style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', maxHeight: '220px' }}
                   >
                     {ftpLogs.map((log, i) => (
@@ -1349,7 +1349,7 @@ export function StartupProjectModal() {
 
           {/* Footer Action */}
           <div className="flex items-center justify-between gap-3 pt-4 mt-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
-            <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
               {currentPath ? `Actif: ${currentPath.split(/[\\/]/).pop()}` : 'Aucun projet sélectionné'}
             </span>
 

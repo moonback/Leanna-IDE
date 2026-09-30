@@ -171,7 +171,7 @@ export default function AutomationView() {
                     {task.description || 'Pas de description fournie.'}
                   </p>
                   
-                  <div className="flex items-center gap-4 mt-3.5 text-[12px] text-[var(--text-muted)] bg-[var(--bg-ctrl)] px-3 py-1.5 rounded-full w-fit border border-[var(--border-base)]">
+                  <div className="flex items-center gap-4 mt-3.5 text-xs text-[var(--text-muted)] bg-[var(--bg-ctrl)] px-3 py-1.5 rounded-full w-fit border border-[var(--border-base)]">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Clock className="w-3.5 h-3.5" /> Intervalle: <span className="text-[var(--text-primary)] font-semibold">{task.interval}</span>
                     </span>

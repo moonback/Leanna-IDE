@@ -92,10 +92,10 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
             <div><h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Logs Assistant</h2><p className="text-xs" style={{ color: 'var(--text-muted)' }}>Session active · 1 000 entrées retenues côté serveur</p></div>
           </div>
           <div className="flex items-center gap-1">
-            <Tooltip content="Rafraîchir les logs" as="button" type="button" onClick={load} className="p-2 rounded-lg hover:bg-white/10">
+            <Tooltip content="Rafraîchir les logs" as="button" type="button" onClick={load} className="p-2 rounded-lg hover:bg-[var(--bg-active)]">
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </Tooltip>
-            <Tooltip content="Fermer les logs" as="button" type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
+            <Tooltip content="Fermer les logs" as="button" type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-active)]">
               <X size={15} />
             </Tooltip>
           </div>
@@ -107,7 +107,7 @@ export function AssistantLogsPanel({ onClose }: AssistantLogsPanelProps) {
         </div>
         {error && <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)', color: 'var(--color-error)' }}><AlertTriangle size={12} />{error}</div>}
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar" role="log" aria-live="polite">
-          {!loading && visibleEntries.length === 0 ? <div className="flex h-40 flex-col items-center justify-center gap-2" style={{ color: 'var(--text-dimmed)' }}><Bot size={22} /><p className="text-xs">Aucun log correspondant pour cette session.</p></div> : <div className="space-y-1">{visibleEntries.map((entry, index) => <div key={`${entry.timestamp}-${entry.module}-${index}`} className="grid grid-cols-[58px_110px_1fr] gap-2 rounded px-2 py-1.5 font-mono text-xs leading-relaxed hover:bg-white/5"><span style={{ color: 'var(--text-dimmed)' }}>{formatTime(entry.timestamp)}</span><span className="truncate font-semibold" style={{ color: LEVEL_COLORS[entry.level] }}>{entry.module}</span><span className="break-words" style={{ color: 'var(--text-secondary)' }}>{entry.message}</span></div>)}</div>}
+          {!loading && visibleEntries.length === 0 ? <div className="flex h-40 flex-col items-center justify-center gap-2" style={{ color: 'var(--text-dimmed)' }}><Bot size={22} /><p className="text-xs">Aucun log correspondant pour cette session.</p></div> : <div className="space-y-1">{visibleEntries.map((entry, index) => <div key={`${entry.timestamp}-${entry.module}-${index}`} className="grid grid-cols-[58px_110px_1fr] gap-2 rounded px-2 py-1.5 font-mono text-xs leading-relaxed hover:bg-[var(--bg-hover)]"><span style={{ color: 'var(--text-dimmed)' }}>{formatTime(entry.timestamp)}</span><span className="truncate font-semibold" style={{ color: LEVEL_COLORS[entry.level] }}>{entry.module}</span><span className="break-words" style={{ color: 'var(--text-secondary)' }}>{entry.message}</span></div>)}</div>}
         </div>
         <footer className="px-4 py-2 text-xs" style={{ borderTop: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}>Les messages sont assainis, mais restent des données non fiables. Rafraîchissement toutes les 15 secondes tant que ce panneau est ouvert.</footer>
       </section>

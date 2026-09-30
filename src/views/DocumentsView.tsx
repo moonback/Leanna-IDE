@@ -371,7 +371,7 @@ function DocumentsTab() {
         <button
           onClick={() => setShowUrlForm(prev => !prev)}
           className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-            showUrlForm ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5'
+            showUrlForm ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-[var(--bg-hover)]'
           }`}
           style={!showUrlForm ? { borderColor: 'var(--border-base)', color: 'var(--text-muted)' } : undefined}
         >
@@ -401,14 +401,14 @@ function DocumentsTab() {
         {/* Refresh */}
         <button
           onClick={loadDocuments}
-          className="p-2 rounded-xl border transition-colors hover:bg-white/5"
+          className="p-2 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
 
         {/* Count */}
-        <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {documents.length + workspaceDocuments.length} document{(documents.length + workspaceDocuments.length) !== 1 ? 's' : ''}
           {workspaceDocuments.length > 0 && ` (${workspaceDocuments.length} auto-extraits)`}
         </span>
@@ -436,7 +436,7 @@ function DocumentsTab() {
                 <button
                   type="button"
                   onClick={() => setShowUrlForm(false)}
-                  className="p-1 rounded-lg hover:bg-white/5 transition"
+                  className="p-1 rounded-lg hover:bg-[var(--bg-hover)] transition"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   <X className="w-3.5 h-3.5" />
@@ -471,7 +471,7 @@ function DocumentsTab() {
                   type="button"
                   onClick={() => setShowUrlForm(false)}
                   disabled={ingestingUrl}
-                  className="px-3 py-2 rounded-xl text-xs font-medium border hover:bg-white/5 transition"
+                  className="px-3 py-2 rounded-xl text-xs font-medium border hover:bg-[var(--bg-hover)] transition"
                   style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -521,18 +521,18 @@ function DocumentsTab() {
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             >
               <div className="flex items-center gap-2">
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                   style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                   {r.resultType}
                 </span>
                 <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                   {r.title}
                 </span>
-                <span className="ml-auto text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   {(r.relevance * 100).toFixed(0)}%
                 </span>
               </div>
-              <p className="text-[11px] mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                 {r.snippet}
               </p>
             </div>
@@ -583,11 +583,11 @@ function DocumentsTab() {
                         {doc.title}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                           {doc.type} • {doc.wordCount ?? '?'} mots
                         </span>
                         {doc.collection && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                          <span className="text-xs px-1.5 py-0.5 rounded-full"
                             style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}>
                             {doc.collection}
                           </span>
@@ -603,7 +603,7 @@ function DocumentsTab() {
                   </div>
 
                   {/* Summary */}
-                  <p className="text-[10px] leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
                     {doc.summary || 'Pas de résumé disponible.'}
                   </p>
 
@@ -611,13 +611,13 @@ function DocumentsTab() {
                   {doc.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-auto pt-1">
                       {doc.keywords.slice(0, 5).map(kw => (
-                        <span key={kw} className="text-[8px] px-1.5 py-0.5 rounded-full"
+                        <span key={kw} className="text-xs px-1.5 py-0.5 rounded-full"
                           style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
                           {kw}
                         </span>
                       ))}
                       {doc.keywords.length > 5 && (
-                        <span className="text-[8px] px-1 py-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs px-1 py-0.5" style={{ color: 'var(--text-dimmed)' }}>
                           +{doc.keywords.length - 5}
                         </span>
                       )}
@@ -626,11 +626,11 @@ function DocumentsTab() {
 
                   {/* Footer */}
                   <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: 'var(--border-base)' }}>
-                    <span className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
                       <Clock className="w-2.5 h-2.5" />
                       {timeAgo(doc.addedAt)}
                     </span>
-                    <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                       {doc.language.toUpperCase()}
                     </span>
                   </div>
@@ -645,7 +645,7 @@ function DocumentsTab() {
               <>
                 <div className="flex items-center gap-2 pt-2">
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                     📄 Documents du Workspace ({workspaceDocuments.length})
                   </span>
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
@@ -664,22 +664,22 @@ function DocumentsTab() {
                             {doc.fileName}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                               {doc.mimeType} • {(doc.textLength / 1000).toFixed(1)}k chars
                             </span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-medium">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-medium">
                               auto-extrait
                             </span>
                           </div>
                         </div>
                       </div>
-                      <p className="text-[10px] leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
                         {doc.summary || 'Extrait automatiquement du workspace.'}
                       </p>
                       {doc.tags && doc.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-auto pt-1">
                           {doc.tags.slice(0, 5).map((tag: string, i: number) => (
-                            <span key={i} className="text-[8px] px-1.5 py-0.5 rounded-full"
+                            <span key={i} className="text-xs px-1.5 py-0.5 rounded-full"
                               style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
                               {tag}
                             </span>
@@ -831,12 +831,12 @@ function MemoryTab() {
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <button onClick={loadFacts} className="p-2 rounded-xl border hover:bg-white/5 transition"
+        <button onClick={loadFacts} className="p-2 rounded-xl border hover:bg-[var(--bg-hover)] transition"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
 
-        <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {facts.length} fait{facts.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -879,7 +879,7 @@ function MemoryTab() {
                 </button>
                 <button
                   onClick={() => setShowAddForm(false)}
-                  className="px-3 py-2 rounded-xl text-xs transition hover:bg-white/5"
+                  className="px-3 py-2 rounded-xl text-xs transition hover:bg-[var(--bg-hover)]"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Annuler
@@ -924,37 +924,37 @@ function MemoryTab() {
                   {fact.content}
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                     style={{ backgroundColor: `${CATEGORY_COLORS[fact.category] || '#6b7280'}20`, color: CATEGORY_COLORS[fact.category] || '#6b7280' }}>
                     {fact.category}
                   </span>
                   {/* Indicateur de source */}
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                  <span className="text-xs px-1.5 py-0.5 rounded-full"
                     style={{ backgroundColor: fact.source === 'project' ? 'var(--bg-base)' : 'transparent', color: 'var(--text-dimmed)' }}>
                     {fact.source === 'project' ? '📦 Projet' : '📄 Document'}
                   </span>
                   {/* Badge "vérifié" pour les faits documents */}
                   {fact.verified && (
-                    <span className="text-[9px] flex items-center gap-0.5 text-emerald-400">
+                    <span className="text-xs flex items-center gap-0.5 text-emerald-400">
                       <CheckCircle2 className="w-2.5 h-2.5" /> vérifié
                     </span>
                   )}
                   {/* Badge "structural" pour les faits projet */}
                   {fact.isStructural && (
-                    <span className="text-[9px] flex items-center gap-0.5 text-purple-400">
+                    <span className="text-xs flex items-center gap-0.5 text-purple-400">
                       <CheckCircle2 className="w-2.5 h-2.5" /> structurel
                     </span>
                   )}
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     confiance: {(fact.confidence * 100).toFixed(0)}%
                   </span>
                   {/* Afficher usageCount pour les faits projet */}
                   {fact.source === 'project' && fact.usageCount !== undefined && fact.usageCount > 0 && (
-                    <span className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                    <span className="text-xs flex items-center gap-0.5" style={{ color: 'var(--text-dimmed)' }}>
                       👁️ {fact.usageCount}
                     </span>
                   )}
-                  <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {timeAgo(fact.createdAt)}
                   </span>
                 </div>
@@ -1025,11 +1025,11 @@ function RelationsTab() {
   return (
     <div className="p-5 lg:p-7 space-y-4">
       <div className="flex items-center gap-3">
-        <button onClick={loadRelations} className="p-2 rounded-xl border hover:bg-white/5 transition"
+        <button onClick={loadRelations} className="p-2 rounded-xl border hover:bg-[var(--bg-hover)] transition"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
-        <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
           {relations.length} relation{relations.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -1052,18 +1052,18 @@ function RelationsTab() {
             <div key={rel.id} className="p-3 rounded-xl border"
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                   style={{
                     backgroundColor: `${RELATION_COLORS[rel.type] || '#6b7280'}20`,
                     color: RELATION_COLORS[rel.type] || '#6b7280',
                   }}>
                   {rel.type}
                 </span>
-                <span className="text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   {(rel.confidence * 100).toFixed(0)}% confiance
                 </span>
                 {rel.autoDetected && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+                  <span className="text-xs px-1.5 py-0.5 rounded-full"
                     style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
                     auto
                   </span>
@@ -1075,7 +1075,7 @@ function RelationsTab() {
                 <span className="font-medium truncate max-w-[35%]">{rel.targetId}</span>
               </div>
               {rel.description && (
-                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{rel.description}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{rel.description}</p>
               )}
             </div>
           ))}
@@ -1359,7 +1359,7 @@ function StatCard({ label, value, icon: Icon, color }: {
     <div className="p-4 rounded-2xl border space-y-2"
       style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           {label}
         </span>
         <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${color}15` }}>

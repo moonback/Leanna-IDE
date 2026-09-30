@@ -212,7 +212,7 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
             {activeMissions.map(mission => (
               <div
                 key={mission.missionId}
-                className="px-3 py-2.5 cursor-pointer hover:bg-white/5 transition"
+                className="px-3 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition"
                 onClick={onOpenMissions}
                 style={{ borderBottom: '1px solid var(--border-base)' }}
               >
@@ -258,7 +258,7 @@ export function AgentActivityOverlay({ onOpenAgents, onOpenMissions, isChatOpen 
             {activeAgents.map(agent => (
               <div
                 key={agent.taskId}
-                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5 transition"
+                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--bg-hover)] transition"
                 onClick={onOpenAgents}
               >
                 <Loader2 size={10} className="animate-spin" style={{ color: 'var(--color-accent-alt)' }} />

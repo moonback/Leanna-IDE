@@ -112,11 +112,11 @@ export default function HistoryView() {
         description="Toutes vos conversations passées avec Leanna"
         actions={
           <>
-            <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--text-muted)' }}>{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</span>
+            <span className="hidden text-xs sm:inline" style={{ color: 'var(--text-muted)' }}>{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</span>
             <button
               type="button"
               onClick={load}
-              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              className="rounded-lg p-2 transition-colors hover:bg-[var(--bg-active)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Rafraîchir"
             >
@@ -193,23 +193,23 @@ export default function HistoryView() {
                           {conv.title || 'Conversation sans titre'}
                         </p>
                         {conv.summary && (
-                          <p className="text-[10px] leading-snug mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                          <p className="text-xs leading-snug mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                             {conv.summary}
                           </p>
                         )}
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                             {timeAgo(conv.started_at)}
                           </span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                             {conv.message_count} msg
                           </span>
                         </div>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between border-t pt-2" style={{ borderColor: 'var(--notebook-border)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                         {selectedId === conv.id ? 'Conversation ouverte' : 'Prête à être consultée'}
                       </span>
                       <div className="flex items-center gap-1">
@@ -257,7 +257,7 @@ export default function HistoryView() {
                     <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {conversations.find(c => c.id === selectedId)?.title || 'Conversation'}
                     </p>
-                    <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                    <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
                       {formatDate(conversations.find(c => c.id === selectedId)?.started_at || '')} — {messages.length} messages
                     </p>
                   </div>
@@ -369,7 +369,7 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
             {showDateSeparator && (
               <div className="flex items-center gap-3 py-4">
                 <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border, var(--border-base))' }} />
-                <span className="text-[10px] font-medium uppercase tracking-wider px-2" style={{ color: 'var(--text-dimmed)' }}>
+                <span className="text-xs font-medium uppercase tracking-wider px-2" style={{ color: 'var(--text-dimmed)' }}>
                   {dateLabel}
                 </span>
                 <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border, var(--border-base))' }} />
@@ -379,7 +379,7 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
             {/* Timestamp between message groups */}
             {showTime && !showDateSeparator && index > 0 && (
               <div className="flex justify-center py-2">
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-md" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--notebook-surface-muted)' }}>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-md" style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--notebook-surface-muted)' }}>
                   {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -411,7 +411,7 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
               <div className={`flex flex-col gap-0.5 max-w-[75%] ${isAssistant ? 'items-start' : 'items-end'}`}>
                 {/* Role label on first message of group */}
                 {!isConsecutiveSameRole && (
-                  <span className="text-[9px] font-semibold uppercase tracking-wider px-1 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs font-semibold uppercase tracking-wider px-1 mb-0.5" style={{ color: 'var(--text-dimmed)' }}>
                     {isAssistant ? 'Leanna' : 'Vous'}
                   </span>
                 )}

@@ -260,7 +260,7 @@ export default function GitHubView() {
           <>
             <button
               onClick={refresh}
-              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              className="rounded-lg p-2 transition-colors hover:bg-[var(--bg-active)]"
               title="Rafraîchir"
               aria-label="Rafraîchir"
             >
@@ -272,7 +272,7 @@ export default function GitHubView() {
             {githubUrl && (
               <button
                 onClick={() => openExternal(githubUrl)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold transition-opacity hover:opacity-80"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--border-base)' }}
                 aria-label="Ouvrir sur GitHub"
               >
@@ -309,7 +309,7 @@ export default function GitHubView() {
           <GitCommit size={14} />
           Commits
           {commits.length > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
               {commits.length}
             </span>
           )}
@@ -328,7 +328,7 @@ export default function GitHubView() {
           <AlertCircle size={14} />
           Issues
           {issues.length > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
               {issues.length}
             </span>
           )}
@@ -347,7 +347,7 @@ export default function GitHubView() {
           <GitPullRequest size={14} />
           Pull Requests
           {prs.length > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(14,165,233,0.15)', color: 'var(--accent-primary)' }}>
               {prs.length}
             </span>
           )}
@@ -365,7 +365,7 @@ export default function GitHubView() {
             style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
             role="alert"
           >
-            <p className="text-[11px]" style={{ color: '#f87171' }}>{error}</p>
+            <p className="text-xs" style={{ color: '#f87171' }}>{error}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -394,7 +394,7 @@ export default function GitHubView() {
                   <div
                     key={commit.hash}
                     onClick={() => fetchCommitDetail(commit.hash)}
-                    className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-white/5 cursor-pointer"
+                    className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
                     style={{
                       borderColor: selectedCommit?.hash === commit.hash ? 'var(--accent-primary)' : 'var(--border-base)',
                       backgroundColor: selectedCommit?.hash === commit.hash ? 'rgba(14,165,233,0.05)' : undefined,
@@ -404,13 +404,13 @@ export default function GitHubView() {
                   >
                     <GitCommit size={14} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                         {commit.message}
                       </p>
                       <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{commit.author}</span>
-                        <span className="text-[10px] font-mono" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>{commit.shortHash}</span>
-                        <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(commit.date)}</span>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{commit.author}</span>
+                        <span className="text-xs font-mono" style={{ color: 'var(--accent-primary)', opacity: 0.8 }}>{commit.shortHash}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(commit.date)}</span>
                       </div>
                     </div>
                   </div>
@@ -442,17 +442,17 @@ export default function GitHubView() {
                             {selectedCommit.message}
                           </p>
                           <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{selectedCommit.author}</span>
-                            <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{new Date(selectedCommit.date).toLocaleString('fr-FR')}</span>
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{selectedCommit.author}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{new Date(selectedCommit.date).toLocaleString('fr-FR')}</span>
                           </div>
-                          <span className="text-[10px] font-mono mt-1 inline-block px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)' }}>
+                          <span className="text-xs font-mono mt-1 inline-block px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(14,165,233,0.1)', color: 'var(--accent-primary)' }}>
                             {selectedCommit.hash.slice(0, 10)}
                           </span>
                         </div>
                         <div className="flex gap-1">
                           <button
                             onClick={() => openExternal(`https://github.com/${repoInfo.full_name}/commit/${selectedCommit.hash}`)}
-                            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
                             title="Voir sur GitHub"
                             aria-label="Voir sur GitHub"
                           >
@@ -460,7 +460,7 @@ export default function GitHubView() {
                           </button>
                           <button
                             onClick={() => setSelectedCommit(null)}
-                            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
                             title="Fermer"
                             aria-label="Fermer le détail"
                           >
@@ -471,18 +471,18 @@ export default function GitHubView() {
 
                       {/* Files changed */}
                       <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--border-base)' }}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>
+                        <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-dimmed)' }}>
                           Fichiers modifiés ({selectedCommit.files.length})
                         </p>
                         <div className="grid gap-1 max-h-[400px] overflow-y-auto custom-scrollbar">
                           {selectedCommit.files.map((file) => (
                             <div
                               key={file.path}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-mono"
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-mono"
                               style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
                             >
                               <span
-                                className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                                className="w-4 h-4 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
                                 style={{
                                   backgroundColor: file.status === 'A' ? 'rgba(63,185,80,0.15)' :
                                                    file.status === 'D' ? 'rgba(248,81,73,0.15)' :
@@ -521,25 +521,25 @@ export default function GitHubView() {
                 <div
                   key={issue.number}
                   onClick={() => openExternal(issue.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-white/5 cursor-pointer"
+                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`Issue #${issue.number}: ${issue.title}`}
                 >
                   <AlertCircle size={14} className="mt-0.5 flex-shrink-0" style={{ color: issue.state === 'open' ? '#3fb950' : '#f85149' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                       #{issue.number} {issue.title}
                     </p>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
-                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
-                      {issue.comments > 0 && <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>💬 {issue.comments}</span>}
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{issue.author}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeAgo(issue.created_at)}</span>
+                      {issue.comments > 0 && <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>💬 {issue.comments}</span>}
                     </div>
                     {issue.labels.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {issue.labels.slice(0, 4).map((l) => (
-                          <span key={l} className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                          <span key={l} className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
                             {l}
                           </span>
                         ))}
@@ -565,23 +565,23 @@ export default function GitHubView() {
                 <div
                   key={pr.number}
                   onClick={() => openExternal(pr.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-white/5 cursor-pointer"
+                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`PR #${pr.number}: ${pr.title}`}
                 >
                   <GitPullRequest size={14} className="mt-0.5 flex-shrink-0" style={{ color: pr.state === 'open' ? '#3fb950' : '#a371f7' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                       #{pr.number} {pr.title}
                     </p>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
-                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                      <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{pr.author}</span>
+                      <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                         {pr.head} → {pr.base}
                       </span>
                       {pr.draft && (
-                        <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--text-dimmed)' }}>
                           draft
                         </span>
                       )}

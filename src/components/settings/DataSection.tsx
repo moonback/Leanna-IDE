@@ -166,7 +166,7 @@ export function DataSection() {
           <div className="flex flex-col gap-1.5">
             {/* Tout sélectionner */}
             <button type="button" onClick={toggleAll}
-              className="mb-1 self-start text-[11px] font-semibold underline-offset-2 hover:underline"
+              className="mb-1 self-start text-xs font-semibold underline-offset-2 hover:underline"
               style={{ color: 'var(--text-muted)' }}>
               {allSelected ? 'Tout décocher' : 'Tout cocher'}
             </button>
@@ -189,7 +189,7 @@ export function DataSection() {
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-base)' }}>{scope.label}</span>
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{scope.hint}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{scope.hint}</span>
                   </span>
                 </button>
               );

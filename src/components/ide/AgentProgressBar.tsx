@@ -177,11 +177,11 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
             <span className="text-sm tracking-wide font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
               {reasoning.strategyLabel ?? 'Raisonnement'}
             </span>
-            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: statusColor }}>
+            <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: statusColor }}>
               {statusLabel}
             </span>
           </div>
-          <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
             {reasoning.announcement ?? (reasoning.active ? 'Analyse des options en cours…' : 'Analyse terminée')}
           </div>
         </div>
@@ -213,7 +213,7 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
       </div>
 
       {streamPreview && (
-        <div className="mt-2 max-h-16 overflow-hidden rounded-md px-2 py-1.5 text-[11px] leading-relaxed font-mono" style={{ color: 'var(--text-secondary)', backgroundColor: 'color-mix(in srgb, var(--bg-base) 45%, transparent)', border: '1px solid color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
+        <div className="mt-2 max-h-16 overflow-hidden rounded-md px-2 py-1.5 text-xs leading-relaxed font-mono" style={{ color: 'var(--text-secondary)', backgroundColor: 'color-mix(in srgb, var(--bg-base) 45%, transparent)', border: '1px solid color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
           {streamPreview.slice(-420)}{reasoning.active ? ' ▍' : ''}
         </div>
       )}
@@ -439,7 +439,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           {!isWorking && onClear && (
             <button
               onClick={e => { e.stopPropagation(); onClear(); }}
-              className="p-0.5 rounded hover:bg-white/5 active:bg-white/10 active:scale-90 transition-all"
+              className="p-0.5 rounded hover:bg-[var(--bg-hover)] active:bg-[var(--bg-active)] active:scale-90 transition-all"
               title="Effacer"
               aria-label="Effacer l'historique"
               style={{ color: 'var(--text-dimmed)' }}

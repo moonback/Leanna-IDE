@@ -502,7 +502,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
         {/* Bouton d'actualisation */}
         <button
           onClick={fetchDocs}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border hover:bg-white/5 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
           title="Actualiser la liste"
         >
@@ -518,7 +518,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
           className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
             selectedCategory === 'all'
               ? 'bg-indigo-500 text-white shadow-sm'
-              : 'hover:bg-white/5'
+              : 'hover:bg-[var(--bg-hover)]'
           }`}
           style={{
             backgroundColor: selectedCategory === 'all' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
@@ -543,7 +543,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
             >
               <span className="capitalize">{cat}</span>
               <span
-                className="text-[10px] px-1 rounded-full font-mono"
+                className="text-xs px-1 rounded-full font-mono"
                 style={{
                   backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)',
                 }}
@@ -580,7 +580,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
             )}
           </div>
 
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-[var(--border-base)]">
             {filteredTools.length === 0 ? (
               <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
                 Aucun outil ne correspond aux critères.
@@ -627,7 +627,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                           {tool.name}
                         </span>
                         <span
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded capitalize"
+                          className="text-xs font-mono px-1.5 py-0.5 rounded capitalize"
                           style={{
                             backgroundColor: 'rgba(255,255,255,0.06)',
                             color: 'var(--text-muted)',
@@ -697,7 +697,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                   </h2>
                   <button
                     onClick={() => handleCopy(activeTool.name, 'tool-name')}
-                    className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors text-xs flex items-center gap-1 cursor-pointer"
+                    className="p-1.5 rounded-lg border hover:bg-[var(--bg-hover)] transition-colors text-xs flex items-center gap-1 cursor-pointer"
                     style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                     title="Copier le nom de l'outil"
                   >
@@ -738,7 +738,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                           <th className="pb-2 font-medium">Description</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5 font-mono">
+                      <tbody className="divide-y divide-[var(--border-base)] font-mono">
                         {Object.entries(activeTool.parameters.properties).map(([pName, pMeta]) => {
                           const isRequired = activeTool.parameters.required.includes(pName);
                           return (
@@ -748,7 +748,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                               </td>
                               <td className="py-2.5">
                                 <span
-                                  className="px-1.5 py-0.5 rounded text-[11px] font-mono"
+                                  className="px-1.5 py-0.5 rounded text-xs font-mono"
                                   style={{
                                     backgroundColor: 'color-mix(in srgb, var(--accent-secondary) 15%, transparent)',
                                     color: 'var(--accent-secondary)',
@@ -759,11 +759,11 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                               </td>
                               <td className="py-2.5">
                                 {isRequired ? (
-                                  <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25">
+                                  <span className="text-xs font-semibold uppercase px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25">
                                     Requis
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/5 text-gray-400">
+                                  <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-gray-400">
                                     Optionnel
                                   </span>
                                 )}
@@ -771,7 +771,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                               <td className="py-2.5 font-sans leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                                 {pMeta.description || '—'}
                                 {pMeta.enum && (
-                                  <span className="block text-[11px] font-mono text-indigo-300 mt-0.5">
+                                  <span className="block text-xs font-mono text-indigo-300 mt-0.5">
                                     Valeurs : [{pMeta.enum.map((v) => `"${v}"`).join(', ')}]
                                   </span>
                                 )}
@@ -820,7 +820,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                     ))}
                     <button
                       onClick={() => handleCopy(activeTool.codeSnippets[snippetTab], `snippet-${snippetTab}`)}
-                      className="p-1 rounded hover:bg-white/5 transition-colors ml-2 cursor-pointer"
+                      className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors ml-2 cursor-pointer"
                       title="Copier le code"
                     >
                       {copiedKey === `snippet-${snippetTab}` ? (
@@ -863,7 +863,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                         setRunnerInputs(ex);
                         setRawJsonInput(JSON.stringify(ex, null, 2));
                       }}
-                      className="text-xs px-2.5 py-1 rounded-lg border hover:bg-white/5 transition-colors cursor-pointer"
+                      className="text-xs px-2.5 py-1 rounded-lg border hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                       style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
                     >
                       Charger l'exemple
@@ -873,7 +873,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
 
                     <button
                       onClick={() => setInputMode(inputMode === 'form' ? 'json' : 'form')}
-                      className="text-xs font-mono px-2 py-1 rounded-lg border hover:bg-white/5 transition-colors cursor-pointer"
+                      className="text-xs font-mono px-2 py-1 rounded-lg border hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                       style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
                     >
                       Mode {inputMode === 'form' ? 'JSON' : 'Formulaire'}
@@ -918,7 +918,7 @@ export function SkillsDocumentation({ embedded = false, initialToolName }: Skill
                                   <span style={{ color: 'var(--text-primary)' }}>
                                     {pName} {isRequired && <span className="text-rose-400">*</span>}
                                   </span>
-                                  <span className="text-[10px] text-gray-500">{pMeta.type}</span>
+                                  <span className="text-xs text-gray-500">{pMeta.type}</span>
                                 </label>
 
                                 {pMeta.type === 'BOOLEAN' ? (

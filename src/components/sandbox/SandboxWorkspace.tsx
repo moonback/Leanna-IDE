@@ -66,7 +66,7 @@ export function SandboxWorkspace({
                 Sandbox
               </h2>
               <span
-                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
                 style={{
                   color: 'var(--color-success)',
                   borderColor: 'color-mix(in srgb, var(--color-success) 28%, transparent)',
@@ -77,7 +77,7 @@ export function SandboxWorkspace({
                 Isolé
               </span>
             </div>
-            <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
               {view === 'diff' ? 'Comparer et valider les changements' : 'Examiner les changements avant synchronisation'}
             </p>
           </div>
@@ -85,7 +85,7 @@ export function SandboxWorkspace({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg p-2 transition hover:bg-white/10"
+          className="rounded-lg p-2 transition hover:bg-[var(--bg-active)]"
           title="Fermer le sandbox"
           aria-label="Fermer le sandbox"
         >

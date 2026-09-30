@@ -127,7 +127,7 @@ export function EditorTabs({
 
                 {/* Close Button: shows on hover, or replaces dot on hover */}
                 <button
-                  className={`absolute inset-0 flex items-center justify-center rounded p-0.5 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity`}
+                  className={`absolute inset-0 flex items-center justify-center rounded p-0.5 hover:bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onCloseTab(file.path);
@@ -148,7 +148,7 @@ export function EditorTabs({
         {isMarkdownFile && (
           <button
             onClick={onToggleMarkdownPreview}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
             title={markdownPreview ? 'Voir le texte brut (Ctrl+Shift+M)' : 'Voir la prévisualisation Markdown (Ctrl+Shift+M)'}
           >
             {markdownPreview
@@ -162,7 +162,7 @@ export function EditorTabs({
         {isHtmlFile && (
           <button
             onClick={onToggleHtmlPreview}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
             title={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML dans le navigateur intégré'}
           >
             <Globe size={13} style={{ color: htmlPreview ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -171,7 +171,7 @@ export function EditorTabs({
 
         <button
           onClick={onToggleMinimap}
-          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition`}
+          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition`}
           title="Basculer la minimap"
         >
           <Map size={13} style={{ color: showMinimap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -179,7 +179,7 @@ export function EditorTabs({
 
         <button
           onClick={onToggleWordWrap}
-          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition`}
+          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition`}
           title="Basculer le retour à la ligne automatique (Alt+Z)"
         >
           <WrapText size={13} style={{ color: wordWrap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -187,7 +187,7 @@ export function EditorTabs({
 
         <button
           onClick={onFormat}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
           title="Formater le document (Shift+Alt+F)"
         >
           <AlignJustify size={13} style={{ color: 'var(--text-muted)' }} />
@@ -196,7 +196,7 @@ export function EditorTabs({
         {onOpenTemplates && (
           <button
             onClick={onOpenTemplates}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 transition"
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
             title="Bibliothèque de Templates & Modèles"
           >
             <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
@@ -206,7 +206,7 @@ export function EditorTabs({
         <button
           onClick={onSave}
           disabled={!activeFileDirty}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 disabled:opacity-30 transition"
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition"
           title="Enregistrer le fichier (Ctrl+S)"
         >
           <Save size={13} style={{ color: activeFileDirty ? 'var(--accent-primary)' : 'var(--text-muted)' }} />

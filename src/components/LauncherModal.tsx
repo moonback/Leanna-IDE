@@ -143,7 +143,7 @@ export function LauncherModal() {
             </div>
             <div>
               <p
-                className="text-[10px] font-bold uppercase tracking-[0.16em] mb-1"
+                className="text-xs font-bold uppercase tracking-[0.16em] mb-1"
                 style={{ color: 'var(--accent-primary)' }}
               >
                 Bienvenue
