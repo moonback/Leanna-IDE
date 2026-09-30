@@ -85,6 +85,38 @@ export interface ToolRegistryConfig {
    * Si absent, un contrôleur désactivé est créé.
    */
   dryRun?: DryRunController;
+  /**
+   * Garde d'idempotence optionnelle (P0.3). Si fournie, chaque appel d'outil
+   * passe par elle AVANT exécution : un appel déjà complété est resservi sans
+   * réexécution ; un appel à effet de bord interrompu par un crash est bloqué.
+   * Découplé du noyau via une interface : aucun cycle d'import, aucun impact si
+   * la garde n'est pas configurée.
+   */
+  idempotency?: IdempotencyGuard;
+}
+
+/**
+ * Contrat minimal d'une garde d'idempotence, implémenté par un adaptateur
+ * au-dessus de `server/core/ExecutionLedger`. Volontairement défini ici pour
+ * garder `ToolRegistry` indépendant du noyau.
+ */
+export interface IdempotencyGuard {
+  /**
+   * Décide du sort d'un appel d'outil AVANT exécution.
+   *   - `{ decision: "execute", commit, fail }` : exécuter, puis appeler commit
+   *     (succès) ou fail (échec) ;
+   *   - `{ decision: "skip", result }` : ne pas exécuter, renvoyer `result` ;
+   *   - `{ decision: "block", reason }` : refuser (rejeu dangereux après crash).
+   */
+  guard(
+    tool: string,
+    args: Record<string, unknown>,
+    permissions: ToolPermission[] | undefined,
+    agentId: string | undefined
+  ):
+    | { decision: "execute"; commit: (result: unknown) => void; fail: (error: string) => void }
+    | { decision: "skip"; result: unknown }
+    | { decision: "block"; reason: string };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -101,6 +133,7 @@ export class ToolRegistry {
   private readCache = new Map<string, { value: any; expires: number }>();
   private permissionPolicy: PermissionPolicy;
   private dryRun: DryRunController;
+  private idempotency?: IdempotencyGuard;
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
@@ -109,6 +142,12 @@ export class ToolRegistry {
     this.permissionPolicy =
       config.permissionPolicy ?? PermissionPolicy.fromEnv(process.env, { eventBus: config.eventBus });
     this.dryRun = config.dryRun ?? new DryRunController({ eventBus: config.eventBus });
+    this.idempotency = config.idempotency;
+  }
+
+  /** Branche (ou remplace) la garde d'idempotence après construction. */
+  setIdempotencyGuard(guard: IdempotencyGuard | undefined): void {
+    this.idempotency = guard;
   }
 
   /** Retourne la politique de permissions appliquée au runtime. */
@@ -312,6 +351,26 @@ export class ToolRegistry {
       return simulated;
     }
 
+    // ── Garde d'idempotence (P0.3) ──────────────────────────────────────────
+    // Placée APRÈS le dry-run (une simulation ne doit rien journaliser) et
+    // AVANT l'exécution réelle. Si aucune garde n'est branchée, comportement
+    // strictement inchangé.
+    let ledgerCommit: ((result: unknown) => void) | undefined;
+    let ledgerFail: ((error: string) => void) | undefined;
+    if (this.idempotency) {
+      const g = this.idempotency.guard(name, args, entry.definition.permissions, options.agentId);
+      if (g.decision === "skip") {
+        // Résultat déjà connu : on le ressert sans réexécuter le handler.
+        this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs: 0, success: true });
+        return g.result;
+      }
+      if (g.decision === "block") {
+        throw new Error(`[idempotency] ${name}: ${g.reason}`);
+      }
+      ledgerCommit = g.commit;
+      ledgerFail = g.fail;
+    }
+
     const timeoutMs = options.timeoutMs ?? entry.definition.timeoutMs ?? this.defaultTimeoutMs;
     const maxRetries = options.retries ?? 0;
 
@@ -339,6 +398,7 @@ export class ToolRegistry {
         const durationMs = Date.now() - startTime;
         this.recordMetrics(entry, name, durationMs, true, options.agentId);
         this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: true });
+        ledgerCommit?.(result);
 
         return result;
       } catch (err) {
@@ -359,6 +419,7 @@ export class ToolRegistry {
     const durationMs = Date.now() - startTime;
     this.recordMetrics(entry, name, durationMs, false, options.agentId, lastError?.message);
     this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: false });
+    ledgerFail?.(lastError?.message ?? "unknown error");
 
     throw lastError!;
   }
