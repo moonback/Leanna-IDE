@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock, FileCog
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -28,6 +28,7 @@ import {
   SkillsDocumentationSection,
   HierarchicalMemorySection,
   TelegramSection,
+  EnvSection,
 } from '../components/settings/index.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
@@ -62,6 +63,7 @@ const NAV_GROUPS = [
       { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre branche' },
       { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
+      { id: 'env-settings', icon: FileCog, label: 'Variables .env', keywords: 'env environnement variables config configuration secrets clés api token port redis supabase gemini openrouter' },
     ],
   },
   {
@@ -265,7 +267,7 @@ export default function SettingsView() {
                       </span>
 
                       {/* Security badge for self-root related items */}
-                      {(id === 'selfroot-settings' || id === 'safeguards-settings') && (
+                      {(id === 'selfroot-settings' || id === 'safeguards-settings' || id === 'env-settings') && (
                         <span className="ml-auto rounded px-1 py-0.5 text-xs font-bold"
                           style={{
                             backgroundColor: 'color-mix(in srgb, #10b981 12%, transparent)',
@@ -397,6 +399,7 @@ export default function SettingsView() {
                 {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
                 {activeSection === 'hierarchical-memory-settings' && <HierarchicalMemorySection />}
                 {activeSection === 'telegram-settings' && <TelegramSection />}
+                {activeSection === 'env-settings' && <EnvSection />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -428,6 +431,7 @@ function getSectionDescription(id: string): string {
     'skills-doc-settings': 'Documentation interactive des skills et outils, auto-générée depuis leurs déclarations TypeScript.',
     'hierarchical-memory-settings': 'Orchestrez la mémoire à 3 niveaux : court-terme (session), moyen-terme (projet) et long-terme (Supabase).',
     'telegram-settings': 'Contrôlez Leanna depuis votre smartphone : chat IA, exécution de tâches agents et notifications.',
+    'env-settings': 'Consultez et modifiez les variables du fichier .env. Les secrets sont chiffrés au repos.',
   };
   return descriptions[id] || 'Configurez les préférences de cette section.';
 }

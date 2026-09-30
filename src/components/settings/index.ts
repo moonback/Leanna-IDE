@@ -16,5 +16,6 @@ export { SystemPromptSection } from './SystemPromptSection.js';
 export { SkillsDocumentationSection } from './SkillsDocumentationSection.js';
 export { HierarchicalMemorySection } from './HierarchicalMemorySection.js';
 export { TelegramSection } from './TelegramSection.js';
+export { EnvSection } from './EnvSection.js';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives.js';
 
