@@ -151,6 +151,11 @@ export class JevSafetyGate implements SafetyGate {
     // "off" ne devrait jamais être branché, mais on garde une porte de sortie.
     if (this.mode === "off") return { decision: "allow" };
 
+    // Pré-filtre : on ne consulte Jev que pour les actions réellement à risque
+    // système. Les outils d'état interne (mémoire, mission, lecture…) passent
+    // sans appel réseau ni faux positif.
+    if (!shouldEvaluate(tool, args)) return { decision: "allow" };
+
     const { target, summary, facts } = summarize(tool, args, permissions);
     const decision = await gateAgentAction(
       { tool, target, summary, facts },

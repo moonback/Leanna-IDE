@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -52,7 +52,9 @@ interface UnifiedTimelineProps {
 
 export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimelineProps) {
   const agentTasks = useSyncExternalStore(subscribe, getAgentTasks, getAgentTasks);
-  const [collapsed, setCollapsed] = useState(false);
+  // Réduit par défaut : l'en-tête résume l'état (en cours / terminé + nb
+  // d'agents). L'utilisateur déplie s'il veut le détail des phases.
+  const [collapsed, setCollapsed] = useState(true);
 
   const activeAgents = useMemo(
     () => agentTasks.filter(t => t.status === 'running' || t.status === 'pending'),
@@ -163,15 +165,23 @@ export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimeline
 function PhaseGroup({ phase, steps }: { phase: Phase; steps: ActivityStep[] }) {
   const meta = PHASE_META[phase];
   const Icon = meta.icon;
-  const [open, setOpen] = useState(true);
   const running = steps.some(s => s.status === 'running');
   const errored = steps.some(s => s.status === 'error');
+  // Réduit par défaut, SAUF si la phase a une action en cours ou une erreur :
+  // on ne cache jamais le travail en direct ni un échec à l'utilisateur.
+  const [open, setOpen] = useState(running || errored);
+  // Suit automatiquement l'activité (ouvre quand ça travaille/échoue, referme
+  // quand c'est fini) TANT QUE l'utilisateur n'a pas cliqué manuellement.
+  const userToggled = useRef(false);
+  useEffect(() => {
+    if (!userToggled.current) setOpen(running || errored);
+  }, [running, errored]);
 
   return (
     <div className="rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--bg-input)' }}>
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => { userToggled.current = true; setOpen(v => !v); }}
         className="flex items-center gap-2 w-full px-2 py-1.5 text-left hover:bg-[var(--bg-hover)] transition"
         aria-expanded={open}
       >
