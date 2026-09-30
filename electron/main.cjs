@@ -103,6 +103,7 @@ function createSplashWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
     },
   });
 
@@ -120,6 +121,12 @@ function createWindow(splash, splashMinEnd) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // sandbox: false — corrige l'erreur d'init du renderer sandboxé
+      // ("Cannot destructure property 'preloadScripts' of 'binding.startupData'
+      // as it is null"). Le preload n'utilise que contextBridge/ipcRenderer et
+      // n'a pas besoin du sandbox ; contextIsolation:true reste la barrière de
+      // sécurité effective (le renderer n'a toujours pas accès à Node).
+      sandbox: false,
       preload: path.join(__dirname, 'preload.cjs'),
       webviewTag: true,
     },

@@ -79,8 +79,13 @@ export class KnowledgeGraph {
     this.load();
   }
 
-  private syncToCurrentWorkspace(): void {
-    if (this.lastRootSeen === SELF_ROOT) return;
+  /**
+   * Aligne l'état sur le workspace courant. Retourne `true` s'il a détecté un
+   * changement de racine ET rechargé le graphe depuis le disque (auquel cas un
+   * `loadFromDisk()` supplémentaire par l'appelant ferait double emploi).
+   */
+  private syncToCurrentWorkspace(): boolean {
+    if (this.lastRootSeen === SELF_ROOT) return false;
 
     this.lastRootSeen = SELF_ROOT;
     this.state = this.createEmptyState();
@@ -90,7 +95,9 @@ export class KnowledgeGraph {
     if (SELF_ROOT) {
       this.loadFromDisk();
       void this.hydrateFromSharedCache(SELF_ROOT, ++this.workspaceLoadVersion);
+      return true; // déjà rechargé depuis le disque pour le nouveau workspace
     }
+    return false;
   }
 
   private async hydrateFromSharedCache(projectRoot: string, loadVersion: number): Promise<void> {
@@ -142,8 +149,12 @@ export class KnowledgeGraph {
    * Charge le graphe depuis le disque.
    */
   load(): void {
-    this.syncToCurrentWorkspace();
-    this.loadFromDisk();
+    // Si le workspace vient de changer, syncToCurrentWorkspace() a DÉJÀ rechargé
+    // le graphe depuis le disque — un second loadFromDisk() ferait doublon (le
+    // « Graphe chargé » loggé deux fois). On ne recharge donc que si sync n'a
+    // rien fait (workspace inchangé).
+    const alreadyLoaded = this.syncToCurrentWorkspace();
+    if (!alreadyLoaded) this.loadFromDisk();
   }
 
   /**

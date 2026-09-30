@@ -110,6 +110,33 @@ router.post('/rollback', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/safeguards/gate
+// Évalue une action agentique via Jev (modèle de décision) et renvoie
+// allow / review / block avec les raisons. Fail-closed : en cas d'erreur, 'review'.
+router.post('/gate', async (req: Request, res: Response) => {
+  const { tool, target, summary, facts, apiKey, model } = req.body as {
+    tool?: string; target?: string; summary?: string;
+    facts?: Record<string, string | number | boolean>;
+    apiKey?: string; model?: string;
+  };
+  if (!tool || typeof tool !== 'string') {
+    return res.status(400).json({ error: 'Le champ "tool" (string) est requis.' });
+  }
+  if (!summary || typeof summary !== 'string') {
+    return res.status(400).json({ error: 'Le champ "summary" (string) est requis.' });
+  }
+  try {
+    const { gateAgentAction } = await import('../utils/jevGating.js');
+    const decision = await gateAgentAction(
+      { tool, target, summary, facts },
+      { apiKey, model },
+    );
+    return res.json({ status: 'success', ...decision });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Liste d'exclusion .leannaignore ──────────────────────────────────────────
 //
 // Dossiers/motifs de fichiers interdits en écriture à l'agent. Le fichier vit

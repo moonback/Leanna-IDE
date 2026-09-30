@@ -1769,7 +1769,7 @@ OPENROUTER_API_KEY="..."
 Le modèle image peut être surchargé :
 
 ```env
-OPENROUTER_IMAGE_MODEL="google/gemini-2.5-flash-image-preview"
+OPENROUTER_IMAGE_MODEL="google/gemini-3.8-flash-image-preview"
 ```
 
 À défaut, `OPENROUTER_FREE_API_KEY` est également pris en compte.

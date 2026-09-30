@@ -465,7 +465,7 @@ async function callGemini(text: string, voiceName: string): Promise<string | nul
   try {
     const { withGeminiRetry } = await import("./geminiKeyPool.js");
 
-    const model = "gemini-2.5-flash-preview-tts";
+    const model = "gemini-3.8-flash-preview-tts";
 
     const response = await withGeminiRetry(
       (ai) =>

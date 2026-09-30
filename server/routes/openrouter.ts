@@ -98,6 +98,55 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
     }
   });
 
+  // ── Jev / Decisions API (modèle de décision typé, PAS du chat) ─────────────
+
+  // POST /api/openrouter/decisions/test
+  // Vérifie que la clé peut atteindre l'API Decisions avec une question triviale.
+  router.post('/decisions/test', async (req: Request, res: Response) => {
+    const { apiKey } = req.body as { apiKey?: string };
+    try {
+      const { decide, JEV_PINNED } = await import('../utils/jevDecisions.js');
+      const result = await decide({
+        apiKey,
+        model: JEV_PINNED,
+        state: { text: 'This is a simple connectivity check.' },
+        questions: {
+          ok: {
+            type: 'noul',
+            instructions: 'Is the `text` a harmless connectivity check?',
+          },
+        },
+        timeoutMs: 10_000,
+      });
+      res.json({ status: 'success', model: result.model, answers: result.answers, cost: result.usage?.cost });
+    } catch (e: any) {
+      res.json({ status: 'error', error: e.message || 'Connexion Decisions échouée' });
+    }
+  });
+
+  // POST /api/openrouter/decide
+  // Appel générique : { state, questions, model?, apiKey? }
+  router.post('/decide', async (req: Request, res: Response) => {
+    const { state, questions, model, apiKey } = req.body as {
+      state?: unknown; questions?: Record<string, any>; model?: string; apiKey?: string;
+    };
+    if (state === undefined || state === null) {
+      res.status(400).json({ status: 'error', error: 'Le champ "state" est requis.' });
+      return;
+    }
+    if (!questions || typeof questions !== 'object' || Object.keys(questions).length === 0) {
+      res.status(400).json({ status: 'error', error: 'Au moins une "question" est requise.' });
+      return;
+    }
+    try {
+      const { decide } = await import('../utils/jevDecisions.js');
+      const result = await decide({ state, questions, model, apiKey });
+      res.json({ status: 'success', data: result });
+    } catch (e: any) {
+      res.status(e.status || 500).json({ status: 'error', error: e.message || 'Erreur Jev/Decisions' });
+    }
+  });
+
   // GET /api/openrouter/models
   router.get('/models', async (req: Request, res: Response) => {
     const key = (req.query.apiKey as string)?.trim() || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_API_KEY || '';

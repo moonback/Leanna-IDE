@@ -13,7 +13,7 @@ create table if not exists public.token_usage (
     agent_role text,
     tool_name text,
     provider text not null,            -- 'gemini' | 'openrouter'
-    model text not null,               -- ex: 'gemini-2.5-flash'
+    model text not null,               -- ex: 'gemini-3.8-flash'
     input_tokens integer not null default 0,
     output_tokens integer not null default 0,
     total_tokens integer not null default 0,

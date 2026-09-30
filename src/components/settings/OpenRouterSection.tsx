@@ -13,7 +13,7 @@ export const OPENROUTER_MODELS = [
   { id: 'openai/gpt-5.6-luna',                               name: 'GPT-5.6',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
   { id: 'z-ai/glm-5.3-flash',                                name: 'GLM 5.3 Flash',         provider: 'ZAI',         free: false, desc: 'Multimodal, efficace pour le code et les tâches agentiques, 1M ctx' },
   { id: 'deepseek/deepseek-v4-flash-0731',                   name: 'DeepSeek V4 Flash',     provider: 'DeepSeek',    free: false, desc: 'MoE 284B sparce, adapté code et raisonnement, GA release, 1.3M ctx' },
-  { id: 'minimax/minimax-m3:free',                           name: 'MiniMax M3',            provider: 'MiniMax',     free: true,  desc: 'Multimodal, MSA sparse attention, rapide et économique, 1M ctx' },
+  { id: 'minimax/minimax-m3',                                name: 'MiniMax M3',            provider: 'MiniMax',     free: false, desc: 'Multimodal, MSA sparse attention, rapide et économique, 1M ctx' },
   // { id: 'moonshotai/kimi-k3',                                name: 'Kimi K3',               provider: 'MoonshotIA',  free: false, desc: '118B-A8B coding agent — meilleur score code de Poolside, 262K ctx' },
   { id: 'nvidia/nemotron-3-ultra-550b-a55b:free',            name: 'Nemotron 3 Ultra',       provider: 'NVIDIA',    free: true, desc: 'MoE 550B-A55B, 1M contexte, raisonnement & orchestration' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free',            name: 'Nemotron 3 Super',       provider: 'NVIDIA',    free: true, desc: 'MoE 120B-A12B, 262K contexte, efficacité maximale' },

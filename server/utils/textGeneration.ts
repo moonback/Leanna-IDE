@@ -51,7 +51,7 @@ export interface GenerateTextOptions {
   maxTokens?: number;
   /** Limite de sortie explicite pour Gemini; propagée aussi à OpenRouter si maxTokens absent. */
   maxOutputTokens?: number;
-  /** Gemini model override (default gemini-2.5-flash) */
+  /** Gemini model override (default gemini-3.8-flash) */
   geminiModel?: string;
   /** OpenRouter model override (uses profile setting if not provided) */
   openrouterModel?: string;
@@ -236,7 +236,7 @@ export async function generateTextStream(options: GenerateTextStreamOptions): Pr
 // ── Gemini streaming implementation ─────────────────────────────────────────
 
 async function streamWithGemini(options: GenerateTextStreamOptions): Promise<string> {
-  const model = options.geminiModel || 'gemini-2.5-flash';
+  const model = options.geminiModel || 'gemini-3.8-flash';
 
   const parts = options.geminiParts
     ? options.geminiParts
@@ -385,7 +385,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
 // ── Gemini non-streaming implementation ─────────────────────────────────────
 
 async function generateWithGemini(options: GenerateTextOptions): Promise<GenerateTextResult> {
-  const model = options.geminiModel || 'gemini-2.5-flash';
+  const model = options.geminiModel || 'gemini-3.8-flash';
 
   // Start OTel span for this model call
   const span = telemetryService.startModelCallSpan('gemini', model, _currentTaskId);

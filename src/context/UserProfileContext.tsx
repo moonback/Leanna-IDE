@@ -121,7 +121,7 @@ const DEFAULT_PROFILE: UserProfile = {
   temperature:      0.9,
   topP:             0.95,
   textProvider:     'openrouter',
-  openrouterModel:  'minimax/minimax-m3:free',
+  openrouterModel:  'minimax/minimax-m3',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-3.6-flash-image',
   theme:         'cyberpunk',

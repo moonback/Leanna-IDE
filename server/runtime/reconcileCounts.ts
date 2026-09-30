@@ -17,7 +17,7 @@
 
 import type { AgentRuntime } from "./AgentRuntime.js";
 import { listAgentDefinitions } from "../agents/roles.js";
-import { resolveToolAttribution } from "../agents/toolAgentMapper.js";
+import { resolveToolAttribution, getToolCategory } from "../agents/toolAgentMapper.js";
 import { defaultAgents } from "./agents/index.js";
 
 export interface ReconciliationReport {
@@ -40,6 +40,12 @@ export interface ReconciliationReport {
   capabilityAttributedTools: number;
   /** Outils attribués explicitement (ToolRegistry / socle sensible). */
   explicitlyAttributedTools: number;
+  /**
+   * Liste NOMINATIVE des outils orphelins (source `unattributed`), avec la
+   * catégorie sémantique éventuellement détectée mais non concluante. Permet de
+   * savoir EXACTEMENT quels outils retombent sur « system », pour les traiter.
+   */
+  unattributedTools: { tool: string; detectedCategory?: string }[];
 }
 
 /**
@@ -85,14 +91,21 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
   let capabilityAttributedTools = 0;
   let categoryAttributedTools = 0;
   let unmappedExecutableTools = 0;
+  const unattributedTools: { tool: string; detectedCategory?: string }[] = [];
   for (const tool of executableToolNames) {
     switch (resolveToolAttribution(tool).source) {
       case "explicit": explicitlyAttributedTools++; break;
       case "capability": capabilityAttributedTools++; break;
       case "category": categoryAttributedTools++; break;
-      default: unmappedExecutableTools++; break;
+      default: {
+        unmappedExecutableTools++;
+        const detectedCategory = getToolCategory(tool);
+        unattributedTools.push(detectedCategory ? { tool, detectedCategory } : { tool });
+        break;
+      }
     }
   }
+  unattributedTools.sort((a, b) => a.tool.localeCompare(b.tool));
 
   const report: ReconciliationReport = {
     delegationAgents: delegationDefs.length,
@@ -105,6 +118,7 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     categoryAttributedTools,
     capabilityAttributedTools,
     explicitlyAttributedTools,
+    unattributedTools,
   };
 
   // ── Log lisible : les 4 populations, explicitement nommées ──────────────────
@@ -148,9 +162,20 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
   }
 
   if (report.unmappedExecutableTools > 0) {
+    // Liste NOMINATIVE : chaque orphelin, avec la catégorie éventuellement
+    // détectée par mot-clé mais qui n'a PAS suffi (rare — normalement une
+    // catégorie détectée bascule en 'category'). « aucune catégorie » = le nom
+    // ne contient aucun mot-clé connu → candidat idéal pour, au choix, ajouter
+    // un mot-clé dans TOOL_CATEGORIES ou déclarer une attribution explicite.
+    const lines = report.unattributedTools
+      .map((u) => `      - ${u.tool}${u.detectedCategory ? ` (catégorie détectée: ${u.detectedCategory})` : " (aucune catégorie)"}`)
+      .join("\n");
     console.warn(
-      `[Reconcile] ⚠️ ${report.unmappedExecutableTools} outil(s) exécutable(s) réellement sans attribution ` +
-      `(ni explicite, ni capability, ni catégorie) — affichés comme « Exécution système » (rôle "system") côté renderer.`
+      `[Reconcile] ⚠️ ${report.unmappedExecutableTools} outil(s) exécutable(s) sans attribution ` +
+      `(ni explicite, ni capability, ni catégorie) — affichés « Exécution système » (rôle "system"). ` +
+      `Statut NEUTRE : sans impact sur les permissions (cf. PermissionPolicy), seulement sur l'attribution UI.\n` +
+      `    Pour les rattacher : ajouter un mot-clé dans TOOL_CATEGORIES (bascule → catégorie) ` +
+      `ou déclarer une attribution explicite (bascule → explicite). Liste :\n${lines}`
     );
   }
 
