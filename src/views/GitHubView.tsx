@@ -438,7 +438,7 @@ export default function GitHubView() {
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                          <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                             {selectedCommit.message}
                           </p>
                           <div className="flex items-center gap-3 mt-1.5">

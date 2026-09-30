@@ -138,6 +138,11 @@ const TYPE_ICONS: Record<string, string> = {
   html: '🌐', url: '🔗', image: '🖼️', other: '📎',
 };
 
+// Neutral fallback for tag/relation swatches when a category has no palette
+// entry. Kept as a hex (not a CSS var) because it is concatenated with a hex
+// alpha suffix (`${color}20`) for subtle backgrounds. Matches --text-muted.
+const FALLBACK_TAG_COLOR = '#6b7280';
+
 const CATEGORY_COLORS: Record<string, string> = {
   // Catégories documents
   definition: '#60a5fa', fact: '#34d399', insight: '#fbbf24',
@@ -914,7 +919,7 @@ function MemoryTab() {
             >
               <div
                 className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                style={{ backgroundColor: CATEGORY_COLORS[fact.category] || '#6b7280' }}
+                style={{ backgroundColor: CATEGORY_COLORS[fact.category] || FALLBACK_TAG_COLOR }}
               />
               <div className="flex-1 min-w-0">
                 <p className="text-xs leading-relaxed" style={{ 
@@ -925,7 +930,7 @@ function MemoryTab() {
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: `${CATEGORY_COLORS[fact.category] || '#6b7280'}20`, color: CATEGORY_COLORS[fact.category] || '#6b7280' }}>
+                    style={{ backgroundColor: `${CATEGORY_COLORS[fact.category] || FALLBACK_TAG_COLOR}20`, color: CATEGORY_COLORS[fact.category] || FALLBACK_TAG_COLOR }}>
                     {fact.category}
                   </span>
                   {/* Indicateur de source */}
@@ -1054,8 +1059,8 @@ function RelationsTab() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                   style={{
-                    backgroundColor: `${RELATION_COLORS[rel.type] || '#6b7280'}20`,
-                    color: RELATION_COLORS[rel.type] || '#6b7280',
+                    backgroundColor: `${RELATION_COLORS[rel.type] || FALLBACK_TAG_COLOR}20`,
+                    color: RELATION_COLORS[rel.type] || FALLBACK_TAG_COLOR,
                   }}>
                   {rel.type}
                 </span>
@@ -1298,7 +1303,7 @@ function StatsTab() {
                 .map(([cat, count]) => (
                   <div key={cat} className="flex items-center justify-between">
                     <span className="text-xs flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || '#6b7280' }} />
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || FALLBACK_TAG_COLOR }} />
                       {cat}
                     </span>
                     <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{count}</span>

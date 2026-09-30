@@ -324,7 +324,7 @@ export default function SettingsView() {
             <button
               type="button"
               onClick={handleReset}
-              className="flex items-center gap-1 rounded border px-2.5 py-1 text-[10.5px] font-medium transition-all hover:opacity-80"
+              className="flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium transition-all hover:opacity-80"
               style={{
                 color: 'var(--text-secondary)',
                 borderColor: 'var(--border-strong)',
@@ -338,7 +338,7 @@ export default function SettingsView() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1 rounded px-3 py-1 text-[10.5px] font-semibold transition-all disabled:opacity-50"
+              className="flex items-center gap-1 rounded px-3 py-1 text-xs font-semibold transition-all disabled:opacity-50"
               style={{
                 backgroundColor: 'var(--accent-primary)',
                 color: '#fff',

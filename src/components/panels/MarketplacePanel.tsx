@@ -67,7 +67,7 @@ const SORT_LABELS: Record<string, string> = {
 
 const TRUST_CONFIG: Record<SecurityTrustLevel, { label: string; color: string; Icon: React.FC<any> }> = {
   verified:   { label: 'Certifié Leanna', color: 'var(--color-success)', Icon: ShieldCheck },
-  community:  { label: 'Communautaire',   color: '#3b82f6',              Icon: Shield },
+  community:  { label: 'Communautaire',   color: 'var(--color-info)',    Icon: Shield },
   unreviewed: { label: 'Non vérifié',     color: 'var(--text-dimmed)',   Icon: ShieldOff },
   flagged:    { label: 'Signalé',         color: 'var(--color-error)',   Icon: ShieldAlert },
 };
@@ -190,7 +190,7 @@ function PackageCard({ pkg, onSelect, onInstall, onUninstall, installing }: {
               {pkg.name}
             </span>
             {pkg.verified && <BadgeCheck size={11} style={{ color: 'var(--color-success)', flexShrink: 0 }} />}
-            {pkg.featured && <Flame size={11} style={{ color: '#f59e0b', flexShrink: 0 }} />}
+            {pkg.featured && <Flame size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />}
           </div>
 
           {/* Auteur + version + type */}

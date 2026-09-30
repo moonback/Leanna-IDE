@@ -637,7 +637,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
             <div className="flex-1 min-w-0">
               <motion.div
-                className="text-[17px] font-bold leading-tight"
+                className="text-lg font-bold leading-tight"
                 style={{ color: 'var(--text)' }}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}

@@ -418,7 +418,7 @@ function MessageList({ messages, loadingMessages }: { messages: ConversationMess
 
                 {/* Bubble */}
                 <div
-                  className="px-4 py-2.5 text-[13px] leading-[1.6] whitespace-pre-wrap"
+                  className="px-4 py-2.5 text-sm leading-[1.6] whitespace-pre-wrap"
                   style={{
                     backgroundColor: isAssistant ? 'var(--notebook-surface)' : 'var(--notebook-accent-surface)',
                     border: `1px solid ${isAssistant ? 'var(--notebook-border)' : 'var(--notebook-accent)'}`,
