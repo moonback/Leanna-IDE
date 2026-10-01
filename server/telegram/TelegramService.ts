@@ -1,4 +1,4 @@
-import { Bot, type InputFile } from "grammy";
+import { Bot, InlineKeyboard, type InputFile } from "grammy";
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
@@ -24,6 +24,41 @@ interface ChatMessage {
   text: string;
 }
 
+/**
+ * Demande d'approbation humaine relayée via Telegram.
+ *
+ * Décrit une action de mission mise en attente par l'`AutonomyPolicy` (mode
+ * `ask`). Le texte et les métadonnées sont fournis par l'appelant ; `onDecision`
+ * est invoqué une seule fois, soit par un clic sur un bouton Telegram, soit par
+ * la résolution côté serveur (UI web ou expiration), via `closeApprovalRequest`.
+ */
+export interface TelegramApprovalRequest {
+  /** Identifiant unique de l'action (clé de corrélation avec l'Executor). */
+  actionId: string;
+  /** Mission d'origine (affichée dans le message). */
+  missionId: string;
+  /** Nom du skill/outil demandé. */
+  skill: string;
+  /** Motif de la demande d'approbation (fourni par l'AutonomyPolicy). */
+  reason: string;
+  /** Aperçu des arguments de l'action (optionnel). */
+  args?: Record<string, unknown>;
+  /**
+   * Callback résolu une seule fois. `source` indique l'origine de la décision :
+   * - "telegram" : clic sur un bouton inline
+   * - "timeout"  : la demande a expiré
+   */
+  onDecision: (approved: boolean, source: "telegram" | "timeout") => void;
+}
+
+/** État interne d'une approbation en attente, suivie pour pouvoir éditer le message. */
+interface TrackedApproval {
+  request: TelegramApprovalRequest;
+  chatId: string;
+  messageId?: number;
+  resolved: boolean;
+}
+
 export class TelegramService {
   private bot: Bot | null = null;
   private isRunning: boolean = false;
@@ -31,6 +66,14 @@ export class TelegramService {
   private botInfo: TelegramBotInfo | null = null;
   private config: TelegramConfig;
   private conversationHistory: Map<number, ChatMessage[]> = new Map();
+
+  /**
+   * Approbations humaines en attente, indexées par actionId. Permet au
+   * gestionnaire de `callback_query` de retrouver la demande à partir du
+   * `callback_data`, et au serveur de clôturer une demande résolue ailleurs
+   * (UI web ou expiration) via `closeApprovalRequest`.
+   */
+  private pendingApprovals: Map<string, TrackedApproval> = new Map();
 
   constructor() {
     this.config = this.loadConfig();
@@ -742,6 +785,60 @@ export class TelegramService {
         }
       });
 
+      // ─── Approbations humaines : clic sur un bouton inline ─────────────────
+      // Le callback_data porte le préfixe "appr:" suivi de "<decision>:<actionId>".
+      // Le middleware de whitelist ci-dessus a déjà filtré l'expéditeur, donc tout
+      // clic qui parvient ici provient d'un utilisateur autorisé.
+      this.bot.on("callback_query:data", async (ctx) => {
+        const data = ctx.callbackQuery.data || "";
+        if (!data.startsWith("appr:")) {
+          // Callback non lié aux approbations : accusé de réception silencieux.
+          await ctx.answerCallbackQuery().catch(() => {});
+          return;
+        }
+
+        // Format attendu : appr:<yes|no>:<actionId>
+        const rest = data.slice("appr:".length);
+        const sep = rest.indexOf(":");
+        const decisionToken = sep >= 0 ? rest.slice(0, sep) : "";
+        const actionId = sep >= 0 ? rest.slice(sep + 1) : "";
+        const approved = decisionToken === "yes";
+
+        const tracked = this.pendingApprovals.get(actionId);
+        if (!tracked || tracked.resolved) {
+          await ctx.answerCallbackQuery({
+            text: "Cette demande a déjà été traitée ou a expiré.",
+          }).catch(() => {});
+          // Nettoie les boutons d'un message périmé.
+          await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+          return;
+        }
+
+        // Marque résolue AVANT d'appeler le callback pour éviter les double-clics.
+        tracked.resolved = true;
+        this.pendingApprovals.delete(actionId);
+
+        await ctx.answerCallbackQuery({
+          text: approved ? "✅ Action approuvée." : "⛔ Action refusée.",
+        }).catch(() => {});
+
+        // Reflète la décision dans le message (boutons retirés).
+        const decided = approved ? "✅ *Approuvée*" : "⛔ *Refusée*";
+        const who = ctx.from?.first_name || ctx.from?.username || "vous";
+        await ctx
+          .editMessageText(
+            this.renderApprovalMessage(tracked.request, `${decided} par ${this.escapeMarkdown(who)}.`),
+            { parse_mode: "Markdown" }
+          )
+          .catch(() => {});
+
+        try {
+          tracked.request.onDecision(approved, "telegram");
+        } catch (e) {
+          console.warn("[Telegram] Erreur dans le callback d'approbation :", (e as Error).message);
+        }
+      });
+
       // Démarrage effectif du long polling
       this.bot.start({
         onStart: (botInfo) => {
@@ -783,6 +880,9 @@ export class TelegramService {
     } finally {
       this.bot = null;
       this.isRunning = false;
+      // Les boutons d'approbation Telegram ne répondront plus : on vide le suivi.
+      // La résolution web et l'expiration côté Executor restent les filets actifs.
+      this.pendingApprovals.clear();
     }
   }
 
@@ -967,6 +1067,126 @@ export class TelegramService {
     } catch (e) {
       console.warn("[Telegram] Notification non délivrée :", (e as Error).message);
       return false;
+    }
+  }
+
+  /**
+   * Compose le corps du message d'une demande d'approbation. `statusLine` est
+   * ajouté en pied (ex. « En attente… », « ✅ Approuvée par X »).
+   */
+  private renderApprovalMessage(request: TelegramApprovalRequest, statusLine: string): string {
+    const argsPreview = (() => {
+      if (!request.args || Object.keys(request.args).length === 0) return "";
+      try {
+        const json = JSON.stringify(request.args, null, 2);
+        const clipped = json.length > 800 ? `${json.slice(0, 800)}\n…(tronqué)` : json;
+        return `\n*Arguments :*\n\`\`\`json\n${clipped}\n\`\`\``;
+      } catch {
+        return "";
+      }
+    })();
+
+    return (
+      `🔐 *Approbation requise*\n\n` +
+      `*Action :* \`${this.escapeMarkdown(request.skill)}\`\n` +
+      `*Mission :* \`${this.escapeMarkdown(request.missionId)}\`\n` +
+      `*Motif :* ${this.escapeMarkdown(request.reason)}\n` +
+      argsPreview +
+      `\n\n${statusLine}`
+    );
+  }
+
+  /**
+   * Relaie une demande d'approbation humaine vers Telegram avec des boutons
+   * inline *Approuver* / *Refuser*.
+   *
+   * - Enregistre la demande dans `pendingApprovals` pour que le gestionnaire de
+   *   `callback_query` puisse la résoudre, ou que `closeApprovalRequest` la
+   *   clôture si la décision vient d'ailleurs (UI web, expiration).
+   * - `onDecision` n'est appelé qu'une seule fois, uniquement sur clic Telegram
+   *   (le serveur gère l'expiration et la résolution web de son côté).
+   *
+   * Retourne `true` si la demande a été relayée (bot actif + destinataire connu),
+   * `false` sinon — l'appelant conserve alors la boucle web/timeout comme filet.
+   */
+  public async sendApprovalRequest(request: TelegramApprovalRequest): Promise<boolean> {
+    if (!this.isRunning || !this.bot) return false;
+
+    let targetChatId = this.config.defaultChatId;
+    if (!targetChatId) {
+      targetChatId = this.config.allowedUsers.find((u) => /^\d+$/.test(u.trim()));
+    }
+    if (!targetChatId) return false;
+
+    const keyboard = new InlineKeyboard()
+      .text("✅ Approuver", `appr:yes:${request.actionId}`)
+      .text("⛔ Refuser", `appr:no:${request.actionId}`);
+
+    const tracked: TrackedApproval = {
+      request,
+      chatId: String(targetChatId),
+      resolved: false,
+    };
+    // Enregistrer AVANT l'envoi : un clic ne peut survenir qu'après réception,
+    // mais on évite toute course avec closeApprovalRequest.
+    this.pendingApprovals.set(request.actionId, tracked);
+
+    try {
+      const sent = await this.bot.api.sendMessage(
+        targetChatId,
+        this.renderApprovalMessage(request, "_⏳ En attente de votre décision…_"),
+        {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+          disable_notification: false,
+        }
+      );
+      tracked.messageId = sent.message_id;
+      return true;
+    } catch (e) {
+      // Échec d'envoi : retirer le suivi pour ne pas bloquer une future demande.
+      this.pendingApprovals.delete(request.actionId);
+      console.warn("[Telegram] Demande d'approbation non délivrée :", (e as Error).message);
+      return false;
+    }
+  }
+
+  /**
+   * Clôture une demande d'approbation résolue en dehors de Telegram (UI web ou
+   * expiration côté serveur). Retire les boutons et met à jour le message pour
+   * refléter l'issue, sans rappeler `onDecision` (déjà géré par l'appelant).
+   *
+   * No-op si l'actionId est inconnu ou déjà résolu — garantit l'idempotence quel
+   * que soit l'ordre d'arrivée (clic Telegram vs résolution web).
+   */
+  public async closeApprovalRequest(
+    actionId: string,
+    outcome: "approved" | "rejected" | "timeout"
+  ): Promise<void> {
+    const tracked = this.pendingApprovals.get(actionId);
+    if (!tracked || tracked.resolved) return;
+
+    tracked.resolved = true;
+    this.pendingApprovals.delete(actionId);
+
+    if (!this.bot || tracked.messageId === undefined) return;
+
+    const statusLine =
+      outcome === "approved"
+        ? "✅ *Approuvée* (via l'application)."
+        : outcome === "rejected"
+          ? "⛔ *Refusée* (via l'application)."
+          : "⌛ *Expirée* — refusée par défaut.";
+
+    try {
+      await this.bot.api.editMessageText(
+        tracked.chatId,
+        tracked.messageId,
+        this.renderApprovalMessage(tracked.request, statusLine),
+        { parse_mode: "Markdown" }
+      );
+    } catch {
+      // Édition best-effort : si le message a été supprimé, on ignore.
     }
   }
 

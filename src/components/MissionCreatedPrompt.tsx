@@ -75,15 +75,26 @@ export function MissionCreatedPrompt() {
     setPending(null);
   }, []);
 
+  // Référence à la mission courante, synchronisée hors rendu. Permet à
+  // openMissionView de dispatcher l'événement SANS lire l'état dans un updater
+  // setState (React exécute les updaters pendant le rendu : y déclencher un
+  // dispatchEvent → setState dans IdeView provoque le warning « Cannot update a
+  // component while rendering a different component »).
+  const pendingRef = useRef<PendingPrompt | null>(null);
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
+
   const openMissionView = useCallback(() => {
-    setPending((current) => {
-      if (current) {
-        window.dispatchEvent(
-          new CustomEvent('Leanna-open-missions', { detail: { missionId: current.missionId } }),
-        );
-      }
-      return null;
-    });
+    const current = pendingRef.current;
+    // Fermer d'abord (met à jour l'état local), puis notifier IdeView via
+    // l'événement — en dehors de tout updater de rendu.
+    setPending(null);
+    if (current) {
+      window.dispatchEvent(
+        new CustomEvent('Leanna-open-missions', { detail: { missionId: current.missionId } }),
+      );
+    }
   }, []);
 
   // Compte à rebours — fermeture automatique sans réponse, avec pause au survol.

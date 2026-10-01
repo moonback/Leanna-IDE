@@ -38,6 +38,9 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "Génération codebase.md + analyse architecturale via OpenRouter",
       onError: "skip" as const,
       maxRetries: 1,
+      // Scan complet du projet + analyse LLM OpenRouter sur des centaines de
+      // fichiers : 60s (défaut) est insuffisant. On accorde jusqu'à 10 min.
+      timeoutMs: 600_000,
     },
     {
       id: "typecheck",

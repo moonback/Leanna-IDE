@@ -1,4 +1,5 @@
 import { Mission } from "./Mission.js";
+import { randomUUID } from "node:crypto";
 import { Planner } from "./Planner.js";
 import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
@@ -87,6 +88,45 @@ export class Executor {
 
   /** Intervalle de sondage de l'état de pause (ms). */
   private static readonly PAUSE_POLL_MS = 500;
+
+  /**
+   * Outils d'EXPLORATION (lecture seule) : utiles pour comprendre le contexte,
+   * mais ne produisent aucun livrable. Une boucle qui les rejoue sans jamais
+   * basculer vers une action de production est le symptôme du bug « mission
+   * exploratoire sans artefact ».
+   */
+  private static readonly EXPLORATION_TOOLS = new Set<string>([
+    "read_project_file", "list_project_files", "read_file_outline",
+    "analyze_project_file", "search_in_files", "get_workspace_info",
+    "knowledge_semantic_search", "knowledge_search_entities",
+    "knowledge_build_context", "knowledge_impact_analyze",
+  ]);
+
+  /**
+   * Outils de PRODUCTION (écriture) : produisent un artefact concret. Leur
+   * présence (réussie) dans un objectif prouve qu'il a dépassé l'exploration.
+   */
+  private static readonly WRITE_TOOLS = [
+    "write_project_file", "modify_project_file", "patch_project_file",
+    "create_project_directory", "rename_project_file",
+  ];
+
+  /**
+   * Nombre d'actions d'exploration consécutives (sans aucune écriture réussie)
+   * au-delà duquel on force une replanification orientée « produire un artefact ».
+   */
+  private static readonly EXPLORATION_LOOP_THRESHOLD = 4;
+
+  /**
+   * Suivi anti-boucle par objectif. `explorationStreak` compte les actions
+   * d'exploration enchaînées sans écriture ; `producedArtifact` passe à true dès
+   * qu'un outil d'écriture réussit ; `forcedArtifact` évite de forcer deux fois.
+   */
+  private loopGuards: Map<string, {
+    explorationStreak: number;
+    producedArtifact: boolean;
+    forcedArtifact: boolean;
+  }> = new Map();
 
   constructor(config: Partial<MissionConfig> = {}) {
     this.config = { ...DEFAULT_MISSION_CONFIG, ...config };
@@ -557,6 +597,10 @@ export class Executor {
     let iterations = 0;
     const maxIterations = 100;
 
+    // Suivi anti-boucle d'exploration pour cet objectif (réinitialisé à chaque
+    // entrée dans la méthode : une reprise repart d'un compteur propre).
+    this.loopGuards.set(goalId, { explorationStreak: 0, producedArtifact: false, forcedArtifact: false });
+
     while (iterations++ < maxIterations) {
       if (mission.isCompleted()) break;
 
@@ -582,6 +626,52 @@ export class Executor {
       // l'objet action de façon invisible pour l'inférence de types).
       const actionSucceeded = (mission.getGoal(goalId)?.plannedActions
         .find((a) => a.id === action.id)?.status) === "completed";
+
+      // ── Détection de boucle d'exploration (Bug: mission sans livrable) ──────
+      // On met à jour le suivi : une écriture réussie prouve qu'un artefact a été
+      // produit ; une action d'exploration incrémente le streak ; toute autre
+      // action réussie le remet à zéro (progrès non-exploratoire).
+      const guard = this.loopGuards.get(goalId)!;
+      const isExploration = Executor.EXPLORATION_TOOLS.has(action.skillName);
+      const isWrite = Executor.WRITE_TOOLS.includes(action.skillName);
+      if (actionSucceeded && isWrite) {
+        guard.producedArtifact = true;
+        guard.explorationStreak = 0;
+      } else if (isExploration) {
+        guard.explorationStreak++;
+      } else if (actionSucceeded) {
+        guard.explorationStreak = 0;
+      }
+
+      // Si l'objectif enchaîne les lectures sans jamais produire d'artefact, on
+      // force UNE fois une replanification contrainte « produire un livrable ».
+      // Cela casse la boucle plan→lire→lire→… observée par le Vérificateur.
+      const goalWantsArtifact = this.goalExpectsArtifact(goal);
+      if (
+        !guard.forcedArtifact &&
+        !guard.producedArtifact &&
+        goalWantsArtifact &&
+        guard.explorationStreak >= Executor.EXPLORATION_LOOP_THRESHOLD
+      ) {
+        guard.forcedArtifact = true;
+        console.log(
+          `[Executor]    🧭 Boucle d'exploration détectée (${guard.explorationStreak} lectures sans livrable) ` +
+          `→ replanification contrainte « produire un artefact » pour "${goal.title}".`
+        );
+        this.emit("goal_loop_detected", {
+          missionId: mission.id,
+          goalId,
+          explorationStreak: guard.explorationStreak,
+          skill: action.skillName,
+        });
+        const forced = await this.planForcedArtifact(mission, goalId, availableSkills);
+        if (forced.length > 0) {
+          mission.setPlanForGoal(goalId, forced);
+          cursor = 0;
+          continue;
+        }
+        // Si aucun outil d'écriture n'est disponible, on ne boucle pas davantage.
+      }
 
       // Décider de la suite selon la réflexion (uniquement en cas d'échec).
       if (!actionSucceeded && result.decision === "abort") {
@@ -653,6 +743,69 @@ export class Executor {
       success: verdict.passed,
       summary: `Objectif "${goal.title}" ${verdict.passed ? "atteint" : "non atteint"} — ${verdict.reasoning}`,
     });
+
+    this.loopGuards.delete(goalId);
+  }
+
+  /**
+   * Heuristique : l'objectif attend-il un livrable concret (fichier/document) ?
+   * On s'appuie sur le vocabulaire du titre, de la description et des critères
+   * de succès (plan, rapport, document, fichier, .md, écrire, générer, produire…).
+   * Objectif purement analytique (ex. « comprendre l'architecture ») → false :
+   * on ne force alors aucune écriture.
+   */
+  private goalExpectsArtifact(goal: Goal): boolean {
+    const haystack = [
+      goal.title,
+      goal.description,
+      ...(goal.successCriteria ?? []),
+    ].join(" ").toLowerCase();
+    return /\b(plan|rapport|report|document|documenter|fichier|écrire|ecrire|rédiger|rediger|générer|generer|produire|créer|creer|livrable|\.md|markdown|synth[èe]se)\b/.test(
+      haystack
+    );
+  }
+
+  /**
+   * Construit un plan FORCÉ orienté production d'artefact, utilisé pour sortir
+   * d'une boucle d'exploration. On privilégie un outil d'écriture disponible et
+   * on pose son `rationale` de sorte que la génération d'arguments (generateArgs)
+   * sache qu'elle doit produire un fichier livrable concret.
+   *
+   * Retourne un plan vide si aucun outil d'écriture n'est disponible (dans ce
+   * cas, l'appelant renonce à forcer et laisse le flux normal se poursuivre).
+   */
+  private async planForcedArtifact(
+    mission: Mission,
+    goalId: string,
+    availableSkills: string[]
+  ): Promise<PlannedAction[]> {
+    const goal = mission.getGoal(goalId);
+    if (!goal) return [];
+
+    const writeTool = Executor.WRITE_TOOLS.find((t) => availableSkills.includes(t));
+    if (!writeTool) return [];
+
+    // Trace la décision pour l'observabilité et pour nourrir generateArgs.
+    mission.addHypothesis(
+      `Objectif "${goal.title}" bloqué en exploration : forcer la production d'un livrable ` +
+      `concret via ${writeTool} (ex. un fichier Markdown récapitulant le résultat).`
+    );
+
+    return [
+      {
+        id: randomUUID(),
+        skillName: writeTool,
+        args: {},
+        rationale:
+          "ARTEFACT REQUIS : l'objectif est resté en exploration (lectures répétées) sans " +
+          "produire de livrable. Écrire MAINTENANT un fichier concret qui matérialise le " +
+          "résultat attendu (ex. un document Markdown : plan, rapport ou synthèse). Le " +
+          "contenu doit refléter les critères de succès de l'objectif.",
+        score: 100,
+        order: 1,
+        status: "pending" as const,
+      },
+    ];
   }
 
   /**
@@ -806,12 +959,40 @@ export class Executor {
     // ne les a pas remplis (ils sont vides par défaut). On utilise le LLM avec
     // le schéma de l'outil, le contexte de l'objectif et les résultats déjà obtenus.
     if (this.needsArgs(action)) {
+      let argGenError: string | null = null;
       try {
         action.args = await this.generateArgs(mission, goal, action);
       } catch (err) {
+        argGenError = (err as Error).message;
         console.warn(
-          `[Executor]    ⚠️ Génération d'arguments échouée pour ${action.skillName}: ${(err as Error).message}`
+          `[Executor]    ⚠️ Génération d'arguments échouée pour ${action.skillName}: ${argGenError}`
         );
+      }
+
+      // Fail-fast : si l'outil exige des arguments mais que la génération a
+      // échoué (JSON LLM invalide) ou n'a rien produit, NE PAS exécuter l'outil
+      // avec des args vides/undefined. On l'a déjà payé en coûts (ex. embedding
+      // Gemini sur une query vide → 400). On enregistre un échec explicite et on
+      // laisse la boucle de réflexion décider (retry/replan).
+      const stillMissingArgs = !action.args || Object.keys(action.args).length === 0;
+      if (this.schemaRequiresArgs(action.skillName) && (argGenError || stillMissingArgs)) {
+        const reason =
+          `Arguments requis non disponibles pour ${action.skillName} ` +
+          `(génération LLM ${argGenError ? `échouée: ${argGenError}` : "sans objet JSON exploitable"}).`;
+        console.log(`[Executor]    ✗ ${action.skillName} ignoré: ${reason}`);
+        mission.recordActionResult(action.id, { error: reason }, false);
+        this.scorer.recordUsage(action.skillName, false, Date.now() - startTime);
+        try { strategyMemory.recordSkillOutcome(action.skillName, false, Date.now() - startTime); } catch { /* best-effort */ }
+        this.emit("action_completed", {
+          missionId: mission.id,
+          goalId,
+          actionId: action.id,
+          skill: action.skillName,
+          success: false,
+          error: reason,
+          durationMs: Date.now() - startTime,
+        });
+        return this.createDefaultReflection(action.id, false);
       }
     }
 
@@ -937,6 +1118,19 @@ export class Executor {
   }
 
   /**
+   * Vrai si l'outil déclare au moins un paramètre `required` dans son schéma.
+   * Sert au fail-fast : un outil sans paramètre obligatoire peut légitimement
+   * s'exécuter avec des args vides, mais un outil à paramètre requis ne doit
+   * jamais être appelé quand la génération d'arguments a échoué.
+   */
+  private schemaRequiresArgs(skillName: string): boolean {
+    const schema = this.toolSchemas.get(skillName);
+    const params = schema?.parameters as any;
+    if (!params || typeof params !== "object") return false;
+    return Array.isArray(params.required) && params.required.length > 0;
+  }
+
+  /**
    * Génère les arguments d'un skill via le LLM, en s'appuyant sur:
    *   - le schéma de paramètres de l'outil
    *   - le but courant (titre, description, critères)
@@ -960,6 +1154,18 @@ export class Executor {
         result: this.summarizeResult(a.result),
       }));
 
+    // En mode « artefact forcé », on injecte une consigne supplémentaire pour
+    // que l'écriture produise un livrable complet et autoportant (pas un
+    // squelette vide), avec un nom de fichier par défaut si besoin.
+    const forcedArtifact = this.loopGuards.get(goal.id)?.forcedArtifact === true;
+    const artifactInstruction = forcedArtifact && Executor.WRITE_TOOLS.includes(action.skillName)
+      ? `\nCONSIGNE PRIORITAIRE (ARTEFACT) :\n` +
+        `- Cet appel DOIT produire un livrable concret et complet qui satisfait les critères de succès.\n` +
+        `- Rédige un contenu réel et détaillé (pas de placeholder), au format Markdown si pertinent.\n` +
+        `- Si aucun chemin n'est évident, utilise un nom de fichier explicite à la racine du projet ` +
+        `(ex. "OPTIMIZATION_PLAN.md" pour un plan d'optimisation, sinon un nom dérivé de l'objectif).\n`
+      : "";
+
     const prompt = `Tu génères les ARGUMENTS d'un outil pour accomplir une étape précise.
 
 OUTIL: ${action.skillName}
@@ -977,7 +1183,7 @@ CONTEXTE:
 - Fichiers pertinents: ${context.relevantFiles.slice(0, 10).join(", ") || "aucun"}
 - Mission: ${mission.getState().title} — ${mission.getState().description}
 - Résultats précédents: ${previousResults.length > 0 ? JSON.stringify(previousResults) : "aucun"}
-
+${artifactInstruction}
 INSTRUCTIONS:
 - Retourne UNIQUEMENT un objet JSON correspondant au schéma des paramètres.
 - N'invente pas de champs absents du schéma.

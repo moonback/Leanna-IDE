@@ -228,7 +228,10 @@ export const TOOL_CATEGORIES: Record<string, {
     label: 'Recherche dans le code',
     description: 'Recherche de motifs, navigation dans la codebase',
     typicalRoles: ['researcher', 'debugger', 'reviewer', 'architect'],
-    keywords: ['search', 'find', 'grep', 'locate', 'explore', 'navigate'],
+    // `list`/`get` captent les outils de récupération/exploration (list_*, get_*,
+    // workspace_info…) qui restaient « Exécution système ». Attribution purement
+    // UI : aucun impact sur les permissions (cf. PermissionPolicy).
+    keywords: ['search', 'find', 'grep', 'locate', 'explore', 'navigate', 'list', 'get'],
   },
   version_control: {
     label: 'Contrôle de version',
@@ -258,7 +261,9 @@ export const TOOL_CATEGORIES: Record<string, {
     label: 'Rédaction et documentation',
     description: 'Création et modification de documents',
     typicalRoles: ['writer', 'formatter', 'proofreader', 'translator', 'summarizer'],
-    keywords: ['write', 'document', 'format', 'proofread', 'translate', 'summarize'],
+    // `doc` capte les outils `doc_*` (ex. doc_generate) que `document` ratait
+    // (getToolCategory fait un includes() de sous-chaîne : "doc_x".includes("document") = false).
+    keywords: ['write', 'document', 'doc', 'format', 'proofread', 'translate', 'summarize'],
   },
   
   // Catégories Recherche & Analyse
@@ -274,7 +279,9 @@ export const TOOL_CATEGORIES: Record<string, {
     label: 'Planification et orchestration',
     description: 'Création de plans et orchestration multi-agents',
     typicalRoles: ['planner', 'architect'],
-    keywords: ['plan', 'orchestrate', 'delegate', 'mission', 'task', 'strategy'],
+    // `agent` capte toute la famille `agent_*` (delegate/orchestrate/status/…),
+    // `workflow` les outils `workflow_*` (chaînes d'actions planifiées).
+    keywords: ['plan', 'orchestrate', 'delegate', 'mission', 'task', 'strategy', 'agent', 'workflow'],
   },
   
   // Catégories Système & Automatisation
@@ -282,7 +289,9 @@ export const TOOL_CATEGORIES: Record<string, {
     label: 'Opérations système',
     description: 'Exécution de commandes système et notifications',
     typicalRoles: ['coder', 'writer'],
-    keywords: ['system', 'execute', 'command', 'notify', 'open', 'process'],
+    // `telegram`/`message`/`broadcast`/`chat` captent les outils `telegram_*`
+    // (notify/send_message/broadcast/get_status/…) jusque-là non attribués.
+    keywords: ['system', 'execute', 'command', 'notify', 'open', 'process', 'telegram', 'message', 'broadcast', 'chat'],
   },
   
   // Catégories Automatisation & Vision

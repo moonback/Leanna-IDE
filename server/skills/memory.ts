@@ -282,6 +282,19 @@ export const memorySkill: Skill = {
           return { status: "success", results: data };
         }
 
+        // Garde-fou : une recherche sémantique a besoin d'une requête non vide.
+        // Sans query exploitable ET sans tags, on refuse AVANT l'appel embedding.
+        // Sinon Gemini reçoit `contents: ""` → ApiError 400 "empty Part".
+        // Ce cas survient typiquement quand la génération d'arguments LLM a
+        // produit un JSON invalide et que `query` arrive à `undefined`.
+        const trimmedQuery = typeof validated.query === "string" ? validated.query.trim() : "";
+        if (trimmedQuery.length === 0) {
+          return {
+            error:
+              "search_memory: 'query' manquante ou vide. Fournissez une requête sémantique non vide, ou des 'tags' pour filtrer.",
+          };
+        }
+
         // Vérification cache (scoped par projet pour éviter les fuites inter-projets)
         const cacheKey = `search:${projectId}:${validated.query || ""}:${JSON.stringify(validated.tags)}:${validated.match_threshold}:${validated.match_count}`;
         const cached = memoryCache.get(cacheKey);
@@ -295,7 +308,7 @@ export const memorySkill: Skill = {
 
         const embedResponse = await ai.models.embedContent({
           model: "gemini-embedding-2",
-          contents: validated.query || "",
+          contents: trimmedQuery,
           config: { outputDimensionality: 768 },
         });
         const queryEmbedding = embedResponse.embeddings?.[0]?.values;

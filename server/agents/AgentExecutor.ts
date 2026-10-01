@@ -170,6 +170,11 @@ export class AgentExecutor implements AgentTaskRunner {
     'analyze_project_file': 90_000,
     'knowledge_build_context': 90_000,
     'knowledge_impact_analyze': 90_000,
+
+    // Génération de documentation codebase : scan de tout le projet + analyse
+    // architecturale LLM (OpenRouter) sur des centaines de fichiers / milliers
+    // d'entités. 60s est largement insuffisant → 10 min.
+    'generate_codebase_markdown': 600_000,
     
     // Outils de vérification (45-60s)
     'verify_file': 60_000,

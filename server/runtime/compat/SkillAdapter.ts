@@ -122,6 +122,8 @@ function resolvePermissions(
 }
 
 const ADAPTED_TOOL_TIMEOUTS: Record<string, number> = {
+  // Scan complet du projet + analyse architecturale LLM : jusqu'à 10 min.
+  generate_codebase_markdown: 600_000,
   agent_execute: 180_000,
   reasoning_think: 180_000,
   agent_orchestrate: 180_000,

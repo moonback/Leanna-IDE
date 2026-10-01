@@ -903,12 +903,41 @@ async function startServer() {
   const missionBroadcasterInterval = setInterval(() => {
     if (skillManager.missionExecutor) {
       clearInterval(missionBroadcasterInterval);
-      skillManager.missionExecutor.setEventEmitter((event: string, data: any) => {
+      const missionExecutor = skillManager.missionExecutor;
+      missionExecutor.setEventEmitter((event: string, data: any) => {
         const payload = JSON.stringify({ type: 'mission_event', event, ...data, timestamp: new Date().toISOString() });
         for (const client of wss.clients) {
           if (client.readyState === WebSocket.OPEN) {
             try { client.send(payload); } catch { /* ignore */ }
           }
+        }
+
+        // ── Relais Telegram de la boucle d'approbation humaine ──────────────
+        // Quand l'AutonomyPolicy (mode "ask") met une action en attente, on
+        // propose la décision via des boutons Telegram, en plus de l'UI web.
+        // La première source à répondre (clic Telegram OU bouton web OU
+        // expiration) gagne ; les autres canaux sont clôturés proprement.
+        if (event === 'approval_required' && data?.actionId) {
+          const actionId = String(data.actionId);
+          telegramService.sendApprovalRequest({
+            actionId,
+            missionId: String(data.missionId ?? '?'),
+            skill: String(data.skill ?? 'action'),
+            reason: String(data.reason ?? 'Approbation requise.'),
+            args: data.args,
+            // Clic Telegram → on résout l'approbation côté Executor. Si elle a
+            // déjà été résolue ailleurs, resolveApproval renvoie false (no-op).
+            onDecision: (approved: boolean) => {
+              try { missionExecutor.resolveApproval(actionId, approved); } catch { /* ignore */ }
+            },
+          }).catch(() => { /* le relais est best-effort */ });
+        } else if (event === 'approval_timeout' && data?.actionId) {
+          // Expiration côté Executor : retirer les boutons Telegram.
+          telegramService.closeApprovalRequest(String(data.actionId), 'timeout').catch(() => {});
+        } else if (event === 'action_denied' && data?.actionId) {
+          telegramService.closeApprovalRequest(String(data.actionId), 'rejected').catch(() => {});
+        } else if (event === 'action_completed' && data?.actionId) {
+          telegramService.closeApprovalRequest(String(data.actionId), 'approved').catch(() => {});
         }
       });
       console.log(`[Server] ✓ Mission System broadcaster connecté au WebSocket.`);
