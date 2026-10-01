@@ -229,7 +229,7 @@ export class TelegramService {
         // Cas 1 : Aucune liste blanche définie
         if (allowedList.length === 0) {
           await ctx.reply(
-            `🔒 *Leanna OS — Configuration de Sécurité Requise*\n\n` +
+            `🔒 *Leanna — Configuration de Sécurité Requise*\n\n` +
             `Votre identifiant Telegram est : \`${senderId}\` ${senderUsername ? `(@${senderUsername})` : ""}\n\n` +
             `Pour sécuriser votre machine contre tout accès non autorisé, ` +
             `veuillez ajouter cet ID dans les **Paramètres Telegram** de l'application Leanna.`,
@@ -262,7 +262,7 @@ export class TelegramService {
       this.bot.command("start", async (ctx) => {
         await ctx.reply(
           `👋 *Bonjour ${ctx.from?.first_name || ""} !*\n` +
-          `Je suis connectée à votre instance de **Leanna OS**.\n\n` +
+          `Je suis connectée à votre instance de **Leanna**.\n\n` +
           `📌 *Commandes rapides :*\n` +
           `• \`/help\` — Guide et liste des commandes\n` +
           `• \`/status\` — État du système et projet actif\n` +
@@ -310,7 +310,7 @@ export class TelegramService {
         const memMb = Math.round(mem.rss / 1024 / 1024);
 
         await ctx.reply(
-          `🖥️ *État de Leanna OS*\n\n` +
+          `🖥️ *État de Leanna*\n\n` +
           `📁 *Projet actif :* \`${project}\`\n` +
           `🧠 *Moteur IA :* \`${provider}\`\n` +
           `💾 *Mémoire RSS :* \`${memMb} Mo\`\n` +

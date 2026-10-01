@@ -167,7 +167,11 @@ export class Planner {
   ): Promise<SubGoalPlan[]> {
     const prompt = this.buildDecomposePrompt(mission, goal, availableSkills);
 
-    const timeoutMs = 20_000;
+    // 45 s : la décomposition LLM demande souvent plusieurs secondes de
+    // réflexion sur un objectif riche. 20 s déclenchait trop souvent le fallback
+    // heuristique (plan générique de moindre qualité) alors que le LLM aurait
+    // répondu peu après.
+    const timeoutMs = 45_000;
     let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error(`LLM decomposition timeout (${timeoutMs}ms)`)), timeoutMs);

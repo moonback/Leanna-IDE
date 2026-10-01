@@ -19,12 +19,12 @@ import path from 'path';
 import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction.js';
 import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history.js';
-import { isSandboxActive } from '../utils/sandbox.js';
+import { isSandboxActive, getSandboxState } from '../utils/sandbox.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
 import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { Supervisor } from '../autonomy/index.js';
-import { WORKSPACE_SITE_URL } from '../utils/selfRoot.js';
+import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
@@ -63,6 +63,27 @@ const MAX_TOOL_RESULT_CHARS = 48_000;
 const TOOL_MAX_RETRIES = 2;
 /** Délai de base en ms entre les tentatives (backoff exponentiel : 1s, 2s). */
 const TOOL_RETRY_DELAY_MS = 1000;
+
+// ─── Court-circuit des échecs répétitifs ─────────────────────────────────────
+
+/**
+ * Au-delà de ce nombre d'échecs IDENTIQUES (même outil + mêmes arguments), on
+ * arrête de ré-exécuter l'outil : il renvoie un résumé compact au lieu du même
+ * payload d'erreur. Empêche l'empilement d'erreurs redondantes qui faisait
+ * exploser la fenêtre de contexte (ex. modify_project_file échouant 15×).
+ */
+const REPEATED_FAILURE_LIMIT = 3;
+
+/** Signature stable d'un appel d'outil pour le suivi des échecs répétés. */
+function toolFailureKey(name: string, args: unknown): string {
+  let serializedArgs: string;
+  try {
+    serializedArgs = JSON.stringify(args ?? {});
+  } catch {
+    serializedArgs = String(args);
+  }
+  return `${name}:${serializedArgs}`;
+}
 
 // ─── Constantes rate limiting audio ──────────────────────────────────────────
 
@@ -216,6 +237,12 @@ export function attachLiveWebSocket(
       lastAlertLevel: '' as '' | 'warn' | 'critical',
       lastAutoSummarizeAt: 0,
       autoSummarizeCount: 0,
+      // Court-circuit des échecs répétitifs : compte les échecs par signature
+      // (tool + args). Au-delà de REPEATED_FAILURE_LIMIT échecs identiques, on
+      // cesse de ré-exécuter l'outil et on renvoie un résumé compact — ce qui
+      // évite d'empiler des payloads d'erreur redondants dans la fenêtre de
+      // contexte (cause de l'explosion à >100%).
+      failTracker: new Map<string, number>(),
     };
 
     let autoSummarizeContext: (() => Promise<void>) | null = null;
@@ -762,7 +789,7 @@ export function attachLiveWebSocket(
             if (message.toolCall) {
               handleToolCall(
                 message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName,
-                deps, sessionSupervisor, contextGate,
+                deps, sessionSupervisor, contextGate, conversationCtx.failTracker,
                 // (B) Les résultats d'outils injectés dans la session comptent dans
                 // la fenêtre de contexte, mais n'apparaissent pas dans usageMetadata.
                 // On les remonte ici pour que le moniteur (et donc l'auto-résumé)
@@ -1321,6 +1348,7 @@ async function handleToolCall(
     requiredFiles: new Set(),
     readFiles: new Set(),
   },
+  failTracker?: Map<string, number>,
   onToolResultTokens?: (tokens: number) => void,
 ): Promise<void> {
   const functionResponses: any[] = [];
@@ -1332,6 +1360,14 @@ async function handleToolCall(
   const WRITE_TOOLS = new Set([
     'write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file',
     'delete_project_file', 'delete_project_folder', 'create_project_directory',
+  ]);
+
+  // Outils qui opèrent sur le workspace (lecture, écriture, exploration). Ils
+  // exigent un SELF_ROOT verrouillé et un sandbox prêt (cf. garde de démarrage).
+  const PROJECT_SCOPED_TOOLS = new Set([
+    ...WRITE_TOOLS,
+    'read_project_file', 'read_file_outline', 'list_project_files', 'search_in_files',
+    'analyze_project_file', 'open_project_file',
   ]);
 
   const context = {
@@ -1358,6 +1394,54 @@ async function handleToolCall(
 
   for (const call of toolCall.functionCalls) {
     try {
+      // ── Court-circuit des échecs répétitifs ──────────────────────────────
+      // Si le même outil a déjà échoué REPEATED_FAILURE_LIMIT fois avec des
+      // arguments identiques, on ne le ré-exécute pas : on renvoie un résumé
+      // compact. Les arguments sont probablement invalides et chaque nouvelle
+      // tentative ne ferait qu'empiler un payload d'erreur dans le contexte.
+      const failKey = toolFailureKey(call.name, call.args);
+      if (failTracker && (failTracker.get(failKey) ?? 0) >= REPEATED_FAILURE_LIMIT) {
+        functionResponses.push({
+          id: call.id,
+          name: call.name,
+          response: {
+            error: `[COURT-CIRCUIT] "${call.name}" a déjà échoué ${REPEATED_FAILURE_LIMIT}× avec les mêmes arguments. ` +
+              `Arrête de réessayer : les arguments sont probablement invalides. ` +
+              `Change d'approche (lis le fichier/contexte, corrige les arguments) ou abandonne cette sous-tâche.`,
+            shortCircuited: true,
+          },
+        });
+        clientWs.send(JSON.stringify({ tool_used: call.name, info: `[COURT-CIRCUIT — ${REPEATED_FAILURE_LIMIT} échecs identiques]` }));
+        continue;
+      }
+
+      // ── Garde de démarrage (anti-race condition) ─────────────────────────
+      // Les outils liés au projet (lecture/écriture/exploration) ne doivent pas
+      // s'exécuter avant que le workspace soit verrouillé (SELF_ROOT) et que le
+      // sandbox soit prêt. Sinon, un appel lancé trop tôt échoue avec « Aucun
+      // workspace ouvert », puis le planificateur reboucle. On renvoie une
+      // erreur explicitement RETRYABLE pour que l'agent réessaie proprement.
+      if (PROJECT_SCOPED_TOOLS.has(call.name)) {
+        const sandboxState = getSandboxState();
+        const workspaceReady = !!SELF_ROOT && sandboxState !== 'INITIALIZING';
+        if (!workspaceReady) {
+          const reason = !SELF_ROOT
+            ? 'aucun workspace ouvert (SELF_ROOT non verrouillé)'
+            : `sandbox ${sandboxState}`;
+          functionResponses.push({
+            id: call.id,
+            name: call.name,
+            response: {
+              error: `[DÉMARRAGE] Workspace pas encore prêt (${reason}). Réessaie cet outil dans un instant.`,
+              retryable: true,
+              workspaceReady: false,
+            },
+          });
+          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[EN ATTENTE — workspace non prêt: ${reason}]` }));
+          continue;
+        }
+      }
+
       // Ask mode guard
       if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
         const filePath = (call.args?.path || call.args?.newPath || '') as string;
@@ -1480,6 +1564,16 @@ async function handleToolCall(
       const success = !(response && (response as any).error && !(response as any).status);
       try { skillManager.recordToolUsage(call.name, success); } catch {}
 
+      // Suivi des échecs répétitifs : on incrémente le compteur par signature
+      // sur échec, on le réinitialise sur succès (l'outil redevient « sain »).
+      if (failTracker) {
+        if (success) {
+          failTracker.delete(failKey);
+        } else {
+          failTracker.set(failKey, (failTracker.get(failKey) ?? 0) + 1);
+        }
+      }
+
       updateContextGate(contextGate, call.name, call.args, response);
 
       functionResponses.push({ id: call.id, name: call.name, response });
@@ -1514,6 +1608,12 @@ async function handleToolCall(
       }
     } catch (e: any) {
       console.error(`Error executing tool ${call.name}:`, e);
+      // Un throw non rattrapé est aussi un échec : il compte dans le suivi des
+      // échecs répétitifs pour que le court-circuit s'applique à ce cas également.
+      if (failTracker) {
+        const thrownKey = toolFailureKey(call.name, call.args);
+        failTracker.set(thrownKey, (failTracker.get(thrownKey) ?? 0) + 1);
+      }
       functionResponses.push({ id: call.id, name: call.name, response: { error: e.message } });
     }
   }
