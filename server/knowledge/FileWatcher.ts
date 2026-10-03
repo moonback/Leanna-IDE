@@ -8,7 +8,7 @@
  * Architecture :
  *   FileWatcher.start()
  *     ├── fs.watch(root, { recursive: true })
- *     ├── debounce(300ms) → accumule les changements
+ *     ├── debounce(500ms) → accumule les changements
  *     └── ProjectIndexer.scanFile() ou .removeFile() par fichier
  *
  * Avantages vs scanAll() :
@@ -22,6 +22,7 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
+import { shouldWatchPath } from "./indexingRules.js";
 
 const log = createLogger("FileWatcher");
 
@@ -30,37 +31,16 @@ const log = createLogger("FileWatcher");
 /** Délai de debounce : accumule les changements pendant cette durée */
 const DEBOUNCE_MS = 500;
 
-/** Extensions surveillées (même liste que ProjectIndexer) */
-const WATCHABLE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-  ".json", ".md", ".css", ".scss", ".html",
-]);
-
-/** Dossiers ignorés */
-const IGNORED_DIRS = new Set([
-  "node_modules", ".git", ".Leanna", "dist", "build", "out",
-  "release", "coverage", ".vscode", ".idea", "assets", "public",
-]);
-
 /**
- * Fichiers ignorés.
- *
- * Inclut les fichiers ÉCRITS PAR LE PROCESS LUI-MÊME (état de connaissance,
- * mémoire, profil) : sans ça, sauvegarder l'un d'eux déclenche le watcher, qui
- * relance une indexation, qui ré-écrit ces fichiers… → boucle / double scan.
- * C'est la cause de la 2ᵉ passe « Relations extraites » observée après
- * l'écriture de .Leanna-profile.json.
+ * Délais de backoff pour le redémarrage automatique après erreur fs.watch.
+ * Bug 6 : après une erreur EMFILE/ENOSPC/etc., le watcher tente de redémarrer
+ * automatiquement avec ces délais successifs (ms). Après le dernier essai,
+ * il abandonne et émet un événement "error" à destination de l'UI.
  */
-const IGNORED_FILES = new Set([
-  "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-  ".project-knowledge.json", ".project-memory.json",
-  ".Leanna-profile.json", ".Leanna-profile.json.tmp",
-]);
+const RESTART_BACKOFF_MS = [1_000, 2_000, 4_000];
 
-/** Suffixes ignorés (fichiers temporaires écrits par le process). */
-const IGNORED_SUFFIXES = [".tmp", ".swp", ".lock"];
-/** Motif des fichiers temporaires d'écriture atomique (ex. .project-memory.json.tmp_1790…). */
-const TMP_WRITE_PATTERN = /\.tmp[_.]?\d*$/i;
+// Les règles d'exclusion (dirs, fichiers, suffixes, extensions)
+// sont importées depuis indexingRules.ts via shouldWatchPath().
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FileWatcher
@@ -76,94 +56,94 @@ export interface FileChangeEvent {
 
 export type FileChangeHandler = (events: FileChangeEvent[]) => Promise<void> | void;
 
+/** Événement émis vers l'UI quand le watcher tombe définitivement. */
+export interface WatcherErrorEvent {
+  message: string;
+  root: string;
+}
+
+export type WatcherErrorHandler = (event: WatcherErrorEvent) => void;
+
 export class FileWatcher {
   private watcher: fs.FSWatcher | null = null;
   private pendingChanges: Map<string, FileChangeType> = new Map();
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private handlers: Set<FileChangeHandler> = new Set();
+  private errorHandlers: Set<WatcherErrorHandler> = new Set();
   private isRunning: boolean = false;
+  /** Racine sur laquelle le watcher tourne actuellement. */
+  private currentRoot: string | null = null;
+  /**
+   * Promesse du batch en cours — garantit qu'un seul batch s'exécute à la fois.
+   * Bug 7 : la chaîne .then() ne peut pas rester rejetée car on y attache
+   * toujours un .catch() qui absorbe les erreurs et remet la chaîne à resolved.
+   */
+  private batchInFlight: Promise<void> = Promise.resolve();
+  /** Tentatives de redémarrage en cours (backoff). */
+  private restartAttempt = 0;
+  private restartTimer: ReturnType<typeof setTimeout> | null = null;
+
   private stats = {
     totalEventsProcessed: 0,
     totalBatchesDispatched: 0,
     lastEventAt: 0,
   };
 
-  /**
-   * Retourne la racine du workspace actif.
-   */
+  // ─── API publique ─────────────────────────────────────────────────────────
+
+  /** Retourne la racine du workspace actif. */
   private getRoot(): string {
     if (isSandboxActive()) return getSandboxRoot();
     return SELF_ROOT;
   }
 
-  /**
-   * Enregistre un handler appelé à chaque batch de changements.
-   */
+  /** Enregistre un handler appelé à chaque batch de changements. */
   onChange(handler: FileChangeHandler): () => void {
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
   }
 
   /**
-   * Démarre la surveillance des fichiers.
-   * Utilise fs.watch en mode récursif (Windows et macOS supporté nativement).
+   * Enregistre un handler d'erreur appelé si le watcher tombe définitivement
+   * (après tous les essais de redémarrage). Utile pour notifier l'UI.
    */
-  start(): boolean {
-    if (this.isRunning) {
-      log.debug("FileWatcher déjà actif");
-      return true;
-    }
-
-    const root = this.getRoot();
-
-    try {
-      this.watcher = fs.watch(root, { recursive: true }, (eventType, filename) => {
-        if (!filename) return;
-
-        // Normaliser le chemin (Windows → forward slashes)
-        const relativePath = filename.replace(/\\/g, "/");
-
-        // Filtrer les fichiers non pertinents
-        if (!this.shouldWatch(relativePath)) return;
-
-        // Déterminer le type de changement
-        const absPath = path.join(root, relativePath);
-        let changeType: FileChangeType;
-
-        try {
-          if (fs.existsSync(absPath)) {
-            // Le fichier existe → modification ou création
-            changeType = this.pendingChanges.has(relativePath) ? "modified" : "modified";
-            // Détection création : si le fichier n'était pas dans le batch précédent
-            // On simplifie : "rename" = création/suppression, "change" = modification
-            if (eventType === "rename") {
-              changeType = "created";
-            }
-          } else {
-            // Le fichier n'existe plus → suppression
-            changeType = "deleted";
-          }
-        } catch {
-          changeType = "modified";
-        }
-
-        this.pendingChanges.set(relativePath, changeType);
-        this.scheduleBatch();
-      });
-
-      this.isRunning = true;
-      log.info(`👁️ FileWatcher démarré sur: ${root}`);
-      return true;
-    } catch (err) {
-      log.error(`❌ Impossible de démarrer le FileWatcher: ${(err as Error).message}`);
-      return false;
-    }
+  onError(handler: WatcherErrorHandler): () => void {
+    this.errorHandlers.add(handler);
+    return () => this.errorHandlers.delete(handler);
   }
 
   /**
-   * Arrête la surveillance.
+   * Démarre la surveillance des fichiers.
+   * Utilise fs.watch en mode récursif (Windows et macOS supporté nativement).
+   *
+   * Idempotent sur la même racine. Si la racine change (sandbox), redémarre.
    */
+  start(): boolean {
+    const root = this.getRoot();
+
+    // Déjà actif sur la bonne racine — rien à faire
+    if (this.isRunning && this.currentRoot === root) {
+      log.debug("FileWatcher déjà actif sur la même racine");
+      return true;
+    }
+
+    // Racine différente : arrêter l'ancien watcher
+    if (this.isRunning) {
+      log.info(`🔄 Racine changée (${this.currentRoot} → ${root}), redémarrage du FileWatcher`);
+      this.stop();
+    }
+
+    return this._startWatcher(root);
+  }
+
+  /** Arrête la surveillance et annule tout redémarrage planifié. */
   stop(): void {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    this.restartAttempt = 0;
+
     if (this.watcher) {
       this.watcher.close();
       this.watcher = null;
@@ -174,71 +154,124 @@ export class FileWatcher {
     }
     this.pendingChanges.clear();
     this.isRunning = false;
+    this.currentRoot = null;
     log.info("🛑 FileWatcher arrêté");
   }
 
-  /**
-   * Retourne si le watcher est actif.
-   */
+  /** Retourne si le watcher est actif. */
   get running(): boolean {
     return this.isRunning;
   }
 
-  /**
-   * Retourne les statistiques du watcher.
-   */
+  /** Retourne les statistiques du watcher. */
   getStats() {
     return { ...this.stats, running: this.isRunning };
   }
 
-  // ─── Logique interne ──────────────────────────────────────────────────────
+  // ─── Implémentation interne ───────────────────────────────────────────────
+
+  /**
+   * Crée et installe le fs.FSWatcher sur `root`.
+   * Appelé par start() et par le mécanisme de redémarrage backoff.
+   */
+  private _startWatcher(root: string): boolean {
+    try {
+      const watcher = fs.watch(root, { recursive: true }, (eventType, filename) => {
+        if (!filename) return;
+
+        const relativePath = filename.replace(/\\/g, "/");
+        if (!this.shouldWatch(relativePath)) return;
+
+        const absPath = path.join(root, relativePath);
+        let changeType: FileChangeType;
+
+        try {
+          if (fs.existsSync(absPath)) {
+            // Bug 5 : ternaire mort corrigé — les deux branches renvoyaient
+            // "modified". On utilise directement "modified" sans ternaire.
+            changeType = "modified";
+            // "rename" signale une création ou un déplacement
+            if (eventType === "rename") changeType = "created";
+          } else {
+            changeType = "deleted";
+          }
+        } catch {
+          changeType = "modified";
+        }
+
+        this.pendingChanges.set(relativePath, changeType);
+        this.scheduleBatch();
+      });
+
+      // Bug 6 : redémarrage avec backoff après erreur fs.watch.
+      watcher.on("error", (err: Error) => {
+        log.error(`❌ Erreur fs.watch (${root}): ${err.message}`);
+        this.stop();
+        this._scheduleRestart(root);
+      });
+
+      this.watcher = watcher;
+      this.isRunning = true;
+      this.currentRoot = root;
+      this.restartAttempt = 0; // succès → réinitialiser le compteur
+      log.info(`👁️ FileWatcher démarré sur: ${root}`);
+      return true;
+    } catch (err) {
+      log.error(`❌ Impossible de démarrer le FileWatcher: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Planifie un redémarrage automatique avec backoff exponentiel.
+   * Bug 6 : après une erreur, jusqu'à 3 tentatives (1 s, 2 s, 4 s).
+   * Si toutes échouent, émet un événement d'erreur vers l'UI.
+   */
+  private _scheduleRestart(root: string): void {
+    if (this.restartAttempt >= RESTART_BACKOFF_MS.length) {
+      log.error(`❌ FileWatcher: ${RESTART_BACKOFF_MS.length} tentatives de redémarrage échouées sur ${root}. Surveillance désactivée.`);
+      const msg = `Le watcher de fichiers a échoué après ${RESTART_BACKOFF_MS.length} tentatives sur ${root}.`;
+      for (const h of this.errorHandlers) {
+        try { h({ message: msg, root }); } catch { /* ignore */ }
+      }
+      return;
+    }
+
+    const delay = RESTART_BACKOFF_MS[this.restartAttempt];
+    this.restartAttempt++;
+    log.warn(`🔁 Tentative de redémarrage du FileWatcher dans ${delay} ms (essai ${this.restartAttempt}/${RESTART_BACKOFF_MS.length})…`);
+
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      const ok = this._startWatcher(root);
+      if (!ok) this._scheduleRestart(root);
+    }, delay);
+  }
 
   /**
    * Vérifie si un fichier doit être surveillé.
+   * Délègue à shouldWatchPath() depuis indexingRules.ts.
    */
   private shouldWatch(relativePath: string): boolean {
-    // Vérifier les dossiers ignorés
-    const parts = relativePath.split("/");
-    for (const part of parts) {
-      if (IGNORED_DIRS.has(part)) return false;
-    }
-
-    // Vérifier le nom de fichier
-    const filename = path.basename(relativePath);
-    if (IGNORED_FILES.has(filename)) return false;
-
-    // Fichiers temporaires d'écriture (atomique) : ex. foo.json.tmp_1790…, foo.swp
-    if (TMP_WRITE_PATTERN.test(filename)) return false;
-    if (IGNORED_SUFFIXES.some((s) => filename.endsWith(s))) return false;
-
-    // Ignorer les fichiers cachés (dont .Leanna-profile.json, .env, etc.)
-    // AVANT la vérification d'extension : un état interne écrit par le process
-    // ne doit jamais déclencher de ré-indexation, quelle que soit son extension.
-    if (filename.startsWith(".")) return false;
-
-    // Vérifier l'extension
-    const ext = path.extname(filename).toLowerCase();
-    if (!WATCHABLE_EXTENSIONS.has(ext)) return false;
-
-    return true;
+    return shouldWatchPath(relativePath);
   }
 
-  /**
-   * Programme l'envoi d'un batch de changements après le debounce.
-   */
+  /** Programme l'envoi d'un batch après le debounce. */
   private scheduleBatch(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
     this.debounceTimer = setTimeout(() => {
-      this.dispatchBatch();
+      // Bug 7 : .catch() à la fin de la chaîne pour absorber toute exception
+      // non gérée dans dispatchBatch — la chaîne ne peut pas rester rejetée.
+      this.batchInFlight = this.batchInFlight
+        .then(() => this.dispatchBatch())
+        .catch((err) => {
+          log.error(`❌ dispatchBatch a levé une exception inattendue: ${(err as Error).message}`);
+        });
     }, DEBOUNCE_MS);
   }
 
-  /**
-   * Envoie le batch de changements accumulés aux handlers.
-   */
+  /** Envoie le batch de changements accumulés aux handlers. */
   private async dispatchBatch(): Promise<void> {
     if (this.pendingChanges.size === 0) return;
 
@@ -256,7 +289,6 @@ export class FileWatcher {
 
     log.info(`📦 Batch: ${events.length} fichier(s) changé(s) [${events.map(e => `${e.type}:${path.basename(e.relativePath)}`).join(", ")}]`);
 
-    // Notifier tous les handlers
     for (const handler of this.handlers) {
       try {
         await handler(events);

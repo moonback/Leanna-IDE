@@ -697,12 +697,20 @@ export class RelationExtractor {
     const relations: EntityRelation[] = [];
     const seenKeys = new Set<string>();
 
-    // Construire un index des fonctions exportées par fichier (pour la résolution)
+    // Construire un index des fonctions exportées par fichier (pour la résolution).
+    // Incoh. 6 : clé composite "filePath::name" pour éviter qu'un même nom dans
+    // deux fichiers différents écrase l'une des entrées.
     const exportIndex = new Map<string, { filePath: string; type: FileNode["entities"][number]["type"] }>();
     for (const file of allFiles) {
       for (const entity of file.entities) {
         if (entity.modifiers?.includes("export")) {
-          exportIndex.set(entity.name, { filePath: file.path, type: entity.type });
+          // Clé primaire : filePath::name (non-ambiguë)
+          exportIndex.set(`${file.path}::${entity.name}`, { filePath: file.path, type: entity.type });
+          // Clé de secours par nom seul — utilisée uniquement si aucune entrée
+          // filePath::name ne correspond (callee cross-file non encore résolu).
+          if (!exportIndex.has(entity.name)) {
+            exportIndex.set(entity.name, { filePath: file.path, type: entity.type });
+          }
         }
       }
     }

@@ -174,27 +174,47 @@ export class KnowledgeGraph {
     }, PERSIST_DEBOUNCE_MS);
   }
 
-  /** Écrit immédiatement le graphe sur disque (async, non-bloquant). */
+  /** Écrit immédiatement le graphe sur disque de façon atomique (tmp → rename). */
   private flush(): void {
     if (!this.dirty) return;
-    
+
+    // Capturer dirty=true AVANT l'écriture asynchrone — on le remettra à false
+    // uniquement après succès pour permettre un retry en cas d'échec.
+    const storePath = getStorePath();
+    const tmpPath = `${storePath}.tmp_${Date.now()}`;
+
     try {
-      const storePath = getStorePath();
       const dir = path.dirname(storePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      
-      const data = JSON.stringify(this.state, null, 2);
-      fs.writeFile(storePath, data, "utf-8", (err) => {
-        if (err) log.error(`❌ Échec sauvegarde graphe: ${err.message}`);
-        else {
+
+      // JSON sans indentation : ~30 % plus compact, stringify plus rapide.
+      const data = JSON.stringify(this.state);
+
+      fs.writeFile(tmpPath, data, "utf-8", (writeErr) => {
+        if (writeErr) {
+          log.error(`❌ Échec écriture tmp graphe: ${writeErr.message}`);
+          // Ne pas toucher à dirty — sera retenté au prochain save()
+          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+          return;
+        }
+
+        // Rename atomique : garantit qu'un lecteur concurrent ne voit jamais
+        // un fichier partiellement écrit.
+        fs.rename(tmpPath, storePath, (renameErr) => {
+          if (renameErr) {
+            log.error(`❌ Échec rename graphe: ${renameErr.message}`);
+            try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+            return;
+          }
+
+          // Succès confirmé — seulement maintenant on pose dirty=false.
+          this.dirty = false;
           void knowledgeGraphCache.set(SELF_ROOT, this.state);
           log.info(`💾 Graphe sauvegardé: ${storePath}`);
-        }
+        });
       });
-      
-      this.dirty = false;
     } catch (err) {
       log.error(`❌ Échec sauvegarde graphe: ${(err as Error).message}`);
     }
@@ -211,14 +231,18 @@ export class KnowledgeGraph {
     }
     
     if (this.dirty) {
-      // Utiliser writeFileSync pour le shutdown (garantit l'écriture avant la sortie)
+      // Utiliser writeFileSync pour le shutdown (garantit l'écriture avant la sortie).
+      // tmp + rename pour rester atomique même en synchrone.
       try {
         const storePath = getStorePath();
+        const tmpPath = `${storePath}.tmp_${Date.now()}`;
         const dir = path.dirname(storePath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(storePath, JSON.stringify(this.state, null, 2), "utf-8");
+        // JSON sans indentation pour cohérence avec flush() async.
+        fs.writeFileSync(tmpPath, JSON.stringify(this.state), "utf-8");
+        fs.renameSync(tmpPath, storePath);
         this.dirty = false;
         void knowledgeGraphCache.set(SELF_ROOT, this.state);
         log.info(`💾 Graphe flushé (shutdown): ${storePath}`);
@@ -459,6 +483,15 @@ export class KnowledgeGraph {
    */
   getASTResult(filePath: string): ASTFileResult | undefined {
     return this.astIndex.get(filePath);
+  }
+
+  /**
+   * Retourne une copie de l'intégralité de l'index AST en mémoire.
+   * Utilisé par refreshSemanticRelations() pour reconstruire les relations
+   * d'appels AST sans avoir à re-parser les fichiers.
+   */
+  getAllASTResults(): Map<string, ASTFileResult> {
+    return new Map(this.astIndex);
   }
 
   /**
