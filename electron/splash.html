@@ -181,6 +181,7 @@
 <body>
 
   <div class="glow"></div>
+  <canvas id="bg-canvas"></canvas>
 
   <div class="stage">
 
@@ -274,11 +275,65 @@
       updateProgressUI(pct, text);
     };
 
-    window.markComplete = function() {
-      clearInterval(progressTimer);
-      clearInterval(stepInterval);
-      updateProgressUI(100, "Système opérationnel • Lancement de leanna...");
-    };
+     window.markComplete = function() {
+       clearInterval(progressTimer);
+       clearInterval(stepInterval);
+       updateProgressUI(100, "Système opérationnel • Lancement de leanna...");
+     };
+
+     // Particules de fond
+     const canvas = document.getElementById('bg-canvas');
+     const ctx = canvas.getContext('2d');
+     let width = canvas.width = window.innerWidth;
+     let height = canvas.height = window.innerHeight;
+     const particles = [];
+
+     class Particle {
+       constructor() {
+         this.reset();
+       }
+       reset() {
+         this.x = Math.random() * width;
+         this.y = Math.random() * height;
+         this.size = Math.random() * 1.5 + 0.5;
+         this.speedX = Math.random() * 0.4 - 0.2;
+         this.speedY = Math.random() * 0.4 - 0.2;
+         this.opacity = Math.random() * 0.5 + 0.1;
+       }
+       update() {
+         this.x += this.speedX;
+         this.y += this.speedY;
+         if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+           this.reset();
+         }
+       }
+       draw() {
+         ctx.fillStyle = `rgba(0, 194, 255, ${this.opacity})`;
+         ctx.beginPath();
+         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+         ctx.fill();
+       }
+     }
+
+     for (let i = 0; i < 100; i++) {
+       particles.push(new Particle());
+     }
+
+     function animate() {
+       ctx.clearRect(0, 0, width, height);
+       particles.forEach(p => {
+         p.update();
+         p.draw();
+       });
+       requestAnimationFrame(animate);
+     }
+     animate();
+
+     window.addEventListener('resize', () => {
+       width = canvas.width = window.innerWidth;
+       height = canvas.height = window.innerHeight;
+     });
+   </script>
   </script>
 </body>
 </html>
