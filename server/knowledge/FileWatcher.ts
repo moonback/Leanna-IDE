@@ -82,6 +82,10 @@ export class FileWatcher {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private handlers: Set<FileChangeHandler> = new Set();
   private isRunning: boolean = false;
+  /** Racine sur laquelle le watcher tourne actuellement. */
+  private currentRoot: string | null = null;
+  /** Promesse du batch en cours — garantit qu'un seul batch s'exécute à la fois. */
+  private batchInFlight: Promise<void> = Promise.resolve();
   private stats = {
     totalEventsProcessed: 0,
     totalBatchesDispatched: 0,
@@ -107,17 +111,27 @@ export class FileWatcher {
   /**
    * Démarre la surveillance des fichiers.
    * Utilise fs.watch en mode récursif (Windows et macOS supporté nativement).
+   *
+   * Si le watcher tourne déjà sur la même racine, retourne true sans rien faire.
+   * Si la racine a changé (sandbox activé/désactivé), redémarre automatiquement.
    */
   start(): boolean {
-    if (this.isRunning) {
-      log.debug("FileWatcher déjà actif");
+    const root = this.getRoot();
+
+    // Déjà actif sur la bonne racine — rien à faire
+    if (this.isRunning && this.currentRoot === root) {
+      log.debug("FileWatcher déjà actif sur la même racine");
       return true;
     }
 
-    const root = this.getRoot();
+    // Racine différente (ex. sandbox activé) : arrêter l'ancien watcher
+    if (this.isRunning) {
+      log.info(`🔄 Racine changée (${this.currentRoot} → ${root}), redémarrage du FileWatcher`);
+      this.stop();
+    }
 
     try {
-      this.watcher = fs.watch(root, { recursive: true }, (eventType, filename) => {
+      const watcher = fs.watch(root, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
 
         // Normaliser le chemin (Windows → forward slashes)
@@ -151,7 +165,17 @@ export class FileWatcher {
         this.scheduleBatch();
       });
 
+      // Bug 5 : capturer les erreurs fs.watch (EMFILE, ENOSPC, …) pour éviter
+      // un crash non géré du process.
+      watcher.on("error", (err: Error) => {
+        log.error(`❌ Erreur fs.watch (${root}): ${err.message}`);
+        // Arrêter proprement et laisser l'appelant relancer si nécessaire
+        this.stop();
+      });
+
+      this.watcher = watcher;
       this.isRunning = true;
+      this.currentRoot = root;
       log.info(`👁️ FileWatcher démarré sur: ${root}`);
       return true;
     } catch (err) {
@@ -174,6 +198,7 @@ export class FileWatcher {
     }
     this.pendingChanges.clear();
     this.isRunning = false;
+    this.currentRoot = null;
     log.info("🛑 FileWatcher arrêté");
   }
 
@@ -232,7 +257,10 @@ export class FileWatcher {
     }
 
     this.debounceTimer = setTimeout(() => {
-      this.dispatchBatch();
+      // Bug 6 : sérialiser les batchs — si un batch est déjà en cours,
+      // attendre qu'il finisse avant d'en lancer un nouveau.
+      // Ainsi refreshSemanticRelations() ne peut jamais tourner en parallèle.
+      this.batchInFlight = this.batchInFlight.then(() => this.dispatchBatch());
     }, DEBOUNCE_MS);
   }
 
