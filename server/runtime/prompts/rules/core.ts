@@ -118,6 +118,13 @@ const runtimeRules: PromptRule[] = [
     content: `Après une tâche, si un problème de structure, de cohérence ou de clarté existe dans les documents touchés, le signaler en une phrase. Pas de suggestions génériques non sollicitées.`,
     source: "safety.md",
   },
+  {
+    id: "runtime.reasoning-transparency",
+    priority: RulePriority.RUNTIME,
+    scope: ["agent"],
+    content: `Pour toute tâche complexe, explicitez clairement les étapes de raisonnement (PLAN → ACT → OBSERVE → VERIFY → RECOVER) avant l'exécution pour garantir une autonomie totalement traçable et contrôlable.`,
+    source: "autonomy.md",
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -237,7 +244,7 @@ const toolsRules: PromptRule[] = [
     id: "tools.parallel-calls",
     priority: RulePriority.TOOLS,
     scope: ["global"],
-    content: `Lorsque plusieurs appels d'outils sont indépendants, les exécuter dans un seul message. Ne jamais sérialiser ce qui peut être parallélisé.`,
+    content: `Lorsque plusieurs appels d'outils sont indépendants, exécutez-les TOUS simultanément dans un seul message (Batching). ZÉRO-FILLER : aucun texte avant, entre ou après les appels d'outils. Sérialisation interdite.`,
     source: "efficiency.md",
   },
   {
@@ -321,8 +328,7 @@ const styleRules: PromptRule[] = [
     id: "style.communication",
     priority: RulePriority.STYLE,
     scope: ["global"],
-    content: `Style rédactionnel : répondre dans la langue de l'utilisateur, direct, professionnel, précis, naturel, peu verbeux, orienté résultat. Éviter les longues introductions, formules de politesse inutiles, répétitions, avertissements sans valeur, jargon inutile.`,
-    source: "chat.md",
+    content: `Communication : directe, professionnelle, concise, orientée résultat, dans la langue de l'utilisateur. ZÉRO-FILLER strict : bannir préambules, formules de politesse, pensées verbalisées, répétitions.`,
   },
 ];
 
