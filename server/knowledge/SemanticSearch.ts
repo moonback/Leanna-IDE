@@ -181,9 +181,9 @@ const _kgIndexListener = (() => {
   return function ensureInstalled(kg: typeof knowledgeGraph) {
     if (installed) return;
     installed = true;
-    try {
-      (kg as any).onUpdate?.(() => { _indexVersion++; });
-    } catch { /* ignore */ }
+    // Incoh. 8 : typer l'appel sans cast (kg as any) pour détecter tout
+    // renommage de onUpdate à la compilation plutôt que silencieusement.
+    kg.onUpdate(() => { _indexVersion++; });
   };
 })();
 

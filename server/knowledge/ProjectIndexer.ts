@@ -33,59 +33,20 @@ import { relationExtractor } from "./RelationExtractor.js";
 import { astParser } from "./ASTParser.js";
 import { astCallGraph } from "./ASTCallGraph.js";
 import type { ASTFileResult } from "./types.js";
+import {
+  EXCLUDED_DIRS,
+  EXCLUDED_FILES,
+  ANALYZABLE_EXTENSIONS,
+  shouldIgnorePath,
+} from "./indexingRules.js";
 
 const log = createLogger("ProjectIndexer");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-/** Répertoires exclus du scan */
-const EXCLUDED_DIRS = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "release",
-  "coverage",
-  ".vscode",
-  ".idea",
-  ".Leanna",
-  "assets",
-  "public",
-]);
-
-/** Fichiers exclus du scan */
-const EXCLUDED_FILES = new Set([
-  "package-lock.json",
-  "yarn.lock",
-  "pnpm-lock.yaml",
-  ".DS_Store",
-  "thumbs.db",
-  ".gitignore",
-  ".env",
-  ".env.local",
-  ".gemini-keys.json",
-  ".npmrc",
-  // Fichiers de persistance du Knowledge System — exclus pour éviter l'auto-indexation
-  // (sinon le scan crée des copies parasites de 1-2 MB dans server/knowledge/)
-  ".project-knowledge.json",
-  ".project-memory.json",
-]);
-
-/** Extensions de fichiers analysables */
-const ANALYZABLE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-  ".md",
-  ".css",
-  ".scss",
-  ".html",
-]);
+// Les règles d'exclusion (EXCLUDED_DIRS, EXCLUDED_FILES, ANALYZABLE_EXTENSIONS,
+// shouldIgnorePath) sont importées depuis indexingRules.ts — source unique de
+// vérité partagée avec FileWatcher.
 
 /** Taille maximale d'un fichier pour l'analyse (500 KB) */
 const MAX_FILE_SIZE = 500_000;
@@ -127,16 +88,16 @@ export class ProjectIndexer {
   private customProjectRoot?: string;
 
   // ── Coalescing des scans concurrents ──────────────────────────────────────
-  // Plusieurs déclencheurs non coordonnés appellent scanAll() en rafale à
-  // l'activation d'un projet (démarrage serveur + activation SELF_ROOT +
-  // rechargement sandbox). Sans garde, chacun relance une passe complète qui
-  // recalcule les mêmes relations (d'où les logs "Relations extraites"
-  // identiques répétés). On sérialise : si un scan tourne déjà, les appelants
-  // suivants réutilisent la MÊME promesse au lieu d'en lancer un nouveau.
   private inFlight: Promise<ScanAllResult> | null = null;
-  // Une demande arrivée pendant un scan en cours programme UN re-scan unique à
-  // la fin (pour ne pas perdre des changements survenus entre-temps).
   private pendingRescan = false;
+
+  // ── Cache contenu pour refreshSemanticRelations ───────────────────────────
+  // Bug 4 : refreshSemanticRelations() relit tous les fichiers TS/JS depuis le
+  // disque à chaque batch du watcher (~2 s). Ce cache évite ces relectures :
+  // il est alimenté à chaque _readContent réussi et invalidé fichier par fichier
+  // lorsqu'un fichier est modifié/supprimé.
+  // Clé : chemin relatif  Valeur : { content, mtimeMs }
+  private _contentCache = new Map<string, { content: string; mtimeMs: number }>();
 
   constructor(projectRoot?: string) {
     this.customProjectRoot = projectRoot;
@@ -176,8 +137,12 @@ export class ProjectIndexer {
     // run et se lancent en parallèle.
     while (this.inFlight) {
       if (!options.force) {
-        // Simple demande de rafraîchissement : on réutilise le scan courant.
+        // Simple demande de rafraîchissement pendant un scan actif.
+        // Bug 8 : on pose pendingRescan=true pour que les changements survenus
+        // pendant ce scan soient rattrapés par un re-scan unique à la fin,
+        // conformément au commentaire de la méthode.
         log.debug("⏳ scanAll déjà en cours — appel coalescé (réutilise le scan actif).");
+        this.pendingRescan = true;
         return this.inFlight;
       }
       // force: on attend la fin du scan courant, puis on re-vérifie la garde.
@@ -246,8 +211,10 @@ export class ProjectIndexer {
           try {
             const stat = fs.statSync(absPath);
             const cachedMtimeMs = Date.parse(cached.lastModified);
-            // Vérifier taille et date de modification (marge 1.5s pour précision FS)
-            if (stat.size !== cached.size || Math.abs(stat.mtimeMs - cachedMtimeMs) > 1500) {
+            // Vérifier taille ET date de modification.
+            // Tolérance 2 ms (précision JS Date) — 1500 ms ratait les doubles
+            // éditions rapprochées de même taille faites par des agents rapides.
+            if (stat.size !== cached.size || Math.abs(stat.mtimeMs - cachedMtimeMs) > 2) {
               modifiedFiles.push(relPath);
             }
           } catch {
@@ -368,10 +335,19 @@ export class ProjectIndexer {
       options.onProgress?.({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
       try {
         const absPath = path.join(root, relativePath);
-        // Lire le contenu UNE seule fois et le partager avec parseFile + AST
-        // (Perf 1/2 : _readContent est appelé ici, parseFile reçoit le contenu
-        // directement sans relire le disque).
-        const content = this._readContent(absPath);
+        // Bug 1 : stat AVANT lecture — les fichiers > 500 Ko sont rejetés
+        // immédiatement sans être chargés en mémoire pour rien.
+        try {
+          const st = fs.statSync(absPath);
+          if (st.size > MAX_FILE_SIZE) {
+            log.debug(`⏭️ Fichier trop volumineux ignoré (CAS C): ${relativePath} (${st.size} octets)`);
+            continue;
+          }
+        } catch {
+          continue;
+        }
+        // Lire le contenu UNE seule fois et le partager avec parseFile + AST.
+        const content = this._readContent(absPath, relativePath);
         const fileNode = await this.parseFile(relativePath, content ?? undefined);
         if (!fileNode) continue;
 
@@ -435,13 +411,27 @@ export class ProjectIndexer {
     };
   }
 
-  /** Lit le contenu d'un fichier de manière sécurisée (null si erreur/binaire). */
-  private _readContent(absPath: string): string | null {
+  /** Lit le contenu d'un fichier de manière sécurisée (null si erreur/binaire).
+   * Alimente _contentCache avec le contenu + mtime pour que
+   * refreshSemanticRelations() puisse éviter les relectures disque. */
+  private _readContent(absPath: string, relPath?: string): string | null {
     try {
-      return fs.readFileSync(absPath, "utf-8");
+      const content = fs.readFileSync(absPath, "utf-8");
+      if (relPath) {
+        try {
+          const mtimeMs = fs.statSync(absPath).mtimeMs;
+          this._contentCache.set(relPath, { content, mtimeMs });
+        } catch { /* mtime non critique */ }
+      }
+      return content;
     } catch {
       return null;
     }
+  }
+
+  /** Retire une entrée du cache contenu (fichier modifié ou supprimé). */
+  private _invalidateContentCache(relPath: string): void {
+    this._contentCache.delete(relPath);
   }
 
   /**
@@ -452,8 +442,10 @@ export class ProjectIndexer {
     try {
       const root = this.getActiveProjectRoot();
       const absPath = path.join(root, relativePath);
-      const content = this._readContent(absPath);
-      const fileNode = await this.parseFile(relativePath);
+      const content = this._readContent(absPath, relativePath);
+      // Bug 2 : transmettre le contenu déjà lu à parseFile — évite une
+      // seconde lecture synchrone (parseFile relit le disque sinon).
+      const fileNode = await this.parseFile(relativePath, content ?? undefined);
 
       if (fileNode) {
         // Enrichissement AST incrémental
@@ -461,8 +453,12 @@ export class ProjectIndexer {
           const astResult = await astParser.parseFile(content, relativePath, fileNode.extension);
           if (!astResult.usedFallback) {
             this.enrichWithAST(fileNode, astResult);
-            const allAst = new Map([[relativePath, astResult]]);
-            astCallGraph.updateFile(astResult, allAst);
+            // Incoh. 5 : mettre à jour l'astIndex du KnowledgeGraph pour que
+            // refreshSemanticRelations() → getAllASTResults() voie ce fichier.
+            knowledgeGraph.setASTResult(relativePath, astResult);
+            // Bug 3 : passer tout l'index AST (pas seulement ce fichier) pour
+            // que la résolution des appels cross-file soit complète.
+            astCallGraph.updateFile(astResult, knowledgeGraph.getAllASTResults());
           }
         }
         knowledgeGraph.updateFile(fileNode);
@@ -711,16 +707,23 @@ export class ProjectIndexer {
     }
 
     // Pour les fichiers Markdown : extraire les titres comme "entités"
+    // Incoh. 7 : type "heading" au lieu de "export" pour distinguer les vrais
+    // exports de code. La regex vérifie aussi que la ligne n'est pas dans un
+    // bloc de code (pas d'indentation/backtick précédent simple — heuristique).
     if (ext === ".md") {
+      let inCodeBlock = false;
       for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("```")) { inCodeBlock = !inCodeBlock; continue; }
+        if (inCodeBlock) continue;
         const headingMatch = lines[i].match(/^(#{1,3})\s+(.+)/);
         if (headingMatch) {
           entities.push({
             name: headingMatch[2].trim(),
-            type: "export",
+            type: "export", // "heading" n'existe pas dans CodeEntityType — on garde "export" mais on ajoute un modifier
             filePath: relativePath,
             lineStart: i + 1,
             signature: lines[i].trim().slice(0, 200),
+            modifiers: ["heading"],
           });
         }
       }
@@ -764,11 +767,61 @@ export class ProjectIndexer {
       return { imports, exports };
     }
 
-    // Supprimer les commentaires pour éviter les faux positifs.
-    // On remplace par des espaces pour conserver les numéros de position.
-    const stripped = content
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length))  // /* … */
-      .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));        // // …
+    // Supprimer les commentaires pour éviter les faux positifs,
+    // en prenant soin de NE PAS toucher aux URL dans les chaînes.
+    // Bug 11 : /\/\/[^\n]*/ coupe "https://…" — on ne neutralise les // de
+    // commentaire que lorsqu'ils ne sont pas précédés de ":" (protocole URL)
+    // et ne sont pas à l'intérieur d'une chaîne littérale.
+    // Stratégie : passer sur le texte char par char en sautant les chaînes
+    // (simple/double/backtick) avant de zapper les commentaires.
+    const stripped = (() => {
+      const src = content;
+      const out = src.split(""); // tableau mutable
+      let i = 0;
+      while (i < src.length) {
+        const ch = src[i];
+        // Chaîne simple ou double quote (une ligne)
+        if (ch === '"' || ch === "'") {
+          i++; // sauter le guillemet ouvrant
+          while (i < src.length && src[i] !== ch && src[i] !== "\n") {
+            if (src[i] === "\\") i++; // séquence d'échappement
+            i++;
+          }
+          i++; // sauter le guillemet fermant
+          continue;
+        }
+        // Template literal
+        if (ch === "`") {
+          i++;
+          let depth = 1;
+          while (i < src.length && depth > 0) {
+            if (src[i] === "`") depth--;
+            else if (src[i] === "\\" ) i++;
+            i++;
+          }
+          continue;
+        }
+        // Commentaire bloc /* … */
+        if (ch === "/" && src[i + 1] === "*") {
+          const start = i;
+          i += 2;
+          while (i < src.length && !(src[i - 1] === "*" && src[i] === "/")) i++;
+          i++; // sauter le / final
+          const len = i - start;
+          for (let j = start; j < start + len && j < out.length; j++) out[j] = " ";
+          continue;
+        }
+        // Commentaire ligne // — seulement si ce n'est pas ://<protocole>
+        if (ch === "/" && src[i + 1] === "/" && src[i - 1] !== ":") {
+          const start = i;
+          while (i < src.length && src[i] !== "\n") i++;
+          for (let j = start; j < i && j < out.length; j++) out[j] = " ";
+          continue;
+        }
+        i++;
+      }
+      return out.join("");
+    })();
 
     // ── Imports ES module (static, multi-lignes) ──────────────────────────
     // Couvre : import Foo from "…"
@@ -847,15 +900,35 @@ export class ProjectIndexer {
   private extractRouteEntities(filePath: string, lines: string[]): CodeEntity[] {
     const entities: CodeEntity[] = [];
     const seen = new Set<string>();
-    const routePattern = /\b(?:app|router)\.(get|post|put|delete|patch|all)\s*\(\s*['"`]([^'"`]+)['"`]/i;
+    // Bug 10 : élargir la regex pour capturer authRouter, apiRouter, etc.
+    // \w*[rR]outer capture tout identifiant se terminant par "router" ou "Router".
+    // On capture aussi le point de montage éventuel (ex. app.use("/api", router))
+    // pour lever l'ambiguïté de routes comme GET /:id.
+    const routePattern =
+      /\b(\w*[rR]outer|app|api)\.(get|post|put|delete|patch|all|use)\s*\(\s*['"`]([^'"`]+)['"`]/i;
+
+    // Chercher les points de montage déclarés dans le fichier (app.use("/prefix", router))
+    const mountPattern = /\b(?:app|api)\s*\.\s*use\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*(\w+)\s*\)/g;
+    const mountMap = new Map<string, string>(); // routerName → prefix
+    for (const line of lines) {
+      for (const m of line.matchAll(mountPattern)) {
+        mountMap.set(m[2], m[1].replace(/\/$/, ""));
+      }
+    }
 
     for (let i = 0; i < lines.length; i++) {
       const match = lines[i].match(routePattern);
       if (!match) continue;
 
-      const method = match[1].toUpperCase();
-      const routePath = match[2];
-      const name = `${method} ${routePath}`;
+      const routerName = match[1];
+      const method = match[2].toUpperCase();
+      const routePath = match[3];
+
+      // Préfixer avec le point de montage si connu
+      const prefix = mountMap.get(routerName) ?? "";
+      const fullPath = prefix ? `${prefix}${routePath}` : routePath;
+
+      const name = `${method} ${fullPath}`;
       if (seen.has(name)) continue;
       seen.add(name);
 
@@ -865,7 +938,7 @@ export class ProjectIndexer {
         filePath,
         lineStart: i + 1,
         signature: lines[i].trim().slice(0, 200),
-        metadata: { framework: "express", method, path: routePath },
+        metadata: { framework: "express", method, path: fullPath },
       });
     }
 
@@ -1102,22 +1175,19 @@ export class ProjectIndexer {
     }
 
     for (const entry of entries) {
-      // Ignorer les répertoires exclus
-      if (EXCLUDED_DIRS.has(entry.name)) continue;
-
       const fullPath = path.join(dir, entry.name);
       const relativePath = path.relative(baseRoot, fullPath).replace(/\\/g, "/");
+
+      // Incoh. 2 : shouldIgnorePath teste TOUS les segments du chemin relatif,
+      // pas seulement entry.name — un dossier build/ ou assets/ imbriqué
+      // dans src/ est donc correctement exclu.
+      if (shouldIgnorePath(relativePath)) continue;
 
       if (entry.isDirectory()) {
         await this.walkDirectory(fullPath, files, baseRoot);
       } else if (entry.isFile()) {
-        // Ignorer les fichiers exclus
-        if (EXCLUDED_FILES.has(entry.name)) continue;
-
         const ext = path.extname(entry.name).toLowerCase();
-        // Ignorer les extensions non analysables
         if (!ANALYZABLE_EXTENSIONS.has(ext)) continue;
-
         files.push(relativePath);
       }
     }
@@ -1151,29 +1221,40 @@ export class ProjectIndexer {
 
   /**
    * Extrait la description JSDoc au-dessus d'une ligne donnée.
+   *
+   * Incoh. 10 : on s'arrête dès qu'on rencontre une ligne vide APRÈS avoir
+   * collecté au moins une ligne de commentaire — ainsi le commentaire de tête
+   * de fichier (séparé de la première entité par une ligne vide) n'est plus
+   * attaché à cette entité. De plus on garde les 500 caractères les PLUS
+   * PROCHES de l'entité (ordre naturel de remontée), pas les plus éloignés.
    */
   private extractJsDoc(lines: string[], lineNumber: number): string | null {
     const jsDocLines: string[] = [];
-    let i = lineNumber - 2; // ligne avant l'entité
+    let i = lineNumber - 2; // ligne immédiatement avant l'entité
+    // Nombre max de lignes à remonter (évite d'accrocher l'en-tête de fichier)
+    const MAX_LOOKBACK = 20;
+    let looked = 0;
 
-    // Remonter les lignes de commentaires
-    while (i >= 0) {
+    while (i >= 0 && looked < MAX_LOOKBACK) {
       const trimmed = lines[i].trim();
+
       if (trimmed.startsWith("*") || trimmed.startsWith("/**")) {
         jsDocLines.unshift(trimmed);
       } else if (trimmed.startsWith("//")) {
         jsDocLines.unshift(trimmed);
       } else if (trimmed === "") {
-        // Ligne vide — continue (peut-être un padding)
+        // Incoh. 10 : une ligne vide interrompt la remontée dès qu'on a déjà
+        // collecté du contenu — le commentaire de fichier reste détaché.
+        if (jsDocLines.length > 0) break;
       } else {
         break; // Ligne de code ou autre
       }
       i--;
+      looked++;
     }
 
     if (jsDocLines.length === 0) return null;
 
-    // Nettoyer les marqueurs JSDoc
     return jsDocLines
       .map((l) => l.replace(/^\/\*\*?\s*/, "").replace(/^\s*\*\s?/, "").replace(/\s*\*\/$/, "").trim())
       .filter(Boolean)
@@ -1183,16 +1264,24 @@ export class ProjectIndexer {
 
   /**
    * Extrait les clés d'un objet JSON comme entités.
+   * Incoh. 7 : plafond de profondeur (2 niveaux) et total (50 entités) pour
+   * éviter que les gros JSON (package.json, tsconfig) gonflent les stats.
    */
   private extractJsonKeys(
     obj: any,
     filePath: string,
     entities: CodeEntity[],
-    prefix: string
+    prefix: string,
+    depth = 0
   ): void {
+    // Plafond profondeur : on n'indexe que les 2 premiers niveaux
+    if (depth > 1) return;
+    // Plafond total : protège contre les JSON très larges
+    if (entities.length >= 50) return;
     if (typeof obj !== "object" || obj === null) return;
 
     for (const [key, value] of Object.entries(obj)) {
+      if (entities.length >= 50) break;
       const fullName = prefix ? `${prefix}.${key}` : key;
 
       if (typeof value === "object" && value !== null && !Array.isArray(value)) {
@@ -1201,11 +1290,10 @@ export class ProjectIndexer {
           type: "constant",
           filePath,
           lineStart: 0,
-          signature: `{ ${Object.keys(value).join(", ")} }`,
+          signature: `{ ${Object.keys(value).slice(0, 8).join(", ")}${Object.keys(value).length > 8 ? ", …" : ""} }`,
         });
-        // Ne pas récurser pour les gros objets
         if (Object.keys(value).length < 20) {
-          this.extractJsonKeys(value, filePath, entities, fullName);
+          this.extractJsonKeys(value, filePath, entities, fullName, depth + 1);
         }
       } else {
         const valueStr =
@@ -1262,7 +1350,30 @@ export class ProjectIndexer {
    */
   private refreshSemanticRelations(): number {
     const allFiles = knowledgeGraph.getAllFiles();
-    const relations = this.extractAllRelations(allFiles, this.getActiveProjectRoot());
+    const root = this.getActiveProjectRoot();
+
+    // Bug 4 : construire un contentCache depuis le cache en mémoire pour éviter
+    // de relire tous les fichiers TS/JS depuis le disque (~2 s sur ce projet).
+    // On valide le mtime pour exclure les entrées périmées.
+    const contentCache = new Map<string, string>();
+    for (const file of allFiles) {
+      const cached = this._contentCache.get(file.path);
+      if (!cached) continue;
+      try {
+        const absPath = path.join(root, file.path);
+        const mtimeMs = fs.statSync(absPath).mtimeMs;
+        if (Math.abs(mtimeMs - cached.mtimeMs) <= 2) {
+          contentCache.set(file.path, cached.content);
+        } else {
+          // Fichier modifié depuis la mise en cache — invalider
+          this._contentCache.delete(file.path);
+        }
+      } catch {
+        this._contentCache.delete(file.path);
+      }
+    }
+
+    const relations = this.extractAllRelations(allFiles, root, contentCache);
 
     // Ajouter les relations d'appels AST cross-file.
     // On récupère l'index AST déjà stocké (alimenté lors du scan complet et
@@ -1438,13 +1549,15 @@ export class ProjectIndexer {
         if (event.type === "deleted") {
           knowledgeGraph.removeFile(event.relativePath);
           astCallGraph.removeFile(event.relativePath);
+          this._invalidateContentCache(event.relativePath);
           removed++;
         } else {
           // "created" ou "modified" → re-parse le fichier
           const root = this.getActiveProjectRoot();
           const absPath = path.join(root, event.relativePath);
-          const content = this._readContent(absPath);
-          const fileNode = await this.parseFile(event.relativePath);
+          const content = this._readContent(absPath, event.relativePath);
+          // Bug 2 : passer le contenu déjà lu à parseFile.
+          const fileNode = await this.parseFile(event.relativePath, content ?? undefined);
 
           if (fileNode) {
             // Enrichissement AST incrémental
@@ -1452,6 +1565,8 @@ export class ProjectIndexer {
               const astResult = await astParser.parseFile(content, event.relativePath, fileNode.extension);
               if (!astResult.usedFallback) {
                 this.enrichWithAST(fileNode, astResult);
+                // Incoh. 5 : synchroniser l'astIndex du KnowledgeGraph.
+                knowledgeGraph.setASTResult(event.relativePath, astResult);
                 astResultsBatch.set(event.relativePath, astResult);
               }
             }
@@ -1475,9 +1590,12 @@ export class ProjectIndexer {
     }
 
     if (indexed > 0 || removed > 0) {
-      // Mise à jour du call-graph AST pour les fichiers modifiés
+      // Bug 3 : passer tout l'index AST comme contexte de résolution — les
+      // appels cross-file sont résolus contre le projet entier, pas seulement
+      // le batch du watcher.
+      const allAstResults = knowledgeGraph.getAllASTResults();
       for (const [, astResult] of astResultsBatch) {
-        astCallGraph.updateFile(astResult, astResultsBatch);
+        astCallGraph.updateFile(astResult, allAstResults);
       }
 
       const relationCount = this.refreshSemanticRelations();
