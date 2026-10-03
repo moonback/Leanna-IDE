@@ -22,6 +22,7 @@ import type { StoredDocument } from "../knowledge/DocumentStore.js";
 
 export const documentLinkerSkill: Skill = {
   name: "documentLinker",
+  permissions: ["read", "write"],
   declarations: [
     {
       name: "document_list",

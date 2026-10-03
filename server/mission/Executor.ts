@@ -1306,9 +1306,71 @@ JSON:`;
   }
 
   private parseJsonObject(raw: string): Record<string, unknown> {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("Aucun objet JSON trouvé dans la réponse LLM");
-    const parsed = JSON.parse(match[0]);
+    const trimmed = raw.trim();
+    // 1. Essayer le parse direct
+    try {
+      const direct = JSON.parse(trimmed);
+      if (typeof direct === "object" && direct !== null && !Array.isArray(direct)) {
+        return direct as Record<string, unknown>;
+      }
+    } catch {
+      // Continuer avec l'extraction
+    }
+
+    // 2. Extraire depuis un bloc de code markdown ```json ... ```
+    const mdMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (mdMatch && mdMatch[1]) {
+      try {
+        const mdParsed = JSON.parse(mdMatch[1].trim());
+        if (typeof mdParsed === "object" && mdParsed !== null && !Array.isArray(mdParsed)) {
+          return mdParsed as Record<string, unknown>;
+        }
+      } catch {
+        // Fallback sur le parcours de balanced braces
+      }
+    }
+
+    // 3. Trouver le premier '{' et équilibrer les accolades
+    const start = trimmed.indexOf("{");
+    if (start === -1) throw new Error("Aucun objet JSON trouvé dans la réponse LLM");
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let jsonEnd = -1;
+
+    for (let i = start; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            jsonEnd = i + 1;
+            break;
+          }
+        }
+      }
+    }
+
+    if (jsonEnd === -1) {
+      throw new Error("Objet JSON malformé ou non fermé dans la réponse LLM");
+    }
+
+    const candidate = trimmed.slice(start, jsonEnd);
+    const parsed = JSON.parse(candidate);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error("La réponse LLM n'est pas un objet JSON");
     }

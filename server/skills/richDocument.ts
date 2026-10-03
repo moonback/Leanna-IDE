@@ -145,7 +145,10 @@ function buildDocumentPath(title: string): string {
 
 export const richDocumentSkill: Skill = {
   name: "richDocument",
-
+  permissions: ["write"],
+  toolPermissions: {
+    create_rich_document: ["write"],
+  },
   declarations: [
     {
       name: "create_rich_document",

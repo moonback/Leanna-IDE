@@ -73,6 +73,11 @@ function sanitizeName(name: string): string {
 
 export const projectSkill: Skill = {
   name: "project",
+  permissions: ["read", "write"],
+  toolPermissions: {
+    project_list_frameworks: ["read"],
+    project_scaffold: ["write", "exec"],
+  },
   declarations: [
     {
       name: "project_scaffold",

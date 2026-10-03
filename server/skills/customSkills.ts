@@ -258,6 +258,15 @@ const nameSchema = z.string().min(1).max(50).regex(/^[a-z0-9_]+$/, "Nom: lettres
 
 export const customSkillsManagementSkill: Skill = {
   name: "custom_skills_management",
+  permissions: ["read", "write"],
+  toolPermissions: {
+    list_custom_skills: ["read"],
+    get_custom_skill: ["read"],
+    create_custom_skill: ["write"],
+    update_custom_skill: ["write"],
+    delete_custom_skill: ["write"],
+    test_custom_skill: ["read", "exec"],
+  },
   declarations: [
     {
       name: "list_custom_skills",

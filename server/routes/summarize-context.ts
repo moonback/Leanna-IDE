@@ -39,21 +39,31 @@ export function createSummarizeContextRouter(): Router {
         content: e.text,
       }));
 
-      const totalInputTokens = messages.reduce((sum, message) => sum + estimateTokens(message.content), 0);
-      if (totalInputTokens > MAX_SUMMARIZE_INPUT_TOKENS) {
-        return res.status(413).json({
-          status: 'error',
-          error: 'budget token dépassé pour le résumé de contexte',
-          budget: {
-            maxInputTokens: MAX_SUMMARIZE_INPUT_TOKENS,
-            estimatedInputTokens: totalInputTokens,
-          },
-        });
-      }
-
       // Séparer les messages à résumer (anciens) des tours récents à garder
-      const toSummarize = messages.slice(0, Math.max(0, messages.length - safeKeepTurns));
+      let toSummarize = messages.slice(0, Math.max(0, messages.length - safeKeepTurns));
       const retained = messages.slice(Math.max(0, messages.length - safeKeepTurns));
+
+      const totalInputTokens = messages.reduce((sum, message) => sum + estimateTokens(message.content), 0);
+
+      // Si le contexte à résumer est volumineux, élaguer / tronquer chaque message pour rester dans le budget
+      let toSummarizeTokens = toSummarize.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+      if (toSummarizeTokens > MAX_SUMMARIZE_INPUT_TOKENS) {
+        // Tronquer le contenu des messages trop longs (ex: dumps de code, outputs d'outils)
+        toSummarize = toSummarize.map((msg) => {
+          if (msg.content.length > 2000) {
+            return {
+              ...msg,
+              content: msg.content.slice(0, 1000) + "\n... [tronqué pour résumé] ...\n" + msg.content.slice(-1000),
+            };
+          }
+          return msg;
+        });
+        // Si encore trop grand, ne garder que les messages les plus significatifs
+        toSummarizeTokens = toSummarize.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+        if (toSummarizeTokens > MAX_SUMMARIZE_INPUT_TOKENS) {
+          toSummarize = toSummarize.slice(-50);
+        }
+      }
 
       if (toSummarize.length === 0) {
         return res.json({

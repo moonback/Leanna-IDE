@@ -180,6 +180,7 @@ const listNameSchema = z.string().min(1, "Le nom de la liste est requis").trim()
 
 export const listSkill: Skill = {
   name: "list",
+  permissions: ["read", "write"],
   declarations: [
     {
       name: "list_create",

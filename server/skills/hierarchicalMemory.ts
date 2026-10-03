@@ -4,6 +4,12 @@ import { hierarchicalMemoryService, type HierarchicalTier } from "../runtime/Hie
 
 export const hierarchicalMemorySkill: Skill = {
   name: "hierarchical_memory",
+  permissions: ["read", "write"],
+  toolPermissions: {
+    hierarchical_memory_search: ["read"],
+    hierarchical_memory_stats: ["read"],
+    hierarchical_memory_store: ["write"],
+  },
   metadata: {
     version: "1.0.0",
     description: "Mémoire hiérarchique unifiée à 3 niveaux : court-terme (session), moyen-terme (projet) et long-terme (Supabase).",

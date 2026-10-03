@@ -406,7 +406,7 @@ const selectOptionSchema = z.object({
 
 export const browserSkill: Skill = {
   name: "browser",
-
+  permissions: ["network"],
   declarations: [
     {
       name: "browser_navigate",

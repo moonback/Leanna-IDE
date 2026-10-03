@@ -3,6 +3,7 @@ import { Skill } from './base.js';
 
 export const testCrashSkill: Skill = {
   name: 'testCrash',
+  permissions: ['read'],
   declarations: [
     {
       name: 'test_crash',

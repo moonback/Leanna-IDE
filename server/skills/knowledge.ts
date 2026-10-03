@@ -41,6 +41,16 @@ const IMPACT_MODES: ImpactMode[] = ["quick", "standard", "deep", "reverse"];
 
 export const knowledgeSkill: Skill = {
   name: "knowledge",
+  permissions: ["read"],
+  toolPermissions: {
+    knowledge_build_context: ["read"],
+    knowledge_semantic_search: ["read"],
+    knowledge_search_entities: ["read"],
+    knowledge_search_hybrid: ["read"],
+    knowledge_impact_analyze: ["read"],
+    knowledge_index_status: ["read"],
+    knowledge_index_rebuild: ["read", "write"],
+  },
   declarations: [
     {
       name: "knowledge_build_context",
