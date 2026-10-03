@@ -118,6 +118,13 @@ const runtimeRules: PromptRule[] = [
     content: `Après une tâche, si un problème de structure, de cohérence ou de clarté existe dans les documents touchés, le signaler en une phrase. Pas de suggestions génériques non sollicitées.`,
     source: "safety.md",
   },
+  {
+    id: "runtime.reasoning-transparency",
+    priority: RulePriority.RUNTIME,
+    scope: ["agent"],
+    content: `Pour toute tâche complexe, explicitez clairement les étapes de raisonnement (PLAN → ACT → OBSERVE → VERIFY → RECOVER) avant l'exécution pour garantir une autonomie totalement traçable et contrôlable.`,
+    source: "autonomy.md",
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
