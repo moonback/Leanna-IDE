@@ -185,6 +185,16 @@ const SENSITIVE_TOOL_ATTRIBUTION: Record<
   delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'], risk: 'dangerous' },
   // Push distant — impact hors machine.
   git_push: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  // Scaffold / générateur de projet — crée une arborescence complète. Jamais attribué par heuristique.
+  project_scaffold: { preferred: 'architect', allowed: ['architect', 'coder'], risk: 'write' },
+  // Boucle qualité — exécute patch+typecheck+tests en chaîne. Risque exec.
+  quality_loop: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
+  // Skills custom — modifient du code exécutable dynamiquement. Risque dangerous.
+  create_custom_skill: { preferred: 'coder', allowed: ['coder', 'architect'], risk: 'dangerous' },
+  update_custom_skill: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  delete_custom_skill: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  // Exécution de workflow complet — chaîne d'actions avec effets de bord.
+  workflow_run: { preferred: 'planner', allowed: ['planner', 'coder'], risk: 'exec' },
 };
 
 /**
