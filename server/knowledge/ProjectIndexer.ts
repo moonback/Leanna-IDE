@@ -92,12 +92,15 @@ export class ProjectIndexer {
   private pendingRescan = false;
 
   // ── Cache contenu pour refreshSemanticRelations ───────────────────────────
-  // Bug 4 : refreshSemanticRelations() relit tous les fichiers TS/JS depuis le
-  // disque à chaque batch du watcher (~2 s). Ce cache évite ces relectures :
-  // il est alimenté à chaque _readContent réussi et invalidé fichier par fichier
-  // lorsqu'un fichier est modifié/supprimé.
-  // Clé : chemin relatif  Valeur : { content, mtimeMs }
+  // Évite de relire tous les fichiers TS/JS à chaque batch du watcher.
+  // Borné à 64 Mo (somme des tailles de contenu) avec éviction LRU simple :
+  // la Map JavaScript préserve l'ordre d'insertion, donc les entrées les plus
+  // anciennes (head) sont évincées en premier quand le plafond est atteint.
+  private static readonly _CACHE_MAX_BYTES = 64 * 1024 * 1024; // 64 Mo
   private _contentCache = new Map<string, { content: string; mtimeMs: number }>();
+  private _contentCacheBytes = 0;
+  /** Racine vue lors du dernier appel — détecte un changement de workspace. */
+  private _contentCacheRoot: string | null = null;
 
   constructor(projectRoot?: string) {
     this.customProjectRoot = projectRoot;
@@ -278,6 +281,7 @@ export class ProjectIndexer {
           for (const delPath of deletedFiles) {
             knowledgeGraph.removeFile(delPath);
             astCallGraph.removeFile(delPath);
+            this._invalidateContentCache(delPath);
           }
 
           // Scanner et enrichir les fichiers ajoutés/modifiés. On DIFFÈRE le
@@ -326,32 +330,19 @@ export class ProjectIndexer {
     // Parser chaque fichier (regex) + enrichissement AST
     const parsedFiles: FileNode[] = [];
     const astResults = new Map<string, ASTFileResult>();
-    // Cache du contenu brut — évite de relire chaque fichier une 2ᵉ fois dans
-    // extractAllRelations() (Perf 3).
-    const contentCache = new Map<string, string>();
     let totalEntities = 0;
     for (let i = 0; i < files.length; i++) {
       const relativePath = files[i];
       options.onProgress?.({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
       try {
         const absPath = path.join(root, relativePath);
-        // Bug 1 : stat AVANT lecture — les fichiers > 500 Ko sont rejetés
-        // immédiatement sans être chargés en mémoire pour rien.
-        try {
-          const st = fs.statSync(absPath);
-          if (st.size > MAX_FILE_SIZE) {
-            log.debug(`⏭️ Fichier trop volumineux ignoré (CAS C): ${relativePath} (${st.size} octets)`);
-            continue;
-          }
-        } catch {
-          continue;
-        }
-        // Lire le contenu UNE seule fois et le partager avec parseFile + AST.
+        // Bug 3 : _readContent ouvre un unique fd, fait fstatSync (taille + mtime)
+        // puis lit le contenu — plus de statSync séparé ici. Le contenu est mis
+        // en cache dans _contentCache (pas de contentCache local en double).
+        // _readContent retourne null si le fichier dépasse MAX_FILE_SIZE.
         const content = this._readContent(absPath, relativePath);
         const fileNode = await this.parseFile(relativePath, content ?? undefined);
         if (!fileNode) continue;
-
-        if (content) contentCache.set(relativePath, content);
 
         // Enrichissement AST si Tree-sitter disponible
         if (astReady && content && ANALYZABLE_EXTENSIONS.has(fileNode.extension)) {
@@ -373,9 +364,16 @@ export class ProjectIndexer {
     // Alimenter le KnowledgeGraph
     knowledgeGraph.update(parsedFiles);
 
+    // Bug 3 : construire contentCache directement depuis _contentCache (déjà peuplé
+    // ci-dessus) — pas de copie supplémentaire en mémoire.
+    const contentCacheForRelations = new Map<string, string>();
+    for (const [relPath, entry] of this._contentCache) {
+      contentCacheForRelations.set(relPath, entry.content);
+    }
+
     // Extraire les relations sémantiques (regex) + relations AST (calls précis)
     options.onProgress?.({ phase: 'relations', current: 0, total: parsedFiles.length });
-    const allRelations = this.extractAllRelations(parsedFiles, root, contentCache);
+    const allRelations = this.extractAllRelations(parsedFiles, root, contentCacheForRelations);
 
     // Relations d'appels inter-fichiers depuis l'AST
     if (astResults.size > 0) {
@@ -412,17 +410,70 @@ export class ProjectIndexer {
   }
 
   /** Lit le contenu d'un fichier de manière sécurisée (null si erreur/binaire).
-   * Alimente _contentCache avec le contenu + mtime pour que
-   * refreshSemanticRelations() puisse éviter les relectures disque. */
+   *
+   * Alimente _contentCache pour que refreshSemanticRelations() puisse éviter
+   * les relectures disque.
+   *
+   * Bug 1 : le cache est borné à 64 Mo. Quand le plafond est dépassé, les
+   * entrées les plus anciennes (LRU — head de la Map) sont évincées.
+   *
+   * Bug 2 : le mtime est lu AVANT le contenu sur le même descripteur pour
+   * éviter la race où un fichier change entre la lecture et le stat.
+   *
+   * Bug 1 (racine) : si la racine active a changé (sandbox), le cache entier
+   * est purgé pour éviter de mélanger des chemins de projets différents.
+   */
   private _readContent(absPath: string, relPath?: string): string | null {
+    // Clear si la racine a changé
+    const root = this.getActiveProjectRoot();
+    if (relPath && this._contentCacheRoot !== root) {
+      this._contentCache.clear();
+      this._contentCacheBytes = 0;
+      this._contentCacheRoot = root;
+    }
+
     try {
-      const content = fs.readFileSync(absPath, "utf-8");
-      if (relPath) {
-        try {
-          const mtimeMs = fs.statSync(absPath).mtimeMs;
-          this._contentCache.set(relPath, { content, mtimeMs });
-        } catch { /* mtime non critique */ }
+      // Bug 2 : ouvrir le fd une seule fois → stat puis lecture sur le même fd
+      // → le mtime correspond exactement au contenu lu.
+      const fd = fs.openSync(absPath, "r");
+      let content: string;
+      let mtimeMs: number;
+      try {
+        // Bug 2+3 : un seul fstatSync pour récupérer mtime ET taille.
+        const fst = fs.fstatSync(fd);
+        mtimeMs = fst.mtimeMs;
+        if (fst.size > MAX_FILE_SIZE) {
+          return null; // skip sans lecture
+        }
+        const buf = Buffer.allocUnsafe(fst.size);
+        fs.readSync(fd, buf, 0, fst.size, 0);
+        content = buf.toString("utf-8");
+      } finally {
+        fs.closeSync(fd);
       }
+
+      if (relPath) {
+        // Éviction LRU si déjà présent (réinsertion en queue)
+        const existing = this._contentCache.get(relPath);
+        if (existing) {
+          this._contentCacheBytes -= existing.content.length;
+          this._contentCache.delete(relPath);
+        }
+        // Éviction des entrées les plus anciennes si plafond dépassé
+        const entryBytes = content.length;
+        while (
+          this._contentCacheBytes + entryBytes > ProjectIndexer._CACHE_MAX_BYTES &&
+          this._contentCache.size > 0
+        ) {
+          const oldestKey = this._contentCache.keys().next().value as string;
+          const oldest = this._contentCache.get(oldestKey)!;
+          this._contentCacheBytes -= oldest.content.length;
+          this._contentCache.delete(oldestKey);
+        }
+        this._contentCache.set(relPath, { content, mtimeMs });
+        this._contentCacheBytes += entryBytes;
+      }
+
       return content;
     } catch {
       return null;
@@ -431,7 +482,72 @@ export class ProjectIndexer {
 
   /** Retire une entrée du cache contenu (fichier modifié ou supprimé). */
   private _invalidateContentCache(relPath: string): void {
-    this._contentCache.delete(relPath);
+    const entry = this._contentCache.get(relPath);
+    if (entry) {
+      this._contentCacheBytes -= entry.content.length;
+      this._contentCache.delete(relPath);
+    }
+  }
+
+  /**
+   * Neutralise les commentaires JS/TS dans `src` en les remplaçant par des
+   * espaces (préserve les offsets/numéros de ligne).
+   *
+   * Bug 5 : helper partagé entre extractImportsExports et extractSymbolEntities
+   * pour éviter la duplication et garantir un comportement cohérent.
+   *
+   * Gère correctement :
+   *   - commentaires bloc  /* … *\/
+   *   - commentaires ligne // … (sans couper "https://…")
+   *   - chaînes simple/double quote et template literals (sautées, non modifiées)
+   *
+   * Limitation connue : les littéraux regex /['"]/  peuvent désynchroniser le
+   * parser. Pour un support complet, préférer es-module-lexer à terme.
+   */
+  private _stripComments(src: string): string {
+    const out = src.split("");
+    let i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      // Chaîne simple ou double quote (une seule ligne)
+      if (ch === '"' || ch === "'") {
+        i++;
+        while (i < src.length && src[i] !== ch && src[i] !== "\n") {
+          if (src[i] === "\\") i++; // séquence d'échappement
+          i++;
+        }
+        i++;
+        continue;
+      }
+      // Template literal
+      if (ch === "`") {
+        i++;
+        while (i < src.length) {
+          if (src[i] === "`") { i++; break; }
+          if (src[i] === "\\") i++;
+          i++;
+        }
+        continue;
+      }
+      // Commentaire bloc /* … */
+      if (ch === "/" && src[i + 1] === "*") {
+        const start = i;
+        i += 2;
+        while (i < src.length && !(src[i - 1] === "*" && src[i] === "/")) i++;
+        i++; // sauter le / final
+        for (let j = start; j < i && j < out.length; j++) out[j] = " ";
+        continue;
+      }
+      // Commentaire ligne // — seulement si non précédé de : (ex. "https://")
+      if (ch === "/" && src[i + 1] === "/" && src[i - 1] !== ":") {
+        const start = i;
+        while (i < src.length && src[i] !== "\n") i++;
+        for (let j = start; j < i && j < out.length; j++) out[j] = " ";
+        continue;
+      }
+      i++;
+    }
+    return out.join("");
   }
 
   /**
@@ -442,9 +558,13 @@ export class ProjectIndexer {
     try {
       const root = this.getActiveProjectRoot();
       const absPath = path.join(root, relativePath);
+      // Bug 4 : _readContent fait fstatSync avant readSync — si le fichier
+      // dépasse MAX_FILE_SIZE il retourne null sans charger le contenu.
+      // On passe relPath pour alimenter _contentCache.
       const content = this._readContent(absPath, relativePath);
-      // Bug 2 : transmettre le contenu déjà lu à parseFile — évite une
-      // seconde lecture synchrone (parseFile relit le disque sinon).
+      // Transmettre le contenu pré-lu à parseFile (évite une seconde lecture).
+      // Si content est null (trop gros / illisible), parseFile reçoit undefined
+      // et gère lui-même l'échec via ses propres vérifications.
       const fileNode = await this.parseFile(relativePath, content ?? undefined);
 
       if (fileNode) {
@@ -477,6 +597,7 @@ export class ProjectIndexer {
           log.debug(`🗑️ Fichier devenu non-indexable, retiré du graphe: ${relativePath}`);
           knowledgeGraph.removeFile(relativePath);
           astCallGraph.removeFile(relativePath);
+          this._invalidateContentCache(relativePath);
           if (!options.skipRelationRefresh) this.refreshSemanticRelations();
         }
       }
@@ -575,6 +696,37 @@ export class ProjectIndexer {
   private async parseFile(relativePath: string, preloadedContent?: string): Promise<FileNode | null> {
     const absolutePath = path.join(this.getActiveProjectRoot(), relativePath);
 
+    if (preloadedContent !== undefined) {
+      // Bug 3 : contenu déjà validé par l'appelant (_readContent a vérifié
+      // la taille via fstatSync) — on saute existsSync + statSync pour éviter
+      // 2 appels système redondants par fichier en scan complet.
+      const ext = path.extname(relativePath).toLowerCase();
+      const name = path.basename(relativePath);
+      // On récupère le stat uniquement pour size/mtime/isFile.
+      let stats: fs.Stats;
+      try {
+        stats = fs.statSync(absolutePath);
+        if (!stats.isFile()) return null;
+      } catch {
+        return null;
+      }
+      const lines = preloadedContent.split(/\r?\n/);
+      const entities = this.extractEntities(relativePath, preloadedContent, lines, ext);
+      const { imports, exports } = this.extractImportsExports(preloadedContent, lines, ext);
+      return {
+        path: relativePath,
+        name,
+        extension: ext || ".txt",
+        size: stats.size,
+        lines: lines.length,
+        lastModified: stats.mtime.toISOString(),
+        entities,
+        imports,
+        exports,
+        language: this.detectLanguage(ext),
+      };
+    }
+
     // Vérifier que le fichier existe et récupérer ses métadonnées AVANT toute
     // lecture — rejette immédiatement les fichiers trop volumineux sans les charger.
     if (!fs.existsSync(absolutePath)) return null;
@@ -591,16 +743,11 @@ export class ProjectIndexer {
     const ext = path.extname(relativePath).toLowerCase();
     const name = path.basename(relativePath);
 
-    // Utiliser le contenu pré-chargé si disponible, sinon lire le disque.
     let content: string;
-    if (preloadedContent !== undefined) {
-      content = preloadedContent;
-    } else {
-      try {
-        content = fs.readFileSync(absolutePath, "utf-8");
-      } catch {
-        return null; // Fichier binaire ou illisible
-      }
+    try {
+      content = fs.readFileSync(absolutePath, "utf-8");
+    } catch {
+      return null; // Fichier binaire ou illisible
     }
 
     const lines = content.split(/\r?\n/);
@@ -769,59 +916,8 @@ export class ProjectIndexer {
 
     // Supprimer les commentaires pour éviter les faux positifs,
     // en prenant soin de NE PAS toucher aux URL dans les chaînes.
-    // Bug 11 : /\/\/[^\n]*/ coupe "https://…" — on ne neutralise les // de
-    // commentaire que lorsqu'ils ne sont pas précédés de ":" (protocole URL)
-    // et ne sont pas à l'intérieur d'une chaîne littérale.
-    // Stratégie : passer sur le texte char par char en sautant les chaînes
-    // (simple/double/backtick) avant de zapper les commentaires.
-    const stripped = (() => {
-      const src = content;
-      const out = src.split(""); // tableau mutable
-      let i = 0;
-      while (i < src.length) {
-        const ch = src[i];
-        // Chaîne simple ou double quote (une ligne)
-        if (ch === '"' || ch === "'") {
-          i++; // sauter le guillemet ouvrant
-          while (i < src.length && src[i] !== ch && src[i] !== "\n") {
-            if (src[i] === "\\") i++; // séquence d'échappement
-            i++;
-          }
-          i++; // sauter le guillemet fermant
-          continue;
-        }
-        // Template literal
-        if (ch === "`") {
-          i++;
-          let depth = 1;
-          while (i < src.length && depth > 0) {
-            if (src[i] === "`") depth--;
-            else if (src[i] === "\\" ) i++;
-            i++;
-          }
-          continue;
-        }
-        // Commentaire bloc /* … */
-        if (ch === "/" && src[i + 1] === "*") {
-          const start = i;
-          i += 2;
-          while (i < src.length && !(src[i - 1] === "*" && src[i] === "/")) i++;
-          i++; // sauter le / final
-          const len = i - start;
-          for (let j = start; j < start + len && j < out.length; j++) out[j] = " ";
-          continue;
-        }
-        // Commentaire ligne // — seulement si ce n'est pas ://<protocole>
-        if (ch === "/" && src[i + 1] === "/" && src[i - 1] !== ":") {
-          const start = i;
-          while (i < src.length && src[i] !== "\n") i++;
-          for (let j = start; j < i && j < out.length; j++) out[j] = " ";
-          continue;
-        }
-        i++;
-      }
-      return out.join("");
-    })();
+    // Bug 5 : utilise le helper _stripComments partagé.
+    const stripped = this._stripComments(content);
 
     // ── Imports ES module (static, multi-lignes) ──────────────────────────
     // Couvre : import Foo from "…"
@@ -900,14 +996,17 @@ export class ProjectIndexer {
   private extractRouteEntities(filePath: string, lines: string[]): CodeEntity[] {
     const entities: CodeEntity[] = [];
     const seen = new Set<string>();
-    // Bug 10 : élargir la regex pour capturer authRouter, apiRouter, etc.
-    // \w*[rR]outer capture tout identifiant se terminant par "router" ou "Router".
-    // On capture aussi le point de montage éventuel (ex. app.use("/api", router))
-    // pour lever l'ambiguïté de routes comme GET /:id.
+    // Capture authRouter, apiRouter, etc. + app + api.
+    // Bug 6 : exclut "use" de la liste des méthodes HTTP — router.use('/x', …)
+    // est un middleware/montage, pas une route endpoint, et créait des entités
+    // parasites "USE /x". La résolution cross-fichier du préfixe (app.use('/api',
+    // xRouter) dans server.ts vs routes dans routes/x.ts) reste une limitation :
+    // mountMap ne voit que le fichier courant. Une passe globale sur tous les
+    // fichiers serait nécessaire pour résoudre les montages inter-fichiers.
     const routePattern =
-      /\b(\w*[rR]outer|app|api)\.(get|post|put|delete|patch|all|use)\s*\(\s*['"`]([^'"`]+)['"`]/i;
+      /\b(\w*[rR]outer|app|api)\.(get|post|put|delete|patch|all)\s*\(\s*['"`]([^'"`]+)['"`]/i;
 
-    // Chercher les points de montage déclarés dans le fichier (app.use("/prefix", router))
+    // Chercher les points de montage déclarés dans CE fichier uniquement.
     const mountPattern = /\b(?:app|api)\s*\.\s*use\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*(\w+)\s*\)/g;
     const mountMap = new Map<string, string>(); // routerName → prefix
     for (const line of lines) {
@@ -924,7 +1023,6 @@ export class ProjectIndexer {
       const method = match[2].toUpperCase();
       const routePath = match[3];
 
-      // Préfixer avec le point de montage si connu
       const prefix = mountMap.get(routerName) ?? "";
       const fullPath = prefix ? `${prefix}${routePath}` : routePath;
 
@@ -1102,9 +1200,8 @@ export class ProjectIndexer {
     };
 
     // Supprimer les commentaires pour éviter les faux positifs.
-    const stripped = content
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length))
-      .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
+    // Bug 5 : utilise le helper _stripComments partagé (protège les URL https://).
+    const stripped = this._stripComments(content);
 
     // Helper : numéro de ligne (1-indexed) de l'offset dans le contenu original
     const lineOf = (offset: number): number =>
@@ -1556,7 +1653,7 @@ export class ProjectIndexer {
           const root = this.getActiveProjectRoot();
           const absPath = path.join(root, event.relativePath);
           const content = this._readContent(absPath, event.relativePath);
-          // Bug 2 : passer le contenu déjà lu à parseFile.
+          // Bug 4 : _readContent rejette les fichiers trop gros via fstatSync.
           const fileNode = await this.parseFile(event.relativePath, content ?? undefined);
 
           if (fileNode) {
@@ -1579,6 +1676,7 @@ export class ProjectIndexer {
               log.debug(`🗑️ Fichier devenu non-indexable, retiré du graphe: ${event.relativePath}`);
               knowledgeGraph.removeFile(event.relativePath);
               astCallGraph.removeFile(event.relativePath);
+              this._invalidateContentCache(event.relativePath);
               removed++;
             }
           }
