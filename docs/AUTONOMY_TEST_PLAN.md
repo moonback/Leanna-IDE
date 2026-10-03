@@ -24,8 +24,8 @@ Critères d'acceptation stricts :
 | **Unitaire** | `server/agents/ToolCallParser.test.ts`<br>`server/utils/safeguards.test.ts`<br>`server/runtime/PermissionPolicy.test.ts` | Parsing robuste des tool calls, application des politiques de sécurité, détection d'injection. | Entrées/sorties pures, regex, structures JSON. |
 | **Sous-système** | `server/runtime/agentic/WorkspaceState.test.ts`<br>`server/runtime/agentic/ToolPromptBuilder.test.ts` | Intégrité transactionnelle de l'état workspace (hash SHA-256), calcul de budgets et compaction de prompts. | Invariants d'état, empreintes cryptographiques. |
 | **Harness Loop** | `server/runtime/agentic/mission-harness.test.ts` | Boucle agentique fermée (fake deterministic LLM) sur FS virtuel. | Transitions d'état de session, compteurs d'usage. |
-| **End-to-End** | `server/agents/e2e-mission.test.ts` | Cycle de mission autonome complet avec 4 scénarios (Success, Recovery, Budget, Independent Verification). | Rapport de mission final, intégrité physique des fichiers, assertions d'indépendance. |
-| **Système Global** | `npm run typecheck`<br>`npm test` | Non-régression totale sur l'ensemble de la suite (852 tests). | Code de sortie 0, 0 erreur TypeScript, 0 échec. |
+| **Intégration REST** | `server/routes/*.test.ts` (22 fichiers) | Validation end-to-end des endpoints HTTP Express, rate limits et auth. | Codes HTTP, schémas de payload JSON (118 tests). |
+| **Système Global** | `npm run typecheck`<br>`npm test` | Non-régression totale sur l'ensemble de la suite (855 tests / 131 suites). | Code de sortie 0, 0 erreur TypeScript, 0 échec. |
 
 ---
 

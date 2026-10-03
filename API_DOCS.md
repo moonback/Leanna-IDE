@@ -45,6 +45,7 @@ Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `
 - [Compétences (Skills)](#compétences-skills)
 - [Git / GitHub](#git--github)
 - [Profil & Tokens](#profil--tokens)
+- [Variables d'environnement (.env)](#variables-denvironnement-env)
 - [Optimisation des tokens](#optimisation-des-tokens)
 - [OpenRouter](#openrouter)
 - [Notebooks (RAG)](#notebooks-rag)
@@ -1452,6 +1453,109 @@ Ajoute ou supprime une clé du pool Gemini.
 
 ---
 
+## Variables d'environnement (.env)
+
+Routeur dédié à la lecture sécurisée et à la mise à jour des variables d'environnement (`server/routes/env.ts`), monté sur `/api/env`.
+
+Sécurité :
+- Les clés sensibles (clés API, secrets, tokens) sont masquées par défaut (`hasValue: true` + preview tronqué `AIza••••wXyz`).
+- En écriture, les valeurs sensibles sont chiffrées sur disque (AES-256-GCM).
+- Une liste blanche stricte dérivée des clés connues empêche l'injection de clés arbitraires.
+
+### `GET /api/env`
+
+Liste toutes les variables d'environnement groupées par section (Général, Sécurité, Modèles, Services, etc.) avec leurs métadonnées d'affichage (`type`, `description`, `options`, `sensitive`).
+
+**Authentification :** Oui (`x-leanna-token`)
+
+**Réponse 200 :**
+```json
+{
+  "status": "success",
+  "path": ".env",
+  "sections": [
+    {
+      "title": "Général",
+      "vars": [
+        {
+          "key": "PORT",
+          "value": "3000",
+          "hasValue": true,
+          "sensitive": false,
+          "type": "number",
+          "section": "Général",
+          "description": "Port d'écoute du serveur"
+        },
+        {
+          "key": "GEMINI_API_KEY",
+          "value": "",
+          "hasValue": true,
+          "preview": "AIza••••wXyz",
+          "sensitive": true,
+          "type": "secret",
+          "section": "Fournisseurs IA"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/env/reveal/:key`
+
+Renvoie la valeur déchiffrée en clair d'une seule clé connue, sur action explicite de l'utilisateur (démasquage d'un secret).
+
+**Authentification :** Oui (`x-leanna-token`)
+
+**Paramètres d'URL :**
+- `key` (string, requis) : nom de la variable (ex: `GEMINI_API_KEY`).
+
+**Réponse 200 :**
+```json
+{
+  "status": "success",
+  "key": "GEMINI_API_KEY",
+  "value": "AIzaSyD...",
+  "hasValue": true
+}
+```
+
+**Erreurs courantes :**
+- `404` : Clé inconnue ou non autorisée dans le schéma `.env`.
+
+---
+
+### `POST /api/env`
+
+Met à jour une ou plusieurs variables d'environnement. Les clés sensibles sont chiffrées avant écriture sur disque et rechargées à chaud dans `process.env`.
+
+**Authentification :** Oui (`x-leanna-token`)
+
+**Body :**
+```json
+{
+  "updates": {
+    "LOG_LEVEL": "info",
+    "LEANNA_AUTONOMY_MODE": "auto",
+    "GEMINI_API_KEY": "nouvelle_cle_secrete"
+  }
+}
+```
+
+**Réponse 200 :**
+```json
+{
+  "status": "success",
+  "applied": ["LOG_LEVEL", "LEANNA_AUTONOMY_MODE", "GEMINI_API_KEY"],
+  "rejected": [],
+  "sections": [...]
+}
+```
+
+---
+
 ## Optimisation des tokens
 
 ### `GET /api/tokens/optimization`
@@ -2264,7 +2368,7 @@ Terminal PTY interactif.
 
 Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`.
 
-**Couverture actuelle : 103 tests d'intégration répartis sur 19 fichiers**
+**Couverture actuelle : 118 tests d'intégration répartis sur 22 fichiers**
 
 ### Tests par routeur
 
@@ -2272,23 +2376,27 @@ Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.
 |---|---|---|---|
 | Agents | `agents.test.ts` | 15 | Statut, tâches, rôles, flotte, bus, collaboration, persistance, mapping |
 | Marketplace | `marketplace.test.ts` | 13 | Recherche, featured, installation, publication, sécurité |
+| MCP Directory | `mcp-directory.test.ts` | 8 | Découverte, serveurs MCP, recherche, installation |
 | Conversations | `conversations.test.ts` | 7 | Liste, recherche, messages, CRUD |
 | Skills | `skills.test.ts` | 7 | Liste, propriétés, core skills, statut Supabase |
 | Workflows | `workflows.test.ts` | 7 | CRUD, exécution, toggle |
 | Browser | `browser.test.ts` | 6 | Content requests, actions, promesses |
-| Upload Document | `upload-document.test.ts` | 6 | Validation fichiers, types supportés, rate limiting |
 | Profile | `profile.test.ts` | 6 | GET/POST profile, GET/POST tokens |
-| Terminal | `terminal.test.ts` | 5 | Configuration, sessions, authentification |
-| Sandbox | `sandbox.test.ts` | 5 | Statut, init/activate, validation, diff |
-| Self-Root | `self-root.test.ts` | 4 | Statut, workspaces, validation, changement |
-| Export | `export.test.ts` | 3 | Formats d'export, validation |
+| Upload Document | `upload-document.test.ts` | 6 | Validation fichiers, types supportés, rate limiting |
 | GitHub | `github.test.ts` | 5 | Repos, issues, PRs, recherche |
+| Sandbox | `sandbox.test.ts` | 5 | Statut, init/activate, validation, diff |
+| Terminal | `terminal.test.ts` | 5 | Configuration, sessions, authentification |
+| Safeguards (Ignore) | `safeguards.ignore.test.ts` | 4 | Compilation règles .leannaignore, validation écritures |
+| Self-Root | `self-root.test.ts` | 4 | Statut, workspaces, validation, changement |
+| Variables d'environnement | `env.test.ts` | 3 | Groupes de variables, masquage secrets, reveal, update |
+| Export | `export.test.ts` | 3 | Formats d'export, validation |
 | IDE | `ide.test.ts` | 3 | Arbre, lecture/écriture fichiers |
 | Memories | `memories.test.ts` | 3 | GET, DELETE (Supabase) |
 | Telegram | `telegram.test.ts` | 3 | Statut, configuration, envoi |
 | Workspace | `workspace.test.ts` | 3 | GET info, POST interdit |
 | Mémoire hiérarchique | `hierarchicalMemory.test.ts` | 1 | Endpoint stats |
 | Health | `health.test.ts` | 1 | Health check |
+| **Total** | **22 fichiers** | **118** | **Couverture REST intégrale** |
 
 ### Exécuter les tests d'intégration
 

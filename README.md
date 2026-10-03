@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-852%20passing-brightgreen?logo=vitest" alt="Tests 852 passing" />
+  <img src="https://img.shields.io/badge/Tests-855%20passing-brightgreen?logo=vitest" alt="Tests 855 passing" />
 
 [![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
