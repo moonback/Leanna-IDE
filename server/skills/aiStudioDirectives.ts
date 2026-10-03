@@ -139,6 +139,7 @@ function getAllDirectives(): string {
 
 export const aiStudioDirectivesSkill: Skill = {
   name: "aiStudioDirectives",
+  permissions: ["read"],
   declarations: [
     {
       name: "get_behavior_directives",

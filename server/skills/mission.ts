@@ -53,6 +53,16 @@ export function updateMissionSkills(skills: string[]): void {
 
 export const missionSkill: Skill = {
   name: "mission",
+  permissions: ["read", "write"],
+  toolPermissions: {
+    mission_create: ["read", "write"],
+    mission_status: ["read"],
+    mission_pause: ["read", "write"],
+    mission_resume: ["read", "write"],
+    mission_cancel: ["read", "write"],
+    mission_list: ["read"],
+    mission_add_goal: ["read", "write"],
+  },
   declarations: [
     {
       name: "mission_create",

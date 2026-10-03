@@ -254,6 +254,10 @@ async function auditDependencies(root: string, requestedMode: "auto" | "offline"
 
 export const securityAuditSkill: Skill = {
   name: "security_audit",
+  permissions: ["read"],
+  toolPermissions: {
+    security_audit: ["read", "network"],
+  },
   metadata: {
     version: "1.2.0",
     description: "Audit défensif autonome et non mutatif du workspace.",

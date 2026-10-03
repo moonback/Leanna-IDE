@@ -146,6 +146,16 @@ async function git(args: string[]): Promise<{ stdout: string; stderr: string }> 
 
 export const gitSkill: Skill = {
   name: "git",
+  permissions: ["exec"],
+  toolPermissions: {
+    git_status: ["read"],
+    git_diff: ["read"],
+    git_log: ["read"],
+    git_commit: ["exec"],
+    git_push: ["network", "exec"],
+    git_create_branch: ["exec"],
+    git_switch_branch: ["exec"],
+  },
   declarations: [
     {
       name: "git_status",

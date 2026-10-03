@@ -40,6 +40,7 @@ const DOC_TYPES: DocumentType[] = [
 
 export const documentKnowledgeSkill: Skill = {
   name: "document_knowledge",
+  permissions: ["read"],
   declarations: [
     {
       name: "doc_search",

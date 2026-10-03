@@ -122,6 +122,13 @@ const UpdateSchema = z.object({
 
 export const graphifySkill: Skill = {
   name: "graphify",
+  permissions: ["read"],
+  toolPermissions: {
+    graphify_query: ["read"],
+    graphify_path: ["read"],
+    graphify_explain: ["read"],
+    graphify_update: ["exec", "write"],
+  },
   declarations: [
     {
       name: "graphify_query",

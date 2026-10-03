@@ -154,6 +154,7 @@ function getSecurityRules(): string {
 
 export const guidelinesSkill: Skill = {
   name: "guidelines",
+  permissions: ["read"],
   declarations: [
     {
       name: "get_workflow_guidelines",

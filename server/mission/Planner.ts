@@ -278,13 +278,38 @@ RÉPONDS EN JSON STRICT:
 
   private parseDecomposeResult(result: string): SubGoalPlan[] {
     try {
-      // Extraire le JSON du résultat (peut contenir du texte autour)
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("No JSON array found in LLM response");
+      const trimmed = result.trim();
+      let jsonStr = "";
+
+      const mdMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (mdMatch && mdMatch[1]) {
+        jsonStr = mdMatch[1].trim();
+      } else {
+        const start = trimmed.indexOf("[");
+        if (start === -1) throw new Error("No JSON array found in LLM response");
+
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let end = -1;
+
+        for (let i = start; i < trimmed.length; i++) {
+          const ch = trimmed[i];
+          if (escape) { escape = false; continue; }
+          if (ch === "\\" && inString) { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (!inString) {
+            if (ch === "[") depth++;
+            else if (ch === "]") {
+              depth--;
+              if (depth === 0) { end = i + 1; break; }
+            }
+          }
+        }
+        jsonStr = end !== -1 ? trimmed.slice(start, end) : trimmed.slice(start);
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonStr);
       if (!Array.isArray(parsed)) {
         throw new Error("Expected array");
       }

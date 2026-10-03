@@ -2,6 +2,7 @@ import { Skill } from "./base.js";
 
 export const timeSkill: Skill = {
   name: "time",
+  permissions: ["read"],
   declarations: [
     {
       name: "get_current_time",

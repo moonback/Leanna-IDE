@@ -169,22 +169,61 @@ function inferPermissions(toolName: string, skillName: string): ToolDefinition["
   const permissions: ToolDefinition["permissions"] = [];
 
   // Lecture
-  if (name.includes("read") || name.includes("list") || name.includes("get") || name.includes("search") || name.includes("outline")) {
+  if (
+    name.includes("read") ||
+    name.includes("list") ||
+    name.includes("get") ||
+    name.includes("search") ||
+    name.includes("outline") ||
+    name.includes("think") ||
+    name.includes("reasoning") ||
+    name.includes("analyze") ||
+    name.includes("audit") ||
+    name.includes("status") ||
+    name.includes("info") ||
+    name.includes("diff")
+  ) {
     permissions.push("read");
   }
 
   // Écriture
-  if (name.includes("write") || name.includes("patch") || name.includes("modify") || name.includes("create") || name.includes("delete") || name.includes("update")) {
+  if (
+    name.includes("write") ||
+    name.includes("patch") ||
+    name.includes("modify") ||
+    name.includes("create") ||
+    name.includes("delete") ||
+    name.includes("update") ||
+    name.includes("append")
+  ) {
     permissions.push("write");
   }
 
   // Exécution
-  if (name.includes("run") || name.includes("exec") || name.includes("command")) {
+  if (
+    name.includes("run") ||
+    name.includes("exec") ||
+    name.includes("command") ||
+    name.includes("verify") ||
+    name.includes("typecheck") ||
+    name.includes("lint") ||
+    name.includes("build") ||
+    name.includes("test")
+  ) {
     permissions.push("execute");
   }
 
   // Réseau
-  if (skillName === "github" || skillName === "weather" || name.includes("navigate") || name.includes("fetch")) {
+  if (
+    skillName === "github" ||
+    skillName === "weather" ||
+    skillName === "browser" ||
+    skillName === "telegram" ||
+    name.includes("navigate") ||
+    name.includes("fetch") ||
+    name.includes("push") ||
+    name.includes("clone")
+  ) {
     permissions.push("network");
   }
 
@@ -193,10 +232,6 @@ function inferPermissions(toolName: string, skillName: string): ToolDefinition["
     permissions.push("dangerous");
   }
 
-  // Aucun mot-clé reconnu → tableau VIDE (et non ["read"]). Un outil sans
-  // permission déclarée est ainsi traité prudemment comme un effet de bord
-  // potentiel par le dry-run et l'AutonomyPolicy, au lieu d'être classé
-  // silencieusement en lecture seule. Voir le commentaire ci-dessus.
   return permissions;
 }
 

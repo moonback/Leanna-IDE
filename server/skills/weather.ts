@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const weatherSkill: Skill = {
   name: "weather",
+  permissions: ["network"],
   declarations: [
     {
       name: "get_weather",

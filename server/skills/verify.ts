@@ -672,6 +672,17 @@ async function runFormatDirect(target: string): Promise<ProcessResult> {
 
 export const verifySkill: Skill = {
   name: "verify",
+  permissions: ["exec"],
+  toolPermissions: {
+    verify_typecheck: ["exec"],
+    verify_file: ["read", "exec"],
+    verify_run_script: ["exec"],
+    verify_format: ["write"],
+    verify_lint: ["exec"],
+    verify_syntax: ["read"],
+    verify_full: ["exec"],
+    verify_test_target: ["exec"],
+  },
   declarations: [
     {
       name: "verify_typecheck",

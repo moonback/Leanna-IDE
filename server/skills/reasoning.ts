@@ -726,6 +726,13 @@ function buildThinkingPrompt(strategy: Exclude<ThinkingStrategy, "auto">, userPr
 
 export const reasoningSkill: Skill = {
   name: "reasoning",
+  permissions: ["read"],
+  toolPermissions: {
+    reasoning_think: ["read"],
+    agent_execute: ["read", "exec"],
+    reasoning_delegate_task: ["exec"],
+    reasoning_list_strategies: ["read"],
+  },
   declarations: [
     {
       name: "reasoning_think",

@@ -291,6 +291,7 @@ export async function updateConversationTitle(conversationId: string, title: str
 
 export const historySkill: Skill = {
   name: "history",
+  permissions: ["read"],
   declarations: [
     {
       name: "search_history",
