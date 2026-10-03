@@ -60,6 +60,10 @@ export interface UseAudioOptions {
   vadEnabled?: boolean;      // Voice Activity Detection
   vadThreshold?: number;     // Amplitude minimum pour détecter la voix (0-100)
   vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
+  /** Appelé une seule fois par utterance quand le VAD détecte le silence long (étape A). */
+  onVadSilence?: () => void;
+  /** Appelé une seule fois quand le premier chunk audio est schedulé pour lecture (étape E). */
+  onFirstAudioScheduled?: () => void;
 }
 
 export function useAudio({ 
@@ -69,6 +73,8 @@ export function useAudio({
   vadEnabled = true,
   vadThreshold = 35,
   vadSilenceDuration = 800,
+  onVadSilence,
+  onFirstAudioScheduled,
 }: UseAudioOptions) {
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
@@ -84,6 +90,12 @@ export function useAudio({
   const vadEnabledRef = useRef(vadEnabled);
   const vadThresholdRef = useRef(vadThreshold);
   const vadSilenceDurationRef = useRef(vadSilenceDuration);
+  // Callback étape A (sonde latence) — ne se déclenche qu'une fois par utterance
+  const onVadSilenceRef = useRef<(() => void) | undefined>(onVadSilence);
+  const vadSilenceFiredRef = useRef(false); // garde pour n'appeler qu'une fois
+  // Callback étape E (sonde latence) — premier chunk audio schedulé pour lecture
+  const onFirstAudioScheduledRef = useRef<(() => void) | undefined>(onFirstAudioScheduled);
+  const firstAudioScheduledFiredRef = useRef(false);
 
   // Keep refs in sync
   autoMuteEnabledRef.current = autoMuteEnabled;
@@ -91,6 +103,8 @@ export function useAudio({
   vadEnabledRef.current = vadEnabled;
   vadThresholdRef.current = vadThreshold;
   vadSilenceDurationRef.current = vadSilenceDuration;
+  onVadSilenceRef.current = onVadSilence;
+  onFirstAudioScheduledRef.current = onFirstAudioScheduled;
 
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
   const outputAudioCtxRef = useRef<AudioContext | null>(null);
@@ -187,6 +201,13 @@ export function useAudio({
       if (nextStartTimeRef.current < now) nextStartTimeRef.current = now + 0.05;
       source.start(nextStartTimeRef.current);
       nextStartTimeRef.current += audioBuffer.duration;
+
+      // Étape E : premier chunk audio schedulé pour lecture effective.
+      // On réarme après chaque interruption (handleInterrupt recrée l'AudioContext).
+      if (!firstAudioScheduledFiredRef.current) {
+        firstAudioScheduledFiredRef.current = true;
+        onFirstAudioScheduledRef.current?.();
+      }
     } catch (e) {
       console.error('Error playing audio chunk', e);
     }
@@ -203,6 +224,8 @@ export function useAudio({
       const newCtx = new AC({ sampleRate: 24000 });
       outputAudioCtxRef.current = newCtx;
       nextStartTimeRef.current = 0;
+      // Réarmer la sonde E : le prochain chunk sera le premier de la nouvelle réponse
+      firstAudioScheduledFiredRef.current = false;
 
       const newAnalyser = newCtx.createAnalyser();
       newAnalyser.fftSize = 256;
@@ -310,6 +333,7 @@ export function useAudio({
 
           if (amplitude > vadThresholdRef.current) {
             vadSilenceStartRef.current = null;
+            vadSilenceFiredRef.current = false; // voix détectée → réarmer la sonde A
             onAudioData(floatToPcm16(channelData));
             resetAutoMute();
           } else {
@@ -320,8 +344,14 @@ export function useAudio({
             if (silenceDuration < vadSilenceDurationRef.current) {
               // Silence court → continuer (pauses naturelles, respiration).
               onAudioData(floatToPcm16(channelData));
+            } else {
+              // Silence long → ne rien envoyer (économie de bande passante).
+              // Étape A : fin de capture audio — on marque UNE SEULE fois par utterance.
+              if (!vadSilenceFiredRef.current) {
+                vadSilenceFiredRef.current = true;
+                onVadSilenceRef.current?.();
+              }
             }
-            // Silence long → ne rien envoyer (économie de bande passante).
           }
         } else {
           onAudioData(floatToPcm16(channelData));

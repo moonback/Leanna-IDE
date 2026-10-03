@@ -149,36 +149,68 @@ function formatArgs(args: any): string {
 }
 
 /** Badge de latence vocale avec code couleur */
-function VoiceLatencyBadge({ getLatencyStats }: { getLatencyStats: () => { avg: number; min: number; max: number; samples: number; last: number } | null }) {
+function VoiceLatencyBadge({
+  getLatencyStats,
+  lastLatencyMs,
+  lastProbeReport,
+}: {
+  getLatencyStats: () => { avg: number; min: number; max: number; samples: number; last: number } | null;
+  lastLatencyMs: number | null;
+  lastProbeReport: { total: number; steps: Record<string, { tFromStart: number; tFromPrev: number }>; serverGeminiMs?: number } | null;
+}) {
   const stats = getLatencyStats();
-  
-  if (!stats) return null;
-  
-  // Fonction helper pour déterminer la couleur selon la latence
+  // Utiliser lastLatencyMs pour une mise à jour réactive immédiate,
+  // getLatencyStats() pour avg/min/max
+  const lastMs = lastLatencyMs ?? stats?.last ?? null;
+
+  if (lastMs === null && !stats) return null;
+
   const getLatencyColor = (ms: number): string => {
-    if (ms < 400) return '#10b981';  // vert (excellente)
-    if (ms < 800) return '#f59e0b';  // orange (acceptable)
-    return '#ef4444';                // rouge (élevée)
+    if (ms < 1000) return '#10b981';   // vert < 1s
+    if (ms < 3000) return '#f59e0b';   // orange 1-3s
+    return '#ef4444';                  // rouge > 3s
   };
-  
-  const color = getLatencyColor(stats.last);
-  
+
+  const display = lastMs ?? stats!.last;
+  const color = getLatencyColor(display);
+
+  // ── Tooltip : afficher le rapport décomposé si disponible ─────────────
+  const probeLines: string[] = [];
+  if (lastProbeReport) {
+    const { steps, serverGeminiMs } = lastProbeReport as any;
+    if (steps.vadSilence)  probeLines.push(`A  VAD silence   +${steps.vadSilence.tFromPrev}ms`);
+    if (steps.wsSend)      probeLines.push(`B  WS send       +${steps.wsSend.tFromPrev}ms`);
+    if (serverGeminiMs != null) probeLines.push(`D  Gemini API   ~${serverGeminiMs}ms (serveur)`);
+    if (steps.audioPlay)   probeLines.push(`E  Audio play    +${steps.audioPlay.tFromPrev}ms`);
+    probeLines.push(`─────────────────────`);
+    probeLines.push(`Total client     ${lastProbeReport.total}ms`);
+  }
+
+  const tooltipText = [
+    `Latence vocale`,
+    `Dernière : ${display}ms`,
+    stats ? `Moyenne : ${stats.avg}ms  Min/Max : ${stats.min}/${stats.max}ms  N=${stats.samples}` : '',
+    ...(probeLines.length ? ['', '── Décomposition ──', ...probeLines] : ['', '(décomposition en attente…)']),
+  ].filter(Boolean).join('\n');
+
   return (
-    <div 
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono group cursor-help"
-      style={{ 
+    <div
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono cursor-help"
+      style={{
         backgroundColor: `${color}10`,
         border: `1px solid ${color}30`,
       }}
-      title={`Latence vocale\nDernière: ${stats.last}ms\nMoyenne: ${stats.avg}ms\nMin/Max: ${stats.min}/${stats.max}ms\nÉchantillons: ${stats.samples}`}
+      title={tooltipText}
     >
       <Activity size={8} style={{ color }} />
       <span className="font-bold" style={{ color }}>
-        {stats.last}ms
+        {display}ms
       </span>
-      <span className="opacity-60 text-xs" style={{ color }}>
-        (⌀{stats.avg}ms)
-      </span>
+      {stats && (
+        <span className="opacity-60 text-xs" style={{ color }}>
+          (⌀{stats.avg}ms)
+        </span>
+      )}
     </div>
   );
 }
@@ -200,7 +232,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
   const { profile } = useProfile();
-  const { connected, getLatencyStats } = useLiveAPIContext();
+  const { connected, getLatencyStats, lastLatencyMs, lastProbeReport } = useLiveAPIContext();
 
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [tab, setTab] = useState<'roster' | 'live' | 'delegated'>('roster');
@@ -292,7 +324,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
           <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="var(--color-success)" />
           {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="var(--color-error)" />}
           {/* Badge de latence vocale */}
-          {connected && <VoiceLatencyBadge getLatencyStats={getLatencyStats} />}
+          {connected && <VoiceLatencyBadge getLatencyStats={getLatencyStats} lastLatencyMs={lastLatencyMs} lastProbeReport={lastProbeReport} />}
         </div>
       </div>
 

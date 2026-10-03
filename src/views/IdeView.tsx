@@ -535,14 +535,24 @@ export default function IdeView() {
     fileSystem.closeTab(filePath);
   }, [fileSystem]);
 
+  // ── Dernier contexte IDE envoyé (pour déduplication) ─────────────────────
+  // On mémorise une signature du dernier contexte injecté. Si rien n'a changé
+  // (même fichier actif, même sélection, mêmes fichiers ouverts) on n'injecte
+  // pas un nouveau bloc — évite d'empiler des tours identiques dans la fenêtre
+  // de contexte Gemini Live et réduit la latence qui scale avec la taille du contexte.
+  const lastEditorContextSigRef = useRef<string>('');
+
   const queueMessageToAI = useCallback(async (message: string, displayText?: string) => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
 
-    // ── Injection automatique du contexte éditeur ──────────────────────────
-    // Avant d'envoyer le message, on informe l'assistant du fichier ouvert,
-    // de la sélection active et de la position du curseur. Cela permet à Gemini
-    // de répondre avec précision sans que l'utilisateur ait à redécrire le contexte.
+    // ── Injection conditionnelle du contexte éditeur ───────────────────────
+    // On n'envoie le contexte IDE que si quelque chose a changé depuis le dernier
+    // tour : fichier actif, sélection, ou liste des fichiers ouverts.
+    // La position curseur seule (sans sélection) ne vaut pas un tour de contexte.
+    // Les erreurs TypeScript sont exclues ici pour éviter un appel réseau à chaque
+    // message ; elles doivent être envoyées explicitement si l'utilisateur demande
+    // une analyse d'erreurs (via un bouton dédié).
     if (connected) {
       const editor = editorRef.current;
       let selection: string | null = null;
@@ -556,40 +566,29 @@ export default function IdeView() {
         } catch { /* ignore si l'éditeur n'est pas prêt */ }
       }
       const activeFile = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
-      
-      // Récupérer les erreurs TypeScript (async, non-bloquant)
-      let tsErrors: Array<{ file: string; line: number; column: number; message: string }> = [];
-      try {
-        const res = await fetch('/api/sandbox/validate', { method: 'POST' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.diagnostics && Array.isArray(data.diagnostics)) {
-            // Ne garder que les erreurs (pas les warnings) et limiter à 20 pour éviter surcharge
-            tsErrors = data.diagnostics
-              .filter((d: any) => d.severity === 'error' && d.file && d.line)
-              .slice(0, 20)
-              .map((d: any) => ({
-                file: d.file,
-                line: d.line,
-                column: d.col ?? 1,
-                message: d.msg ?? 'Erreur TypeScript'
-              }));
-          }
-        }
-      } catch (err) {
-        // Silent fail - ne pas bloquer l'envoi du message si validation échoue
-        console.warn('[IdeView] Impossible de récupérer les erreurs TypeScript:', err);
-      }
 
-      sendEditorContext({
-        openFile: fileSystem.activePath ?? null,
-        language: activeFile?.language ?? null,
-        selection,
-        cursorLine: cursorPosition?.line ?? null,
-        cursorColumn: cursorPosition?.column ?? null,
-        openFiles: fileSystem.openFiles.map(f => f.path),
-        tsErrors: tsErrors.length > 0 ? tsErrors : undefined,
-      });
+      // Signature compacte : fichier actif + sélection (tronquée) + 10 premiers fichiers ouverts
+      const openFilesTop10 = fileSystem.openFiles.slice(0, 10).map(f => f.path);
+      const ctxSig = [
+        fileSystem.activePath ?? '',
+        selection?.slice(0, 50) ?? '',
+        openFilesTop10.join('|'),
+      ].join('§');
+
+      if (ctxSig !== lastEditorContextSigRef.current) {
+        lastEditorContextSigRef.current = ctxSig;
+        sendEditorContext({
+          openFile: fileSystem.activePath ?? null,
+          language: activeFile?.language ?? null,
+          selection,
+          // La position curseur n'est utile que si une sélection est active
+          cursorLine: selection ? (cursorPosition?.line ?? null) : null,
+          cursorColumn: selection ? (cursorPosition?.column ?? null) : null,
+          // Limiter à 10 fichiers ouverts (au lieu de 30) — la liste complète
+          // est rarement pertinente et peut représenter ~100 tokens inutiles/tour
+          openFiles: openFilesTop10,
+        });
+      }
     }
 
     setPendingChatMessage({ text: trimmedMessage, displayText });

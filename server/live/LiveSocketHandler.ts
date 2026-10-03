@@ -204,6 +204,8 @@ export function attachLiveWebSocket(
     let conversationReady: Promise<void> | null = null;
     let lastErrorMessage: string | null = null;
     let lastServerMessage: LiveServerMessage | null = null;
+    // Contexte IDE en attente de fusion avec le prochain message texte (Fix 4)
+    let pendingVoiceContext: any = null;
 
     const busyStateRef = { activeDescription: null as string | null };
     const getBusyDescription = () => busyStateRef.activeDescription;
@@ -757,7 +759,34 @@ export function attachLiveWebSocket(
             if (message.goAway) handleGoAway(message.goAway);
 
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audio) clientWs.send(Buffer.from(audio, 'base64'));
+            if (audio) {
+              // ── Sonde D : sendRealtimeInput → premier audio Gemini ────
+              // Mesure le délai pur de traitement côté API Gemini Live.
+              // On ne tire qu'une fois par utterance (premier chunk audio).
+              if (!srvProbe.firstAudioOnmessageFired && srvProbe.lastSendRealtimeInputAt > 0n) {
+                srvProbe.firstAudioOnmessageFired = true;
+                const nowNs = process.hrtime.bigint();
+                const dMs = Number((nowNs - srvProbe.lastSendRealtimeInputAt) / 1_000_000n);
+                const cAvgMs = srvProbe.cChunkCount > 0
+                  ? Number(srvProbe.cTotalNs / BigInt(srvProbe.cChunkCount) / 1_000_000n)
+                  : 0;
+                // Un seul log résumé par utterance : C (overhead moyen) + D (Gemini)
+                console.log(
+                  `[LatencyProbe][server] utterance  C_avg=${cAvgMs}ms/${srvProbe.cChunkCount}chunks  D_gemini=${dMs}ms`,
+                );
+                // Réinitialiser les accumulateurs C pour la prochaine utterance
+                srvProbe.cTotalNs = 0n;
+                srvProbe.cChunkCount = 0;
+                // Propager D au client pour enrichir le rapport LatencyProbe
+                try {
+                  clientWs.send(JSON.stringify({
+                    type: 'latency_probe_server',
+                    D_gemini_ms: dMs,
+                  }));
+                } catch { /* ignore si WS fermé */ }
+              }
+              clientWs.send(Buffer.from(audio, 'base64'));
+            }
 
             const textPart = message.serverContent?.modelTurn?.parts?.find(p => p.text);
             if (textPart?.text) {
@@ -976,6 +1005,32 @@ export function attachLiveWebSocket(
       };
 
       // ── Client message handler ──────────────────────────────────────
+      // ── Sondes latence côté serveur (C & D) ─────────────────────────
+      // Ces mesures complètent celles du client (latencyProbe.ts) pour
+      // couvrir la partie du pipeline qui s'exécute dans Node.js.
+      //
+      //   C  serverRecv → sendRealtimeInput
+      //      Durée entre la réception du dernier chunk audio binaire par le
+      //      handler WS Node.js et l'appel à session.sendRealtimeInput().
+      //      Isole le coût du décodage base64 + rate-limiter serveur.
+      //
+      //   D  sendRealtimeInput → premier onmessage avec audio Gemini
+      //      Durée entre le dernier sendRealtimeInput et le premier
+      //      onmessage contenant de l'audio (inlineData). C'est le délai
+      //      pur de traitement côté Gemini Live API.
+      //
+      // Stratégie : on enregistre le timestamp du DERNIER sendRealtimeInput
+      // (écrase à chaque chunk comme la sonde B côté client) pour mesurer
+      // le délai depuis la fin réelle de l'utterance, pas depuis le début.
+      const srvProbe = {
+        lastSendRealtimeInputAt: 0n as bigint,   // process.hrtime.bigint() en ns
+        firstAudioOnmessageFired: false,
+        // Sonde C : accumuler l'overhead total sur tous les chunks d'une utterance
+        // pour loguer UN seul résumé à la sonde D (au lieu de 20+ lignes/utterance).
+        cTotalNs: 0n as bigint,
+        cChunkCount: 0,
+      };
+
       clientWs.on('message', (data, isBinary) => {
         try {
           if (isBinary) {
@@ -1009,7 +1064,17 @@ export function attachLiveWebSocket(
               }
             } else {
               audioRateState.bytesInWindow += chunkBytes;
+              // ── Sonde C : mesure silencieuse, accumulée par utterance ──
+              // On ne log PAS ici (trop verbeux : ~20 lignes/utterance).
+              // L'overhead total sera reporté dans le log de la sonde D.
+              const recvAt = process.hrtime.bigint();
               session.sendRealtimeInput({ audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+              const sendAt = process.hrtime.bigint();
+              srvProbe.cTotalNs += (sendAt - recvAt);
+              srvProbe.cChunkCount++;
+              // Enregistrer pour la sonde D (dernier sendRealtimeInput = fin utterance)
+              srvProbe.lastSendRealtimeInputAt = sendAt;
+              srvProbe.firstAudioOnmessageFired = false;
             }
             return;
           }
@@ -1024,36 +1089,13 @@ export function attachLiveWebSocket(
           // Envoyé par le client avant/pendant une requête vocale pour que Gemini
           // dispose du contexte IDE de l'utilisateur sans qu'il ait à le décrire.
           if (msg.type === 'voice_context') {
-            const parts: string[] = [];
-            if (msg.openFile) parts.push(`Fichier actif : ${msg.openFile}${msg.language ? ` (${msg.language})` : ''}`);
-            if (msg.cursorLine != null) parts.push(`Curseur : ligne ${msg.cursorLine}${msg.cursorColumn != null ? `, colonne ${msg.cursorColumn}` : ''}`);
-            if (msg.selection && String(msg.selection).trim().length > 0) {
-              const sel = String(msg.selection).slice(0, 2000); // cap à 2000 chars
-              parts.push(`Sélection en cours :\n\`\`\`\n${sel}\n\`\`\``);
-            }
-            
-            // Fichiers ouverts (contexte élargi)
-            if (msg.openFiles && Array.isArray(msg.openFiles) && msg.openFiles.length > 0) {
-              const fileList = msg.openFiles.slice(0, 30).join(', '); // limiter à 30 fichiers
-              parts.push(`Fichiers ouverts (${msg.openFiles.length}) : ${fileList}`);
-            }
-            
-            // Erreurs TypeScript actives
-            if (msg.tsErrors && Array.isArray(msg.tsErrors) && msg.tsErrors.length > 0) {
-              const errorLines = msg.tsErrors.slice(0, 15).map((err: any) => 
-                `  • ${err.file}:${err.line}:${err.column} - ${err.message}`
-              ).join('\n');
-              parts.push(`Erreurs TypeScript détectées (${msg.tsErrors.length}) :\n${errorLines}`);
-            }
-            
-            if (parts.length > 0) {
-              const contextText = `[CONTEXTE IDE]\n${parts.join('\n')}`;
-              try {
-                session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: contextText }] }] });
-              } catch (e) {
-                console.error('[VoiceContext] Erreur injection contexte éditeur:', e);
-              }
-            }
+            // Le contexte IDE est mémorisé et sera fusionné avec le prochain
+            // message texte en un seul sendClientContent (Fix 4).
+            // On ne l'injecte PAS ici — l'envoi se fait dans le bloc msg.text
+            // ci-dessous afin de ne créer qu'un seul tour dans la fenêtre Gemini
+            // au lieu de deux (voice_context + message), ce qui économise ~1 tour
+            // de contexte par échange et réduit la latence de traitement.
+            pendingVoiceContext = msg;
           }
 
           if (msg.type === 'context_resume_summary' && msg.summary && !contextResumeSummary) {
@@ -1078,7 +1120,34 @@ export function attachLiveWebSocket(
             if (getBusyDescription()) {
               clientWs.send(JSON.stringify({ text: `Je suis actuellement en train de ${getBusyDescription()}. Je m'occupe de ta demande dès que j'ai terminé.` }));
             }
-            session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: msg.text }] }] });
+
+            // ── Fix 4 : fusion voice_context + message en un seul tour ────────
+            // Si un contexte IDE est en attente (envoyé juste avant ce message),
+            // on le préfixe au texte utilisateur dans le même sendClientContent.
+            // Résultat : 1 tour au lieu de 2 dans la fenêtre Gemini → moins de
+            // tokens accumulés et moins de latence de traitement.
+            let textToSend = msg.text;
+            if (pendingVoiceContext) {
+              const vc = pendingVoiceContext;
+              pendingVoiceContext = null;
+              const parts: string[] = [];
+              if (vc.openFile) parts.push(`Fichier actif : ${vc.openFile}${vc.language ? ` (${vc.language})` : ''}`);
+              if (vc.cursorLine != null && vc.selection) parts.push(`Curseur : ligne ${vc.cursorLine}${vc.cursorColumn != null ? `, colonne ${vc.cursorColumn}` : ''}`);
+              if (vc.selection && String(vc.selection).trim().length > 0) {
+                const sel = String(vc.selection).slice(0, 2000);
+                parts.push(`Sélection en cours :\n\`\`\`\n${sel}\n\`\`\``);
+              }
+              if (vc.openFiles && Array.isArray(vc.openFiles) && vc.openFiles.length > 0) {
+                // Déjà limité à 10 côté client — on le respecte
+                const fileList = vc.openFiles.slice(0, 10).join(', ');
+                parts.push(`Fichiers ouverts (${vc.openFiles.length}) : ${fileList}`);
+              }
+              if (parts.length > 0) {
+                textToSend = `[CONTEXTE IDE]\n${parts.join('\n')}\n\n${msg.text}`;
+              }
+            }
+
+            session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: textToSend }] }] });
             (async () => {
               if (conversationReady) await conversationReady;
               if (conversationId) {

@@ -9,6 +9,7 @@ import { useToken, type TokenUsage, type TokenUsageSession, type PromptContextSt
 import { useTranscript, type TranscriptRole, type TranscriptEntry, type ContextSource } from './useTranscript.js';
 import { useActivity, type ActivityStep, type ModifiedFile, type ReasoningState, type ReasoningStep } from './useActivity.js';
 import { useProfile } from '../context/UserProfileContext.js';
+import { probe, resetProbe, type LatencyReport } from '../lib/latencyProbe.js';
 
 // Re-export types to keep existing component imports functional
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';
@@ -99,6 +100,26 @@ export function useLiveAPI() {
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
   const latencyHistoryRef = useRef<number[]>([]);
 
+  // Rapport décomposé par étape (produit par latencyProbe.ts via CustomEvent)
+  const [lastProbeReport, setLastProbeReport] = useState<LatencyReport | null>(null);
+  // Délai Gemini mesuré côté serveur (message latency_probe_server)
+  const serverGeminiMsRef = useRef<number | null>(null);
+
+  // Écoute le CustomEvent émis par latencyProbe.ts quand l'étape E est atteinte
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const report = (e as CustomEvent<LatencyReport>).detail;
+      // Enrichir le rapport avec le délai Gemini serveur si disponible
+      if (serverGeminiMsRef.current !== null) {
+        (report as any).serverGeminiMs = serverGeminiMsRef.current;
+        serverGeminiMsRef.current = null;
+      }
+      setLastProbeReport(report);
+    };
+    window.addEventListener('Leanna-latency-report', handler);
+    return () => window.removeEventListener('Leanna-latency-report', handler);
+  }, []);
+
   const recordLatency = useCallback((ms: number) => {
     // Validation : rejeter les latences manifestement incorrectes ou négatives.
     // Un départ périmé est désormais réarmé en amont (handleAudioData), donc ce
@@ -123,31 +144,41 @@ export function useLiveAPI() {
   }, []);
 
   // ── Barge-in : envoi audio continu, interruption gérée côté serveur ────────
-  // Gemini Live supporte nativement le barge-in — envoyer de l'audio pendant
-  // que le modèle parle interrompt la génération. On ne bloque donc plus
-  // l'envoi pendant isBusy, sauf pendant l'exécution d'outils (tool calls)
-  // où Gemini n'écoute pas et où l'audio serait ignoré de toute façon.
-  // On mesure également la latence entre le début d'utterance et le premier chunk.
   const handleAudioData = useCallback((pcm16: ArrayBuffer) => {
     // Bloquer uniquement pendant l'exécution d'outils côté serveur
     if (isBusyRef.current) return;
 
-    // Mesure de latence : détecter le début d'utterance.
-    // Cas normal : aucune utterance en cours → armer le timestamp.
-    // Garde-fou anti-timestamp-périmé : si on attend une réponse depuis trop
-    // longtemps (aucun chunk n'est jamais arrivé — VAD faux positif, audio
-    // ignoré pendant un tool call, réponse filtrée), l'ancien timestamp est
-    // périmé. On le ré-arme sur l'utterance COURANTE plutôt que de mesurer un
-    // jour plus tard depuis un départ obsolète (cause du 81276ms).
+    // ── Mesure de latence : timestamp du DERNIER chunk envoyé ─────────────
+    // On écrase utteranceStartRef à chaque chunk pour que la mesure reflète
+    // le délai depuis la FIN réelle de l'utterance (dernier audio envoyé à
+    // Gemini → premier audio reçu), pas depuis le début de la parole.
+    //
+    // Avant : armé sur le premier chunk → incluait toute la durée de la parole
+    //         → valeurs gonflées à 4-5s même pour une réponse rapide de Gemini.
+    // Après : armé sur le dernier chunk → mesure le "time-to-first-audio" réel,
+    //         cohérent avec ce que perçoit l'utilisateur après avoir parlé.
+    //
+    // Garde-fou anti-stale inchangé : si on attend depuis > LATENCY_MAX_MS
+    // sans réponse, on réarme de toute façon pour éviter les mesures aberrantes.
     const now = performance.now();
     const stale =
       waitingFirstResponseChunkRef.current &&
       utteranceStartRef.current !== null &&
       now - utteranceStartRef.current > LATENCY_MAX_MS;
-    if ((utteranceStartRef.current === null && !waitingFirstResponseChunkRef.current) || stale) {
+
+    // Mise à jour inconditionnelle (sauf si on a déjà reçu le premier audio
+    // de cette utterance — dans ce cas on ne touche pas, la mesure est faite)
+    if (!waitingFirstResponseChunkRef.current || stale) {
       utteranceStartRef.current = now;
       waitingFirstResponseChunkRef.current = true;
+    } else {
+      // Utterance en cours, réponse pas encore arrivée → glisser le timestamp
+      // vers le chunk le plus récent (fin d'utterance progressive).
+      utteranceStartRef.current = now;
     }
+
+    // Étape B : dernier chunk audio transmis vers le serveur WS.
+    probe('wsSend');
 
     sendAudioData(pcm16);
   }, []);
@@ -171,6 +202,10 @@ export function useLiveAPI() {
       vadEnabled: profile.vadEnabled,
       vadThreshold: profile.vadThreshold,
       vadSilenceDuration: profile.vadSilenceDuration,
+      // Étape A : fin de capture (VAD silence long atteint)
+      onVadSilence: () => probe('vadSilence'),
+      // Étape E : premier chunk audio schedulé pour lecture effective
+      onFirstAudioScheduled: () => probe('audioPlay'),
     });
 
   // Define onMessage handler for WS events
@@ -195,6 +230,7 @@ export function useLiveAPI() {
       // Réinitialiser le tracking de latence si l'assistant est interrompu
       utteranceStartRef.current = null;
       waitingFirstResponseChunkRef.current = false;
+      resetProbe();
       handleInterrupt();
       addLog('Interrupted', 'system');
     }
@@ -334,6 +370,11 @@ export function useLiveAPI() {
     // ── Rate limiting audio ───────────────────────────────────────────────────
     if (msg.type === 'audio_rate_limited') {
       addLog(`⚠️ Débit audio limité (violation #${msg.violations}, max ${msg.limitKBs} KB/s) — certains chunks ignorés`, 'error');
+    }
+    // ── Sonde latence serveur (D : temps de traitement Gemini) ───────────────
+    if (msg.type === 'latency_probe_server' && typeof msg.D_gemini_ms === 'number') {
+      serverGeminiMsRef.current = msg.D_gemini_ms;
+      console.debug(`[LatencyProbe][D] Gemini processing: ${msg.D_gemini_ms}ms (server-side)`);
     }
     if (msg.busy !== undefined) {
       setIsBusy(!!msg.busy);
@@ -746,6 +787,7 @@ export function useLiveAPI() {
       // ── Monitoring latence vocale ────────────────────────────────────────
       lastLatencyMs,
       getLatencyStats,
+      lastProbeReport,
       // ── Contrôle résumé automatique ─────────────────────────────────────
       autoSummarizeEnabled,
       autoSummarizeThreshold,

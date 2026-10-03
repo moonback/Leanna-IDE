@@ -20,7 +20,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Tests-848%20passing-brightgreen?logo=vitest" alt="Tests 848 passing" />
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
 [![React](https://img.shields.io/badge/React-frontend-61DAFB.svg)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-runtime-3178C6.svg)](#)
