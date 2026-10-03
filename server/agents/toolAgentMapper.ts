@@ -500,8 +500,23 @@ export function canAgentUseTool(role: AgentRole, tool: string): boolean {
  * @returns La catégorie correspondante ou undefined
  */
 export function getToolCategory(tool: string): string | undefined {
+  const lowerTool = tool.toLowerCase();
+  const segments = lowerTool.split(/[^a-z0-9]+/);
+
   for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
-    if (config.keywords.some(keyword => tool.toLowerCase().includes(keyword.toLowerCase()))) {
+    const matched = config.keywords.some(keyword => {
+      const kw = keyword.toLowerCase();
+      // Segment exact match (ex: 'git' in 'git_push', 'get' in 'get_file')
+      if (segments.includes(kw)) return true;
+      // Prefix match with separator (ex: 'doc' in 'doc_generate')
+      if (lowerTool.startsWith(kw + '_') || lowerTool.startsWith(kw + '-')) return true;
+      // Suffix match with separator (ex: '_doc')
+      if (lowerTool.endsWith('_' + kw) || lowerTool.endsWith('-' + kw)) return true;
+      // Keywords >= 4 chars can match substring if meaningful (ex: 'search', 'verify', 'telegram')
+      if (kw.length >= 4 && lowerTool.includes(kw)) return true;
+      return false;
+    });
+    if (matched) {
       return category;
     }
   }

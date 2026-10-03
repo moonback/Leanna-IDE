@@ -34,8 +34,6 @@ import { astParser } from "./ASTParser.js";
 import { astCallGraph } from "./ASTCallGraph.js";
 import type { ASTFileResult } from "./types.js";
 import {
-  EXCLUDED_DIRS,
-  EXCLUDED_FILES,
   ANALYZABLE_EXTENSIONS,
   shouldIgnorePath,
 } from "./indexingRules.js";

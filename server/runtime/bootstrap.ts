@@ -107,15 +107,8 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   const dryRun = config.dryRun ?? DryRunController.fromEnv();
   const runtime = new AgentRuntime(config.runtime, { permissionPolicy, dryRun });
 
-  // 1.5. Configurer l'AgentOrchestrator pour utiliser le ToolRegistry du runtime (timeout corrigé)
-  // Import dynamique pour éviter la dépendance circulaire
+  // 1.5. Préparer l'AgentOrchestrator (l'initialisation de la flotte se fera après configuration du runner agentique)
   const { agentOrchestrator } = await import("../agents/AgentOrchestrator.js");
-  // Le 3e argument (options) porte le kill-switch temps-réel : le signal
-  // remonte de l'AgentExecutor jusqu'au ToolRegistry.call, qui interrompt
-  // l'outil en cours (ex. build de 10 min) dès l'annulation.
-  agentOrchestrator.setSkillHandler((name: string, args: any, options?: { signal?: AbortSignal }) =>
-    runtime.tools.call(name, args, { signal: options?.signal })
-  );
 
   // 2. Créer le SkillManagerV2 qui partage le ToolRegistry du runtime
   const skillManager = new SkillManagerV2({
@@ -215,6 +208,10 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   // Migration : l'orchestrateur exécute désormais les tâches via le runtime
   // agentique (boucle plan→act→verify→recover), plus via l'AgentExecutor legacy.
   agentOrchestrator.enableAgenticRuntime(agentic);
+  // Initialiser la flotte d'agents une seule fois, directement sur le runner agentique
+  agentOrchestrator.setSkillHandler((name: string, args: any, options?: { signal?: AbortSignal }) =>
+    runtime.tools.call(name, args, { signal: options?.signal })
+  );
 
   // Noyau P0 : branche (si activé) la garde d'idempotence sur le MÊME
   // ToolRegistry que le runtime agentique, de sorte qu'une action à effet de

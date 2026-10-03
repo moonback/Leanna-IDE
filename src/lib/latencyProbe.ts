@@ -125,9 +125,11 @@ export function flushProbe(): LatencyReport | null {
     .filter(s => report.steps[s])
     .map(s => {
       const e = report.steps[s];
+      if (!e) return '';
       const arrow = e.tFromPrev > 0 ? ` (+${e.tFromPrev}ms)` : '';
       return `  ${s.padEnd(12)} ${e.tFromStart}ms${arrow}`;
-    });
+    })
+    .filter(Boolean);
 
   console.group(
     `%c[LatencyProbe] Total ${report.total}ms`,

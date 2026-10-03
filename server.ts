@@ -290,7 +290,7 @@ import { LeannaCore } from "./server/autonomy/LeannaCore.js";
 import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
 import { RedisEventBridge } from "./server/runtime/RedisEventBridge.js";
 
-const { runtime, skillManager } = bootstrapRuntimeSync({
+const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
   skills: [
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
@@ -468,8 +468,10 @@ const leannaCore = new LeannaCore(runtimeV2, {
 });
 leannaCore.start();
 
-// Connecter l'AgentOrchestrator au nouveau skillManager (compatible avec l'ancien)
-// L'ancien SkillManager faisait cela dans son constructeur, maintenant on le fait explicitement
+// 1. Activer le runtime agentique sur l'AgentOrchestrator AVANT d'initialiser la flotte
+agentOrchestrator.enableAgenticRuntime(agentic);
+
+// 2. Connecter l'AgentOrchestrator au skillManager (initialise la flotte directement sur le runner agentique, 0 flap)
 agentOrchestrator.setSkillHandler((name: string, args: any) => skillManager.handleToolCall(name, args));
 
 // Connecter le Workflow Engine

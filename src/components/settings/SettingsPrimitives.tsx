@@ -175,7 +175,14 @@ export function SecretInput({ value, onChange, placeholder, ...props }: {
         }}
         {...props}
       />
-      
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
+        tabIndex={-1}
+      >
+        {show ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
     </div>
   );
 }

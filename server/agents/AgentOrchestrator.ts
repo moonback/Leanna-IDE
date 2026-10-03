@@ -97,6 +97,10 @@ export class AgentOrchestrator {
    * plus aucun fallback silencieux vers `AgentExecutor` pour `agent_orchestrate`.
    */
   enableAgenticRuntime(agentic: AgenticRuntime): void {
+    if (this.agenticEnabled && this.executor instanceof AgentRuntimeExecutor) {
+      log.debug("Runtime agentique déjà activé sur l'orchestrateur — skip");
+      return;
+    }
     const runtimeExecutor = new AgentRuntimeExecutor(agentic, this.notifier);
     this.executor = runtimeExecutor;
     this.scheduler.setRunner(runtimeExecutor);
