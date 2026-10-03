@@ -315,7 +315,29 @@ function GlobalStyles() {
 // ─── Hook personnalisé pour les fichiers récents ───────────────────────
 
 function useGitInfo() {
-  return null; // À remplacer par une vraie implémentation
+  const [gitInfo, setGitInfo] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/git/status')
+      .then(async (res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.status === 'success') {
+          setGitInfo({
+            branch: data.data?.branch,
+            files: data.data?.files,
+            repository: data.data?.repository
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGitInfo(null);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return gitInfo;
 }
 
 // ─── Hook de piège de focus (pour les modales) ─────────────────────────
@@ -561,17 +583,17 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             onMouseEnter={() => setCtaHovered(true)}
             onMouseLeave={() => setCtaHovered(false)}
             className="ai-interactive ai-hero ai-glass group relative w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px] overflow-hidden"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--surface) 40%, transparent)',
-              border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
-              height: '112px',
-              minHeight: '112px',
-              maxWidth: '600px',
-              boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 32px color-mix(in srgb, #000 22%, transparent)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
+             style={{
+               backgroundColor: 'color-mix(in srgb, var(--surface) 50%, transparent)',
+               border: '1px solid color-mix(in srgb, var(--primary) 25%, var(--border))',
+               backdropFilter: 'blur(12px)',
+               WebkitBackdropFilter: 'blur(12px)',
+               height: '120px',
+               minHeight: '120px',
+               maxWidth: '640px',
+               boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent), 0 20px 40px -10px color-mix(in srgb, #000 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent)',
+               transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+             }}
             {...makeEntranceProps(0.08)}
             aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
             whileHover={prefersReducedMotion ? { borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)' } : {
@@ -584,19 +606,20 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             {/* Gradient background overlay for depth */}
             <div
               className="absolute inset-0 rounded-[20px] pointer-events-none"
-              style={{
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 6%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 4%, transparent) 100%)',
-              }}
-            />
+               style={{
+                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 70%)',
+               }}
+             />
 
             <div
               className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0 relative"
-              style={{
-                backgroundColor: 'color-mix(in srgb, var(--surface-soft) 50%, transparent)',
-                border: '1px solid color-mix(in srgb, #fff 16%, transparent)',
-                backdropFilter: 'blur(4px)',
-                WebkitBackdropFilter: 'blur(4px)',
-              }}
+               style={{
+                 backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)',
+                 border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
+                 backdropFilter: 'blur(8px)',
+                 WebkitBackdropFilter: 'blur(8px)',
+                 boxShadow: '0 4px 12px -2px color-mix(in srgb, var(--primary) 40%, transparent)',
+               }}
             >
               {/* Icône — animation d'oscillation seulement si motion non réduite */}
               <motion.div
@@ -687,8 +710,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
           {/* ── NIVEAU 5 : Barre d'info bas ── */}
           <motion.div
-            className="flex items-center justify-between mt-8 pt-6"
-            style={{ borderTop: '1px solid var(--border)' }}
+            className="flex items-center justify-between mt-12 pt-6 border-t"
+            style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
