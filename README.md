@@ -2386,9 +2386,9 @@ Environnement de développement recommandé :
 ## Cloner le dépôt
 
 ```bash
-git clone https://github.com/moonback/Jarvis-os-original.git
+git clone https://github.com/moonback/Leanna-IDE.git
 
-cd Jarvis-os-original
+cd Leanna-IDE
 ```
 
 ---
