@@ -286,14 +286,14 @@ const procedureRules: PromptRule[] = [
     id: "procedure.verify-after-write",
     priority: RulePriority.PROCEDURE,
     scope: ["coding", "full"],
-    content: `Après chaque écriture dans la sandbox, valider le résultat (\`verify_file\`) et corriger toute incohérence avant de continuer. Si la vérification échoue, corriger dans la sandbox. Ne jamais laisser un fichier cassé.`,
+    content: `Après chaque écriture dans la sandbox, valider le résultat par une vérification indépendante (\`verify_file\`, \`verify_typecheck\`, tests). Un retour d'outil \`ok: true\` n'est pas une preuve suffisante : seule la conformité d'état réelle (hash SHA-256 et absence d'erreurs compilateur) permet de conclure. Corriger toute anomalie dans la sandbox avant de continuer.`,
     source: "safety.md",
   },
   {
     id: "procedure.autonomy-loop",
     priority: RulePriority.PROCEDURE,
     scope: ["full"],
-    content: `Boucle d'exécution pour chaque tâche complexe : Planifier → Rédiger → Vérifier → Corriger → Continuer/Terminer. Maximum 3 approches (6 tentatives), puis escalade obligatoire à l'utilisateur.`,
+    content: `Boucle d'exécution fermée pour chaque tâche complexe : PLAN → ACT → OBSERVE → VERIFY → RECOVER → COMPLETE. Maximum 3 approches distinctes (6 tentatives cumulées avec pivot de stratégie obligatoire après 2 échecs sur la même approche), puis arrêt propre et escalade à l'utilisateur.`,
     source: "autonomy.md",
   },
   {

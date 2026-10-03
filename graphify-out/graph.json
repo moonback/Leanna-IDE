@@ -465,11 +465,50 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "editortabsprops",
       "source_file": "src/components/ide/EditorTabs.tsx",
       "source_location": "L17"
+    },
+    {
+      "id": "src_hooks_usefilesystem_diffinfo",
+      "label": "DiffInfo",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "diffinfo",
+      "source_file": "src/hooks/useFileSystem.ts",
+      "source_location": "L6"
+    },
+    {
+      "id": "src_types_ide_idesettings",
+      "label": "IdeSettings",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "idesettings",
+      "source_file": "src/types/ide.ts",
+      "source_location": "L21"
+    },
+    {
+      "id": "src_types_ide_openfile",
+      "label": "OpenFile",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "openfile",
+      "source_file": "src/types/ide.ts",
+      "source_location": "L12"
     },
     {
       "id": "src_components_ide_githubpanel_commit",
@@ -621,7 +660,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentactivity",
       "source_file": "src/components/ide/AgentActivityOverlay.tsx",
@@ -634,7 +673,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentactivityoverlayprops",
       "source_file": "src/components/ide/AgentActivityOverlay.tsx",
@@ -647,7 +686,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "missionactivity",
       "source_file": "src/components/ide/AgentActivityOverlay.tsx",
@@ -660,11 +699,24 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentssidebarbuttonprops",
       "source_file": "src/components/ide/sidebar/AgentsSidebarButton.tsx",
       "source_location": "L16"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_phase",
+      "label": "Phase",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "phase",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L22"
     },
     {
       "id": "src_stores_agentactivitystore_agenttaskentry",
@@ -673,7 +725,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agenttaskentry",
       "source_file": "src/stores/agentActivityStore.ts",
@@ -836,29 +888,16 @@
       "source_location": "L5"
     },
     {
-      "id": "src_types_ide_idesettings",
-      "label": "IdeSettings",
+      "id": "src_components_ide_activityfeed_feedentry",
+      "label": "FeedEntry",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 109,
-      "community_name": "ide.ts",
+      "community_name": "ActivityFeed.tsx",
       "file_type": "code",
-      "norm_label": "idesettings",
-      "source_file": "src/types/ide.ts",
-      "source_location": "L21"
-    },
-    {
-      "id": "src_types_ide_openfile",
-      "label": "OpenFile",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 109,
-      "community_name": "ide.ts",
-      "file_type": "code",
-      "norm_label": "openfile",
-      "source_file": "src/types/ide.ts",
+      "norm_label": "feedentry",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
       "source_location": "L12"
     },
     {
@@ -927,17 +966,56 @@
       "source_location": "L56"
     },
     {
-      "id": "src_context_liveapicontext_liveapicontextvalue",
-      "label": "LiveAPIContextValue",
+      "id": "src_components_ide_multiagentindicator_agentdef",
+      "label": "AgentDef",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 111,
-      "community_name": "LiveAPIContext.tsx",
+      "community_name": "MultiAgentIndicator.tsx",
       "file_type": "code",
-      "norm_label": "liveapicontextvalue",
-      "source_file": "src/context/LiveAPIContext.tsx",
-      "source_location": "L5"
+      "norm_label": "agentdef",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L12"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_agentkind",
+      "label": "AgentKind",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 111,
+      "community_name": "MultiAgentIndicator.tsx",
+      "file_type": "code",
+      "norm_label": "agentkind",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L98"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_liveagent",
+      "label": "LiveAgent",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 111,
+      "community_name": "MultiAgentIndicator.tsx",
+      "file_type": "code",
+      "norm_label": "liveagent",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L100"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_roleagentdef",
+      "label": "RoleAgentDef",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 111,
+      "community_name": "MultiAgentIndicator.tsx",
+      "file_type": "code",
+      "norm_label": "roleagentdef",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L67"
     },
     {
       "id": "src_components_autonomy_autonomylevelselector_autonomylevelselectorprops",
@@ -1187,43 +1265,43 @@
       "source_location": "L27"
     },
     {
-      "id": "src_components_panels_sessiontranscriptpanel_sessiontranscriptpanelprops",
-      "label": "SessionTranscriptPanelProps",
+      "id": "src_lib_latencyprobe_latencyreport",
+      "label": "LatencyReport",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 119,
-      "community_name": "TranscriptEntry",
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "sessiontranscriptpanelprops",
-      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
-      "source_location": "L9"
+      "norm_label": "latencyreport",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L163"
     },
     {
-      "id": "src_hooks_usetranscript_transcriptentry",
-      "label": "TranscriptEntry",
+      "id": "src_lib_latencyprobe_probeentry",
+      "label": "ProbeEntry",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 119,
-      "community_name": "TranscriptEntry",
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "transcriptentry",
-      "source_file": "src/hooks/useTranscript.ts",
-      "source_location": "L14"
+      "norm_label": "probeentry",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L25"
     },
     {
-      "id": "src_hooks_usefilesystem_diffinfo",
-      "label": "DiffInfo",
+      "id": "src_lib_latencyprobe_probestep",
+      "label": "ProbeStep",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 120,
-      "community_name": "useFileSystem.ts",
+      "community": 119,
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "diffinfo",
-      "source_file": "src/hooks/useFileSystem.ts",
-      "source_location": "L6"
+      "norm_label": "probestep",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L23"
     },
     {
       "id": "src_components_ide_bottomdock_bottomdockprops",
@@ -1237,19 +1315,6 @@
       "norm_label": "bottomdockprops",
       "source_file": "src/components/ide/BottomDock.tsx",
       "source_location": "L30"
-    },
-    {
-      "id": "src_components_panels_visionpanel_visionpanelprops",
-      "label": "VisionPanelProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 122,
-      "community_name": "../components/panels/VisionPanel.js",
-      "file_type": "code",
-      "norm_label": "visionpanelprops",
-      "source_file": "src/components/panels/VisionPanel.tsx",
-      "source_location": "L6"
     },
     {
       "id": "src_components_ide_rightdock_rightdockprops",
@@ -1278,45 +1343,6 @@
       "source_location": "L27"
     },
     {
-      "id": "src_components_ide_activityfeed_activityfeedprops",
-      "label": "ActivityFeedProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "activityfeedprops",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L21"
-    },
-    {
-      "id": "src_components_ide_activityfeed_feedentry",
-      "label": "FeedEntry",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "feedentry",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L12"
-    },
-    {
-      "id": "src_components_ide_agentprogressbar_agentprogressbarprops",
-      "label": "AgentProgressBarProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "agentprogressbarprops",
-      "source_file": "src/components/ide/AgentProgressBar.tsx",
-      "source_location": "L12"
-    },
-    {
       "id": "src_components_ide_agentprogressbar_stepstatus",
       "label": "StepStatus",
       "_callable": true,
@@ -1343,134 +1369,17 @@
       "source_location": "L20"
     },
     {
-      "id": "src_components_ide_assistantactivitybar_assistantactivitybarprops",
-      "label": "AssistantActivityBarProps",
+      "id": "src_components_panels_sessiontranscriptpanel_sessiontranscriptpanelprops",
+      "label": "SessionTranscriptPanelProps",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
       "file_type": "code",
-      "norm_label": "assistantactivitybarprops",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L12"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_agentdef",
-      "label": "AgentDef",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "agentdef",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L12"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_agentkind",
-      "label": "AgentKind",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "agentkind",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L98"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_liveagent",
-      "label": "LiveAgent",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "liveagent",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L100"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_multiagentindicatorprops",
-      "label": "MultiAgentIndicatorProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "multiagentindicatorprops",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L89"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_roleagentdef",
-      "label": "RoleAgentDef",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "roleagentdef",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L67"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_phase",
-      "label": "Phase",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "phase",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L22"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_unifiedtimelineprops",
-      "label": "UnifiedTimelineProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "unifiedtimelineprops",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L47"
-    },
-    {
-      "id": "src_hooks_useactivity_activitystep",
-      "label": "ActivityStep",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "activitystep",
-      "source_file": "src/hooks/useActivity.ts",
-      "source_location": "L3"
-    },
-    {
-      "id": "src_hooks_useactivity_reasoningstate",
-      "label": "ReasoningState",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "reasoningstate",
-      "source_file": "src/hooks/useActivity.ts",
-      "source_location": "L28"
+      "norm_label": "sessiontranscriptpanelprops",
+      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
+      "source_location": "L9"
     },
     {
       "id": "src_hooks_usechatpersistence_persistedtranscriptentry",
@@ -1484,6 +1393,45 @@
       "norm_label": "persistedtranscriptentry",
       "source_file": "src/hooks/useChatPersistence.ts",
       "source_location": "L7"
+    },
+    {
+      "id": "src_hooks_usetranscript_contextsource",
+      "label": "ContextSource",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "contextsource",
+      "source_file": "src/hooks/useTranscript.ts",
+      "source_location": "L6"
+    },
+    {
+      "id": "src_hooks_usetranscript_transcriptentry",
+      "label": "TranscriptEntry",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "transcriptentry",
+      "source_file": "src/hooks/useTranscript.ts",
+      "source_location": "L14"
+    },
+    {
+      "id": "src_hooks_usetranscript_transcriptrole",
+      "label": "TranscriptRole",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "transcriptrole",
+      "source_file": "src/hooks/useTranscript.ts",
+      "source_location": "L4"
     },
     {
       "id": "src_components_ui_asyncstate_asyncemptyprops",
@@ -2942,19 +2890,6 @@
       "source_location": "L65"
     },
     {
-      "id": "src_components_ide_mentiondropdown_mentiondropdownprops",
-      "label": "MentionDropdownProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "mentiondropdownprops",
-      "source_file": "src/components/ide/MentionDropdown.tsx",
-      "source_location": "L6"
-    },
-    {
       "id": "src_components_notebooks_notebookchat_chatmessage",
       "label": "ChatMessage",
       "_callable": true,
@@ -3057,19 +2992,6 @@
       "norm_label": "workspaceitem",
       "source_file": "src/components/StartupProjectModal.tsx",
       "source_location": "L16"
-    },
-    {
-      "id": "src_hooks_usefilemention_mentionsuggestion",
-      "label": "MentionSuggestion",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "mentionsuggestion",
-      "source_file": "src/hooks/useFileMention.ts",
-      "source_location": "L4"
     },
     {
       "id": "src_services_ideapi_cacheentry",
@@ -3226,19 +3148,6 @@
       "norm_label": "auditstep",
       "source_file": "src/utils/audit.ts",
       "source_location": "L3"
-    },
-    {
-      "id": "src_utils_audit_auditstepstatus",
-      "label": "AuditStepStatus",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 180,
-      "community_name": "AuditPanel.tsx",
-      "file_type": "code",
-      "norm_label": "auditstepstatus",
-      "source_file": "src/utils/audit.ts",
-      "source_location": "L1"
     },
     {
       "id": "src_components_panels_mcppanel_mcpmetric",
@@ -3551,6 +3460,19 @@
       "norm_label": "optimizationdata",
       "source_file": "src/components/TokenCounter.tsx",
       "source_location": "L27"
+    },
+    {
+      "id": "src_hooks_usetoken_tokenusage",
+      "label": "TokenUsage",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 197,
+      "community_name": "TokenCounter.tsx",
+      "file_type": "code",
+      "norm_label": "tokenusage",
+      "source_file": "src/hooks/useToken.ts",
+      "source_location": "L3"
     },
     {
       "id": "src_components_ui_toast_toastcontextvalue",
@@ -4060,19 +3982,6 @@
       "source_location": "L19"
     },
     {
-      "id": "src_hooks_usetoken_tokenusage",
-      "label": "TokenUsage",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 217,
-      "community_name": "useToken.ts",
-      "file_type": "code",
-      "norm_label": "tokenusage",
-      "source_file": "src/hooks/useToken.ts",
-      "source_location": "L3"
-    },
-    {
       "id": "src_hooks_usetoken_tokenusagesession",
       "label": "TokenUsageSession",
       "_callable": true,
@@ -4109,7 +4018,7 @@
       "file_type": "code",
       "norm_label": "logentry",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L25"
+      "source_location": "L26"
     },
     {
       "id": "src_components_ide_contextmenu_clipboardentry",
@@ -4162,6 +4071,19 @@
       "norm_label": "contexttarget",
       "source_file": "src/components/ide/ContextMenu.tsx",
       "source_location": "L9"
+    },
+    {
+      "id": "src_components_ide_globalsearch_flatitem",
+      "label": "FlatItem",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 222,
+      "community_name": "GlobalSearch.tsx",
+      "file_type": "code",
+      "norm_label": "flatitem",
+      "source_file": "src/components/ide/GlobalSearch.tsx",
+      "source_location": "L38"
     },
     {
       "id": "src_components_ide_globalsearch_globalsearchprops",
@@ -4437,30 +4359,95 @@
       "source_location": "L33"
     },
     {
-      "id": "src_hooks_useliveapi_connectionstatus",
-      "label": "ConnectionStatus",
+      "id": "src_components_ide_activityfeed_activityfeedprops",
+      "label": "ActivityFeedProps",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "connectionstatus",
-      "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L14"
+      "norm_label": "activityfeedprops",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L21"
     },
     {
-      "id": "src_hooks_usewebsocket_usewebsocketoptions",
-      "label": "UseWebSocketOptions",
+      "id": "src_components_ide_agentprogressbar_agentprogressbarprops",
+      "label": "AgentProgressBarProps",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "usewebsocketoptions",
-      "source_file": "src/hooks/useWebSocket.ts",
-      "source_location": "L5"
+      "norm_label": "agentprogressbarprops",
+      "source_file": "src/components/ide/AgentProgressBar.tsx",
+      "source_location": "L12"
+    },
+    {
+      "id": "src_components_ide_assistantactivitybar_assistantactivitybarprops",
+      "label": "AssistantActivityBarProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "assistantactivitybarprops",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L12"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_multiagentindicatorprops",
+      "label": "MultiAgentIndicatorProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "multiagentindicatorprops",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L89"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_unifiedtimelineprops",
+      "label": "UnifiedTimelineProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "unifiedtimelineprops",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L47"
+    },
+    {
+      "id": "src_hooks_useactivity_activitystep",
+      "label": "ActivityStep",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "activitystep",
+      "source_file": "src/hooks/useActivity.ts",
+      "source_location": "L3"
+    },
+    {
+      "id": "src_hooks_useactivity_reasoningstate",
+      "label": "ReasoningState",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "reasoningstate",
+      "source_file": "src/hooks/useActivity.ts",
+      "source_location": "L28"
     },
     {
       "id": "src_components_panels_scheduledtaskspanel_scheduledtaskspanelprops",
@@ -4616,7 +4603,7 @@
       "file_type": "code",
       "norm_label": "agentpanelprops",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L190"
+      "source_location": "L222"
     },
     {
       "id": "src_components_settings_modelsection_sliderprops",
@@ -5334,6 +5321,19 @@
       "source_location": "L26"
     },
     {
+      "id": "src_context_liveapicontext_liveapicontextvalue",
+      "label": "LiveAPIContextValue",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "liveapicontextvalue",
+      "source_file": "src/context/LiveAPIContext.tsx",
+      "source_location": "L5"
+    },
+    {
       "id": "src_hooks_useactivity_modifiedfile",
       "label": "ModifiedFile",
       "_callable": true,
@@ -5360,6 +5360,19 @@
       "source_location": "L20"
     },
     {
+      "id": "src_hooks_useliveapi_connectionstatus",
+      "label": "ConnectionStatus",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "connectionstatus",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L15"
+    },
+    {
       "id": "src_hooks_useliveapi_logtype",
       "label": "LogType",
       "_callable": true,
@@ -5370,33 +5383,33 @@
       "file_type": "code",
       "norm_label": "logtype",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L15"
+      "source_location": "L16"
     },
     {
-      "id": "src_hooks_usetranscript_contextsource",
-      "label": "ContextSource",
+      "id": "src_hooks_usewebsocket_usewebsocketoptions",
+      "label": "UseWebSocketOptions",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 4,
       "community_name": "useLiveAPI.ts",
       "file_type": "code",
-      "norm_label": "contextsource",
-      "source_file": "src/hooks/useTranscript.ts",
-      "source_location": "L6"
+      "norm_label": "usewebsocketoptions",
+      "source_file": "src/hooks/useWebSocket.ts",
+      "source_location": "L5"
     },
     {
-      "id": "src_hooks_usetranscript_transcriptrole",
-      "label": "TranscriptRole",
+      "id": "src_utils_audit_auditstepstatus",
+      "label": "AuditStepStatus",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 4,
       "community_name": "useLiveAPI.ts",
       "file_type": "code",
-      "norm_label": "transcriptrole",
-      "source_file": "src/hooks/useTranscript.ts",
-      "source_location": "L4"
+      "norm_label": "auditstepstatus",
+      "source_file": "src/utils/audit.ts",
+      "source_location": "L1"
     },
     {
       "id": "src_components_ui_iconbutton_iconbuttonprops",
@@ -5890,7 +5903,7 @@
       "file_type": "code",
       "norm_label": "documentsdata",
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L54"
+      "source_location": "L56"
     },
     {
       "id": "src_components_knowledge_knowledgehealthdashboard_healthdata",
@@ -5903,7 +5916,33 @@
       "file_type": "code",
       "norm_label": "healthdata",
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L20"
+      "source_location": "L22"
+    },
+    {
+      "id": "src_components_knowledge_knowledgehealthdashboard_reindexprogress",
+      "label": "ReindexProgress",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 55,
+      "community_name": "KnowledgeHealthDashboard.tsx",
+      "file_type": "code",
+      "norm_label": "reindexprogress",
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L71"
+    },
+    {
+      "id": "src_components_knowledge_knowledgehealthdashboard_tabid",
+      "label": "TabId",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 55,
+      "community_name": "KnowledgeHealthDashboard.tsx",
+      "file_type": "code",
+      "norm_label": "tabid",
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L86"
     },
     {
       "id": "src_components_settings_envsection_envapiresponse",
@@ -6894,6 +6933,19 @@
       "source_location": "L23"
     },
     {
+      "id": "src_components_panels_visionpanel_visionpanelprops",
+      "label": "VisionPanelProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "visionpanelprops",
+      "source_file": "src/components/panels/VisionPanel.tsx",
+      "source_location": "L6"
+    },
+    {
       "id": "src_components_ide_chatpanel_chatpanelprops",
       "label": "ChatPanelProps",
       "_callable": true,
@@ -6970,6 +7022,19 @@
       "norm_label": "toastprops",
       "source_file": "src/components/ide/ChatPanel.tsx",
       "source_location": "L66"
+    },
+    {
+      "id": "src_components_ide_mentiondropdown_mentiondropdownprops",
+      "label": "MentionDropdownProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "mentiondropdownprops",
+      "source_file": "src/components/ide/MentionDropdown.tsx",
+      "source_location": "L6"
     },
     {
       "id": "src_components_ide_skillpicker_skillpickerprops",
@@ -7061,6 +7126,19 @@
       "norm_label": "customskillparam",
       "source_file": "src/hooks/useCustomSkills.ts",
       "source_location": "L5"
+    },
+    {
+      "id": "src_hooks_usefilemention_mentionsuggestion",
+      "label": "MentionSuggestion",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "mentionsuggestion",
+      "source_file": "src/hooks/useFileMention.ts",
+      "source_location": "L4"
     },
     {
       "id": "src_hooks_useslashcommand_slashcommandsuggestion",
@@ -7683,7 +7761,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "editortabs()",
       "source_file": "src/components/ide/EditorTabs.tsx",
@@ -7695,11 +7773,35 @@
       "_callable": true,
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "gethostnamedisplay()",
       "source_file": "src/components/ide/EditorTabs.tsx",
       "source_location": "L8"
+    },
+    {
+      "id": "src_hooks_usefilesystem_replacedirectorychildren",
+      "label": "replaceDirectoryChildren()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "replacedirectorychildren()",
+      "source_file": "src/hooks/useFileSystem.ts",
+      "source_location": "L452"
+    },
+    {
+      "id": "src_hooks_usefilesystem_usefilesystem",
+      "label": "useFileSystem()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "usefilesystem()",
+      "source_file": "src/hooks/useFileSystem.ts",
+      "source_location": "L15"
     },
     {
       "id": "src_utils_fileutils_filename",
@@ -7707,11 +7809,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "filename()",
       "source_file": "src/utils/fileUtils.ts",
       "source_location": "L37"
+    },
+    {
+      "id": "src_utils_fileutils_getlanguage",
+      "label": "getLanguage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "getlanguage()",
+      "source_file": "src/utils/fileUtils.ts",
+      "source_location": "L28"
     },
     {
       "id": "src_components_ide_githubpanel_commitdetailpanel",
@@ -7839,7 +7953,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentactivityoverlay()",
       "source_file": "src/components/ide/AgentActivityOverlay.tsx",
@@ -7851,11 +7965,47 @@
       "_callable": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentssidebarbutton()",
       "source_file": "src/components/ide/sidebar/AgentsSidebarButton.tsx",
       "source_location": "L21"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_phasegroup",
+      "label": "PhaseGroup()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "phasegroup()",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L165"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_tooltophase",
+      "label": "toolToPhase()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "tooltophase()",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L33"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_unifiedtimeline",
+      "label": "UnifiedTimeline()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "unifiedtimeline()",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L53"
     },
     {
       "id": "src_components_panels_agentpanel_agentpanel",
@@ -7863,11 +8013,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentpanel()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L198"
+      "source_location": "L230"
     },
     {
       "id": "src_stores_agentactivitystore_getagenttasks",
@@ -7875,7 +8025,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "getagenttasks()",
       "source_file": "src/stores/agentActivityStore.ts",
@@ -7887,7 +8037,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "subscribe()",
       "source_file": "src/stores/agentActivityStore.ts",
@@ -8302,40 +8452,100 @@
       "source_location": "L517"
     },
     {
-      "id": "src_hooks_useidesettings_useidesettings",
-      "label": "useIdeSettings()",
+      "id": "src_components_ide_activityfeed_activityfeed",
+      "label": "ActivityFeed()",
       "_callable": true,
       "_origin": "ast",
       "community": 109,
-      "community_name": "ide.ts",
+      "community_name": "ActivityFeed.tsx",
       "file_type": "code",
-      "norm_label": "useidesettings()",
-      "source_file": "src/hooks/useIdeSettings.ts",
-      "source_location": "L7"
+      "norm_label": "activityfeed()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L135"
     },
     {
-      "id": "src_hooks_useidesettings_useidesettings_loadsettings",
-      "label": "loadSettings()",
+      "id": "src_components_ide_activityfeed_classifytool",
+      "label": "classifyTool()",
       "_callable": true,
       "_origin": "ast",
       "community": 109,
-      "community_name": "ide.ts",
+      "community_name": "ActivityFeed.tsx",
       "file_type": "code",
-      "norm_label": "loadsettings()",
-      "source_file": "src/hooks/useIdeSettings.ts",
-      "source_location": "L11"
+      "norm_label": "classifytool()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L58"
     },
     {
-      "id": "src_hooks_useidesettings_useidesettings_savesettings",
-      "label": "saveSettings()",
+      "id": "src_components_ide_activityfeed_deduplicatesteps",
+      "label": "deduplicateSteps()",
       "_callable": true,
       "_origin": "ast",
       "community": 109,
-      "community_name": "ide.ts",
+      "community_name": "ActivityFeed.tsx",
       "file_type": "code",
-      "norm_label": "savesettings()",
-      "source_file": "src/hooks/useIdeSettings.ts",
-      "source_location": "L21"
+      "norm_label": "deduplicatesteps()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L73"
+    },
+    {
+      "id": "src_components_ide_activityfeed_feedrow",
+      "label": "FeedRow()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 109,
+      "community_name": "ActivityFeed.tsx",
+      "file_type": "code",
+      "norm_label": "feedrow()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L192"
+    },
+    {
+      "id": "src_components_ide_activityfeed_getcolor",
+      "label": "getColor()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 109,
+      "community_name": "ActivityFeed.tsx",
+      "file_type": "code",
+      "norm_label": "getcolor()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L45"
+    },
+    {
+      "id": "src_components_ide_activityfeed_geticon",
+      "label": "getIcon()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 109,
+      "community_name": "ActivityFeed.tsx",
+      "file_type": "code",
+      "norm_label": "geticon()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L32"
+    },
+    {
+      "id": "src_components_ide_activityfeed_gettypelabel",
+      "label": "getTypeLabel()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 109,
+      "community_name": "ActivityFeed.tsx",
+      "file_type": "code",
+      "norm_label": "gettypelabel()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L120"
+    },
+    {
+      "id": "src_components_ide_activityfeed_timelabel",
+      "label": "timeLabel()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 109,
+      "community_name": "ActivityFeed.tsx",
+      "file_type": "code",
+      "norm_label": "timelabel()",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
+      "source_location": "L28"
     },
     {
       "id": "src_components_ide_telegramstatusmodal_capability",
@@ -8443,19 +8653,31 @@
       "file_type": "code",
       "norm_label": "useaudio()",
       "source_file": "src/hooks/useAudio.ts",
-      "source_location": "L65"
+      "source_location": "L69"
     },
     {
-      "id": "src_context_liveapicontext_useliveapicontext",
-      "label": "useLiveAPIContext()",
+      "id": "src_components_ide_multiagentindicator_getagentfortool",
+      "label": "getAgentForTool()",
       "_callable": true,
       "_origin": "ast",
       "community": 111,
-      "community_name": "LiveAPIContext.tsx",
+      "community_name": "MultiAgentIndicator.tsx",
       "file_type": "code",
-      "norm_label": "useliveapicontext()",
-      "source_file": "src/context/LiveAPIContext.tsx",
-      "source_location": "L9"
+      "norm_label": "getagentfortool()",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L83"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_multiagentindicator",
+      "label": "MultiAgentIndicator()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 111,
+      "community_name": "MultiAgentIndicator.tsx",
+      "file_type": "code",
+      "norm_label": "multiagentindicator()",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L118"
     },
     {
       "id": "src_components_autonomy_autonomylevelselector_autonomylevelselector",
@@ -8938,52 +9160,64 @@
       "source_location": "L19"
     },
     {
-      "id": "src_components_panels_sessiontranscriptpanel_timelabel",
-      "label": "timeLabel()",
+      "id": "src_lib_latencyprobe_flushprobe",
+      "label": "flushProbe()",
       "_callable": true,
       "_origin": "ast",
       "community": 119,
-      "community_name": "TranscriptEntry",
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "timelabel()",
-      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
-      "source_location": "L14"
+      "norm_label": "flushprobe()",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L93"
     },
     {
-      "id": "src_hooks_usefilesystem_replacedirectorychildren",
-      "label": "replaceDirectoryChildren()",
+      "id": "src_lib_latencyprobe_probe",
+      "label": "probe()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 119,
+      "community_name": "latencyProbe.ts",
+      "file_type": "code",
+      "norm_label": "probe()",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L42"
+    },
+    {
+      "id": "src_lib_latencyprobe_resetprobe",
+      "label": "resetProbe()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 119,
+      "community_name": "latencyProbe.ts",
+      "file_type": "code",
+      "norm_label": "resetprobe()",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L157"
+    },
+    {
+      "id": "src_views_notebooksview_getnotebookidfromhash",
+      "label": "getNotebookIdFromHash()",
       "_callable": true,
       "_origin": "ast",
       "community": 120,
-      "community_name": "useFileSystem.ts",
+      "community_name": "NotebooksView.tsx",
       "file_type": "code",
-      "norm_label": "replacedirectorychildren()",
-      "source_file": "src/hooks/useFileSystem.ts",
-      "source_location": "L452"
+      "norm_label": "getnotebookidfromhash()",
+      "source_file": "src/views/NotebooksView.tsx",
+      "source_location": "L16"
     },
     {
-      "id": "src_hooks_usefilesystem_usefilesystem",
-      "label": "useFileSystem()",
+      "id": "src_views_notebooksview_notebooksview",
+      "label": "NotebooksView()",
       "_callable": true,
       "_origin": "ast",
       "community": 120,
-      "community_name": "useFileSystem.ts",
+      "community_name": "NotebooksView.tsx",
       "file_type": "code",
-      "norm_label": "usefilesystem()",
-      "source_file": "src/hooks/useFileSystem.ts",
-      "source_location": "L15"
-    },
-    {
-      "id": "src_utils_fileutils_getlanguage",
-      "label": "getLanguage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 120,
-      "community_name": "useFileSystem.ts",
-      "file_type": "code",
-      "norm_label": "getlanguage()",
-      "source_file": "src/utils/fileUtils.ts",
-      "source_location": "L28"
+      "norm_label": "notebooksview()",
+      "source_file": "src/views/NotebooksView.tsx",
+      "source_location": "L22"
     },
     {
       "id": "src_components_ide_bottomdock_bottomdock",
@@ -9032,102 +9266,6 @@
       "norm_label": "missioncreatedprompt()",
       "source_file": "src/components/MissionCreatedPrompt.tsx",
       "source_location": "L34"
-    },
-    {
-      "id": "src_components_ide_activityfeed_activityfeed",
-      "label": "ActivityFeed()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "activityfeed()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L135"
-    },
-    {
-      "id": "src_components_ide_activityfeed_classifytool",
-      "label": "classifyTool()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "classifytool()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L58"
-    },
-    {
-      "id": "src_components_ide_activityfeed_deduplicatesteps",
-      "label": "deduplicateSteps()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "deduplicatesteps()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L73"
-    },
-    {
-      "id": "src_components_ide_activityfeed_feedrow",
-      "label": "FeedRow()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "feedrow()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L192"
-    },
-    {
-      "id": "src_components_ide_activityfeed_getcolor",
-      "label": "getColor()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "getcolor()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L45"
-    },
-    {
-      "id": "src_components_ide_activityfeed_geticon",
-      "label": "getIcon()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "geticon()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L32"
-    },
-    {
-      "id": "src_components_ide_activityfeed_gettypelabel",
-      "label": "getTypeLabel()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "gettypelabel()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L120"
-    },
-    {
-      "id": "src_components_ide_activityfeed_timelabel",
-      "label": "timeLabel()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "timelabel()",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L28"
     },
     {
       "id": "src_components_ide_agentprogressbar_agentprogressbar",
@@ -9214,100 +9352,16 @@
       "source_location": "L116"
     },
     {
-      "id": "src_components_ide_assistantactivitybar_assistantactivitybar",
-      "label": "AssistantActivityBar()",
+      "id": "src_components_panels_sessiontranscriptpanel_timelabel",
+      "label": "timeLabel()",
       "_callable": true,
       "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
       "file_type": "code",
-      "norm_label": "assistantactivitybar()",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L123"
-    },
-    {
-      "id": "src_components_ide_assistantactivitybar_elapsed",
-      "label": "elapsed()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "elapsed()",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L56"
-    },
-    {
-      "id": "src_components_ide_assistantactivitybar_getmeta",
-      "label": "getMeta()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "getmeta()",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L52"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_getagentfortool",
-      "label": "getAgentForTool()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "getagentfortool()",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L83"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_multiagentindicator",
-      "label": "MultiAgentIndicator()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "multiagentindicator()",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L118"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_phasegroup",
-      "label": "PhaseGroup()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "phasegroup()",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L165"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_tooltophase",
-      "label": "toolToPhase()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "tooltophase()",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L33"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_unifiedtimeline",
-      "label": "UnifiedTimeline()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "unifiedtimeline()",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L53"
+      "norm_label": "timelabel()",
+      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
+      "source_location": "L14"
     },
     {
       "id": "src_hooks_usechatpersistence_getstoragekey",
@@ -9356,6 +9410,18 @@
       "norm_label": "usechatpersistence()",
       "source_file": "src/hooks/useChatPersistence.ts",
       "source_location": "L47"
+    },
+    {
+      "id": "src_hooks_usetranscript_usetranscript",
+      "label": "useTranscript()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "usetranscript()",
+      "source_file": "src/hooks/useTranscript.ts",
+      "source_location": "L22"
     },
     {
       "id": "src_components_ui_asyncstate_asyncempty",
@@ -11302,30 +11368,6 @@
       "source_location": "L69"
     },
     {
-      "id": "src_components_ide_mentiondropdown_highlightmatch",
-      "label": "HighlightMatch()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "highlightmatch()",
-      "source_file": "src/components/ide/MentionDropdown.tsx",
-      "source_location": "L117"
-    },
-    {
-      "id": "src_components_ide_mentiondropdown_mentiondropdown",
-      "label": "MentionDropdown()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "mentiondropdown()",
-      "source_file": "src/components/ide/MentionDropdown.tsx",
-      "source_location": "L18"
-    },
-    {
       "id": "src_components_notebooks_notebookchat_notebookchat",
       "label": "NotebookChat()",
       "_callable": true,
@@ -11614,30 +11656,6 @@
       "source_location": "L31"
     },
     {
-      "id": "src_utils_audit_isopenrouterrequest",
-      "label": "isOpenRouterRequest()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 180,
-      "community_name": "AuditPanel.tsx",
-      "file_type": "code",
-      "norm_label": "isopenrouterrequest()",
-      "source_file": "src/utils/audit.ts",
-      "source_location": "L45"
-    },
-    {
-      "id": "src_utils_audit_issystemauditrequest",
-      "label": "isSystemAuditRequest()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 180,
-      "community_name": "AuditPanel.tsx",
-      "file_type": "code",
-      "norm_label": "issystemauditrequest()",
-      "source_file": "src/utils/audit.ts",
-      "source_location": "L34"
-    },
-    {
       "id": "src_components_panels_mcppanel_formattimestamp",
       "label": "formatTimestamp()",
       "_callable": true,
@@ -11839,7 +11857,7 @@
       "file_type": "code",
       "norm_label": "chipgroup()",
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L220"
+      "source_location": "L227"
     },
     {
       "id": "src_components_settings_settingsprimitives_field",
@@ -11863,7 +11881,7 @@
       "file_type": "code",
       "norm_label": "inforow()",
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L258"
+      "source_location": "L265"
     },
     {
       "id": "src_components_settings_settingsprimitives_secretinput",
@@ -11923,7 +11941,7 @@
       "file_type": "code",
       "norm_label": "toggleswitch()",
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L185"
+      "source_location": "L192"
     },
     {
       "id": "src_components_tokencounter_formatnumber",
@@ -12358,6 +12376,18 @@
       "source_location": "L44"
     },
     {
+      "id": "src_hooks_usetoken_usetoken",
+      "label": "useToken()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 217,
+      "community_name": "useToken.ts",
+      "file_type": "code",
+      "norm_label": "usetoken()",
+      "source_file": "src/hooks/useToken.ts",
+      "source_location": "L45"
+    },
+    {
       "id": "src_components_ide_contextmenu_contextmenu",
       "label": "ContextMenu()",
       "_callable": true,
@@ -12382,6 +12412,18 @@
       "source_location": "L43"
     },
     {
+      "id": "src_components_ide_globalsearch_buildflatitems",
+      "label": "buildFlatItems()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 222,
+      "community_name": "GlobalSearch.tsx",
+      "file_type": "code",
+      "norm_label": "buildflatitems()",
+      "source_file": "src/components/ide/GlobalSearch.tsx",
+      "source_location": "L46"
+    },
+    {
       "id": "src_components_ide_globalsearch_getauthheaders",
       "label": "getAuthHeaders()",
       "_callable": true,
@@ -12403,7 +12445,7 @@
       "file_type": "code",
       "norm_label": "globalsearch()",
       "source_file": "src/components/ide/GlobalSearch.tsx",
-      "source_location": "L75"
+      "source_location": "L103"
     },
     {
       "id": "src_components_ide_globalsearch_highlightedline",
@@ -12415,7 +12457,7 @@
       "file_type": "code",
       "norm_label": "highlightedline()",
       "source_file": "src/components/ide/GlobalSearch.tsx",
-      "source_location": "L38"
+      "source_location": "L66"
     },
     {
       "id": "src_components_knowledge_astcallgraphexplorer_astcallgraphexplorer",
@@ -12526,52 +12568,40 @@
       "source_location": "L42"
     },
     {
-      "id": "src_hooks_usewebsocket_usewebsocket",
-      "label": "useWebSocket()",
+      "id": "src_components_ide_assistantactivitybar_assistantactivitybar",
+      "label": "AssistantActivityBar()",
       "_callable": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "usewebsocket()",
-      "source_file": "src/hooks/useWebSocket.ts",
-      "source_location": "L11"
+      "norm_label": "assistantactivitybar()",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L123"
     },
     {
-      "id": "src_lib_sound_getaudiocontext",
-      "label": "getAudioContext()",
+      "id": "src_components_ide_assistantactivitybar_elapsed",
+      "label": "elapsed()",
       "_callable": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "getaudiocontext()",
-      "source_file": "src/lib/sound.ts",
-      "source_location": "L7"
+      "norm_label": "elapsed()",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L56"
     },
     {
-      "id": "src_lib_sound_playsessionstartsound",
-      "label": "playSessionStartSound()",
+      "id": "src_components_ide_assistantactivitybar_getmeta",
+      "label": "getMeta()",
       "_callable": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "playsessionstartsound()",
-      "source_file": "src/lib/sound.ts",
-      "source_location": "L18"
-    },
-    {
-      "id": "src_lib_sound_playsoundfile",
-      "label": "playSoundFile()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "useWebSocket.ts",
-      "file_type": "code",
-      "norm_label": "playsoundfile()",
-      "source_file": "src/lib/sound.ts",
-      "source_location": "L59"
+      "norm_label": "getmeta()",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L52"
     },
     {
       "id": "src_components_panels_scheduledtaskspanel_formatinterval",
@@ -12667,7 +12697,7 @@
       "file_type": "code",
       "norm_label": "agentgroupcard()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L546"
+      "source_location": "L578"
     },
     {
       "id": "src_components_panels_agentpanel_delegatedtab",
@@ -12679,7 +12709,7 @@
       "file_type": "code",
       "norm_label": "delegatedtab()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L690"
+      "source_location": "L722"
     },
     {
       "id": "src_components_panels_agentpanel_delegatedtaskcard",
@@ -12691,7 +12721,7 @@
       "file_type": "code",
       "norm_label": "delegatedtaskcard()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L710"
+      "source_location": "L742"
     },
     {
       "id": "src_components_panels_agentpanel_emptystate",
@@ -12703,7 +12733,7 @@
       "file_type": "code",
       "norm_label": "emptystate()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L824"
+      "source_location": "L856"
     },
     {
       "id": "src_components_panels_agentpanel_formatargs",
@@ -12751,7 +12781,7 @@
       "file_type": "code",
       "norm_label": "livetab()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L527"
+      "source_location": "L559"
     },
     {
       "id": "src_components_panels_agentpanel_rostertab",
@@ -12763,7 +12793,7 @@
       "file_type": "code",
       "norm_label": "rostertab()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L449"
+      "source_location": "L481"
     },
     {
       "id": "src_components_panels_agentpanel_runningelapsed",
@@ -12775,7 +12805,7 @@
       "file_type": "code",
       "norm_label": "runningelapsed()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L678"
+      "source_location": "L710"
     },
     {
       "id": "src_components_panels_agentpanel_statpill",
@@ -12787,7 +12817,7 @@
       "file_type": "code",
       "norm_label": "statpill()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L416"
+      "source_location": "L448"
     },
     {
       "id": "src_components_panels_agentpanel_statusbadge",
@@ -12811,7 +12841,7 @@
       "file_type": "code",
       "norm_label": "tabbtn()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L428"
+      "source_location": "L460"
     },
     {
       "id": "src_components_panels_agentpanel_timelabel",
@@ -12835,7 +12865,7 @@
       "file_type": "code",
       "norm_label": "toolactivityrow()",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L640"
+      "source_location": "L672"
     },
     {
       "id": "src_components_panels_agentpanel_useelapsed",
@@ -14074,6 +14104,18 @@
       "source_location": "L1"
     },
     {
+      "id": "src_context_liveapicontext_useliveapicontext",
+      "label": "useLiveAPIContext()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "useliveapicontext()",
+      "source_file": "src/context/LiveAPIContext.tsx",
+      "source_location": "L9"
+    },
+    {
       "id": "src_hooks_useactivity_toollabel",
       "label": "toolLabel()",
       "_callable": true,
@@ -14107,31 +14149,55 @@
       "file_type": "code",
       "norm_label": "useliveapi()",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L34"
+      "source_location": "L35"
     },
     {
-      "id": "src_hooks_usetoken_usetoken",
-      "label": "useToken()",
+      "id": "src_hooks_usewebsocket_usewebsocket",
+      "label": "useWebSocket()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
       "community_name": "useLiveAPI.ts",
       "file_type": "code",
-      "norm_label": "usetoken()",
-      "source_file": "src/hooks/useToken.ts",
-      "source_location": "L45"
+      "norm_label": "usewebsocket()",
+      "source_file": "src/hooks/useWebSocket.ts",
+      "source_location": "L11"
     },
     {
-      "id": "src_hooks_usetranscript_usetranscript",
-      "label": "useTranscript()",
+      "id": "src_lib_sound_getaudiocontext",
+      "label": "getAudioContext()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
       "community_name": "useLiveAPI.ts",
       "file_type": "code",
-      "norm_label": "usetranscript()",
-      "source_file": "src/hooks/useTranscript.ts",
-      "source_location": "L22"
+      "norm_label": "getaudiocontext()",
+      "source_file": "src/lib/sound.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "src_lib_sound_playsessionstartsound",
+      "label": "playSessionStartSound()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "playsessionstartsound()",
+      "source_file": "src/lib/sound.ts",
+      "source_location": "L18"
+    },
+    {
+      "id": "src_lib_sound_playsoundfile",
+      "label": "playSoundFile()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "playsoundfile()",
+      "source_file": "src/lib/sound.ts",
+      "source_location": "L59"
     },
     {
       "id": "src_utils_audit_buildauditsteps",
@@ -14144,6 +14210,30 @@
       "norm_label": "buildauditsteps()",
       "source_file": "src/utils/audit.ts",
       "source_location": "L54"
+    },
+    {
+      "id": "src_utils_audit_isopenrouterrequest",
+      "label": "isOpenRouterRequest()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "isopenrouterrequest()",
+      "source_file": "src/utils/audit.ts",
+      "source_location": "L45"
+    },
+    {
+      "id": "src_utils_audit_issystemauditrequest",
+      "label": "isSystemAuditRequest()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "issystemauditrequest()",
+      "source_file": "src/utils/audit.ts",
+      "source_location": "L34"
     },
     {
       "id": "src_components_ui_iconbutton_iconbutton",
@@ -14575,7 +14665,7 @@
       "file_type": "code",
       "norm_label": "knowledgehealthdashboard()",
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L69"
+      "source_location": "L90"
     },
     {
       "id": "src_components_settings_envsection_envsection",
@@ -15466,6 +15556,42 @@
       "source_location": "L6"
     },
     {
+      "id": "src_hooks_useidesettings_useidesettings",
+      "label": "useIdeSettings()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "useidesettings()",
+      "source_file": "src/hooks/useIdeSettings.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "src_hooks_useidesettings_useidesettings_loadsettings",
+      "label": "loadSettings()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "loadsettings()",
+      "source_file": "src/hooks/useIdeSettings.ts",
+      "source_location": "L11"
+    },
+    {
+      "id": "src_hooks_useidesettings_useidesettings_savesettings",
+      "label": "saveSettings()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "savesettings()",
+      "source_file": "src/hooks/useIdeSettings.ts",
+      "source_location": "L21"
+    },
+    {
       "id": "src_views_ideview_ideview",
       "label": "IdeView()",
       "_callable": true,
@@ -15476,30 +15602,6 @@
       "norm_label": "ideview()",
       "source_file": "src/views/IdeView.tsx",
       "source_location": "L84"
-    },
-    {
-      "id": "src_views_notebooksview_getnotebookidfromhash",
-      "label": "getNotebookIdFromHash()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "IdeView.tsx",
-      "file_type": "code",
-      "norm_label": "getnotebookidfromhash()",
-      "source_file": "src/views/NotebooksView.tsx",
-      "source_location": "L16"
-    },
-    {
-      "id": "src_views_notebooksview_notebooksview",
-      "label": "NotebooksView()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "IdeView.tsx",
-      "file_type": "code",
-      "norm_label": "notebooksview()",
-      "source_file": "src/views/NotebooksView.tsx",
-      "source_location": "L22"
     },
     {
       "id": "src_components_helpbutton_helpbutton",
@@ -15680,6 +15782,30 @@
       "norm_label": "useresizablepanel()",
       "source_file": "src/components/ide/ChatPanel.tsx",
       "source_location": "L926"
+    },
+    {
+      "id": "src_components_ide_mentiondropdown_highlightmatch",
+      "label": "HighlightMatch()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "highlightmatch()",
+      "source_file": "src/components/ide/MentionDropdown.tsx",
+      "source_location": "L117"
+    },
+    {
+      "id": "src_components_ide_mentiondropdown_mentiondropdown",
+      "label": "MentionDropdown()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "mentiondropdown()",
+      "source_file": "src/components/ide/MentionDropdown.tsx",
+      "source_location": "L18"
     },
     {
       "id": "src_components_ide_skillpicker_getcategoryicon",
@@ -16351,18 +16477,62 @@
       "label": "EditorTabs.tsx",
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "editortabs.tsx",
       "source_file": "src/components/ide/EditorTabs.tsx",
       "source_location": "L1"
     },
     {
+      "id": "src_hooks_usefilesystem",
+      "label": "useFileSystem.ts",
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "usefilesystem.ts",
+      "source_file": "src/hooks/useFileSystem.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_hooks_useidesettings",
+      "label": "useIdeSettings.ts",
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "useidesettings.ts",
+      "source_file": "src/hooks/useIdeSettings.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_types_ide",
+      "label": "ide.ts",
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "ide.ts",
+      "source_file": "src/types/ide.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_types_ide_default_ide_settings",
+      "label": "DEFAULT_IDE_SETTINGS",
+      "_origin": "ast",
+      "community": 104,
+      "community_name": "useFileSystem.ts",
+      "file_type": "code",
+      "norm_label": "default_ide_settings",
+      "source_file": "src/types/ide.ts",
+      "source_location": "L33"
+    },
+    {
       "id": "src_utils_fileutils",
       "label": "fileUtils.ts",
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "fileutils.ts",
       "source_file": "src/utils/fileUtils.ts",
@@ -16373,7 +16543,7 @@
       "label": "LANGUAGE_BY_EXT",
       "_origin": "ast",
       "community": 104,
-      "community_name": "EditorTabs.tsx",
+      "community_name": "useFileSystem.ts",
       "file_type": "code",
       "norm_label": "language_by_ext",
       "source_file": "src/utils/fileUtils.ts",
@@ -16401,17 +16571,6 @@
       "norm_label": "file_status",
       "source_file": "src/components/ide/GitHubPanel.tsx",
       "source_location": "L113"
-    },
-    {
-      "id": "src_views_ideview_githubpanel",
-      "label": "GitHubPanel",
-      "_origin": "ast",
-      "community": 105,
-      "community_name": "../components/ide/GitHubPanel.js",
-      "file_type": "code",
-      "norm_label": "githubpanel",
-      "source_file": "src/views/IdeView.tsx",
-      "source_location": "L17"
     },
     {
       "id": "src_views_settingsview",
@@ -16463,7 +16622,7 @@
       "label": "AgentActivityOverlay.tsx",
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentactivityoverlay.tsx",
       "source_file": "src/components/ide/AgentActivityOverlay.tsx",
@@ -16474,11 +16633,44 @@
       "label": "AgentsSidebarButton.tsx",
       "_origin": "ast",
       "community": 107,
-      "community_name": "getAgentTasks",
+      "community_name": "UnifiedTimeline.tsx",
       "file_type": "code",
       "norm_label": "agentssidebarbutton.tsx",
       "source_file": "src/components/ide/sidebar/AgentsSidebarButton.tsx",
       "source_location": "L1"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline",
+      "label": "UnifiedTimeline.tsx",
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "unifiedtimeline.tsx",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_phase_meta",
+      "label": "PHASE_META",
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "phase_meta",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L24"
+    },
+    {
+      "id": "src_components_ide_unifiedtimeline_phase_order",
+      "label": "PHASE_ORDER",
+      "_origin": "ast",
+      "community": 107,
+      "community_name": "UnifiedTimeline.tsx",
+      "file_type": "code",
+      "norm_label": "phase_order",
+      "source_file": "src/components/ide/UnifiedTimeline.tsx",
+      "source_location": "L30"
     },
     {
       "id": "src_components_ide_fileexplorervirtualized",
@@ -16635,37 +16827,15 @@
       "source_location": "L876"
     },
     {
-      "id": "src_hooks_useidesettings",
-      "label": "useIdeSettings.ts",
+      "id": "src_components_ide_activityfeed",
+      "label": "ActivityFeed.tsx",
       "_origin": "ast",
       "community": 109,
-      "community_name": "ide.ts",
+      "community_name": "ActivityFeed.tsx",
       "file_type": "code",
-      "norm_label": "useidesettings.ts",
-      "source_file": "src/hooks/useIdeSettings.ts",
+      "norm_label": "activityfeed.tsx",
+      "source_file": "src/components/ide/ActivityFeed.tsx",
       "source_location": "L1"
-    },
-    {
-      "id": "src_types_ide",
-      "label": "ide.ts",
-      "_origin": "ast",
-      "community": 109,
-      "community_name": "ide.ts",
-      "file_type": "code",
-      "norm_label": "ide.ts",
-      "source_file": "src/types/ide.ts",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_types_ide_default_ide_settings",
-      "label": "DEFAULT_IDE_SETTINGS",
-      "_origin": "ast",
-      "community": 109,
-      "community_name": "ide.ts",
-      "file_type": "code",
-      "norm_label": "default_ide_settings",
-      "source_file": "src/types/ide.ts",
-      "source_location": "L33"
     },
     {
       "id": "src_components_ide_telegramstatusmodal",
@@ -16701,26 +16871,37 @@
       "source_location": "L1"
     },
     {
-      "id": "src_context_liveapicontext",
-      "label": "LiveAPIContext.tsx",
+      "id": "src_components_ide_multiagentindicator",
+      "label": "MultiAgentIndicator.tsx",
       "_origin": "ast",
       "community": 111,
-      "community_name": "LiveAPIContext.tsx",
+      "community_name": "MultiAgentIndicator.tsx",
       "file_type": "code",
-      "norm_label": "liveapicontext.tsx",
-      "source_file": "src/context/LiveAPIContext.tsx",
+      "norm_label": "multiagentindicator.tsx",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
       "source_location": "L1"
     },
     {
-      "id": "src_context_liveapicontext_liveapicontext",
-      "label": "LiveAPIContext",
+      "id": "src_components_ide_multiagentindicator_role_agents",
+      "label": "ROLE_AGENTS",
       "_origin": "ast",
       "community": 111,
-      "community_name": "LiveAPIContext.tsx",
+      "community_name": "MultiAgentIndicator.tsx",
       "file_type": "code",
-      "norm_label": "liveapicontext",
-      "source_file": "src/context/LiveAPIContext.tsx",
-      "source_location": "L7"
+      "norm_label": "role_agents",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L74"
+    },
+    {
+      "id": "src_components_ide_multiagentindicator_tool_agents",
+      "label": "TOOL_AGENTS",
+      "_origin": "ast",
+      "community": 111,
+      "community_name": "MultiAgentIndicator.tsx",
+      "file_type": "code",
+      "norm_label": "tool_agents",
+      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
+      "source_location": "L20"
     },
     {
       "id": "src_components_notebooks_audit_22_p1_autonomie_avanc\u00e9e",
@@ -17170,26 +17351,37 @@
       "source_location": "L491"
     },
     {
-      "id": "src_components_panels_sessiontranscriptpanel",
-      "label": "SessionTranscriptPanel.tsx",
+      "id": "src_lib_latencyprobe",
+      "label": "latencyProbe.ts",
       "_origin": "ast",
       "community": 119,
-      "community_name": "TranscriptEntry",
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "sessiontranscriptpanel.tsx",
-      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
+      "norm_label": "latencyprobe.ts",
+      "source_file": "src/lib/latencyProbe.ts",
       "source_location": "L1"
     },
     {
-      "id": "src_components_panels_sessiontranscriptpanel_sessiontranscriptpanel",
-      "label": "SessionTranscriptPanel",
+      "id": "src_lib_latencyprobe_session",
+      "label": "session",
       "_origin": "ast",
       "community": 119,
-      "community_name": "TranscriptEntry",
+      "community_name": "latencyProbe.ts",
       "file_type": "code",
-      "norm_label": "sessiontranscriptpanel",
-      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
-      "source_location": "L18"
+      "norm_label": "session",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L31"
+    },
+    {
+      "id": "src_lib_latencyprobe_step_order",
+      "label": "STEP_ORDER",
+      "_origin": "ast",
+      "community": 119,
+      "community_name": "latencyProbe.ts",
+      "file_type": "code",
+      "norm_label": "step_order",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L33"
     },
     {
       "id": "src_design_tokens",
@@ -17336,15 +17528,38 @@
       "source_location": "L452"
     },
     {
-      "id": "src_hooks_usefilesystem",
-      "label": "useFileSystem.ts",
+      "id": "src_views_notebooksview",
+      "label": "NotebooksView.tsx",
       "_origin": "ast",
       "community": 120,
-      "community_name": "useFileSystem.ts",
+      "community_name": "NotebooksView.tsx",
+      "confidence": "EXTRACTED",
       "file_type": "code",
-      "norm_label": "usefilesystem.ts",
-      "source_file": "src/hooks/useFileSystem.ts",
+      "norm_label": "notebooksview.tsx",
+      "source_file": "src/views/NotebooksView.tsx",
       "source_location": "L1"
+    },
+    {
+      "id": "src_main_notebooksview",
+      "label": "NotebooksView",
+      "_origin": "ast",
+      "community": 120,
+      "community_name": "NotebooksView.tsx",
+      "file_type": "code",
+      "norm_label": "notebooksview",
+      "source_file": "src/main.tsx",
+      "source_location": "L32"
+    },
+    {
+      "id": "src_views_ideview_notebooksview",
+      "label": "NotebooksView",
+      "_origin": "ast",
+      "community": 120,
+      "community_name": "NotebooksView.tsx",
+      "file_type": "code",
+      "norm_label": "notebooksview",
+      "source_file": "src/views/IdeView.tsx",
+      "source_location": "L19"
     },
     {
       "id": "src_components_ide_bottomdock",
@@ -17356,40 +17571,6 @@
       "norm_label": "bottomdock.tsx",
       "source_file": "src/components/ide/BottomDock.tsx",
       "source_location": "L1"
-    },
-    {
-      "id": "src_components_panels_visionpanel",
-      "label": "../components/panels/VisionPanel.js",
-      "_origin": "ast",
-      "community": 122,
-      "community_name": "../components/panels/VisionPanel.js",
-      "confidence": "EXTRACTED",
-      "file_type": "code",
-      "norm_label": "../components/panels/visionpanel.js",
-      "source_file": "src/components/panels/VisionPanel.js",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_panels_visionpanel_visionpanel",
-      "label": "VisionPanel",
-      "_origin": "ast",
-      "community": 122,
-      "community_name": "../components/panels/VisionPanel.js",
-      "file_type": "code",
-      "norm_label": "visionpanel",
-      "source_file": "src/components/panels/VisionPanel.tsx",
-      "source_location": "L11"
-    },
-    {
-      "id": "src_views_ideview_visionpanel",
-      "label": "VisionPanel",
-      "_origin": "ast",
-      "community": 122,
-      "community_name": "../components/panels/VisionPanel.js",
-      "file_type": "code",
-      "norm_label": "visionpanel",
-      "source_file": "src/views/IdeView.tsx",
-      "source_location": "L16"
     },
     {
       "id": "src_components_ide_rightdock",
@@ -17486,17 +17667,6 @@
       "source_location": "L13"
     },
     {
-      "id": "src_components_ide_activityfeed",
-      "label": "ActivityFeed.tsx",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "activityfeed.tsx",
-      "source_file": "src/components/ide/ActivityFeed.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_components_ide_agentprogressbar",
       "label": "AgentProgressBar.tsx",
       "_origin": "ast",
@@ -17585,105 +17755,6 @@
       "source_location": "L100"
     },
     {
-      "id": "src_components_ide_assistantactivitybar",
-      "label": "AssistantActivityBar.tsx",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "assistantactivitybar.tsx",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ide_assistantactivitybar_steprow",
-      "label": "StepRow",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "steprow",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L62"
-    },
-    {
-      "id": "src_components_ide_assistantactivitybar_tool_meta",
-      "label": "TOOL_META",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "tool_meta",
-      "source_file": "src/components/ide/AssistantActivityBar.tsx",
-      "source_location": "L20"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator",
-      "label": "MultiAgentIndicator.tsx",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "multiagentindicator.tsx",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_role_agents",
-      "label": "ROLE_AGENTS",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "role_agents",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L74"
-    },
-    {
-      "id": "src_components_ide_multiagentindicator_tool_agents",
-      "label": "TOOL_AGENTS",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "tool_agents",
-      "source_file": "src/components/ide/MultiAgentIndicator.tsx",
-      "source_location": "L20"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline",
-      "label": "UnifiedTimeline.tsx",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "unifiedtimeline.tsx",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_phase_meta",
-      "label": "PHASE_META",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "phase_meta",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L24"
-    },
-    {
-      "id": "src_components_ide_unifiedtimeline_phase_order",
-      "label": "PHASE_ORDER",
-      "_origin": "ast",
-      "community": 127,
-      "community_name": "AgentProgressBar.tsx",
-      "file_type": "code",
-      "norm_label": "phase_order",
-      "source_file": "src/components/ide/UnifiedTimeline.tsx",
-      "source_location": "L30"
-    },
-    {
       "id": "src_components_notebooks_audit_27_mon_plan_de_transformation",
       "label": "27. Mon plan de transformation",
       "_origin": "ast",
@@ -17720,6 +17791,28 @@
       "source_location": "L1428"
     },
     {
+      "id": "src_components_panels_sessiontranscriptpanel",
+      "label": "SessionTranscriptPanel.tsx",
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "sessiontranscriptpanel.tsx",
+      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_panels_sessiontranscriptpanel_sessiontranscriptpanel",
+      "label": "SessionTranscriptPanel",
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "sessiontranscriptpanel",
+      "source_file": "src/components/panels/SessionTranscriptPanel.tsx",
+      "source_location": "L18"
+    },
+    {
       "id": "src_hooks_usechatpersistence",
       "label": "useChatPersistence.ts",
       "_origin": "ast",
@@ -17728,6 +17821,17 @@
       "file_type": "code",
       "norm_label": "usechatpersistence.ts",
       "source_file": "src/hooks/useChatPersistence.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_hooks_usetranscript",
+      "label": "useTranscript.ts",
+      "_origin": "ast",
+      "community": 129,
+      "community_name": "useChatPersistence.ts",
+      "file_type": "code",
+      "norm_label": "usetranscript.ts",
+      "source_file": "src/hooks/useTranscript.ts",
       "source_location": "L1"
     },
     {
@@ -18338,28 +18442,6 @@
       "norm_label": "configuredapitoken",
       "source_file": "src/main.tsx",
       "source_location": "L44"
-    },
-    {
-      "id": "src_main_documentsview",
-      "label": "DocumentsView",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "main.tsx",
-      "file_type": "code",
-      "norm_label": "documentsview",
-      "source_file": "src/main.tsx",
-      "source_location": "L31"
-    },
-    {
-      "id": "src_main_ideview",
-      "label": "IdeView",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "main.tsx",
-      "file_type": "code",
-      "norm_label": "ideview",
-      "source_file": "src/main.tsx",
-      "source_location": "L27"
     },
     {
       "id": "src_components_ide_emptyeditorstate",
@@ -19052,17 +19134,6 @@
       "source_location": "L30"
     },
     {
-      "id": "src_components_ide_mentiondropdown",
-      "label": "MentionDropdown.tsx",
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "mentiondropdown.tsx",
-      "source_file": "src/components/ide/MentionDropdown.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_components_notebooks_notebookchat",
       "label": "NotebookChat.tsx",
       "_origin": "ast",
@@ -19160,17 +19231,6 @@
       "norm_label": "overlay_fade",
       "source_file": "src/components/StartupProjectModal.tsx",
       "source_location": "L33"
-    },
-    {
-      "id": "src_hooks_usefilemention",
-      "label": "useFileMention.ts",
-      "_origin": "ast",
-      "community": 177,
-      "community_name": "ideApi.ts",
-      "file_type": "code",
-      "norm_label": "usefilemention.ts",
-      "source_file": "src/hooks/useFileMention.ts",
-      "source_location": "L1"
     },
     {
       "id": "src_services_ideapi",
@@ -19336,17 +19396,6 @@
       "norm_label": "auditpanel",
       "source_file": "src/components/panels/AuditPanel.tsx",
       "source_location": "L84"
-    },
-    {
-      "id": "src_utils_audit",
-      "label": "audit.ts",
-      "_origin": "ast",
-      "community": 180,
-      "community_name": "AuditPanel.tsx",
-      "file_type": "code",
-      "norm_label": "audit.ts",
-      "source_file": "src/utils/audit.ts",
-      "source_location": "L1"
     },
     {
       "id": "src_components_panels_mcppanel",
@@ -20281,26 +20330,37 @@
       "source_location": "L1"
     },
     {
-      "id": "src_hooks_usewebsocket",
-      "label": "useWebSocket.ts",
+      "id": "src_components_ide_assistantactivitybar",
+      "label": "AssistantActivityBar.tsx",
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "usewebsocket.ts",
-      "source_file": "src/hooks/useWebSocket.ts",
+      "norm_label": "assistantactivitybar.tsx",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
       "source_location": "L1"
     },
     {
-      "id": "src_lib_sound",
-      "label": "sound.ts",
+      "id": "src_components_ide_assistantactivitybar_steprow",
+      "label": "StepRow",
       "_origin": "ast",
       "community": 23,
-      "community_name": "useWebSocket.ts",
+      "community_name": "ActivityStep",
       "file_type": "code",
-      "norm_label": "sound.ts",
-      "source_file": "src/lib/sound.ts",
-      "source_location": "L1"
+      "norm_label": "steprow",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L62"
+    },
+    {
+      "id": "src_components_ide_assistantactivitybar_tool_meta",
+      "label": "TOOL_META",
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ActivityStep",
+      "file_type": "code",
+      "norm_label": "tool_meta",
+      "source_file": "src/components/ide/AssistantActivityBar.tsx",
+      "source_location": "L20"
     },
     {
       "id": "src_components_panels_scheduledtaskspanel",
@@ -21440,6 +21500,28 @@
       "source_location": "L1"
     },
     {
+      "id": "src_context_liveapicontext",
+      "label": "LiveAPIContext.tsx",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "liveapicontext.tsx",
+      "source_file": "src/context/LiveAPIContext.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_context_liveapicontext_liveapicontext",
+      "label": "LiveAPIContext",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "liveapicontext",
+      "source_file": "src/context/LiveAPIContext.tsx",
+      "source_location": "L7"
+    },
+    {
       "id": "src_hooks_useactivity",
       "label": "useActivity.ts",
       "_origin": "ast",
@@ -21462,14 +21544,36 @@
       "source_location": "L1"
     },
     {
-      "id": "src_hooks_usetranscript",
-      "label": "useTranscript.ts",
+      "id": "src_hooks_usewebsocket",
+      "label": "useWebSocket.ts",
       "_origin": "ast",
       "community": 4,
       "community_name": "useLiveAPI.ts",
       "file_type": "code",
-      "norm_label": "usetranscript.ts",
-      "source_file": "src/hooks/useTranscript.ts",
+      "norm_label": "usewebsocket.ts",
+      "source_file": "src/hooks/useWebSocket.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_lib_sound",
+      "label": "sound.ts",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "sound.ts",
+      "source_file": "src/lib/sound.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_utils_audit",
+      "label": "audit.ts",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "useLiveAPI.ts",
+      "file_type": "code",
+      "norm_label": "audit.ts",
+      "source_file": "src/utils/audit.ts",
       "source_location": "L1"
     },
     {
@@ -22034,6 +22138,17 @@
       "norm_label": "knowledgehealthdashboard.tsx",
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
       "source_location": "L1"
+    },
+    {
+      "id": "src_components_knowledge_knowledgehealthdashboard_phase_labels",
+      "label": "PHASE_LABELS",
+      "_origin": "ast",
+      "community": 55,
+      "community_name": "KnowledgeHealthDashboard.tsx",
+      "file_type": "code",
+      "norm_label": "phase_labels",
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L78"
     },
     {
       "id": "src_components_settings_envsection",
@@ -22949,6 +23064,17 @@
       "source_location": "L1"
     },
     {
+      "id": "src_main_documentsview",
+      "label": "DocumentsView",
+      "_origin": "ast",
+      "community": 87,
+      "community_name": "./DocumentsView.js",
+      "file_type": "code",
+      "norm_label": "documentsview",
+      "source_file": "src/main.tsx",
+      "source_location": "L31"
+    },
+    {
       "id": "src_views_documentsview_category_colors",
       "label": "CATEGORY_COLORS",
       "_origin": "ast",
@@ -23103,6 +23229,18 @@
       "source_file": "@monaco-editor/react"
     },
     {
+      "id": "src_components_panels_visionpanel",
+      "label": "../components/panels/VisionPanel.js",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "confidence": "EXTRACTED",
+      "file_type": "code",
+      "norm_label": "../components/panels/visionpanel.js",
+      "source_file": "src/components/panels/VisionPanel.js",
+      "source_location": "L1"
+    },
+    {
       "id": "src_views_ideview",
       "label": "IdeView.tsx",
       "_origin": "ast",
@@ -23115,16 +23253,15 @@
       "source_location": "L1"
     },
     {
-      "id": "src_views_notebooksview",
-      "label": "NotebooksView.tsx",
+      "id": "src_components_panels_visionpanel_visionpanel",
+      "label": "VisionPanel",
       "_origin": "ast",
       "community": 9,
       "community_name": "IdeView.tsx",
-      "confidence": "EXTRACTED",
       "file_type": "code",
-      "norm_label": "notebooksview.tsx",
-      "source_file": "src/views/NotebooksView.tsx",
-      "source_location": "L1"
+      "norm_label": "visionpanel",
+      "source_file": "src/components/panels/VisionPanel.tsx",
+      "source_location": "L11"
     },
     {
       "id": "src_hooks_useeditoractions",
@@ -23138,15 +23275,15 @@
       "source_location": "L1"
     },
     {
-      "id": "src_main_notebooksview",
-      "label": "NotebooksView",
+      "id": "src_main_ideview",
+      "label": "IdeView",
       "_origin": "ast",
       "community": 9,
       "community_name": "IdeView.tsx",
       "file_type": "code",
-      "norm_label": "notebooksview",
+      "norm_label": "ideview",
       "source_file": "src/main.tsx",
-      "source_location": "L32"
+      "source_location": "L27"
     },
     {
       "id": "src_views_ideview_documentsview",
@@ -23158,6 +23295,17 @@
       "norm_label": "documentsview",
       "source_file": "src/views/IdeView.tsx",
       "source_location": "L18"
+    },
+    {
+      "id": "src_views_ideview_githubpanel",
+      "label": "GitHubPanel",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "githubpanel",
+      "source_file": "src/views/IdeView.tsx",
+      "source_location": "L17"
     },
     {
       "id": "src_views_ideview_importmeta",
@@ -23182,17 +23330,6 @@
       "source_location": "L5"
     },
     {
-      "id": "src_views_ideview_notebooksview",
-      "label": "NotebooksView",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "IdeView.tsx",
-      "file_type": "code",
-      "norm_label": "notebooksview",
-      "source_file": "src/views/IdeView.tsx",
-      "source_location": "L19"
-    },
-    {
       "id": "src_views_ideview_richdocumentviewerlazy",
       "label": "RichDocumentViewerLazy",
       "_origin": "ast",
@@ -23202,6 +23339,17 @@
       "norm_label": "richdocumentviewerlazy",
       "source_file": "src/views/IdeView.tsx",
       "source_location": "L20"
+    },
+    {
+      "id": "src_views_ideview_visionpanel",
+      "label": "VisionPanel",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "IdeView.tsx",
+      "file_type": "code",
+      "norm_label": "visionpanel",
+      "source_file": "src/views/IdeView.tsx",
+      "source_location": "L16"
     },
     {
       "id": "src_components_helpbutton",
@@ -23391,6 +23539,17 @@
       "source_location": "L35"
     },
     {
+      "id": "src_components_ide_mentiondropdown",
+      "label": "MentionDropdown.tsx",
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "mentiondropdown.tsx",
+      "source_file": "src/components/ide/MentionDropdown.tsx",
+      "source_location": "L1"
+    },
+    {
       "id": "src_components_ide_skillpicker",
       "label": "SkillPicker.tsx",
       "_origin": "ast",
@@ -23443,6 +23602,17 @@
       "file_type": "code",
       "norm_label": "usecustomskills.ts",
       "source_file": "src/hooks/useCustomSkills.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_hooks_usefilemention",
+      "label": "useFileMention.ts",
+      "_origin": "ast",
+      "community": 97,
+      "community_name": "ChatPanel.tsx",
+      "file_type": "code",
+      "norm_label": "usefilemention.ts",
+      "source_file": "src/hooks/useFileMention.ts",
       "source_location": "L1"
     },
     {
@@ -24626,6 +24796,18 @@
     },
     {
       "source": "src_components_ide_globalsearch_globalsearch",
+      "target": "src_components_ide_globalsearch_buildflatitems",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/components/ide/GlobalSearch.tsx",
+      "source_location": "L128",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_ide_globalsearch_globalsearch",
       "target": "src_components_ide_globalsearch_getauthheaders",
       "relation": "calls",
       "_origin": "ast",
@@ -24633,7 +24815,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/ide/GlobalSearch.tsx",
-      "source_location": "L107",
+      "source_location": "L165",
       "weight": 1.0
     },
     {
@@ -25365,7 +25547,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L552",
+      "source_location": "L584",
       "weight": 1.0
     },
     {
@@ -25377,7 +25559,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L595",
+      "source_location": "L627",
       "weight": 1.0
     },
     {
@@ -25389,7 +25571,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L715",
+      "source_location": "L747",
       "weight": 1.0
     },
     {
@@ -25401,7 +25583,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L744",
+      "source_location": "L776",
       "weight": 1.0
     },
     {
@@ -25413,7 +25595,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L748",
+      "source_location": "L780",
       "weight": 1.0
     },
     {
@@ -25425,7 +25607,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L679",
+      "source_location": "L711",
       "weight": 1.0
     },
     {
@@ -25437,7 +25619,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L642",
+      "source_location": "L674",
       "weight": 1.0
     },
     {
@@ -25449,7 +25631,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L667",
+      "source_location": "L699",
       "weight": 1.0
     },
     {
@@ -25461,7 +25643,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L672",
+      "source_location": "L704",
       "weight": 1.0
     },
     {
@@ -27045,7 +27227,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useAudio.ts",
-      "source_location": "L313",
+      "source_location": "L337",
       "weight": 1.0
     },
     {
@@ -27057,7 +27239,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useAudio.ts",
-      "source_location": "L338",
+      "source_location": "L368",
       "weight": 1.0
     },
     {
@@ -27146,6 +27328,18 @@
     },
     {
       "source": "src_hooks_useliveapi_useliveapi",
+      "target": "src_lib_latencyprobe_probe",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L181",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi_useliveapi",
       "target": "src_hooks_useaudio_useaudio",
       "relation": "calls",
       "_origin": "ast",
@@ -27153,7 +27347,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L167",
+      "source_location": "L198",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi_useliveapi",
+      "target": "src_lib_latencyprobe_resetprobe",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -27165,7 +27371,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L36",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -27177,7 +27383,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L474",
+      "source_location": "L515",
       "weight": 1.0
     },
     {
@@ -27189,7 +27395,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L609",
+      "source_location": "L650",
       "weight": 1.0
     },
     {
@@ -27201,7 +27407,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L65",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -27213,7 +27419,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L73",
+      "source_location": "L74",
       "weight": 1.0
     },
     {
@@ -27225,7 +27431,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L85",
+      "source_location": "L86",
       "weight": 1.0
     },
     {
@@ -27442,6 +27648,18 @@
       "context": "call",
       "source_file": "src/hooks/useWebSocket.ts",
       "source_location": "L276",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe_probe",
+      "target": "src_lib_latencyprobe_flushprobe",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -28715,7 +28933,7 @@
       "confidence_score": 1.0,
       "context": "export",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -28727,7 +28945,7 @@
       "confidence_score": 1.0,
       "context": "export",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -28739,7 +28957,7 @@
       "confidence_score": 1.0,
       "context": "export",
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -31242,6 +31460,42 @@
     },
     {
       "source": "src_hooks_useliveapi",
+      "target": "src_lib_latencyprobe_latencyreport",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi",
+      "target": "src_lib_latencyprobe_probe",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi",
+      "target": "src_lib_latencyprobe_resetprobe",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi",
       "target": "src_utils_audit_auditreport",
       "relation": "imports",
       "_origin": "ast",
@@ -32765,6 +33019,18 @@
       "context": "import",
       "source_file": "src/hooks/useIdeSettings.ts",
       "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "src_hooks_useliveapi",
+      "target": "src_lib_latencyprobe",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "src/hooks/useLiveAPI.ts",
+      "source_location": "L12",
       "weight": 1.0
     },
     {
@@ -35896,6 +36162,17 @@
     },
     {
       "source": "src_components_ide_globalsearch",
+      "target": "src_components_ide_globalsearch_globalsearch",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ide/GlobalSearch.tsx",
+      "source_location": "L103",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_ide_globalsearch",
       "target": "src_components_ide_globalsearch_getauthheaders",
       "relation": "contains",
       "_origin": "ast",
@@ -35940,7 +36217,7 @@
     },
     {
       "source": "src_components_ide_globalsearch",
-      "target": "src_components_ide_globalsearch_highlightedline",
+      "target": "src_components_ide_globalsearch_flatitem",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -35951,13 +36228,24 @@
     },
     {
       "source": "src_components_ide_globalsearch",
-      "target": "src_components_ide_globalsearch_globalsearch",
+      "target": "src_components_ide_globalsearch_buildflatitems",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/ide/GlobalSearch.tsx",
-      "source_location": "L75",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_ide_globalsearch",
+      "target": "src_components_ide_globalsearch_highlightedline",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ide/GlobalSearch.tsx",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -38025,7 +38313,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L20",
+      "source_location": "L22",
       "weight": 1.0
     },
     {
@@ -38036,7 +38324,40 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L54",
+      "source_location": "L56",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_knowledge_knowledgehealthdashboard",
+      "target": "src_components_knowledge_knowledgehealthdashboard_reindexprogress",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_knowledge_knowledgehealthdashboard",
+      "target": "src_components_knowledge_knowledgehealthdashboard_phase_labels",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L78",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_knowledge_knowledgehealthdashboard",
+      "target": "src_components_knowledge_knowledgehealthdashboard_tabid",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
+      "source_location": "L86",
       "weight": 1.0
     },
     {
@@ -38047,7 +38368,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/knowledge/KnowledgeHealthDashboard.tsx",
-      "source_location": "L69",
+      "source_location": "L90",
       "weight": 1.0
     },
     {
@@ -40511,7 +40832,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L190",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -40522,7 +40843,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L198",
+      "source_location": "L230",
       "weight": 1.0
     },
     {
@@ -40544,7 +40865,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L416",
+      "source_location": "L448",
       "weight": 1.0
     },
     {
@@ -40555,7 +40876,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L428",
+      "source_location": "L460",
       "weight": 1.0
     },
     {
@@ -40566,7 +40887,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L449",
+      "source_location": "L481",
       "weight": 1.0
     },
     {
@@ -40577,7 +40898,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L527",
+      "source_location": "L559",
       "weight": 1.0
     },
     {
@@ -40588,7 +40909,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L546",
+      "source_location": "L578",
       "weight": 1.0
     },
     {
@@ -40610,29 +40931,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L640",
-      "weight": 1.0
-    },
-    {
-      "source": "src_components_panels_agentpanel",
-      "target": "src_components_panels_agentpanel_runningelapsed",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L678",
-      "weight": 1.0
-    },
-    {
-      "source": "src_components_panels_agentpanel",
-      "target": "src_components_panels_agentpanel_delegatedtab",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L690",
+      "source_location": "L672",
       "weight": 1.0
     },
     {
@@ -40648,7 +40947,7 @@
     },
     {
       "source": "src_components_panels_agentpanel",
-      "target": "src_components_panels_agentpanel_delegatedtaskcard",
+      "target": "src_components_panels_agentpanel_runningelapsed",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -40659,13 +40958,35 @@
     },
     {
       "source": "src_components_panels_agentpanel",
+      "target": "src_components_panels_agentpanel_delegatedtab",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/panels/AgentPanel.tsx",
+      "source_location": "L722",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_panels_agentpanel",
+      "target": "src_components_panels_agentpanel_delegatedtaskcard",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/panels/AgentPanel.tsx",
+      "source_location": "L742",
+      "weight": 1.0
+    },
+    {
+      "source": "src_components_panels_agentpanel",
       "target": "src_components_panels_agentpanel_emptystate",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L824",
+      "source_location": "L856",
       "weight": 1.0
     },
     {
@@ -43602,7 +43923,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L185",
+      "source_location": "L192",
       "weight": 1.0
     },
     {
@@ -43613,7 +43934,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L220",
+      "source_location": "L227",
       "weight": 1.0
     },
     {
@@ -43624,7 +43945,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/settings/SettingsPrimitives.tsx",
-      "source_location": "L258",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -46979,7 +47300,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/hooks/useAudio.ts",
-      "source_location": "L65",
+      "source_location": "L69",
       "weight": 1.0
     },
     {
@@ -47353,7 +47674,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L14",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -47364,7 +47685,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L15",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -47375,7 +47696,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L25",
+      "source_location": "L26",
       "weight": 1.0
     },
     {
@@ -47386,7 +47707,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/hooks/useLiveAPI.ts",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -48135,6 +48456,94 @@
       "confidence_score": 1.0,
       "source_file": "src/hooks/useWorkspaceState.ts",
       "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_resetprobe",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L157",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_latencyreport",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L163",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_probestep",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_probeentry",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_session",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_step_order",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_probe",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "src_lib_latencyprobe",
+      "target": "src_lib_latencyprobe_flushprobe",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/latencyProbe.ts",
+      "source_location": "L93",
       "weight": 1.0
     },
     {
@@ -52434,7 +52843,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L200",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -52446,7 +52855,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L200",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -52458,7 +52867,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "src/components/panels/AgentPanel.tsx",
-      "source_location": "L201",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -52955,5 +53364,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "60b0c1e229499307cc2cfdebd2100f687a9a5703"
+  "built_at_commit": "d5860164f3630d57f877d9cf19067a5d5fd9cc26"
 }

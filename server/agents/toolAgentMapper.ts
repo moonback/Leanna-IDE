@@ -185,6 +185,16 @@ const SENSITIVE_TOOL_ATTRIBUTION: Record<
   delete_project_folder: { preferred: 'coder', allowed: ['coder', 'refactor'], risk: 'dangerous' },
   // Push distant — impact hors machine.
   git_push: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  // Scaffold / générateur de projet — crée une arborescence complète. Jamais attribué par heuristique.
+  project_scaffold: { preferred: 'architect', allowed: ['architect', 'coder'], risk: 'write' },
+  // Boucle qualité — exécute patch+typecheck+tests en chaîne. Risque exec.
+  quality_loop: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
+  // Skills custom — modifient du code exécutable dynamiquement. Risque dangerous.
+  create_custom_skill: { preferred: 'coder', allowed: ['coder', 'architect'], risk: 'dangerous' },
+  update_custom_skill: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  delete_custom_skill: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
+  // Exécution de workflow complet — chaîne d'actions avec effets de bord.
+  workflow_run: { preferred: 'planner', allowed: ['planner', 'coder'], risk: 'exec' },
 };
 
 /**
@@ -500,8 +510,23 @@ export function canAgentUseTool(role: AgentRole, tool: string): boolean {
  * @returns La catégorie correspondante ou undefined
  */
 export function getToolCategory(tool: string): string | undefined {
+  const lowerTool = tool.toLowerCase();
+  const segments = lowerTool.split(/[^a-z0-9]+/);
+
   for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
-    if (config.keywords.some(keyword => tool.toLowerCase().includes(keyword.toLowerCase()))) {
+    const matched = config.keywords.some(keyword => {
+      const kw = keyword.toLowerCase();
+      // Segment exact match (ex: 'git' in 'git_push', 'get' in 'get_file')
+      if (segments.includes(kw)) return true;
+      // Prefix match with separator (ex: 'doc' in 'doc_generate')
+      if (lowerTool.startsWith(kw + '_') || lowerTool.startsWith(kw + '-')) return true;
+      // Suffix match with separator (ex: '_doc')
+      if (lowerTool.endsWith('_' + kw) || lowerTool.endsWith('-' + kw)) return true;
+      // Keywords >= 4 chars can match substring if meaningful (ex: 'search', 'verify', 'telegram')
+      if (kw.length >= 4 && lowerTool.includes(kw)) return true;
+      return false;
+    });
+    if (matched) {
       return category;
     }
   }

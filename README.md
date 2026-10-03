@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-848%20passing-brightgreen?logo=vitest" alt="Tests 848 passing" />
+  <img src="https://img.shields.io/badge/Tests-855%20passing-brightgreen?logo=vitest" alt="Tests 855 passing" />
 
 [![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
@@ -74,6 +74,7 @@
 * [Édition des variables d'environnement dans l'interface](#édition-des-variables-denvironnement-dans-linterface)
 * [Développement](#développement)
 * [Tests](#tests)
+* [Validation de l'autonomie](#validation-de-lautonomie)
 * [Build et packaging](#build-et-packaging)
 * [API](#api)
 * [Recommandations de sécurité](#recommandations-de-sécurité)
@@ -2841,6 +2842,41 @@ Cela exécute le test de charge du gestionnaire de tâches d'autonomie.
 
 ---
 
+# Validation de l'autonomie
+
+L'autonomie de Leanna ne repose pas sur de simples déclarations ou logs, mais sur un **comportement démontré et vérifié formellement** via une boucle agentique fermée :
+
+$$\text{PLAN} \longrightarrow \text{ACT} \longrightarrow \text{OBSERVE} \longrightarrow \text{VERIFY} \longrightarrow \text{RECOVER} \longrightarrow \text{COMPLETE}$$
+
+### Banc d'intégration End-to-End autonome (`server/agents/e2e-mission.test.ts`)
+
+Un banc de test autonome hermétique et sans dépendance réseau externe simule et valide l'ensemble du cycle de vie d'une mission :
+
+* **Scénario A — Succès direct (1 boucle)** : L'agent reçoit une mission de correction de code, planifie les étapes, lit le fichier source, applique le correctif typé, et la vérification post-écriture indépendante valide la conformité par empreinte `SHA-256` en un seul cycle.
+* **Scénario B — Auto-récupération (Auto-Repair Loop)** : Un premier patch erroné est détecté et rejeté par la vérification cryptographique et le typecheck $\rightarrow$ déclenchement automatique du diagnostic et de la stratégie de réparation $\rightarrow$ génération et application du correctif valide (0 intervention humaine).
+* **Scénario C — Respect strict des budgets** : Garantie d'absence de boucle infinie : lorsque les quotas d'écritures, de lectures ou d'itérations sont atteints, le runtime interrompt la boucle de manière propre, prévisible et structurée.
+* **Scénario D — Découplage outil / vérification réelle** : Démontre qu'un retour d'outil déclarant `ok: true` ne suffit jamais. Seule la preuve d'état indépendante (`verify_file`, diagnostics compiler, relecture de fichier) autorise la validation d'une étape.
+
+### Commandes de vérification de l'autonomie
+
+Exécuter le banc de test E2E autonome :
+
+```bash
+npx tsx --test server/agents/e2e-mission.test.ts
+```
+
+Exécuter le harness de mission agentique :
+
+```bash
+npx tsx --test server/runtime/agentic/mission-harness.test.ts
+```
+
+### Matrice d'attribution des outils et sécurité
+
+Tous les 210+ outils du `ToolRegistry` sont audités et cartographiés dans [`docs/TOOL_OWNERSHIP_MATRIX.md`](docs/TOOL_OWNERSHIP_MATRIX.md). Les outils sensibles à effets de bord majeurs (`project_scaffold`, `quality_loop`, `create/update/delete_custom_skill`, `workflow_run`, `git_push`) sont explicitement verrouillés dans `SENSITIVE_TOOL_ATTRIBUTION` pour interdire tout routage imprévisible par simple heuristique.
+
+---
+
 # API
 
 Leanna expose une API HTTP et des points de terminaison WebSocket.
@@ -3306,6 +3342,38 @@ docs/LEANNA_AUTONOMY_IMPLEMENTATION_REPORT.md
 ```
 
 Rapport d'autonomie au niveau de l'implémentation.
+
+## Audit officiel d'autonomie (v1.4.0)
+
+```text
+docs/AUTONOMY_AUDIT.md
+```
+
+Audit rigoureux distinguant ce qui est formellement vérifié (`VERIFIED`), implémenté (`IMPLEMENTED`), partiel (`PARTIAL`), manquant (`MISSING`) et les risques résiduels (`RISK`).
+
+## Plan de test de l'autonomie
+
+```text
+docs/AUTONOMY_TEST_PLAN.md
+```
+
+Plan de test détaillé avec spécifications des oracles, invariants SHA-256 et scénarios de validation E2E.
+
+## Matrice de propriété des outils
+
+```text
+docs/TOOL_OWNERSHIP_MATRIX.md
+```
+
+Matrice exhaustive des 210+ outils du `ToolRegistry` avec attribution explicite (`SENSITIVE_TOOL_ATTRIBUTION`), niveau de risque, permissions et contraintes de bac à sable.
+
+## Cartographie du runtime autonome
+
+```text
+docs/AUTONOMY_RUNTIME_MAP.md
+```
+
+Cartographie complète du flux d'exécution depuis l'intention utilisateur jusqu'à la vérification finale et la persistance.
 
 ## Base de données
 

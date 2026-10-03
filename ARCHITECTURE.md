@@ -402,7 +402,8 @@ Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les test
 
 **Couverture actuelle :**
 - ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
-- ✅ **Routes REST** : 103 tests d'intégration (19 fichiers `server/routes/*.test.ts`)
+- ✅ **Routes REST** : 118 tests d'intégration (22 fichiers `server/routes/*.test.ts`)
+- ✅ **Global** : 855+ tests automatisés (`node --import tsx --test server/**/*.test.ts`)
 
 ### Tests unitaires (Skills)
 
@@ -433,16 +434,19 @@ Fichiers : `server/routes/*.test.ts`
 |---|---|---|
 | Agents | 15 | Statut, tâches, rôles, flotte, bus de messages, collaboration, persistance, tool-mapping, tool-categories |
 | Marketplace | 13 | Recherche, featured, installed, stats, installation, publication, rating, sécurité, export |
+| MCP Directory | 8 | Découverte, serveurs MCP, recherche, installation |
 | Conversations | 7 | Liste, recherche, messages, mise à jour titre, suppression |
 | Skills | 7 | Liste, propriétés requises, core skills, statut Supabase |
 | Workflows | 7 | Liste, création, exécution, toggle, suppression |
 | Browser | 6 | Validation requêtes, résolution promesses, actions |
-| Upload Document | 6 | Validation types fichiers, rate limiting, contexte |
 | Profile & Tokens | 6 | GET/POST profile, GET/POST tokens, validation clés |
-| Terminal | 5 | Configuration, sessions actives, authentification |
-| Sandbox | 5 | Statut, init/activate, validation TSC, diff |
+| Upload Document | 6 | Validation types fichiers, rate limiting, contexte |
 | GitHub | 5 | Repos, issues, PRs, recherche |
+| Sandbox | 5 | Statut, init/activate, validation TSC, diff |
+| Terminal | 5 | Configuration, sessions actives, authentification |
+| Safeguards (Ignore) | 4 | Compilation règles .leannaignore, validation écritures |
 | Self-Root | 4 | Statut, workspaces, validation, changement de projet |
+| Variables d'environnement | 3 | Groupes de variables, masquage secrets, reveal, update |
 | Export | 3 | Formats d'export, validation |
 | IDE | 3 | Arbre, lecture/écriture fichiers |
 | Memories | 3 | Liste, suppression globale, suppression par ID |
@@ -450,7 +454,7 @@ Fichiers : `server/routes/*.test.ts`
 | Workspace | 3 | Info workspace, verrouillage POST |
 | Mémoire hiérarchique | 1 | Endpoint stats |
 | Health | 1 | Health check |
-| **Total** | **103** | **19 fichiers** |
+| **Total** | **118** | **22 fichiers** |
 
 ### Exécution des tests
 

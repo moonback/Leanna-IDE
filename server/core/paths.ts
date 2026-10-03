@@ -42,9 +42,27 @@ export function coreDir(...segments: string[]): string {
  */
 export function writeJsonAtomic(filePath: string, data: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
-  fs.renameSync(tmp, filePath);
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch (err: any) {
+    if (err.code === "EPERM" || err.code === "EBUSY" || err.code === "EACCES") {
+      try {
+        fs.copyFileSync(tmp, filePath);
+        fs.unlinkSync(tmp);
+        return;
+      } catch {
+        // Fallback to rethrow if copy also fails
+      }
+    }
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+      // Best-effort cleanup
+    }
+    throw err;
+  }
 }
 
 /** Lit un fichier JSON. Retourne `fallback` si absent ou illisible. */

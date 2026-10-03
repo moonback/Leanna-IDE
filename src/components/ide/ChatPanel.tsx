@@ -309,7 +309,7 @@ const ChatMessage = memo(function ChatMessage({
         </div>
 
         {/* Sources */}
-        {/* {isAssistant && visibleSources.length > 0 && (
+        {isAssistant && visibleSources.length > 0 && (
           <div className="mt-2 text-left w-full">
             <button
               type="button"
@@ -415,7 +415,7 @@ const ChatMessage = memo(function ChatMessage({
               )}
             </AnimatePresence>
           </div>
-        )} */}
+        )}
       </div>
     </motion.div>
   );
