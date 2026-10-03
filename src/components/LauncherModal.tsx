@@ -1,16 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Code2, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
+import { Code2, BookOpen, ArrowRight, Sparkles, FolderClock, FolderOpen, GitBranch, Loader2 } from 'lucide-react';
 // @ts-ignore - Asset handled by bundler
 import bgVideo from '../../assets/video.mp4';
+import { ideApi } from '../services/ideApi.js';
 
 /**
  * LauncherModal — écran de choix affiché au démarrage (après le splash).
  *
- * Laisse l'utilisateur choisir entre :
- *   - Ouvrir l'IDE       → navigue vers /ide
- *   - Ouvrir un Notebook → navigue vers /notebooks
+ * Permet de :
+ *   - Reprendre directement le dernier projet s'il existe → active le workspace et navigue vers /ide
+ *   - Ouvrir un autre projet ou créer un workspace → ouvre StartupProjectModal
+ *   - Ouvrir un Notebook sans projet → active le mode sans workspace et navigue vers /notebooks
  *
  * Le choix est mémorisé pour la session (sessionStorage) afin de ne pas
  * réafficher l'écran à chaque navigation ou rechargement de route interne.
@@ -24,11 +26,24 @@ const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
 const OVERLAY_FADE = { duration: 0.2 };
 const CARD_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.35 };
 
+interface WorkspaceItem {
+  id: string;
+  name: string;
+  path: string;
+  siteUrl?: string;
+  lastOpened: string;
+  createdAt: string;
+  isGit: boolean;
+  gitBranch?: string;
+}
+
 export function LauncherModal() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const shouldReduceMotion = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
+  const [lastWorkspace, setLastWorkspace] = useState<WorkspaceItem | null>(null);
+  const [isOpeningLast, setIsOpeningLast] = useState(false);
 
   useEffect(() => {
     // N'afficher qu'une seule fois par session, et uniquement au tout début
@@ -43,39 +58,94 @@ export function LauncherModal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Permet de rouvrir le launcher à la demande depuis n'importe où
-  // (ex: bouton "retour au sélecteur" dans la vue Notebooks).
+  // Récupérer le dernier projet enregistré
   useEffect(() => {
-    const handleReopen = () => setIsOpen(true);
+    const fetchRecent = async () => {
+      try {
+        const res = await fetch('/api/self-root/workspaces');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.workspaces && data.workspaces.length > 0) {
+            setLastWorkspace(data.workspaces[0]);
+          }
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    fetchRecent();
+  }, []);
+
+  // Permet de rouvrir le launcher à la demande depuis n'importe où
+  useEffect(() => {
+    const handleReopen = () => {
+      setIsOpen(true);
+      fetch('/api/self-root/workspaces')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.workspaces && data.workspaces.length > 0) {
+            setLastWorkspace(data.workspaces[0]);
+          }
+        })
+        .catch(() => {});
+    };
     window.addEventListener('Leanna-open-launcher', handleReopen);
     return () => window.removeEventListener('Leanna-open-launcher', handleReopen);
   }, []);
 
-  const choose = useCallback(
-    (target: '/ide' | '/notebooks') => {
-      sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
-
-      if (target === '/notebooks') {
-        // Les notebooks n'ont pas besoin d'un workspace : activer le mode
-        // "sans projet" pour empêcher StartupProjectModal de s'ouvrir par-dessus,
-        // et aller directement à la vue Notebooks.
-        sessionStorage.setItem(NO_WORKSPACE_KEY, '1');
-        window.dispatchEvent(new CustomEvent('Leanna-no-workspace-mode'));
+  const openLastProject = useCallback(async () => {
+    if (!lastWorkspace || isOpeningLast) return;
+    setIsOpeningLast(true);
+    try {
+      const res = await fetch('/api/self-root/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: lastWorkspace.path,
+          userConfirmed: true,
+          siteUrl: lastWorkspace.siteUrl || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+        sessionStorage.removeItem(NO_WORKSPACE_KEY);
+        ideApi.invalidateCache();
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+        window.dispatchEvent(
+          new CustomEvent('Leanna-workspace-changed', {
+            detail: { workspace: data.newRoot || lastWorkspace.path },
+          }),
+        );
         setIsOpen(false);
-        navigate('/notebooks');
+        navigate('/ide');
         return;
       }
+    } catch (e) {
+      console.error('Erreur lors de la réouverture du dernier projet:', e);
+    } finally {
+      setIsOpeningLast(false);
+    }
 
-      // Pour l'IDE : ouvrir le sélecteur de workspace (StartupProjectModal).
-      // On lève le mode "sans projet" et on demande explicitement l'ouverture
-      // du sélecteur, même si un workspace est déjà actif.
-      sessionStorage.removeItem(NO_WORKSPACE_KEY);
-      setIsOpen(false);
-      navigate('/ide');
-      window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
-    },
-    [navigate],
-  );
+    // Si la réouverture échoue, basculer sur le sélecteur
+    openWorkspaceSwitcher();
+  }, [lastWorkspace, isOpeningLast, navigate]);
+
+  const openWorkspaceSwitcher = useCallback(() => {
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+    sessionStorage.removeItem(NO_WORKSPACE_KEY);
+    setIsOpen(false);
+    navigate('/ide');
+    window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
+  }, [navigate]);
+
+  const openNotebooks = useCallback(() => {
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+    sessionStorage.setItem(NO_WORKSPACE_KEY, '1');
+    window.dispatchEvent(new CustomEvent('Leanna-no-workspace-mode'));
+    setIsOpen(false);
+    navigate('/notebooks');
+  }, [navigate]);
 
   if (!isOpen) return null;
 
@@ -162,21 +232,75 @@ export function LauncherModal() {
           </div>
 
           {/* Choix */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <LauncherCard
-              icon={<Code2 className="w-5 h-5" />}
-              title="Ouvrir l'IDE"
-              description="Éditeur de code, terminal, agents et outils de développement."
-              onClick={() => choose('/ide')}
-              reduceMotion={!!shouldReduceMotion}
-            />
-            <LauncherCard
-              icon={<BookOpen className="w-5 h-5" />}
-              title="Ouvrir un Notebook"
-              description="Sources, notes, chat documentaire et génération de contenu."
-              onClick={() => choose('/notebooks')}
-              reduceMotion={!!shouldReduceMotion}
-            />
+          <div
+            className={`grid gap-4 ${
+              lastWorkspace ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'
+            }`}
+          >
+            {lastWorkspace ? (
+              <>
+                {/* 1. Dernier projet */}
+                <LauncherCard
+                  highlight
+                  icon={
+                    isOpeningLast ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-[var(--accent-primary)]" />
+                    ) : (
+                      <FolderClock className="w-5 h-5 text-[var(--accent-primary)]" />
+                    )
+                  }
+                  badge="Dernier ouvert"
+                  title={lastWorkspace.name || 'Dernier projet'}
+                  description={lastWorkspace.path}
+                  extraMeta={
+                    lastWorkspace.isGit && lastWorkspace.gitBranch ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--accent-secondary)] mt-1.5 opacity-90">
+                        <GitBranch className="w-3 h-3" />
+                        {lastWorkspace.gitBranch}
+                      </span>
+                    ) : undefined
+                  }
+                  onClick={openLastProject}
+                  reduceMotion={!!shouldReduceMotion}
+                />
+
+                {/* 2. Autre projet */}
+                <LauncherCard
+                  icon={<FolderOpen className="w-5 h-5" />}
+                  title="Autre projet / Nouveau"
+                  description="Parcourir un dossier local, cloner un dépôt Git ou connecter un FTP."
+                  onClick={openWorkspaceSwitcher}
+                  reduceMotion={!!shouldReduceMotion}
+                />
+
+                {/* 3. Notebooks */}
+                <LauncherCard
+                  icon={<BookOpen className="w-5 h-5" />}
+                  title="Ouvrir un Notebook"
+                  description="Sources, notes, chat documentaire et génération de contenu."
+                  onClick={openNotebooks}
+                  reduceMotion={!!shouldReduceMotion}
+                />
+              </>
+            ) : (
+              <>
+                {/* Mode par défaut si aucun projet dans l'historique */}
+                <LauncherCard
+                  icon={<Code2 className="w-5 h-5" />}
+                  title="Ouvrir l'IDE"
+                  description="Éditeur de code, terminal, agents et outils de développement."
+                  onClick={openWorkspaceSwitcher}
+                  reduceMotion={!!shouldReduceMotion}
+                />
+                <LauncherCard
+                  icon={<BookOpen className="w-5 h-5" />}
+                  title="Ouvrir un Notebook"
+                  description="Sources, notes, chat documentaire et génération de contenu."
+                  onClick={openNotebooks}
+                  reduceMotion={!!shouldReduceMotion}
+                />
+              </>
+            )}
           </div>
         </motion.div>
       </motion.div>
@@ -188,12 +312,18 @@ function LauncherCard({
   icon,
   title,
   description,
+  badge,
+  extraMeta,
+  highlight,
   onClick,
   reduceMotion,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  badge?: string;
+  extraMeta?: React.ReactNode;
+  highlight?: boolean;
   onClick: () => void;
   reduceMotion: boolean;
 }) {
@@ -201,43 +331,82 @@ function LauncherCard({
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={reduceMotion ? undefined : { y: -2 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.99 }}
-      className="group flex flex-col items-start gap-3 p-5 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-base)' }}
+      whileHover={reduceMotion ? undefined : { y: -3 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+      className={`group relative flex flex-col items-start justify-between gap-3 p-5 rounded-xl border text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] ${
+        highlight ? 'shadow-lg' : ''
+      }`}
+      style={{
+        backgroundColor: highlight
+          ? 'color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary))'
+          : 'var(--bg-secondary)',
+        borderColor: highlight
+          ? 'color-mix(in srgb, var(--accent-primary) 55%, var(--border-base))'
+          : 'var(--border-base)',
+      }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent-primary)';
-        (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-          'color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary))';
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = highlight
+          ? 'color-mix(in srgb, var(--accent-primary) 16%, var(--bg-secondary))'
+          : 'color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary))';
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-base)';
-        (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--bg-secondary)';
+        (e.currentTarget as HTMLButtonElement).style.borderColor = highlight
+          ? 'color-mix(in srgb, var(--accent-primary) 55%, var(--border-base))'
+          : 'var(--border-base)';
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = highlight
+          ? 'color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary))'
+          : 'var(--bg-secondary)';
       }}
     >
-      <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-          color: 'var(--accent-secondary)',
-          border: '1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent)',
-        }}
-      >
-        {icon}
-      </div>
-      <div>
+      <div className="w-full">
+        <div className="flex items-center justify-between w-full mb-3">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              backgroundColor: highlight
+                ? 'color-mix(in srgb, var(--accent-primary) 22%, transparent)'
+                : 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+              color: 'var(--accent-secondary)',
+              border: '1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent)',
+            }}
+          >
+            {icon}
+          </div>
+
+          {badge && (
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shadow-sm"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+                borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                color: 'var(--accent-primary)',
+              }}
+            >
+              {badge}
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }} title={title}>
             {title}
           </h3>
           <ArrowRight
-            className="w-4 h-4 opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0"
+            className="w-4 h-4 opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0 flex-shrink-0"
             style={{ color: 'var(--accent-primary)' }}
           />
         </div>
-        <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+
+        <p
+          className="text-xs mt-1 leading-relaxed line-clamp-2 break-all"
+          style={{ color: 'var(--text-muted)' }}
+          title={description}
+        >
           {description}
         </p>
+
+        {extraMeta}
       </div>
     </motion.button>
   );

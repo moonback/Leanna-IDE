@@ -12,6 +12,8 @@ import { useToast } from '../components/ui/Toast.js';
 
 /** Clé sessionStorage pour le mode "sans projet" (réinitialisée à chaque fermeture du navigateur) */
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
+/** Clé sessionStorage : le launcher a déjà été traité pour cette session */
+const LAUNCHER_DONE_KEY = 'Leanna-launcher-done';
 
 interface WorkspaceItem {
   id: string;
@@ -139,6 +141,11 @@ export function StartupProjectModal() {
     try {
       const wsData = await fetchWorkspaces();
       if (!wsData?.activeRoot) {
+        // Si le launcher n'a pas encore été validé pour cette session, ne pas ouvrir StartupProjectModal en arrière-plan
+        if (sessionStorage.getItem(LAUNCHER_DONE_KEY) !== '1') {
+          setIsOpen(false);
+          return;
+        }
         // Si l'utilisateur a choisi "sans projet" pour cette session, ne pas rouvrir la modale
         if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') {
           setIsOpen(false);
@@ -152,8 +159,10 @@ export function StartupProjectModal() {
         }
       }
     } catch {
-      setIsOpen(true);
-      toastError('Impossible de vérifier le statut du projet');
+      if (sessionStorage.getItem(LAUNCHER_DONE_KEY) === '1') {
+        setIsOpen(true);
+        toastError('Impossible de vérifier le statut du projet');
+      }
     } finally {
       setLoading(false);
     }
