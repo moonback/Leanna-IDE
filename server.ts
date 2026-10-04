@@ -122,6 +122,7 @@ process.on('uncaughtException', (error) => {
 });
 
 import { setKnowledgeBroadcaster, broadcastKnowledgeProgress } from "./server/utils/knowledgeBroadcaster.js";
+import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaster.js";
 
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
 // IMPORTANT: loadWorkflows() DOIT être awaité avant ensureAuditWorkflow().
@@ -853,6 +854,17 @@ async function startServer() {
     for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) {
         try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+  });
+
+  // ── IDE Action broadcaster global ────────────────────────────────────────────
+  // Permet aux agents autonomes (sans session Live active) d'envoyer des événements
+  // ide-action (file-changed, open-file, etc.) à tous les clients /live connectés.
+  registerIdeActionBroadcaster((payload: string) => {
+    for (const client of wss.clients) {
+      if ((client as WebSocket).readyState === WebSocket.OPEN) {
+        try { (client as WebSocket).send(payload); } catch { /* ignore */ }
       }
     }
   });

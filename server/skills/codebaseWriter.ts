@@ -8,6 +8,7 @@ import { appendAuditEvent, generateDiffSummary } from "../audit.js";
 import { isSandboxActive, markFileModified } from "../utils/sandbox.js";
 import { createLogger } from "../utils/logger.js";
 import { supervisor } from "../autonomy/Supervisor.js";
+import { broadcastIdeAction } from "../utils/ideActionBroadcaster.js";
 import {
   getProjectRoot,
   resolveWritePath,
@@ -147,7 +148,13 @@ export async function handleWriteProjectFile(args: any, toolContext: any) {
     console.warn(`[Audit] appendAuditEvent failed for write_project_file on ${requestedPath}:`, err);
   });
   toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
-  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  // Fallback sur le broadcaster global quand emitIdeAction n'est pas disponible (agents autonomes)
+  if (toolContext.emitIdeAction) {
+    toolContext.emitIdeAction({ type: "file-changed", path: requestedPath });
+  } else {
+    broadcastIdeAction({ type: "open-file", path: requestedPath });
+    broadcastIdeAction({ type: "file-changed", path: requestedPath });
+  }
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
     scheduleValidation(true, toolContext?.supervisor);
@@ -286,7 +293,13 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
     console.warn(`[Audit] appendAuditEvent failed for modify_project_file on ${requestedPath}:`, err);
   });
   toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
-  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  // Fallback sur le broadcaster global quand emitIdeAction n'est pas disponible (agents autonomes)
+  if (toolContext.emitIdeAction) {
+    toolContext.emitIdeAction({ type: "file-changed", path: requestedPath });
+  } else {
+    broadcastIdeAction({ type: "open-file", path: requestedPath });
+    broadcastIdeAction({ type: "file-changed", path: requestedPath });
+  }
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
     scheduleValidation(true, toolContext?.supervisor);
@@ -409,7 +422,13 @@ export async function handlePatchProjectFile(args: any, toolContext: any) {
     console.warn(`[Audit] appendAuditEvent failed for patch_project_file on ${requestedPath}:`, err);
   });
   toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
-  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  // Fallback sur le broadcaster global quand emitIdeAction n'est pas disponible (agents autonomes)
+  if (toolContext.emitIdeAction) {
+    toolContext.emitIdeAction({ type: "file-changed", path: requestedPath });
+  } else {
+    broadcastIdeAction({ type: "open-file", path: requestedPath });
+    broadcastIdeAction({ type: "file-changed", path: requestedPath });
+  }
   if (!sandboxMode_patch) {
     triggerRestartIfNeeded(requestedPath);
     scheduleValidation(true, toolContext?.supervisor);
@@ -527,7 +546,13 @@ export async function handleApplyPatch(args: any, toolContext: any) {
     console.warn(`[Audit] appendAuditEvent failed for apply_patch on ${requestedPath}:`, err);
   });
   toolContext.emitIdeAction?.({ type: "open-file", path: requestedPath });
-  toolContext.emitIdeAction?.({ type: "file-changed", path: requestedPath });
+  // Fallback sur le broadcaster global quand emitIdeAction n'est pas disponible (agents autonomes)
+  if (toolContext.emitIdeAction) {
+    toolContext.emitIdeAction({ type: "file-changed", path: requestedPath });
+  } else {
+    broadcastIdeAction({ type: "open-file", path: requestedPath });
+    broadcastIdeAction({ type: "file-changed", path: requestedPath });
+  }
   if (!sandboxMode) {
     triggerRestartIfNeeded(requestedPath);
     scheduleValidation(true, toolContext?.supervisor);
