@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import {
   Bot, Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, FileText, ListTree,
-  UserRoundCog, RefreshCw
+  UserRoundCog, RefreshCw, Palette, TrendingUp, BookOpen, Accessibility, Gauge,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -15,7 +15,7 @@ interface AgentRoleMeta {
   desc: string;
   icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
   color: string;
-  category: 'code' | 'docs' | 'custom';
+  category: 'code' | 'docs' | 'web' | 'custom';
   isCustom?: boolean;
 }
 
@@ -37,6 +37,13 @@ const STATIC_AGENT_ROLES_META: AgentRoleMeta[] = [
   { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation multilingue',        icon: Languages,    color: 'var(--color-error)', category: 'docs' },
   { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés exécutifs',                icon: FileText,     color: 'var(--color-warning)', category: 'docs' },
   { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: 'var(--color-info)', category: 'docs' },
+
+  // Web & Qualité
+  { id: 'ui_ux',         label: 'UI/UX',           desc: 'Interfaces & expérience utilisateur',          icon: Palette,       color: 'var(--accent-primary)',    category: 'web' },
+  { id: 'seo',           label: 'SEO',             desc: 'Référencement & optimisation web',             icon: TrendingUp,    color: 'var(--color-success)',     category: 'web' },
+  { id: 'documentation', label: 'Documentation',   desc: 'Docs techniques, API & guides',                icon: BookOpen,      color: 'var(--color-info)',        category: 'web' },
+  { id: 'accessibility', label: 'Accessibilité',   desc: 'Standards WCAG 2.1 & ARIA',                   icon: Accessibility, color: 'var(--color-accent-alt)', category: 'web' },
+  { id: 'performance',   label: 'Performance',     desc: 'Optimisation & Core Web Vitals',               icon: Gauge,         color: 'var(--color-warning)',     category: 'web' },
 ];
 
 export function AgentsSection() {
@@ -108,7 +115,7 @@ export function AgentsSection() {
     save();
   };
 
-  const selectCategory = (category: 'code' | 'docs' | 'custom') => {
+  const selectCategory = (category: 'code' | 'docs' | 'web' | 'custom') => {
     const categoryRoles = allAgentsMeta.filter(r => r.category === category).map(r => r.id);
     const otherRoles = agents.allowedRoles.filter(id => !categoryRoles.includes(id));
     setField('agents', { ...agents, allowedRoles: [...otherRoles, ...categoryRoles] });
@@ -125,6 +132,7 @@ export function AgentsSection() {
 
   const codeRoles = allAgentsMeta.filter(r => r.category === 'code');
   const docsRoles = allAgentsMeta.filter(r => r.category === 'docs');
+  const webRoles  = allAgentsMeta.filter(r => r.category === 'web');
   const customRoles = allAgentsMeta.filter(r => r.category === 'custom');
 
   return (
@@ -197,6 +205,18 @@ export function AgentsSection() {
               }}
             >
               + Tous Rédaction ({docsRoles.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategory('web')}
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 hover:scale-105"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
+                color: 'var(--color-success)',
+                border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)',
+              }}
+            >
+              + Tous Web ({webRoles.length})
             </button>
             {customRoles.length > 0 && (
               <button
@@ -366,6 +386,72 @@ export function AgentsSection() {
               );
             })}
           </div>
+
+          {/* Section: Web & Qualité */}
+          {webRoles.length > 0 && (
+            <>
+              <SectionDivider label="Web & Qualité" />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {webRoles.map(role => {
+                  const isActive = agents.allowedRoles.includes(role.id);
+                  const Icon = role.icon;
+
+                  return (
+                    <motion.button
+                      key={role.id}
+                      type="button"
+                      onClick={() => toggleRole(role.id)}
+                      whileHover={{ y: -1, scale: 1.01 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+                      style={{
+                        backgroundColor: isActive ? `color-mix(in srgb, ${role.color} 8%, transparent)` : 'var(--bg-secondary)',
+                        border: `1.5px solid ${isActive ? role.color + '60' : 'var(--border-base)'}`,
+                        boxShadow: isActive ? `0 2px 8px ${role.color}15` : 'none',
+                      }}
+                      aria-pressed={isActive}
+                      aria-label={`${isActive ? 'Désactiver' : 'Activer'} l'agent ${role.label}`}
+                    >
+                      <div
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200"
+                        style={{
+                          backgroundColor: isActive ? `color-mix(in srgb, ${role.color} 15%, transparent)` : 'var(--bg-panel)',
+                          border: `1px solid ${isActive ? role.color + '40' : 'var(--border-base)'}`,
+                        }}
+                      >
+                        <Icon
+                          style={{ width: 16, height: 16, color: isActive ? role.color : 'var(--text-dimmed)' }}
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="text-xs font-semibold truncate transition-colors duration-200"
+                          style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                        >
+                          {role.label}
+                        </div>
+                        <div
+                          className="text-xs truncate leading-tight transition-colors duration-200"
+                          style={{ color: isActive ? 'var(--text-muted)' : 'var(--text-dimmed)' }}
+                        >
+                          {role.desc}
+                        </div>
+                      </div>
+
+                      <div
+                        className="h-2 w-2 flex-shrink-0 rounded-full transition-all duration-200"
+                        style={{
+                          backgroundColor: isActive ? role.color : 'var(--border-base)',
+                          boxShadow: isActive ? `0 0 6px ${role.color}60` : 'none',
+                        }}
+                      />
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* Section: Agents Personnalisés */}
           {customRoles.length > 0 && (
