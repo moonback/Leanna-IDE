@@ -58,3 +58,55 @@ test('sandbox: state management and path resolution', () => {
   assert.ok('active' in status);
   assert.ok('modifiedCount' in status);
 });
+
+// ── Régression : syncDirectory ne doit pas entrer dans dst quand dst ⊂ src ──
+//
+// Reproduit le bug EPERM :
+//   initSandbox() appelle syncDirectory(SELF_ROOT, SELF_ROOT/.Leanna/sandbox)
+//   Sans la garde « dst inside src », le walk entre dans .Leanna/sandbox et
+//   essaie de copier sandbox → sandbox/.Leanna/sandbox/… → EPERM / récursion.
+test('sandbox: initSandbox ne se copie pas récursivement dans le dossier destination', async () => {
+  const os = await import('os');
+  const { initSandbox, getSandboxRoot } = await import('./sandbox.js');
+
+  // Créer un répertoire temporaire jouant le rôle de SELF_ROOT
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-sandbox-test-'));
+
+  try {
+    // Écrire quelques fichiers sources dans la « racine de projet »
+    fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{"name":"test"}', 'utf-8');
+    fs.mkdirSync(path.join(tmpRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'src', 'index.ts'), '// test', 'utf-8');
+
+    // Pointer SELF_ROOT vers le dossier temporaire
+    setSelfRoot(tmpRoot);
+
+    // initSandbox doit terminer sans erreur même si dst ⊂ src
+    let threw = false;
+    try {
+      await initSandbox();
+    } catch (err: any) {
+      threw = true;
+      assert.fail(`initSandbox a levé une erreur inattendue : ${err.message}`);
+    }
+    assert.ok(!threw);
+
+    // Le dossier sandbox doit exister
+    const sandboxBase = getSandboxRoot();
+    assert.ok(fs.existsSync(sandboxBase), 'Le dossier sandbox doit avoir été créé');
+
+    // Les fichiers sources doivent être présents dans le sandbox
+    assert.ok(fs.existsSync(path.join(sandboxBase, 'package.json')));
+    assert.ok(fs.existsSync(path.join(sandboxBase, 'src', 'index.ts')));
+
+    // Le sandbox ne doit PAS contenir une copie de lui-même (boucle infinie)
+    const nestedSandbox = path.join(sandboxBase, '.Leanna', 'sandbox');
+    assert.ok(
+      !fs.existsSync(nestedSandbox),
+      `Le sandbox ne doit pas contenir une copie imbriquée de lui-même : ${nestedSandbox}`
+    );
+  } finally {
+    // Nettoyage
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
