@@ -14,7 +14,7 @@
 import { EventEmitter } from 'events';
 import { McpClient, McpClientStatus, McpToolDefinition, McpToolResult } from './McpClient.js';
 import { McpServerConfig, loadMcpConfig, upsertMcpServer, removeMcpServer } from './mcpConfig.js';
-import { normalizeSelfPath } from '../utils/selfRoot.js';
+import { normalizeSelfPath, resolveRealPathWithinSelf } from '../utils/selfRoot.js';
 import type { Skill } from '../skills/base.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,7 +342,7 @@ export class McpBridge extends EventEmitter {
       // ── Sandboxing : valider les arguments qui ressemblent à des chemins ──
       // Dans le try : si un chemin est rejeté, on enregistre la métrique
       // d'échec et on logge proprement au lieu de laisser fuiter l'exception.
-      const sanitizedArgs = this.sanitizePathArgs(args);
+      const sanitizedArgs = await this.sanitizePathArgs(args);
 
       // Trouver le serveur qui fournit cet outil (par son nom réel MCP)
       for (const [id, client] of this.clients) {
@@ -372,30 +372,84 @@ export class McpBridge extends EventEmitter {
   }
 
   /**
-   * SECURITY: Valide et sanitize les arguments qui contiennent des chemins de fichiers.
-   * Rejette tout chemin qui sort du SELF_ROOT.
+   * SECURITY: Valide et sanitize récursivement les arguments qui contiennent
+   * des chemins de fichiers. Rejette tout chemin qui sort du SELF_ROOT.
+   *
+   * Améliorations par rapport à la version initiale :
+   *  1. **Récursion** sur les objets imbriqués et les tableaux — un chemin
+   *     caché dans `{ options: { outputPath: "../../../etc/passwd" } }` est
+   *     désormais détecté.
+   *  2. **Résolution de symlinks** via `resolveRealPathWithinSelf()` (async) —
+   *     protège contre les attaques de type "symlink escape" où un chemin
+   *     apparemment valide pointe hors du SELF_ROOT après résolution.
+   *  3. **Profondeur limitée** (max 8 niveaux) pour éviter les boucles sur
+   *     des structures circulaires ou excessivement profondes.
    */
-  private sanitizePathArgs(args: Record<string, any>): Record<string, any> {
-    const PATH_KEYS = ['path', 'file', 'filepath', 'filePath', 'file_path', 'directory', 'dir', 'cwd', 'workdir', 'target', 'source', 'destination'];
-    const sanitized = { ...args };
+  private async sanitizePathArgs(
+    args: Record<string, any>,
+    depth: number = 0
+  ): Promise<Record<string, any>> {
+    const MAX_DEPTH = 8;
+    const PATH_KEYS = [
+      'path', 'file', 'filepath', 'filePath', 'file_path',
+      'directory', 'dir', 'cwd', 'workdir',
+      'target', 'source', 'destination', 'output', 'input',
+    ];
+
+    if (depth > MAX_DEPTH) return args;
+
+    // Shallow copy at this level
+    const sanitized: Record<string, any> = { ...args };
 
     for (const [key, value] of Object.entries(sanitized)) {
+      // ── Récursion : objet imbriqué ────────────────────────────────────────
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        sanitized[key] = await this.sanitizePathArgs(value as Record<string, any>, depth + 1);
+        continue;
+      }
+
+      // ── Récursion : tableau ───────────────────────────────────────────────
+      if (Array.isArray(value)) {
+        sanitized[key] = await Promise.all(
+          value.map((item) =>
+            item !== null && typeof item === 'object' && !Array.isArray(item)
+              ? this.sanitizePathArgs(item as Record<string, any>, depth + 1)
+              : Promise.resolve(item)
+          )
+        );
+        continue;
+      }
+
+      // ── Valeur scalaire : vérifier si c'est un chemin ────────────────────
       if (typeof value !== 'string') continue;
-      
-      // Check if this key looks like a path argument
-      const isPathKey = PATH_KEYS.some(pk => key.toLowerCase().includes(pk.toLowerCase()));
+
+      const isPathKey = PATH_KEYS.some(
+        (pk) => key.toLowerCase().includes(pk.toLowerCase())
+      );
       if (!isPathKey) continue;
 
-      // Validate the path stays within SELF_ROOT
-      const resolved = normalizeSelfPath(value);
-      if (!resolved) {
+      // ── Étape 1 : vérification rapide via normalizeSelfPath (sync) ────────
+      // Rejette immédiatement les chemins manifestement hors périmètre.
+      const normalized = normalizeSelfPath(value);
+      if (!normalized) {
         throw new Error(
           `[MCP Security] L'argument "${key}" contient un chemin hors du périmètre autorisé: "${value}". ` +
           `Les outils MCP ne peuvent accéder qu'aux fichiers du repo Leanna.`
         );
       }
-      // Replace with the normalized absolute path for safety
-      sanitized[key] = resolved;
+
+      // ── Étape 2 : résolution des symlinks (async) ─────────────────────────
+      // Détecte les symlink-escapes : un chemin qui semble dans SELF_ROOT mais
+      // dont la cible réelle est en dehors après résolution de liens symboliques.
+      const real = await resolveRealPathWithinSelf(normalized);
+      if (!real) {
+        throw new Error(
+          `[MCP Security] L'argument "${key}" pointe (via symlink) hors du périmètre autorisé: "${value}". ` +
+          `Les outils MCP ne peuvent accéder qu'aux fichiers du repo Leanna.`
+        );
+      }
+
+      sanitized[key] = real;
     }
 
     return sanitized;
