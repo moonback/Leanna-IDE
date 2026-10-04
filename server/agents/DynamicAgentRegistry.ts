@@ -9,6 +9,10 @@
  */
 import type { AgentDefinition, AgentRole } from "./types.js";
 import { createLogger } from "../utils/logger.js";
+import {
+  validateAgentDefinition,
+  AgentSecurityError,
+} from "../security/agentDefinitionSchema.js";
 
 const log = createLogger("DynamicAgentRegistry");
 
@@ -30,6 +34,12 @@ export interface DynamicAgentDefinition extends AgentDefinition {
   isActive?: boolean;
   /** Tags pour catégorisation */
   tags?: string[];
+  /**
+   * Signature HMAC-SHA256 de la définition.
+   * Requise quand la variable d'environnement LEANNA_AGENT_SECRET est définie.
+   * Calculée via `computeAgentSignature()` depuis agentDefinitionSchema.ts.
+   */
+  signature?: string;
 }
 
 /**
@@ -54,17 +64,41 @@ export class DynamicAgentRegistry {
 
   /**
    * Enregistre un nouvel agent dynamique.
+   *
+   * SECURITY : la définition est validée avant tout enregistrement via
+   * `validateAgentDefinition()` (schéma Zod + vérification HMAC optionnelle).
+   * Toute définition non conforme lève une `AgentSecurityError`.
+   *
    * @param definition - Définition complète de l'agent
    * @param override - Si true, écrase une définition existante (défaut: false)
    * @returns Le rôle de l'agent enregistré
-   * @throws Error si le rôle est déjà enregistré et override=false
+   * @throws {AgentSecurityError} si la définition échoue la validation de sécurité
+   * @throws {Error} si le rôle est déjà enregistré et override=false
    */
   registerAgent(
     definition: DynamicAgentDefinition,
     override: boolean = false
   ): AgentRole {
+    // ── Étape 1 : Validation sécurité (Zod + HMAC) ──────────────────────────
+    // validateAgentDefinition lève AgentSecurityError si la définition est
+    // invalide structurellement ou si la signature HMAC est absente/incorrecte
+    // quand LEANNA_AGENT_SECRET est configuré.
+    try {
+      validateAgentDefinition(definition);
+    } catch (err) {
+      if (err instanceof AgentSecurityError) {
+        log.error(
+          `🚫 Enregistrement refusé pour l'agent "${definition.role ?? "(sans rôle)"}": ${err.message}` +
+          (err.details?.length ? `\n  → ${err.details.join("\n  → ")}` : "")
+        );
+        throw err;
+      }
+      throw err;
+    }
+
+    // ── Étape 2 : Garde de doublon ───────────────────────────────────────────
     const role = definition.role as AgentRole;
-    
+
     if (this.agents.has(role) && !override) {
       throw new Error(
         `Agent "${role}" déjà enregistré dans le registre dynamique. ` +
@@ -83,7 +117,7 @@ export class DynamicAgentRegistry {
     };
 
     this.agents.set(role, agentDef);
-    
+
     log.info(
       `✅ Agent dynamique "${role}" enregistré${override ? " (remplacé)" : ""} ` +
       `(capabilities: ${agentDef.capabilities.length}, concurrency: ${agentDef.maxConcurrency})`
@@ -147,9 +181,15 @@ export class DynamicAgentRegistry {
 
   /**
    * Met à jour une définition d'agent existante.
+   *
+   * SECURITY : si les `updates` touchent des champs sensibles (capabilities,
+   * systemPrompt, role, permissions), la définition fusionnée est re-validée
+   * intégralement avant d'être persistée.
+   *
    * @param role - Rôle de l'agent à mettre à jour
-   * @param updates - Champ partiels à mettre à jour
+   * @param updates - Champs partiels à mettre à jour
    * @returns true si l'agent a été mis à jour, false sinon
+   * @throws {AgentSecurityError} si la définition fusionnée échoue la validation
    */
   updateAgent(
     role: string,
@@ -160,13 +200,40 @@ export class DynamicAgentRegistry {
       return false;
     }
 
-    const updated: DynamicAgentDefinition = {
+    const SECURITY_SENSITIVE_FIELDS: Array<keyof DynamicAgentDefinition> = [
+      "capabilities",
+      "systemPrompt",
+      "role",
+      "permissions",
+      "signature",
+    ];
+
+    const touchesSensitiveField = SECURITY_SENSITIVE_FIELDS.some(
+      (f) => f in updates
+    );
+
+    const merged: DynamicAgentDefinition = {
       ...existing,
       ...updates,
       updatedAt: new Date().toISOString(),
     };
 
-    this.agents.set(role as AgentRole, updated);
+    if (touchesSensitiveField) {
+      try {
+        validateAgentDefinition(merged);
+      } catch (err) {
+        if (err instanceof AgentSecurityError) {
+          log.error(
+            `🚫 Mise à jour refusée pour l'agent "${role}": ${err.message}` +
+            (err.details?.length ? `\n  → ${err.details.join("\n  → ")}` : "")
+          );
+          throw err;
+        }
+        throw err;
+      }
+    }
+
+    this.agents.set(role as AgentRole, merged);
     log.info(`🔄 Agent dynamique "${role}" mis à jour`);
     return true;
   }

@@ -1022,16 +1022,31 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
   const base = relativeTo || src;
   let count = 0;
 
+  // Chemin absolu de la destination pour détecter le cas où dst est sous src
+  // (ex. initSandbox copie SELF_ROOT → SELF_ROOT/.Leanna/sandbox).
+  // Sans cette garde, le walk entre dans le dossier destination en cours de
+  // création et produit une récursion infinie type :
+  //   sandbox/.Leanna/sandbox/.Leanna/sandbox/…
+  const absDst = path.resolve(dst);
+  const absSrc = path.resolve(src);
+
   const entries = await fs.promises.readdir(src, { withFileTypes: true });
   for (const entry of entries) {
-    const relPath = path.relative(base, path.join(src, entry.name)).replace(/\\/g, "/");
+    const srcPath = path.join(src, entry.name);
+    const relPath = path.relative(base, srcPath).replace(/\\/g, "/");
 
-    // Vérifier les exclusions
+    // Vérifier les exclusions par pattern
     if (EXCLUDE_PATTERNS.some(p => relPath === p || relPath.startsWith(p + "/"))) {
       continue;
     }
 
-    const srcPath = path.join(src, entry.name);
+    // Ignorer le répertoire destination s'il se trouve à l'intérieur de la source.
+    // Couvre les cas : dst === srcPath ou srcPath est un ancêtre de dst.
+    const absSrcPath = path.resolve(srcPath);
+    if (absDst === absSrcPath || absDst.startsWith(absSrcPath + path.sep)) {
+      continue;
+    }
+
     const dstPath = path.join(dst, entry.name);
 
     if (entry.isDirectory()) {

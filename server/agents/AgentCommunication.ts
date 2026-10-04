@@ -244,6 +244,38 @@ export const DELEGATION_MATRIX: Record<AgentRole, DelegationCapability[]> = {
     { targetRole: "formatter", taskTypes: ["mise-en-forme-plan"], reason: "Formatage du plan en document structuré" },
     { targetRole: "proofreader", taskTypes: ["relecture-document"], reason: "Relecture et correction du document planifié" },
   ],
+
+  // ── Web & Qualité ──
+  ui_ux: [
+    { targetRole: "coder", taskTypes: ["implementation-ui", "correction-composant"], reason: "Implémentation des améliorations UI/UX recommandées" },
+    { targetRole: "accessibility", taskTypes: ["audit-accessibilite"], reason: "Vérification WCAG des composants après modification UI" },
+    { targetRole: "performance", taskTypes: ["audit-performance-ui"], reason: "Vérification des performances après ajout d'animations ou d'effets visuels" },
+    { targetRole: "reviewer", taskTypes: ["revue-code-ui"], reason: "Revue de code des composants UI modifiés" },
+  ],
+  seo: [
+    { targetRole: "coder", taskTypes: ["implementation-seo", "correction-balises"], reason: "Implémentation des optimisations SEO techniques recommandées" },
+    { targetRole: "writer", taskTypes: ["optimisation-contenu"], reason: "Rédaction de contenu optimisé pour les intentions de recherche cibles" },
+    { targetRole: "performance", taskTypes: ["core-web-vitals"], reason: "Optimisation des Core Web Vitals impactant le référencement" },
+    { targetRole: "documentation", taskTypes: ["documentation-seo"], reason: "Documentation des décisions SEO et des règles à maintenir" },
+  ],
+  documentation: [
+    { targetRole: "writer", taskTypes: ["redaction-guide", "redaction-api-doc"], reason: "Rédaction des sections nécessitant une expertise rédactionnelle poussée" },
+    { targetRole: "proofreader", taskTypes: ["relecture-documentation"], reason: "Relecture et correction de la documentation produite" },
+    { targetRole: "formatter", taskTypes: ["formatage-documentation"], reason: "Mise en forme et structuration de la documentation" },
+    { targetRole: "coder", taskTypes: ["exemples-code", "snippets-doc"], reason: "Création d'exemples de code fonctionnels pour la documentation" },
+  ],
+  accessibility: [
+    { targetRole: "coder", taskTypes: ["correction-accessibilite", "implementation-aria"], reason: "Implémentation des correctifs d'accessibilité identifiés" },
+    { targetRole: "ui_ux", taskTypes: ["redesign-accessible"], reason: "Refonte UI pour intégrer les exigences d'accessibilité dès la conception" },
+    { targetRole: "tester", taskTypes: ["tests-accessibilite"], reason: "Écriture de tests automatisés pour vérifier la conformité WCAG" },
+    { targetRole: "documentation", taskTypes: ["documentation-accessibilite"], reason: "Documentation des patterns d'accessibilité et des décisions prises" },
+  ],
+  performance: [
+    { targetRole: "coder", taskTypes: ["optimisation-code", "code-splitting", "lazy-loading"], reason: "Implémentation des optimisations de performance identifiées" },
+    { targetRole: "refactor", taskTypes: ["refactorisation-performance"], reason: "Restructuration du code pour éliminer les bottlenecks" },
+    { targetRole: "reviewer", taskTypes: ["revue-performance"], reason: "Revue de code focalisée sur les patterns de performance" },
+    { targetRole: "documentation", taskTypes: ["documentation-performance"], reason: "Documentation des décisions d'optimisation et des métriques cibles" },
+  ],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

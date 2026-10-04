@@ -390,6 +390,9 @@ export default function IdeView() {
       } else {
         openFileAt(filePath);
       }
+      // Rafraîchir le diff sandbox si actif (pour les agents autonomes sans session Live)
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-file-changed', { detail: { path: filePath } }));
     };
 
     const handleWorkspaceChanged = (e?: Event) => {

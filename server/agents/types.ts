@@ -23,6 +23,12 @@ export const STATIC_AGENT_ROLES = [
   "translator",
   "summarizer",
   "planner",
+  // Agents Spécialisés Web & Qualité
+  "ui_ux",
+  "seo",
+  "documentation",
+  "accessibility",
+  "performance",
 ] as const;
 
 /**
@@ -115,6 +121,33 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   plan: "planner",
   outline: "planner",
   planification: "planner",
+  // Aliases Web & Qualité
+  ui_ux: "ui_ux",
+  ui: "ui_ux",
+  ux: "ui_ux",
+  "ui-ux": "ui_ux",
+  interface: "ui_ux",
+  experience_utilisateur: "ui_ux",
+  expérience_utilisateur: "ui_ux",
+  design_ux: "ui_ux",
+  seo: "seo",
+  référencement: "seo",
+  referencement: "seo",
+  search_engine: "seo",
+  optimisation_seo: "seo",
+  documentation: "documentation",
+  doc_technique: "documentation",
+  "tech-doc": "documentation",
+  technical_writing: "documentation",
+  accessibility: "accessibility",
+  accessibilité: "accessibility",
+  a11y: "accessibility",
+  wcag: "accessibility",
+  performance: "performance",
+  perf: "performance",
+  optimisation: "performance",
+  "load-time": "performance",
+  vitesse: "performance",
 };
 
 /**
