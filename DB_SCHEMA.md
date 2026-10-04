@@ -230,25 +230,35 @@ Les autres tables sont indépendantes (pas de clés étrangères entre elles).
 
 ## Migrations
 
-Les migrations sont dans `supabase/migrations/`. Une seule migration est actuellement versionnée :
+Toutes les migrations sont dans `supabase/migrations/` et doivent être appliquées **dans l'ordre chronologique** (nom de fichier = horodatage). Chaque fichier est idempotent (`IF NOT EXISTS`, `OR REPLACE`, `DROP … IF EXISTS`).
 
-| Fichier | Date | Description |
+> Les anciens fichiers ad-hoc dans `supabase/*.sql` sont conservés à titre de référence mais **ne doivent plus être exécutés directement** : les migrations versionnées ci-dessous en sont désormais la source de vérité.
+
+### Ordre d'application
+
+| # | Fichier | Description |
 |---|---|---|
-| `20260726000000_memories_updated_at.sql` | 2026-07-26 | Ajout du trigger `updated_at` sur la table `memories` |
+| 1 | `20260101000000_extensions.sql` | Extensions `pgvector` et `pg_trgm` |
+| 2 | `20260101000001_create_memories.sql` | Table `memories`, index, trigger `updated_at`, fonction `match_memories()` avec isolation par projet |
+| 3 | `20260101000002_create_lists.sql` | Table `lists` |
+| 4 | `20260101000003_create_conversations.sql` | Tables `conversations` + `conversation_messages`, index FTS français, fonction `search_conversations()` |
+| 5 | `20260101000004_create_workflows.sql` | Table `workflows`, index partiel sur les workflows planifiés |
+| 6 | `20260101000005_create_scheduled_tasks.sql` | Table `scheduled_tasks` |
+| 7 | `20260101000006_create_custom_skills.sql` | Table `custom_skills`, trigger `updated_at` |
+| 8 | `20260101000007_create_token_usage.sql` | Table `token_usage`, vues `token_usage_daily_by_model` et `token_usage_by_mission` |
+| 9 | `20260101000008_create_autonomy_tasks.sql` | Table `autonomy_tasks` (task store durable du TaskManager) |
+| 10 | `20260101000009_create_missions.sql` | Table `missions` (persistance des missions autonomes) |
+| 11 | `20260726000000_memories_updated_at.sql` | _(base existante avant v0.1)_ Backfill `updated_at` sur `memories` |
+| 12 | `20260927000000_memories_project_isolation.sql` | _(base existante avant v0.2)_ Ajout `project_id` sur `memories`, mise à jour `match_memories()` |
+| 13 | `20261001000000_create_agent_tables.sql` | Tables `agent_orchestrations`, `agent_tasks`, `agent_messages` ; corrections idempotentes des contraintes CHECK |
 
-Pour appliquer les schémas initiaux, exécuter dans le SQL Editor Supabase (dans l'ordre) :
+> **Migrations 11 et 12** : uniquement nécessaires sur une base créée *avant* les migrations initiales versionnées. Sur une base fraîche, les migrations 2 et 13 intègrent déjà les colonnes et contraintes à jour.
 
-```bash
-supabase/supabase_schema.sql          # memories + lists + pgvector + pg_trgm
-supabase/conversations_schema.sql     # conversations + conversation_messages
-supabase/workflows_schema.sql         # workflows
-supabase/scheduled_tasks_schema.sql   # scheduled_tasks
-supabase/custom_skills_schema.sql     # custom_skills
-supabase/token_usage_schema.sql       # token_usage (observabilité coûts & tokens)
-supabase/autonomy_tasks_schema.sql    # autonomy_tasks (task store durable du TaskManager)
-```
+### Application
 
-Pour la persistance des agents (optionnel), exécuter le SQL retourné par :
+Sans CLI Supabase, copier-coller chaque fichier dans le **SQL Editor** du dashboard Supabase, dans l'ordre du tableau ci-dessus.
+
+Pour les tables agents (migration 13), l'endpoint suivant retourne le même SQL à titre informatif :
 
 ```
 GET /api/agents/persistence/migration
