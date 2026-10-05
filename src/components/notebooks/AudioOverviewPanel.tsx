@@ -107,12 +107,15 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
       if (data.overview.status === 'ready') {
         success('Audio Overview généré !');
         setSelectedOverview(data.overview);
-      } else {
-        toastError('Erreur lors de la génération');
+        onRefresh();
+        return data.overview;
       }
+      toastError('Erreur lors de la génération');
       onRefresh();
+      return null;
     } catch (e: any) {
       toastError(e.message);
+      return null;
     } finally {
       setGenerating(false);
     }
@@ -159,16 +162,31 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
 
   const handleRegenerate = useCallback(async () => {
     if (!selectedOverview) return;
-    try {
-      await fetch(`/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}`, {
-        method: 'DELETE',
-      });
-    } catch (err) {
-      console.error('[AudioOverviewPanel] Failed to delete overview:', err);
+    const previousId = selectedOverview.id;
+
+    // Opération atomique : on génère d'abord. L'ancien overview n'est supprimé
+    // qu'une fois le nouveau obtenu, pour ne jamais perdre les deux en cas d'échec.
+    const newOverview = await handleGenerate();
+    if (!newOverview || newOverview.id === previousId) {
+      // La génération a échoué (ou n'a pas produit de nouvel overview) :
+      // on conserve l'ancien tel quel.
+      return;
     }
-    setSelectedOverview(null);
-    handleGenerate();
-  }, [notebookId, selectedOverview, handleGenerate]);
+
+    // Génération réussie : on supprime l'ancien overview en arrière-plan.
+    try {
+      const res = await fetch(
+        `/api/notebooks/${notebookId}/audio-overviews/${previousId}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      // L'ancien overview n'a pas pu être supprimé, mais le nouveau existe :
+      // on prévient l'utilisateur plutôt que de perdre l'information en silence.
+      toastError("Nouvel audio généré, mais l'ancien n'a pas pu être supprimé.");
+    }
+    onRefresh();
+  }, [notebookId, selectedOverview, handleGenerate, toastError, onRefresh]);
 
   // ─── TTS Playback ──────────────────────────────────────────────────────────
 

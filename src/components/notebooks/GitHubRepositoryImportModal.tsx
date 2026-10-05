@@ -21,6 +21,7 @@ import {
   Sliders, ShieldCheck, ChevronRight
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { SPRING_MODAL } from './motion.js';
 
 interface Repository {
   full_name: string;
@@ -107,8 +108,6 @@ const PRESET_EXTENSIONS = [
   { name: 'Backend', extensions: '.ts,.js,.py,.java,.go,.rs,.cpp,.c' },
   { name: 'Documentation', extensions: '.md,.txt,.json,.yaml,.yml' },
 ];
-
-const SPRING_MODAL = { type: 'spring' as const, bounce: 0, duration: 0.3 };
 
 export function GitHubRepositoryImportModal({
   onClose,

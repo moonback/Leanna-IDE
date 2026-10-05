@@ -9,16 +9,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { BookOpen, Plus, X, Loader2 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
 
 interface CreateNotebookModalProps {
   onClose: () => void;
   onCreated: () => void;
 }
-
-// Critically damped default — graceful, no overshoot
-const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
-
-const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.3 };
 
 export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalProps) {
   const { success, error: toastError } = useToast();

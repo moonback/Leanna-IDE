@@ -16,6 +16,7 @@ import {
 import { useToast } from '../ui/Toast.js';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
+import { SPRING_UI_SLOW as SPRING_UI, SPRING_SNAPPY } from './motion.js';
 
 interface SourceItem {
   id: string;
@@ -63,9 +64,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
 
-// Ressort par défaut : critically damped, pas de rebond — cf. apple-design (UI non gestuelle)
-const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.35 };
-const SPRING_SNAPPY = { type: 'spring' as const, bounce: 0, duration: 0.22 };
+
 
 export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId }: Props) {
   const { success, error: toastError } = useToast();

@@ -11,6 +11,7 @@ import {
   Download, FileText, Layout, ListChecks, BookOpen, Grid3X3, List, Link2,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { timeAgo } from './utils.js';
 import { NotesCanvas } from './NotesCanvas.js';
 import { TemplateSelectorModal } from '../templates/TemplateSelectorModal.js';
 import { Sparkles } from 'lucide-react';
@@ -37,17 +38,6 @@ interface Props {
   compact?: boolean;
   /** Called when user wants to create/edit a note in the center column */
   onOpenNoteEditor?: (data: NoteEditorData) => void;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days > 0) return `${days}j`;
-  if (hours > 0) return `${hours}h`;
-  if (mins > 0) return `${mins}m`;
-  return 'now';
 }
 
 export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOpenNoteEditor }: Props) {

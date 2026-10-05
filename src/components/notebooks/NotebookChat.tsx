@@ -17,6 +17,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
+import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from './motion.js';
 
 interface Citation {
   sourceId: string;
@@ -54,14 +55,6 @@ interface QueuedChatRequest {
   personality?: string;
   threadId?: string;
 }
-
-// Critically damped default — graceful settle, no overshoot. Used for
-// anything not triggered by a physical gesture (menus, message entrance,
-// panel reveals).
-const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
-// Slight bounce, reserved for momentum-flavoured moments (a message that
-// just "arrived", a floating action button appearing).
-const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.2, duration: 0.3 };
 
 /** Rich markdown rendering for chat messages */
 function renderMessageContent(content: string): JSX.Element {

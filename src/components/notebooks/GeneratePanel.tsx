@@ -833,17 +833,22 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     timerId = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const timeProgress = Math.min(90, Math.round((elapsed / ESTIMATED_MS) * 100));
+      // Updater pur : ne met à jour que la progression de cette tâche, et
+      // seulement si le timer est en avance sur les chunks SSE déjà reçus.
       setGenerationProgresses(prev => {
         const current = prev[task.id] ?? 0;
-        // N'avance que si le timer est en avance sur les chunks
         if (timeProgress > current) {
-          setGenerationQueue(q => q.map(t =>
-            t.id === task.id ? { ...t, progress: timeProgress } : t
-          ));
           return { ...prev, [task.id]: timeProgress };
         }
-        return prev;
+        return prev; // inchangé : pas de re-render inutile
       });
+      // La file est mise à jour via son propre setter (également pur).
+      // map() ne crée un nouveau tableau que si la valeur change réellement.
+      setGenerationQueue(q => q.map(t =>
+        t.id === task.id && timeProgress > (t.progress ?? 0)
+          ? { ...t, progress: timeProgress }
+          : t
+      ));
     }, 500);
     
     // Mettre à jour le statut de la tâche

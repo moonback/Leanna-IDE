@@ -14,6 +14,8 @@ import {
 import { CreateNotebookModal } from './CreateNotebookModal.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
 import { useToast } from '../ui/Toast.js';
+import { timeAgoLong as timeAgo } from './utils.js';
+import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
 
 interface NotebookSummary {
   id: string;
@@ -33,20 +35,6 @@ interface Props {
 }
 
 type SortBy = 'updatedAt' | 'title' | 'sourcesCount';
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days > 0) return `il y a ${days}j`;
-  if (hours > 0) return `il y a ${hours}h`;
-  if (mins > 0) return `il y a ${mins}m`;
-  return 'à l\'instant';
-}
-
-const SPRING_UI = { type: 'spring' as const, bounce: 0, duration: 0.3 };
-const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.3 };
 
 export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const { success, error: toastError } = useToast();

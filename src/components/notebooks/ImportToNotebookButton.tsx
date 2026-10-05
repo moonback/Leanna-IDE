@@ -9,6 +9,7 @@ import React, { useState, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Upload, Loader2 } from 'lucide-react';
 import { NotebookPickerModal } from '../ide/NotebookPickerModal.js';
+import { SPRING_MOMENTUM } from './motion.js';
 
 interface ImportToNotebookButtonProps {
   /** Callback appelé après import réussi (optionnel) */
@@ -39,8 +40,6 @@ export function ImportToNotebookButton({
   const [showPicker, setShowPicker] = useState(false);
   const [fileToImport, setFileToImport] = useState<{ path: string; name: string } | null>(null);
   const [loading] = useState(false);
-
-  const SPRING_MOMENTUM = { type: 'spring' as const, bounce: 0.18, duration: 0.3 };
 
   // Gérer la sélection de fichier (pour les inputs file)
   const fileInputRef = React.useRef<HTMLInputElement>(null);
