@@ -626,7 +626,7 @@ function useReducedTransparency(): boolean {
   return reduced;
 }
 
-export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, fullView = false, onClose, onViewDoc: _onViewDoc, initialDoc }: Props) {
+export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false, onClose, onViewDoc: _onViewDoc, initialDoc }: Props) {
   const { success, error: toastError } = useToast();
   const { profile } = useProfile();
   const [_generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
@@ -766,27 +766,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
 
   // Cache pour savoir si les suggestions ont déjà été chargées
   const hasLoadedSuggestionsRef = useRef(false);
-  
-  // Refresh UNIQUEMENT quand des NOUVELLES sources sont ajoutées (pas au premier rendu)
-  const prevSourcesCountRef = useRef(sources.length);
+
+  // Chargement AUTOMATIQUE une seule fois : dès qu'au moins une source est
+  // disponible, les suggestions sont générées une unique fois. Les ajouts de
+  // sources suivants ne relancent PAS les suggestions — seul le bouton
+  // "Rafraîchir" (actualisation manuelle) peut les relancer.
   useEffect(() => {
-    const currentCount = sources.length;
-    
-    // Si on passe de 0 à >0 sources, charger les suggestions (premier ajout)
-    if (currentCount > 0 && prevSourcesCountRef.current === 0 && !hasLoadedSuggestionsRef.current) {
-      prevSourcesCountRef.current = currentCount;
-      hasLoadedSuggestionsRef.current = true;
-      loadSuggestions();
-    }
-    // Si le nombre de sources augmente (nouvelle source ajoutée)
-    else if (currentCount > prevSourcesCountRef.current && currentCount > 0) {
-      prevSourcesCountRef.current = currentCount;
-      loadSuggestions();
-    }
-    // Mettre à jour le compteur même si pas de chargement
-    else if (currentCount !== prevSourcesCountRef.current) {
-      prevSourcesCountRef.current = currentCount;
-    }
+    if (hasLoadedSuggestionsRef.current) return;
+    if (sources.length === 0) return;
+    hasLoadedSuggestionsRef.current = true;
+    loadSuggestions();
   }, [sources.length, loadSuggestions]);
 
   // Ouvrir le modal "Rapport complet"
@@ -926,6 +915,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 setGeneratedDocs(prev => [parsed.document, ...prev]);
                 setSelectedDoc(parsed.document);
                 success(`"${parsed.document.title}" généré`);
+                // Rafraîchir le notebook parent pour que le nouveau rapport
+                // apparaisse immédiatement dans l'onglet Historique et le badge,
+                // sans actualisation manuelle.
+                onRefresh();
               } else if (parsed.error) {
                 setGenerationQueue(prev => prev.map(t => 
                   t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
@@ -961,7 +954,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
         setGenerationQueue(prev => prev.filter(t => t.id !== task.id));
       }, 1000);
     }
-  }, [notebookId, profile.openrouterImageModel, success, toastError]);
+  }, [notebookId, profile.openrouterImageModel, success, toastError, onRefresh]);
   
   // Traitement de la file d'attente - gérer jusqu'à MAX_PARALLEL_GENERATIONS tâches simultanées
   useEffect(() => {
@@ -1051,11 +1044,13 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
     try {
       await fetch(`/api/notebooks/${notebookId}/generated/${selectedDoc.id}`, { method: 'DELETE' });
       setGeneratedDocs(prev => prev.filter(d => d.id !== selectedDoc.id));
+      // Synchroniser l'historique parent après suppression de l'ancien doc.
+      onRefresh();
     } catch { /* ignore */ }
     setSelectedDoc(null);
     // Relancer la génération
     handleGenerate(selectedDoc.type);
-  }, [selectedDoc, notebookId, handleGenerate]);
+  }, [selectedDoc, notebookId, handleGenerate, onRefresh]);
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
@@ -1741,24 +1736,49 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
 
                 {/* Suggestions IA */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
-                    <h3 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-                      Suggestions pour vos sources
-                    </h3>
-                    {loadingSuggestions && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--color-warning)' }} />}
+                <div
+                  className="rounded-2xl p-4 space-y-4"
+                  style={{
+                    background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-warning) 7%, transparent), color-mix(in srgb, var(--accent-primary) 5%, transparent))',
+                    border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
+                      }}
+                    >
+                      <Lightbulb className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                        Suggestions pour vos sources
+                      </h3>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>
+                        Recommandations générées par l'IA
+                      </p>
+                    </div>
                     {!loadingSuggestions && suggestions.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)', color: 'var(--color-warning)' }}>
-                        {suggestions.length} suggestions
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0"
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)', color: 'var(--color-warning)' }}
+                      >
+                        {suggestions.length}
                       </span>
                     )}
                     {!loadingSuggestions && (
                       <button
                         onClick={loadSuggestions}
-                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                        style={{ border: '1px solid var(--border-base)', color: 'var(--color-warning)' }}
-                        title="Demander de nouvelles suggestions"
+                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 flex-shrink-0"
+                        style={{
+                          border: '1px solid color-mix(in srgb, var(--color-warning) 35%, transparent)',
+                          color: 'var(--color-warning)',
+                          backgroundColor: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
+                        }}
+                        title="Demander de nouvelles suggestions (actualisation manuelle)"
                       >
                         <RefreshCw className="w-3 h-3" />
                         {suggestions.length > 0 ? 'Rafraîchir' : 'Obtenir des suggestions'}
@@ -1767,20 +1787,34 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                   </div>
 
                   {loadingSuggestions && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
-                      <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-warning)' }} />
-                      <div>
-                        <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Analyse de vos sources en cours…</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>L'IA identifie les rapports les plus pertinents</p>
-                      </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-3 p-3.5 rounded-xl animate-pulse"
+                          style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-xl flex-shrink-0"
+                            style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 12%, transparent)' }}
+                          />
+                          <div className="flex-1 space-y-2 pt-0.5">
+                            <div className="h-3 w-3/4 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 15%, transparent)' }} />
+                            <div className="h-2.5 w-full rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 10%, transparent)' }} />
+                            <div className="h-2.5 w-2/3 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 10%, transparent)' }} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   {!loadingSuggestions && suggestions.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {suggestions.map((suggestion, idx) => {
                         const docType = REPORT_TYPES.find(t => t.key === suggestion.type) || DOC_TYPES.find(t => t.key === suggestion.type);
                         const SugIcon = docType?.icon || Sparkles;
+                        const docColor = docType?.color || 'var(--text-muted)';
+                        const relevance = Math.max(0, Math.min(100, suggestion.relevance ?? 0));
                         return (
                           <button
                             key={idx}
@@ -1790,38 +1824,57 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                               }
                               handleModalGenerate(suggestion.type);
                             }}
-                            className="w-full flex items-start gap-3 p-3.5 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] text-left group"
+                            className="relative w-full flex flex-col gap-2.5 p-3.5 rounded-xl border transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] text-left group overflow-hidden"
                             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
                           >
-                            <div
-                              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: `color-mix(in srgb, ${docType?.color || 'var(--text-muted)'} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${docType?.color || 'var(--text-muted)'} 25%, transparent)` }}
-                            >
-                              <SugIcon className="w-4 h-4" style={{ color: docType?.color || 'var(--text-muted)' }} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {/* Liseré coloré latéral */}
+                            <span
+                              className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
+                              style={{ backgroundColor: docColor, opacity: 0.8 }}
+                            />
+                            <div className="flex items-start gap-3 pl-1.5">
+                              <div
+                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+                                style={{ backgroundColor: `color-mix(in srgb, ${docColor} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${docColor} 25%, transparent)` }}
+                              >
+                                <SugIcon className="w-4 h-4" style={{ color: docColor }} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
                                   {suggestion.title}
                                 </p>
-                                {(() => {
-                                  const docColor = docType?.color || 'var(--text-muted)';
-                                  return (
-                                    <span
-                                      className="text-xs px-1.5 py-0.5 rounded-full font-bold"
-                                      style={{ backgroundColor: `color-mix(in srgb, ${docColor} 15%, transparent)`, color: docColor }}
-                                    >
-                                      {suggestion.relevance}% pertinent
-                                    </span>
-                                  );
-                                })()}
+                                <p className="text-xs mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                                  {suggestion.reason}
+                                </p>
                               </div>
-                              <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                                {suggestion.reason}
-                              </p>
                             </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1">
-                              <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Générer</span>
+
+                            {/* Barre de pertinence */}
+                            <div className="pl-1.5 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
+                                  Pertinence
+                                </span>
+                                <span className="text-xs font-bold" style={{ color: docColor }}>
+                                  {relevance}%
+                                </span>
+                              </div>
+                              <div
+                                className="h-1.5 w-full rounded-full overflow-hidden"
+                                style={{ backgroundColor: 'color-mix(in srgb, var(--text-muted) 12%, transparent)' }}
+                              >
+                                <span
+                                  className="block h-full rounded-full transition-all"
+                                  style={{ width: `${relevance}%`, backgroundColor: docColor }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* CTA au survol */}
+                            <div
+                              className="flex items-center justify-center gap-1.5 pl-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <span className="text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>Générer ce rapport</span>
                               <Zap className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
                             </div>
                           </button>
@@ -1831,9 +1884,37 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                   )}
 
                   {!loadingSuggestions && suggestions.length === 0 && (
-                    <p className="text-xs py-3 text-center" style={{ color: 'var(--text-dimmed)' }}>
-                      Cliquez sur "Obtenir des suggestions" pour que l'IA analyse vos sources.
-                    </p>
+                    <div
+                      className="flex flex-col items-center gap-3 py-6 px-4 rounded-xl text-center"
+                      style={{ backgroundColor: 'var(--bg-base)', border: '1px dashed color-mix(in srgb, var(--color-warning) 30%, transparent)' }}
+                    >
+                      <div
+                        className="w-11 h-11 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)' }}
+                      >
+                        <Sparkles className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          Aucune suggestion pour le moment
+                        </p>
+                        <p className="text-xs mt-1 max-w-xs" style={{ color: 'var(--text-dimmed)' }}>
+                          Lancez l'analyse pour que l'IA identifie les rapports les plus pertinents à partir de vos sources.
+                        </p>
+                      </div>
+                      <button
+                        onClick={loadSuggestions}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
+                        style={{
+                          backgroundColor: 'color-mix(in srgb, var(--color-warning) 14%, transparent)',
+                          color: 'var(--color-warning)',
+                          border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
+                        }}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Obtenir des suggestions
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1847,28 +1928,36 @@ export function GeneratePanel({ notebookId, sources, onRefresh: _onRefresh, full
                 </div>
 
                 {/* Grille de tous les types */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   {REPORT_TYPES.map(({ key, label, icon: Icon, desc, color }) => (
                     <button
                       key={key}
                       onClick={() => handleModalGenerate(key)}
-                      className="flex items-start gap-3 p-3 rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] text-left group"
+                      className="relative flex items-start gap-3 p-3.5 pl-4 rounded-xl border transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.97] text-left group overflow-hidden"
                       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
                     >
+                      <span
+                        className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
+                        style={{ backgroundColor: color, opacity: 0.7 }}
+                      />
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110"
                         style={{ backgroundColor: `${color}12`, border: `1px solid ${color}25` }}
                       >
                         <Icon className="w-4 h-4" style={{ color }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                           {label}
                         </p>
-                        <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-dimmed)' }}>
+                        <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-dimmed)' }}>
                           {desc}
                         </p>
                       </div>
+                      <ArrowRight
+                        className="w-3.5 h-3.5 flex-shrink-0 mt-1 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
+                        style={{ color }}
+                      />
                     </button>
                   ))}
                 </div>
