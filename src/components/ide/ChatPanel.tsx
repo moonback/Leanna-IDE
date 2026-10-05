@@ -1,9 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, animate } from 'motion/react';
 import {
-  Send, Mic, MicOff, User, Bot, Eye, X,
+  Send, Mic, MicOff, User, Bot, X,
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
-  ChevronDown, Download, MessageSquare, MoreVertical, ArrowDown,
+  Download, MessageSquare, MoreVertical, ArrowDown,
   Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
   FileText, Terminal, FlaskConical,
 } from 'lucide-react';
@@ -199,7 +199,9 @@ const ChatMessage = memo(function ChatMessage({
   entry,
   profile: _profile,
   reduceMotion,
-  onExcludeSource,
+  // Prop conservée (le parent la fournit) pour la future ré-activation du bloc
+  // « Sources » actuellement commenté ; non consommée pour l'instant.
+  onExcludeSource: _onExcludeSource,
   onCopy,
   onRetry,
   isLast,
@@ -213,11 +215,8 @@ const ChatMessage = memo(function ChatMessage({
   isLast?: boolean;
 }) {
   const isAssistant = entry.role === 'assistant';
-  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
-  const [showSources, setShowSources] = useState(false);
   const [copied, setCopied] = useState(false);
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
-  const visibleSources = entry.sources?.filter(s => !excludedIds.has(s.id)) ?? [];
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(entry.text).then(() => {

@@ -92,7 +92,8 @@ const AGENT_ROLE_ALIASES: Readonly<Record<string, AgentRole>> = {
   writer: "writer",
   docs: "writer",
   doc: "writer",
-  documentation: "writer",
+  // NB : l'alias « documentation » est mappé plus bas vers le rôle dédié
+  // `documentation` (bloc Web & Qualité), pas vers `writer`.
   redacteur: "writer",
   rédacteur: "writer",
   write: "writer",

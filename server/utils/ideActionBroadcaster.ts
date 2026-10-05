@@ -14,8 +14,6 @@
  * les clients /live connectés, indépendamment de la session Live active.
  */
 
-import type { WebSocket as WsWebSocket } from "ws";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type IdeAction =

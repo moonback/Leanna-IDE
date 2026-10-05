@@ -1028,7 +1028,6 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
   // création et produit une récursion infinie type :
   //   sandbox/.Leanna/sandbox/.Leanna/sandbox/…
   const absDst = path.resolve(dst);
-  const absSrc = path.resolve(src);
 
   const entries = await fs.promises.readdir(src, { withFileTypes: true });
   for (const entry of entries) {
