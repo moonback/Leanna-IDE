@@ -7,7 +7,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach } from 'vitest';
 
 afterEach(() => {
   cleanup();
@@ -47,5 +47,9 @@ if (!('ResizeObserver' in window)) {
 
 // scrollIntoView — appelé pour auto-scroller la zone de chat ; absent de jsdom.
 if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = () => {};
 }
+
+// window.scrollTo — non implémenté par jsdom ; appelé par Framer Motion lors
+// de la mesure des keyframes. Stub silencieux pour éviter le bruit en sortie.
+window.scrollTo = (() => {}) as typeof window.scrollTo;

@@ -25,6 +25,8 @@ import { SlidePreviewModal } from './SlidePreviewModal.js';
 import { useToast } from '../ui/Toast.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
+import { streamSSE } from './api/sse.js';
+import type { GenerateStreamData } from './api/types.js';
 // Styles premium NotebookLM
 import '../../styles/notebooklm.css';
 
@@ -859,82 +861,53 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     if (selectedDoc) setSelectedDoc(null);
     
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/generate/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: task.type,
-          sourceIds: task.sourceIds,
-          customInstructions: task.customInstructions,
-          imageModel: profile.openrouterImageModel || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de body stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
       let accumulated = "";
       // Estimation cible : ~12 000 caractères pour un document moyen.
       // On plafonne à 95 % pour que le passage à 100 % soit déclenché
       // uniquement par l'événement "document" final du serveur.
       const ESTIMATED_TOTAL_CHARS = 12_000;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      await streamSSE(`/api/notebooks/${notebookId}/generate/stream`, {
+        json: {
+          type: task.type,
+          sourceIds: task.sourceIds,
+          customInstructions: task.customInstructions,
+          imageModel: profile.openrouterImageModel || undefined,
+        },
+        onFrame: ({ data }) => {
+          const parsed = data as GenerateStreamData;
+          if (parsed.text) {
+            accumulated += parsed.text;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) continue;
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                accumulated += parsed.text;
-
-                // Progression linéaire bornée à 95 % jusqu'à réception du doc final
-                const progress = Math.min(95, Math.round((accumulated.length / ESTIMATED_TOTAL_CHARS) * 100));
-                setGenerationProgresses(prev => ({ ...prev, [task.id]: progress }));
-                setGenerationQueue(prev => prev.map(t =>
-                  t.id === task.id ? { ...t, progress } : t
-                ));
-                setStreamingTexts(prev => ({ ...prev, [task.id]: accumulated }));
-              } else if (parsed.document) {
-                setGenerationProgresses(prev => ({ ...prev, [task.id]: 100 }));
-                setGenerationQueue(prev => prev.map(t => 
-                  t.id === task.id ? { ...t, progress: 100, status: 'completed' } : t
-                ));
-                setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
-                setGeneratedDocs(prev => [parsed.document, ...prev]);
-                setSelectedDoc(parsed.document);
-                success(`"${parsed.document.title}" généré`);
-                // Rafraîchir le notebook parent pour que le nouveau rapport
-                // apparaisse immédiatement dans l'onglet Historique et le badge,
-                // sans actualisation manuelle.
-                onRefresh();
-              } else if (parsed.error) {
-                setGenerationQueue(prev => prev.map(t => 
-                  t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
-                ));
-                throw new Error(parsed.error);
-              }
-            } catch (e: any) {
-              if (e.message && !e.message.includes('JSON')) throw e;
-            }
+            // Progression linéaire bornée à 95 % jusqu'à réception du doc final
+            const progress = Math.min(95, Math.round((accumulated.length / ESTIMATED_TOTAL_CHARS) * 100));
+            setGenerationProgresses(prev => ({ ...prev, [task.id]: progress }));
+            setGenerationQueue(prev => prev.map(t =>
+              t.id === task.id ? { ...t, progress } : t
+            ));
+            setStreamingTexts(prev => ({ ...prev, [task.id]: accumulated }));
+          } else if (parsed.document) {
+            const doc = parsed.document;
+            setGenerationProgresses(prev => ({ ...prev, [task.id]: 100 }));
+            setGenerationQueue(prev => prev.map(t =>
+              t.id === task.id ? { ...t, progress: 100, status: 'completed' } : t
+            ));
+            setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
+            setGeneratedDocs(prev => [doc, ...prev]);
+            setSelectedDoc(doc);
+            success(`"${doc.title}" généré`);
+            // Rafraîchir le notebook parent pour que le nouveau rapport
+            // apparaisse immédiatement dans l'onglet Historique et le badge,
+            // sans actualisation manuelle.
+            onRefresh();
+          } else if (parsed.error) {
+            setGenerationQueue(prev => prev.map(t =>
+              t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
+            ));
+            throw new Error(parsed.error);
           }
-        }
-      }
+        },
+      });
     } catch (e: any) {
       setGenerationQueue(prev => prev.map(t => 
         t.id === task.id ? { ...t, status: 'error', progress: 0 } : t

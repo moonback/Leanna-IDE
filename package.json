@@ -19,6 +19,7 @@
     "lint:eslint:fix": "eslint . --fix",
     "lint:eslint:notebooks": "eslint \"src/components/notebooks/**/*.{ts,tsx}\" --max-warnings=-1",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "test": "node --import tsx --test server/**/*.test.ts",
     "test:ui": "vitest run --config vitest.config.ts",
     "test:ui:watch": "vitest --config vitest.config.ts",

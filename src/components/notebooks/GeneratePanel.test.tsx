@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { GeneratePanel } from './GeneratePanel.js';
 import {
   renderWithProviders,
@@ -28,7 +28,7 @@ describe('GeneratePanel — génération de document (caractérisation)', () => 
     localStorage.clear();
   });
 
-  it("refuse la génération et avertit lorsqu'il n'y a aucune source", async () => {
+  it("désactive les types de document et n'émet aucune génération sans source", async () => {
     const user = userEvent.setup();
     const onRefresh = vi.fn();
     const fetchMock = mockFetchRouter(
@@ -40,16 +40,16 @@ describe('GeneratePanel — génération de document (caractérisation)', () => 
       <GeneratePanel notebookId="nb-1" sources={[]} onRefresh={onRefresh} />,
     );
 
-    // "Résumé" est l'un des types de documents proposés.
+    // "Résumé" est l'un des types de documents proposés : sans source, le
+    // bouton est désactivé (comportement actuel) et un message d'aide s'affiche.
     const summaryBtn = await screen.findByRole('button', { name: /Résumé/ });
-    await user.click(summaryBtn);
-
-    // Toast d'erreur du comportement actuel.
+    expect(summaryBtn).toBeDisabled();
     expect(
-      await screen.findByText("Ajoutez des sources d'abord."),
+      screen.getByText('Ajoutez des sources pour activer la génération'),
     ).toBeInTheDocument();
 
-    // Aucune requête de génération n'a été émise.
+    // Cliquer un bouton désactivé ne déclenche aucune requête de génération.
+    await user.click(summaryBtn);
     const genCall = fetchMock.mock.calls.find(([url]) =>
       String(url).includes('/generate/stream'),
     );

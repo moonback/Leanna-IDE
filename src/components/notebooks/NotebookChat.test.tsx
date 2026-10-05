@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { NotebookChat } from './NotebookChat.js';
 import {
   renderWithProviders,

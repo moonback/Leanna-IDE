@@ -17,6 +17,7 @@ import { useToast } from '../ui/Toast.js';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
 import { SPRING_UI_SLOW as SPRING_UI, SPRING_SNAPPY } from './motion.js';
+import { api, apiVoid } from './api/client.js';
 
 interface SourceItem {
   id: string;
@@ -139,37 +140,30 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch(`/api/notebooks/${notebookId}/sources/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({ error: 'Upload failed' }));
-          throw new Error(d.error || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await api<{ source: { title: string; wordCount: number; chunksCount: number } }>(
+          `/api/notebooks/${notebookId}/sources/upload`,
+          { method: 'POST', body: formData },
+        );
         setUploadQueue([{ name: file.name, status: 'success' }]);
         success(`Source "${data.source.title}" ajoutée (${data.source.wordCount} mots, ${data.source.chunksCount} chunks)`);
         onRefresh();
-      } catch (e: any) {
-        setUploadQueue([{ name: file.name, status: 'error', error: e.message }]);
-        toastError(e.message);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Upload failed';
+        setUploadQueue([{ name: file.name, status: 'error', error: message }]);
+        toastError(message);
       }
     } else {
       setUploadQueue(files.map(f => ({ name: f.name, status: 'uploading' })));
       try {
         const formData = new FormData();
         for (const file of files) formData.append('files', file);
-        const res = await fetch(`/api/notebooks/${notebookId}/sources/upload-multi`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({ error: 'Upload failed' }));
-          throw new Error(d.error || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        setUploadQueue(data.results.map((r: any) => ({
+        const data = await api<{
+          results: { filename: string; status: UploadFileStatus['status']; error?: string }[];
+          successCount: number;
+          errorCount: number;
+          total: number;
+        }>(`/api/notebooks/${notebookId}/sources/upload-multi`, { method: 'POST', body: formData });
+        setUploadQueue(data.results.map((r) => ({
           name: r.filename, status: r.status, error: r.error,
         })));
         if (data.successCount > 0) {
@@ -177,9 +171,10 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
           onRefresh();
         }
         if (data.errorCount > 0) toastError(`${data.errorCount} fichier(s) en erreur`);
-      } catch (e: any) {
-        setUploadQueue(files.map(f => ({ name: f.name, status: 'error', error: e.message })));
-        toastError(e.message);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Upload failed';
+        setUploadQueue(files.map(f => ({ name: f.name, status: 'error', error: message })));
+        toastError(message);
       }
     }
 
@@ -228,21 +223,15 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
     if (!url.trim()) return;
     setUploading(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Ingestion failed' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await api<{ source: { title: string } }>(
+        `/api/notebooks/${notebookId}/sources/url`,
+        { method: 'POST', json: { url: url.trim() } },
+      );
       success(`Source "${data.source.title}" ajoutée`);
       setUrl(''); setShowUrlForm(false);
       onRefresh();
-    } catch (e: any) {
-      toastError(e.message);
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Ingestion failed');
     } finally { setUploading(false); }
   }, [url, notebookId, success, toastError, onRefresh]);
 
@@ -250,24 +239,21 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
     if (!textContent.trim()) return;
     setUploading(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: textTitle.trim() || undefined, content: textContent }),
-      });
-      if (!res.ok) throw new Error('Erreur');
-      const data = await res.json();
+      const data = await api<{ source: { title: string } }>(
+        `/api/notebooks/${notebookId}/sources/text`,
+        { method: 'POST', json: { title: textTitle.trim() || undefined, content: textContent } },
+      );
       success(`Source "${data.source.title}" ajoutée`);
       setTextTitle(''); setTextContent(''); setShowTextForm(false);
       onRefresh();
-    } catch (e: any) { toastError(e.message); }
-    finally { setUploading(false); }
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Erreur');
+    } finally { setUploading(false); }
   }, [textTitle, textContent, notebookId, success, toastError, onRefresh]);
 
   const handleDelete = useCallback(async (sourceId: string) => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await apiVoid(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: 'DELETE' });
       success('Source supprimée');
       onRefresh();
     } catch { toastError('Impossible de supprimer'); }

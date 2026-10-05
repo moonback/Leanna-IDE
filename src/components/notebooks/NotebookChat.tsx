@@ -18,6 +18,8 @@ import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
 import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from './motion.js';
+import { streamSSE } from './api/sse.js';
+import type { ChatStreamData } from './api/types.js';
 
 interface Citation {
   sourceId: string;
@@ -972,65 +974,33 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         try {
           abortRef.current = new AbortController();
 
-          const res = await fetch(`/api/notebooks/${notebookId}/chat/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          let accumulated = '';
+
+          await streamSSE(`/api/notebooks/${notebookId}/chat/stream`, {
+            signal: abortRef.current.signal,
+            json: {
               question: request.question,
               sourceIds: request.sourceIds,
               personality: request.personality,
               threadId: request.threadId,
-            }),
-            signal: abortRef.current.signal,
-          });
+            },
+            onFrame: ({ data }) => {
+              const parsed = data as ChatStreamData;
+              if (parsed.text) {
+                accumulated += parsed.text;
+                setStreamingText(accumulated);
+              } else if (parsed.message) {
+                setStreamingText('');
+                setMessages(prev => [...prev, parsed.message!]);
 
-          if (!res.ok) {
-            const d = await res.json().catch(() => ({ error: 'Erreur' }));
-            throw new Error(d.error || `HTTP ${res.status}`);
-          }
-
-          const reader = res.body?.getReader();
-          if (!reader) throw new Error('Pas de body stream');
-
-          const decoder = new TextDecoder();
-          let buffer = '';
-          let accumulated = '';
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-
-              const data = line.slice(6);
-              try {
-                const parsed = JSON.parse(data);
-
-                if (parsed.text) {
-                  accumulated += parsed.text;
-                  setStreamingText(accumulated);
-                } else if (parsed.message) {
-                  setStreamingText('');
-                  setMessages(prev => [...prev, parsed.message]);
-
-                  if (!document.hidden) {
-                    toastSuccess('✓ Réponse générée avec succès');
-                  }
-                } else if (parsed.error) {
-                  throw new Error(parsed.error);
+                if (!document.hidden) {
+                  toastSuccess('✓ Réponse générée avec succès');
                 }
-              } catch (e: unknown) {
-                if (e instanceof Error && !e.message.includes('JSON')) {
-                  throw e;
-                }
+              } else if (parsed.error) {
+                throw new Error(parsed.error);
               }
-            }
-          }
+            },
+          });
         } catch (e: unknown) {
           if (e instanceof DOMException && e.name === 'AbortError') {
             // Stop only the current request. Pending requests remain in the FIFO queue.

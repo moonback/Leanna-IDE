@@ -111,7 +111,7 @@ export function mockFetchRouter(
     return jsonResponse({});
   });
 
-  // @ts-expect-error — on remplace volontairement le fetch global dans les tests.
-  global.fetch = fetchMock;
+  // On remplace volontairement le fetch global dans les tests.
+  global.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;
 }
