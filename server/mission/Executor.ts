@@ -8,6 +8,7 @@ import { AutonomyPolicy } from "./AutonomyPolicy.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
+  MissionState,
   Goal,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
@@ -89,6 +90,17 @@ export class Executor {
 
   /** Intervalle de sondage de l'état de pause (ms). */
   private static readonly PAUSE_POLL_MS = 500;
+
+  /**
+   * Missions interrompues (crash/redémarrage) rechargées depuis le store mais
+   * NON relancées : elles attendent une décision explicite de l'utilisateur
+   * (réactiver ou effacer). Clé = missionId → état rechargé + titre.
+   * Tant qu'une mission est ici, elle n'est ni active ni relancée.
+   */
+  private pendingResumes: Map<string, { state: MissionState; title: string }> = new Map();
+
+  /** Skills disponibles mémorisés pour relancer une mission réactivée. */
+  private resumeAvailableSkills: string[] = [];
 
   /**
    * Outils d'EXPLORATION (lecture seule) : utiles pour comprendre le contexte,
@@ -1581,9 +1593,21 @@ JSON:`;
   }
 
   /**
-   * Reprend les missions interrompues (statut pending/in_progress) au démarrage.
-   * Recharge leur état depuis le store et relance leur exécution en arrière-plan.
+   * Détecte les missions interrompues (statut pending/in_progress) persistées
+   * dans le store, SANS les relancer automatiquement.
+   *
+   * Au lieu de reprendre l'exécution d'office, chaque mission interrompue est
+   * mise « en attente de décision » : l'utilisateur devra explicitement choisir
+   * de la **réactiver** ou de l'**effacer** (via `confirmResume`). On émet un
+   * événement `mission_resume_pending` par mission pour que l'UI présente le
+   * choix.
+   *
+   * Cette méthode ne doit être appelée que lorsqu'un workspace est connecté
+   * (l'appelant garde cette responsabilité). Elle est idempotente : une mission
+   * déjà active ou déjà en attente n'est pas re-proposée.
+   *
    * Ne fait rien si aucun store n'est branché ou si le SkillHandler manque.
+   * Retourne le nombre de missions mises en attente de décision.
    */
   async resumePending(availableSkills: string[]): Promise<number> {
     if (!this.store || !this.store.isEnabled()) return 0;
@@ -1592,29 +1616,93 @@ JSON:`;
       return 0;
     }
 
+    // Mémoriser les skills pour pouvoir relancer une mission réactivée plus tard.
+    this.resumeAvailableSkills = availableSkills;
+
     const states = await this.store.listByStatus(["pending", "in_progress"]);
     if (states.length === 0) return 0;
 
-    let resumed = 0;
+    let proposed = 0;
     for (const state of states) {
-      // Éviter de reprendre une mission déjà active en mémoire.
+      // Ne pas re-proposer une mission déjà active ou déjà en attente de décision.
       if (this.activeMissions.has(state.id)) continue;
+      if (this.pendingResumes.has(state.id)) continue;
 
-      const mission = Mission.fromJSON(state);
-      this.activeMissions.set(mission.id, mission);
+      this.pendingResumes.set(state.id, { state, title: state.title });
 
-      console.log(`[Executor] ♻️ Reprise de la mission "${state.title}" (${state.id}).`);
-      this.emit("mission_resumed", { missionId: mission.id, title: state.title });
-
-      this.executeMission(mission, availableSkills).catch((err) => {
-        console.error(`[Executor] Reprise mission ${mission.id} échouée:`, err);
-        this.emit("mission_failed", { missionId: mission.id, error: String(err) });
+      console.log(
+        `[Executor] ⏸️ Mission interrompue détectée "${state.title}" (${state.id}) — ` +
+          `en attente de décision utilisateur (réactiver / effacer).`
+      );
+      this.emit("mission_resume_pending", {
+        missionId: state.id,
+        title: state.title,
+        priority: state.priority,
+        status: state.status,
+        updatedAt: state.updatedAt,
       });
-      resumed++;
+      proposed++;
     }
 
-    console.log(`[Executor] ♻️ ${resumed} mission(s) reprise(s) depuis le store.`);
-    return resumed;
+    if (proposed > 0) {
+      console.log(`[Executor] ⏸️ ${proposed} mission(s) interrompue(s) en attente de décision.`);
+    }
+    return proposed;
+  }
+
+  /**
+   * Liste les missions interrompues en attente de décision utilisateur.
+   * Utilisé par l'UI (fetch initial) pour reconstituer les cartes de décision.
+   */
+  listPendingResumes(): Array<{ missionId: string; title: string; priority: string; status: string; updatedAt: string }> {
+    return Array.from(this.pendingResumes.values()).map(({ state }) => ({
+      missionId: state.id,
+      title: state.title,
+      priority: state.priority,
+      status: state.status,
+      updatedAt: state.updatedAt,
+    }));
+  }
+
+  /**
+   * Applique la décision de l'utilisateur sur une mission interrompue :
+   *   - `reactivate` : recharge la mission et relance son exécution en arrière-plan ;
+   *   - `delete`     : efface la mission du store et l'abandonne définitivement.
+   *
+   * Retourne false si aucune mission en attente ne correspond à `missionId`.
+   */
+  confirmResume(missionId: string, decision: "reactivate" | "delete"): boolean {
+    const pending = this.pendingResumes.get(missionId);
+    if (!pending) return false;
+
+    this.pendingResumes.delete(missionId);
+
+    if (decision === "delete") {
+      console.log(`[Executor] 🗑️ Mission interrompue "${pending.title}" (${missionId}) effacée sur demande.`);
+      if (this.store) void this.store.delete(missionId);
+      this.emit("mission_deleted", { missionId });
+      return true;
+    }
+
+    // reactivate
+    if (!this.skillHandler) {
+      console.warn(`[Executor] Réactivation impossible: SkillHandler non configuré.`);
+      return false;
+    }
+    // Garde-fou : si déjà active (double-clic), ne pas relancer deux fois.
+    if (this.activeMissions.has(missionId)) return true;
+
+    const mission = Mission.fromJSON(pending.state);
+    this.activeMissions.set(mission.id, mission);
+
+    console.log(`[Executor] ♻️ Reprise de la mission "${pending.title}" (${missionId}).`);
+    this.emit("mission_resumed", { missionId: mission.id, title: pending.title });
+
+    this.executeMission(mission, this.resumeAvailableSkills).catch((err) => {
+      console.error(`[Executor] Reprise mission ${mission.id} échouée:`, err);
+      this.emit("mission_failed", { missionId: mission.id, error: String(err) });
+    });
+    return true;
   }
 
   private emit(event: string, data: Record<string, unknown>): void {

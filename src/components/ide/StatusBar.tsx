@@ -276,6 +276,10 @@ export const StatusBar = memo(function StatusBar({
   // puis mis à jour en temps réel via les événements 'Leanna-mission-event',
   // exactement comme le MissionPanel.
   const [activeMissionCount, setActiveMissionCount] = useState(0);
+  // Miroir du compteur pour que le polling ajuste sa cadence sans recréer
+  // l'effet (deps stables []).
+  const activeMissionCountRef = useRef(0);
+  activeMissionCountRef.current = activeMissionCount;
 
   // Demandes d'approbation en attente — source partagée, visibles même panneau fermé.
   const pendingApprovalCount = usePendingApprovalCount();
@@ -339,14 +343,37 @@ export const StatusBar = memo(function StatusBar({
     };
 
     let cancelled = false;
-    fetch('/api/missions')
-      .then(res => (res.ok ? res.json() : { missions: [] }))
-      .then((data: { missions?: Array<{ id: string; status?: string }> }) => {
-        if (cancelled || !Array.isArray(data.missions)) return;
-        for (const m of data.missions) statuses.set(m.id, m.status ?? 'pending');
-        recompute();
-      })
-      .catch(() => { /* système de missions indisponible — badge à 0, normal */ });
+    let pollTimer: ReturnType<typeof setTimeout>;
+
+    // Resynchronise la carte des statuts depuis le serveur. Fait autorité :
+    // on remplace entièrement la carte pour refléter aussi les missions
+    // disparues (effacées) ou dont le statut a changé hors WebSocket.
+    const syncFromServer = () => {
+      fetch('/api/missions')
+        .then(res => (res.ok ? res.json() : { missions: [] }))
+        .then((data: { missions?: Array<{ id: string; status?: string }> }) => {
+          if (cancelled || !Array.isArray(data.missions)) return;
+          statuses.clear();
+          for (const m of data.missions) statuses.set(m.id, m.status ?? 'pending');
+          recompute();
+        })
+        .catch(() => { /* système de missions indisponible — badge à 0, normal */ });
+    };
+
+    // Polling de repli : les événements mission ne transitent par le WebSocket
+    // que lorsqu'une session Live est ouverte. Sans session active (ex. écran
+    // d'accueil), une mission réactivée/terminée ne mettrait jamais à jour le
+    // badge. Un sondage périodique garantit la fraîcheur du compteur, comme le
+    // fait déjà le MissionPanel.
+    const schedulePoll = () => {
+      if (cancelled) return;
+      // Rythme soutenu s'il y a une mission vivante, économe sinon.
+      const delay = activeMissionCountRef.current > 0 ? 3000 : 8000;
+      pollTimer = setTimeout(() => { syncFromServer(); schedulePoll(); }, delay);
+    };
+
+    syncFromServer();
+    schedulePoll();
 
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ type?: string; event?: string; missionId?: string; success?: boolean }>).detail;
@@ -387,6 +414,7 @@ export const StatusBar = memo(function StatusBar({
     window.addEventListener('Leanna-mission-event', handler);
     return () => {
       cancelled = true;
+      clearTimeout(pollTimer);
       window.removeEventListener('Leanna-mission-event', handler);
     };
   }, []);

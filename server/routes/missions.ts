@@ -199,6 +199,37 @@ export function createMissionsRouter(
     return res.json({ pending: executor.listPendingApprovals() });
   });
 
+  // ── Lister les missions interrompues en attente de décision ──────────────
+  // (reprise au démarrage : réactiver ou effacer).
+  router.get("/missions/pending-resumes", (_req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    return res.json({ pending: executor.listPendingResumes?.() ?? [] });
+  });
+
+  // ── Décider du sort d'une mission interrompue (réactiver / effacer) ──────
+  router.post("/missions/:id/resume-decision", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+
+    const missionId = req.params.id;
+    const { decision } = req.body ?? {};
+    if (decision !== "reactivate" && decision !== "delete") {
+      return res.status(400).json({
+        error: "Champ 'decision' invalide (reactivate | delete).",
+      });
+    }
+
+    const ok = executor.confirmResume?.(missionId, decision) ?? false;
+    if (!ok) {
+      return res.status(404).json({
+        error: "Aucune mission interrompue en attente pour cet ID (déjà décidée ou inexistante).",
+        missionId,
+      });
+    }
+    return res.json({ ok: true, missionId, decision });
+  });
+
   // ── Lire le mode d'autonomie courant ─────────────────────────────────────
   router.get("/missions/autonomy", (_req: Request, res: Response) => {
     const executor = requireExecutor(res);

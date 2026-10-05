@@ -8,6 +8,12 @@ import {
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
+import {
+  useResumeConfirmations,
+  clearResumeConfirmation,
+  seedResumeConfirmations,
+  type ResumeConfirmationInfo,
+} from '../../hooks/useResumeConfirmations.js';
 import { skillLabel } from '../../utils/skillLabels.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -221,7 +227,11 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   // Source partagée : les approbations en attente sont aussi lues par la barre
   // de statut (pastille globale), pour rester visibles panneau fermé.
   const approvals = usePendingApprovals();
+  // Missions interrompues (crash/redémarrage) en attente d'une décision :
+  // réactiver ou effacer. Jamais relancées d'office par le serveur.
+  const resumeConfirmations = useResumeConfirmations();
   const [resolving, setResolving] = useState<string | null>(null);
+  const [decidingResume, setDecidingResume] = useState<string | null>(null);
   const [busyMission, setBusyMission] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -276,6 +286,26 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
       console.error('[MissionPanel] Échec de résolution d\'approbation:', err);
     } finally {
       setResolving(null);
+    }
+  }, []);
+
+  // Décide du sort d'une mission interrompue : la réactiver ou l'effacer.
+  const decideResume = useCallback(async (missionId: string, decision: 'reactivate' | 'delete') => {
+    setDecidingResume(missionId);
+    try {
+      const res = await fetch(`/api/missions/${missionId}/resume-decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      // Succès OU déjà décidée côté serveur (404) → retirer la carte localement.
+      if (res.ok || res.status === 404) {
+        clearResumeConfirmation(missionId);
+      }
+    } catch (err) {
+      console.error('[MissionPanel] Échec de décision de reprise:', err);
+    } finally {
+      setDecidingResume(null);
     }
   }, []);
 
@@ -361,6 +391,22 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   useEffect(() => {
     return syncMissionsFromServer();
   }, [syncMissionsFromServer]);
+
+  // Amorcer les missions interrompues en attente de décision (réactiver/effacer).
+  // L'événement `mission_resume_pending` peut être arrivé avant le montage du
+  // panneau (ou sans session WebSocket active) : ce fetch garantit que les
+  // cartes de décision apparaissent quand même.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/missions/pending-resumes')
+      .then(res => (res.ok ? res.json() : { pending: [] }))
+      .then((data: { pending?: Array<Omit<ResumeConfirmationInfo, 'receivedAt'>> }) => {
+        if (cancelled || !Array.isArray(data.pending) || data.pending.length === 0) return;
+        seedResumeConfirmations(data.pending);
+      })
+      .catch(() => { /* mission system indisponible — normal */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Indique si une mission est « vivante » (tourne, en pause ou bloquée). Lu par
   // le polling via une ref, pour éviter de recréer l'intervalle à chaque
@@ -737,6 +783,23 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
         )}
       </AnimatePresence>
 
+      {/* Missions interrompues en attente de décision (réactiver / effacer) */}
+      {resumeConfirmations.length > 0 && (
+        <div className="px-2 pt-2 space-y-1.5 flex-shrink-0">
+          <AnimatePresence initial={false}>
+            {resumeConfirmations.map(confirmation => (
+              <ResumeConfirmationCard
+                key={confirmation.missionId}
+                confirmation={confirmation}
+                deciding={decidingResume === confirmation.missionId}
+                onReactivate={() => decideResume(confirmation.missionId, 'reactivate')}
+                onDelete={() => decideResume(confirmation.missionId, 'delete')}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
       {/* Approbations en attente */}
       {approvals.length > 0 && (
         <div className="px-2 pt-2 space-y-1.5 flex-shrink-0">
@@ -811,6 +874,71 @@ function StatChip({ count, label, color }: { count: number; label: string; color
       <span className="font-bold">{count}</span>
       <span className="opacity-70">{label}</span>
     </div>
+  );
+}
+
+function ResumeConfirmationCard({
+  confirmation,
+  deciding,
+  onReactivate,
+  onDelete,
+}: {
+  confirmation: ResumeConfirmationInfo;
+  deciding: boolean;
+  onReactivate: () => void;
+  onDelete: () => void;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const statusText = confirmation.status === 'in_progress' ? 'en cours' : 'en attente';
+
+  return (
+    <motion.div
+      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+      animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+      className="rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--color-info) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
+      }}
+    >
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2 mb-1.5">
+          <RotateCcw size={13} style={{ color: 'var(--color-info)' }} className="flex-shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: 'var(--color-info)' }}>
+            Mission interrompue
+          </span>
+        </div>
+
+        <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-semibold">{confirmation.title}</span>
+        </p>
+        <p className="text-xs leading-relaxed mb-2" style={{ color: 'var(--text-muted)' }}>
+          Cette mission a été interrompue (statut : {statusText}). Souhaitez-vous la réactiver ou l'effacer ?
+        </p>
+
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={onReactivate}
+            disabled={deciding}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+            style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)' }}
+          >
+            {deciding ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
+            Réactiver
+          </button>
+          <button
+            onClick={onDelete}
+            disabled={deciding}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+            style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)' }}
+          >
+            <Trash2 size={11} />
+            Effacer
+          </button>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

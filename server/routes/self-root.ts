@@ -4,8 +4,22 @@ import { z } from 'zod';
 import { requestConfirmation } from '../utils/confirmationBridge.js';
 import { broadcastKnowledgeProgress } from '../utils/knowledgeBroadcaster.js';
 
-export function createSelfRootRouter(getWss: () => WebSocketServer | null): Router {
+export function createSelfRootRouter(
+  getWss: () => WebSocketServer | null,
+  /**
+   * Appelé après chaque connexion réussie d'un workspace (change / new /
+   * scaffold / clone). Permet au runtime de (re)détecter les missions
+   * interrompues une fois qu'un projet est actif. Best-effort : les erreurs
+   * sont absorbées par l'appelant.
+   */
+  onWorkspaceConnected?: () => void,
+): Router {
   const router = Router();
+
+  /** Notifie best-effort que le workspace est connecté (jamais bloquant). */
+  const notifyWorkspaceConnected = () => {
+    try { onWorkspaceConnected?.(); } catch { /* best-effort */ }
+  };
 
   // GET /api/self-root/status
   router.get('/status', async (_req: Request, res: Response) => {
@@ -231,6 +245,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }
 
+      notifyWorkspaceConnected();
       return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
       return res.status(400).json({ error: e.message });
@@ -333,6 +348,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
         }).catch(() => {});
       } catch { /* silent */ }
 
+      notifyWorkspaceConnected();
       return res.json({ status: 'success', newRoot, siteUrl: siteUrl ?? '' });
     } catch (e: any) {
       return res.status(400).json({ error: e.message });
@@ -520,6 +536,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
 
             sendLog(`🎉 Workspace basculé sur: ${newRoot}`);
             sendLog(`👉 Lancez maintenant : npm install && npm run dev`);
+            notifyWorkspaceConnected();
             sendEvent('done', { status: 'success', newRoot });
           } catch (activateErr: any) {
             sendLog(`⚠️  Scaffolding OK mais activation échouée: ${activateErr.message}`, 'warn');
@@ -721,6 +738,7 @@ export function createSelfRootRouter(getWss: () => WebSocketServer | null): Rout
             } catch { /* silent */ }
 
             sendLog(`🎉 Workspace basculé sur: ${newRoot}`);
+            notifyWorkspaceConnected();
             sendEvent('done', { status: 'success', newRoot, repoName });
           } catch (activateErr: any) {
             sendLog(`⚠️  Clone OK mais activation échouée: ${activateErr.message}`, 'warn');

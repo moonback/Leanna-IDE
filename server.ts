@@ -396,11 +396,20 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       (sm as any)._missionExecutor = executor;
       console.log(`[Bootstrap] ✓ Mission System initialisé.`);
 
-      // Reprendre les missions interrompues (crash/redémarrage) en arrière-plan.
-      executor
-        .resumePending(skillNames)
-        .then((n) => { if (n > 0) console.log(`[Bootstrap] ♻️ ${n} mission(s) reprise(s).`); })
-        .catch((e) => console.warn(`[Bootstrap] ⚠️ Reprise des missions échouée:`, e));
+      // Détecter les missions interrompues (crash/redémarrage) — UNIQUEMENT si
+      // un workspace est connecté. Sans projet actif, on diffère la détection
+      // jusqu'à la connexion d'un workspace (voir createSelfRootRouter ci-dessous).
+      // Les missions détectées ne sont PAS relancées d'office : l'utilisateur
+      // doit choisir de les réactiver ou de les effacer (événement
+      // mission_resume_pending → UI → POST /api/missions/:id/resume-decision).
+      if (hasProject()) {
+        executor
+          .resumePending(skillNames)
+          .then((n) => { if (n > 0) console.log(`[Bootstrap] ⏸️ ${n} mission(s) interrompue(s) en attente de décision.`); })
+          .catch((e) => console.warn(`[Bootstrap] ⚠️ Détection des missions interrompues échouée:`, e));
+      } else {
+        console.log(`[Bootstrap] ⏸️ Aucun workspace connecté — détection des missions interrompues différée.`);
+      }
     } catch (error) {
       console.warn(`[Bootstrap] ⚠️ Erreur initialisation Mission System:`, error);
     }
@@ -670,7 +679,18 @@ async function startServer() {
     () => skillManager.missionExecutor,
     (name: string, args: any) => skillManager.handleToolCall(name, args),
   ));
-  app.use("/api/self-root", createSelfRootRouter(() => wss));
+  app.use("/api/self-root", createSelfRootRouter(() => wss, () => {
+    // Un workspace vient d'être connecté (changé / créé / cloné / scaffoldé).
+    // On (re)détecte alors les missions interrompues persistées pour ce
+    // runtime, afin de proposer à l'utilisateur de les réactiver ou effacer.
+    const executor = skillManager.missionExecutor;
+    if (!executor) return;
+    const skillNames = skillManager.getToolDeclarations().map((d: any) => d.name);
+    executor
+      .resumePending(skillNames)
+      .then((n: number) => { if (n > 0) console.log(`[SelfRoot] ⏸️ ${n} mission(s) interrompue(s) en attente de décision.`); })
+      .catch((e: unknown) => console.warn(`[SelfRoot] ⚠️ Détection des missions interrompues échouée:`, e));
+  }));
   app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);
 

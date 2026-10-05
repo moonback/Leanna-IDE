@@ -166,7 +166,7 @@ export class PlanEstimator {
   }): { riskLevel: MissionPlan["riskLevel"]; riskFactors: string[]; rawScore: number } {
     const {
       plannedActions, missionTitle, missionDescription,
-      targetedFiles, maxRetries, estimatedDurationMs,
+      targetedFiles, estimatedDurationMs,
     } = params;
 
     let score = 0;

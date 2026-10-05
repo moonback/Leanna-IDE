@@ -5,11 +5,18 @@ import {
   Plus, FolderOpen,
   Search, KeyRound, AlertCircle,
   BookOpen, Sparkles,
+  RotateCcw, Trash2, Loader2, Play,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
+import {
+  useResumeConfirmations,
+  clearResumeConfirmation,
+  seedResumeConfirmations,
+  type ResumeConfirmationInfo,
+} from '../../hooks/useResumeConfirmations.js';
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
 
@@ -221,6 +228,194 @@ const QuickLink = React.memo(function QuickLink({
     >
       {label}
     </button>
+  );
+});
+
+// ─── Missions interrompues (reprise après crash / redémarrage) ─────────
+
+/**
+ * Carte unitaire d'une mission interrompue en attente de décision :
+ * la réactiver ou l'effacer.
+ */
+const InterruptedMissionCard = React.memo(function InterruptedMissionCard({
+  confirmation,
+  deciding,
+  reduceMotion = false,
+  onReactivate,
+  onDelete,
+}: {
+  confirmation: ResumeConfirmationInfo;
+  deciding: boolean;
+  reduceMotion?: boolean;
+  onReactivate: () => void;
+  onDelete: () => void;
+}) {
+  const statusText = confirmation.status === 'in_progress' ? 'en cours' : 'en attente';
+
+  return (
+    <motion.div
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+      transition={{ duration: reduceMotion ? 0.15 : 0.3 }}
+      className="ai-glass relative flex items-center gap-3 p-4 rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--surface) 50%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--primary) 28%, var(--border))',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--primary) 14%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)',
+        }}
+      >
+        <RotateCcw size={16} style={{ color: 'var(--primary)' }} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }}>
+          {confirmation.title}
+        </div>
+        <div className="text-xs leading-snug mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          Mission interrompue ({statusText}) — réactiver ou effacer ?
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onReactivate}
+          disabled={deciding}
+          className="ai-interactive flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+          style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)' }}
+          title="Réactiver la mission"
+        >
+          {deciding ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          Réactiver
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deciding}
+          className="ai-interactive flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+          style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)' }}
+          title="Effacer définitivement la mission"
+        >
+          <Trash2 size={12} />
+          Effacer
+        </button>
+      </div>
+    </motion.div>
+  );
+});
+
+/**
+ * Section affichée sur l'accueil quand des missions ont été interrompues
+ * (crash/redémarrage). Elle écoute le store partagé `useResumeConfirmations`
+ * et amorce son état depuis `GET /api/missions/pending-resumes` au montage,
+ * puis permet de réactiver ou effacer chaque mission.
+ */
+const InterruptedMissionsSection = React.memo(function InterruptedMissionsSection({
+  reduceMotion = false,
+  entranceProps,
+}: {
+  reduceMotion?: boolean;
+  entranceProps?: Record<string, unknown>;
+}) {
+  const confirmations = useResumeConfirmations();
+  const [deciding, setDeciding] = useState<string | null>(null);
+
+  // Amorcer depuis le serveur, SANS attendre d'ouvrir le panneau Missions.
+  // L'événement WebSocket `mission_resume_pending` est émis peu après le
+  // démarrage / la connexion d'un workspace — potentiellement APRÈS le montage
+  // de l'accueil. Un simple fetch unique au montage raterait donc ces missions.
+  // On sonde donc le serveur de façon répétée : rapidement au début (pour que
+  // les cartes apparaissent automatiquement), puis à un rythme lent de veille
+  // pour capter les reprises tardives (nouveau workspace connecté, etc.).
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+
+    const poll = () => {
+      fetch('/api/missions/pending-resumes')
+        .then(res => (res.ok ? res.json() : { pending: [] }))
+        .then((data: { pending?: Array<Omit<ResumeConfirmationInfo, 'receivedAt'>> }) => {
+          if (cancelled) return;
+          if (Array.isArray(data.pending) && data.pending.length > 0) {
+            seedResumeConfirmations(data.pending);
+          }
+        })
+        .catch(() => { /* mission system indisponible — normal */ })
+        .finally(() => {
+          if (cancelled) return;
+          attempts += 1;
+          // 10 sondages rapides (toutes les 1,5 s ≈ 15 s), puis veille toutes les 15 s.
+          const delay = attempts < 10 ? 1_500 : 15_000;
+          timer = setTimeout(poll, delay);
+        });
+    };
+
+    poll();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, []);
+
+  const decideResume = useCallback(async (missionId: string, decision: 'reactivate' | 'delete') => {
+    setDeciding(missionId);
+    try {
+      const res = await fetch(`/api/missions/${missionId}/resume-decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      if (res.ok || res.status === 404) {
+        clearResumeConfirmation(missionId);
+      }
+    } catch (err) {
+      console.error('[EmptyEditorState] Échec de décision de reprise:', err);
+    } finally {
+      setDeciding(null);
+    }
+  }, []);
+
+  if (confirmations.length === 0) return null;
+
+  return (
+    <motion.div className="mb-5" {...entranceProps}>
+      <div className="flex items-center gap-2 mb-2">
+        <RotateCcw size={13} style={{ color: 'var(--primary)' }} />
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          Mission{confirmations.length > 1 ? 's' : ''} interrompue{confirmations.length > 1 ? 's' : ''}
+        </h2>
+        <span
+          className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded-full text-xs font-semibold"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
+            color: 'var(--primary)',
+          }}
+        >
+          {confirmations.length}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        <AnimatePresence initial={false}>
+          {confirmations.map(confirmation => (
+            <InterruptedMissionCard
+              key={confirmation.missionId}
+              confirmation={confirmation}
+              deciding={deciding === confirmation.missionId}
+              reduceMotion={reduceMotion}
+              onReactivate={() => decideResume(confirmation.missionId, 'reactivate')}
+              onDelete={() => decideResume(confirmation.missionId, 'delete')}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 });
 
@@ -679,6 +874,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <Kbd>{MOD}+L</Kbd>
             </motion.div>
           </motion.button>
+
+          {/* ── Missions interrompues (reprise après crash/redémarrage) ── */}
+          <InterruptedMissionsSection
+            reduceMotion={!!prefersReducedMotion}
+            entranceProps={makeEntranceProps(0.1)}
+          />
 
           {/* ── NIVEAU 4 : Actions secondaires compactes ── */}
           <motion.div
