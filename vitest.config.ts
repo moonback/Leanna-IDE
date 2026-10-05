@@ -28,5 +28,9 @@ export default defineConfig({
     exclude: ['node_modules/**', 'dist/**', '.Leanna/**', 'server/**'],
     css: false,
     restoreMocks: true,
+    // La transformation/collecte à froid de la suite complète peut dépasser 5 s
+    // par test sur une machine lente (surtout en parallèle). On élargit le délai
+    // pour fiabiliser le run complet ; les tests eux-mêmes s'exécutent en ~1 s.
+    testTimeout: 20000,
   },
 });
