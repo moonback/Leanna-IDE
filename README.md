@@ -42,6 +42,7 @@
 * [Cerveau de l'agent (Agent Brain)](#cerveau-de-lagent-agent-brain)
 * [Runtime de l'agent](#runtime-de-lagent)
 * [Système de missions](#système-de-missions)
+* [Estimation avant exécution](#estimation-avant-exécution)
 * [Architecture multi-agents](#architecture-multi-agents)
 * [Outils et compétences](#outils-et-compétences)
 * [Connaissance et compréhension](#connaissance-et-compréhension)
@@ -246,6 +247,7 @@ Une mission possède :
 * un contexte ;
 * des contraintes ;
 * un plan ;
+* **une estimation coût / durée / risque avant exécution** ;
 * des étapes d'exécution ;
 * des outils ;
 * des agents ;
@@ -624,6 +626,7 @@ Executor.ts
 Reflection.ts
 AutonomyPolicy.ts
 SkillScorer.ts
+PlanEstimator.ts
 ```
 
 Une mission représente un objectif structuré qui peut être :
@@ -636,6 +639,88 @@ Une mission représente un objectif structuré qui peut être :
 6. soumis à réflexion ;
 7. réessayé ou replanifié ;
 8. terminé ou arrêté.
+
+---
+
+# Estimation avant exécution
+
+Avant qu'une seule action ne soit exécutée, Leanna calcule une **estimation structurée** du coût LLM, de la durée totale et du niveau de risque du plan.
+
+Cette estimation est affichée dans le panneau de mission au moment où le plan est présenté à l'utilisateur.
+
+## Composant
+
+```text
+server/mission/PlanEstimator.ts
+```
+
+## Ce qui est estimé
+
+### Coût LLM (`estimatedCostUsd`)
+
+Calculé action par action à partir de :
+
+* les tokens d'entrée estimés par appel (prompt système + contexte objectif) ;
+* les tokens de sortie estimés selon la **catégorie** du skill (lecture → ~300 tokens, génération de code → ~2 000 tokens…) ;
+* la **tarification réelle du modèle actif** via `TelemetryService.calculateCost()`.
+
+L'overhead de planification (décomposition LLM des sous-objectifs) est inclus.
+
+### Durée (`estimatedDurationMs`)
+
+Somme des durées moyennes observées par skill via le `SkillScorer`, avec :
+
+* repli sur des durées conservatrices par catégorie si aucun historique n'est disponible (`read` → 1,5 s, `code` → 20 s…) ;
+* majoration de 15 % pour l'overhead de réflexion LLM entre chaque action.
+
+### Niveau de risque (`riskLevel`)
+
+Score multi-facteurs (0–100) converti en niveau qualitatif :
+
+```text
+low       → score ≤ 25
+medium    → score ≤ 50
+high      → score ≤ 75
+critical  → score > 75
+```
+
+Les facteurs pris en compte incluent :
+
+* le nombre d'actions planifiées ;
+* la présence d'actions à effet de bord élevé (écriture de fichier, commandes shell, push Git…) ;
+* les mots-clés à risque dans l'énoncé (suppression, migration, production, credentials…) ;
+* les fichiers sensibles ciblés (`.env`, schémas d'authentification…) ;
+* le score de fiabilité moyen des actions planifiées.
+
+### Confiance dans l'estimation (`estimationConfidence`)
+
+Proportion d'actions pour lesquelles le `SkillScorer` dispose d'historique, pondérée par le niveau de risque. Une faible confiance signale que les estimations sont principalement basées sur les defaults de catégorie.
+
+## Affichage dans l'interface
+
+Le composant `MissionPlanSummary` du panneau de mission affiche une **bannière à trois colonnes** dès réception du plan :
+
+```text
+┌──────────────────────────────────────────┐
+│  Plan d'action              ~4 200 tokens│
+├──────────────────────────────────────────┤
+│  💲 $0.0012  │  ⏱ ~3min 20s  │  🛡 Modéré │
+├──────────────────────────────────────────┤
+│  ████████░░░░░░░░  65% confiance         │
+└──────────────────────────────────────────┘
+```
+
+La barre de confiance est colorée selon le niveau :
+
+```text
+≥ 70 %   → vert   (données historiques suffisantes)
+≥ 40 %   → orange (historique partiel)
+< 40 %   → rouge  (estimation principalement basée sur les defaults)
+```
+
+## Boucle d'amélioration continue
+
+Les durées réelles enregistrées par `SkillScorer.recordUsage()` après chaque exécution améliorent automatiquement les estimations des missions suivantes, via l'amorçage depuis `StrategyMemory` à chaque démarrage de mission.
 
 ---
 
@@ -2270,7 +2355,8 @@ Leanna/
 │   │   ├── Executor.ts
 │   │   ├── Reflection.ts
 │   │   ├── AutonomyPolicy.ts
-│   │   └── SkillScorer.ts
+│   │   ├── SkillScorer.ts
+│   │   └── PlanEstimator.ts
 │   │
 │   ├── runtime/
 │   │   ├── AgentRuntime.ts
