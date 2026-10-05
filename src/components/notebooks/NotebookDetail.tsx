@@ -17,6 +17,7 @@ import {
   Save,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { api, apiVoid } from './api/client.js';
 import { SourcePanel } from './SourcePanel.js';
 import { SourceViewer } from './SourceViewer.js';
 import { NotebookChat } from './NotebookChat.js';
@@ -101,21 +102,17 @@ function NoteEditorCenter({
     try {
       if (data.id) {
         // Update
-        const res = await fetch(`/api/notebooks/${notebookId}/notes/${data.id}`, {
+        await apiVoid(`/api/notebooks/${notebookId}/notes/${data.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+          json: { title: title.trim(), content: content.trim() },
         });
-        if (!res.ok) throw new Error();
         success('Note mise à jour');
       } else {
         // Create
-        const res = await fetch(`/api/notebooks/${notebookId}/notes`, {
+        await apiVoid(`/api/notebooks/${notebookId}/notes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+          json: { title: title.trim(), content: content.trim() },
         });
-        if (!res.ok) throw new Error();
         success('Note créée');
       }
       onSaved();
@@ -239,12 +236,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const loadNotebook = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}`);
-      if (!res.ok) throw new Error('Notebook introuvable');
-      const data = await res.json();
+      const data = await api<{ notebook: NotebookData }>(`/api/notebooks/${notebookId}`);
       setNotebook(data.notebook);
-    } catch (e: any) {
-      toastError(e.message);
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Notebook introuvable');
     } finally {
       setLoading(false);
     }

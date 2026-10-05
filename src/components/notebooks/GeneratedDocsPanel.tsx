@@ -9,6 +9,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { api, apiVoid } from './api/client.js';
 
 interface SourceItem {
   id: string;
@@ -88,11 +89,10 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
   const loadGeneratedDocs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/generated`);
-      if (res.ok) {
-        const data = await res.json();
-        setGeneratedDocs(data.documents || []);
-      }
+      const data = await api<{ documents?: GeneratedDoc[] }>(
+        `/api/notebooks/${notebookId}/generated`,
+      );
+      setGeneratedDocs(data.documents || []);
     } catch {
       toastError('Erreur lors du chargement de l\'historique');
     } finally {
@@ -107,16 +107,10 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
   // Supprimer un document
   const handleDelete = useCallback(async (docId: string) => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/generated/${docId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setGeneratedDocs(prev => prev.filter(d => d.id !== docId));
-        success('Document supprimé');
-        onRefresh();
-      } else {
-        throw new Error('Erreur lors de la suppression');
-      }
+      await apiVoid(`/api/notebooks/${notebookId}/generated/${docId}`, { method: 'DELETE' });
+      setGeneratedDocs(prev => prev.filter(d => d.id !== docId));
+      success('Document supprimé');
+      onRefresh();
     } catch {
       toastError('Erreur lors de la suppression du document');
     }

@@ -26,7 +26,7 @@ function makeValid() {
     role: "my_agent",
     name: "My Agent",
     description: "An agent that does something useful",
-    capabilities: ["read_file", "write_project_file"],
+    capabilities: ["read_project_file", "write_project_file"],
     systemPrompt: "You are a helpful coding assistant.",
     maxConcurrency: 2,
     defaultTimeoutMs: 10_000,
@@ -62,7 +62,7 @@ test("agentDefinitionSchema: refuse un rôle avec un slash", () => {
 });
 
 test("agentDefinitionSchema: refuse une capability non autorisée", () => {
-  const def = { ...makeValid(), capabilities: ["read_file", "rm_rf_everything"] };
+  const def = { ...makeValid(), capabilities: ["read_project_file", "rm_rf_everything"] };
   assert.throws(() => validateAgentDefinition(def), AgentSecurityError);
 });
 

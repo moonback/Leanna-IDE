@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Pin, Move, Link2 } from 'lucide-react';
+import { timeAgo } from './utils.js';
 
 interface NoteItem {
   id: string;
@@ -20,17 +21,6 @@ interface NoteItem {
 interface Props {
   notes: NoteItem[];
   onSelectNote?: (noteId: string) => void;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days > 0) return `${days}j`;
-  if (hours > 0) return `${hours}h`;
-  if (mins > 0) return `${mins}m`;
-  return 'now';
 }
 
 export function NotesCanvas({ notes, onSelectNote }: Props) {

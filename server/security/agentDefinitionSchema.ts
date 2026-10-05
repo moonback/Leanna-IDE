@@ -31,24 +31,40 @@ import type { DynamicAgentDefinition } from "../agents/DynamicAgentRegistry.js";
 // un agent tiers qui s'attribuerait des outils dangereux inventés.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ⚠️ SOURCE DE VÉRITÉ : cette liste DOIT rester synchronisée avec
+// `EXECUTABLE_AGENT_TOOLS` dans server/agents/AgentExecutor.ts — l'ensemble des
+// skills structurés réellement exécutables par un agent. On la duplique ici
+// (plutôt que de l'importer) pour garder ce module de sécurité auto-contenu et
+// auditable, sans tirer la lourde chaîne de dépendances de l'exécuteur. Un nom
+// de capability qui n'est pas un vrai outil ne protège rien ; un vrai outil
+// absent de cette liste bloque à tort tout agent légitime qui le déclare.
 export const ALLOWED_CAPABILITIES = new Set<string>([
-  // Lecture
-  "read_file", "read_directory", "read_project", "search_files",
-  "read_knowledge", "get_task", "get_agent",
-  // Écriture contrôlée
-  "write_project_file", "create_file", "delete_file", "move_file",
-  // Exécution système encadrée
-  "run_command", "run_tests", "run_lint",
-  // Délégation inter-agents
-  "delegate_task", "orchestrate_agents",
-  // Outils IA / LLM
-  "call_llm", "generate_code", "analyze_code", "review_code",
-  // Web & réseau
-  "web_search", "fetch_url",
-  // Utilitaires
-  "log", "notify_user", "request_confirmation",
-  // Compétences spécifiques agents de rédaction
-  "format_document", "translate_text", "summarize_text", "proofread_text",
+  // ── Lecture / analyse de fichiers ──
+  "list_project_files", "read_project_file", "read_file_outline",
+  "search_in_files", "analyze_project_file",
+  // ── Écriture / édition contrôlée ──
+  "write_project_file", "modify_project_file", "apply_patch",
+  "patch_project_file", "rename_project_file", "delete_project_file",
+  "create_project_directory",
+  // ── Vérification ──
+  "verify_file", "verify_typecheck", "verify_lint", "verify_format",
+  "verify_full",
+  // ── Exécution encadrée & qualité ──
+  "run_project_command", "quality_loop",
+  // ── Connaissance / mémoire ──
+  "knowledge_build_context", "knowledge_semantic_search",
+  "knowledge_search_entities", "knowledge_memory_search",
+  "knowledge_memory_add", "knowledge_memory_list",
+  "knowledge_impact_analyze", "knowledge_status", "knowledge_reindex",
+  // ── AST call-graph ──
+  "knowledge_ast_callers", "knowledge_ast_callees",
+  "knowledge_ast_call_chain", "knowledge_ast_file_inspect",
+  // ── Automatisation & vision ──
+  "automation_navigate", "automation_click", "automation_type",
+  "automation_extract", "automation_inspect", "automation_screenshot",
+  "automation_analyze_screenshot", "automation_scroll",
+  // ── Raisonnement & délégation ──
+  "reasoning_think", "agent_execute",
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════════════

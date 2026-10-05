@@ -34,5 +34,17 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
-}
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release",
+    ".Leanna",
+    "vitest.config.ts",
+    "src/test/**",
+    "src/**/*.test.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.spec.ts"
+  ]
 }

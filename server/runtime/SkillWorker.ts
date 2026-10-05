@@ -205,10 +205,14 @@ export async function runPluginInWorker(
           }
 
           // ── Délégation au ToolRegistry principal ──
+          // API réelle de ToolRegistry : has() + call(name, args) (et NON un
+          // get().execute() qui n'existe pas). call() applique permissions,
+          // timeout et métriques, et retourne directement le résultat.
           try {
-            const tool = tools.get(msg.toolName);
-            if (!tool) throw new Error(`Outil "${msg.toolName}" introuvable dans le ToolRegistry`);
-            const result = await tool.execute(msg.args as any);
+            if (!tools.has(msg.toolName)) {
+              throw new Error(`Outil "${msg.toolName}" introuvable dans le ToolRegistry`);
+            }
+            const result = await tools.call(msg.toolName, msg.args);
             const response: ToolCallResponseMessage = {
               type: "tool_response",
               requestId: msg.requestId,
@@ -306,12 +310,23 @@ async function workerEntrypoint(): Promise<void> {
       // ── Proxy ToolRegistry : chaque appel d'outil envoie un message au main thread ──
       const toolProxy = buildWorkerToolProxy(allowedCapabilities);
 
+      // Maintien de la boucle d'événements du Worker pendant l'exécution.
+      // Sans cela, un plugin qui attend une promesse jamais résolue
+      // (`await new Promise(() => {})`) laisse la boucle se vider : Node fait
+      // sortir le Worker avec le code 0 AVANT que le timeout de l'hôte ne puisse
+      // le `terminate()`. L'hôte rejetterait alors « exit inattendu » au lieu de
+      // « Timeout ». Ce timer garde le Worker vivant jusqu'à ce que l'hôte le
+      // tue au timeout (ou qu'on l'annule nous-mêmes une fois `execute` settlé).
+      const keepAlive = setInterval(() => {}, 1 << 30);
+
       try {
         const result = await plugin.execute(context, toolProxy);
+        clearInterval(keepAlive);
         const resultMsg: ResultMessage = { type: "result", result };
         parentPort!.postMessage(resultMsg);
         resolve();
       } catch (err: any) {
+        clearInterval(keepAlive);
         const errMsg: ErrorMessage = {
           type: "error",
           message: err?.message ?? "Erreur inconnue dans plugin.execute()",

@@ -2,26 +2,62 @@
  * MermaidDiagram — Rendu de diagrammes Mermaid
  *
  * Utilise la lib mermaid pour convertir le code Mermaid en SVG.
- * Gère le thème clair/sombre et le resize.
+ * Suit le thème de l'application (data-theme) et le resize.
  */
 
 import { useEffect, useRef, useState, memo } from 'react';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import mermaid from 'mermaid';
 import { Tooltip } from '../ui/Tooltip.js';
+import { errorMessage } from './utils.js';
+
+// `mermaid` est une dépendance lourde (plusieurs centaines de Ko). On la charge
+// dynamiquement pour la sortir du bundle principal : elle n'est fetchée que
+// lorsqu'un diagramme doit réellement être rendu (import() mémoïsé → un seul
+// téléchargement partagé par toutes les instances).
+type Mermaid = typeof import('mermaid')['default'];
+let mermaidPromise: Promise<Mermaid> | null = null;
+function loadMermaid(): Promise<Mermaid> {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((m) => m.default);
+  }
+  return mermaidPromise;
+}
 
 interface Props {
   code: string;
   id?: string;
 }
 
-let mermaidInitialized = false;
+// Thèmes de l'application (data-theme) → thème Mermaid le plus proche.
+// Mermaid n'accepte que 'default' | 'dark' | 'forest' | 'neutral' | 'base'.
+type MermaidTheme = 'default' | 'dark' | 'neutral';
 
-function initMermaid() {
-  if (mermaidInitialized) return;
+function resolveMermaidTheme(): MermaidTheme {
+  const appTheme =
+    typeof document !== 'undefined'
+      ? document.documentElement.getAttribute('data-theme')
+      : null;
+  switch (appTheme) {
+    case 'light':
+      return 'default';
+    case 'sepia':
+      return 'neutral';
+    // 'dark', 'cyberpunk', 'high-contrast' et valeur par défaut → thème sombre
+    default:
+      return 'dark';
+  }
+}
+
+// Thème avec lequel Mermaid a été initialisé pour la dernière fois.
+// null tant qu'aucune initialisation n'a eu lieu.
+let initializedTheme: MermaidTheme | null = null;
+
+function initMermaid(mermaid: Mermaid, theme: MermaidTheme) {
+  // Mermaid est initialisé globalement : on ne ré-initialise que si le thème a changé.
+  if (initializedTheme === theme) return;
   mermaid.initialize({
     startOnLoad: false,
-    theme: 'dark',
+    theme,
     // SECURITY: Use 'strict' to sanitize labels/tooltips and disable JS callbacks.
     // This prevents XSS via mermaid diagrams with malicious click handlers.
     // Note: Diagram code can originate from AI-generated notebook content (untrusted).
@@ -39,7 +75,7 @@ function initMermaid() {
       curve: 'basis',
     },
   });
-  mermaidInitialized = true;
+  initializedTheme = theme;
 }
 
 export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) {
@@ -51,6 +87,20 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
   const [expanded, setExpanded] = useState(false);
   const uniqueId = useRef(`mermaid-${id || Math.random().toString(36).slice(2, 10)}`);
   const isMindmap = /^\s*mindmap\b/m.test(code);
+  const [mermaidTheme, setMermaidTheme] = useState<MermaidTheme>(resolveMermaidTheme);
+
+  // Suit les changements de thème de l'application (attribut data-theme sur <html>)
+  // et re-rend le diagramme avec le thème Mermaid correspondant.
+  useEffect(() => {
+    const target = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setMermaidTheme(resolveMermaidTheme());
+    });
+    observer.observe(target, { attributes: true, attributeFilter: ['data-theme'] });
+    // Resynchronise au montage au cas où le thème a changé avant l'abonnement.
+    setMermaidTheme(resolveMermaidTheme());
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setZoom(isMindmap ? 0.85 : 1);
@@ -66,7 +116,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
       setError('');
 
       try {
-        initMermaid();
+        const mermaid = await loadMermaid();
+        if (cancelled) return;
+        initMermaid(mermaid, mermaidTheme);
 
         // Nettoyer le code (retirer les espaces de début/fin)
         const cleanCode = code.trim();
@@ -77,9 +129,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
           setSvg(renderedSvg);
           setRendering(false);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(e.message || 'Erreur de rendu Mermaid');
+          setError(errorMessage(e) || 'Erreur de rendu Mermaid');
           setRendering(false);
         }
       }
@@ -87,7 +139,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
 
     render();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, mermaidTheme]);
 
   if (rendering) {
     return (

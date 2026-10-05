@@ -16,6 +16,7 @@ import {
   Loader2, Monitor, Maximize2, ChevronRight,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { api } from './api/client.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,18 +137,10 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
   const handleGenerate = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/generated/${doc.id}/slides`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme, transition, ratio, density }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur serveur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await api<{ html: string; slidesCount?: number }>(
+        `/api/notebooks/${notebookId}/generated/${doc.id}/slides`,
+        { method: 'POST', json: { theme, transition, ratio, density } },
+      );
       const html: string = data.html;
       const count: number = data.slidesCount ?? 0;
 
