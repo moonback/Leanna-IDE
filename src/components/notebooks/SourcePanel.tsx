@@ -15,7 +15,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Upload, Search, X } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
-import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
+import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModalLazy.js';
 import { SPRING_UI_SLOW as SPRING_UI, SPRING_SNAPPY } from './motion.js';
 import { useSourceUpload } from './sources/useSourceUpload.js';
 import { useSourceList } from './sources/useSourceList.js';

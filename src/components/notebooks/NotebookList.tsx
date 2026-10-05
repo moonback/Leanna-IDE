@@ -12,7 +12,7 @@ import {
   Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid, X,
 } from 'lucide-react';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
-import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
+import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModalLazy.js';
 import { useToast } from '../ui/Toast.js';
 import { timeAgoLong as timeAgo } from './utils.js';
 import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';

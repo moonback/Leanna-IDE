@@ -39,6 +39,11 @@ export function useChatStream({
   const initial = loadGenerationStateFor(generationStateKey);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Miroir de `messages` pour que les handlers (retry/edit/saveToNote) le lisent
+  // sans l'avoir en dépendance : ils restent ainsi référentiellement stables
+  // (le memo de MessageItem n'est plus invalidé à chaque nouveau message).
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
   const [loading, setLoading] = useState(initial.loading);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [streamingText, setStreamingText] = useState(initial.streamingText);
@@ -249,28 +254,29 @@ export function useChatStream({
   }, [selectedSources, personality, activeThreadId, processChatQueue]);
 
   const handleRetry = useCallback(async (msgId: string) => {
-    const msgIndex = messages.findIndex(m => m.id === msgId);
+    const current = messagesRef.current;
+    const msgIndex = current.findIndex(m => m.id === msgId);
     if (msgIndex < 1) return;
 
-    const userMsg = messages[msgIndex - 1];
+    const userMsg = current[msgIndex - 1];
     if (userMsg.role !== 'user') return;
 
     setMessages(prev => prev.filter((_, i) => i !== msgIndex));
     setTimeout(() => handleSend(userMsg.content), 50);
-  }, [messages, handleSend]);
+  }, [handleSend]);
 
   const handleEditSubmit = useCallback((msgId: string) => {
     const newContent = editingContent.trim();
     if (!newContent) return;
 
-    const msgIndex = messages.findIndex(m => m.id === msgId);
+    const msgIndex = messagesRef.current.findIndex(m => m.id === msgId);
     if (msgIndex < 0) return;
 
     setMessages(prev => prev.slice(0, msgIndex));
     setEditingMsgId(null);
     setEditingContent('');
     setTimeout(() => handleSend(newContent), 50);
-  }, [editingContent, messages, handleSend]);
+  }, [editingContent, handleSend]);
 
   // ─── Deep Dive / Compare / Insights (hook dédié) ──────────────────────────
   const { handleDeepDive, handleCompare, handleInsights } = useChatGenerators({
@@ -310,8 +316,9 @@ export function useChatStream({
   }, [notebookId, onError]);
 
   const handleSaveToNote = useCallback(async (msg: ChatMessage) => {
-    const msgIndex = messages.findIndex(m => m.id === msg.id);
-    const userMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+    const current = messagesRef.current;
+    const msgIndex = current.findIndex(m => m.id === msg.id);
+    const userMsg = msgIndex > 0 ? current[msgIndex - 1] : null;
     const title = userMsg?.role === 'user'
       ? userMsg.content.slice(0, 80).replace(/[\n\r]/g, ' ')
       : `Note du chat — ${new Date(msg.timestamp).toLocaleDateString('fr')}`;
@@ -326,7 +333,7 @@ export function useChatStream({
     } catch (e: any) {
       onError(`Erreur : ${e.message}`);
     }
-  }, [messages, notebookId, onRefresh, onError, onSuccess]);
+  }, [notebookId, onRefresh, onError, onSuccess]);
 
   const fetchCitationChunk = useCallback(async (citation: Citation, x: number, y: number) => {
     const cached = chunkCache.current.get(citation.chunkId);

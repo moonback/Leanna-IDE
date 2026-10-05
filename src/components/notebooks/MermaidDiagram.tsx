@@ -7,8 +7,20 @@
 
 import { useEffect, useRef, useState, memo } from 'react';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import mermaid from 'mermaid';
 import { Tooltip } from '../ui/Tooltip.js';
+
+// `mermaid` est une dépendance lourde (plusieurs centaines de Ko). On la charge
+// dynamiquement pour la sortir du bundle principal : elle n'est fetchée que
+// lorsqu'un diagramme doit réellement être rendu (import() mémoïsé → un seul
+// téléchargement partagé par toutes les instances).
+type Mermaid = typeof import('mermaid')['default'];
+let mermaidPromise: Promise<Mermaid> | null = null;
+function loadMermaid(): Promise<Mermaid> {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((m) => m.default);
+  }
+  return mermaidPromise;
+}
 
 interface Props {
   code: string;
@@ -39,7 +51,7 @@ function resolveMermaidTheme(): MermaidTheme {
 // null tant qu'aucune initialisation n'a eu lieu.
 let initializedTheme: MermaidTheme | null = null;
 
-function initMermaid(theme: MermaidTheme) {
+function initMermaid(mermaid: Mermaid, theme: MermaidTheme) {
   // Mermaid est initialisé globalement : on ne ré-initialise que si le thème a changé.
   if (initializedTheme === theme) return;
   mermaid.initialize({
@@ -103,7 +115,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
       setError('');
 
       try {
-        initMermaid(mermaidTheme);
+        const mermaid = await loadMermaid();
+        if (cancelled) return;
+        initMermaid(mermaid, mermaidTheme);
 
         // Nettoyer le code (retirer les espaces de début/fin)
         const cleanCode = code.trim();

@@ -9,11 +9,15 @@
  *    plus les modales Report / Infographic / Slide.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { useReducedMotion } from 'motion/react';
 import { useToast } from '../ui/Toast.js';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { SlidePreviewModal } from './SlidePreviewModal.js';
+// SlidePreviewModal (~450 lignes) n'est affichée qu'au clic sur « Diapositives ».
+// Chargée paresseusement pour la sortir du bundle principal du panneau.
+const SlidePreviewModal = lazy(() =>
+  import('./SlidePreviewModal.js').then((m) => ({ default: m.SlidePreviewModal })),
+);
 import { api } from './api/client.js';
 import { useGenerationQueue } from './generation/useGenerationQueue.js';
 import { useReducedTransparency } from './generation/renderInfographic.js';
@@ -310,12 +314,14 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
       />
 
       {showSlideModal && selectedDoc && (
-        <SlidePreviewModal
-          open={showSlideModal}
-          onClose={() => setShowSlideModal(false)}
-          notebookId={notebookId}
-          doc={selectedDoc}
-        />
+        <Suspense fallback={null}>
+          <SlidePreviewModal
+            open={showSlideModal}
+            onClose={() => setShowSlideModal(false)}
+            notebookId={notebookId}
+            doc={selectedDoc}
+          />
+        </Suspense>
       )}
     </div>
   );
