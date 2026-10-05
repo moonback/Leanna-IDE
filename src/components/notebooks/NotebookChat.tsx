@@ -240,7 +240,7 @@ function renderMessageContent(content: string): JSX.Element {
           }
 
           // Unordered lists
-          if (line.match(/^[\-\*]\s/)) {
+          if (line.match(/^[-*]\s/)) {
             blocks.push(
               <div key={`ul-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
                 <span

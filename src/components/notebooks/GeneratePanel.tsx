@@ -285,8 +285,8 @@ function renderGeneratedContent(content: string): JSX.Element {
                 );
 
               // ========== LISTES À PUCES ==========
-              if (line.match(/^[\-\*\+]\s/)) {
-                const bullet = line.match(/^([\-\*\+])\s/)![1];
+              if (line.match(/^[-*+]\s/)) {
+                const bullet = line.match(/^([-*+])\s/)![1];
                 return (
                   <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
                     <span
@@ -322,7 +322,7 @@ function renderGeneratedContent(content: string): JSX.Element {
               }
 
               // ========== LISTES DE TÂCHES ==========
-              const taskMatch = line.match(/^[\-\*]\s\[([xX\s])\]\s(.*)$/);
+              const taskMatch = line.match(/^[-*]\s\[([xX\s])\]\s(.*)$/);
               if (taskMatch)
                 return (
                   <div key={j} className="flex items-start gap-3 py-1.5 notebooklm-task">
@@ -829,8 +829,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     // même si les chunks SSE arrivent groupés ou rarement.
     const startTime = Date.now();
     const ESTIMATED_MS = 30_000; // estimation 30s pour un doc moyen
-    let timerId: ReturnType<typeof setInterval> | undefined;
-    timerId = setInterval(() => {
+    const timerId: ReturnType<typeof setInterval> = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const timeProgress = Math.min(90, Math.round((elapsed / ESTIMATED_MS) * 100));
       // Updater pur : ne met à jour que la progression de cette tâche, et
