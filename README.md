@@ -18,7 +18,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-855%20passing-brightgreen?logo=vitest" alt="Tests 855 passing" />
+  <img src="https://img.shields.io/badge/Tests%20backend-894%20passing-brightgreen?logo=nodedotjs" alt="Tests backend 894 passing" />
+  <img src="https://img.shields.io/badge/Tests%20front-27%20passing-brightgreen?logo=vitest" alt="Tests front 27 passing" />
 
 [![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F.svg)](#)
@@ -62,6 +63,7 @@
 * [Automatisation du navigateur](#automatisation-du-navigateur)
 * [Git et GitHub](#git-et-github)
 * [Notebooks et RAG](#notebooks-et-rag)
+* [Architecture du module notebooks (frontend)](#architecture-du-module-notebooks-frontend)
 * [Génération d'images](#génération-dimages)
 * [Graphe de connaissances](#graphe-de-connaissances)
 * [Workflows et automatisation](#workflows-et-automatisation)
@@ -1913,6 +1915,64 @@ RichDocumentViewer
 
 ---
 
+# Architecture du module notebooks (frontend)
+
+Le module `src/components/notebooks/` suit une architecture **orchestrateur /
+hooks / composants présentationnels**. Chaque panneau est un orchestrateur mince
+qui détient l'état et délègue la logique à des hooks dédiés, puis rend des
+composants purement présentationnels. L'objectif : des fichiers courts (< 400
+lignes), une logique testable isolément et un comportement identique à
+l'implémentation d'origine.
+
+Les grands panneaux sont découpés en sous-modules :
+
+```text
+notebooks/
+├── api/            Client fetch typé, flux SSE, hook useResource
+├── chat/           NotebookChat : ThreadBar, MessageList, MessageItem,
+│                   Composer, FolderPickerModal + hooks (useChatStream,
+│                   useChatThreads, useChatGenerators, useTts, …)
+├── sources/        SourcePanel : UploadToolbar, UploadQueue,
+│                   SourceListFull / SourceListCompact + hooks d'upload/liste
+├── generation/     GeneratePanel : DocTypePicker, DocViewer,
+│                   GenerationProgress, ReportModal, InfographicModal
+│                   + useGenerationQueue
+├── audio/          AudioOverviewPanel : AudioGenerator, AudioPlayer,
+│                   useTtsPlayer
+├── motion.ts       Constantes de transition (spring) partagées
+└── motionTypes.ts  Types d'animation partagés (design system)
+```
+
+## Performance
+
+Le module applique plusieurs optimisations ciblées :
+
+* **Code-splitting (`React.lazy`)** : les composants lourds affichés uniquement
+  sur action explicite sont chargés paresseusement, ce qui les sort du bundle
+  initial — `MermaidDiagram` (diagrammes, via `import()` dynamique de `mermaid`),
+  `GitHubRepositoryImportModal` et `SlidePreviewModal`.
+* **Virtualisation** : `SourceListFull` bascule sur une liste fenêtrée
+  (`react-window`) au-delà d'un seuil de sources ; en-dessous, la liste animée
+  d'origine est conservée.
+* **Mémoïsation ciblée** : les éléments de liste sont mémoïsés et les
+  handlers passés en props sont référentiellement stables (lecture via refs)
+  pour éviter les re-rendus inutiles.
+
+## Tests et qualité
+
+Le module est couvert par des **tests de caractérisation** (Vitest + React
+Testing Library, environnement jsdom) qui verrouillent le comportement observable
+des panneaux et de la bascule de virtualisation. Les barrières de qualité du
+module :
+
+```bash
+npm run test:ui                 # tests front (Vitest + RTL)
+npm run typecheck:test          # typage des fichiers de test
+npm run lint:eslint:notebooks   # lint ESLint du module notebooks
+```
+
+---
+
 # Génération d'images
 
 Leanna peut générer des images à la demande à partir d'une description en langage naturel.
@@ -2838,10 +2898,17 @@ Une boucle de développement recommandée est :
 
 # Tests
 
-Lancer la suite de tests principale :
+Lancer la suite de tests principale (backend, `node:test`) :
 
 ```bash
 npm test
+```
+
+Lancer les tests du frontend (Vitest + React Testing Library) :
+
+```bash
+npm run test:ui          # exécution unique
+npm run test:ui:watch    # mode watch
 ```
 
 ---

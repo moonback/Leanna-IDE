@@ -18,13 +18,11 @@ import assert from "node:assert/strict";
 import * as os from "os";
 import * as fs from "fs";
 import * as path from "path";
-import { fileURLToPath } from "url";
 import { runPluginInWorker } from "./SkillWorker.js";
 import type { AgentContext, TaskResult } from "./types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMP_DIR = os.tmpdir();
 
 /** Écrit un fichier .mjs temporaire qui exporte un AgentPlugin factice */
@@ -45,13 +43,18 @@ const BASE_CONTEXT: AgentContext = {
   files: [],
 };
 
-/** ToolRegistry stub minimal utilisé dans les tests */
+/**
+ * ToolRegistry stub minimal utilisé dans les tests.
+ * Reflète l'API réelle de ToolRegistry consommée par SkillWorker : has()
+ * (présence) + call(name, args) (exécution, retourne directement le résultat).
+ */
 function makeToolRegistryStub(tools: Record<string, (args: any) => any> = {}): any {
   return {
-    get: (name: string) => {
+    has: (name: string) => Object.prototype.hasOwnProperty.call(tools, name),
+    call: (name: string, args: any) => {
       const fn = tools[name];
-      if (!fn) return undefined;
-      return { execute: (args: any) => Promise.resolve(fn(args)) };
+      if (!fn) return Promise.reject(new Error(`Outil "${name}" introuvable`));
+      return Promise.resolve(fn(args));
     },
   };
 }
