@@ -50,7 +50,7 @@ describe('streamSSE', () => {
 
     await streamSSE('/api/x', { json: { question: 'q' }, onFrame: () => {} });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ question: 'q' });
   });
@@ -59,7 +59,7 @@ describe('streamSSE', () => {
     const fetchMock = vi.fn(async () => jsonResponse({ error: 'bad' }, { ok: false, status: 500 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const err = await streamSSE('/api/x', { onFrame: () => {} }).catch((e) => e);
+    const err = (await streamSSE('/api/x', { onFrame: () => {} }).catch((e) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(500);
   });

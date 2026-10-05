@@ -16,6 +16,9 @@ import {
   Trash2, RefreshCw, Volume2, Settings2, FileText, CheckSquare
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { api, apiVoid } from './api/client.js';
+import { streamSSE } from './api/sse.js';
+import type { TtsStreamData } from './api/types.js';
 
 interface AudioOverview {
   id: string;
@@ -89,21 +92,18 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/audio-overview`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          duration,
-          sourceIds: selectedSourceIds.length < sources.length ? selectedSourceIds : undefined,
-          tone: tone !== 'casual' ? tone : undefined,
-          customInstructions: customInstructions.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await api<{ overview: AudioOverview }>(
+        `/api/notebooks/${notebookId}/audio-overview`,
+        {
+          method: 'POST',
+          json: {
+            duration,
+            sourceIds: selectedSourceIds.length < sources.length ? selectedSourceIds : undefined,
+            tone: tone !== 'casual' ? tone : undefined,
+            customInstructions: customInstructions.trim() || undefined,
+          },
+        },
+      );
       if (data.overview.status === 'ready') {
         success('Audio Overview généré !');
         setSelectedOverview(data.overview);
@@ -125,17 +125,12 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     if (!selectedOverview) return;
     setDownloading(true);
     try {
-      const res = await fetch(
-        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/export?save=sandbox`
+      const data = await api<{ filePath: string }>(
+        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/export?save=sandbox`,
       );
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
       success(`Script audio sauvegardé dans la sandbox : ${data.filePath}`);
-    } catch (e: any) {
-      toastError(e.message);
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Erreur');
     } finally {
       setDownloading(false);
     }
@@ -143,20 +138,16 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
 
   const handleDelete = useCallback(async (overviewId: string) => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/audio-overviews/${overviewId}`, {
+      await apiVoid(`/api/notebooks/${notebookId}/audio-overviews/${overviewId}`, {
         method: 'DELETE',
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
       success('Audio overview supprimé');
       if (selectedOverview?.id === overviewId) {
         setSelectedOverview(null);
       }
       onRefresh();
-    } catch (e: any) {
-      toastError(e.message);
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Erreur');
     }
   }, [notebookId, selectedOverview, success, toastError, onRefresh]);
 
@@ -175,12 +166,10 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
 
     // Génération réussie : on supprime l'ancien overview en arrière-plan.
     try {
-      const res = await fetch(
-        `/api/notebooks/${notebookId}/audio-overviews/${previousId}`,
-        { method: 'DELETE' }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch (err) {
+      await apiVoid(`/api/notebooks/${notebookId}/audio-overviews/${previousId}`, {
+        method: 'DELETE',
+      });
+    } catch {
       // L'ancien overview n'a pas pu être supprimé, mais le nouveau existe :
       // on prévient l'utilisateur plutôt que de perdre l'information en silence.
       toastError("Nouvel audio généré, mais l'ancien n'a pas pu être supprimé.");
@@ -242,64 +231,30 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     abortControllerRef.current = controller;
 
     try {
-      const res = await fetch(
+      await streamSSE(
         `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/tts`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
           signal: controller.signal,
-        }
+          json: {},
+          onFrame: ({ event, data }) => {
+            // On cesse de traiter les frames si la lecture a été stoppée.
+            if (!playingRef.current) return;
+            const parsed = data as TtsStreamData;
+            if (event === 'start') {
+              setTtsTotalLines(parsed.total ?? 0);
+              setTtsLoading(false);
+            } else if (event === 'chunk') {
+              setCurrentLineIndex(parsed.index ?? 0);
+              setTtsProgress(prev => prev + 1);
+              if (parsed.audio) playAudioChunk(parsed.audio);
+            } else if (event === 'done') {
+              // Fini
+            } else if (event === 'error') {
+              toastError(parsed.error ?? 'Erreur TTS');
+            }
+          },
+        },
       );
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de stream");
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!playingRef.current) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const event of events) {
-          if (!event.trim()) continue;
-
-          const lines = event.split('\n');
-          let eventType = '';
-          let data = '';
-
-          for (const line of lines) {
-            if (line.startsWith('event: ')) eventType = line.slice(7);
-            if (line.startsWith('data: ')) data = line.slice(6);
-          }
-
-          if (eventType === 'start') {
-            const parsed = JSON.parse(data);
-            setTtsTotalLines(parsed.total);
-            setTtsLoading(false);
-          } else if (eventType === 'chunk') {
-            const parsed = JSON.parse(data);
-            setCurrentLineIndex(parsed.index);
-            setTtsProgress(prev => prev + 1);
-            playAudioChunk(parsed.audio);
-          } else if (eventType === 'done') {
-            // Fini
-          } else if (eventType === 'error') {
-            const parsed = JSON.parse(data);
-            toastError(parsed.error);
-          }
-        }
-      }
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         toastError(`Erreur TTS: ${e.message}`);

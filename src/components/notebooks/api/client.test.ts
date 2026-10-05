@@ -23,7 +23,7 @@ describe('api client', () => {
 
     await api('/api/x', { method: 'POST', json: { url: 'https://ex.fr' } });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ url: 'https://ex.fr' });
     const headers = new Headers(init.headers);
@@ -36,7 +36,7 @@ describe('api client', () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const err = await api('/api/x').catch((e) => e);
+    const err = (await api('/api/x').catch((e) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(422);
     expect(err.message).toBe('Boom'); // message extrait du corps { error }
@@ -47,7 +47,7 @@ describe('api client', () => {
     const fetchMock = vi.fn(async () => jsonResponse(null, { ok: false, status: 500 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const err = await api('/api/x').catch((e) => e);
+    const err = (await api('/api/x').catch((e) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.message).toBe('HTTP 500');
   });
@@ -63,7 +63,7 @@ describe('api client', () => {
     const fetchMock = vi.fn(async () => jsonResponse({ error: 'nope' }, { ok: false, status: 404 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const err = await apiVoid('/api/x', { method: 'DELETE' }).catch((e) => e);
+    const err = (await apiVoid('/api/x', { method: 'DELETE' }).catch((e) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(404);
   });

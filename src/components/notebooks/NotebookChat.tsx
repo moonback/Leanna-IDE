@@ -19,7 +19,7 @@ import { useToast } from '../ui/Toast.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
 import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from './motion.js';
 import { streamSSE } from './api/sse.js';
-import type { ChatStreamData } from './api/types.js';
+import type { ChatStreamData, DeepDiveStreamData, TtsStreamData } from './api/types.js';
 
 interface Citation {
   sourceId: string;
@@ -624,43 +624,16 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     try {
       // Utiliser le streaming SSE pour les textes longs, requête simple sinon
       if (content.length > 500) {
-        const res = await fetch('/api/tts/speak-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: content, voice: 'ff_siwis' }),
+        await streamSSE('/api/tts/speak-stream', {
           signal: controller.signal,
-        });
-
-        if (!res.ok) throw new Error(`TTS stream error: ${res.status}`);
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No stream body');
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const events = buffer.split('\n\n');
-          buffer = events.pop() || '';
-
-          for (const event of events) {
-            if (!event.trim()) continue;
-            const lines = event.split('\n');
-            let eventType = '';
-            let data = '';
-            for (const line of lines) {
-              if (line.startsWith('event: ')) eventType = line.slice(7);
-              if (line.startsWith('data: ')) data = line.slice(6);
-            }
-            if (eventType === 'chunk') {
-              const parsed = JSON.parse(data);
+          json: { text: content, voice: 'ff_siwis' },
+          onFrame: ({ event, data }) => {
+            if (event === 'chunk') {
+              const parsed = data as TtsStreamData;
               if (parsed.audio) playTTSChunk(parsed.audio);
             }
-          }
-        }
+          },
+        });
       } else {
         const res = await fetch('/api/tts/speak', {
           method: 'POST',
@@ -1114,56 +1087,26 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/deep-dive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
-      });
+      await streamSSE(`/api/notebooks/${notebookId}/chat/deep-dive`, {
+        json: { question: q },
+        onFrame: ({ data }) => {
+          const parsed = data as DeepDiveStreamData;
+          if (parsed.stage) {
+            setDeepDiveProgress(parsed.content || parsed.stage);
+          } else if (parsed.message) {
+            setDeepDiveProgress('');
+            setMessages(prev => [...prev, parsed.message!]);
 
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de body stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.stage) {
-                setDeepDiveProgress(parsed.content || parsed.stage);
-              } else if (parsed.message) {
-                setDeepDiveProgress('');
-                setMessages(prev => [...prev, parsed.message]);
-                
-                // Notification de fin de génération
-                if (!document.hidden) {
-                  toastSuccess('✓ Deep Dive terminé avec succès');
-                }
-                // Follow-ups ne se mettent plus à jour automatiquement
-              } else if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-            } catch (e: any) {
-              if (e.message && !e.message.includes('JSON')) throw e;
+            // Notification de fin de génération
+            if (!document.hidden) {
+              toastSuccess('✓ Deep Dive terminé avec succès');
             }
+            // Follow-ups ne se mettent plus à jour automatiquement
+          } else if (parsed.error) {
+            throw new Error(parsed.error);
           }
-        }
-      }
+        },
+      });
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         toastError(e.message);
@@ -1208,55 +1151,27 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/compare`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceIds: sources.map(s => s.id) }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de body stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
       let accumulated = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      await streamSSE(`/api/notebooks/${notebookId}/chat/compare`, {
+        json: { sourceIds: sources.map(s => s.id) },
+        onFrame: ({ data }) => {
+          const parsed = data as ChatStreamData;
+          if (parsed.text) {
+            accumulated += parsed.text;
+            setStreamingText(accumulated);
+          } else if (parsed.message) {
+            setStreamingText('');
+            setMessages(prev => [...prev, parsed.message!]);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) continue;
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                accumulated += parsed.text;
-                setStreamingText(accumulated);
-              } else if (parsed.message) {
-                setStreamingText('');
-                setMessages(prev => [...prev, parsed.message]);
-                
-                // Notification de fin de génération
-                if (!document.hidden) {
-                  toastSuccess('✓ Comparaison terminée avec succès');
-                }
-                // Follow-ups ne se mettent plus à jour automatiquement
-              }
-            } catch { /* skip */ }
+            // Notification de fin de génération
+            if (!document.hidden) {
+              toastSuccess('✓ Comparaison terminée avec succès');
+            }
+            // Follow-ups ne se mettent plus à jour automatiquement
           }
-        }
-      }
+        },
+      });
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         toastError(e.message);
@@ -1286,54 +1201,26 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/insights`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Pas de body stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
       let accumulated = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      await streamSSE(`/api/notebooks/${notebookId}/chat/insights`, {
+        onFrame: ({ data }) => {
+          const parsed = data as ChatStreamData;
+          if (parsed.text) {
+            accumulated += parsed.text;
+            setStreamingText(accumulated);
+          } else if (parsed.message) {
+            setStreamingText('');
+            setMessages(prev => [...prev, parsed.message!]);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) continue;
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                accumulated += parsed.text;
-                setStreamingText(accumulated);
-              } else if (parsed.message) {
-                setStreamingText('');
-                setMessages(prev => [...prev, parsed.message]);
-                
-                // Notification de fin de génération
-                if (!document.hidden) {
-                  toastSuccess('✓ Extraction d\'insights terminée avec succès');
-                }
-                // Follow-ups ne se mettent plus à jour automatiquement
-              }
-            } catch { /* skip */ }
+            // Notification de fin de génération
+            if (!document.hidden) {
+              toastSuccess('✓ Extraction d\'insights terminée avec succès');
+            }
+            // Follow-ups ne se mettent plus à jour automatiquement
           }
-        }
-      }
+        },
+      });
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         toastError(e.message);
