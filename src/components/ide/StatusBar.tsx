@@ -667,40 +667,6 @@ export const StatusBar = memo(function StatusBar({
   // Actions occasionnelles regroupées dans le menu "Outils" — l'ordre suit
   // la fréquence d'usage estimée (agents/missions en haut, réindexation en bas).
   const toolsMenuItems: (ToolsMenuItem | 'divider')[] = [
-    {
-      key: 'telegram',
-      icon: Send,
-      label: 'Telegram',
-      description: !telegramStatus?.isConfigured
-        ? 'Non configuré'
-        : telegramStatus.isRunning
-        ? `En ligne (@${telegramStatus.botInfo?.username || 'bot'})`
-        : telegramStatus.lastError
-        ? 'Erreur — cliquer pour voir'
-        : 'Arrêté',
-      onClick: () => { onToggleTelegram?.(); setShowToolsMenu(false); },
-      iconColor: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)',
-      iconBg: telegramStatus?.isRunning ? 'var(--color-success-subtle, var(--bg-hover))' : undefined,
-      trailing: telegramStatus?.isConfigured ? (
-        <button
-          type="button"
-          onClick={handleQuickToggleTelegram}
-          disabled={telegramActionLoading}
-          className="p-1 rounded-md hover:bg-[var(--accent-subtle)] transition-all duration-200 active:scale-90 disabled:opacity-40 flex-shrink-0"
-          title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
-          aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
-        >
-          {telegramActionLoading ? (
-            <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-          ) : telegramStatus.isRunning ? (
-            <Square size={11} style={{ color: 'var(--color-error)' }} fill="currentColor" />
-          ) : (
-            <Play size={11} style={{ color: 'var(--color-success)' }} fill="currentColor" />
-          )}
-        </button>
-      ) : undefined,
-    },
-    'divider',
     ...(profile.agents.enabled ? [
       {
         key: 'agents',
@@ -885,7 +851,50 @@ export const StatusBar = memo(function StatusBar({
           </button>
 
           <Divider />
-
+<div className={`${PILL} gap-1.5`} style={{ color: 'var(--text-muted)' }}>
+            <button
+              type="button"
+              onClick={() => onToggleTelegram?.()}
+              className="flex items-center gap-1.5"
+              title={
+                !telegramStatus?.isConfigured
+                  ? 'Telegram — non configuré'
+                  : telegramStatus.isRunning
+                  ? `Telegram en ligne (@${telegramStatus.botInfo?.username || 'bot'})`
+                  : telegramStatus.lastError
+                  ? 'Telegram — erreur, cliquer pour voir'
+                  : 'Telegram — arrêté'
+              }
+            >
+              <Send
+                size={13}
+                style={{ color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)' }}
+              />
+              <span style={{ color: telegramStatus?.isRunning ? 'var(--color-success)' : 'var(--text-muted)' }}>
+                Telegram
+              </span>
+            </button>
+            {telegramStatus?.isConfigured && (
+              <button
+                type="button"
+                onClick={handleQuickToggleTelegram}
+                disabled={telegramActionLoading}
+                className="p-0.5 rounded-md hover:bg-[var(--accent-subtle)] transition-all duration-200 active:scale-90 disabled:opacity-40 flex-shrink-0"
+                title={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+                aria-label={telegramStatus.isRunning ? 'Arrêter le bot Telegram' : 'Démarrer le bot Telegram'}
+              >
+                {telegramActionLoading ? (
+                  <LoaderCircle size={11} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                ) : telegramStatus.isRunning ? (
+                  <Square size={11} style={{ color: 'var(--color-error)' }} fill="currentColor" />
+                ) : (
+                  <Play size={11} style={{ color: 'var(--color-success)' }} fill="currentColor" />
+                )}
+              </button>
+            )}
+          </div>
+          
+          <Divider />
           {/* Menu "Outils" — regroupe les actions occasionnelles (Telegram,
               Agents, Flotte, Missions, Logs, GitHub, Réindexer) dans une
               modale pour garder la barre lisible. Le badge reflète
@@ -910,6 +919,10 @@ export const StatusBar = memo(function StatusBar({
               </span>
             )}
           </button>
+
+
+          
+          
         </div>
 
         {/* ─── Spacer ───────────────────────────────────────────────────── */}
