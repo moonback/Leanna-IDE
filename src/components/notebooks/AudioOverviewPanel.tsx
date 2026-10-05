@@ -48,12 +48,14 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   // ─── Lecture TTS (hook dédié) ──────────────────────────────────────────────
   const player = useTtsPlayer({ notebookId, selectedOverview, onError: toastError });
 
-  // Initialiser la sélection de sources avec toutes les sources
+  // Initialiser la sélection de sources avec toutes les sources (une fois les
+  // sources chargées). La garde `length === 0` rend l'effet idempotent : une
+  // fois peuplée, il ne réécrit plus la sélection.
   useEffect(() => {
     if (selectedSourceIds.length === 0 && sources.length > 0) {
       setSelectedSourceIds(sources.map(s => s.id));
     }
-  }, [sources]);
+  }, [sources, selectedSourceIds.length]);
 
   const toggleSource = useCallback((sourceId: string) => {
     setSelectedSourceIds(prev =>

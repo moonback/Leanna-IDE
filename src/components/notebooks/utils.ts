@@ -38,3 +38,21 @@ export function timeAgoLong(dateStr: string): string {
   if (mins > 0) return `il y a ${mins}m`;
   return "à l'instant";
 }
+
+/**
+ * Extrait un message lisible d'une erreur inconnue (bloc `catch`), sans recourir
+ * à `any`. Remplace le motif récurrent `catch (e: any) { … e.message }`.
+ */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'string') return e;
+  return String(e);
+}
+
+/**
+ * Vrai si l'erreur correspond à une annulation (AbortController) — à ignorer
+ * silencieusement dans les flux SSE/TTS interrompus volontairement.
+ */
+export function isAbortError(e: unknown): boolean {
+  return e instanceof Error && e.name === 'AbortError';
+}

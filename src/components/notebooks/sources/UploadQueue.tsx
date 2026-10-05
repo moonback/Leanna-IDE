@@ -6,13 +6,13 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import type { UploadFileStatus } from './constants.js';
+import type { SpringTransition } from '../motionTypes.js';
 
 interface Props {
   uploadQueue: UploadFileStatus[];
   uploadDone: number;
   uploadErrors: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  spring: any;
+  spring: SpringTransition;
 }
 
 export function UploadQueue({ uploadQueue, uploadDone, uploadErrors, spring }: Props) {

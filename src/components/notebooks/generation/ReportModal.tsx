@@ -5,6 +5,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { FileBarChart, X, Lightbulb, RefreshCw, Sparkles, Zap, ArrowRight } from 'lucide-react';
+import type { SpringTransition, ScrimStyle } from '../motionTypes.js';
 import { DOC_TYPES, REPORT_TYPES } from './constants.js';
 
 interface Suggestion {
@@ -25,12 +26,9 @@ interface Props {
   onLoadSuggestions: () => void;
   onSelectSuggestion: (suggestion: Suggestion) => void;
   onSelectType: (type: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scrimSpring: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scrimStyle: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  modalSpring: any;
+  scrimSpring: SpringTransition;
+  scrimStyle: ScrimStyle;
+  modalSpring: SpringTransition;
   reduceMotion: boolean | null;
 }
 
@@ -81,6 +79,9 @@ export function ReportModal({
                 onClick={onClose}
                 className="p-2 rounded-lg transition-all hover:bg-[var(--bg-hover)] active:scale-95"
                 style={{ color: 'var(--text-muted)' }}
+                // autoFocus justifié : point d'entrée du focus-trap à l'ouverture
+                // de la modale (bouton de fermeture), focus attendu.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
               >
                 <X className="w-4 h-4" />

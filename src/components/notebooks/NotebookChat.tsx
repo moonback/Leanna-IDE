@@ -12,6 +12,7 @@ import { useToast } from '../ui/Toast.js';
 import { api } from './api/client.js';
 import type { ChatMessage, SandboxFolder } from './chat/types.js';
 import { SLASH_COMMANDS, CONTEXT_SUGGESTIONS, PERSONALITIES } from './chat/constants.js';
+import { errorMessage } from './utils.js';
 import { useChatStream } from './chat/useChatStream.js';
 import { useChatThreads } from './chat/useChatThreads.js';
 import { useTts } from './chat/useTts.js';
@@ -148,8 +149,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
       window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
       toastSuccess(`✓ Sauvegardé : ${filePath}`);
       setFolderPickerMsg(null);
-    } catch (e: any) {
-      toastError(`Erreur : ${e.message}`);
+    } catch (e: unknown) {
+      toastError(`Erreur : ${errorMessage(e)}`);
     } finally {
       setSavingMd(false);
     }

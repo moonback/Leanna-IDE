@@ -4,6 +4,7 @@
  * pilules, et pied de page avec statistiques. Composant présentationnel.
  */
 
+import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, Loader2, Trash2, Plus, FileText, CheckSquare, Square, X,
@@ -23,14 +24,10 @@ interface Props {
   totalWords: number;
   totalChunks: number;
   prefersReducedMotion: boolean | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fileInputRef: React.RefObject<HTMLInputElement | null>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  spring: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  springSnappy: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tapScale: any;
+  spring: SpringTransition;
+  springSnappy: SpringTransition;
+  tapScale: TapScaleProps;
 
   onFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   openFilePicker: () => void;

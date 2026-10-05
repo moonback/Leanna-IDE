@@ -9,6 +9,7 @@ import { api, apiVoid } from '../api/client.js';
 import { streamSSE } from '../api/sse.js';
 import type { ChatStreamData } from '../api/types.js';
 import type { Citation, ChatMessage, SandboxFolder, QueuedChatRequest } from './types.js';
+import { errorMessage } from '../utils.js';
 import { loadGenerationStateFor, useChatPersistence } from './useChatPersistence.js';
 import { useChatGenerators } from './useChatGenerators.js';
 
@@ -310,8 +311,8 @@ export function useChatStream({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      onError(e.message);
+    } catch (e: unknown) {
+      onError(errorMessage(e));
     }
   }, [notebookId, onError]);
 
@@ -330,8 +331,8 @@ export function useChatStream({
       });
       onSuccess('Sauvegardé dans les notes');
       onRefresh?.();
-    } catch (e: any) {
-      onError(`Erreur : ${e.message}`);
+    } catch (e: unknown) {
+      onError(`Erreur : ${errorMessage(e)}`);
     }
   }, [notebookId, onRefresh, onError, onSuccess]);
 

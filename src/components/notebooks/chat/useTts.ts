@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { streamSSE } from '../api/sse.js';
 import type { TtsStreamData } from '../api/types.js';
+import { errorMessage, isAbortError } from '../utils.js';
 
 export function useTts() {
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
@@ -98,9 +99,9 @@ export function useTts() {
         });
         if (data.audio) playTTSChunk(data.audio);
       }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        console.error('[NotebookChat TTS] Erreur:', e.message);
+    } catch (e: unknown) {
+      if (!isAbortError(e)) {
+        console.error('[NotebookChat TTS] Erreur:', errorMessage(e));
       }
     } finally {
       // Attendre la fin de la lecture audio avant de réinitialiser l'état

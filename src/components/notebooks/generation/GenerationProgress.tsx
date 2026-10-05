@@ -5,6 +5,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Loader2, CheckCircle2, X, RefreshCw } from 'lucide-react';
+import type { SpringTransition } from '../motionTypes.js';
 import { DOC_TYPES, REPORT_TYPES, getDocTypeColor, getDocTypeLabel } from './constants.js';
 import type { QueuedGeneration } from './types.js';
 
@@ -16,8 +17,7 @@ interface Props {
   setShowQueue: (v: boolean) => void;
   onRetryTask: (taskId: string) => void;
   onCancelTask: (taskId: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  modalSpring: any;
+  modalSpring: SpringTransition;
 }
 
 export function GenerationProgress({

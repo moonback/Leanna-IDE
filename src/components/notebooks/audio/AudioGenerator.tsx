@@ -258,6 +258,7 @@ export function AudioGenerator({
               >
                 <button
                   onClick={() => onSelectOverview(ov)}
+                  aria-label={`Sélectionner l'aperçu audio : ${ov.title}`}
                   className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
                   style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
                 >

@@ -6,6 +6,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { Filter, PenLine, FileBarChart, ArrowRight, Loader2 } from 'lucide-react';
+import type { SpringTransition } from '../motionTypes.js';
 import { DOC_TYPES } from './constants.js';
 import type { SourceItem } from './types.js';
 
@@ -30,8 +31,7 @@ interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   infographicModalTriggerRef: React.RefObject<any>;
   reduceMotion: boolean | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  modalSpring: any;
+  modalSpring: SpringTransition;
 }
 
 export function DocTypePicker({
@@ -102,9 +102,11 @@ export function DocTypePicker({
               {sources.map(src => (
                 <label
                   key={src.id}
+                  htmlFor={`doctype-src-${src.id}`}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <input
+                    id={`doctype-src-${src.id}`}
                     type="checkbox"
                     checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
                     onChange={() => toggleSourceSelection(src.id)}

@@ -13,6 +13,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
+import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import {
   Sparkles, Search, Loader2, Eye, RefreshCw, Trash2, CheckSquare, Square,
 } from 'lucide-react';
@@ -36,10 +37,8 @@ interface Props {
   reindexingId: string | null;
   tagInput: { sourceId: string; value: string } | null;
   prefersReducedMotion: boolean | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  spring: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tapScale: any;
+  spring: SpringTransition;
+  tapScale: TapScaleProps;
 
   onToggleSelect: (sourceId: string) => void;
   onTogglePreview: (sourceId: string) => void;
@@ -60,8 +59,7 @@ interface SourceCardProps {
   sourcePreview: Record<string, string>;
   reindexingId: string | null;
   tagInput: { sourceId: string; value: string } | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tapScale: any;
+  tapScale: TapScaleProps;
   onToggleSelect: (sourceId: string) => void;
   onTogglePreview: (sourceId: string) => void;
   onReindex: (sourceId: string) => void;
@@ -167,15 +165,17 @@ function SourceCard({
         {source.keywords.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2 items-center">
             {source.keywords.slice(0, 6).map((kw: string) => (
-              <span
+              <button
                 key={kw}
+                type="button"
                 className="text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-all hover:line-through hover:opacity-50"
                 style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)', border: '1px solid var(--border-base)' }}
                 onClick={() => onRemoveTag(source.id, kw)}
                 title="Cliquer pour retirer"
+                aria-label={`Retirer le mot-clé ${kw}`}
               >
                 {kw}
-              </span>
+              </button>
             ))}
             {source.keywords.length > 6 && (
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ color: 'var(--text-dimmed)' }}>
@@ -193,6 +193,9 @@ function SourceCard({
                   value={tagInput.value}
                   onChange={(e) => setTagInput({ sourceId: source.id, value: e.target.value })}
                   placeholder="tag..."
+                  // autoFocus justifié : le champ n'apparaît qu'après clic sur
+                  // « + tag » ; focus immédiat attendu pour la saisie.
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   onBlur={() => setTagInput(null)}
                   className="text-xs px-2 py-0.5 rounded-full w-16 outline-none"

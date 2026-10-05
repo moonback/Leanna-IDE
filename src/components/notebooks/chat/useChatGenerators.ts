@@ -11,6 +11,7 @@ import { useCallback } from 'react';
 import { streamSSE } from '../api/sse.js';
 import type { ChatStreamData, DeepDiveStreamData } from '../api/types.js';
 import type { ChatMessage } from './types.js';
+import { errorMessage, isAbortError } from '../utils.js';
 
 interface UseChatGeneratorsOptions {
   notebookId: string;
@@ -66,14 +67,15 @@ export function useChatGenerators({
           }
         },
       });
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        onError(e.message);
+    } catch (e: unknown) {
+      const msg = errorMessage(e);
+      if (!isAbortError(e)) {
+        onError(msg);
       }
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: `❌ Erreur Deep Dive: ${e.message}`,
+        content: `❌ Erreur Deep Dive: ${msg}`,
         citations: [],
         timestamp: new Date().toISOString(),
       }]);
@@ -118,9 +120,9 @@ export function useChatGenerators({
           }
         },
       });
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        onError(e.message);
+    } catch (e: unknown) {
+      if (!isAbortError(e)) {
+        onError(errorMessage(e));
       }
       setStreamingText('');
     } finally {
@@ -162,9 +164,9 @@ export function useChatGenerators({
           }
         },
       });
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        onError(e.message);
+    } catch (e: unknown) {
+      if (!isAbortError(e)) {
+        onError(errorMessage(e));
       }
       setStreamingText('');
     } finally {

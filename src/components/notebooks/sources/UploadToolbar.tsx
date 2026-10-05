@@ -4,6 +4,7 @@
  * Codebase). Composant présentationnel piloté par le hook useSourceUpload.
  */
 
+import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Globe, Type, ClipboardPaste, Github, FolderCode, Loader2,
@@ -16,10 +17,8 @@ type UploadApi = ReturnType<typeof useSourceUpload>;
 interface Props {
   upload: UploadApi;
   onOpenGitHub: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  spring: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tapScale: any;
+  spring: SpringTransition;
+  tapScale: TapScaleProps;
 }
 
 export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props) {
@@ -132,6 +131,9 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 onChange={e => setUrl(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleUrlIngest()}
                 placeholder="https://example.com/article..."
+                // autoFocus justifié : le champ apparaît après sélection de
+                // l'onglet URL ; focus immédiat attendu pour la saisie.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-shadow focus:ring-2"
                 style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
@@ -249,10 +251,11 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
               />
 
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                <label htmlFor="codebase-extensions" className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                   Extensions à inclure <span style={{ color: 'var(--text-dimmed)' }}>(vide = toutes les extensions texte)</span>
                 </label>
                 <input
+                  id="codebase-extensions"
                   type="text"
                   value={codebaseExtensions}
                   onChange={e => setCodebaseExtensions(e.target.value)}
@@ -264,11 +267,12 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
 
               <div className="flex items-center gap-6 flex-wrap">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <label htmlFor="codebase-max-size" className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                     Taille max par fichier
                   </label>
                   <div className="flex items-center gap-2">
                     <input
+                      id="codebase-max-size"
                       type="number"
                       min={10}
                       max={500}
@@ -281,8 +285,9 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label htmlFor="codebase-include-config" className="flex items-center gap-2 cursor-pointer select-none">
                   <input
+                    id="codebase-include-config"
                     type="checkbox"
                     checked={codebaseIncludeConfig}
                     onChange={e => setCodebaseIncludeConfig(e.target.checked)}

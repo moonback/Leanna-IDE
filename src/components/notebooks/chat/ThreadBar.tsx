@@ -57,9 +57,12 @@ export function ThreadBar({
               <div className="max-h-60 overflow-y-auto custom-scrollbar">
                 {/* Main conversation option */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   className={`flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer border-b ${activeThreadId === null ? 'bg-[var(--accent-subtle)]' : ''}`}
                   style={{ borderColor: 'var(--border-base)' }}
                   onClick={() => onSwitchThread(null)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSwitchThread(null); } }}
                 >
                   <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: activeThreadId === null ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                   <span
@@ -79,8 +82,11 @@ export function ThreadBar({
                   threads.map(thread => (
                     <div
                       key={thread.id}
+                      role="button"
+                      tabIndex={0}
                       className={`group flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-[var(--accent-subtle)] cursor-pointer ${thread.id === activeThreadId ? 'bg-[var(--accent-subtle)]' : ''}`}
                       onClick={() => onSwitchThread(thread.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSwitchThread(thread.id); } }}
                     >
                       <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: thread.id === activeThreadId ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                       <span

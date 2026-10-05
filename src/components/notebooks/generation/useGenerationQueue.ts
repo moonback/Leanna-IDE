@@ -18,6 +18,7 @@ import { streamSSE } from '../api/sse.js';
 import type { GenerateStreamData } from '../api/types.js';
 import { getDocTypeLabel, MAX_PARALLEL_GENERATIONS } from './constants.js';
 import type { GeneratedDoc, QueuedGeneration, SourceItem, DocRef } from './types.js';
+import { errorMessage } from '../utils.js';
 
 interface UseGenerationQueueOptions {
   notebookId: string;
@@ -170,11 +171,11 @@ export function useGenerationQueue({
           }
         },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       setGenerationQueue(prev => prev.map(t =>
         t.id === task.id ? { ...t, status: 'error', progress: 0 } : t
       ));
-      onError(e.message);
+      onError(errorMessage(e));
       setStreamingTexts(prev => ({ ...prev, [task.id]: '' }));
     } finally {
       clearInterval(timerId);
@@ -265,8 +266,8 @@ export function useGenerationQueue({
       }
 
       onSuccess(`Importé dans le workspace : ${filePath}`);
-    } catch (e: any) {
-      onError(`Erreur import : ${e.message}`);
+    } catch (e: unknown) {
+      onError(`Erreur import : ${errorMessage(e)}`);
     }
   }, [onSuccess, onError]);
 

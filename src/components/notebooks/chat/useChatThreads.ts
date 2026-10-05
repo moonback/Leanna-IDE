@@ -51,7 +51,7 @@ export function useChatThreads({
       setMessages([]);
       setFollowUps([]);
     } catch { /* ignore */ }
-  }, [notebookId, threads.length, setMessages, setFollowUps]);
+  }, [notebookId, threads.length, setActiveThreadId, setMessages, setFollowUps]);
 
   const handleSwitchThread = useCallback((threadId: string | null) => {
     if (threadId === activeThreadId) {
@@ -62,7 +62,7 @@ export function useChatThreads({
     setShowThreadList(false);
     setFollowUps([]);
     setStreamingText('');
-  }, [activeThreadId, setFollowUps, setStreamingText]);
+  }, [activeThreadId, setActiveThreadId, setFollowUps, setStreamingText]);
 
   const handleDeleteThread = useCallback(async (threadId: string) => {
     try {
@@ -78,7 +78,7 @@ export function useChatThreads({
         }
       }
     } catch { /* ignore */ }
-  }, [notebookId, activeThreadId, threads, setMessages]);
+  }, [notebookId, activeThreadId, threads, setActiveThreadId, setMessages]);
 
   return {
     threads,

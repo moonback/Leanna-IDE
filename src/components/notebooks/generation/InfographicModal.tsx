@@ -6,6 +6,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { Lightbulb, X, Smartphone, Monitor, Square } from 'lucide-react';
+import type { SpringTransition, ScrimStyle } from '../motionTypes.js';
 
 interface Props {
   show: boolean;
@@ -23,12 +24,9 @@ interface Props {
   setInfraDescription: (v: string) => void;
   onClose: () => void;
   onGenerate: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scrimSpring: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scrimStyle: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  modalSpring: any;
+  scrimSpring: SpringTransition;
+  scrimStyle: ScrimStyle;
+  modalSpring: SpringTransition;
   reduceMotion: boolean | null;
 }
 
@@ -79,6 +77,9 @@ export function InfographicModal({
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                 style={{ color: 'var(--text-muted)' }}
+                // autoFocus justifié : point d'entrée du focus-trap à l'ouverture
+                // de la modale (bouton de fermeture), focus attendu.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
               >
                 <X className="w-4 h-4" />

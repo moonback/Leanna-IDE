@@ -5,6 +5,7 @@
 
 import { memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import type { SpringTransition } from '../motionTypes.js';
 import {
   Check, Copy, RefreshCw, Square, Volume2, StickyNote, Download,
   ThumbsUp, ThumbsDown, Pencil, Quote, ChevronDown, ExternalLink,
@@ -15,8 +16,7 @@ import type { Citation, ChatMessage } from './types.js';
 interface Props {
   msg: ChatMessage;
   prefersReducedMotion: boolean | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  spring: any;
+  spring: SpringTransition;
   loading: boolean;
   editingMsgId: string | null;
   editingContent: string;
@@ -72,6 +72,9 @@ export const MessageItem = memo(function MessageItem({
               className="w-full px-3 py-2 rounded-full text-sm outline-none resize-none"
               style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               rows={3}
+              // autoFocus justifié : le champ n'apparaît qu'après action explicite
+              // (clic sur « Modifier ») ; focus immédiat attendu pour l'édition.
+              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
             />
             <div className="flex items-center gap-2">

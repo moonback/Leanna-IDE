@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, memo } from 'react';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip.js';
+import { errorMessage } from './utils.js';
 
 // `mermaid` est une dépendance lourde (plusieurs centaines de Ko). On la charge
 // dynamiquement pour la sortir du bundle principal : elle n'est fetchée que
@@ -128,9 +129,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
           setSvg(renderedSvg);
           setRendering(false);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(e.message || 'Erreur de rendu Mermaid');
+          setError(errorMessage(e) || 'Erreur de rendu Mermaid');
           setRendering(false);
         }
       }
