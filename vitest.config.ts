@@ -1,0 +1,26 @@
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import { defineConfig } from 'vitest/config';
+
+// Configuration Vitest dédiée au front (composants React dans src/).
+// Volontairement séparée de vite.config.ts : on n'a besoin ni de Monaco ni de
+// Tailwind pour les tests, et le runner serveur (node:test sur server/**) reste
+// inchangé.
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    // On ne teste que le front ; le serveur garde son propre runner (node:test).
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules/**', 'dist/**', '.Leanna/**', 'server/**'],
+    css: false,
+    restoreMocks: true,
+  },
+});
