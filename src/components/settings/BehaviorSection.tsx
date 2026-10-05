@@ -84,6 +84,16 @@ export function BehaviorSection() {
             style={{ width: '80px' }}
           />
         </Field>
+        <SectionDivider label="Interface de Chat" />
+
+        <Field label="Suggestions rapides" hint="Affiche des chips de raccourcis (Expliquer ce fichier, Écrire des tests…) au-dessus du champ de saisie quand il est vide">
+          <ToggleSwitch
+            value={profile.showChatSuggestions}
+            onChange={v => setField('showChatSuggestions', v)}
+            label="Suggestions rapides"
+            hint={profile.showChatSuggestions ? 'Les suggestions s\'affichent quand le chat est vide' : 'Suggestions masquées'}
+          />
+        </Field>
       </div>
     </Section>
   );

@@ -166,6 +166,14 @@ export interface MissionPlan {
   risks: string[];
   estimatedTokens: number;
   stopConditions: string[];
+  /** Coût LLM estimé en USD avant exécution. */
+  estimatedCostUsd: number;
+  /** Durée totale estimée en millisecondes avant exécution. */
+  estimatedDurationMs: number;
+  /** Niveau de risque global : low | medium | high | critical */
+  riskLevel: "low" | "medium" | "high" | "critical";
+  /** Confiance dans l'estimation (0–1). Faible si peu d'historique disponible. */
+  estimationConfidence: number;
 }
 
 /** Score calculé pour un skill */

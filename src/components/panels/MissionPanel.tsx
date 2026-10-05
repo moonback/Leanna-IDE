@@ -4,6 +4,7 @@ import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
   TrendingUp, TrendingDown, Minus, Clock, Plus, Trash2, X,
+  DollarSign, Timer, Shield, Activity,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
@@ -49,6 +50,10 @@ interface MissionPlan {
   risks: string[];
   estimatedTokens: number;
   stopConditions: string[];
+  estimatedCostUsd?: number;
+  estimatedDurationMs?: number;
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  estimationConfidence?: number;
 }
 
 interface MissionEntry {
@@ -1182,8 +1187,35 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
     { label: "Conditions d'arrêt", items: plan.stopConditions },
   ];
 
+  // ── Helpers d'affichage ─────────────────────────────────────────────────
+  function fmtDuration(ms: number): string {
+    if (ms < 60_000) return `~${Math.round(ms / 1_000)}s`;
+    const m = Math.floor(ms / 60_000);
+    const s = Math.round((ms % 60_000) / 1_000);
+    return s > 0 ? `~${m}min ${s}s` : `~${m}min`;
+  }
+
+  function fmtCost(usd: number): string {
+    if (usd < 0.001) return '< $0.001';
+    if (usd < 1)     return `$${usd.toFixed(4)}`;
+    return `$${usd.toFixed(2)}`;
+  }
+
+  const riskConfig: Record<NonNullable<MissionPlan['riskLevel']>, { color: string; label: string }> = {
+    low:      { color: 'var(--color-success)',  label: 'Faible'    },
+    medium:   { color: 'var(--color-warning)',  label: 'Modéré'    },
+    high:     { color: 'var(--color-error)',    label: 'Élevé'     },
+    critical: { color: 'var(--color-error)',    label: 'Critique'  },
+  };
+
+  const hasEstimate =
+    plan.estimatedCostUsd !== undefined ||
+    plan.estimatedDurationMs !== undefined ||
+    plan.riskLevel !== undefined;
+
   return (
     <div className="pt-2 pb-1 space-y-2" style={{ borderBottom: '1px solid var(--border-base)' }}>
+      {/* ── En-tête ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-info)' }}>
           Plan d'action
@@ -1192,6 +1224,72 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
           ~{plan.estimatedTokens.toLocaleString('fr-FR')} tokens
         </span>
       </div>
+
+      {/* ── Bandeaux coût / durée / risque ─────────────────────────────── */}
+      {hasEstimate && (
+        <div
+          className="grid grid-cols-3 gap-1.5 rounded-lg p-2"
+          style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
+        >
+          {/* Coût estimé */}
+          {plan.estimatedCostUsd !== undefined && (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-1" style={{ color: 'var(--accent-secondary)' }}>
+                <DollarSign size={10} />
+                <span className="text-xs font-bold">{fmtCost(plan.estimatedCostUsd)}</span>
+              </div>
+              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Coût estimé</span>
+            </div>
+          )}
+
+          {/* Durée estimée */}
+          {plan.estimatedDurationMs !== undefined && (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-1" style={{ color: 'var(--color-info)' }}>
+                <Timer size={10} />
+                <span className="text-xs font-bold">{fmtDuration(plan.estimatedDurationMs)}</span>
+              </div>
+              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Durée estimée</span>
+            </div>
+          )}
+
+          {/* Niveau de risque */}
+          {plan.riskLevel && (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-1" style={{ color: riskConfig[plan.riskLevel].color }}>
+                <Shield size={10} />
+                <span className="text-xs font-bold">{riskConfig[plan.riskLevel].label}</span>
+              </div>
+              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Risque</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Barre de confiance dans l'estimation ────────────────────────── */}
+      {plan.estimationConfidence !== undefined && (
+        <div className="flex items-center gap-2">
+          <Activity size={9} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />
+          <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${Math.round(plan.estimationConfidence * 100)}%`,
+                backgroundColor: plan.estimationConfidence >= 0.7
+                  ? 'var(--color-success)'
+                  : plan.estimationConfidence >= 0.4
+                    ? 'var(--color-warning)'
+                    : 'var(--color-error)',
+              }}
+            />
+          </div>
+          <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)', flexShrink: 0 }}>
+            {Math.round(plan.estimationConfidence * 100)}% confiance
+          </span>
+        </div>
+      )}
+
+      {/* ── Sections textuelles ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-1.5">
         {sections.map(section => (
           <div key={section.label} className="text-xs">

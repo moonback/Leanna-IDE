@@ -450,9 +450,10 @@ interface InputAreaProps {
   onSend: (text: string) => void;
   onDocumentAnalyzed: (result: DocumentResult) => void;
   onToast: (msg: string, icon?: React.ReactNode) => void;
+  showChips?: boolean;
 }
 
-function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast }: InputAreaProps) {
+function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -606,52 +607,68 @@ function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, o
           />
         )}
 
-      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide.
-          Les 4 chips tiennent sur une seule ligne : icône dans une pastille au repos,
-          le label se révèle au survol. */}
+      {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide. */}
       <AnimatePresence>
-        {connected && !isBusy && input.length === 0 && (
+        {connected && !isBusy && input.length === 0 && showChips && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="mb-2.5"
           >
+            {/* Header */}
             <div
-              className="flex items-center gap-1 mb-1.5 px-0.5 text-xs font-medium uppercase tracking-wider"
-              style={{ color: 'var(--text-dimmed)' }}
+              className="flex items-center gap-1.5 mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--accent-primary)', opacity: 0.75 }}
             >
-              <Sparkles size={10} style={{ color: 'var(--accent-primary)' }} />
+              <Sparkles size={9} />
               Suggestions
             </div>
-            <div className="flex flex-nowrap items-center gap-1.5">
+
+            {/* Grid 2×2 */}
+            <div className="grid grid-cols-2 gap-1.5">
               {SUGGESTION_CHIPS.map((chip, i) => (
                 <motion.button
                   key={chip.label}
                   type="button"
                   onClick={() => onSend(chip.prompt)}
-                  title={chip.label}
+                  title={chip.prompt}
                   aria-label={chip.label}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.18, delay: i * 0.04, ease: 'easeOut' }}
-                  whileTap={{ scale: 0.94 }}
-                  className="group/chip flex items-center gap-1.5 pl-1 pr-1 py-1 rounded-full text-xs font-medium flex-shrink-0
-                             transition-[background-color,border-color,box-shadow,padding] duration-200
-                             hover:border-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]
-                             hover:bg-[var(--accent-subtle)] hover:pr-2.5 hover:shadow-[0_2px_10px_var(--accent-glow)]"
-                  style={{ border: '1px solid var(--border-base)', color: 'var(--text-secondary)' }}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.16, delay: i * 0.05, ease: 'easeOut' }}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="group/chip flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-left
+                             transition-[background-color,border-color,box-shadow] duration-200
+                             hover:shadow-[0_2px_12px_var(--accent-glow)]"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface))',
+                    border: '1px solid var(--border-base)',
+                    color: 'var(--text-secondary)',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-subtle)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent-primary) 40%, transparent)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface))';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-base)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                  }}
                 >
+                  {/* Icon badge */}
                   <span
-                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' }}
+                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-200
+                               group-hover/chip:bg-[color-mix(in_srgb,var(--accent-primary)_22%,transparent)]"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 13%, transparent)' }}
                   >
-                    <chip.icon size={12} style={{ color: 'var(--accent-primary)' }} />
+                    <chip.icon size={11} style={{ color: 'var(--accent-primary)' }} />
                   </span>
-                  <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/chip:max-w-[160px] group-hover/chip:opacity-100">
-                    {chip.label}
-                  </span>
+                  {/* Label — always visible, truncated */}
+                  <span className="truncate leading-tight">{chip.label}</span>
                 </motion.button>
               ))}
             </div>
@@ -1756,6 +1773,7 @@ export function ChatPanel({
                 onSend={handleSend}
                 onDocumentAnalyzed={handleDocumentAnalyzed}
                 onToast={showToast}
+                showChips={profile.showChatSuggestions ?? true}
               />
             )}
           </>

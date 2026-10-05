@@ -99,6 +99,8 @@ export interface UserProfile {
   reasoningEnabled: boolean;  // Activer/désactiver le raisonnement structuré (CoT, etc.)
   // Custom system prompt
   customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
+  // Chat UI
+  showChatSuggestions: boolean;  // Afficher les chips de suggestions rapides dans le chat
 }
 
 const STORAGE_KEY = 'Leanna_user_profile';
@@ -140,6 +142,8 @@ const DEFAULT_PROFILE: UserProfile = {
   reasoningEnabled: true,
   // Custom system prompt
   customSystemPrompt: '',
+  // Chat UI
+  showChatSuggestions: true,
 };
 
 function load(): UserProfile {

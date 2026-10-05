@@ -144,6 +144,52 @@ export class SkillScorer {
   }
 
   /**
+   * Retourne la durée moyenne observée pour un skill (en ms).
+   * Si aucun historique n'est disponible, retourne une durée de référence
+   * basée sur la catégorie du skill (fallback conservateur).
+   */
+  getEstimatedDurationMs(skillName: string): number {
+    const stats = this.usageHistory.get(skillName);
+    if (stats && stats.totalCalls > 0) {
+      return stats.totalDurationMs / stats.totalCalls;
+    }
+    // Fallback par catégorie — durées conservatrices (p50 observé en prod)
+    const category = this.skillCategories.get(skillName);
+    switch (category) {
+      case "read":     return 1_500;
+      case "search":   return 3_000;
+      case "verify":   return 5_000;
+      case "test":     return 15_000;
+      case "write":    return 8_000;
+      case "code":     return 20_000;
+      case "analysis": return 12_000;
+      case "system":   return 4_000;
+      case "memory":   return 2_000;
+      default:         return 10_000;
+    }
+  }
+
+  /**
+   * Retourne le nombre de tokens de sortie estimés pour un skill.
+   * Utilisé par PlanEstimator pour calculer le coût USD avant exécution.
+   */
+  getEstimatedOutputTokens(skillName: string): number {
+    const category = this.skillCategories.get(skillName);
+    switch (category) {
+      case "read":     return 300;
+      case "search":   return 400;
+      case "verify":   return 200;
+      case "test":     return 500;
+      case "write":    return 1_200;
+      case "code":     return 2_000;
+      case "analysis": return 800;
+      case "system":   return 150;
+      case "memory":   return 200;
+      default:         return 600;
+    }
+  }
+
+  /**
    * Enregistre les mots-clés d'un skill (pour le scoring de pertinence).
    */
   registerSkillKeywords(skillName: string, keywords: string[]): void {

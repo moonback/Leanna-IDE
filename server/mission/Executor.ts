@@ -16,6 +16,7 @@ import { setTelemetryContext, clearTelemetryContext } from "../utils/textGenerat
 import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
+import { PlanEstimator } from "./PlanEstimator.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -128,11 +129,15 @@ export class Executor {
     forcedArtifact: boolean;
   }> = new Map();
 
+  /** Estimateur coût / durée / risque avant exécution. */
+  private planEstimator!: PlanEstimator;
+
   constructor(config: Partial<MissionConfig> = {}) {
     this.config = { ...DEFAULT_MISSION_CONFIG, ...config };
     this.scorer = new SkillScorer();
     this.planner = new Planner(this.scorer);
     this.reflection = new ReflectionEngine();
+    this.planEstimator = new PlanEstimator(this.scorer);
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
@@ -361,7 +366,20 @@ export class Executor {
       text.match(/[\w./\\-]+\.(?:ts|tsx|js|jsx|json|css|md|html|sql|cjs|mjs)/gi) ?? []
     ));
     const tools = Array.from(new Set(plannedActions.map((action) => action.skillName)));
-    const risks = [
+
+    // ── Estimation coût / durée / risque ─────────────────────────────────
+    const state = mission.getState();
+    const estimate = this.planEstimator.estimate({
+      plannedActions,
+      missionTitle: state.title,
+      missionDescription: state.description,
+      targetedFiles,
+      maxRetries: this.config.maxRetries,
+    });
+
+    // ── Risques qualitatifs ───────────────────────────────────────────────
+    const risks: string[] = [
+      ...estimate.riskFactors,
       "Une action peut échouer et déclencher une replanification.",
       ...(targetedFiles.length === 0 ? ["Les fichiers ciblés seront confirmés pendant l'analyse."] : []),
       ...(plannedActions.length === 0 ? ["Aucun outil n'a encore atteint le score minimum."] : []),
@@ -372,7 +390,11 @@ export class Executor {
       targetedFiles: targetedFiles.length > 0 ? targetedFiles : ["À déterminer pendant l'analyse"],
       tools: tools.length > 0 ? tools : ["Sélection automatique selon le contexte"],
       risks,
-      estimatedTokens: 1200 + plannedActions.length * 800,
+      estimatedTokens:      estimate.estimatedTokens,
+      estimatedCostUsd:     estimate.estimatedCostUsd,
+      estimatedDurationMs:  estimate.estimatedDurationMs,
+      riskLevel:            estimate.riskLevel,
+      estimationConfidence: estimate.estimationConfidence,
       stopConditions: [
         "Arrêt immédiat si un objectif critique échoue.",
         `Arrêt après ${this.config.maxRetries} échecs d'une même action.`,
