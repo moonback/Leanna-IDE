@@ -16,6 +16,7 @@ import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModal.js';
 import { useToast } from '../ui/Toast.js';
 import { timeAgoLong as timeAgo } from './utils.js';
 import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
+import { api, apiVoid } from './api/client.js';
 
 interface NotebookSummary {
   id: string;
@@ -51,9 +52,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   const loadWorkspace = useCallback(async () => {
     try {
-      const res = await fetch('/api/workspace');
-      if (!res.ok) throw new Error();
-      const data = await res.json() as { workspace?: string; exists?: boolean };
+      const data = await api<{ workspace?: string; exists?: boolean }>('/api/workspace');
       const path = (data.workspace || '').trim();
       if (path && data.exists !== false) {
         // Extraire le dernier segment du chemin (nom du dossier), Windows ou POSIX
@@ -70,11 +69,9 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/notebooks');
-      if (!res.ok) throw new Error('Erreur réseau');
-      const data = await res.json();
+      const data = await api<{ notebooks?: NotebookSummary[] }>('/api/notebooks');
       setNotebooks(data.notebooks || []);
-    } catch (e: any) {
+    } catch {
       toastError('Impossible de charger les notebooks');
     } finally {
       setLoading(false);
@@ -137,8 +134,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/notebooks/${deleteTarget}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await apiVoid(`/api/notebooks/${deleteTarget}`, { method: 'DELETE' });
       success('Notebook supprimé');
       setNotebooks(prev => prev.filter(n => n.id !== deleteTarget));
     } catch {

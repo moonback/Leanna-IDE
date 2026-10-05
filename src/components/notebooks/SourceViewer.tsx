@@ -12,6 +12,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { api } from './api/client.js';
 
 interface SourceData {
   id: string;
@@ -59,9 +60,13 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/content`);
-      if (!res.ok) throw new Error('Impossible de charger le contenu');
-      const data = await res.json();
+      const data = await api<SourceData & {
+        content?: string;
+        text?: string;
+        imageBase64?: string;
+        imageMimeType?: string;
+        rawHtml?: string;
+      }>(`/api/notebooks/${notebookId}/sources/${sourceId}/content`);
       setContent(data.content || data.text || 'Contenu non disponible');
       // If it's an image source, store the image data
       if (data.type === 'image' && data.imageBase64) {

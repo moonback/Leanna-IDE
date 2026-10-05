@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { timeAgo } from './utils.js';
+import { apiVoid } from './api/client.js';
 import { NotesCanvas } from './NotesCanvas.js';
 import { TemplateSelectorModal } from '../templates/TemplateSelectorModal.js';
 import { Sparkles } from 'lucide-react';
@@ -126,12 +127,10 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
   const handleCreate = useCallback(async () => {
     if (!title.trim()) return;
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/notes`, {
+      await apiVoid(`/api/notebooks/${notebookId}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+        json: { title: title.trim(), content: content.trim() },
       });
-      if (!res.ok) throw new Error();
       success('Note créée');
       setTitle('');
       setContent('');
@@ -144,12 +143,10 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
 
   const handleUpdate = useCallback(async (noteId: string) => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/notes/${noteId}`, {
+      await apiVoid(`/api/notebooks/${notebookId}/notes/${noteId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), content: content.trim() }),
+        json: { title: title.trim(), content: content.trim() },
       });
-      if (!res.ok) throw new Error();
       success('Note mise à jour');
       setEditingId(null);
       setTitle('');
@@ -162,7 +159,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
 
   const handleDelete = useCallback(async (noteId: string) => {
     try {
-      await fetch(`/api/notebooks/${notebookId}/notes/${noteId}`, { method: 'DELETE' });
+      await apiVoid(`/api/notebooks/${notebookId}/notes/${noteId}`, { method: 'DELETE' });
       success('Note supprimée');
       onRefresh();
     } catch {
@@ -172,10 +169,9 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
 
   const handleTogglePin = useCallback(async (noteId: string, pinned: boolean) => {
     try {
-      await fetch(`/api/notebooks/${notebookId}/notes/${noteId}`, {
+      await apiVoid(`/api/notebooks/${notebookId}/notes/${noteId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pinned: !pinned }),
+        json: { pinned: !pinned },
       });
       onRefresh();
     } catch { /* ignore */ }

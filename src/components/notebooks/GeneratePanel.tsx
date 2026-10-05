@@ -25,6 +25,7 @@ import { SlidePreviewModal } from './SlidePreviewModal.js';
 import { useToast } from '../ui/Toast.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
+import { api, apiVoid } from './api/client.js';
 import { streamSSE } from './api/sse.js';
 import type { GenerateStreamData } from './api/types.js';
 // Styles premium NotebookLM
@@ -727,11 +728,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/notebooks/${notebookId}/generated`);
-        if (res.ok) {
-          const data = await res.json();
-          setGeneratedDocs(data.documents || []);
-        }
+        const data = await api<{ documents?: GeneratedDoc[] }>(
+          `/api/notebooks/${notebookId}/generated`,
+        );
+        setGeneratedDocs(data.documents || []);
       } catch { /* ignore */ }
     })();
   }, [notebookId]);
@@ -757,11 +757,10 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     if (sources.length === 0) return;
     setLoadingSuggestions(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/report-suggestions`);
-      if (res.ok) {
-        const data = await res.json();
-        setSuggestions(data.suggestions || []);
-      }
+      const data = await api<{ suggestions?: typeof suggestions }>(
+        `/api/notebooks/${notebookId}/report-suggestions`,
+      );
+      setSuggestions(data.suggestions || []);
     } catch { /* ignore */ }
     finally { setLoadingSuggestions(false); }
   }, [notebookId, sources.length]);
@@ -1019,7 +1018,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     if (!selectedDoc) return;
     // Supprimer l'ancien document
     try {
-      await fetch(`/api/notebooks/${notebookId}/generated/${selectedDoc.id}`, { method: 'DELETE' });
+      await apiVoid(`/api/notebooks/${notebookId}/generated/${selectedDoc.id}`, { method: 'DELETE' });
       setGeneratedDocs(prev => prev.filter(d => d.id !== selectedDoc.id));
       // Synchroniser l'historique parent après suppression de l'ancien doc.
       onRefresh();

@@ -18,8 +18,9 @@ import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { MermaidDiagram } from './MermaidDiagram.js';
 import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from './motion.js';
+import { api, apiVoid } from './api/client.js';
 import { streamSSE } from './api/sse.js';
-import type { ChatStreamData, DeepDiveStreamData, TtsStreamData } from './api/types.js';
+import type { ChatStreamData, ChatThread, DeepDiveStreamData, TtsStreamData } from './api/types.js';
 
 interface Citation {
   sourceId: string;
@@ -490,11 +491,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
   useEffect(() => {
     (async () => {
       try {
-        const threadsRes = await fetch(`/api/notebooks/${notebookId}/chat/threads`);
-        if (threadsRes.ok) {
-          const data = await threadsRes.json();
-          setThreads(data.threads || []);
-        }
+        const data = await api<{ threads?: ChatThread[] }>(
+          `/api/notebooks/${notebookId}/chat/threads`,
+        );
+        setThreads(data.threads || []);
       } catch { /* ignore */ }
     })();
   }, [notebookId]);
@@ -507,11 +507,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     (async () => {
       try {
         const threadParam = activeThreadId ? `?threadId=${activeThreadId}` : '';
-        const res = await fetch(`/api/notebooks/${notebookId}/chat/history${threadParam}`);
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setMessages(data.messages || []);
-        }
+        const data = await api<{ messages?: ChatMessage[] }>(
+          `/api/notebooks/${notebookId}/chat/history${threadParam}`,
+        );
+        if (!cancelled) setMessages(data.messages || []);
       } catch { /* ignore */ }
       if (!cancelled) setLoadingHistory(false);
     })();
@@ -526,11 +525,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     suggestionsLoadedRef.current = true;
     (async () => {
       try {
-        const res = await fetch(`/api/notebooks/${notebookId}/chat/suggestions`);
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data.suggestions || []);
-        }
+        const data = await api<{ suggestions?: string[] }>(
+          `/api/notebooks/${notebookId}/chat/suggestions`,
+        );
+        setSuggestions(data.suggestions || []);
       } catch { /* ignore */ }
     })();
   }, [notebookId, hasSources]);
@@ -635,15 +633,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
           },
         });
       } else {
-        const res = await fetch('/api/tts/speak', {
+        const data = await api<{ audio?: string }>('/api/tts/speak', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: content, voice: 'ff_siwis' }),
+          json: { text: content, voice: 'ff_siwis' },
           signal: controller.signal,
         });
-
-        if (!res.ok) throw new Error(`TTS error: ${res.status}`);
-        const data = await res.json();
         if (data.audio) playTTSChunk(data.audio);
       }
     } catch (e: any) {
@@ -717,11 +711,8 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
     setSelectedFolder('');
     setCustomFolderName('');
     try {
-      const res = await fetch('/api/notebooks/sandbox/folders');
-      if (res.ok) {
-        const data = await res.json();
-        setSandboxFolders(data.folders || []);
-      }
+      const data = await api<{ folders?: SandboxFolder[] }>('/api/notebooks/sandbox/folders');
+      setSandboxFolders(data.folders || []);
     } catch { /* ignore */ }
   }, []);
 
@@ -734,19 +725,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         ? customFolderName.trim()
         : selectedFolder;
 
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/save-message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: folderPickerMsg.id, folder: folder || undefined }),
-      });
+      const data = await api<{ filePath: string }>(
+        `/api/notebooks/${notebookId}/chat/save-message`,
+        { method: 'POST', json: { messageId: folderPickerMsg.id, folder: folder || undefined } },
+      );
 
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur serveur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      
       // Import ideApi dynamiquement pour éviter les dépendances circulaires
       const { ideApi } = await import('../../services/ideApi.js');
       
@@ -814,10 +797,9 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
     // Send to backend (fire & forget)
     try {
-      await fetch(`/api/notebooks/${notebookId}/chat/feedback`, {
+      await apiVoid(`/api/notebooks/${notebookId}/chat/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: msgId, feedback: newType || null }),
+        json: { messageId: msgId, feedback: newType || null },
       });
     } catch { /* silent */ }
   }, [feedbackMap, notebookId]);
@@ -841,18 +823,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
   const handleNewThread = useCallback(async () => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/chat/threads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `Conversation ${threads.length + 1}` }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setThreads(prev => [data.thread, ...prev]);
-        setActiveThreadId(data.thread.id);
-        setMessages([]);
-        setFollowUps([]);
-      }
+      const data = await api<{ thread: ChatThread }>(
+        `/api/notebooks/${notebookId}/chat/threads`,
+        { method: 'POST', json: { title: `Conversation ${threads.length + 1}` } },
+      );
+      setThreads(prev => [data.thread, ...prev]);
+      setActiveThreadId(data.thread.id);
+      setMessages([]);
+      setFollowUps([]);
     } catch { /* ignore */ }
   }, [notebookId, threads.length]);
 
@@ -869,7 +847,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
   const handleDeleteThread = useCallback(async (threadId: string) => {
     try {
-      await fetch(`/api/notebooks/${notebookId}/chat/threads/${threadId}`, { method: 'DELETE' });
+      await apiVoid(`/api/notebooks/${notebookId}/chat/threads/${threadId}`, { method: 'DELETE' });
       setThreads(prev => prev.filter(t => t.id !== threadId));
       if (activeThreadId === threadId) {
         const remaining = threads.filter(t => t.id !== threadId);
@@ -1127,7 +1105,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
   const handleClear = useCallback(async () => {
     try {
-      await fetch(`/api/notebooks/${notebookId}/chat/history`, { method: 'DELETE' });
+      await apiVoid(`/api/notebooks/${notebookId}/chat/history`, { method: 'DELETE' });
       setMessages([]);
       setFollowUps([]);
     } catch { /* ignore */ }
@@ -1273,19 +1251,10 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
       : `Note du chat — ${new Date(msg.timestamp).toLocaleDateString('fr')}`;
 
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/notes`, {
+      await apiVoid(`/api/notebooks/${notebookId}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          content: msg.content,
-        }),
+        json: { title, content: msg.content },
       });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: 'Erreur' }));
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
 
       toastSuccess('Sauvegardé dans les notes');
       onRefresh?.();
@@ -1804,18 +1773,17 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
                     });
 
                     try {
-                      const res = await fetch(`/api/notebooks/${notebookId}/chat/chunk/${cit.chunkId}`);
-                      if (res.ok) {
-                        const data = await res.json();
-                        const content = data.chunk?.content || cit.excerpt;
-                        chunkCache.current.set(cit.chunkId, content);
-                        setHoveredCitation({
-                          citation: cit,
-                          fullContent: content,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
-                      }
+                      const data = await api<{ chunk?: { content?: string } }>(
+                        `/api/notebooks/${notebookId}/chat/chunk/${cit.chunkId}`,
+                      );
+                      const content = data.chunk?.content || cit.excerpt;
+                      chunkCache.current.set(cit.chunkId, content);
+                      setHoveredCitation({
+                        citation: cit,
+                        fullContent: content,
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
                     } catch { /* ignore */ }
                   }}
                   className="text-xs opacity-60 hover:opacity-100 transition-opacity mt-1 flex items-center gap-1"
