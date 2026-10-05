@@ -12,6 +12,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 
 | Version | Date | Changements majeurs |
 |---|---|---|
+| **1.4.0** | 2026-10-04 | Sandbox d'exécution des skills tiers : `SkillWorker` (worker_threads isolé), `agentDefinitionSchema` (Zod + HMAC-SHA256), `AgentLoader` hardened (SHA-256 fichier + allowlist), `DynamicAgentRegistry.registerAgent()` validé, `McpBridge.sanitizePathArgs()` récursif + résolution de symlinks. 32 nouveaux tests. |
 | **1.3.0** | 2026-09-25 | Re-audit post-`AGENTIC_RUNTIME` et `AUTONOMY_IMPLEMENTATION`. 11 items migrés 📋/🟡 → ✅ (preuves fichier+test). Dette technique recalculée. KPI actualisés. |
 | 1.3.0 | 2026-09-04 | Refonte complète : audit du code, 5 paris, 6 phases R0→R6, registre de risques. |
 
@@ -85,7 +86,7 @@ Constat honnête, tiré du code source. C'est le point de départ de toute la re
 | **Harness d'évaluation d'agents** | Pas de dossier `eval/`, pas de suite de tâches de référence, pas de scoring reproductible, pas de fixtures enregistrées. Les tests agentiques (`mission-harness.test.ts`) valident la **mécanique** (budget, hash, réparation) avec un modèle déterministe, pas la **qualité** des décisions. |
 | **CI GitHub Actions bloquante** | Aucun `.github/workflows/*.yml` dans le dépôt. La règle « lint + typecheck + test + build à chaque PR » n'est pas automatisée. |
 | **Migrations Supabase versionnées** | `supabase/migrations/` ne contient qu'**une seule migration** (`20260726000000_memories_updated_at.sql`). Les autres schémas sont des fichiers `.sql` ad-hoc à exécuter manuellement. Pas de processus de migration réversible. |
-| **Exécution sandboxée des skills tiers** | `McpBridge.sanitizePathArgs()` protège les chemins passés aux serveurs MCP, mais il n'y a **pas de worker isolé** ni de signature pour un skill tiers custom. `dynamicAgentRegistry` accepte une définition sans vérification de signature. |
+| ✅ ~~**Exécution sandboxée des skills tiers**~~ | ✅ Livré — `server/security/agentDefinitionSchema.ts` (schéma Zod strict + HMAC-SHA256 via `LEANNA_AGENT_SECRET`), `server/runtime/SkillWorker.ts` (worker_threads isolé, capability enforcement, timeout), `server/runtime/AgentLoader.ts` (SHA-256 fichier + `LEANNA_PLUGIN_ALLOWLIST`, mode sandbox `LEANNA_PLUGIN_SANDBOX=true`), `server/agents/DynamicAgentRegistry.ts` (validation avant enregistrement + re-validation sur `updateAgent`), `server/mcp/McpBridge.sanitizePathArgs()` (récursion objets/tableaux + résolution de symlinks via `resolveRealPathWithinSelf`). Tests : `agentDefinitionSchema.test.ts` (16 cas), `skillWorker.test.ts` (6 cas), `mcpBridgeSanitize.test.ts` (10 cas). |
 | **Support Linux / macOS Electron** | `package.json > build.win` uniquement (`nsis` x64). Pas de cible AppImage/deb/dmg. |
 | **Mode headless / CLI** | Pas de binaire CLI. L'unique point d'entrée est `server-bootstrap.ts` qui démarre HTTP + WebSocket + Electron. |
 | **SDK de plugins versionné** | Non présent. Aucun package `@leanna/plugin-sdk`, aucune API publique versionnée. |
@@ -250,7 +251,7 @@ Ces cinq paris structurent toute la roadmap. Chacun transforme une force existan
 
 | Fonctionnalité | Prio | Effort | Statut |
 |---|---|---|---|
-| **Exécution des skills tiers en sandbox** (worker isolé, permissions déclarées, timeout) + **signature** | P0 | L | 📋 |
+| **Exécution des skills tiers en sandbox** (worker isolé, permissions déclarées, timeout) + **signature** | P0 | L | ✅ Livré — `SkillWorker.ts`, `agentDefinitionSchema.ts`, `AgentLoader.ts` hardened, `DynamicAgentRegistry.registerAgent()` validé, `McpBridge.sanitizePathArgs()` récursif + symlink-aware. Activé via `LEANNA_PLUGIN_SANDBOX`, `LEANNA_PLUGIN_ALLOWLIST`, `LEANNA_AGENT_SECRET`. |
 | **Support Linux** (AppImage/deb) et **macOS** (.dmg notarisé) | P1 | L | 📋 |
 | **Docker Compose self-hosted** (app + Supabase local + Ollama + Jaeger) | P1 | M | 📋 |
 | **Mode headless / CLI** : lancer une mission depuis le terminal ou un cron, sans UI | P1 | L | 📋 |
@@ -272,7 +273,7 @@ Ces cinq paris structurent toute la roadmap. Chacun transforme une force existan
 | Coûts modèles non maîtrisés | Moyen | Budgets **appliqués par action** (R0 ✅) ; kill-switch temps-réel à ajouter (R0 📋) |
 | Scaffolding pris pour du fini (fausse confiance) | Moyen | Cette roadmap distingue explicitement 🟡 de ✅ ; DoD strict (code + test + doc + changelog) |
 | Parallélisme du scheduler introduisant des races | Moyen | Sandbox transactionnel + mutex existants ; `BrainScheduler.test.ts` couvre le fan-out/fan-in |
-| Skills tiers non fiables | Élevé | Sandbox d'exécution + signature (R6) |
+| Skills tiers non fiables | Élevé | ✅ **Mitigé** — `SkillWorker` (isolation V8 via worker_threads), capability enforcement, timeout ; `agentDefinitionSchema` (Zod + HMAC-SHA256, pattern injection) ; `AgentLoader` SHA-256 + `LEANNA_PLUGIN_ALLOWLIST` ; `McpBridge.sanitizePathArgs()` récursif + symlink-aware |
 | Fuite de secrets dans prompts/logs | Élevé | Scan + redaction (R0) |
 | Boucle de réparation qui ne converge pas | Moyen | ✅ `AgentRepairLoop` détecte patch identique répété / stall / régression (`AgentRepairLoop.assess`) ; `maxReplans` borné |
 
@@ -329,9 +330,14 @@ node --import tsx --test server/knowledge/StrategyMemory.test.ts
 node --import tsx --test server/mission/Planner.replan.test.ts
 node --import tsx --test server/autonomy/AutonomousExecutive.test.ts
 
-# Superviseur AgentBrain end-to-end (vérification hashée)
-node --import tsx --test server/agents/brain/supervisor-harness.test.ts
-```
+# Sécurité des skills tiers — schéma Zod + HMAC
+node --import tsx --test server/security/agentDefinitionSchema.test.ts
+
+# Sécurité des skills tiers — SkillWorker (isolation, timeout, capabilities)
+node --import tsx --test server/runtime/skillWorker.test.ts
+
+# Sécurité MCP — sanitizePathArgs récursif + symlink-aware
+node --import tsx --test server/mcp/mcpBridgeSanitize.test.ts
 
 Un item ✅ **sans** test exécutable associé est un bug de cette roadmap — signalez-le.
 

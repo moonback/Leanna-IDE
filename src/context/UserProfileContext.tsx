@@ -10,6 +10,7 @@ export type AIProvider    = 'gemini' | 'openrouter';
 export const STATIC_AGENT_ROLES = [
   'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
   'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
+  'ui_ux', 'seo', 'documentation', 'accessibility', 'performance',
 ] as const;
 
 // Type pour les rôles d'agents (statiques + dynamiques)
@@ -136,6 +137,7 @@ const DEFAULT_PROFILE: UserProfile = {
     allowedRoles: [
       'coder', 'refactor', 'debugger', 'reviewer', 'tester', 'security', 'architect',
       'writer', 'formatter', 'researcher', 'proofreader', 'translator', 'summarizer', 'planner',
+      'ui_ux', 'seo', 'documentation', 'accessibility', 'performance',
     ],
   },
   // Reasoning

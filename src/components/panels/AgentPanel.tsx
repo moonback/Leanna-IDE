@@ -7,6 +7,7 @@ import {
   Brain, Database, Target, Activity, ArrowRight,
   Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
+  Palette, TrendingUp, BookOpen, Accessibility, Gauge,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { IconButton } from '../ui/IconButton.js';
@@ -47,6 +48,13 @@ const ROLE_META: Record<string, {
   summarizer:  { icon: FileText,     color: 'var(--color-warning)', label: 'Synthèse',        description: 'Résumés & condensés' },
   planner:     { icon: ListTree,     color: 'var(--color-info)', label: 'Planificateur',   description: 'Plans & outlines' },
 
+  // Web & Qualité
+  ui_ux:         { icon: Palette,       color: 'var(--accent-primary)',    label: 'UI/UX',           description: 'Interfaces & expérience utilisateur' },
+  seo:           { icon: TrendingUp,    color: 'var(--color-success)',     label: 'SEO',             description: 'Référencement & optimisation web' },
+  documentation: { icon: BookOpen,      color: 'var(--color-info)',        label: 'Documentation',   description: 'Docs techniques & API' },
+  accessibility: { icon: Accessibility, color: 'var(--color-accent-alt)', label: 'Accessibilité',   description: 'Standards WCAG & ARIA' },
+  performance:   { icon: Gauge,         color: 'var(--color-warning)',     label: 'Performance',     description: 'Optimisation & Core Web Vitals' },
+
   // Activités & outils
   code:     { icon: Code,         color: 'var(--color-info)', label: 'Code',         description: 'Lecture/écriture de fichiers' },
   files:    { icon: FileText,     color: 'var(--color-success)', label: 'Fichiers',     description: 'Gestion de fichiers' },
@@ -85,6 +93,12 @@ const AGENT_ROSTER: { id: AgentRole; label: string; desc: string; icon: React.Co
   { id: 'translator',  label: 'Traducteur',      desc: 'Traduction & localisation',                    icon: Languages,    color: 'var(--accent-secondary)' },
   { id: 'summarizer',  label: 'Synthèse',        desc: 'Résumés & condensés',                          icon: FileText,     color: 'var(--color-warning)' },
   { id: 'planner',     label: 'Planificateur',   desc: 'Plans & outlines de documents',                icon: ListTree,     color: 'var(--color-info)' },
+  // Web & Qualité
+  { id: 'ui_ux',         label: 'UI/UX',           desc: 'Interfaces & expérience utilisateur',          icon: Palette,       color: 'var(--accent-primary)' },
+  { id: 'seo',           label: 'SEO',             desc: 'Référencement & optimisation web',             icon: TrendingUp,    color: 'var(--color-success)' },
+  { id: 'documentation', label: 'Documentation',   desc: 'Docs techniques & API',                        icon: BookOpen,      color: 'var(--color-info)' },
+  { id: 'accessibility', label: 'Accessibilité',   desc: 'Standards WCAG & ARIA',                        icon: Accessibility, color: 'var(--color-accent-alt)' },
+  { id: 'performance',   label: 'Performance',     desc: 'Optimisation & Core Web Vitals',               icon: Gauge,         color: 'var(--color-warning)' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
