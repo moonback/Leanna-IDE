@@ -3,6 +3,7 @@
  * estimé, et bouton « Nouveau ». Composant présentationnel.
  */
 
+import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, ChevronDown, Trash2, MessageSquarePlus } from 'lucide-react';
 import { SPRING_UI } from '../motion.js';
@@ -18,11 +19,14 @@ interface Props {
   onDeleteThread: (threadId: string) => void;
   onNewThread: () => void;
   prefersReducedMotion: boolean | null;
+  /** Contrôle de l'assistant vocal, rendu à côté du bouton « Nouveau ». */
+  voiceSlot?: ReactNode;
 }
 
 export function ThreadBar({
   threads, activeThreadId, showThreadList, setShowThreadList,
   messages, onSwitchThread, onDeleteThread, onNewThread, prefersReducedMotion,
+  voiceSlot,
 }: Props) {
   return (
     <div
@@ -122,6 +126,9 @@ export function ThreadBar({
         </span>
         <span>tokens</span>
       </div>
+
+      {/* Assistant vocal — Interroger vos sources */}
+      {voiceSlot}
 
       {/* New thread button */}
       <button

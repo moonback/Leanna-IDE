@@ -20,6 +20,7 @@ import { ThreadBar } from './chat/ThreadBar.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
 import { FolderPickerModal } from './chat/FolderPickerModal.js';
+import { NotebookVoicePanel } from './chat/NotebookVoicePanel.js';
 
 interface Props {
   notebookId: string;
@@ -233,6 +234,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         onDeleteThread={handleDeleteThread}
         onNewThread={handleNewThread}
         prefersReducedMotion={prefersReducedMotion}
+        voiceSlot={
+          <NotebookVoicePanel
+            notebookId={notebookId}
+            selectedSources={selectedSources}
+            prefersReducedMotion={prefersReducedMotion}
+            onError={toastError}
+          />
+        }
       />
 
       <MessageList

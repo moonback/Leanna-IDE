@@ -36,6 +36,7 @@ import { createCheckpointRouter } from "./server/routes/checkpoint.js";
 import ideRouter from "./server/routes/ide.js";
 import { createBrowserRouter } from "./server/routes/browser.js";
 import { attachLiveWebSocket } from "./server/live/LiveSocketHandler.js";
+import { attachNotebookLiveWebSocket } from "./server/live/NotebookLiveSocketHandler.js";
 import { createExportRouter } from "./server/routes/export.js";
 
 import { createGithubRouter } from "./server/routes/github.js";
@@ -896,6 +897,10 @@ async function startServer() {
   const terminalWss = new WebSocketServer({ noServer: true });
   setupTerminalWebSocket(terminalWss, apiToken);
 
+  // WebSocket server dédié au second assistant vocal « live » du Notebook Chat
+  // (« Interrogez vos sources »). Indépendant de la session Live globale /live.
+  const notebookLiveWss = new WebSocketServer({ noServer: true });
+
   // WebSocket server dédié pour la timeline d'autonomie (lecture seule, aucun
   // session Gemini — contrairement à /live). Diffuse uniquement les événements
   // autonomy:* déjà émis par le runtime.
@@ -1003,7 +1008,7 @@ async function startServer() {
     // Sécurité : on exige le même jeton que pour les routes /api (passé en
     // cookie uniquement, plus de fallback par query string pour éviter
     // l'exposition du token dans les logs).
-    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy') {
+    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy' || pathname === '/notebook-live') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
       cookieHeader.split(';').forEach(c => {
@@ -1038,6 +1043,10 @@ async function startServer() {
       autonomyWss.handleUpgrade(request, socket, head, (ws) => {
         autonomyWss.emit('connection', ws, request);
       });
+    } else if (pathname === '/notebook-live') {
+      notebookLiveWss.handleUpgrade(request, socket, head, (ws) => {
+        notebookLiveWss.emit('connection', ws, request);
+      });
     } else {
       // In dev, Vite's own upgrade listener (registered via hmr.server)
       // handles the HMR WebSocket — just return and let it process.
@@ -1059,6 +1068,15 @@ async function startServer() {
     activeGeminiSessions,
     browserReadPending,
     browserActionPending,
+  });
+
+  // ── Second assistant vocal « live » dédié au Notebook Chat ──────────────
+  // Session Gemini Live indépendante, groundée sur les sources du notebook via
+  // l'outil notebook_search (moteur RAG). Chemin : /notebook-live?notebookId=...
+  attachNotebookLiveWebSocket(notebookLiveWss, {
+    getCurrentProfile: () => currentProfile,
+    createGeminiAI: getGeminiAI,
+    activeGeminiSessions,
   });
 
   // ── Graceful shutdown — extrait dans server/lifecycle.ts ────────────────
