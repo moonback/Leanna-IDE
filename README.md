@@ -20,7 +20,7 @@
 
 <br>
 
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=18&pause=1000&color=A78BFA&center=true&vCenter=true&width=600&lines=Comprendre+%E2%86%92+Planifier+%E2%86%92+Agir+%E2%86%92+V%C3%A9rifier+%E2%86%92+R%C3%A9cup%C3%A9rer+%E2%86%92+Terminer" alt="Typing SVG" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=18&pause=1000&color=A78BFA&center=true&vCenter=true&width=1200&lines=Comprendre+%E2%86%92+Planifier+%E2%86%92+Agir+%E2%86%92+V%C3%A9rifier+%E2%86%92+R%C3%A9cup%C3%A9rer+%E2%86%92+Terminer" alt="Typing SVG" />
 
 <br>
 
