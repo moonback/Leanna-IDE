@@ -590,11 +590,11 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   }, [connected, connect, onOpenChat, clearTranscript, clearActivity]);
 
   const handleOpenAgents = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('Leanna-open-agents-panel'));
+    window.dispatchEvent(new CustomEvent('Leanna-toggle-agents-panel'));
   }, []);
 
   const handleOpenMissions = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('Leanna-open-missions'));
+    window.dispatchEvent(new CustomEvent('Leanna-toggle-missions'));
   }, []);
 
   // Raccourcis : ⌘/Ctrl+N, +L, +, ainsi que « ? » pour l'aide

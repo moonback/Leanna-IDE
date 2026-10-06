@@ -467,9 +467,14 @@ export default function IdeView() {
   // ── Ouvrir la vue des missions (déclenché par MissionCreatedPrompt) ─────────
   useEffect(() => {
     const handleOpenMissions = () => openRightPanel('missions');
+    const handleToggleMissions = () => toggleRightPanel('missions', showMissions);
     window.addEventListener('Leanna-open-missions', handleOpenMissions);
-    return () => window.removeEventListener('Leanna-open-missions', handleOpenMissions);
-  }, []);
+    window.addEventListener('Leanna-toggle-missions', handleToggleMissions);
+    return () => {
+      window.removeEventListener('Leanna-open-missions', handleOpenMissions);
+      window.removeEventListener('Leanna-toggle-missions', handleToggleMissions);
+    };
+  }, [showMissions]);
 
   // ── Actions navigateur pilotées par Leanna via Leanna-ide-action ───────────
   useEffect(() => {
@@ -513,12 +518,15 @@ export default function IdeView() {
   // Open Agents panel only on explicit user action (button click, overlay)
   useEffect(() => {
     const handleOpenAgents = () => openRightPanel('agents');
+    const handleToggleAgents = () => toggleRightPanel('agents', showAgents);
     window.addEventListener('Leanna-open-agents-panel', handleOpenAgents);
+    window.addEventListener('Leanna-toggle-agents-panel', handleToggleAgents);
 
     return () => {
       window.removeEventListener('Leanna-open-agents-panel', handleOpenAgents);
+      window.removeEventListener('Leanna-toggle-agents-panel', handleToggleAgents);
     };
-  }, []);
+  }, [showAgents]);
 
   const saveActiveFile = useCallback(async () => {
     if (!fileSystem.activePath) return;
