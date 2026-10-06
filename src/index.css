@@ -839,8 +839,48 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Inter OpenType features — a more polished, professional rendering:
+     cv11 = single-storey 'a', ss01 = alternate glyph set, calt/liga = contextual
+     ligatures. kern enables kerning. These are what make Inter look "designed"
+     rather than default. */
+  font-feature-settings: "cv11", "ss01", "calt", "liga", "kern";
+  font-optical-sizing: auto;
+  letter-spacing: -0.006em;      /* subtle optical tightening for UI text */
+  line-height: var(--leading-normal);
+  font-size: var(--text-base);
   @apply font-sans antialiased overflow-hidden;
 }
+
+/* ═══════════════════════════════════════════════
+   PROFESSIONAL TYPOGRAPHY REFINEMENTS
+   Centralised polish applied on top of the design-system
+   tokens. Does not change the token scale — only tightens
+   headings, enables tabular figures for data, and keeps
+   rendering crisp across themes.
+═══════════════════════════════════════════════ */
+
+/* Headings: slightly tighter tracking + balanced wrapping for a
+   more deliberate, editorial feel. */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+/* Tabular, lining figures wherever numbers must align or update in place
+   (status bars, counters, timers, metrics). Prevents the "jittering digits"
+   effect that reads as unpolished. */
+.tabular-nums,
+.font-mono,
+[class*="font-mono"],
+code, kbd, samp, pre,
+time {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum", "lnum";
+}
+
+/* Long-form reading surfaces get comfortable measure + rhythm. */
+p { text-wrap: pretty; }
 
 button,
 input,
@@ -1084,14 +1124,14 @@ button {
 
 
 .t-heading {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .t-caption {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-family: var(--font-mono);
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -1156,7 +1196,7 @@ button {
 ═══════════════════════════════════════════════ */
 .markdown-body {
   max-width: 78ch;
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.72;
   color: var(--text-primary);
 }
@@ -1415,7 +1455,7 @@ button {
   background: var(--bg-panel);
   color: var(--text-primary);
   padding: var(--space-2) var(--space-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   box-shadow: var(--shadow-lg);
   transition: transform 0.2s ease;
