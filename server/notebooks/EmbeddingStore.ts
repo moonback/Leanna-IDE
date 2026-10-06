@@ -1,8 +1,13 @@
 /**
- * EmbeddingStore — Stockage et recherche vectorielle via Gemini Embeddings
+ * EmbeddingStore — Stockage et recherche vectorielle via OpenRouter Embeddings
  *
- * Utilise le modèle gemini-embedding-001 de Google pour vectoriser les chunks
- * et effectuer une recherche par similarité cosinus.
+ * Utilise un modèle d'embedding servi par OpenRouter (openai/text-embedding-3-small
+ * par défaut) pour vectoriser les chunks et effectuer une recherche par
+ * similarité cosinus.
+ *
+ * Migration : l'implémentation précédente passait par l'API Gemini
+ * (gemini-embedding-001) qui saturait son quota (429 RESOURCE_EXHAUSTED).
+ * Le passage à OpenRouter réutilise la clé OPENROUTER_API_KEY déjà présente.
  *
  * Architecture :
  *   1. À l'ingestion d'une source, chaque chunk est vectorisé
@@ -23,15 +28,15 @@
 import fs from "fs";
 import path from "path";
 import { createLogger } from "../utils/logger.js";
-import { withGeminiRetry } from "../utils/geminiKeyPool.js";
+import { embedTextsOpenRouter, DEFAULT_EMBEDDING_MODEL } from "../utils/openrouterEmbeddings.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("EmbeddingStore");
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-/** Modèle d'embedding Gemini */
-const EMBEDDING_MODEL = "gemini-embedding-001";
+/** Modèle d'embedding OpenRouter (surchargeable via OPENROUTER_EMBEDDING_MODEL) */
+const EMBEDDING_MODEL = DEFAULT_EMBEDDING_MODEL;
 
 /** Dimensionalité des vecteurs (256 = bon compromis performance/qualité) */
 const EMBEDDING_DIMENSIONS = 256;
@@ -275,20 +280,14 @@ export class EmbeddingStore {
       const batch = texts.slice(i, i + BATCH_SIZE);
 
       try {
-        const response = await withGeminiRetry(async (ai) => {
-          return ai.models.embedContent({
-            model: EMBEDDING_MODEL,
-            contents: batch,
-            config: { outputDimensionality: EMBEDDING_DIMENSIONS },
-          });
+        const vectors = await embedTextsOpenRouter(batch, {
+          model: EMBEDDING_MODEL,
+          dimensions: EMBEDDING_DIMENSIONS,
         });
 
-        if (response.embeddings) {
-          for (const embedding of response.embeddings) {
-            allVectors.push(embedding.values || []);
-          }
-        } else {
-          for (let j = 0; j < batch.length; j++) allVectors.push([]);
+        // embedTextsOpenRouter renvoie un tableau aligné sur `batch`.
+        for (let j = 0; j < batch.length; j++) {
+          allVectors.push(vectors[j] || []);
         }
       } catch (e: any) {
         log.error(`Erreur embedding batch ${i}-${i + batch.length}: ${e.message}`);
