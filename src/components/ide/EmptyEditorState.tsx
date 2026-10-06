@@ -2,8 +2,9 @@ import React, {
   useState, useEffect, useMemo, useCallback, useId,
 } from 'react';
 import {
-  Plus, FolderPlus, FolderOpen, Search, KeyRound, AlertCircle, BookOpen,
-  Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch,
+  FolderOpen, Search, KeyRound, AlertCircle, BookOpen,
+  Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
+  Bot, Target,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -178,6 +179,62 @@ function GlobalStyles() {
           color-mix(in srgb, var(--primary) 14%, transparent) 0%, transparent 65%);
       }
 
+      /* Cartes d'action rapide : accent coloré par carte */
+      .ee-card {
+        position: relative;
+        overflow: hidden;
+        background-color: color-mix(in srgb, var(--surface) 50%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+                    0 8px 24px color-mix(in srgb, #000 16%, transparent);
+        transition: border-color 200ms ease-out, background-color 200ms ease-out,
+                    box-shadow 200ms ease-out;
+      }
+      .ee-card::after {
+        content: '';
+        position: absolute; inset: 0; z-index: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        background: linear-gradient(135deg,
+          color-mix(in srgb, var(--card-accent) 10%, transparent) 0%, transparent 55%);
+        transition: opacity 200ms ease-out;
+      }
+      .ee-card > * { position: relative; z-index: 1; }
+      .ee-card:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--card-accent) 50%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+                    0 10px 28px color-mix(in srgb, var(--card-accent) 18%, transparent);
+      }
+      .ee-card:hover:not(:disabled)::after { opacity: 1; }
+      .ee-card:hover:not(:disabled) .ee-card-icon {
+        background-color: color-mix(in srgb, var(--card-accent) 20%, transparent);
+        border-color: color-mix(in srgb, var(--card-accent) 40%, transparent);
+      }
+      .ee-card-icon { transition: background-color 200ms ease-out, border-color 200ms ease-out; }
+
+      .ee-card-arrow {
+        opacity: 0;
+        transform: translateX(-4px);
+        transition: opacity 180ms ease-out, transform 180ms ease-out;
+      }
+      .ee-card:hover:not(:disabled) .ee-card-arrow,
+      .ee-card:focus-visible .ee-card-arrow {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .ee-card { background-color: var(--surface); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ee-card-arrow { transition: opacity 150ms ease-out; transform: none; }
+        .ee-card:hover:not(:disabled) .ee-card-arrow { transform: none; }
+      }
+
       .ee-chip {
         display: inline-flex; align-items: center; gap: 6px;
         padding: 4px 10px; border-radius: 999px;
@@ -242,6 +299,7 @@ const Kbd = React.memo(function Kbd({
 
 const ActionCard = React.memo(function ActionCard({
   icon: Icon, title, description, shortcut, onClick, disabled = false, reduceMotion = false,
+  accent = 'var(--primary)', comingSoon = false,
 }: {
   icon: IconType;
   title: string;
@@ -250,6 +308,8 @@ const ActionCard = React.memo(function ActionCard({
   onClick?: () => void;
   disabled?: boolean;
   reduceMotion?: boolean;
+  accent?: string;
+  comingSoon?: boolean;
 }) {
   const descId = useId();
   return (
@@ -258,29 +318,48 @@ const ActionCard = React.memo(function ActionCard({
       onClick={onClick}
       disabled={disabled}
       aria-describedby={descId}
-      className="ee-glass ee-focus flex items-start gap-3 p-4 text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed"
+      className="ee-card ee-focus group flex items-start gap-3 p-4 text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed"
+      style={{ ['--card-accent' as string]: accent }}
       whileHover={reduceMotion || disabled ? undefined : { y: -2 }}
       whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
       transition={{ duration: 0.15 }}
     >
       <span
-        className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
+        className="ee-card-icon w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--primary) 22%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--card-accent) 12%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--card-accent) 22%, transparent)',
         }}
       >
-        <Icon size={16} style={{ color: 'var(--primary)' }} />
+        <Icon size={16} style={{ color: 'var(--card-accent)' }} />
       </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
-          {title}
+        <span className="flex items-center gap-2">
+          <span className="block text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
+            {title}
+          </span>
+          {comingSoon && (
+            <span
+              className="inline-flex items-center h-[16px] px-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: 'var(--text-muted)', backgroundColor: 'color-mix(in srgb, var(--surface-soft) 70%, transparent)' }}
+            >
+              Bientôt
+            </span>
+          )}
         </span>
         <span id={descId} className="block text-xs leading-snug mt-1" style={{ color: 'var(--text-muted)' }}>
           {description}
         </span>
       </span>
-      {shortcut && <Kbd className="hidden sm:inline-flex">{shortcut}</Kbd>}
+      {shortcut
+        ? <Kbd className="hidden sm:inline-flex">{shortcut}</Kbd>
+        : !disabled && (
+          <ArrowRight
+            size={15}
+            className="ee-card-arrow hidden sm:block flex-shrink-0 mt-0.5"
+            style={{ color: 'var(--card-accent)' }}
+          />
+        )}
     </motion.button>
   );
 });
@@ -464,7 +543,7 @@ interface EmptyEditorStateProps {
 export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenFile: _onOpenFile,
   onCreateFile,
-  onCreateFolder,
+  onCreateFolder: _onCreateFolder,
   onShowSettings,
   onOpenSearch,
   onOpenChat,
@@ -510,6 +589,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     onOpenChat?.();
   }, [connected, connect, onOpenChat, clearTranscript, clearActivity]);
 
+  const handleOpenAgents = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('Leanna-open-agents-panel'));
+  }, []);
+
+  const handleOpenMissions = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('Leanna-open-missions'));
+  }, []);
+
   // Raccourcis : ⌘/Ctrl+N, +L, +, ainsi que « ? » pour l'aide
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -530,13 +617,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       if (key === 'n' && !e.shiftKey) { e.preventDefault(); onCreateFile(); }
       else if (key === ',') { e.preventDefault(); onShowSettings(); }
       else if (key === 'l') { e.preventDefault(); handleConnect(); }
+      else if (key === 'p') { e.preventDefault(); onOpenSearch?.(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onCreateFile, onShowSettings, handleConnect, showSystem]);
+  }, [onCreateFile, onShowSettings, handleConnect, onOpenSearch, showSystem]);
 
   // ── Textes du CTA ──
-  const ctaTitle = connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`;
+  const ctaTitle = connected ? 'Connecter' : `Démarrer ${aiName}`;
   const ctaText = connected
     ? 'Une session vocale et texte est en cours.'
     : 'Parlez, écrivez ou confiez une tâche à votre assistant.';
@@ -692,20 +780,24 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             {...enter(0.12)}
           >
             <ActionCard
-              icon={Plus} title="Nouveau fichier" description="Créer dans l'espace de travail"
-              shortcut={`${MOD}+N`} onClick={onCreateFile} reduceMotion={reduceMotion}
+              icon={Bot} title="Agents" description="Flotte et activité"
+              onClick={handleOpenAgents} reduceMotion={reduceMotion}
+              accent="#60a5fa"
             />
             <ActionCard
-              icon={FolderPlus} title="Nouveau dossier" description="Organiser vos fichiers"
-              onClick={onCreateFolder} reduceMotion={reduceMotion}
+              icon={Target} title="Missions" description="Suivi et reprises"
+              onClick={handleOpenMissions} reduceMotion={reduceMotion}
+              accent="#f472b6"
             />
             <ActionCard
               icon={Search} title="Rechercher" description="Fichiers et contenus"
               shortcut={`${MOD}+P`} onClick={onOpenSearch} disabled={!onOpenSearch} reduceMotion={reduceMotion}
+              accent="#f59e0b"
             />
             <ActionCard
               icon={BookOpen} title="Notebooks" description="Sources et résumés"
               onClick={onOpenNotebooks} disabled={!onOpenNotebooks} reduceMotion={reduceMotion}
+              accent="#6ee7b7" comingSoon={!onOpenNotebooks}
             />
           </motion.section>
 
