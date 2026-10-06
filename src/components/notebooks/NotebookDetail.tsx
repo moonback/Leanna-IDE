@@ -212,6 +212,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
+  // Compteur de documents générés tenu à jour en direct, sans recharger tout
+  // le notebook (ce qui démonterait l'assistant vocal). Alimenté par l'event
+  // léger 'notebook-generated-docs-changed'.
+  const [generatedCount, setGeneratedCount] = useState(0);
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
   const { spring, fadeOnly } = useFluidTransition();
   
@@ -259,6 +263,25 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     return () => window.removeEventListener('notebook-sources-changed', handler);
   }, [notebookId, loadNotebook]);
 
+  // Resynchroniser le compteur quand le notebook (re)charge depuis le serveur.
+  const serverGeneratedCount = notebook?.generatedDocuments.length ?? 0;
+  useEffect(() => {
+    setGeneratedCount(serverGeneratedCount);
+  }, [serverGeneratedCount]);
+
+  // Compteur en direct : un document généré par l'assistant vocal incrémente le
+  // badge sans recharger le notebook (préserve la session vocale active).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ notebookId?: string }>).detail;
+      if (!detail?.notebookId || detail.notebookId === notebookId) {
+        setGeneratedCount((n) => n + 1);
+      }
+    };
+    window.addEventListener('notebook-generated-docs-changed', handler as EventListener);
+    return () => window.removeEventListener('notebook-generated-docs-changed', handler as EventListener);
+  }, [notebookId]);
+
   // Keyboard shortcuts — Cmd sur macOS, Ctrl ailleurs (convention plateforme)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -298,9 +321,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   }
 
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
-    { key: 'generate', icon: Sparkles, label: 'Générer', badge: notebook.generatedDocuments.length },
+    { key: 'generate', icon: Sparkles, label: 'Générer', badge: generatedCount },
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
-    { key: 'history', icon: Clock, label: 'Historique', badge: notebook.generatedDocuments.length },
+    { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
   ];
 

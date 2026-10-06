@@ -24,14 +24,34 @@ export interface NotebookLiveTranscriptEntry {
   text: string;
 }
 
+interface GeneratedDocInfo {
+  taskId?: string;
+  id: string;
+  type: string;
+  title: string;
+}
+
 interface UseNotebookLiveOptions {
   notebookId: string;
   /** Sous-ensemble de sources à interroger (vide = toutes). */
   selectedSources?: string[];
   onError?: (message: string) => void;
+  /** Appelé quand l'assistant démarre la génération d'un document. */
+  onDocumentGenerating?: (info: { taskId?: string; type: string }) => void;
+  /** Appelé quand l'assistant a généré un document (rafraîchir l'historique). */
+  onDocumentGenerated?: (doc: GeneratedDocInfo) => void;
+  /** Appelé si la génération d'un document échoue. */
+  onDocumentGenerationError?: (info: { taskId?: string; type?: string; error: string }) => void;
 }
 
-export function useNotebookLive({ notebookId, selectedSources = [], onError }: UseNotebookLiveOptions) {
+export function useNotebookLive({
+  notebookId,
+  selectedSources = [],
+  onError,
+  onDocumentGenerating,
+  onDocumentGenerated,
+  onDocumentGenerationError,
+}: UseNotebookLiveOptions) {
   const [status, setStatus] = useState<NotebookLiveStatus>('idle');
   const [busy, setBusy] = useState(false);
   const [transcript, setTranscript] = useState<NotebookLiveTranscriptEntry[]>([]);
@@ -49,6 +69,12 @@ export function useNotebookLive({ notebookId, selectedSources = [], onError }: U
 
   const onErrorRef = useRef<typeof onError>(onError);
   onErrorRef.current = onError;
+  const onDocGeneratingRef = useRef<typeof onDocumentGenerating>(onDocumentGenerating);
+  onDocGeneratingRef.current = onDocumentGenerating;
+  const onDocGeneratedRef = useRef<typeof onDocumentGenerated>(onDocumentGenerated);
+  onDocGeneratedRef.current = onDocumentGenerated;
+  const onDocGenErrorRef = useRef<typeof onDocumentGenerationError>(onDocumentGenerationError);
+  onDocGenErrorRef.current = onDocumentGenerationError;
 
   // ── Audio micro + lecture (hook partagé) ─────────────────────────────────
   const handleAudioData = useCallback((pcm16: ArrayBuffer) => {
@@ -152,6 +178,24 @@ export function useNotebookLive({ notebookId, selectedSources = [], onError }: U
         if (typeof msg.busy === 'boolean') setBusy(msg.busy);
         if (Array.isArray(msg.citations)) setLastCitations(msg.citations as Citation[]);
         if (typeof msg.error === 'string') onErrorRef.current?.(msg.error);
+        // ── Génération automatique de documents par l'assistant ──────────
+        if (msg.document_generating && typeof msg.document_generating.type === 'string') {
+          onDocGeneratingRef.current?.({
+            taskId: msg.document_generating.taskId,
+            type: msg.document_generating.type,
+          });
+        }
+        if (msg.document_generated && typeof msg.document_generated.id === 'string') {
+          onDocGeneratedRef.current?.(msg.document_generated as GeneratedDocInfo);
+        }
+        if (msg.document_generation_error && typeof msg.document_generation_error.error === 'string') {
+          onDocGenErrorRef.current?.({
+            taskId: msg.document_generation_error.taskId,
+            type: msg.document_generation_error.type,
+            error: msg.document_generation_error.error,
+          });
+          onErrorRef.current?.(`Échec de la génération du document : ${msg.document_generation_error.error}`);
+        }
       } catch {
         /* ignore JSON mal formé */
       }

@@ -22,10 +22,37 @@ interface Props {
   selectedSources: string[];
   prefersReducedMotion: boolean | null;
   onError: (message: string) => void;
+  /** Notification de progression quand l'assistant génère un document. */
+  onInfo?: (message: string) => void;
+  /** Appelé quand l'assistant a généré un document (rafraîchir l'historique). */
+  onDocumentGenerated?: (doc: { id: string; type: string; title: string }) => void;
 }
 
-export function NotebookVoicePanel({ notebookId, selectedSources, prefersReducedMotion, onError }: Props) {
-  const live = useNotebookLive({ notebookId, selectedSources, onError });
+export function NotebookVoicePanel({ notebookId, selectedSources, prefersReducedMotion, onError, onInfo, onDocumentGenerated }: Props) {
+  const live = useNotebookLive({
+    notebookId,
+    selectedSources,
+    onError,
+    onDocumentGenerating: (info) => {
+      onInfo?.(`Génération du document (${info.type})…`);
+      // Refléter la génération dans la barre de progression du panneau « Générer ».
+      window.dispatchEvent(new CustomEvent('notebook-voice-generation-start', {
+        detail: { notebookId, taskId: info.taskId, type: info.type },
+      }));
+    },
+    onDocumentGenerated: (doc) => {
+      onInfo?.(`Document généré : ${doc.title}`);
+      window.dispatchEvent(new CustomEvent('notebook-voice-generation-done', {
+        detail: { notebookId, taskId: doc.taskId, type: doc.type, title: doc.title },
+      }));
+      onDocumentGenerated?.(doc);
+    },
+    onDocumentGenerationError: (info) => {
+      window.dispatchEvent(new CustomEvent('notebook-voice-generation-done', {
+        detail: { notebookId, taskId: info.taskId, type: info.type, error: info.error },
+      }));
+    },
+  });
   const {
     connected, connecting, busy, muted, toggleMute, transcript, toggle,
     amplitude, inputLevel, outputLevel, isSpeaking, isListening,

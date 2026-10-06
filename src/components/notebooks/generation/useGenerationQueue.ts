@@ -192,6 +192,105 @@ export function useGenerationQueue({
     }
   }, [notebookId, imageModel, onSuccess, onError, onRefresh, selectedDoc]);
 
+  // ── Générations déclenchées par l'assistant vocal ───────────────────────
+  // L'assistant vocal du notebook lance des générations côté serveur (hors de
+  // cette file). On reflète ces générations dans la barre de progression via
+  // deux CustomEvents dispatchés par NotebookChat :
+  //   notebook-voice-generation-start { notebookId, taskId, type }
+  //   notebook-voice-generation-done  { notebookId, taskId, type, title, error? }
+  // Une tâche « fantôme » (préfixe voice-) est insérée en statut 'generating'
+  // avec une progression basée sur le temps, puis complétée/supprimée à la fin.
+  useEffect(() => {
+    const voiceTimers = new Map<string, ReturnType<typeof setInterval>>();
+
+    const stopTimer = (taskId: string) => {
+      const t = voiceTimers.get(taskId);
+      if (t) { clearInterval(t); voiceTimers.delete(taskId); }
+    };
+
+    const onStart = (e: Event) => {
+      const detail = (e as CustomEvent<{ notebookId?: string; taskId?: string; type?: string }>).detail;
+      if (!detail || (detail.notebookId && detail.notebookId !== notebookId)) return;
+      const taskId = detail.taskId || `voice-${Date.now()}`;
+      const type = detail.type || 'summary';
+
+      setGenerationQueue(prev => {
+        if (prev.some(t => t.id === taskId)) return prev;
+        return [...prev, {
+          id: taskId,
+          type,
+          title: getDocTypeLabel(type),
+          progress: 1,
+          status: 'generating',
+          createdAt: Date.now(),
+        }];
+      });
+      setActiveGenerationIds(prev => new Set(prev).add(taskId));
+      setGenerationProgresses(prev => ({ ...prev, [taskId]: 1 }));
+
+      // Progression temporelle jusqu'à 90 % (la fin arrive sur l'event 'done').
+      const startTime = Date.now();
+      const ESTIMATED_MS = 25_000;
+      const timerId = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const timeProgress = Math.min(90, Math.round((elapsed / ESTIMATED_MS) * 100));
+        setGenerationProgresses(prev => {
+          const current = prev[taskId] ?? 0;
+          return timeProgress > current ? { ...prev, [taskId]: timeProgress } : prev;
+        });
+        setGenerationQueue(q => q.map(t =>
+          t.id === taskId && timeProgress > (t.progress ?? 0) ? { ...t, progress: timeProgress } : t,
+        ));
+      }, 500);
+      voiceTimers.set(taskId, timerId);
+    };
+
+    const onDone = (e: Event) => {
+      const detail = (e as CustomEvent<{ notebookId?: string; taskId?: string; error?: string }>).detail;
+      if (!detail || (detail.notebookId && detail.notebookId !== notebookId)) return;
+      const taskId = detail.taskId || '';
+      stopTimer(taskId);
+
+      const failed = !!detail.error;
+      setGenerationProgresses(prev => ({ ...prev, [taskId]: failed ? 0 : 100 }));
+      setGenerationQueue(prev => prev.map(t =>
+        t.id === taskId ? { ...t, progress: failed ? 0 : 100, status: failed ? 'error' : 'completed' } : t,
+      ));
+      setActiveGenerationIds(prev => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+      // Recharger la liste des docs générés pour refléter le nouveau document.
+      if (!failed) {
+        (async () => {
+          try {
+            const data = await api<{ documents?: GeneratedDoc[] }>(`/api/notebooks/${notebookId}/generated`);
+            setGeneratedDocs(data.documents || []);
+          } catch { /* ignore */ }
+        })();
+      }
+      // Retrait différé de la file (comme pour les générations manuelles).
+      setTimeout(() => {
+        setGenerationQueue(prev => prev.filter(t => t.id !== taskId));
+        setGenerationProgresses(prev => {
+          const next = { ...prev };
+          delete next[taskId];
+          return next;
+        });
+      }, 1200);
+    };
+
+    window.addEventListener('notebook-voice-generation-start', onStart as EventListener);
+    window.addEventListener('notebook-voice-generation-done', onDone as EventListener);
+    return () => {
+      window.removeEventListener('notebook-voice-generation-start', onStart as EventListener);
+      window.removeEventListener('notebook-voice-generation-done', onDone as EventListener);
+      voiceTimers.forEach(t => clearInterval(t));
+      voiceTimers.clear();
+    };
+  }, [notebookId]);
+
   // Traitement de la file — jusqu'à MAX_PARALLEL_GENERATIONS tâches simultanées
   useEffect(() => {
     if (sources.length === 0 || generationQueue.length === 0) return;

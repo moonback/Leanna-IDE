@@ -240,6 +240,14 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
             selectedSources={selectedSources}
             prefersReducedMotion={prefersReducedMotion}
             onError={toastError}
+            onInfo={toastSuccess}
+            onDocumentGenerated={() => {
+              // On NE recharge PAS tout le notebook ici : loadNotebook() repasse par
+              // l'état "loading" qui démonte NotebookChat → coupe la session vocale.
+              // Les panneaux concernés (Historique, barre de progression) se
+              // rafraîchissent via ces CustomEvents ciblés, sans remontage.
+              window.dispatchEvent(new CustomEvent('notebook-generated-docs-changed', { detail: { notebookId } }));
+            }}
           />
         }
       />

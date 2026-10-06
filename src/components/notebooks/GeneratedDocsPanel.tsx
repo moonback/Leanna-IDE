@@ -110,6 +110,18 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
     loadGeneratedDocs();
   }, [loadGeneratedDocs]);
 
+  // Rafraîchir quand l'assistant vocal génère un document pour ce notebook.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ notebookId?: string }>).detail;
+      if (!detail?.notebookId || detail.notebookId === notebookId) {
+        loadGeneratedDocs();
+      }
+    };
+    window.addEventListener('notebook-generated-docs-changed', handler as EventListener);
+    return () => window.removeEventListener('notebook-generated-docs-changed', handler as EventListener);
+  }, [notebookId, loadGeneratedDocs]);
+
   // Supprimer un document
   const handleDelete = useCallback(async (docId: string) => {
     try {

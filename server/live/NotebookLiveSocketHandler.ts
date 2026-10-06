@@ -26,7 +26,8 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, LiveServerMessage, Modality, type FunctionDeclaration } from '@google/genai';
-import { notebookManager, ragEngine } from '../notebooks/index.js';
+import { notebookManager, ragEngine, contentGenerator } from '../notebooks/index.js';
+import type { GeneratedDocType } from '../notebooks/types.js';
 import type { ProfileConfig } from '../prompts/systemInstruction.js';
 
 export interface NotebookLiveSocketDeps {
@@ -98,6 +99,43 @@ const NOTEBOOK_SEARCH_TOOL: FunctionDeclaration = {
       },
     },
     required: ['query'],
+  },
+};
+
+/** Types de documents que l'assistant vocal peut générer automatiquement. */
+const GENERATABLE_DOC_TYPES: GeneratedDocType[] = [
+  'summary', 'faq', 'study-guide', 'briefing', 'timeline', 'outline', 'mindmap',
+  'swot', 'glossary', 'full-report', 'report-business', 'report-market',
+  'report-technical', 'report-competitive', 'report-financial', 'report-marketing',
+  'report-product', 'report-risk', 'report-executive', 'report-project', 'roadmap',
+];
+
+const GENERATE_DOCUMENT_TOOL: FunctionDeclaration = {
+  name: 'generate_document',
+  description:
+    "Génère automatiquement un document dérivé des sources du notebook (résumé, FAQ, guide d'étude, " +
+    "briefing, chronologie, plan, carte mentale, analyse SWOT, glossaire, rapport complet ou rapports " +
+    "spécialisés : business, marché, technique, concurrentiel, financier, marketing, produit, risques, " +
+    "synthèse exécutive, projet). Le document est enregistré dans l'historique des générations du notebook. " +
+    "À utiliser quand l'utilisateur demande de créer, rédiger, générer ou produire un document/rapport.",
+  parameters: {
+    type: 'object' as never,
+    properties: {
+      type: {
+        type: 'string' as never,
+        enum: GENERATABLE_DOC_TYPES as unknown as string[],
+        description: "Le type de document à générer.",
+      },
+      language: {
+        type: 'string' as never,
+        description: "Langue du document (ex. 'fr' ou 'en'). Optionnel — par défaut la langue des sources.",
+      },
+      customInstructions: {
+        type: 'string' as never,
+        description: "Consignes supplémentaires de l'utilisateur à prendre en compte. Optionnel.",
+      },
+    },
+    required: ['type'],
   },
 };
 
@@ -188,7 +226,7 @@ export function attachNotebookLiveWebSocket(
           temperature,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: { parts: [{ text: systemText }] },
-          tools: [{ functionDeclarations: [NOTEBOOK_SEARCH_TOOL] }],
+          tools: [{ functionDeclarations: [NOTEBOOK_SEARCH_TOOL, GENERATE_DOCUMENT_TOOL] }],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
@@ -267,6 +305,89 @@ export function attachNotebookLiveWebSocket(
               name: 'notebook_search',
               response: { context: 'Erreur lors de la recherche dans les sources.', sourceCount: 0 },
             });
+          }
+        } else if (call.name === 'generate_document') {
+          const args = (call.args ?? {}) as { type?: unknown; language?: unknown; customInstructions?: unknown };
+          const docType = String(args.type ?? '').trim() as GeneratedDocType;
+          const language = typeof args.language === 'string' ? args.language : undefined;
+          const customInstructions = typeof args.customInstructions === 'string' ? args.customInstructions : undefined;
+
+          if (!GENERATABLE_DOC_TYPES.includes(docType)) {
+            responses.push({
+              id: call.id,
+              name: 'generate_document',
+              response: { success: false, error: `Type de document non supporté : "${docType}".` },
+            });
+          } else {
+            const nb = notebookManager.getNotebook(notebookId);
+            if (!nb || nb.sources.length === 0) {
+              responses.push({
+                id: call.id,
+                name: 'generate_document',
+                response: { success: false, error: 'Aucune source dans ce notebook — impossible de générer un document.' },
+              });
+            } else {
+              // Identifiant de corrélation pour relier début ↔ fin côté client
+              // (barre de progression du panneau « Générer »).
+              const genTaskId = `voice-gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              // Prévenir le client qu'une génération démarre (UI : toast + spinner + progressbar).
+              sendJson({ document_generating: { taskId: genTaskId, type: docType } });
+
+              // ── Retour vocal intermédiaire + génération asynchrone ──────────
+              // On répond IMMÉDIATEMENT au tool call en demandant au modèle
+              // d'annoncer vocalement qu'il prépare le document. La génération
+              // (10–20 s pour un rapport) se poursuit en arrière-plan et le
+              // résultat est injecté comme nouveau tour une fois prêt — l'audio
+              // intermédiaire n'est donc pas bloqué par l'attente.
+              responses.push({
+                id: call.id,
+                name: 'generate_document',
+                response: {
+                  success: true,
+                  status: 'started',
+                  message:
+                    "La génération a démarré. Annonce brièvement à l'oral que tu prépares le document " +
+                    "(par exemple « Je prépare le document, un instant… ») sans donner de détails. " +
+                    "Tu recevras le résultat dès qu'il sera prêt.",
+                },
+              });
+
+              // Lancer la génération en tâche de fond (ne pas await ici).
+              void (async () => {
+                try {
+                  const doc = await contentGenerator.generate(notebookId, docType, { language, customInstructions });
+                  sendJson({ document_generated: { taskId: genTaskId, id: doc.id, type: doc.type, title: doc.title } });
+                  // Injecter un tour pour que l'assistant confirme vocalement.
+                  if (!closed) {
+                    session?.sendClientContent({
+                      turns: [{
+                        role: 'user',
+                        parts: [{
+                          text:
+                            `[SYSTÈME] Le document « ${doc.title} » (${doc.type}) vient d'être généré et ` +
+                            `enregistré dans l'historique des générations du notebook. Confirme-le brièvement ` +
+                            `à l'oral à l'utilisateur, en une phrase.`,
+                        }],
+                      }],
+                      turnComplete: true,
+                    });
+                  }
+                } catch (err) {
+                  const errMsg = err instanceof Error ? err.message : String(err);
+                  console.error('[NotebookLive] Erreur generate_document:', errMsg);
+                  sendJson({ document_generation_error: { taskId: genTaskId, type: docType, error: errMsg } });
+                  if (!closed) {
+                    session?.sendClientContent({
+                      turns: [{
+                        role: 'user',
+                        parts: [{ text: `[SYSTÈME] La génération du document a échoué : ${errMsg}. Préviens brièvement l'utilisateur à l'oral.` }],
+                      }],
+                      turnComplete: true,
+                    });
+                  }
+                }
+              })();
+            }
           }
         } else {
           responses.push({
