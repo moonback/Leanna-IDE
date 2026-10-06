@@ -7,9 +7,9 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap } from 'lucide-react';
+import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap, FilePlus, Loader2, Check } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
-import { api, apiVoid } from './api/client.js';
+import { api, apiVoid, ApiError } from './api/client.js';
 
 interface SourceItem {
   id: string;
@@ -83,7 +83,13 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDoc[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);
   const [loading, setLoading] = useState(true);
+  // État d'ajout aux sources, par document : 'adding' | 'added'.
+  const [addingToSources, setAddingToSources] = useState<Record<string, 'adding' | 'added'>>({});
   const { spring, fadeOnly } = useFluidTransition();
+
+  // Types dont le contenu n'est pas de la prose (image/visualisation) :
+  // non promouvables en source textuelle.
+  const NON_PROSE_TYPES = ['infographic', 'visualization', 'chart'];
 
   // Charger les documents générés
   const loadGeneratedDocs = useCallback(async () => {
@@ -113,6 +119,30 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
       onRefresh();
     } catch {
       toastError('Erreur lors de la suppression du document');
+    }
+  }, [notebookId, onRefresh, success, toastError]);
+
+  // Ajouter un document généré aux sources du notebook (le rend interrogeable
+  // par le chat groundé et l'assistant vocal).
+  const handleAddToSources = useCallback(async (doc: GeneratedDoc) => {
+    setAddingToSources(prev => ({ ...prev, [doc.id]: 'adding' }));
+    try {
+      await api(`/api/notebooks/${notebookId}/generated/${doc.id}/add-to-sources`, {
+        method: 'POST',
+      });
+      setAddingToSources(prev => ({ ...prev, [doc.id]: 'added' }));
+      success('Document ajouté aux sources');
+      onRefresh();
+    } catch (e) {
+      const msg = e instanceof ApiError && e.status === 409
+        ? 'Une source portant ce titre existe déjà'
+        : 'Erreur lors de l\'ajout aux sources';
+      toastError(msg);
+      setAddingToSources(prev => {
+        const next = { ...prev };
+        delete next[doc.id];
+        return next;
+      });
     }
   }, [notebookId, onRefresh, success, toastError]);
 
@@ -253,6 +283,31 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                       
                       {/* Actions */}
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {!NON_PROSE_TYPES.includes(doc.type) && (() => {
+                          const state = addingToSources[doc.id];
+                          const isAdded = state === 'added';
+                          const isAdding = state === 'adding';
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!state) handleAddToSources(doc);
+                              }}
+                              disabled={isAdding || isAdded}
+                              className={`p-1.5 rounded transition-all ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:bg-[var(--accent-subtle)] disabled:cursor-default`}
+                              title={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources (interrogeable par l\u2019assistant)'}
+                              aria-label={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources'}
+                            >
+                              {isAdding ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                              ) : isAdded ? (
+                                <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+                              ) : (
+                                <FilePlus className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                              )}
+                            </button>
+                          );
+                        })()}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

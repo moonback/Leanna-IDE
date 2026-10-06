@@ -13,7 +13,7 @@
 
 import { useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Loader2, Volume2, X, BookOpen } from 'lucide-react';
+import { Mic, MicOff, Loader2, Volume2 } from 'lucide-react';
 import { LiveAPIContext } from '../../../context/LiveAPIContext.js';
 import { useNotebookLive } from './useNotebookLive.js';
 
@@ -27,7 +27,7 @@ interface Props {
 export function NotebookVoicePanel({ notebookId, selectedSources, prefersReducedMotion, onError }: Props) {
   const live = useNotebookLive({ notebookId, selectedSources, onError });
   const {
-    connected, connecting, busy, muted, toggleMute, transcript, lastCitations, toggle,
+    connected, connecting, busy, muted, toggleMute, transcript, toggle,
     amplitude, inputLevel, outputLevel, isSpeaking, isListening,
   } = live;
 
@@ -61,8 +61,6 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
-
-  const spring = prefersReducedMotion ? { duration: 0.12 } : { type: 'spring' as const, stiffness: 320, damping: 26 };
 
   return (
     <div className="relative flex items-center gap-1.5">

@@ -1,7 +1,13 @@
 import { Router, Request, Response } from "express";
-import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import { notebookManager, contentGenerator, sourceIngester } from "../../notebooks/index.js";
 import type { GeneratedDocType, ReportSuggestion } from "../../notebooks/types.js";
 import { buildRevealPresentation, countSlides } from "./slidesTheme.js";
+
+/**
+ * Types de documents générés dont le `content` est un blob JSON (image, data D3)
+ * plutôt que de la prose : non promouvables en source textuelle telle quelle.
+ */
+const NON_PROSE_DOC_TYPES = new Set<string>(["infographic", "visualization", "chart"]);
 
 export function createContentRouter(): Router {
   const router = Router();
@@ -88,6 +94,72 @@ export function createContentRouter(): Router {
         return;
       }
       res.json({ status: "success", message: "Document supprimé." });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Promouvoir un document généré en source du notebook ──────────────────
+  // Le document généré est ingéré comme une vraie source (chunking + embeddings),
+  // ce qui le rend immédiatement interrogeable par le chat groundé ET par
+  // l'assistant vocal (outil notebook_search), sans reconnexion.
+  router.post("/:id/generated/:docId/add-to-sources", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const notebookId = req.params.id;
+      const notebook = notebookManager.getNotebook(notebookId);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const doc = notebook.generatedDocuments.find((d) => d.id === req.params.docId);
+      if (!doc) {
+        res.status(404).json({ error: "Document introuvable." });
+        return;
+      }
+
+      if (NON_PROSE_DOC_TYPES.has(doc.type)) {
+        res.status(400).json({
+          error: "Ce type de document (image/visualisation) ne peut pas être ajouté comme source textuelle.",
+        });
+        return;
+      }
+
+      const content = (doc.content || "").trim();
+      if (!content) {
+        res.status(400).json({ error: "Le document est vide." });
+        return;
+      }
+
+      // Éviter les doublons : si une source avec le même titre existe déjà, on refuse.
+      const title = doc.title?.trim() || "Document généré";
+      if (notebook.sources.some((s) => s.title === title)) {
+        res.status(409).json({ error: "Une source portant ce titre existe déjà." });
+        return;
+      }
+
+      const buffer = Buffer.from(content, "utf-8");
+      const source = await sourceIngester.ingestFromBuffer(
+        buffer,
+        title,
+        "text/markdown",
+        notebookId,
+      );
+      notebookManager.addSource(notebookId, source);
+
+      res.json({
+        status: "success",
+        source: {
+          id: source.id,
+          title: source.title,
+          type: source.type,
+          summary: source.summary,
+          keywords: source.keywords,
+          wordCount: source.wordCount,
+          chunksCount: source.chunks.length,
+          language: source.language,
+        },
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
