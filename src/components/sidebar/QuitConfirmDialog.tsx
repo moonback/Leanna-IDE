@@ -3,17 +3,14 @@
  *
  * Alignée sur le langage visuel des autres modales du projet
  * (CriticalEditConfirm, TelegramStatusModal, etc.) :
- *   - <Modal.Header> avec tuile icône + titre/sous-titre
- *   - Cartes internes rounded-xl sur --bg-secondary / --border-base
+ *   - <Modal.Header> avec tuile icône statique (10×10, rounded-xl) + titre/sous-titre
+ *   - Carte de détail interne rounded-xl sur --bg-secondary / --border-base
+ *   - Bandeau d'alerte « badge-* » comme dans TelegramStatusModal
  *   - Icônes lucide-react, échelle typographique standard (text-xs/text-sm)
- *   - Composant <Button> pour les actions
- *
- * Le seul accent décoratif conservé est le léger "battement" de la tuile
- * icône (respecte prefers-reduced-motion).
+ *   - Corps en space-y-4, composant <Button> pour les actions
  */
 
 import { Power, AlertTriangle } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 
@@ -24,28 +21,24 @@ interface QuitConfirmDialogProps {
 }
 
 export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialogProps) {
-  const prefersReducedMotion = useReducedMotion();
-
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="sm"
-      tone="danger"
+      tone="info"
       layer="critical"
       aria-describedby="quit-desc"
     >
       <Modal.Header>
         <div className="flex items-center gap-3">
-          {/* Tuile icône — même gabarit que les autres modales */}
-          <motion.div
+          {/* Tuile icône — même gabarit statique que CriticalEditConfirm */}
+          <div
             className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'var(--color-error-subtle)' }}
-            animate={prefersReducedMotion ? undefined : { scale: [1, 1.06, 1] }}
-            transition={{ duration: 3.4, ease: 'easeInOut', repeat: Infinity }}
+            style={{ backgroundColor: 'var(--color-info-subtle)' }}
           >
-            <Power className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
-          </motion.div>
+            <Power className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
+          </div>
           <div>
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               Quitter Leanna
@@ -58,19 +51,12 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
       </Modal.Header>
 
       <Modal.Body>
-        <div className="space-y-3">
-          {/* Carte d'avertissement */}
+        <div className="space-y-4">
+          {/* Carte de détail — surface neutre, comme les autres modales */}
           <div
-            className="rounded-xl p-4 flex items-start gap-3"
-            style={{
-              backgroundColor: 'var(--color-warning-subtle)',
-              border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
-            }}
+            className="rounded-xl p-4"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
           >
-            <AlertTriangle
-              className="w-4 h-4 mt-0.5 flex-shrink-0"
-              style={{ color: 'var(--color-warning)' }}
-            />
             <p id="quit-desc" className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               Les modifications non enregistrées pourraient être perdues.{' '}
               <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -89,7 +75,7 @@ export function QuitConfirmDialog({ open, onClose, onConfirm }: QuitConfirmDialo
           Annuler
         </Button>
         <Button
-          variant="danger"
+          variant="primary"
           size="sm"
           onClick={onConfirm}
           iconLeft={<Power className="w-3.5 h-3.5" />}
