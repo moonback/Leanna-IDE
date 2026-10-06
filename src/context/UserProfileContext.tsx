@@ -90,6 +90,7 @@ export interface UserProfile {
   // Appearance (kept here so Settings is the single source of truth)
   theme:         'dark' | 'light' | 'cyberpunk' | 'sepia' | 'high-contrast';
   accentColor:   string;
+  fontFamily:    string;   // Pile CSS appliquée à --font-sans (police d'interface)
   // UI features
   floatingOrb:   boolean;  // Afficher l'orb flottant déplaçable
   // Token optimization
@@ -129,6 +130,7 @@ const DEFAULT_PROFILE: UserProfile = {
   openrouterImageModel: 'google/gemini-3.6-flash-image',
   theme:         'cyberpunk',
   accentColor:   '#0ea5e9',
+  fontFamily:    'Arial, "Helvetica Neue", Helvetica, sans-serif',
   floatingOrb:   false,
   compactPrompt: true,
   // Agents
@@ -185,7 +187,10 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', profile.theme);
     document.documentElement.style.setProperty('--accent-primary', profile.accentColor);
-  }, [profile.theme, profile.accentColor]);
+    if (profile.fontFamily) {
+      document.documentElement.style.setProperty('--font-sans', profile.fontFamily);
+    }
+  }, [profile.theme, profile.accentColor, profile.fontFamily]);
 
   const setField = useCallback(<K extends keyof UserProfile>(key: K, value: UserProfile[K]) => {
     setProfile(prev => ({ ...prev, [key]: value }));

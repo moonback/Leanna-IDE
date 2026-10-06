@@ -2,8 +2,8 @@
 @import "./styles/layers.css";
 @theme {
   /* Typography */
---font-sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
---font-mono: "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
+--font-sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+--font-mono: "Courier New", Courier, monospace;
 
 /* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
 --text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
@@ -839,11 +839,9 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Inter OpenType features — a more polished, professional rendering:
-     cv11 = single-storey 'a', ss01 = alternate glyph set, calt/liga = contextual
-     ligatures. kern enables kerning. These are what make Inter look "designed"
-     rather than default. */
-  font-feature-settings: "cv11", "ss01", "calt", "liga", "kern";
+  /* Arial : police système, pas de features OpenType spécifiques — on garde
+     uniquement le kerning et les ligatures standard. */
+  font-feature-settings: "kern";
   font-optical-sizing: auto;
   letter-spacing: -0.006em;      /* subtle optical tightening for UI text */
   line-height: var(--leading-normal);

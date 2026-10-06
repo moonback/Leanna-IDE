@@ -23,6 +23,23 @@ export const RESPONSE_STYLES: { id: ResponseStyle; label: string; desc: string }
   { id: 'detailed', label: 'Détaillé',  desc: 'Réponses complètes' },
 ];
 
+/**
+ * Polices d'interface sélectionnables depuis Apparence.
+ * `value` est une pile CSS concrète appliquée directement à --font-sans.
+ * Arial / Helvetica / Times / Courier / Georgia / Verdana sont des polices
+ * système disponibles d'office (aucun fichier à charger). "system" suit la
+ * police native de l'OS.
+ */
+export const FONTS: { id: string; label: string; value: string; desc: string }[] = [
+  { id: 'system', label: 'Système',   value: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', desc: 'Police native de l\'OS' },
+  { id: 'arial',  label: 'Arial',     value: 'Arial, "Helvetica Neue", Helvetica, sans-serif',                       desc: 'Sans-serif classique' },
+  { id: 'helvetica', label: 'Helvetica', value: '"Helvetica Neue", Helvetica, Arial, sans-serif',                    desc: 'Neutre & lisible' },
+  { id: 'verdana', label: 'Verdana',  value: 'Verdana, Geneva, Tahoma, sans-serif',                                  desc: 'Large & aérée' },
+  { id: 'georgia', label: 'Georgia',  value: 'Georgia, "Times New Roman", serif',                                    desc: 'Serif élégante' },
+  { id: 'times',  label: 'Times',     value: '"Times New Roman", Times, serif',                                      desc: 'Serif traditionnelle' },
+  { id: 'courier', label: 'Courier',  value: '"Courier New", Courier, monospace',                                    desc: 'Monospace rétro' },
+];
+
 export const ACCENTS = [
   { label: 'Sky',     value: 'var(--color-info)' },
   { label: 'Violet',  value: 'var(--color-accent-alt)' },

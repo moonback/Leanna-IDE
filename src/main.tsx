@@ -32,13 +32,7 @@ const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
-// Bundled fonts for identical rendering across platforms (Windows/macOS/Linux).
-// Inter (variable weight axis) for UI, JetBrains Mono for code.
-import '@fontsource-variable/inter/wght.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
-import '@fontsource/jetbrains-mono/600.css';
-import '@fontsource/jetbrains-mono/700.css';
+// Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
@@ -174,6 +168,7 @@ try {
     const p = JSON.parse(raw);
     if (p.theme)       document.documentElement.setAttribute('data-theme', p.theme);
     if (p.accentColor) document.documentElement.style.setProperty('--accent-primary', p.accentColor);
+    if (p.fontFamily)  document.documentElement.style.setProperty('--font-sans', p.fontFamily);
   } else {
     document.documentElement.setAttribute('data-theme', 'cyberpunk');
   }

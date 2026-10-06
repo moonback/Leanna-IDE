@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
-import { ACCENTS } from './constants.js';
+import { ACCENTS, FONTS } from './constants.js';
 
 // Additional accent colors with labels
 const EXTENDED_ACCENTS = [
@@ -19,6 +19,11 @@ export function AppearanceSection() {
   const applyAccent = useCallback((color: string) => {
     setField('accentColor', color);
     document.documentElement.style.setProperty('--accent-primary', color);
+  }, [setField]);
+
+  const applyFont = useCallback((font: string) => {
+    setField('fontFamily', font);
+    document.documentElement.style.setProperty('--font-sans', font);
   }, [setField]);
 
   return (
@@ -111,6 +116,41 @@ export function AppearanceSection() {
                 </motion.button>
                 <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{a.label}</span>
               </div>
+            );
+          })}
+        </div>
+      </Field>
+
+      {/* Font family */}
+      <Field label="Police de l'interface" hint="Appliquée immédiatement à toute l'interface.">
+        <div role="radiogroup" aria-label="Police" className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {FONTS.map(f => {
+            const isActive = profile.fontFamily === f.value;
+            return (
+              <motion.button
+                key={f.id}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => applyFont(f.value)}
+                className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+                style={{
+                  backgroundColor: isActive ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+                  border: `1.5px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                  boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--accent-primary) 15%, transparent)' : 'none',
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate"
+                    style={{ fontFamily: f.value, color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                    {f.label}
+                  </p>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{f.desc}</p>
+                </div>
+                {isActive && <Check className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+              </motion.button>
             );
           })}
         </div>
