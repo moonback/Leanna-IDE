@@ -63,6 +63,7 @@
 * [Automatisation du navigateur](#automatisation-du-navigateur)
 * [Git et GitHub](#git-et-github)
 * [Notebooks et RAG](#notebooks-et-rag)
+* [Assistant vocal du notebook](#assistant-vocal-du-notebook)
 * [Architecture du module notebooks (frontend)](#architecture-du-module-notebooks-frontend)
 * [Génération d'images](#génération-dimages)
 * [Graphe de connaissances](#graphe-de-connaissances)
@@ -341,6 +342,7 @@ Leanna contient plusieurs systèmes de compréhension du projet :
 ## Productivité
 
 * notebooks ;
+* assistant vocal du notebook (interrogation et génération à la voix) ;
 * ingestion de documents ;
 * RAG ;
 * embeddings ;
@@ -1915,6 +1917,82 @@ RichDocumentViewer
 
 ---
 
+# Assistant vocal du notebook
+
+Leanna dispose d'un **second assistant vocal live**, indépendant de l'assistant global, dédié à l'interrogation et à la génération de documents à partir des sources du notebook.
+
+## Principe
+
+L'utilisateur peut poser des questions à la voix, directement depuis le notebook, et obtenir des réponses **vocales** fondées exclusivement sur les sources du notebook (chat groundé). L'assistant peut également **générer des documents** à la demande (rapport, résumé, FAQ, guide d'étude, etc.) et les enregistrer dans l'historique des générations.
+
+```text
+Micro utilisateur
+       ↓
+  WebSocket /notebook-live
+       ↓
+  Session Gemini Live (audio bidirectionnel)
+       ↓
+  Outil notebook_search → RAG (searchHybrid + buildContext)
+  Outil generate_document → ContentGenerator.generate
+       ↓
+  Réponse vocale groundée avec citations
+```
+
+## Architecture
+
+La session vocale du notebook est **indépendante** de la session Live globale de Leanna. Elle dispose de son propre handler WebSocket (`/notebook-live`), de sa propre session Gemini Live, et de son propre pipeline audio. Les deux sessions ne partagent aucun état — l'assistant global est mis en sourdine pendant qu'une session notebook est active.
+
+### Serveur
+
+```text
+server/live/NotebookLiveSocketHandler.ts
+  └── attachNotebookLiveWebSocket(wss, deps)
+      ├── Session Gemini Live (modèle gemini-3.8-live, audio bidirectionnel)
+      ├── Outil notebook_search  → ragEngine.searchHybrid
+      └── Outil generate_document → contentGenerator.generate
+```
+
+Le chemin WebSocket est `/notebook-live?notebookId=<id>&sources=<csv optionnel>`, avec authentification par cookie identique au handler Live global.
+
+### Frontend
+
+```text
+src/components/notebooks/chat/
+  ├── useNotebookLive.ts       Hook de session (WebSocket, useAudio, transcription)
+  └── NotebookVoicePanel.tsx   Bouton micro + indicateur d'amplitude + mute
+```
+
+Le bouton « Interroger à la voix » est placé dans la `ThreadBar`, à côté du bouton « Nouveau ». L'indicateur d'amplitude animé (barres + anneaux) réagit au niveau audio d'entrée (écoute) et de sortie (réponse).
+
+## Outils disponibles
+
+| Outil | Description |
+|-------|-------------|
+| `notebook_search` | Recherche RAG hybride (embeddings + TF-IDF) dans les sources du notebook. Appelé automatiquement avant chaque réponse factuelle. Renvoie le contexte groundé + les citations. |
+| `generate_document` | Génère un document dérivé des sources (21 types : résumé, FAQ, guide d'étude, briefing, chronologie, plan, carte mentale, SWOT, glossaire, rapport complet, rapports spécialisés…). Le document est enregistré dans l'historique des générations et apparaît dans la barre de progression du panneau « Générer ». |
+
+## Retour vocal intermédiaire
+
+La génération d'un document peut prendre 10 à 20 secondes. Pour ne pas bloquer l'assistant pendant ce temps, l'outil `generate_document` retourne **immédiatement** une réponse au modèle (« annonce que tu prépares le document »), lance la génération en arrière-plan, puis injecte un tour de confirmation vocale une fois le document prêt (ou un message d'erreur en cas d'échec).
+
+## Ajout aux sources
+
+Les documents générés peuvent être **promus en sources** du notebook via un bouton dans l'historique des générations. Une fois promu, le document est chunké, vectorisé (embeddings) et devient interrogeable par l'assistant vocal et le chat groundé, sans reconnexion.
+
+```text
+Endpoint : POST /api/notebooks/:id/generated/:docId/add-to-sources
+```
+
+## Synchronisation en direct
+
+Les événements de génération vocale (`document_generating`, `document_generated`, `document_generation_error`) sont relayés au frontend via des CustomEvents, ce qui permet :
+
+* la mise à jour en direct de la barre de progression du panneau « Générer » ;
+* le rafraîchissement automatique de l'historique des générations ;
+* l'incrémentation du badge de compteur sans recharger le notebook (ce qui démonterait la session vocale).
+
+---
+
 # Architecture du module notebooks (frontend)
 
 Le module `src/components/notebooks/` suit une architecture **orchestrateur /
@@ -1930,8 +2008,9 @@ Les grands panneaux sont découpés en sous-modules :
 notebooks/
 ├── api/            Client fetch typé, flux SSE, hook useResource
 ├── chat/           NotebookChat : ThreadBar, MessageList, MessageItem,
-│                   Composer, FolderPickerModal + hooks (useChatStream,
-│                   useChatThreads, useChatGenerators, useTts, …)
+│                   Composer, FolderPickerModal, NotebookVoicePanel
+│                   + hooks (useChatStream, useChatThreads,
+│                   useChatGenerators, useTts, useNotebookLive, …)
 ├── sources/        SourcePanel : UploadToolbar, UploadQueue,
 │                   SourceListFull / SourceListCompact + hooks d'upload/liste
 ├── generation/     GeneratePanel : DocTypePicker, DocViewer,
