@@ -10,7 +10,7 @@
  *   - Corps en space-y-4, composant <Button> pour les actions
  */
 
-import { Power, AlertTriangle } from 'lucide-react';
+import { Power } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 
