@@ -13,7 +13,7 @@ interface SystemModalProps {
   onClose: () => void;
   connected: boolean;
   profile: any;
-  gitInfo: { branch: string; summary: string } | null;
+  gitInfo: { branch?: string; summary?: string } | null;
   workspace: { path: string; exists: boolean } | null;
 }
 
@@ -111,7 +111,7 @@ export function SystemModal({ onClose, connected, profile, gitInfo, workspace }:
             <StatusRow
               icon={<GitBranch size={12} style={{ color: 'var(--color-error)' }} />}
               label="Git"
-              value={gitInfo.branch}
+              value={gitInfo.branch ?? '—'}
               valueColor="var(--color-error)"
               sub={gitInfo.summary}
               mono

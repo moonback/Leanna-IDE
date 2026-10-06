@@ -1,11 +1,9 @@
 import React, {
-  useState, useEffect, useMemo, useCallback, useRef,
+  useState, useEffect, useMemo, useCallback, useId,
 } from 'react';
 import {
-  Plus, FolderOpen,
-  Search, KeyRound, AlertCircle,
-  BookOpen, Sparkles,
-  RotateCcw, Trash2, Loader2, Play,
+  Plus, FolderPlus, FolderOpen, Search, KeyRound, AlertCircle, BookOpen,
+  Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -20,87 +18,221 @@ import {
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
 
-// ─── Types ───────────────────────────────────────────────────────────────
-
 // ─── Constantes ──────────────────────────────────────────────────────────
 
 const MOD = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
   ? '⌘'
   : 'Ctrl';
 
-const ENTRANCE_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
+const SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
-// ─── Hook animation lettre par lettre ────────────────────────────────────
+type GeminiStatus = 'configured' | 'invalid' | 'unconfigured' | null;
+type IconType = React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+
+// ─── Hook : machine à écrire ─────────────────────────────────────────────
 
 function useTypewriter(text: string, active: boolean) {
   const [displayed, setDisplayed] = useState(text);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeRef = useRef(active);
-  activeRef.current = active;
 
   useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
     if (!active) {
       setDisplayed(text);
       return;
     }
-
-    // Démarre l'animation depuis zéro
     let index = 0;
     setDisplayed('');
-    intervalRef.current = setInterval(() => {
+    const id = setInterval(() => {
       index += 1;
       setDisplayed(text.slice(0, index));
-      if (index >= text.length) {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
-      }
-    }, 28);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+      if (index >= text.length) clearInterval(id);
+    }, 24);
+    return () => clearInterval(id);
   }, [active, text]);
 
-  const isTyping = active && displayed.length < text.length;
-  return { displayed, isTyping };
+  return { displayed, isTyping: active && displayed.length < text.length };
 }
 
-// ─── Validation des fichiers récents ────────────────────────────────────
+// ─── Hook : statut Git ───────────────────────────────────────────────────
 
-// ─── Sous‑composants (extraits et memoïsés) ────────────────────────────
+interface GitInfo { branch?: string; files?: unknown; repository?: string }
+
+function useGitInfo() {
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/git/status')
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.status === 'success') {
+          setGitInfo({
+            branch: data.data?.branch,
+            files: data.data?.files,
+            repository: data.data?.repository,
+          });
+        }
+      })
+      .catch(() => { if (!cancelled) setGitInfo(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return gitInfo;
+}
+
+// ─── Hook : statut de la clé Gemini ──────────────────────────────────────
+
+function useGeminiStatus(): GeminiStatus {
+  const [status, setStatus] = useState<GeminiStatus>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/tokens').then(r => r.json()),
+      fetch('/api/gemini-keys').then(r => r.json()),
+    ])
+      .then(([tokens, keys]) => {
+        if (cancelled || tokens.status !== 'success' || keys.status !== 'success') return;
+        const token = tokens.tokens?.find((t: { key: string }) => t.key === 'GEMINI_API_KEY');
+        const hasPoolKey = keys.keys?.some((k: { disabled: boolean }) => !k.disabled) === true;
+        setStatus(
+          token?.valid === false ? 'invalid'
+            : token?.configured === true || hasPoolKey ? 'configured'
+              : 'unconfigured',
+        );
+      })
+      .catch(() => { if (!cancelled) setStatus(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return status;
+}
+
+// ─── Hook : piège de focus, limité à la modale ouverte ───────────────────
+
+function useFocusTrap(isActive: boolean) {
+  useEffect(() => {
+    if (!isActive) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"], [aria-modal="true"]');
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [isActive]);
+}
+
+// ─── Styles partagés ─────────────────────────────────────────────────────
+// Les transformations (survol, appui) sont gérées uniquement par motion :
+// plus de conflit avec des règles CSS `transform`.
+
+function GlobalStyles() {
+  return (
+    <style>{`
+      .ee-focus { outline: none; }
+      .ee-focus:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+      .ee-glass {
+        position: relative;
+        overflow: hidden;
+        background-color: color-mix(in srgb, var(--surface) 50%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+                    0 8px 24px color-mix(in srgb, #000 16%, transparent);
+        transition: border-color 200ms ease-out, background-color 200ms ease-out;
+      }
+      .ee-glass::before {
+        content: '';
+        position: absolute; inset: 0; z-index: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(135deg, color-mix(in srgb, #fff 10%, transparent) 0%, transparent 40%);
+      }
+      .ee-glass > * { position: relative; z-index: 1; }
+      .ee-glass:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+      .ee-hero {
+        border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+        background-image: linear-gradient(135deg,
+          color-mix(in srgb, var(--primary) 14%, transparent) 0%, transparent 65%);
+      }
+
+      .ee-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 999px;
+        font-size: 0.75rem; font-weight: 500;
+        color: var(--text-muted);
+        background-color: color-mix(in srgb, var(--surface-soft) 55%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+      }
+
+      .ee-link {
+        padding: 4px 8px; border-radius: 6px;
+        font-size: 0.8125rem; font-weight: 500;
+        color: var(--text-muted);
+        transition: color 150ms, background-color 150ms;
+      }
+      .ee-link:hover {
+        color: var(--primary);
+        background-color: color-mix(in srgb, var(--surface-soft) 55%, transparent);
+      }
+
+      .ee-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 12px; border-radius: 8px;
+        font-size: 0.75rem; font-weight: 600;
+        transition: opacity 150ms, background-color 150ms;
+      }
+      .ee-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .ee-glass { background-color: var(--surface); }
+      }
+
+      .ee-dot-live { animation: ee-pulse 2s ease-in-out infinite; }
+      @keyframes ee-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      @keyframes ee-caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ee-dot-live { animation: none; }
+      }
+    `}</style>
+  );
+}
+
+// ─── Petits composants ───────────────────────────────────────────────────
 
 const Kbd = React.memo(function Kbd({
-  children,
-  tone = 'default',
-}: {
-  children: React.ReactNode;
-  tone?: 'default' | 'invert';
-}) {
-  if (tone === 'invert') {
-    return (
-      <span
-        className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded text-xs font-mono font-semibold tracking-wide"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
-          color: 'var(--primary)',
-        }}
-      >
-        {children}
-      </span>
-    );
-  }
+  children, className = '',
+}: { children: React.ReactNode; className?: string }) {
   return (
     <kbd
-      className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 text-xs font-mono font-semibold tracking-wide"
+      className={`inline-flex items-center justify-center h-[20px] min-w-[20px] px-1.5 text-xs font-mono font-semibold rounded ${className}`}
       style={{
         color: 'var(--text-muted)',
-        backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--surface-soft) 60%, transparent)',
         border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-        borderRadius: '4px',
       }}
     >
       {children}
@@ -108,144 +240,59 @@ const Kbd = React.memo(function Kbd({
   );
 });
 
-const CompactActionCard = React.memo(function CompactActionCard({
-  icon: Icon,
-  title,
-  description,
-  shortcut,
-  onClick,
-  reduceMotion = false,
+const ActionCard = React.memo(function ActionCard({
+  icon: Icon, title, description, shortcut, onClick, disabled = false, reduceMotion = false,
 }: {
-  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
+  icon: IconType;
   title: string;
   description: string;
   shortcut?: string;
   onClick?: () => void;
+  disabled?: boolean;
   reduceMotion?: boolean;
 }) {
+  const descId = useId();
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      className="ai-interactive ai-compact-card ai-glass group relative flex flex-col items-center gap-3 p-5 text-center rounded-xl overflow-hidden"
-      style={{
-        backgroundColor: 'color-mix(in srgb, var(--surface) 45%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-        boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent), 0 8px 24px color-mix(in srgb, #000 18%, transparent)',
-        minHeight: '96px',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      }}
-      aria-describedby={`action-desc-${title.replace(/\s/g, '')}`}
-      whileHover={reduceMotion ? { borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)' } : {
-        y: -4,
-        scale: 1.02,
-        boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 30px color-mix(in srgb, #000 24%, transparent)',
-        borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)',
-      }}
-      whileTap={reduceMotion ? undefined : { scale: 0.95 }}
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduceMotion ? 0.15 : 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      disabled={disabled}
+      aria-describedby={descId}
+      className="ee-glass ee-focus flex items-start gap-3 p-4 text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed"
+      whileHover={reduceMotion || disabled ? undefined : { y: -2 }}
+      whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
+      transition={{ duration: 0.15 }}
     >
-      {/* Hover glow effect */}
-      <div
-        className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
+      <span
+        className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
         style={{
-          background: 'radial-gradient(circle at center, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 70%)',
-          transition: 'opacity 0.3s ease',
+          backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--primary) 22%, transparent)',
         }}
-      />
-
-      <motion.div
-        className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 relative"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
-          border: '1px solid color-mix(in srgb, #fff 14%, transparent)',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
-        }}
-        whileHover={reduceMotion ? undefined : { scale: 1.1, rotate: 5 }}
-        transition={{ duration: 0.2 }}
       >
         <Icon size={16} style={{ color: 'var(--primary)' }} />
-        {/* Icon glow on hover */}
-        <div
-          className="absolute inset-0 rounded-xl pointer-events-none opacity-0 group-hover:opacity-100"
-          style={{
-            boxShadow: 'inset 0 0 10px color-mix(in srgb, var(--primary) 22%, transparent)',
-            transition: 'opacity 0.3s ease',
-          }}
-        />
-      </motion.div>
-
-      <div className="flex flex-col items-center gap-1">
-        <motion.div
-          className="text-sm font-semibold leading-tight"
-          style={{ color: 'var(--text)' }}
-          whileHover={{ color: 'var(--primary)' }}
-          transition={{ duration: 0.2 }}
-        >
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
           {title}
-        </motion.div>
-        <div
-          id={`action-desc-${title.replace(/\s/g, '')}`}
-          className="text-xs leading-snug"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        </span>
+        <span id={descId} className="block text-xs leading-snug mt-1" style={{ color: 'var(--text-muted)' }}>
           {description}
-        </div>
-      </div>
-
-      {shortcut && (
-        <motion.div
-          className="flex-shrink-0 mt-2"
-          initial={{ opacity: 0, scale: 0.8 }}
-          whileHover={{ scale: 1.05 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Kbd>{shortcut}</Kbd>
-        </motion.div>
-      )}
+        </span>
+      </span>
+      {shortcut && <Kbd className="hidden sm:inline-flex">{shortcut}</Kbd>}
     </motion.button>
   );
 });
 
-const QuickLink = React.memo(function QuickLink({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="ai-interactive ai-quicklink flex items-center gap-1 px-2 py-1 rounded text-sm font-medium"
-      style={{ color: 'var(--text-muted)' }}
-    >
-      {label}
-    </button>
-  );
-});
+// ─── Missions interrompues ───────────────────────────────────────────────
 
-// ─── Missions interrompues (reprise après crash / redémarrage) ─────────
-
-/**
- * Carte unitaire d'une mission interrompue en attente de décision :
- * la réactiver ou l'effacer.
- */
 const InterruptedMissionCard = React.memo(function InterruptedMissionCard({
-  confirmation,
-  deciding,
-  reduceMotion = false,
-  onReactivate,
-  onDelete,
+  confirmation, deciding, disabled, reduceMotion = false, onReactivate, onDelete,
 }: {
   confirmation: ResumeConfirmationInfo;
-  deciding: boolean;
+  deciding: 'reactivate' | 'delete' | null;
+  disabled: boolean;
   reduceMotion?: boolean;
   onReactivate: () => void;
   onDelete: () => void;
@@ -253,318 +300,156 @@ const InterruptedMissionCard = React.memo(function InterruptedMissionCard({
   const statusText = confirmation.status === 'in_progress' ? 'en cours' : 'en attente';
 
   return (
-    <motion.div
+    <motion.li
+      layout={!reduceMotion}
       initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-      transition={{ duration: reduceMotion ? 0.15 : 0.3 }}
-      className="ai-glass relative flex items-center gap-3 p-4 rounded-xl overflow-hidden"
-      style={{
-        backgroundColor: 'color-mix(in srgb, var(--surface) 50%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--primary) 28%, var(--border))',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-      }}
+      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, marginTop: 0 }}
+      transition={{ duration: reduceMotion ? 0.15 : 0.25 }}
+      className="ee-glass flex flex-wrap items-center gap-3 p-4 rounded-xl list-none"
     >
-      <div
-        className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+      <span
+        className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
         style={{
           backgroundColor: 'color-mix(in srgb, var(--primary) 14%, transparent)',
           border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)',
         }}
       >
         <RotateCcw size={16} style={{ color: 'var(--primary)' }} />
-      </div>
+      </span>
 
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }}>
+      <div className="flex-1 min-w-[180px]">
+        <div className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }} title={confirmation.title}>
           {confirmation.title}
         </div>
         <div className="text-xs leading-snug mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          Mission interrompue ({statusText}) — réactiver ou effacer ?
+          Interrompue pendant l'exécution ({statusText}). Voulez-vous la reprendre ?
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onReactivate}
-          disabled={deciding}
-          className="ai-interactive flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+          disabled={disabled}
+          className="ee-btn ee-focus"
           style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)' }}
-          title="Réactiver la mission"
+          title="Reprendre la mission là où elle s'est arrêtée"
         >
-          {deciding ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-          Réactiver
+          {deciding === 'reactivate' ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          Reprendre
         </button>
         <button
           type="button"
           onClick={onDelete}
-          disabled={deciding}
-          className="ai-interactive flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+          disabled={disabled}
+          className="ee-btn ee-focus"
           style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)' }}
-          title="Effacer définitivement la mission"
+          title="Supprimer définitivement la mission"
         >
-          <Trash2 size={12} />
-          Effacer
+          {deciding === 'delete' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+          Supprimer
         </button>
       </div>
-    </motion.div>
+    </motion.li>
   );
 });
 
-/**
- * Section affichée sur l'accueil quand des missions ont été interrompues
- * (crash/redémarrage). Elle écoute le store partagé `useResumeConfirmations`
- * et amorce son état depuis `GET /api/missions/pending-resumes` au montage,
- * puis permet de réactiver ou effacer chaque mission.
- */
 const InterruptedMissionsSection = React.memo(function InterruptedMissionsSection({
   reduceMotion = false,
-  entranceProps,
-}: {
-  reduceMotion?: boolean;
-  entranceProps?: Record<string, unknown>;
-}) {
+}: { reduceMotion?: boolean }) {
   const confirmations = useResumeConfirmations();
-  const [deciding, setDeciding] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ id: string; decision: 'reactivate' | 'delete' } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Amorcer depuis le serveur, SANS attendre d'ouvrir le panneau Missions.
-  // L'événement WebSocket `mission_resume_pending` est émis peu après le
-  // démarrage / la connexion d'un workspace — potentiellement APRÈS le montage
-  // de l'accueil. Un simple fetch unique au montage raterait donc ces missions.
-  // On sonde donc le serveur de façon répétée : rapidement au début (pour que
-  // les cartes apparaissent automatiquement), puis à un rythme lent de veille
-  // pour capter les reprises tardives (nouveau workspace connecté, etc.).
+  // Sondage : rapide au début (cartes affichées sans attendre le WebSocket),
+  // puis lent. Suspendu quand l'onglet est caché.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let attempts = 0;
 
+    const schedule = () => {
+      if (cancelled) return;
+      attempts += 1;
+      timer = setTimeout(poll, attempts < 10 ? 1_500 : 15_000);
+    };
+
     const poll = () => {
+      if (document.hidden) { schedule(); return; }
       fetch('/api/missions/pending-resumes')
         .then(res => (res.ok ? res.json() : { pending: [] }))
         .then((data: { pending?: Array<Omit<ResumeConfirmationInfo, 'receivedAt'>> }) => {
-          if (cancelled) return;
-          if (Array.isArray(data.pending) && data.pending.length > 0) {
+          if (!cancelled && Array.isArray(data.pending) && data.pending.length > 0) {
             seedResumeConfirmations(data.pending);
           }
         })
-        .catch(() => { /* mission system indisponible — normal */ })
-        .finally(() => {
-          if (cancelled) return;
-          attempts += 1;
-          // 10 sondages rapides (toutes les 1,5 s ≈ 15 s), puis veille toutes les 15 s.
-          const delay = attempts < 10 ? 1_500 : 15_000;
-          timer = setTimeout(poll, delay);
-        });
+        .catch(() => { /* système de missions indisponible : normal */ })
+        .finally(schedule);
     };
 
     poll();
     return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
-  const decideResume = useCallback(async (missionId: string, decision: 'reactivate' | 'delete') => {
-    setDeciding(missionId);
+  const decide = useCallback(async (id: string, decision: 'reactivate' | 'delete') => {
+    setPending({ id, decision });
+    setError(null);
     try {
-      const res = await fetch(`/api/missions/${missionId}/resume-decision`, {
+      const res = await fetch(`/api/missions/${id}/resume-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),
       });
-      if (res.ok || res.status === 404) {
-        clearResumeConfirmation(missionId);
-      }
+      if (res.ok || res.status === 404) clearResumeConfirmation(id);
+      else setError('Le serveur a refusé la demande. Réessayez dans un instant.');
     } catch (err) {
       console.error('[EmptyEditorState] Échec de décision de reprise:', err);
+      setError('Impossible de joindre le serveur. Vérifiez la connexion et réessayez.');
     } finally {
-      setDeciding(null);
+      setPending(null);
     }
   }, []);
 
   if (confirmations.length === 0) return null;
+  const plural = confirmations.length > 1;
 
   return (
-    <motion.div className="mb-5" {...entranceProps}>
+    <section className="mb-6" aria-label="Missions interrompues">
       <div className="flex items-center gap-2 mb-2">
-        <RotateCcw size={13} style={{ color: 'var(--primary)' }} />
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-          Mission{confirmations.length > 1 ? 's' : ''} interrompue{confirmations.length > 1 ? 's' : ''}
+          {plural ? 'Missions interrompues' : 'Mission interrompue'}
         </h2>
         <span
           className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded-full text-xs font-semibold"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
-            color: 'var(--primary)',
-          }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)', color: 'var(--primary)' }}
         >
           {confirmations.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2 p-0 m-0">
         <AnimatePresence initial={false}>
-          {confirmations.map(confirmation => (
+          {confirmations.map(c => (
             <InterruptedMissionCard
-              key={confirmation.missionId}
-              confirmation={confirmation}
-              deciding={deciding === confirmation.missionId}
+              key={c.missionId}
+              confirmation={c}
+              deciding={pending?.id === c.missionId ? pending.decision : null}
+              disabled={pending?.id === c.missionId}
               reduceMotion={reduceMotion}
-              onReactivate={() => decideResume(confirmation.missionId, 'reactivate')}
-              onDelete={() => decideResume(confirmation.missionId, 'delete')}
+              onReactivate={() => decide(c.missionId, 'reactivate')}
+              onDelete={() => decide(c.missionId, 'delete')}
             />
           ))}
         </AnimatePresence>
-      </div>
-    </motion.div>
+      </ul>
+      {error && (
+        <p role="alert" className="text-xs mt-2" style={{ color: 'var(--color-error)' }}>{error}</p>
+      )}
+    </section>
   );
 });
 
-// ─── Styles interactifs partagés ───────────────────────────────────────
-
-function GlobalStyles() {
-  return (
-    <style>{`
-      .ai-interactive {
-        transition: all 150ms ease-out;
-        outline: none;
-      }
-      .ai-interactive:active {
-        transform: scale(0.985);
-        transition-duration: 60ms;
-      }
-      .ai-interactive:focus-visible {
-        outline: 2px solid var(--primary);
-        outline-offset: 2px;
-      }
-
-      /* ── Glassmorphism : reflet lumineux en haut + halo au survol ── */
-      .ai-glass::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        background: linear-gradient(
-          135deg,
-          color-mix(in srgb, #fff 14%, transparent) 0%,
-          transparent 40%,
-          transparent 100%
-        );
-        opacity: 0.7;
-        transition: opacity 0.3s ease;
-      }
-      .ai-glass:hover::before {
-        opacity: 1;
-      }
-
-      .ai-compact-card:hover {
-        border-color: color-mix(in srgb, var(--primary) 45%, transparent);
-        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 12px 30px color-mix(in srgb, #000 24%, transparent);
-        transform: translateY(-1px);
-      }
-
-      .ai-hero:hover {
-        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 16px 40px color-mix(in srgb, #000 26%, transparent);
-        transform: translateY(-1px);
-      }
-
-      .ai-hero:active {
-        transform: translateY(0);
-      }
-
-      .ai-quicklink:hover {
-        color: var(--primary);
-        background-color: color-mix(in srgb, var(--surface-soft) 55%, transparent);
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-      }
-
-      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .ai-glass {
-          background-color: var(--surface) !important;
-        }
-      }
-
-      .ai-status-dot {
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-      }
-
-      @keyframes blink-cursor {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .ai-interactive:active { transform: none; }
-        .ai-status-dot { animation: none; }
-      }
-    `}</style>
-  );
-}
-
-// ─── Hook personnalisé pour les fichiers récents ───────────────────────
-
-function useGitInfo() {
-  const [gitInfo, setGitInfo] = useState<any>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/git/status')
-      .then(async (res) => res.json())
-      .then((data) => {
-        if (!cancelled && data.status === 'success') {
-          setGitInfo({
-            branch: data.data?.branch,
-            files: data.data?.files,
-            repository: data.data?.repository
-          });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setGitInfo(null);
-      });
-
-    return () => { cancelled = true; };
-  }, []);
-
-  return gitInfo;
-}
-
-// ─── Hook de piège de focus (pour les modales) ─────────────────────────
-
-function useFocusTrap(isActive: boolean) {
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
-        const focusable = document.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const first = focusable[0] as HTMLElement;
-        const last = focusable[focusable.length - 1] as HTMLElement;
-
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isActive]);
-}
-
-// ─── Composant principal ────────────────────────────────────────────────
+// ─── Composant principal ─────────────────────────────────────────────────
 
 interface EmptyEditorStateProps {
   onOpenFile: (path: string) => void;
@@ -579,7 +464,7 @@ interface EmptyEditorStateProps {
 export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenFile: _onOpenFile,
   onCreateFile,
-  onCreateFolder: _onCreateFolder,
+  onCreateFolder,
   onShowSettings,
   onOpenSearch,
   onOpenChat,
@@ -588,78 +473,34 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const ws = useWorkspaceState();
   const { connected, isBusy, connect, clearTranscript, clearActivity } = useLiveAPIContext();
   const { profile } = useProfile();
-  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = !!useReducedMotion();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
   const [ctaHovered, setCtaHovered] = useState(false);
-  const [geminiStatus, setGeminiStatus] = useState<'configured' | 'invalid' | 'unconfigured' | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([fetch('/api/tokens'), fetch('/api/gemini-keys')])
-      .then(async ([tokensResponse, keysResponse]) => [
-        await tokensResponse.json(),
-        await keysResponse.json(),
-      ])
-      .then(([tokensData, keysData]) => {
-        if (!cancelled && tokensData.status === 'success' && keysData.status === 'success') {
-          const geminiToken = tokensData.tokens?.find((token: { key: string; valid: boolean | null }) => token.key === 'GEMINI_API_KEY');
-          const hasActivePoolKey = keysData.keys?.some((key: { disabled: boolean }) => !key.disabled);
-          setGeminiStatus(
-            geminiToken?.valid === false
-              ? 'invalid'
-              : geminiToken?.configured === true || hasActivePoolKey === true
-                ? 'configured'
-                : 'unconfigured',
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setGeminiStatus(null);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const ctaText = connected
-    ? 'Session vocale et texte en cours'
-    : 'Parlez, écrivez ou demandez quelque chose à votre assistant IA';
-  const { displayed: ctaDisplayed, isTyping: ctaIsTyping } = useTypewriter(ctaText, ctaHovered && !prefersReducedMotion);
-
+  const geminiStatus = useGeminiStatus();
   const gitInfo = useGitInfo();
-
-  // Piège de focus pour les modales
   useFocusTrap(showShortcuts || showSystem);
 
   const aiName = profile.aiName || 'Leanna';
   const userName = profile.userName || 'Utilisateur';
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 6) return 'Bonne nuit';
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+  const { greeting, dateLabel } = useMemo(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    const g = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    const d = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return { greeting: g, dateLabel: d.charAt(0).toUpperCase() + d.slice(1) };
   }, []);
 
-  // Props d'entrée avec spring ou fondu selon la motion réduite
-  const makeEntranceProps = useCallback(
-    (delay = 0) =>
-      prefersReducedMotion
-        ? {
-            initial: { opacity: 0 },
-            animate: { opacity: 1 },
-            transition: { duration: 0.15, delay },
-          }
-        : {
-            initial: { opacity: 0, y: 10 },
-            animate: { opacity: 1, y: 0 },
-            transition: { ...ENTRANCE_SPRING, delay },
-          },
-    [prefersReducedMotion]
-  );
+  // Une seule séquence d'entrée orchestrée (délais courts) plutôt que
+  // des effets sur chaque bloc.
+  const enter = useCallback((delay = 0) => (reduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.15, delay } }
+    : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { ...SPRING, delay } }),
+  [reduceMotion]);
 
-  // Démarrage d'une session vierge avec Leanna et ouverture du chat
   const handleConnect = useCallback(() => {
     if (!connected) {
       clearTranscript();
@@ -669,303 +510,248 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     onOpenChat?.();
   }, [connected, connect, onOpenChat, clearTranscript, clearActivity]);
 
-  // Raccourcis clavier (stabilisés)
+  // Raccourcis : ⌘/Ctrl+N, +L, +, ainsi que « ? » pour l'aide
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      if (e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        onCreateFile();
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      );
+
+      if (!e.metaKey && !e.ctrlKey) {
+        if (e.key === '?' && !typing && !showSystem) {
+          e.preventDefault();
+          setShowShortcuts(v => !v);
+        }
+        if (e.key === 'Escape') { setShowShortcuts(false); setShowSystem(false); }
+        return;
       }
-      if (e.key === ',') {
-        e.preventDefault();
-        onShowSettings();
-      }
-      if (e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        handleConnect();
-      }
+      const key = e.key.toLowerCase();
+      if (key === 'n' && !e.shiftKey) { e.preventDefault(); onCreateFile(); }
+      else if (key === ',') { e.preventDefault(); onShowSettings(); }
+      else if (key === 'l') { e.preventDefault(); handleConnect(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onCreateFile, onShowSettings, handleConnect]);
+  }, [onCreateFile, onShowSettings, handleConnect, showSystem]);
+
+  // ── Textes du CTA ──
+  const ctaTitle = connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`;
+  const ctaText = connected
+    ? 'Une session vocale et texte est en cours.'
+    : 'Parlez, écrivez ou confiez une tâche à votre assistant.';
+  const { displayed: ctaDisplayed, isTyping } = useTypewriter(ctaText, ctaHovered && !reduceMotion);
+
+  const statusLabel = connected ? 'Prête' : isBusy ? 'Connexion…' : 'En attente';
+  const workspaceName = ws.workspace ? ws.workspace.path.split(/[/\\]/).pop() : null;
+  const changedFiles = Array.isArray(gitInfo?.files) ? gitInfo!.files.length : null;
+
+  const geminiProblem = geminiStatus === 'invalid' || geminiStatus === 'unconfigured';
 
   return (
-    <div
-      className="flex flex-1 flex-col overflow-y-auto relative"
-      style={{ backgroundColor: 'var(--bg)' }}
-    >
+    <div className="flex flex-1 flex-col overflow-y-auto relative" style={{ backgroundColor: 'var(--bg)' }}>
       <GlobalStyles />
 
-      {/* ── Fond statique : dégradé bleu très léger en haut seulement ──
-          (les vidéos de fond ont été retirées — trop coûteuses en GPU ;
-           la vidéo reste réservée au splash de démarrage.) ── */}
+      {/* Fond statique : léger halo en haut */}
       <div
         className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to bottom, var(--primary) 0%, var(--primary) 12%, transparent 30%)',
-          opacity: 0.03,
-        }}
-      />
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse 100% 100% at 50% 0%, var(--primary) 0%, transparent 40%)',
-          opacity: 0.05,
-        }}
+        style={{ background: 'radial-gradient(ellipse 90% 60% at 50% 0%, var(--primary) 0%, transparent 60%)', opacity: 0.06 }}
       />
 
-      {/* ── Contenu ── */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-[1000px]">
-          {/* ── NIVEAU 1 : Header avec salutation premium ── */}
-          <motion.div 
-            className="mb-2 flex items-baseline gap-4"
-            {...makeEntranceProps(0)}
-          >
-            <div className="flex flex-col gap-0">
-              <span 
-                className="text-sm font-normal"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                {greeting}
-              </span>
+      <div className="relative z-10 flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-14">
+        <main className="w-full max-w-[880px] my-auto">
+
+          {/* ── En-tête ── */}
+          <motion.header className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3" {...enter(0)}>
+            <div>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {dateLabel}
+              </p>
               <h1
-                className="text-4xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight"
+                className="text-3xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight mt-1"
                 style={{ color: 'var(--text)' }}
               >
-                {userName}
+                {greeting}, {userName}
               </h1>
+              <p className="text-base sm:text-lg mt-2" style={{ color: 'var(--text-secondary)' }}>
+                Que souhaitez-vous faire aujourd'hui ?
+              </p>
             </div>
 
-            {/* ── NIVEAU 1 : Statut Leanna discret ── */}
-            <div className="flex-1" />
-            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-              <span 
-                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ai-status-dot' : ''}`}
+            <div className="ee-chip" role="status" aria-live="polite">
+              <span
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ee-dot-live' : ''}`}
                 style={{
                   backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
                   boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,
                 }}
               />
-              <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
-                {aiName}
-              </span>
-              <span>
-                {connected ? 'Prête' : isBusy ? 'Connexion...' : 'En attente'}
-              </span>
+              <span style={{ color: 'var(--text-secondary)' }}>{aiName}</span>
+              <span>{statusLabel}</span>
             </div>
-          </motion.div>
+          </motion.header>
 
-          {/* ── NIVEAU 2 : Sous-titre principal ── */}
-          <motion.div 
-            className="mb-8"
-            {...makeEntranceProps(0.04)}
-          >
-            <h2 
-              className="text-lg sm:text-xl font-normal"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Que souhaitez-vous faire aujourd'hui ?
-            </h2>
-          </motion.div>
+          {/* ── Alerte clé Gemini (visible seulement si nécessaire) ── */}
+          <AnimatePresence initial={false}>
+            {geminiProblem && (
+              <motion.div
+                role="alert"
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                animate={reduceMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div
+                  className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl text-sm"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    backgroundColor: `color-mix(in srgb, ${geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--primary)'} 10%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--primary)'} 30%, transparent)`,
+                  }}
+                >
+                  {geminiStatus === 'invalid'
+                    ? <AlertCircle size={16} style={{ color: 'var(--color-error)' }} />
+                    : <KeyRound size={16} style={{ color: 'var(--primary)' }} />}
+                  <span className="flex-1 min-w-[200px]">
+                    {geminiStatus === 'invalid'
+                      ? 'La clé API Gemini est invalide. Remplacez-la pour utiliser l\'assistant.'
+                      : 'Aucune clé API Gemini n\'est configurée. Ajoutez-en une pour utiliser l\'assistant.'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onShowSettings('tokens-settings')}
+                    className="ee-btn ee-focus"
+                    style={{ color: 'var(--text)', backgroundColor: 'color-mix(in srgb, var(--surface-soft) 70%, transparent)' }}
+                  >
+                    {geminiStatus === 'invalid' ? 'Corriger la clé' : 'Ajouter une clé'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* ── NIVEAU 3 : CTA principal - Plus grand et centré avec identité IA ── */}
+          {/* ── Action principale ── */}
           <motion.button
             type="button"
             onClick={handleConnect}
             onMouseEnter={() => setCtaHovered(true)}
             onMouseLeave={() => setCtaHovered(false)}
-            className="ai-interactive ai-hero ai-glass group relative w-full mx-auto flex items-center gap-4 p-6 mb-5 text-left rounded-[22px] overflow-hidden"
-             style={{
-               backgroundColor: 'color-mix(in srgb, var(--surface) 50%, transparent)',
-               border: '1px solid color-mix(in srgb, var(--primary) 25%, var(--border))',
-               backdropFilter: 'blur(12px)',
-               WebkitBackdropFilter: 'blur(12px)',
-               height: '120px',
-               minHeight: '120px',
-               maxWidth: '640px',
-               boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent), 0 20px 40px -10px color-mix(in srgb, #000 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent)',
-               transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-             }}
-            {...makeEntranceProps(0.08)}
-            aria-label={connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
-            whileHover={prefersReducedMotion ? { borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)' } : {
-              scale: 1.02,
-              boxShadow: 'inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 16px 40px color-mix(in srgb, #000 26%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)',
-            }}
-            whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+            onFocus={() => setCtaHovered(true)}
+            onBlur={() => setCtaHovered(false)}
+            className="ee-glass ee-hero ee-focus w-full flex items-center gap-4 sm:gap-5 p-5 sm:p-6 mb-6 text-left rounded-[22px]"
+            style={{ minHeight: '112px' }}
+            aria-label={ctaTitle}
+            whileHover={reduceMotion ? undefined : { scale: 1.01 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+            {...enter(0.06)}
           >
-            {/* Gradient background overlay for depth */}
-            <div
-              className="absolute inset-0 rounded-[20px] pointer-events-none"
-               style={{
-                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 70%)',
-               }}
-             />
-
-            <div
-              className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0 relative"
-               style={{
-                 backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)',
-                 border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-                 backdropFilter: 'blur(8px)',
-                 WebkitBackdropFilter: 'blur(8px)',
-                 boxShadow: '0 4px 12px -2px color-mix(in srgb, var(--primary) 40%, transparent)',
-               }}
+            <span
+              className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--primary) 16%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--primary) 32%, transparent)',
+                boxShadow: '0 4px 14px -2px color-mix(in srgb, var(--primary) 40%, transparent)',
+              }}
             >
-              {/* Icône — animation d'oscillation seulement si motion non réduite */}
-              <motion.div
-                animate={prefersReducedMotion ? undefined : { rotate: [0, 10, -5, 0] }}
-                transition={prefersReducedMotion ? undefined : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                <Sparkles size={20} style={{ color: 'var(--primary)' }} />
-              </motion.div>
-              {/* Subtle glow effect */}
-              <div
-                className="absolute inset-0 rounded-xl pointer-events-none"
-                style={{
-                  boxShadow: 'inset 0 0 12px color-mix(in srgb, var(--primary) 12%, transparent)',
-                }}
-              />
-            </div>
+              <Sparkles size={20} style={{ color: 'var(--primary)' }} />
+            </span>
 
-            <div className="flex-1 min-w-0">
-              <motion.div
-                className="text-lg font-bold leading-tight"
-                style={{ color: 'var(--text)' }}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-              >
-                {connected ? 'Ouvrir le chat' : `Démarrer avec ${aiName}`}
-              </motion.div>
-              <motion.div
-                className="text-sm mt-1 leading-snug"
-                style={{ color: 'var(--text-muted)' }}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.15, duration: 0.3 }}
-              >
-                {ctaDisplayed}
-                {ctaIsTyping && (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '1px',
-                      height: '0.9em',
-                      backgroundColor: 'var(--text-muted)',
-                      marginLeft: '1px',
-                      verticalAlign: 'text-bottom',
-                      animation: 'blink-cursor 0.6s step-end infinite',
-                    }}
-                  />
-                )}
-              </motion.div>
-            </div>
+            <span className="flex-1 min-w-0">
+              <span className="block text-lg sm:text-xl font-bold leading-tight" style={{ color: 'var(--text)' }}>
+                {ctaTitle}
+              </span>
+              {/* Le texte complet est rendu invisible pour réserver la hauteur :
+                  l'animation ne fait plus sauter la mise en page. */}
+              <span className="relative block text-sm mt-1 leading-snug" style={{ color: 'var(--text-muted)' }}>
+                <span className="invisible" aria-hidden="true">{ctaText}</span>
+                <span className="absolute inset-0" aria-hidden={ctaHovered}>
+                  {ctaDisplayed}
+                  {isTyping && (
+                    <span
+                      style={{
+                        display: 'inline-block', width: 1, height: '0.9em', marginLeft: 1,
+                        verticalAlign: 'text-bottom', backgroundColor: 'var(--text-muted)',
+                        animation: 'ee-caret 0.6s step-end infinite',
+                      }}
+                    />
+                  )}
+                </span>
+              </span>
+            </span>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 500, damping: 25 }}
-            >
-              <Kbd>{MOD}+L</Kbd>
-            </motion.div>
+            <Kbd className="hidden sm:inline-flex">{MOD}+L</Kbd>
           </motion.button>
 
-          {/* ── Missions interrompues (reprise après crash/redémarrage) ── */}
-          <InterruptedMissionsSection
-            reduceMotion={!!prefersReducedMotion}
-            entranceProps={makeEntranceProps(0.1)}
-          />
+          {/* ── Missions interrompues ── */}
+          <InterruptedMissionsSection reduceMotion={reduceMotion} />
 
-          {/* ── NIVEAU 4 : Actions secondaires compactes ── */}
-          <motion.div
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5"
-            {...makeEntranceProps(0.12)}
+          {/* ── Actions rapides ── */}
+          <motion.section
+            aria-label="Actions rapides"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+            {...enter(0.12)}
           >
-            <CompactActionCard
-              icon={Plus}
-              title="Nouveau fichier"
-              description="Ctrl+N"
-              onClick={onCreateFile}
-              reduceMotion={!!prefersReducedMotion}
+            <ActionCard
+              icon={Plus} title="Nouveau fichier" description="Créer dans l'espace de travail"
+              shortcut={`${MOD}+N`} onClick={onCreateFile} reduceMotion={reduceMotion}
             />
-            <CompactActionCard
-              icon={Search}
-              title="Rechercher"
-              description="Ctrl+P"
-              onClick={onOpenSearch}
-              reduceMotion={!!prefersReducedMotion}
+            <ActionCard
+              icon={FolderPlus} title="Nouveau dossier" description="Organiser vos fichiers"
+              onClick={onCreateFolder} reduceMotion={reduceMotion}
             />
-            <CompactActionCard
-              icon={BookOpen}
-              title="Notebooks"
-              description="Sources et résumés"
-              onClick={onOpenNotebooks}
-              reduceMotion={!!prefersReducedMotion}
+            <ActionCard
+              icon={Search} title="Rechercher" description="Fichiers et contenus"
+              shortcut={`${MOD}+P`} onClick={onOpenSearch} disabled={!onOpenSearch} reduceMotion={reduceMotion}
             />
-          </motion.div>
+            <ActionCard
+              icon={BookOpen} title="Notebooks" description="Sources et résumés"
+              onClick={onOpenNotebooks} disabled={!onOpenNotebooks} reduceMotion={reduceMotion}
+            />
+          </motion.section>
 
-          {/* ── NIVEAU 5 : Barre d'info bas ── */}
-          <motion.div
-            className="flex items-center justify-between mt-12 pt-6 border-t"
+          {/* ── Pied de page ── */}
+          <motion.footer
+            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mt-10 pt-5 border-t"
             style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: prefersReducedMotion ? 0.15 : 0.4 }}
+            transition={{ delay: 0.25, duration: reduceMotion ? 0.15 : 0.4 }}
           >
-            {/* Workspace info */}
-            <div className="flex items-center gap-1.5 text-sm font-mono" style={{ color: 'var(--text-muted)' }}>
-              {ws.workspace ? (
-                <>
-                  <FolderOpen size={11} />
-                  {ws.workspace.path.split(/[/\\]/).pop()}
-                </>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {workspaceName ? (
+                <span className="inline-flex items-center gap-1.5 font-mono" title={ws.workspace?.path}>
+                  <FolderOpen size={13} />
+                  {workspaceName}
+                </span>
               ) : (
                 <span>Aucun espace de travail ouvert</span>
               )}
+              {gitInfo?.branch && (
+                <span
+                  className="inline-flex items-center gap-1.5 font-mono"
+                  title={changedFiles ? `${changedFiles} fichier(s) modifié(s)` : 'Aucune modification'}
+                >
+                  <GitBranch size={13} />
+                  {gitInfo.branch}
+                  {changedFiles ? (
+                    <span style={{ color: 'var(--primary)' }}>+{changedFiles}</span>
+                  ) : null}
+                </span>
+              )}
             </div>
 
-            {/* Quick links */}
-            <div className="flex items-center gap-1">
-              {geminiStatus !== 'configured' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onShowSettings('tokens-settings')}
-                    className="ai-interactive flex items-center gap-1.5 rounded px-2 py-1 text-sm font-medium"
-                    style={{
-                      color: geminiStatus === 'invalid' ? 'var(--color-error)' : 'var(--text-muted)',
-                      backgroundColor: 'color-mix(in srgb, var(--surface-soft) 55%, transparent)',
-                      border: '1px solid color-mix(in srgb, #fff 12%, transparent)',
-                      backdropFilter: 'blur(4px)',
-                      WebkitBackdropFilter: 'blur(4px)',
-                    }}
-                    title={geminiStatus === 'invalid'
-                      ? 'API key not valid. Please pass a valid API key.'
-                      : 'Configurer la clé API Gemini'}
-                  >
-                    {geminiStatus === 'invalid' ? <AlertCircle size={13} /> : <KeyRound size={13} />}
-                    <span>
-                      Gemini: {geminiStatus === null ? 'Vérification…'
-                        : geminiStatus === 'invalid' ? 'Clé invalide' : 'Non configurée'}
-                    </span>
-                  </button>
-                  <span style={{ color: 'var(--text-muted)' }}>·</span>
-                </>
-              )}
-              <QuickLink label="Raccourcis" onClick={() => setShowShortcuts(true)} />
-              <span style={{ color: 'var(--text-muted)' }}>·</span>
-              <QuickLink label="Système" onClick={() => setShowSystem(true)} />
-            </div>
-          </motion.div>
-        </div>
+            <nav className="flex items-center gap-1" aria-label="Aide et système">
+              <button type="button" onClick={() => setShowShortcuts(true)} className="ee-link ee-focus">
+                Raccourcis <Kbd className="ml-1">?</Kbd>
+              </button>
+              <button type="button" onClick={() => setShowSystem(true)} className="ee-link ee-focus">
+                Système
+              </button>
+            </nav>
+          </motion.footer>
+        </main>
       </div>
 
-      {/* Modales */}
       <AnimatePresence>
         {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
         {showSystem && (
