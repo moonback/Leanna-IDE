@@ -6,9 +6,12 @@ import {
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
   Github, Terminal, FolderDown, Server, RefreshCw, Send, Settings,
+  FolderClock, Layers,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
+// @ts-ignore - Asset handled by bundler
+import logo from '../../assets/images/logo.png';
 
 /** Clé sessionStorage pour le mode "sans projet" (réinitialisée à chaque fermeture du navigateur) */
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
@@ -559,46 +562,78 @@ export function StartupProjectModal() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[99999] flex items-center justify-center"
-        style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-hidden"
+        style={{ backgroundColor: 'rgba(5, 7, 12, 0.82)', backdropFilter: 'blur(14px)' }}
       >
+        {/* ── Orbes de lumière atmosphériques ── */}
+        {!shouldReduceMotion && (
+          <>
+            <motion.div
+              animate={{ x: [-20, 20, -20], y: [-15, 15, -15], opacity: [0.2, 0.4, 0.2] }}
+              transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full pointer-events-none blur-[120px]"
+              style={{ background: 'radial-gradient(circle, var(--accent-primary) 0%, transparent 70%)' }}
+            />
+            <motion.div
+              animate={{ x: [20, -20, 20], y: [15, -15, 15], opacity: [0.15, 0.35, 0.15] }}
+              transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -bottom-40 -right-40 w-[34rem] h-[34rem] rounded-full pointer-events-none blur-[130px]"
+              style={{ background: 'radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%)' }}
+            />
+          </>
+        )}
+
         <motion.div
           {...cardMotionProps}
           transition={MODAL_SPRING}
           role="dialog"
           aria-modal="true"
           aria-labelledby="workspace-modal-title"
-          className="w-[calc(100%-24px)] max-w-7xl h-[min(780px,calc(100vh-32px))] rounded-2xl p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col"
+          className="relative z-10 w-[calc(100%-16px)] max-w-7xl h-[min(780px,calc(100vh-32px))] rounded-3xl p-5 sm:p-7 shadow-2xl overflow-hidden flex flex-col border"
           style={{
-            backgroundColor: 'var(--bg-panel)',
-            border: '1px solid var(--border-base)',
-            boxShadow: '0 24px 80px rgba(0, 0, 0, 0.4)',
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 82%, rgba(13, 17, 26, 0.9))',
+            borderColor: 'color-mix(in srgb, var(--accent-primary) 24%, rgba(255, 255, 255, 0.1))',
+            boxShadow:
+              '0 32px 100px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 40px -10px color-mix(in srgb, var(--accent-primary) 15%, transparent)',
           }}
         >
+          {/* Ligne lumineuse supérieure */}
+          <div
+            className="absolute top-0 left-0 right-0 h-[1.5px] pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(90deg, transparent 0%, var(--accent-primary) 30%, var(--accent-secondary) 70%, transparent 100%)',
+            }}
+          />
+
           {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-5 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b flex-shrink-0" style={{ borderColor: 'color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
+            <div className="flex items-center gap-3.5">
+              <motion.div
+                whileHover={shouldReduceMotion ? undefined : { rotate: 10, scale: 1.06 }}
+                className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent)',
+                  background:
+                    'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 30%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 20%, transparent) 100%)',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 45%, transparent)',
+                  boxShadow: '0 8px 24px -4px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
                 }}
               >
-                <FolderOpen className="w-5 h-5" style={{ color: 'var(--accent-secondary)' }} />
-              </div>
+                <img src={logo} alt="Leanna" className="w-8 h-8 object-contain" draggable={false} />
+              </motion.div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
                   Workspace manager
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 id="workspace-modal-title" className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                  <h2 id="workspace-modal-title" className="text-xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
                     Choisir un workspace
                   </h2>
                   <span
-                    className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                    className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border"
                     style={{
                       backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
+                      borderColor: 'color-mix(in srgb, var(--color-success) 30%, transparent)',
                       color: 'var(--color-success)',
                     }}
                   >
@@ -639,61 +674,56 @@ export function StartupProjectModal() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 items-center gap-1 p-1 rounded-xl mb-5 flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
-            <button
-              type="button"
-              onClick={() => setActiveTab('recent')}
-              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'recent' ? 'shadow-sm' : 'opacity-70 hover:opacity-100 '
-              }`}
-              style={{
-                backgroundColor: activeTab === 'recent' ? 'var(--bg-panel)' : 'transparent',
-                color: activeTab === 'recent' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              Dépôts récents ({workspaces.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('open')}
-              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'open' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'open' ? 'var(--bg-panel)' : 'transparent',
-                color: activeTab === 'open' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              Ouvrir local
-            </button>
-            <button
-              type="button"
-              onClick={() => { setActiveTab('clone'); setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }}
-              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
-                activeTab === 'clone' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'clone' ? 'var(--bg-panel)' : 'transparent',
-                color: activeTab === 'clone' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              <Github className="w-3 h-3" />
-              Cloner
-            </button>
-            <button
-              type="button"
-              onClick={() => { setActiveTab('ftp'); setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); fetchFtpServers(); }}
-              className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
-                activeTab === 'ftp' ? 'shadow-sm' : 'opacity-70 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'ftp' ? 'var(--bg-panel)' : 'transparent',
-                color: activeTab === 'ftp' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              <Server className="w-3 h-3" />
-              FTP
-            </button>
+          <div
+            className="grid grid-cols-2 sm:grid-cols-4 items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
+              border: '1px solid var(--border-base)',
+            }}
+          >
+            {([
+              { id: 'recent', label: 'Dépôts récents', count: workspaces.length, icon: FolderClock },
+              { id: 'open', label: 'Ouvrir local', count: undefined, icon: FolderOpen },
+              { id: 'clone', label: 'Cloner', count: undefined, icon: Github },
+              { id: 'ftp', label: 'FTP', count: undefined, icon: Server },
+            ] as const).map(({ id, label, count, icon: Icon }) => {
+              const selected = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(id);
+                    if (id === 'clone') { setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }
+                    if (id === 'ftp') { setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); fetchFtpServers(); }
+                  }}
+                  className="relative py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                  style={{
+                    color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  }}
+                >
+                  {selected && (
+                    <motion.span
+                      layoutId="ws-tab-active"
+                      className="absolute inset-0 rounded-xl -z-0"
+                      style={{
+                        backgroundColor: 'var(--bg-panel)',
+                        border: '1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-base))',
+                        boxShadow: '0 2px 10px -2px color-mix(in srgb, var(--accent-primary) 25%, transparent)',
+                      }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <Icon className="w-3.5 h-3.5 relative z-10" />
+                  <span className="relative z-10 truncate">
+                    {label}
+                    {count !== undefined && (
+                      <span className="ml-1 opacity-60">({count})</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* ── Tab Content ── */}
@@ -1357,9 +1387,14 @@ export function StartupProjectModal() {
           </div>
 
           {/* Footer Action */}
-          <div className="flex items-center justify-between gap-3 pt-4 mt-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
-            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-              {currentPath ? `Actif: ${currentPath.split(/[\\/]/).pop()}` : 'Aucun projet sélectionné'}
+          <div className="flex items-center justify-between gap-3 pt-4 mt-3 border-t flex-shrink-0" style={{ borderColor: 'color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
+            <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+              <Layers className="w-3.5 h-3.5 opacity-70" style={{ color: 'var(--accent-primary)' }} />
+              {currentPath ? (
+                <>Actif : <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{currentPath.split(/[\\/]/).pop()}</span></>
+              ) : (
+                'Aucun projet sélectionné'
+              )}
             </span>
 
             <div className="flex items-center gap-2">

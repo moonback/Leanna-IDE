@@ -5,7 +5,6 @@ import {
   Code2,
   BookOpen,
   ArrowRight,
-  Sparkles,
   FolderClock,
   FolderOpen,
   GitBranch,
@@ -17,6 +16,8 @@ import {
 } from 'lucide-react';
 // @ts-ignore - Asset handled by bundler
 import bgVideo from '../../assets/video.mp4';
+// @ts-ignore - Asset handled by bundler
+import logo from '../../assets/images/logo-sombre.png';
 import { ideApi } from '../services/ideApi.js';
 
 /**
@@ -272,7 +273,7 @@ export function LauncherModal() {
             <div className="flex items-center gap-4">
               <motion.div
                 whileHover={shouldReduceMotion ? undefined : { rotate: 12, scale: 1.08 }}
-                className="relative w-13 h-13 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg"
+                className="relative w-13 h-13 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden"
                 style={{
                   background:
                     'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 30%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 20%, transparent) 100%)',
@@ -280,7 +281,12 @@ export function LauncherModal() {
                   boxShadow: '0 8px 24px -4px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
                 }}
               >
-                <Sparkles className="w-6 h-6" style={{ color: 'var(--accent-secondary)' }} />
+                <img
+                  src={logo}
+                  alt="Leanna"
+                  className="w-13 h-13 object-contain"
+                  draggable={false}
+                />
                 <span className="absolute -top-1 -right-1 flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-primary)] opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-primary)]" />
@@ -289,16 +295,7 @@ export function LauncherModal() {
 
               <div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className="text-[10px] font-extrabold uppercase tracking-[0.2em] px-2.5 py-0.5 rounded-full border shadow-sm"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-                      borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, transparent)',
-                      color: 'var(--accent-primary)',
-                    }}
-                  >
-                    Leanna Hub
-                  </span>
+                  
                   <span className="text-xs text-[var(--text-muted)] font-mono opacity-70">
                     v2.5 • Environnement actif
                   </span>
@@ -306,7 +303,7 @@ export function LauncherModal() {
 
                 <h2
                   id="launcher-title"
-                  className="text-xl sm:text-2xl font-black tracking-tight mt-1.5 flex items-center gap-2"
+                  className="text-xl sm:text-1xl font-black tracking-tight mt-1.5 flex items-center gap-2"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   <span>Que souhaitez-vous ouvrir ?</span>
