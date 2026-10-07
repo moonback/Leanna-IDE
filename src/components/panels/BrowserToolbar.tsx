@@ -199,16 +199,16 @@ export function BrowserToolbar({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
+    <div className="flex flex-col gap-2 px-2.5 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
       <div className="flex items-center justify-between gap-1 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Globe size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+        <div className="flex items-center gap-2 min-w-0">
+          <Globe size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
           <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }} title={pageTitle || 'Navigateur'}>
             {pageTitle || 'Navigateur'}
           </span>
           {assistantNavActive && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium" style={{
-              backgroundColor: 'color-mix(in srgb, var(--color-accent-alt) 15%, transparent)',
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{
+              backgroundColor: 'var(--color-accent-alt-subtle)',
               color: 'var(--color-accent-alt)',
               border: '1px solid color-mix(in srgb, var(--color-accent-alt) 30%, transparent)',
             }}>
@@ -234,13 +234,13 @@ export function BrowserToolbar({
             onRenameProfile={onRenameProfile}
             onDeleteProfile={onDeleteProfile}
           />
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-active)] transition" title="Fermer le navigateur" aria-label="Fermer le navigateur">
-            <X size={13} style={{ color: 'var(--text-muted)' }} />
+          <button type="button" onClick={onClose} className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--bg-active)] transition" title="Fermer le navigateur" aria-label="Fermer le navigateur">
+            <X size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         <ToolbarButton label="Page précédente" onClick={onGoBack} disabled={!canGoBack}><ArrowLeft size={13} /></ToolbarButton>
         <ToolbarButton label="Page suivante" onClick={onGoForward} disabled={!canGoForward}><ArrowRight size={13} /></ToolbarButton>
         <ToolbarButton label={loading ? 'Arrêter le chargement' : 'Actualiser'} onClick={onRefresh}>
@@ -251,10 +251,15 @@ export function BrowserToolbar({
         <ToolbarButton label="Ouvrir dans une nouvelle fenêtre" onClick={onOpenExternal}><ExternalLink size={13} /></ToolbarButton>
 
         <div ref={containerRef} className="relative flex flex-1 min-w-0">
-          <div className="flex flex-1 items-center gap-1 min-w-0 rounded-lg px-2 py-1" style={{
+          <div className="flex flex-1 items-center gap-1.5 min-w-0 rounded-full px-3 py-1.5" style={{
             backgroundColor: 'var(--bg-input, var(--bg-secondary))',
-            border: `1px solid ${assistantNavActive ? 'rgba(139,92,246,0.5)' : 'var(--border-base)'}`,
-            transition: 'border-color 0.2s',
+            border: `1px solid ${assistantNavActive ? 'var(--accent-primary)' : focused ? 'var(--border-focus)' : 'var(--border-base)'}`,
+            boxShadow: assistantNavActive
+              ? '0 0 0 3px var(--accent-subtle)'
+              : focused
+                ? '0 0 0 3px var(--accent-subtle)'
+                : 'none',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
           }}>
             {secure ? (
               <Lock size={11} style={{ color: 'var(--color-success)', flexShrink: 0 }} aria-label="Connexion sécurisée (HTTPS)" />
@@ -336,12 +341,14 @@ export function BrowserToolbar({
           )}
         </div>
 
+        <span className="w-px h-5 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-base)' }} aria-hidden="true" />
+
         <ToolbarButton label="Dézoomer" onClick={onZoomOut}><ZoomOut size={13} /></ToolbarButton>
         <button
           type="button"
           onClick={onZoomReset}
-          className="px-1 rounded transition hover:bg-[var(--bg-active)] text-xs tabular-nums"
-          style={{ color: 'var(--text-muted)', minWidth: 38 }}
+          className="h-7 px-1.5 rounded-lg transition hover:bg-[var(--bg-active)] text-xs font-medium tabular-nums"
+          style={{ color: zoomPercent === 100 ? 'var(--text-muted)' : 'var(--accent-primary)', minWidth: 42 }}
           title="Réinitialiser le zoom"
           aria-label={`Zoom ${zoomPercent} %, cliquer pour réinitialiser`}
         >
@@ -354,10 +361,18 @@ export function BrowserToolbar({
   );
 }
 
-function ToolbarButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function ToolbarButton({ label, onClick, disabled, children, active = false }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode; active?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="p-1.5 rounded transition hover:bg-[var(--bg-active)] disabled:opacity-30" title={label} aria-label={label}>
-      <span style={{ color: 'var(--text-muted)' }}>{children}</span>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center justify-center w-7 h-7 rounded-lg transition hover:bg-[var(--bg-active)] disabled:opacity-30 disabled:cursor-not-allowed"
+      style={active ? { backgroundColor: 'var(--btn-active-bg, var(--accent-subtle))' } : undefined}
+      title={label}
+      aria-label={label}
+    >
+      <span style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'inline-flex' }}>{children}</span>
     </button>
   );
 }

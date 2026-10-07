@@ -1574,12 +1574,12 @@ export function BrowserPanel({
         <div
           className="flex items-center gap-2 px-3 py-2 text-sm flex-shrink-0"
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-            borderBottom: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
+            backgroundColor: 'var(--color-error-subtle)',
+            borderBottom: '1px solid var(--border-error-subtle)',
             color: 'var(--color-error)',
           }}
         >
-          <AlertTriangle size={12} />
+          <AlertTriangle size={13} className="flex-shrink-0" />
           <span className="flex-1 truncate">{loadError}</span>
         </div>
       )}
