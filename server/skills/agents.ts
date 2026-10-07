@@ -10,6 +10,7 @@ import {
   orchestrateSchema,
   listAgentTasksSchema,
   hasAgent,
+  swarmComposer,
 } from "../agents/index.js";
 import { SkillValidationError } from "./base.js";
 import type { AgentRole } from "../agents/index.js";
@@ -144,6 +145,7 @@ export const agentsSkill: Skill = {
     agent_delegation_matrix: ["read"],
     agent_bus_metrics: ["read"],
     agent_message_history: ["read"],
+    agent_compose_swarm: ["read"],
   },
   declarations: [
     // ─── Outils existants ─────────────────────────────────────────────────────
@@ -382,6 +384,21 @@ export const agentsSkill: Skill = {
         required: ["goal"],
       },
     },
+    {
+      name: "agent_compose_swarm",
+      description:
+        "🤖 Dynamic Agent Swarm — compose dynamiquement l'ÉQUIPE d'agents spécialisés adaptée à un objectif (recherche → conception → implémentation → tests → revue → sécurité → optimisation → doc), ordonnée en pipeline. Lecture seule : prévisualise la composition de l'équipe avant de lancer une orchestration. N'invente aucun rôle.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          objective: { type: "STRING", description: "L'objectif de la mission (ex: « Optimise les performances de mon application »)." },
+          description: { type: "STRING", description: "Détails additionnels (optionnel)." },
+          planned_skills: { type: "ARRAY", items: { type: "STRING" }, description: "Skills envisagés pour affiner la composition (optionnel)." },
+          max_members: { type: "NUMBER", description: "Taille max de l'équipe (défaut 6)." },
+        },
+        required: ["objective"],
+      },
+    },
   ],
 
   inputSchemas: {
@@ -410,6 +427,12 @@ export const agentsSkill: Skill = {
       mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
       maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
       maxReplans: z.number().int().min(0).max(5).optional().default(2),
+    }),
+    agent_compose_swarm:              z.object({
+      objective: z.string().min(1, "L'objectif est requis").trim(),
+      description: z.string().trim().optional(),
+      planned_skills: z.array(z.string().trim()).optional().default([]),
+      max_members: z.number().int().min(1).max(12).optional().default(6),
     }),
   },
 
@@ -616,6 +639,22 @@ export const agentsSkill: Skill = {
             capabilities: a.capabilities,
             maxConcurrency: a.maxConcurrency, defaultTimeoutMs: a.defaultTimeoutMs,
           })),
+        };
+      }
+
+      case "agent_compose_swarm": {
+        const v = validateArgs(agentsSkill.inputSchemas!["agent_compose_swarm"], args);
+        const composition = swarmComposer.plan({
+          objective: { title: v.objective, description: v.description },
+          plannedSkills: v.planned_skills,
+          maxMembers: v.max_members,
+        });
+        return {
+          status: "success",
+          objective: composition.objective,
+          members: composition.members,
+          pipeline: composition.pipeline,
+          summary: composition.summary,
         };
       }
 

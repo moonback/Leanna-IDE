@@ -42,6 +42,7 @@ test("agentsSkill — déclare tous les outils attendus", () => {
     "assistant_logs",
     "agent_message_history",
     "agent_brain",
+    "agent_compose_swarm",
   ];
   for (const name of expected) {
     assert.ok(toolNames.includes(name), `Outil "${name}" doit être déclaré`);

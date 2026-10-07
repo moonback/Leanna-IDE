@@ -130,3 +130,13 @@ export type {
   ProjectDomain,
   ComplexityLevel,
 } from "./brain/types.js";
+
+// Dynamic Agent Swarm (P1) — composition dynamique d'une équipe d'agents par objectif
+export { SwarmComposer, swarmComposer } from "./SwarmComposer.js";
+export type {
+  TeamComposition,
+  SwarmHandle,
+  SwarmMember,
+  SwarmStage,
+  SwarmComposeInput,
+} from "./SwarmComposer.js";
