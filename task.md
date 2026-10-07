@@ -1,3 +1,30 @@
+# 📊 État d'implémentation
+
+> Mis à jour automatiquement par l'agent. Chaque fonctionnalité est déterministe,
+> réutilise le runtime existant, et livrée avec tests + typecheck au vert.
+
+### ✅ P0 — Terminé (5/5)
+
+| Fonctionnalité | Module(s) | Tests |
+| --- | --- | --- |
+| 🧠 **Anticipation Engine** | `server/autonomy/AnticipationEngine.ts` (+ wiring `LeannaCore`, event `autonomy:anticipation`) | 9 ✅ |
+| 📚 **Playbooks appris** | `server/knowledge/PlaybookStore.ts` (+ hook `Executor.finalizeMission`) | 10 ✅ |
+| 👤 **Project Intelligence Profile** | `server/knowledge/ProjectProfile.ts` (+ refresh workspace/mission) | 7 ✅ |
+| 🔍 **AI Project Doctor** | `server/knowledge/ProjectDoctor.ts` (+ skill `knowledge_project_doctor`) | 9 ✅ |
+| 🧪 **Mission Simulator** | `server/mission/MissionSimulator.ts` (+ skill `mission_simulate`) | 9 ✅ |
+
+### 🚧 P1 — En cours
+
+| Fonctionnalité | Module(s) | Statut |
+| --- | --- | --- |
+| 🔮 **Predictive Agent** | `server/knowledge/PredictionEngine.ts` (+ skill `knowledge_predict`) | ✅ 9 tests |
+| 🔥 **Opportunity Engine** | — | à venir |
+| 🤖 **Dynamic Agent Swarm** | — | à venir |
+| 🕰️ **Mission Time Travel** | — | à venir |
+| 👁️ **Computer Use Agent** | — | à venir |
+
+---
+
 Leanna est déjà **très riche en briques IA** : runtime agentique, missions, mémoire, Knowledge Graph, RAG, agents spécialisés, navigateur, vision, voix, workflows, GitHub, apprentissage de fiabilité, sécurité et observabilité. 
 
 Le point important est donc : **ne pas ajouter encore 50 outils**. Il faut ajouter des capacités qui rendent Leanna **plus intelligente, proactive et capable de travailler seule**.

@@ -184,3 +184,15 @@ export {
   type SecuritySignal,
   type ProjectDoctorOptions,
 } from "./ProjectDoctor.js";
+
+// Predictive Agent (P1) — prédiction pré-vol (succès, risques, stratégie, étape fragile)
+export {
+  PredictionEngine,
+  predictionEngine,
+  type PredictionReport,
+  type StepPrediction,
+  type PredictionRisk,
+  type PredictInput,
+  type PredictionEstimate,
+  type PredictionEngineOptions,
+} from "./PredictionEngine.js";

@@ -8,6 +8,7 @@ import {
   impactAnalyzer,
   knowledgeGraph,
   projectDoctor,
+  predictionEngine,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -52,6 +53,7 @@ export const knowledgeSkill: Skill = {
     knowledge_index_status: ["read"],
     knowledge_index_rebuild: ["read", "write"],
     knowledge_project_doctor: ["read"],
+    knowledge_predict: ["read"],
   },
   declarations: [
     {
@@ -384,6 +386,31 @@ export const knowledgeSkill: Skill = {
         },
       },
     },
+    {
+      name: "knowledge_predict",
+      description:
+        "🔮 Predictive Agent : AVANT d'exécuter, prédit la probabilité de réussite d'un objectif, les risques, la durée/coût estimés, la stratégie recommandée (réutilise un Playbook appris si disponible) et l'étape la plus fragile. Exploite la fiabilité historique des outils. Fournir l'objectif et la séquence de skills envisagée.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING", description: "Titre / objectif de la mission à prédire." },
+          description: { type: "STRING", description: "Description détaillée (optionnelle)." },
+          planned_skills: {
+            type: "ARRAY",
+            description: "Séquence ordonnée des skills/outils envisagés (ex: ['read_code','str_replace','run_typecheck']).",
+            items: { type: "STRING" },
+          },
+          errors: {
+            type: "ARRAY",
+            description: "Messages d'erreur connus liés à l'objectif (améliore la correspondance de Playbook).",
+            items: { type: "STRING" },
+          },
+          estimated_duration_ms: { type: "NUMBER", description: "Durée estimée en ms (optionnelle)." },
+          estimated_cost_usd: { type: "NUMBER", description: "Coût estimé en USD (optionnel)." },
+        },
+        required: ["title"],
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -465,6 +492,14 @@ export const knowledgeSkill: Skill = {
     }),
     knowledge_project_doctor: z.object({
       include_missions: z.boolean().optional().default(true),
+    }),
+    knowledge_predict: z.object({
+      title: z.string().min(1, "L'objectif ne peut être vide").trim(),
+      description: z.string().trim().optional(),
+      planned_skills: z.array(z.string().trim()).optional().default([]),
+      errors: z.array(z.string().trim()).optional().default([]),
+      estimated_duration_ms: z.number().nonnegative().optional(),
+      estimated_cost_usd: z.number().nonnegative().optional(),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1110,6 +1145,39 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR projectDoctor: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_predict — Predictive Agent (P1)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_predict") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_predict, args);
+        log(`predict objective='${validated.title}' skills=${validated.planned_skills.length}`);
+        const report = predictionEngine.predict(
+          {
+            objective: { title: validated.title, description: validated.description, errors: validated.errors },
+            plannedSkills: validated.planned_skills,
+          },
+          { durationMs: validated.estimated_duration_ms, costUsd: validated.estimated_cost_usd },
+        );
+        return {
+          status: "success",
+          success_probability: report.successProbability,
+          success_percent: report.successPercent,
+          risk_level: report.riskLevel,
+          risks: report.risks,
+          recommended_strategy: report.recommendedStrategy,
+          playbook_id: report.playbookId,
+          weakest_step: report.weakestStep,
+          steps: report.steps,
+          confidence: report.confidence,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR predict: ${e.message}`);
         return { error: e.message };
       }
     }
