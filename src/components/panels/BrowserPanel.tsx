@@ -9,16 +9,33 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { BrowserExternalOverlay } from './BrowserExternalOverlay.js';
 import { BrowserToolbar } from './BrowserToolbar.js';
+import { BrowserTabStrip } from './BrowserTabStrip.js';
+import { BrowserTabView } from './BrowserTabView.js';
+import type { BrowserTabHandle, TabStatePatch } from './BrowserTabView.js';
 import { useBrowserHistory } from './useBrowserHistory.js';
 import { useBrowserProfiles } from './useBrowserProfiles.js';
 import { useBrowserExtensions } from './useBrowserExtensions.js';
 import type {
   BrowserPanelProps,
   WebviewElement,
-  WebviewFailLoadEvent,
-  WebviewNavigateEvent,
-  WebviewTitleEvent,
 } from './browserTypes.js';
+
+/** Un onglet du navigateur : identité + état d'affichage dérivé de sa webview. */
+interface BrowserTab {
+  id: string;
+  url: string;
+  title: string;
+  loading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loadError: string | null;
+}
+
+let tabCounter = 0;
+function newTabId(): string {
+  tabCounter += 1;
+  return `tab-${Date.now().toString(36)}-${tabCounter}`;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +56,7 @@ export function normalizeUrl(raw: string): string {
 export function BrowserPanel({
   onClose,
   onOpenExternal,
+  onOpenInNewTab,
   url: controlledUrl,
   defaultUrl = BROWSER_HOME_URL,
   fullWidth = false,
@@ -65,13 +83,38 @@ export function BrowserPanel({
   /** Extensions Chromium chargées pour le profil (partition) actif. */
   const extensions = useBrowserExtensions(partition);
 
-  const [inputValue, setInputValue] = useState(defaultUrl);
-  const [currentUrl, setCurrentUrl] = useState(defaultUrl);
-  const [loading, setLoading] = useState(false);
-  const [canGoBack, setCanGoBack] = useState(false);
-  const [canGoForward, setCanGoForward] = useState(false);
-  const [pageTitle, setPageTitle] = useState('');
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // ── Onglets ─────────────────────────────────────────────────────────────────
+  const [tabs, setTabs] = useState<BrowserTab[]>(() => [{
+    id: newTabId(),
+    url: defaultUrl,
+    title: '',
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+    loadError: null,
+  }]);
+  const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0].id);
+
+  /** Handles impératifs par onglet (loadURL/reload/stop/goBack/getWebview/getConsole). */
+  const tabHandlesRef = useRef<Map<string, BrowserTabHandle>>(new Map());
+  /** Id de l'onglet actif, en ref (lisible depuis les closures d'événements). */
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  // L'input de la barre d'adresse est édité librement : état séparé, resynchronisé
+  // sur l'URL de l'onglet actif via l'effet ci-dessous.
+  const [inputValue, setInputValue] = useState(activeTab.url);
+
+  // État dérivé de l'onglet actif (pilote la barre d'outils).
+  const currentUrl = activeTab.url;
+  const loading = activeTab.loading;
+  const canGoBack = activeTab.canGoBack;
+  const canGoForward = activeTab.canGoForward;
+  const pageTitle = activeTab.title;
+  const loadError = activeTab.loadError;
+
   /** Indicateur visuel quand Leanna pilote la navigation */
   const [assistantNavActive, setAssistantNavActive] = useState(false);
   /** Indique si une fenêtre externe est ouverte */
@@ -79,40 +122,97 @@ export function BrowserPanel({
   /** Référence à la fenêtre externe ouverte (pour vérifier closed) */
   const externalWindowRef = useRef<Window | null>(null);
 
-  /** true dès que le <webview> a émis dom-ready — loadURL ne peut être appelé qu'après */
-  const domReadyRef = useRef(false);
-  /** URL en attente si elle arrive avant que dom-ready soit émis */
-  const pendingUrlRef = useRef<string | null>(null);
-
-  // Références stables vers les callbacks d'historique : l'effet d'abonnement
-  // aux événements webview tourne avec [] et ne doit pas se réabonner à chaque
-  // changement de callback.
+  // Références stables vers les callbacks d'historique : l'onglet actif les
+  // appelle lors des navigations/titres.
   const recordVisitRef = useRef(recordVisit);
   const updateTitleRef = useRef(updateTitle);
   useEffect(() => { recordVisitRef.current = recordVisit; }, [recordVisit]);
   useEffect(() => { updateTitleRef.current = updateTitle; }, [updateTitle]);
 
-  /**
-   * Tampon circulaire des messages console + échecs de ressources de la page
-   * courante. Permet à Leanna de « voir » les erreurs JS/réseau d'un aperçu de
-   * projet et de les corriger. Vidé à chaque navigation de la frame principale.
-   */
-  const consoleBufferRef = useRef<Array<{ level: string; message: string; source?: string; line?: number; ts: number }>>([]);
-  const MAX_CONSOLE_ENTRIES = 300;
+  // Resynchroniser la barre d'adresse quand on change d'onglet ou que l'onglet
+  // actif change d'URL (navigation).
+  useEffect(() => {
+    setInputValue(activeTab.url);
+  }, [activeTab.id, activeTab.url]);
 
-  // ── Navigation interne ──────────────────────────────────────────────────────
+  // ── Réception des patchs d'état d'onglet (depuis BrowserTabView) ────────────
+  const handleTabState = useCallback((tabId: string, patch: TabStatePatch) => {
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, ...patch } : t)));
+    // Historique : enregistrer la visite/titre pour les navigations réussies.
+    if (patch.url) recordVisitRef.current(patch.url, patch.title ?? '');
+    if (patch.title) updateTitleRef.current(patch.url ?? '', patch.title);
+  }, []);
+
+  const handleTabRegister = useCallback((tabId: string, handle: BrowserTabHandle | null) => {
+    if (handle) tabHandlesRef.current.set(tabId, handle);
+    else tabHandlesRef.current.delete(tabId);
+  }, []);
+
+  /** Branche la webview de l'onglet actif sur webviewRef (handlers inchangés). */
+  const handleActiveWebview = useCallback((wv: WebviewElement | null) => {
+    (webviewRef as React.MutableRefObject<WebviewElement | null>).current = wv;
+  }, []);
+
+  /** Handle de l'onglet actif (navigation interne). Lu via ref pour les closures. */
+  const activeHandle = () => tabHandlesRef.current.get(activeTabIdRef.current) ?? null;
+
+  // ── Navigation interne (sur l'onglet actif) ─────────────────────────────────
 
   const navigateTo = useCallback((raw: string) => {
     const url = normalizeUrl(raw);
-    setLoadError(null);
     setInputValue(url);
-    if (domReadyRef.current) {
-      webviewRef.current?.loadURL(url);
-    } else {
-      // Le webview n'est pas encore prêt — on met l'URL en attente
-      pendingUrlRef.current = url;
-    }
+    setTabs((prev) => prev.map((t) => (t.id === activeTabId ? { ...t, loadError: null } : t)));
+    tabHandlesRef.current.get(activeTabId)?.loadURL(url);
+  }, [activeTabId]);
+
+  // ── Gestion des onglets ─────────────────────────────────────────────────────
+
+  /** Ouvre un nouvel onglet (optionnellement en arrière-plan) et renvoie son id. */
+  const openTab = useCallback((url: string = BROWSER_HOME_URL, activate = true): string => {
+    const id = newTabId();
+    const normalized = (() => { try { return normalizeUrl(url); } catch { return BROWSER_HOME_URL; } })();
+    setTabs((prev) => [...prev, {
+      id, url: normalized, title: '', loading: false, canGoBack: false, canGoForward: false, loadError: null,
+    }]);
+    if (activate) setActiveTabId(id);
+    return id;
   }, []);
+
+  const switchTab = useCallback((id: string) => {
+    setActiveTabId((prev) => (prev === id ? prev : id));
+  }, []);
+
+  /** Ferme un onglet ; si c'était le dernier, ferme le panneau. */
+  const closeTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      if (prev.length <= 1) {
+        // Dernier onglet : fermer le navigateur entier.
+        onClose();
+        return prev;
+      }
+      const idx = prev.findIndex((t) => t.id === id);
+      const next = prev.filter((t) => t.id !== id);
+      // Si on ferme l'onglet actif, activer le voisin.
+      setActiveTabId((cur) => {
+        if (cur !== id) return cur;
+        const neighbor = next[Math.max(0, idx - 1)] ?? next[0];
+        return neighbor.id;
+      });
+      tabHandlesRef.current.delete(id);
+      return next;
+    });
+  }, [onClose]);
+
+  // Relai depuis le main (setWindowOpenHandler) : window.open / target=_blank →
+  // ouvrir dans un nouvel onglet d'arrière-plan plutôt qu'une fenêtre non contrôlée.
+  useEffect(() => {
+    const onOpenUrl = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { url?: string } | undefined;
+      if (detail?.url) openTab(detail.url, false);
+    };
+    window.addEventListener('Leanna-browser-open-url', onOpenUrl as EventListener);
+    return () => window.removeEventListener('Leanna-browser-open-url', onOpenUrl as EventListener);
+  }, [openTab]);
 
   // ── Navigation contrôlée depuis l'extérieur (Leanna) ───────────────────────
 
@@ -153,14 +253,14 @@ export function BrowserPanel({
   const handleGoBack = useCallback(() => webviewRef.current?.goBack(), []);
   const handleGoForward = useCallback(() => webviewRef.current?.goForward(), []);
   const handleRefresh = useCallback(() => {
-    setLoadError(null);
+    setTabs((prev) => prev.map((t) => (t.id === activeTabId ? { ...t, loadError: null } : t)));
     // Si un chargement est en cours, le bouton agit comme « Arrêter ».
     if (loading) {
       webviewRef.current?.stop();
     } else {
       webviewRef.current?.reload();
     }
-  }, [loading]);
+  }, [loading, activeTabId]);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
   // Référence pour l'intervalle de vérification de la fenêtre externe
   const externalWindowCheckRef = useRef<NodeJS.Timeout | null>(null);
@@ -212,131 +312,10 @@ export function BrowserPanel({
   }, []);
 
   // ── Événements webview ──────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const wv = webviewRef.current;
-    if (!wv) return;
-
-    // On ne pose PLUS l'attribut `allowpopups` : sa simple présence (même à
-    // "false") active les popups. Les popups/nouvelles fenêtres sont refusées
-    // côté main via setWindowOpenHandler, et les webPreferences sécurisées sont
-    // imposées via will-attach-webview (nodeIntegration:false, contextIsolation,
-    // sandbox:true). Rien à faire ici.
-
-    const onDomReady = () => {
-      domReadyRef.current = true;
-      // Charger l'URL mise en attente si elle existe
-      if (pendingUrlRef.current) {
-        wv.loadURL(pendingUrlRef.current);
-        pendingUrlRef.current = null;
-      }
-    };
-
-    const onLoadStart = () => {
-      setLoading(true);
-      setLoadError(null);
-    };
-
-    const onLoadStop = () => {
-      setLoading(false);
-      const url = wv.getURL();
-      setCurrentUrl(url);
-      setInputValue(url);
-      setCanGoBack(wv.canGoBack());
-      setCanGoForward(wv.canGoForward());
-
-      // Enregistrer la visite dans l'historique de navigation persistant.
-      recordVisitRef.current(url, wv.getTitle?.() ?? '');
-
-      // Notifier l'app (utilisé par le skill pour confirmer la navigation)
-      window.dispatchEvent(new CustomEvent('Leanna-browser-navigated', {
-        detail: { url },
-      }));
-    };
-
-    const onTitleUpdate = (e: Event) => {
-      const title = (e as WebviewTitleEvent).title;
-      setPageTitle(title);
-      // Garder l'historique à jour avec le titre réel de la page.
-      updateTitleRef.current(wv.getURL(), title);
-      window.dispatchEvent(new CustomEvent('Leanna-browser-title-updated', {
-        detail: { title, url: wv.getURL() },
-      }));
-    };
-
-    /** Ajoute une entrée au tampon console en respectant la taille max. */
-    const pushConsole = (entry: { level: string; message: string; source?: string; line?: number }) => {
-      const buf = consoleBufferRef.current;
-      buf.push({ ...entry, ts: Date.now() });
-      if (buf.length > MAX_CONSOLE_ENTRIES) buf.splice(0, buf.length - MAX_CONSOLE_ENTRIES);
-    };
-
-    // console.log/warn/error de la page → tampon.
-    const onConsoleMessage = (e: Event) => {
-      const ev = e as unknown as { level: number; message: string; line: number; sourceId: string };
-      // Electron : level 0=verbose/log, 1=info, 2=warning, 3=error.
-      const level = ev.level === 3 ? 'error' : ev.level === 2 ? 'warn' : ev.level === 1 ? 'info' : 'log';
-      pushConsole({ level, message: String(ev.message ?? ''), source: ev.sourceId, line: ev.line });
-    };
-
-    const onFailLoad = (e: Event) => {
-      const ev = e as WebviewFailLoadEvent;
-      // Les échecs de sous-ressources (iframe, pub, script, image…) sont des
-      // erreurs réseau utiles à l'agent : on les journalise sans masquer la page.
-      if (ev.isMainFrame === false) {
-        if (ev.errorCode !== -3) {
-          pushConsole({ level: 'network', message: `Échec ressource (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
-        }
-        return;
-      }
-      if (ev.errorCode === -3) {
-        // ERR_ABORTED — annulation normale (navigation remplacée avant fin de chargement, destroy, etc.)
-        setLoading(false);
-        return;
-      }
-      pushConsole({ level: 'network', message: `Échec chargement page (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
-      setLoading(false);
-      setLoadError(`Impossible de charger cette page (${ev.errorDescription})`);
-    };
-
-    const onNavigate = (e: Event) => {
-      const ev = e as WebviewNavigateEvent;
-      // Navigation de la frame principale → nouvelle page : vider le tampon
-      // console (did-navigate-in-page conserve les logs de la même page).
-      if (ev.isMainFrame !== false && e.type === 'did-navigate') {
-        consoleBufferRef.current = [];
-      }
-      setCurrentUrl(ev.url);
-      setInputValue(ev.url);
-      setCanGoBack(wv.canGoBack());
-      setCanGoForward(wv.canGoForward());
-      // NB : l'enregistrement dans l'historique se fait uniquement dans
-      // onLoadStop (did-stop-loading) pour éviter un double comptage des visites.
-    };
-
-    wv.addEventListener('dom-ready', onDomReady);
-    wv.addEventListener('did-start-loading', onLoadStart);
-    wv.addEventListener('did-stop-loading', onLoadStop);
-    wv.addEventListener('page-title-updated', onTitleUpdate);
-    wv.addEventListener('did-fail-load', onFailLoad);
-    wv.addEventListener('did-navigate', onNavigate);
-    wv.addEventListener('did-navigate-in-page', onNavigate);
-    wv.addEventListener('console-message', onConsoleMessage);
-
-    return () => {
-      wv.removeEventListener('dom-ready', onDomReady);
-      wv.removeEventListener('did-start-loading', onLoadStart);
-      domReadyRef.current = false;
-      wv.removeEventListener('did-stop-loading', onLoadStop);
-      wv.removeEventListener('page-title-updated', onTitleUpdate);
-      wv.removeEventListener('did-fail-load', onFailLoad);
-      wv.removeEventListener('did-navigate', onNavigate);
-      wv.removeEventListener('did-navigate-in-page', onNavigate);
-      wv.removeEventListener('console-message', onConsoleMessage);
-    };
-    // `partition` : un changement de profil remonte le <webview> (nouvelle
-    // partition de session) ; on doit réabonner les listeners au nouvel élément.
-  }, [partition]);
+  // Chaque onglet (BrowserTabView) gère désormais ses propres événements natifs
+  // (chargement/titre/url/console/échec) et remonte son état via handleTabState.
+  // Le panneau n'a plus d'effet natif global ; webviewRef pointe sur la webview
+  // de l'onglet actif (branchée par handleActiveWebview).
 
   // ── Écoute des commandes directes via CustomEvent (fallback / scroll) ───────
 
@@ -346,6 +325,15 @@ export function BrowserPanel({
       if (!detail?.url) return;
       setAssistantNavActive(true);
       navigateTo(detail.url);
+      setTimeout(() => setAssistantNavActive(false), 3000);
+    };
+
+    // Ouvrir une URL dans un nouvel onglet (depuis browser_new_tab).
+    const handleNewTab = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { url?: string; activate?: boolean };
+      if (!detail?.url) return;
+      openTab(detail.url, detail.activate !== false);
+      setAssistantNavActive(true);
       setTimeout(() => setAssistantNavActive(false), 3000);
     };
 
@@ -376,7 +364,6 @@ export function BrowserPanel({
       } else if (detail.type === 'browser-forward') {
         wv.goForward();
       } else if (detail.type === 'browser-reload') {
-        setLoadError(null);
         wv.reload();
       }
     };
@@ -1312,7 +1299,9 @@ export function BrowserPanel({
     // ── Journal console/réseau : Leanna lit les erreurs de la page ───────────
     const handleGetConsole = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; level?: string; limit?: number };
-      let entries = consoleBufferRef.current.slice();
+      // Lire le tampon console de l'onglet ACTIF (via son handle).
+      const buffer = activeHandle()?.getConsole() ?? [];
+      let entries = buffer.slice();
       const level = detail.level ?? 'all';
       if (level === 'error') {
         entries = entries.filter((x) => x.level === 'error' || x.level === 'network');
@@ -1324,7 +1313,7 @@ export function BrowserPanel({
       const sliced = entries.slice(-limit);
       postActionResult(detail.requestId, {
         url: webviewRef.current?.getURL?.() ?? '',
-        total: consoleBufferRef.current.length,
+        total: buffer.length,
         returned: sliced.length,
         entries: sliced,
       });
@@ -1357,6 +1346,7 @@ export function BrowserPanel({
     };
 
     window.addEventListener('Leanna-browser-navigate', handleNav);
+    window.addEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
     window.addEventListener('Leanna-browser-scroll', handleScroll);
     window.addEventListener('Leanna-browser-control', handleBrowserControl);
     window.addEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
@@ -1383,6 +1373,7 @@ export function BrowserPanel({
     window.addEventListener('Leanna-browser-capture', handleCapture as EventListener);
     return () => {
       window.removeEventListener('Leanna-browser-navigate', handleNav);
+      window.removeEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
       window.removeEventListener('Leanna-browser-scroll', handleScroll);
       window.removeEventListener('Leanna-browser-control', handleBrowserControl);
       window.removeEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
@@ -1406,7 +1397,7 @@ export function BrowserPanel({
       window.removeEventListener('Leanna-browser-get-console', handleGetConsole as EventListener);
       window.removeEventListener('Leanna-browser-capture', handleCapture as EventListener);
     };
-  }, [navigateTo]);
+  }, [navigateTo, openTab]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -1424,6 +1415,18 @@ export function BrowserPanel({
         backgroundColor: 'var(--bg-panel)',
       }}
     >
+      <BrowserTabStrip
+        tabs={tabs.map((t) => ({ id: t.id, title: t.title, url: t.url, loading: t.loading }))}
+        activeTabId={activeTabId}
+        onSelect={switchTab}
+        onClose={closeTab}
+        onNewTab={() => {
+          const id = openTab(BROWSER_HOME_URL, true);
+          onOpenInNewTab?.(BROWSER_HOME_URL);
+          return id;
+        }}
+      />
+
       <BrowserToolbar
         pageTitle={pageTitle}
         assistantNavActive={assistantNavActive}
@@ -1473,24 +1476,26 @@ export function BrowserPanel({
         </div>
       )}
 
-      {/* ── Webview ── */}
-      <div className="flex-1 min-h-0 relative">
-        <webview
-          // `key` dérivée de la partition : changer de profil remonte le
-          // <webview> car l'attribut `partition` est immuable après attache.
-          key={partition}
-          ref={webviewRef}
-          src={defaultUrl}
-          partition={partition}
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            // Masquer le webview quand l'overlay est affiché
-            visibility: isExternalWindowOpen ? 'hidden' : 'visible',
-          }}
-        />
-        
+      {/* ── Webviews (une par onglet, inactives masquées) ── */}
+      <div
+        className="flex-1 min-h-0 relative"
+        style={{ visibility: isExternalWindowOpen ? 'hidden' : 'visible' }}
+      >
+        {tabs.map((t) => (
+          <BrowserTabView
+            // key = id d'onglet + partition : changer de profil remonte la
+            // <webview> (partition immuable après attache).
+            key={`${t.id}:${partition}`}
+            tabId={t.id}
+            active={t.id === activeTabId}
+            partition={partition}
+            initialUrl={t.url}
+            onState={handleTabState}
+            onRegister={handleTabRegister}
+            onActiveWebview={handleActiveWebview}
+          />
+        ))}
+
         {isExternalWindowOpen && (
           <BrowserExternalOverlay
             onDismiss={() => {

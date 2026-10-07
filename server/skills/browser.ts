@@ -487,6 +487,12 @@ const captureSchema = z.object({
   prompt: z.string().max(2000).optional(),
 });
 
+// Ouvre une URL dans un nouvel onglet du navigateur intégré.
+const newTabSchema = z.object({
+  url: z.string().min(1, "URL requise"),
+  activate: z.boolean().optional().default(true),
+});
+
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
 
 // J1 — Accessibilité
@@ -831,6 +837,25 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_new_tab",
+      description:
+        "Ouvre une URL dans un NOUVEL onglet du navigateur intégré (le navigateur supporte plusieurs onglets). Utile pour comparer des pages ou garder plusieurs sources ouvertes sans perdre l'onglet courant. Par défaut le nouvel onglet devient actif ; mets activate=false pour l'ouvrir en arrière-plan.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          url: {
+            type: "STRING",
+            description: "L'URL à ouvrir dans le nouvel onglet (URL complète, domaine, ou terme de recherche).",
+          },
+          activate: {
+            type: "BOOLEAN",
+            description: "Si true (défaut), le nouvel onglet devient actif. false pour l'ouvrir en arrière-plan.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -1031,6 +1056,7 @@ export const browserSkill: Skill = {
     browser_web_search: webSearchSchema,
     browser_get_console: getConsoleSchema,
     browser_capture: captureSchema,
+    browser_new_tab: newTabSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1742,6 +1768,22 @@ export const browserSkill: Skill = {
           message: `Capture réussie mais analyse visuelle impossible : ${err?.message ?? "erreur inconnue"} (vérifie qu'une clé Gemini est configurée).`,
         };
       }
+    }
+
+    // ── browser_new_tab ───────────────────────────────────────────────────────
+    if (name === "browser_new_tab") {
+      const { url, activate } = validateArgs(browserSkill.inputSchemas!["browser_new_tab"], args);
+      return withEmit(emit, (fire) => {
+        const normalized = normalizeUrl(url); // peut throw → capté par withEmit
+        fire({ type: "open-browser" });
+        fire({ type: "browser-new-tab", url: normalized, activate });
+        return {
+          status: "success",
+          url: normalized,
+          activate,
+          message: `Nouvel onglet ${activate ? "actif" : "en arrière-plan"} ouvert sur : ${normalized}`,
+        };
+      });
     }
 
     // ── browser_click ─────────────────────────────────────────────────────────
