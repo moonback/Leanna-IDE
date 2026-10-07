@@ -58,7 +58,7 @@ export function StartupProjectModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'recent' | 'open' | 'new' | 'clone' | 'ftp'>('recent');
+  const [activeTab, setActiveTab] = useState<'recent' | 'open' | 'new' | 'clone' | 'ftp'>('open');
 
   // Onglet "Ouvrir"
   const [inputPath, setInputPath] = useState('');
@@ -155,11 +155,7 @@ export function StartupProjectModal() {
           return;
         }
         setIsOpen(true);
-        if ((wsData?.workspaces?.length ?? 0) > 0) {
-          setActiveTab('recent');
-        } else {
-          setActiveTab('open');
-        }
+        setActiveTab('open');
       }
     } catch {
       if (sessionStorage.getItem(LAUNCHER_DONE_KEY) === '1') {
@@ -675,18 +671,20 @@ export function StartupProjectModal() {
 
           {/* Navigation Tabs */}
           <div
-            className="grid grid-cols-2 sm:grid-cols-4 items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0"
+            className={`grid grid-cols-2 ${workspaces.length > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0`}
             style={{
               backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
               border: '1px solid var(--border-base)',
             }}
           >
             {([
-              { id: 'recent', label: 'Dépôts récents', count: workspaces.length, icon: FolderClock },
-              { id: 'open', label: 'Ouvrir local', count: undefined, icon: FolderOpen },
-              { id: 'clone', label: 'Cloner', count: undefined, icon: Github },
-              { id: 'ftp', label: 'FTP', count: undefined, icon: Server },
-            ] as const).map(({ id, label, count, icon: Icon }) => {
+              ...(workspaces.length > 0
+                ? [{ id: 'recent' as const, label: 'Dépôts récents', count: workspaces.length, icon: FolderClock }]
+                : []),
+              { id: 'open' as const, label: 'Ouvrir local', count: undefined, icon: FolderOpen },
+              { id: 'clone' as const, label: 'Cloner', count: undefined, icon: Github },
+              { id: 'ftp' as const, label: 'FTP', count: undefined, icon: Server },
+            ]).map(({ id, label, count, icon: Icon }) => {
               const selected = activeTab === id;
               return (
                 <button
