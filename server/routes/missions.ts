@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
+import { projectDoctor } from "../knowledge/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Missions Router — Approbation humaine & curseur d'autonomie
@@ -44,6 +45,44 @@ export function createMissionsRouter(
         return res.status(400).json(result);
       }
       return res.json(result);
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Diagnostiquer : créer les missions d'amélioration du Project Doctor ──
+  // Lance le diagnostic puis matérialise les missions proposées via le chemin
+  // mission_create existant (validation, skills, executor, permissions).
+  router.post("/missions/doctor/create", async (req: Request, res: Response) => {
+    if (!handleToolCall) {
+      return res.status(503).json({ error: "Création de mission indisponible (handler non configuré)." });
+    }
+    try {
+      const report = projectDoctor.diagnose();
+      const requestedMax = Number(req.body?.max);
+      const max = Number.isInteger(requestedMax) && requestedMax > 0 ? Math.min(requestedMax, 10) : 5;
+      const missions = report.improvementMissions.slice(0, max);
+      const created: Array<{ missionId: string; title: string }> = [];
+      const failed: Array<{ title: string; error: string }> = [];
+
+      for (const m of missions) {
+        try {
+          const result = await handleToolCall("mission_create", {
+            title: m.title,
+            description: m.description,
+            priority: m.priority,
+          });
+          if (result && typeof result === "object" && "missionId" in result) {
+            created.push({ missionId: String((result as any).missionId), title: m.title });
+          } else {
+            failed.push({ title: m.title, error: (result as any)?.error ?? "Création refusée." });
+          }
+        } catch (err) {
+          failed.push({ title: m.title, error: (err as Error).message });
+        }
+      }
+
+      return res.json({ status: "success", global: report.global, created, failed, proposed: missions.length });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }

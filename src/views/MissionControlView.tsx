@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
-  Lightbulb, Wrench, ShieldAlert, Zap, Loader2,
+  Lightbulb, Wrench, ShieldAlert, Zap, Loader2, Stethoscope, Sun, X, CheckCircle2,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
@@ -24,6 +25,14 @@ interface Opportunity {
   value: number;
   payoff: number;
 }
+interface BriefingReport {
+  greeting: string;
+  projectName: string;
+  healthScore: number;
+  counts: { critical: number; pending: number; improvement: number };
+  highlights: string[];
+}
+interface DiagnoseResult { created: Array<{ missionId: string; title: string }>; failed: Array<{ title: string; error: string }>; proposed: number }
 
 const DIMENSION_LABELS: Record<HealthDimension, string> = {
   architecture: 'Architecture',
@@ -45,26 +54,50 @@ function scoreColor(n: number): string {
 
 export default function MissionControlView() {
   const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
   const { state, proposals, connection } = useAutonomyTimeline({ enabled: true });
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [briefing, setBriefing] = useState<BriefingReport | null>(null);
+  const [briefingDismissed, setBriefingDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [doctorRes, oppRes] = await Promise.all([
+      const [doctorRes, oppRes, briefRes] = await Promise.all([
         fetch('/api/knowledge/doctor').then((r) => r.json()).catch(() => null),
         fetch('/api/knowledge/opportunities?limit=8').then((r) => r.json()).catch(() => null),
+        fetch('/api/knowledge/daily-briefing').then((r) => r.json()).catch(() => null),
       ]);
       if (doctorRes?.report) setHealth(doctorRes.report as HealthReport);
       if (oppRes?.report?.opportunities) setOpportunities(oppRes.report.opportunities as Opportunity[]);
+      if (briefRes?.report) setBriefing(briefRes.report as BriefingReport);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  /** « Diagnostiquer » : matérialise les missions d'amélioration du Doctor. */
+  const diagnose = useCallback(async () => {
+    setDiagnosing(true);
+    setDiagnoseResult(null);
+    try {
+      const res = await fetch('/api/missions/doctor/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max: 5 }),
+      });
+      const data = await res.json();
+      if (res.ok && !data?.error) setDiagnoseResult(data as DiagnoseResult);
+    } finally {
+      setDiagnosing(false);
+    }
+  }, []);
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
@@ -90,6 +123,11 @@ export default function MissionControlView() {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
 
+          {/* Daily briefing — « point du jour » affiché au chargement */}
+          {briefing && !briefingDismissed && (
+            <DailyBriefingBanner briefing={briefing} reduceMotion={!!reduceMotion} onDismiss={() => setBriefingDismissed(true)} />
+          )}
+
           {/* Row 1 — Agent state + health global */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <AgentStateCard status={state?.status} health={state?.health} activeTasks={state?.activeTasks} />
@@ -105,13 +143,61 @@ export default function MissionControlView() {
             <OpportunitiesCard opportunities={opportunities} />
           </div>
 
-          {/* Row 4 — Improvement plan */}
+          {/* Row 4 — Improvement plan + Diagnostiquer */}
           {health?.improvementMissions && health.improvementMissions.length > 0 && (
-            <ImprovementPlanCard missions={health.improvementMissions} />
+            <ImprovementPlanCard
+              missions={health.improvementMissions}
+              diagnosing={diagnosing}
+              result={diagnoseResult}
+              onDiagnose={() => void diagnose()}
+              onOpenTimeline={() => navigate('/mission-timeline')}
+            />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function DailyBriefingBanner({ briefing, reduceMotion, onDismiss }: { briefing: BriefingReport; reduceMotion: boolean; onDismiss: () => void }) {
+  const { counts } = briefing;
+  const chip = (n: number, color: string, label: string) => (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} aria-hidden /> {n} {label}
+    </span>
+  );
+  return (
+    <motion.section
+      initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.2 }}
+      className="relative rounded-lg border p-4 shadow-sm"
+      style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+    >
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Masquer le point du jour"
+        className="absolute right-2 top-2 rounded-md p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+        style={{ color: 'var(--text-dimmed)' }}
+      >
+        <X size={13} />
+      </button>
+      <div className="mb-2 flex items-center gap-2">
+        <Sun size={15} style={{ color: 'var(--accent-secondary)' }} />
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{briefing.greeting}</h2>
+      </div>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {chip(counts.critical, 'var(--color-error)', 'critique(s)')}
+        {chip(counts.pending, 'var(--color-warning)', 'en attente')}
+        {chip(counts.improvement, 'var(--color-success)', 'amélioration(s)')}
+      </div>
+      {briefing.highlights.length > 0 && (
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          {briefing.highlights.map((h, i) => <li key={i}>• {h}</li>)}
+        </ul>
+      )}
+    </motion.section>
   );
 }
 
@@ -269,10 +355,43 @@ function OpportunitiesCard({ opportunities }: { opportunities: Opportunity[] }) 
   );
 }
 
-function ImprovementPlanCard({ missions }: { missions: Array<{ title: string; priority: string }> }) {
+function ImprovementPlanCard({ missions, diagnosing, result, onDiagnose, onOpenTimeline }: {
+  missions: Array<{ title: string; priority: string }>;
+  diagnosing: boolean;
+  result: DiagnoseResult | null;
+  onDiagnose: () => void;
+  onOpenTimeline: () => void;
+}) {
   const priorityColor = (p: string) => p === 'critical' ? 'var(--color-error)' : p === 'high' ? 'var(--color-warning)' : 'var(--color-info)';
   return (
-    <Card icon={Wrench} title="Plan d'amélioration proposé">
+    <Card
+      icon={Wrench}
+      title="Plan d'amélioration proposé"
+      action={
+        result ? (
+          <button
+            type="button"
+            onClick={onOpenTimeline}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            style={{ backgroundColor: 'var(--bg-input)', color: 'var(--color-success)', border: '1px solid var(--border-base)' }}
+          >
+            <CheckCircle2 size={12} /> {result.created.length} mission(s) créée(s) · voir
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onDiagnose}
+            disabled={diagnosing}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-60"
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-base)' }}
+            title="Créer les missions d'amélioration proposées"
+          >
+            {diagnosing ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
+            Diagnostiquer & créer
+          </button>
+        )
+      }
+    >
       <ol className="flex flex-col gap-1.5">
         {missions.slice(0, 8).map((m, i) => (
           <li key={i} className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -282,6 +401,11 @@ function ImprovementPlanCard({ missions }: { missions: Array<{ title: string; pr
           </li>
         ))}
       </ol>
+      {result && result.failed.length > 0 && (
+        <p className="mt-2 text-xs" style={{ color: 'var(--color-warning)' }}>
+          {result.failed.length} mission(s) non créée(s) (voir les logs serveur).
+        </p>
+      )}
     </Card>
   );
 }
