@@ -17,6 +17,7 @@ import { setTelemetryContext, clearTelemetryContext } from "../utils/textGenerat
 import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
+import { playbookStore, type PlaybookMissionInput } from "../knowledge/PlaybookStore.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1506,6 +1507,54 @@ JSON:`;
     // Persistance finale (statut terminal).
     void this.persist(mission);
     this.proposeLearning(mission);
+    this.proposePlaybook(mission);
+  }
+
+  /**
+   * Learn a reusable Playbook from a *successful* mission (task.md §3, P0).
+   * Complements proposeLearning: LearningEngine stores prose lessons, this stores
+   * a replayable ordered skill sequence keyed by a stable trigger signature so
+   * Leanna can later say « j'ai déjà résolu N problèmes similaires » and reuse
+   * the strategy. Guarded and best-effort — never flips a terminal mission.
+   */
+  private proposePlaybook(mission: Mission): void {
+    try {
+      if (mission.status !== "completed") return;
+      const state = mission.getState();
+      const input: PlaybookMissionInput = {
+        id: mission.id,
+        title: state.title,
+        status: state.status,
+        goals: Object.fromEntries(
+          Object.entries(state.goals).map(([id, goal]) => [id, {
+            status: goal.status,
+            dependsOn: goal.dependsOn,
+            completedAt: goal.completedAt,
+            parentId: goal.parentId,
+            plannedActions: goal.plannedActions.map((action) => ({
+              skillName: action.skillName,
+              order: action.order,
+              status: action.status,
+            })),
+          }]),
+        ),
+        errors: state.context.errors.map((error) => ({ action: error.action, error: error.error })),
+        relevantFiles: state.context.relevantFiles,
+      };
+      const playbook = playbookStore.learnFromMission(input);
+      if (playbook) {
+        this.emit("mission_playbook_learned", {
+          missionId: mission.id,
+          playbookId: playbook.id,
+          triggerSignature: playbook.triggerSignature,
+          steps: playbook.steps.length,
+          timesLearned: playbook.timesLearned,
+        });
+      }
+    } catch (error) {
+      // Playbook learning must never turn an already terminal mission into a failure.
+      this.emit("mission_playbook_failed", { missionId: mission.id, error: String(error) });
+    }
   }
 
   /**

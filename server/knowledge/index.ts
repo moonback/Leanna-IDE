@@ -151,3 +151,12 @@ export {
   type ExtractionStats,
 } from "./WorkspaceIndexer.js";
 
+
+// Playbooks appris automatiquement (P0) — stratégies réutilisables par classe de problème
+export {
+  PlaybookStore,
+  playbookStore,
+  type Playbook,
+  type PlaybookStep,
+  type PlaybookMissionInput,
+} from "./PlaybookStore.js";
