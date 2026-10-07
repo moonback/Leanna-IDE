@@ -6,6 +6,7 @@ import {
   projectProfile,
   predictionEngine,
   missionEvolutionStore,
+  WorkflowCompiler,
 } from '../../knowledge/index.js';
 
 /**
@@ -103,6 +104,42 @@ router.post('/explain', (req: Request, res: Response) => {
       prediction,
       evolution,
       factors,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/knowledge/automate — « Automatiser » une opportunité : compile une
+// demande en workflow (NL→Automation) puis le crée réellement (workflow_create).
+router.post('/automate', async (req: Request, res: Response) => {
+  const { request, name } = req.body as { request?: string; name?: string };
+  if (!request || typeof request !== 'string' || !request.trim()) {
+    return res.status(400).json({ error: "Le paramètre 'request' est requis." });
+  }
+  try {
+    const compiled = new WorkflowCompiler().compile(request.trim(), { name });
+    // Matérialise le workflow via le chemin skill existant (validation + persistance).
+    const { createWorkflow } = await import('../../skills/workflow.js');
+    const workflow = await createWorkflow({
+      name: compiled.workflow.name,
+      description: compiled.workflow.description,
+      steps: compiled.workflow.steps.map((s) => ({
+        id: s.id,
+        action: s.action,
+        args: s.args,
+        label: s.label,
+        onError: s.onError,
+      })),
+      schedule: compiled.workflow.schedule,
+    });
+    return res.json({
+      status: 'success',
+      workflowId: workflow.id,
+      name: workflow.name,
+      stepCount: workflow.steps.length,
+      trigger: compiled.workflow.trigger,
+      warnings: compiled.warnings,
     });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });

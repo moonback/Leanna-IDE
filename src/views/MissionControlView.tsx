@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
   Lightbulb, Wrench, ShieldAlert, Zap, Loader2, Stethoscope, Sun, X, CheckCircle2,
+  Play, Workflow,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
@@ -139,7 +140,7 @@ export default function MissionControlView() {
 
           {/* Row 3 — Insights (anticipation) + Opportunities */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <InsightsCard proposals={proposals} />
+            <InsightsCard proposals={proposals} onLaunched={() => navigate('/mission-timeline')} />
             <OpportunitiesCard opportunities={opportunities} />
           </div>
 
@@ -198,6 +199,46 @@ function DailyBriefingBanner({ briefing, reduceMotion, onDismiss }: { briefing: 
         </ul>
       )}
     </motion.section>
+  );
+}
+
+// ─── Per-item action helper (idle → loading → done/error) ───────────────────
+
+type ActionStatus = 'idle' | 'loading' | 'done' | 'error';
+
+function useItemActions() {
+  const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
+  const run = useCallback(async (key: string, fn: () => Promise<boolean>) => {
+    setStatuses((s) => ({ ...s, [key]: 'loading' }));
+    let ok = false;
+    try { ok = await fn(); } catch { ok = false; }
+    setStatuses((s) => ({ ...s, [key]: ok ? 'done' : 'error' }));
+  }, []);
+  return { statuses, run };
+}
+
+/** Small inline action button that reflects an ActionStatus. */
+function ActionButton({ status, idleLabel, doneLabel, icon: Icon, onClick }: {
+  status: ActionStatus;
+  idleLabel: string;
+  doneLabel: string;
+  icon: React.FC<{ size?: number; className?: string }>;
+  onClick: () => void;
+}) {
+  const done = status === 'done';
+  const error = status === 'error';
+  const color = done ? 'var(--color-success)' : error ? 'var(--color-error)' : 'var(--accent-secondary)';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={status === 'loading' || done}
+      className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-70"
+      style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}
+    >
+      {status === 'loading' ? <Loader2 size={11} className="animate-spin" /> : <Icon size={11} />}
+      {done ? doneLabel : error ? 'Réessayer' : idleLabel}
+    </button>
   );
 }
 
@@ -297,7 +338,19 @@ const PROPOSAL_ICON: Record<AnticipationProposal['kind'], React.FC<{ size?: numb
   problem: AlertTriangle, risk: ShieldAlert, opportunity: Lightbulb, optimization: Zap, automation: Wrench,
 };
 
-function InsightsCard({ proposals }: { proposals: AnticipationProposal[] }) {
+function InsightsCard({ proposals, onLaunched }: { proposals: AnticipationProposal[]; onLaunched: () => void }) {
+  const { statuses, run } = useItemActions();
+  const launch = (p: AnticipationProposal) => run(p.proposalId, async () => {
+    const res = await fetch('/api/missions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: p.suggestedAction, description: p.message }),
+    });
+    const data = await res.json().catch(() => null);
+    const ok = res.ok && data && !data.error;
+    if (ok) setTimeout(onLaunched, 600);
+    return ok;
+  });
   return (
     <Card icon={Sparkles} title="Insights (Anticipation)">
       {proposals.length === 0 ? (
@@ -310,10 +363,17 @@ function InsightsCard({ proposals }: { proposals: AnticipationProposal[] }) {
             return (
               <li key={p.proposalId} className="flex items-start gap-2 rounded-md p-2" style={{ backgroundColor: 'var(--bg-input)' }}>
                 <Icon size={14} style={{ color, marginTop: 2 }} />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs" style={{ color: 'var(--text-primary)' }}>{p.message}</p>
                   <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>→ {p.suggestedAction}</p>
                 </div>
+                <ActionButton
+                  status={statuses[p.proposalId] ?? 'idle'}
+                  idleLabel="Lancer"
+                  doneLabel="Lancée"
+                  icon={Play}
+                  onClick={() => void launch(p)}
+                />
               </li>
             );
           })}
@@ -328,6 +388,16 @@ const OPP_ICON: Record<Opportunity['kind'], React.FC<{ size?: number; style?: Re
 };
 
 function OpportunitiesCard({ opportunities }: { opportunities: Opportunity[] }) {
+  const { statuses, run } = useItemActions();
+  const automate = (o: Opportunity) => run(o.id, async () => {
+    const res = await fetch('/api/knowledge/automate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: `${o.suggestedAction}. ${o.message}`, name: o.suggestedAction }),
+    });
+    const data = await res.json().catch(() => null);
+    return res.ok && data && !data.error && !!data.workflowId;
+  });
   return (
     <Card icon={Lightbulb} title="Opportunités">
       {opportunities.length === 0 ? (
@@ -339,13 +409,22 @@ function OpportunitiesCard({ opportunities }: { opportunities: Opportunity[] }) 
             return (
               <li key={o.id} className="flex items-start gap-2 rounded-md p-2" style={{ backgroundColor: 'var(--bg-input)' }}>
                 <Icon size={14} style={{ color: 'var(--accent-secondary)', marginTop: 2 }} />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{o.suggestedAction}</p>
                   <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>{o.message}</p>
                 </div>
-                <span className="ml-auto flex-shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)' }}>
-                  {Math.round(o.payoff)}
-                </span>
+                <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                  <span className="rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)' }}>
+                    {Math.round(o.payoff)}
+                  </span>
+                  <ActionButton
+                    status={statuses[o.id] ?? 'idle'}
+                    idleLabel="Automatiser"
+                    doneLabel="Workflow créé"
+                    icon={Workflow}
+                    onClick={() => void automate(o)}
+                  />
+                </div>
               </li>
             );
           })}
