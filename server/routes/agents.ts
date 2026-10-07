@@ -62,6 +62,28 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     }
   });
 
+  // POST /api/agents/compose-swarm — Dynamic Agent Swarm (preview, read-only)
+  router.post('/compose-swarm', async (req: Request, res: Response) => {
+    const { objective, description, planned_skills, max_members } = req.body ?? {};
+    if (typeof objective !== 'string' || !objective.trim()) {
+      return res.status(400).json({ error: "Champ 'objective' (string) requis." });
+    }
+    try {
+      const result = await skillManager.handleToolCall('agent_compose_swarm', {
+        objective: objective.trim(),
+        description: typeof description === 'string' ? description.trim() : undefined,
+        planned_skills: Array.isArray(planned_skills) ? planned_skills : undefined,
+        max_members: typeof max_members === 'number' ? max_members : undefined,
+      });
+      if (result && typeof result === 'object' && 'error' in result) {
+        return res.status(400).json(result);
+      }
+      return res.json(result);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // GET /api/agents/tasks
   router.get('/tasks', async (_req: Request, res: Response) => {
     try {

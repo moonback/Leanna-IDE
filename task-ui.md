@@ -12,11 +12,12 @@
 | 🔴 P0 | **Agent State / Progress** (barre d'état permanente : état + pourquoi) | ✅ `src/components/AgentStatusBar.tsx` + `src/hooks/useAgentStatus.ts`, montée dans le shell global |
 | 🔴 P0 | Autonomy Center | ✅ déjà existant (`/autonomy`) |
 | 🟠 P1 | **Simulation / Dry-Run UI** — objectif → simulation → fichiers/commandes/agents/coût/risque + [Modifier/Exécuter/Annuler] | ✅ `src/views/MissionSimulationView.tsx` + route `/mission-simulation` + nav |
-| 🟠 P1 | Agent Swarm · Explainability | à venir |
+| 🟠 P1 | **Agent Swarm** — composition dynamique de l'équipe en pipeline (rôle · étape · raison) | ✅ `src/views/AgentSwarmView.tsx` + route `/agent-swarm` + nav |
+| 🟠 P1 | Explainability | à venir |
 
-**P0 UI terminé (6/6).** P1 : ✅ Simulation/Dry-Run UI — reste visualisation Agent Swarm, Explainability.
+**P0 UI terminé (6/6).** P1 : ✅ Simulation/Dry-Run UI, ✅ Agent Swarm — reste Explainability.
 
-Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), `POST /api/missions/simulate` (Mission Simulator dry-run), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
+Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), `POST /api/missions/simulate` (Mission Simulator dry-run), `POST /api/agents/compose-swarm` (SwarmComposer), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
 
 ---
 
