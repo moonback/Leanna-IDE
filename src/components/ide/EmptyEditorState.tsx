@@ -2,9 +2,9 @@ import React, {
   useState, useEffect, useMemo, useCallback, useId,
 } from 'react';
 import {
-  FolderOpen, Search, KeyRound, AlertCircle, BookOpen,
+  FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
-  Bot, Target,
+  Bot, Target, Globe,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -597,6 +597,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     window.dispatchEvent(new CustomEvent('Leanna-toggle-missions'));
   }, []);
 
+  const handleOpenBrowser = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: { type: 'open-browser' } }));
+  }, []);
+
   // Raccourcis : ⌘/Ctrl+N, +L, +, ainsi que « ? » pour l'aide
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -790,14 +794,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               accent="#f472b6"
             />
             <ActionCard
-              icon={Search} title="Rechercher" description="Fichiers et contenus"
-              shortcut={`${MOD}+P`} onClick={onOpenSearch} disabled={!onOpenSearch} reduceMotion={reduceMotion}
-              accent="#f59e0b"
-            />
-            <ActionCard
               icon={BookOpen} title="Notebooks" description="Sources et résumés"
               onClick={onOpenNotebooks} disabled={!onOpenNotebooks} reduceMotion={reduceMotion}
               accent="#6ee7b7" comingSoon={!onOpenNotebooks}
+            />
+            <ActionCard
+              icon={Globe} title="Navigateur" description="Ouvrir le navigateur intégré"
+              onClick={handleOpenBrowser} reduceMotion={reduceMotion}
+              accent="#a78bfa"
             />
           </motion.section>
 
