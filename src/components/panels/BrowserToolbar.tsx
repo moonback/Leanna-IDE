@@ -10,6 +10,7 @@ import {
   Home,
   Loader2,
   Lock,
+  Plus,
   RefreshCw,
   Trash2,
   X,
@@ -39,6 +40,8 @@ interface BrowserToolbarProps {
   onRefresh: () => void;
   onHome: () => void;
   onOpenExternal: () => void;
+  /** Ouvre un nouvel onglet. */
+  onNewTab: () => void;
   /** Fournit les suggestions d'autocomplétion pour une saisie. */
   getSuggestions: (query: string) => BrowserHistoryEntry[];
   /** Navigue vers l'URL d'une suggestion sélectionnée. */
@@ -93,6 +96,7 @@ export function BrowserToolbar({
   onRefresh,
   onHome,
   onOpenExternal,
+  onNewTab,
   getSuggestions,
   onSelectSuggestion,
   onClearHistory,
@@ -228,6 +232,7 @@ export function BrowserToolbar({
           {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
         </ToolbarButton>
         <ToolbarButton label="Page d'accueil" onClick={onHome}><Home size={13} /></ToolbarButton>
+        <ToolbarButton label="Nouvel onglet" onClick={onNewTab}><Plus size={13} /></ToolbarButton>
         <ToolbarButton label="Ouvrir dans une nouvelle fenêtre" onClick={onOpenExternal}><ExternalLink size={13} /></ToolbarButton>
 
         <div ref={containerRef} className="relative flex flex-1 min-w-0">
