@@ -25,6 +25,7 @@ import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
 import net from "node:net";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { createWebSearchProvider } from "./webSearchProvider.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -236,6 +237,28 @@ function assertAllowedBrowserUrl(url: string): void {
   }
 }
 
+/**
+ * Garde SSRF STRICTE pour les récupérations serveur (fetch côté Node) :
+ * seul le web public en http(s) est autorisé — jamais localhost ni IP privée,
+ * contrairement à la webview visible qui peut viser un serveur de dev local.
+ * Lève une erreur explicite sinon.
+ */
+export function assertPublicHttpUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`URL malformée : ${String(url).slice(0, 60)}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Schéma non autorisé pour une récupération serveur : ${parsed.protocol}`);
+  }
+  const classification = classifyHost(parsed.hostname);
+  if (classification !== "PUBLIC_WEB") {
+    throw new Error(`Destination ${classification} interdite pour une récupération serveur.`);
+  }
+}
+
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
 
@@ -443,6 +466,14 @@ const researchSchema = z.object({
   query: z.string().min(1, "Requête de recherche requise"),
   engine: searchEngineEnum.optional().default("google"),
   maxSources: z.number().int().positive().max(5).default(3),
+});
+
+// Recherche web 100 % serveur (sans détourner la webview visible).
+const webSearchSchema = z.object({
+  query: z.string().min(1, "Requête de recherche requise"),
+  maxSources: z.number().int().positive().max(6).default(4),
+  // Si false, renvoie seulement les résultats (titre/url/extrait) sans lire les pages.
+  read: z.boolean().optional().default(true),
 });
 
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
@@ -734,6 +765,29 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_web_search",
+      description:
+        "RECHERCHE WEB RAPIDE CÔTÉ SERVEUR. Effectue une recherche et lit les pages EN PARALLÈLE directement sur le serveur (fetch + extraction), SANS détourner le navigateur visible de l'utilisateur. Beaucoup plus rapide et robuste que browser_research pour collecter de l'information factuelle. Retourne des sources structurées (titre, url, extrait, contenu, fiabilité, fraîcheur) avec consensus/contradictions. Préfère cet outil à browser_research sauf si une session connectée ou une interaction (formulaire, SPA) est nécessaire.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          query: {
+            type: "STRING",
+            description: "Le sujet ou la question à rechercher.",
+          },
+          maxSources: {
+            type: "NUMBER",
+            description: "Nombre de pages à lire en parallèle (défaut 4, max 6).",
+          },
+          read: {
+            type: "BOOLEAN",
+            description: "Si false, renvoie seulement les résultats (titre/url/extrait) sans lire le contenu des pages. Défaut : true.",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -931,6 +985,7 @@ export const browserSkill: Skill = {
     browser_inspect: inspectSchema,
     browser_summarize_page: summarizePageSchema,
     browser_research: researchSchema,
+    browser_web_search: webSearchSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1444,6 +1499,116 @@ export const browserSkill: Skill = {
           sources.length > 0
             ? `${sources.length} source(s) lue(s) pour "${query}". Consensus: ${research.consensus.length}, contradictions: ${research.contradictions.length}, confiance: ${(research.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`
             : `Aucune source n'a pu être lue pour "${query}".`,
+      };
+    }
+
+    // ── browser_web_search ──────────────────────────────────────────────────
+    // Recherche + lecture 100 % serveur, en parallèle, sans détourner la webview.
+    if (name === "browser_web_search") {
+      const { query, maxSources, read } = validateArgs(browserSkill.inputSchemas!["browser_web_search"], args);
+      const provider = createWebSearchProvider();
+
+      let hits;
+      try {
+        hits = await provider.search(query, Math.max(maxSources * 2, 8));
+      } catch (err: any) {
+        return {
+          status: "error",
+          query,
+          message: `Recherche web impossible : ${err?.message ?? "erreur inconnue"}. Essaie browser_research (via la webview) en repli.`,
+        };
+      }
+
+      // Dédupliquer par domaine pour diversifier les sources.
+      const seenDomains = new Set<string>();
+      const picked: typeof hits = [];
+      for (const h of hits) {
+        let domain: string;
+        try { domain = new URL(h.url).hostname.replace(/^www\./, ""); } catch { continue; }
+        if (isSponsoredLink(h.title, h.url)) continue;
+        if (seenDomains.has(domain)) continue;
+        seenDomains.add(domain);
+        picked.push(h);
+        if (picked.length >= maxSources) break;
+      }
+
+      if (picked.length === 0) {
+        return {
+          status: "error",
+          query,
+          message: `Recherche effectuée pour "${query}" mais aucun résultat exploitable.`,
+        };
+      }
+
+      // Mode « liens seulement » : neutraliser titres/extraits et renvoyer.
+      if (!read) {
+        const results = picked.map((h) => ({
+          title: guardUntrustedContent(h.title, "web-search").text,
+          url: h.url,
+          snippet: guardUntrustedContent(h.snippet, "web-search").text,
+        }));
+        return {
+          status: "success",
+          query,
+          mode: "links",
+          results,
+          message: `${results.length} résultat(s) pour "${query}" (sans lecture des pages).`,
+        };
+      }
+
+      // Lecture EN PARALLÈLE des pages sélectionnées.
+      const pages = await provider.fetchPages(picked.map((h) => h.url));
+      const sources: ResearchSource[] = [];
+      const errors: Array<{ url: string; message: string }> = [];
+
+      pages.forEach((page, i) => {
+        const hit = picked[i];
+        if (!page.ok || page.text.trim().length < 40) {
+          errors.push({ url: hit.url, message: page.error ?? "contenu vide" });
+          return;
+        }
+        // Contenu + titre = données externes non fiables → neutralisation.
+        const safeContent = guardUntrustedContent(page.text, "web-search").text;
+        const safeTitle = guardUntrustedContent(page.title || hit.title, "web-search").text;
+        const sourceUrl = page.finalUrl || hit.url;
+        const extracted = extractSourceEvidence(safeContent, query);
+        let domain = "";
+        try { domain = new URL(sourceUrl).hostname; } catch { domain = ""; }
+        sources.push({
+          url: sourceUrl,
+          title: safeTitle,
+          domain,
+          content: safeContent,
+          contentLength: safeContent.length,
+          reliability: sourceReliability(sourceUrl, safeContent),
+          freshness: sourceFreshness(safeContent, sourceUrl),
+          facts: extracted.facts,
+          evidence: extracted.evidence,
+          contradictions: [],
+        });
+      });
+
+      if (sources.length === 0) {
+        return {
+          status: "error",
+          query,
+          errors: errors.length ? errors : undefined,
+          message: `Aucune page lisible pour "${query}".`,
+        };
+      }
+
+      const comparison = compareResearchSources(sources);
+      return {
+        status: "success",
+        query,
+        mode: "read",
+        sourcesRead: sources.length,
+        sources,
+        consensus: comparison.consensus,
+        contradictions: comparison.contradictions,
+        confidence: comparison.confidence,
+        errors: errors.length ? errors : undefined,
+        message: `${sources.length} source(s) lue(s) en parallèle pour "${query}". Consensus: ${comparison.consensus.length}, contradictions: ${comparison.contradictions.length}, confiance: ${(comparison.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`,
       };
     }
 
