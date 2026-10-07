@@ -13,6 +13,7 @@ import {
   missionEvolutionStore,
   dailyBriefing,
   WorkflowCompiler,
+  voiceCommandInterpreter,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -81,6 +82,7 @@ export const knowledgeSkill: Skill = {
     knowledge_mission_evolution: ["read"],
     knowledge_daily_briefing: ["read"],
     knowledge_compile_workflow: ["read"],
+    knowledge_voice_command: ["read"],
   },
   declarations: [
     {
@@ -487,6 +489,18 @@ export const knowledgeSkill: Skill = {
         required: ["request"],
       },
     },
+    {
+      name: "knowledge_voice_command",
+      description:
+        "🎙️ Voice Agent : interprète une transcription vocale en une SÉQUENCE ordonnée de commandes agentiques (diagnostic, correction, tests, commit, mission, ouverture de fichier…) avec cibles (« le premier », « les trois »), conditions (« si tout est bon, commit ») et drapeau de confirmation pour les actions risquées. Mappe chaque commande sur un skill réel. Lecture seule — ne fait que planifier.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          transcript: { type: "STRING", description: "La transcription de la commande vocale." },
+        },
+        required: ["transcript"],
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -592,6 +606,9 @@ export const knowledgeSkill: Skill = {
     knowledge_compile_workflow: z.object({
       request: z.string().min(1, "La demande ne peut être vide").trim(),
       name: z.string().trim().optional(),
+    }),
+    knowledge_voice_command: z.object({
+      transcript: z.string().min(1, "La transcription ne peut être vide").trim(),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1357,6 +1374,27 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR compile_workflow: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_voice_command — Voice Agent (#12)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_voice_command") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_voice_command, args);
+        log(`voice_command transcript='${validated.transcript.slice(0, 60)}'`);
+        const result = voiceCommandInterpreter.interpret(validated.transcript);
+        return {
+          status: "success",
+          wake_word: result.wakeWord,
+          commands: result.commands,
+          unrecognized: result.unrecognized,
+          summary: result.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR voice_command: ${e.message}`);
         return { error: e.message };
       }
     }

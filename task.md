@@ -23,13 +23,13 @@
 | 🕰️ **Mission Time Travel** | `server/mission/MissionTimeTravel.ts` (+ skills `mission_timeline`/`mission_rewind`) | ✅ 10 tests |
 | 👁️ **Computer Use Agent** | `server/autonomy/ComputerUseAgent.ts` (boucle observe→act→verify, gating par risque) | ✅ 10 tests |
 
-### 🚧 Bonus — Autres fonctionnalités du document
+### ✅ Bonus — Autres fonctionnalités du document (toutes implémentées)
 
 | Fonctionnalité | Module(s) | Statut |
 | --- | --- | --- |
 | 🧬 **Mission Evolution** (#6) | `server/knowledge/MissionEvolution.ts` (+ skill `knowledge_mission_evolution`) | ✅ 7 tests |
 | 🧠 **Self-Critique** (#10) | `server/mission/SelfEvaluation.ts` (+ skill `mission_self_critique`) | ✅ 8 tests |
-| 🎙️ **Voice Agent** (#12) | — | à venir |
+| 🎙️ **Voice Agent** (#12) | `server/knowledge/VoiceCommandInterpreter.ts` (+ skill `knowledge_voice_command`) — cœur déterministe ; reste à brancher sur l'audio Gemini Live | ✅ 14 tests |
 | 📡 **Daily AI Briefing** (#13) | `server/knowledge/DailyBriefing.ts` (+ skill `knowledge_daily_briefing`) | ✅ 9 tests |
 | 🧩 **NL → Automation** (#15) | `server/knowledge/WorkflowCompiler.ts` (+ skill `knowledge_compile_workflow`) | ✅ 11 tests |
 

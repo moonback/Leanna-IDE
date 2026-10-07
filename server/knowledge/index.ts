@@ -237,3 +237,15 @@ export {
   type CompileResult,
   type WorkflowCompilerOptions,
 } from "./WorkflowCompiler.js";
+
+// Voice Agent (#12) — interprète de commandes vocales (transcription → commandes agentiques)
+export {
+  VoiceCommandInterpreter,
+  voiceCommandInterpreter,
+  INTENT_SKILL,
+  type VoiceIntent,
+  type VoiceCommand,
+  type VoiceTarget,
+  type VoiceInterpretation,
+  type VoiceInterpreterOptions,
+} from "./VoiceCommandInterpreter.js";
