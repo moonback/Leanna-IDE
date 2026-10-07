@@ -1,3 +1,22 @@
+# 📊 État d'implémentation UI
+
+> Démarrage de la couche interface. Construite sur la stack existante
+> (React 19 + Vite + Tailwind 4 + react-router v7, tokens du design system).
+
+| Priorité | Écran UI | Statut |
+| --- | --- | --- |
+| 🔴 P0 | **Mission Control** (dashboard : état agent, santé projet, insights, opportunités, plan d'amélioration) | ✅ `src/views/MissionControlView.tsx` + route `/mission-control` + entrée nav |
+| 🔴 P0 | **Insights / Anticipation** (panneau live des propositions) | ✅ intégré au Mission Control (via `useAutonomyTimeline` étendu aux `proposals`) |
+| 🔴 P0 | **Project Intelligence** (gauges de santé par dimension) | ✅ intégré au Mission Control (via `/api/knowledge/doctor`) |
+| 🔴 P0 | Mission Timeline (UI) | à venir |
+| 🔴 P0 | Agent State / Progress (barre d'état) | à venir |
+| 🔴 P0 | Autonomy Center | déjà existant (`/autonomy`) — à enrichir |
+| 🟠 P1 | Simulation / Dry Run UI · Agent Swarm · Time Travel · Explainability | à venir |
+
+Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
+
+---
+
 Oui. **Au niveau UI**, je pense que Leanna doit évoluer beaucoup plus que simplement ajouter des écrans.
 
 Le changement principal serait de passer d'une **interface d'IDE avec des fonctionnalités IA** à une **interface de centre de contrôle d'un agent autonome**.

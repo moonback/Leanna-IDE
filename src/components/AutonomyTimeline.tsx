@@ -38,6 +38,7 @@ const EVENT_LABELS: Record<AutonomyEventType, string> = {
   'autonomy:health': 'Santé',
   'autonomy:taskCreated': 'Tâche créée',
   'autonomy:taskStateChanged': 'Tâche mise à jour',
+  'autonomy:anticipation': 'Anticipation',
 };
 
 /** Couleur sémantique (token CSS) associée à un type d'événement. */
