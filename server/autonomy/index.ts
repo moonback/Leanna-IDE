@@ -26,6 +26,17 @@ export type {
 export { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 export { PerceptionEngine } from "./PerceptionEngine.js";
 export { AnticipationEngine, anticipationConfigFromEnv } from "./AnticipationEngine.js";
+export { ComputerUseAgent } from "./ComputerUseAgent.js";
+export type {
+  ComputerAction,
+  ComputerActionType,
+  ComputerRisk,
+  ActionOutcome,
+  ComputerStepRecord,
+  ComputerUseResult,
+  ComputerUseHandlers,
+  ComputerUseConfig,
+} from "./ComputerUseAgent.js";
 export type {
   AnticipationProposal,
   AnticipationKind,

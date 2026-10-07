@@ -13,7 +13,7 @@
 | 🔍 **AI Project Doctor** | `server/knowledge/ProjectDoctor.ts` (+ skill `knowledge_project_doctor`) | 9 ✅ |
 | 🧪 **Mission Simulator** | `server/mission/MissionSimulator.ts` (+ skill `mission_simulate`) | 9 ✅ |
 
-### 🚧 P1 — En cours
+### ✅ P1 — Terminé (5/5)
 
 | Fonctionnalité | Module(s) | Statut |
 | --- | --- | --- |
@@ -21,7 +21,7 @@
 | 🔥 **Opportunity Engine** | `server/knowledge/OpportunityEngine.ts` (+ skill `knowledge_opportunities`) | ✅ 11 tests |
 | 🤖 **Dynamic Agent Swarm** | `server/agents/SwarmComposer.ts` (+ skill `agent_compose_swarm`) | ✅ 10 tests |
 | 🕰️ **Mission Time Travel** | `server/mission/MissionTimeTravel.ts` (+ skills `mission_timeline`/`mission_rewind`) | ✅ 10 tests |
-| 👁️ **Computer Use Agent** | — | à venir |
+| 👁️ **Computer Use Agent** | `server/autonomy/ComputerUseAgent.ts` (boucle observe→act→verify, gating par risque) | ✅ 10 tests |
 
 ---
 
