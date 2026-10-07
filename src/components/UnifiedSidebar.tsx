@@ -18,6 +18,7 @@ import {
   Settings,
   BrainCircuit,
   LayoutList,
+  LayoutDashboard,
   FileText,
   NotebookPen,
   Menu,
@@ -597,6 +598,7 @@ function GlobalNavSection({
   }, [currentPath, showHistory, showAutomation, showMemory, showNotebooks]);
 
   const subItems = [
+    { id: 'mission-control', path: '/mission-control', icon: LayoutDashboard, label: 'Mission Control', active: currentPath === '/mission-control', onClick: () => navigate('/mission-control') },
     { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },

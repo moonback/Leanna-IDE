@@ -23,7 +23,7 @@ import { setTextGenerationProfile, generateText } from "./server/utils/textGener
 
 // Routeurs modulaires
 import healthRouter from "./server/routes/health.js";
-import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from "./server/routes/knowledge/index.js";
+import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter, insightsRouter } from "./server/routes/knowledge/index.js";
 
 // Sprint 1 — routeurs extraits de server.ts
 import { createAgentBuilderRouter } from "./server/routes/agent-builder.js";
@@ -715,6 +715,7 @@ async function startServer() {
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);
   app.use("/api/knowledge", understandingRouter);
+  app.use("/api/knowledge", insightsRouter);
 
   app.use("/api/notebooks/:id/chat", rateBundle.notebookChatLimiter);
   app.use("/api/notebooks/:id/embeddings/reindex", rateBundle.notebookEmbeddingLimiter);

@@ -6,7 +6,20 @@ export type AutonomyEventType =
   | 'autonomy:stateChanged'
   | 'autonomy:health'
   | 'autonomy:taskCreated'
-  | 'autonomy:taskStateChanged';
+  | 'autonomy:taskStateChanged'
+  | 'autonomy:anticipation';
+
+/** Proactive proposal emitted by the Anticipation Engine (server-side). */
+export interface AnticipationProposal {
+  proposalId: string;
+  kind: 'problem' | 'opportunity' | 'optimization' | 'risk' | 'automation';
+  importance: number;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  affectedResources: string[];
+  suggestedAction: string;
+  queuedAsTask: boolean;
+}
 
 export interface AutonomyEvent {
   /** Monotonic client-side id used as a stable React key. */
@@ -41,6 +54,7 @@ interface SnapshotMessage {
   timestamp: string;
   state: AutonomyState;
   tasks: AutonomyTask[];
+  proposals?: AnticipationProposal[];
 }
 
 interface EventMessage {
@@ -65,6 +79,8 @@ interface UseAutonomyTimelineResult {
   state: AutonomyState | null;
   tasks: AutonomyTask[];
   events: AutonomyEvent[];
+  /** Proactive anticipation proposals (newest first). */
+  proposals: AnticipationProposal[];
   connection: AutonomyConnectionStatus;
 }
 
@@ -85,6 +101,7 @@ export function useAutonomyTimeline({
   const [state, setState] = useState<AutonomyState | null>(null);
   const [tasks, setTasks] = useState<AutonomyTask[]>([]);
   const [events, setEvents] = useState<AutonomyEvent[]>([]);
+  const [proposals, setProposals] = useState<AnticipationProposal[]>([]);
   const [connection, setConnection] = useState<AutonomyConnectionStatus>('closed');
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -129,6 +146,7 @@ export function useAutonomyTimeline({
     if (data.type === 'autonomy_snapshot') {
       setState(data.state ?? null);
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      if (Array.isArray(data.proposals)) setProposals(data.proposals);
       return;
     }
 
@@ -150,6 +168,14 @@ export function useAutonomyTimeline({
       }
       if (data.event === 'autonomy:health' && typeof data.payload?.status === 'string') {
         setState((prev) => (prev ? { ...prev, health: data.payload.status as AutonomyState['health'] } : prev));
+      }
+      // Live anticipation proposal → prepend (deduped by proposalId), bounded.
+      if (data.event === 'autonomy:anticipation' && typeof data.payload?.proposalId === 'string') {
+        const proposal = data.payload as unknown as AnticipationProposal;
+        setProposals((prev) => {
+          const next = [proposal, ...prev.filter((p) => p.proposalId !== proposal.proposalId)];
+          return next.slice(0, 50);
+        });
       }
     }
   }, []);
@@ -222,5 +248,5 @@ export function useAutonomyTimeline({
     return cleanupConnection;
   }, [enabled, connect, cleanupConnection]);
 
-  return { state, tasks, events, connection };
+  return { state, tasks, events, proposals, connection };
 }
