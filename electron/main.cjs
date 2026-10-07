@@ -396,6 +396,154 @@ app.whenReady().then(() => {
     }
   });
 
+  // ── Extensions Chromium (navigateur intégré) ─────────────────────────────────
+  // Electron ne supporte qu'un sous-ensemble de l'API Chrome Extensions et
+  // exige des extensions « décompressées » (dossier). Les extensions chargées
+  // ne sont pas restaurées automatiquement entre deux lancements : on persiste
+  // donc nous-mêmes la liste des chemins par partition dans userData, et on les
+  // recharge à la première utilisation de la partition.
+  const { session: electronSession } = require('electron');
+  const extensionsStorePath = path.join(app.getPath('userData'), 'browser-extensions.json');
+  // Partitions déjà réhydratées pendant cette session (évite les doubles chargements).
+  const hydratedPartitions = new Set();
+
+  function readExtensionsStore() {
+    try {
+      if (!fs.existsSync(extensionsStorePath)) return {};
+      const raw = fs.readFileSync(extensionsStorePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      log('[extensions] Lecture du store échouée:', e.message);
+      return {};
+    }
+  }
+
+  function writeExtensionsStore(store) {
+    try {
+      fs.writeFileSync(extensionsStorePath, JSON.stringify(store, null, 2), 'utf-8');
+    } catch (e) {
+      log('[extensions] Écriture du store échouée:', e.message);
+    }
+  }
+
+  function isValidPartition(partition) {
+    return typeof partition === 'string' && /^persist:browser-[\w-]+$/.test(partition);
+  }
+
+  function serializeExtension(ext) {
+    return {
+      id: ext.id,
+      name: ext.name,
+      version: ext.version,
+      path: ext.path,
+    };
+  }
+
+  // Recharge les extensions persistées pour une partition (une seule fois par session).
+  async function hydratePartition(partition) {
+    if (hydratedPartitions.has(partition)) return;
+    hydratedPartitions.add(partition);
+    const store = readExtensionsStore();
+    const paths = Array.isArray(store[partition]) ? store[partition] : [];
+    if (!paths.length) return;
+    const ses = electronSession.fromPartition(partition);
+    const stillValid = [];
+    for (const extPath of paths) {
+      try {
+        if (!fs.existsSync(extPath)) {
+          log('[extensions] Chemin introuvable, retiré du store:', extPath);
+          continue;
+        }
+        await ses.extensions.loadExtension(extPath, { allowFileAccess: true });
+        stillValid.push(extPath);
+      } catch (e) {
+        log('[extensions] Rechargement échoué pour', extPath, ':', e.message);
+      }
+    }
+    // Nettoyer le store des chemins devenus invalides.
+    if (stillValid.length !== paths.length) {
+      store[partition] = stillValid;
+      writeExtensionsStore(store);
+    }
+  }
+
+  ipcMain.handle('electron/browser-extensions-list', async function (_event, partition) {
+    if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
+    try {
+      await hydratePartition(partition);
+      const ses = electronSession.fromPartition(partition);
+      const all = ses.extensions.getAllExtensions();
+      return { success: true, extensions: all.map(serializeExtension) };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('electron/browser-extensions-load', async function (_event, partition, extPath) {
+    if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
+    let targetPath = extPath;
+    // Si aucun chemin fourni, ouvrir un sélecteur de dossier.
+    if (!targetPath) {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Choisir le dossier de l\'extension (décompressée)',
+      });
+      if (result.canceled || !result.filePaths.length) {
+        return { success: false, canceled: true };
+      }
+      targetPath = result.filePaths[0];
+    }
+    if (typeof targetPath !== 'string' || !fs.existsSync(targetPath)) {
+      return { success: false, error: 'Dossier d\'extension introuvable.' };
+    }
+    // Vérifier la présence d'un manifest.json (indice d'une extension décompressée).
+    if (!fs.existsSync(path.join(targetPath, 'manifest.json'))) {
+      return { success: false, error: 'Aucun manifest.json dans ce dossier — ce n\'est pas une extension décompressée.' };
+    }
+    try {
+      await hydratePartition(partition);
+      const ses = electronSession.fromPartition(partition);
+      const ext = await ses.extensions.loadExtension(targetPath, { allowFileAccess: true });
+      // Persister le chemin.
+      const store = readExtensionsStore();
+      const list = Array.isArray(store[partition]) ? store[partition] : [];
+      if (!list.includes(targetPath)) list.push(targetPath);
+      store[partition] = list;
+      writeExtensionsStore(store);
+      log('[extensions] Chargée:', ext.name, ext.version, 'sur', partition);
+      return { success: true, extension: serializeExtension(ext) };
+    } catch (e) {
+      log('[extensions] Chargement échoué:', e.message);
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('electron/browser-extensions-remove', async function (_event, partition, extensionId) {
+    if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
+    if (typeof extensionId !== 'string' || !extensionId) {
+      return { success: false, error: 'Identifiant d\'extension invalide.' };
+    }
+    try {
+      const ses = electronSession.fromPartition(partition);
+      const existing = ses.extensions.getAllExtensions().find(function (e) { return e.id === extensionId; });
+      const removedPath = existing ? existing.path : null;
+      ses.extensions.removeExtension(extensionId);
+      // Retirer le chemin du store.
+      if (removedPath) {
+        const store = readExtensionsStore();
+        if (Array.isArray(store[partition])) {
+          store[partition] = store[partition].filter(function (p) { return p !== removedPath; });
+          writeExtensionsStore(store);
+        }
+      }
+      log('[extensions] Retirée:', extensionId, 'de', partition);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
   ipcMain.handle('electron/get-screen-sources', async function () {
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],

@@ -1,9 +1,9 @@
 {
-  "botToken": "gcm:ef83c39a825160e528125b69:d9538ffebb2a9b4ba2f75570265b4914:0b6a6375967c81a65886286a0a4cdedd2d691834d56eae5e25e19d18762f65d7f2142f6041ba312ecc975bfe0263",
+  "botToken": "",
   "allowedUsers": [
-    "8367779354"
+    "user_test_42"
   ],
-  "autoStart": true,
+  "autoStart": false,
   "notificationsEnabled": true,
   "defaultChatId": ""
 }

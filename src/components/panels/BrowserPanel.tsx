@@ -9,6 +9,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { BrowserExternalOverlay } from './BrowserExternalOverlay.js';
 import { BrowserToolbar } from './BrowserToolbar.js';
+import { useBrowserHistory } from './useBrowserHistory.js';
+import { useBrowserProfiles } from './useBrowserProfiles.js';
+import { useBrowserExtensions } from './useBrowserExtensions.js';
 import type {
   BrowserPanelProps,
   WebviewElement,
@@ -44,6 +47,24 @@ export function BrowserPanel({
   const webviewRef = useRef<WebviewElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /** Historique de navigation persistant + suggestions d'autocomplétion */
+  const { recordVisit, updateTitle, getSuggestions, clearHistory } = useBrowserHistory();
+
+  /** Profils de navigation isolés (sessions/cookies/cache séparés) */
+  const {
+    profiles,
+    activeProfile,
+    createProfile,
+    renameProfile,
+    deleteProfile,
+    switchProfile,
+  } = useBrowserProfiles();
+  /** Partition de session Electron du profil actif. */
+  const partition = activeProfile.partition;
+
+  /** Extensions Chromium chargées pour le profil (partition) actif. */
+  const extensions = useBrowserExtensions(partition);
+
   const [inputValue, setInputValue] = useState(defaultUrl);
   const [currentUrl, setCurrentUrl] = useState(defaultUrl);
   const [loading, setLoading] = useState(false);
@@ -62,6 +83,14 @@ export function BrowserPanel({
   const domReadyRef = useRef(false);
   /** URL en attente si elle arrive avant que dom-ready soit émis */
   const pendingUrlRef = useRef<string | null>(null);
+
+  // Références stables vers les callbacks d'historique : l'effet d'abonnement
+  // aux événements webview tourne avec [] et ne doit pas se réabonner à chaque
+  // changement de callback.
+  const recordVisitRef = useRef(recordVisit);
+  const updateTitleRef = useRef(updateTitle);
+  useEffect(() => { recordVisitRef.current = recordVisit; }, [recordVisit]);
+  useEffect(() => { updateTitleRef.current = updateTitle; }, [updateTitle]);
 
   // ── Navigation interne ──────────────────────────────────────────────────────
 
@@ -102,6 +131,15 @@ export function BrowserPanel({
       }
     },
     [inputValue, currentUrl, navigateTo],
+  );
+
+  /** Sélection d'une suggestion d'autocomplétion : navigue vers l'URL. */
+  const handleSelectSuggestion = useCallback(
+    (url: string) => {
+      navigateTo(url);
+      inputRef.current?.blur();
+    },
+    [navigateTo],
   );
 
   const handleGoBack = useCallback(() => webviewRef.current?.goBack(), []);
@@ -202,6 +240,9 @@ export function BrowserPanel({
       setCanGoBack(wv.canGoBack());
       setCanGoForward(wv.canGoForward());
 
+      // Enregistrer la visite dans l'historique de navigation persistant.
+      recordVisitRef.current(url, wv.getTitle?.() ?? '');
+
       // Notifier l'app (utilisé par le skill pour confirmer la navigation)
       window.dispatchEvent(new CustomEvent('Leanna-browser-navigated', {
         detail: { url },
@@ -211,6 +252,8 @@ export function BrowserPanel({
     const onTitleUpdate = (e: Event) => {
       const title = (e as WebviewTitleEvent).title;
       setPageTitle(title);
+      // Garder l'historique à jour avec le titre réel de la page.
+      updateTitleRef.current(wv.getURL(), title);
       window.dispatchEvent(new CustomEvent('Leanna-browser-title-updated', {
         detail: { title, url: wv.getURL() },
       }));
@@ -233,6 +276,7 @@ export function BrowserPanel({
       setInputValue(ev.url);
       setCanGoBack(wv.canGoBack());
       setCanGoForward(wv.canGoForward());
+      recordVisitRef.current(ev.url, wv.getTitle?.() ?? '');
     };
 
     wv.addEventListener('dom-ready', onDomReady);
@@ -253,7 +297,9 @@ export function BrowserPanel({
       wv.removeEventListener('did-navigate', onNavigate);
       wv.removeEventListener('did-navigate-in-page', onNavigate);
     };
-  }, []);
+    // `partition` : un changement de profil remonte le <webview> (nouvelle
+    // partition de session) ; on doit réabonner les listeners au nouvel élément.
+  }, [partition]);
 
   // ── Écoute des commandes directes via CustomEvent (fallback / scroll) ───────
 
@@ -1305,6 +1351,21 @@ export function BrowserPanel({
         onRefresh={handleRefresh}
         onHome={handleHome}
         onOpenExternal={handleOpenInNewWindow}
+        getSuggestions={getSuggestions}
+        onSelectSuggestion={handleSelectSuggestion}
+        onClearHistory={clearHistory}
+        profiles={profiles}
+        activeProfile={activeProfile}
+        onSwitchProfile={switchProfile}
+        onCreateProfile={createProfile}
+        onRenameProfile={renameProfile}
+        onDeleteProfile={deleteProfile}
+        extensionsSupported={extensions.supported}
+        extensions={extensions.extensions}
+        extensionsLoading={extensions.loading}
+        extensionsError={extensions.error}
+        onLoadExtension={extensions.loadExtension}
+        onRemoveExtension={extensions.removeExtension}
       />
 
       {/* ── Error banner ── */}
@@ -1325,8 +1386,12 @@ export function BrowserPanel({
       {/* ── Webview ── */}
       <div className="flex-1 min-h-0 relative">
         <webview
+          // `key` dérivée de la partition : changer de profil remonte le
+          // <webview> car l'attribut `partition` est immuable après attache.
+          key={partition}
           ref={webviewRef}
           src={defaultUrl}
+          partition={partition}
           style={{
             width: '100%',
             height: '100%',

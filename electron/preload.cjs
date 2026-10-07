@@ -39,4 +39,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Retourne : { success: boolean, path?: string, repoName?: string, error?: string }
   gitClone: (repoUrl, targetDir) =>
     ipcRenderer.invoke('electron/git-clone', repoUrl, targetDir),
+
+  // ── Extensions Chromium du navigateur intégré ───────────────────────────────
+  // partition : la partition de session du profil actif (ex: persist:browser-default)
+  // Retournent toutes : { success: boolean, ... , error?: string }
+
+  // Liste les extensions chargées pour une partition.
+  browserExtensionsList: (partition) =>
+    ipcRenderer.invoke('electron/browser-extensions-list', partition),
+
+  // Charge une extension décompressée. Si extPath est omis, ouvre un sélecteur de dossier.
+  browserExtensionsLoad: (partition, extPath) =>
+    ipcRenderer.invoke('electron/browser-extensions-load', partition, extPath),
+
+  // Retire une extension par son identifiant.
+  browserExtensionsRemove: (partition, extensionId) =>
+    ipcRenderer.invoke('electron/browser-extensions-remove', partition, extensionId),
 });
