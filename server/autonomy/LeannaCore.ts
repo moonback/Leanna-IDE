@@ -3,6 +3,7 @@ import type { AgentRuntime, EventBus } from "../runtime/index.js";
 import type { RuntimeEvent } from "../runtime/types.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
+import { AnticipationEngine, anticipationConfigFromEnv, type AnticipationEngineConfig, type AnticipationProposal } from "./AnticipationEngine.js";
 import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
 import {
   TaskManager,
@@ -46,7 +47,8 @@ export type AutonomyEventType =
   | "autonomy:stateChanged"
   | "autonomy:health"
   | "autonomy:taskCreated"
-  | "autonomy:taskStateChanged";
+  | "autonomy:taskStateChanged"
+  | "autonomy:anticipation";
 
 /**
  * Envelope pushed to WebSocket clients for the autonomy timeline. It mirrors the
@@ -71,6 +73,17 @@ export interface LeannaCoreOptions {
   persistence?: AutonomyTaskStore;
   /** Optional real-time broadcaster for the autonomy timeline (e.g. WebSocket). */
   broadcaster?: AutonomyBroadcaster;
+  /**
+   * Anticipation Engine configuration. The engine runs by default (observe-and-
+   * suggest). Set `enabled: false` to disable it entirely, or `autoLaunch: false`
+   * to keep it in pure proposal mode even for high-importance signals.
+   */
+  anticipation?: {
+    enabled?: boolean;
+    /** When false, high-importance proposals are surfaced but never auto-queued as missions. */
+    autoLaunch?: boolean;
+    config?: Partial<AnticipationEngineConfig>;
+  };
 }
 
 const MAX_RECENT_FAILURES = 20;
@@ -85,6 +98,7 @@ export class LeannaCore {
   private readonly taskManager: TaskManager;
   private readonly heartbeat: HeartbeatService;
   private readonly executive?: AutonomousExecutive;
+  private readonly anticipation?: AnticipationEngine;
   private readonly unsubscribers: Array<() => void> = [];
   private readonly persistence?: AutonomyTaskStore;
   private broadcaster?: AutonomyBroadcaster;
@@ -122,6 +136,17 @@ export class LeannaCore {
         onEvent: (event) => this.broadcastExecutive(event),
       });
     }
+    // Proactive observation. On by default. It reuses the shared heartbeat tick
+    // and the existing TaskManager, so no new runtime loop is introduced. Launch
+    // of any auto-queued mission still flows through TaskManager →
+    // AutonomousExecutive → executeMission (permissions / dry-run / approval).
+    if (options.anticipation?.enabled !== false) {
+      const autoLaunch = options.anticipation?.autoLaunch !== false;
+      this.anticipation = new AnticipationEngine(runtime, {
+        config: { ...anticipationConfigFromEnv(), ...options.anticipation?.config },
+        submitTask: autoLaunch ? (input) => this.taskManager.submit(input) : undefined,
+      });
+    }
   }
 
   start(): void {
@@ -131,6 +156,9 @@ export class LeannaCore {
     this.unsubscribers.push(this.events.onAny((event) => this.handleEvent(event)));
     this.unsubscribers.push(this.events.on("autonomy:heartbeat", (event) => this.handleHeartbeat(event.state)));
     this.subscribeTimeline();
+    // Start anticipation before the heartbeat so its heartbeat subscription is
+    // in place for the very first tick.
+    this.anticipation?.start();
     this.heartbeat.start();
     void this.resumePersistedTasks();
   }
@@ -152,6 +180,7 @@ export class LeannaCore {
       "autonomy:health",
       "autonomy:taskCreated",
       "autonomy:taskStateChanged",
+      "autonomy:anticipation",
     ];
     for (const event of events) {
       this.unsubscribers.push(this.events.on(event, (e) => this.broadcast(e as RuntimeEvent)));
@@ -199,6 +228,7 @@ export class LeannaCore {
     if (!this.started) return;
     this.setStatus("stopping", "Graceful shutdown requested.");
     this.heartbeat.stop();
+    this.anticipation?.stop();
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     await this.taskManager.stop();
     this.started = false;
@@ -214,6 +244,15 @@ export class LeannaCore {
 
   getTasks(): AutonomousTask[] {
     return this.taskManager.list();
+  }
+
+  /**
+   * Proactive proposals detected by the Anticipation Engine (newest first).
+   * Empty when anticipation is disabled. These are suggestions surfaced to the
+   * user; any that were actionable enough were also queued as mission tasks.
+   */
+  getProposals(): AnticipationProposal[] {
+    return this.anticipation?.getProposals() ?? [];
   }
 
   private get events(): EventBus {

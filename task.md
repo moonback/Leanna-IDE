@@ -1,109 +1,753 @@
-Je commence par lire le fichier.Le fichier fait plus de 271 000 lignes. Je cible les parties liées au navigateur, à la recherche et à la navigation web.Je suis en train de lire le code de ton navigateur intégré : la skill serveur `browser.ts`, puis `BrowserPanel.tsx` et la barre d'outils. Ensuite je te livre l'analyse.Je suis dans le code Electron (`main.cjs`) pour vérifier la sécurité du `<webview>` : popups, permissions, téléchargements. Ensuite j'écris l'analyse complète.Je regarde un dernier fichier, `automationBrowser.ts` (le moteur Puppeteer headless et sa recherche DuckDuckGo). Après ça, je te donne l'analyse complète.Je vérifie deux soupçons de bugs en les exécutant avant de te les affirmer.J'ai lu le navigateur intégré : `server/skills/browser.ts`, `BrowserPanel.tsx`, `BrowserToolbar.tsx`, `useBrowserHistory.ts`, `electron/main.cjs`, `automationBrowser.ts` et le prompt `browser.md`. Je n'ai pas relu en détail les handlers click/type/get-links du panneau, les profils, l'UI des extensions, le preload ni les tests. J'ai exécuté les deux bugs 1 et 2 pour les confirmer.
+Leanna est déjà **très riche en briques IA** : runtime agentique, missions, mémoire, Knowledge Graph, RAG, agents spécialisés, navigateur, vision, voix, workflows, GitHub, apprentissage de fiabilité, sécurité et observabilité. 
 
-L'architecture est solide : un navigateur visible piloté par IPC, des profils isolés, de l'ARIA snapshot, des retries. Il y a aussi une vraie ambition de recherche (`browser_research`, avec fiabilité, fraîcheur et contradictions). Les problèmes sont dans les détails d'implémentation et dans le choix de scraper Google dans une webview.
+Le point important est donc : **ne pas ajouter encore 50 outils**. Il faut ajouter des capacités qui rendent Leanna **plus intelligente, proactive et capable de travailler seule**.
 
-## 1. Bugs et sécurité à corriger en priorité
+## 🚀 Les fonctionnalités IA que je recommande
 
-**1. `classifyHost` bloque des sites légitimes et laisse passer des adresses internes** (`browser.ts`)
-- Les tests par préfixe `startsWith("fc"/"fd"/"fe8"/"fec"/"fed"/"fee"/"fef")` s'appliquent aussi aux noms de domaine. Résultat : `fedex.com`, `fda.gov`, `fcc.gov` et `feedly.com` sont refusés (testé). Seule la version `www.` passe.
-- À l'inverse, `http://[::ffff:127.0.0.1]/`, `[fd00::1]` et `[fe80::1]` sont classés `PUBLIC_WEB`. `URL.hostname` garde les crochets et normalise l'IPv4 mappée en `[::ffff:7f00:1]`. C'est un contournement de ta policy SSRF.
-- Correction : retirer les crochets, utiliser `net.isIP()` et une lib de plages (`ipaddr.js`) pour les IP, et ne tester aucun préfixe sur les noms de domaine. Idéalement, résoudre le DNS (`dns.lookup`, `all: true`) et vérifier chaque adresse.
+### 1. 🧠 Leanna Anticipation Engine — priorité P0
 
-**2. `isSponsored` marque comme publicitaires des sources officielles** (`rankLinkCandidates`)
-- Le motif `pub` matche `service-public.fr`, `pubmed.ncbi.nlm.nih.gov` et « Publications » (testé). `ads\b` matche `downloads`.
-- Ces liens perdent 100 points et sont exclus de `browser_research` et `browser_open_link`.
-- Correction : un motif à bornes de mots (`\b(sponsor(is[ée]s?)?|annonce|advertisement)\b`) et surtout la détection structurelle des blocs pub du moteur (par exemple `#tads` ou `[data-text-ad]` sur Google), pas des mots.
+C'est celle que je mettrais en premier.
 
-**3. `allowpopups` est activé alors que tu veux le désactiver** (`BrowserPanel.tsx`)
-- `setAttribute('allowpopups', 'false')` crée l'attribut, et c'est la présence de l'attribut qui l'active (c'est un attribut booléen). `webpreferences` posé après l'attache est aussi ignoré.
-- Côté `main.cjs`, je ne trouve ni `setWindowOpenHandler`, ni `will-attach-webview`, ni `setPermissionRequestHandler`, ni `will-download`, ni `certificate-error`.
-- Sans handler de permissions, Electron accorde par défaut caméra, micro, géolocalisation et notifications à n'importe quel site chargé dans la webview.
-- Correction : ne pas poser l'attribut, puis dans `main.cjs` :
+Aujourd'hui Leanna sait essentiellement :
 
-```js
-win.webContents.on('will-attach-webview', (e, prefs, params) => {
-  delete prefs.preload; prefs.nodeIntegration = false; prefs.contextIsolation = true;
-  if (!/^persist:browser-[\w-]+$/.test(params.partition)) e.preventDefault();
-});
-app.on('web-contents-created', (_e, wc) => {
-  wc.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) win.webContents.send('browser-open-tab', url); // futurs onglets
-    return { action: 'deny' };
-  });
-});
-// par partition : ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+> « Donne-moi un objectif → je l'exécute. »
+
+Il faut passer à :
+
+> **« J'observe ton environnement → je détecte ce qui mérite ton attention → je propose ou lance une mission. »**
+
+Exemples :
+
+```text
+Leanna observe
+      ↓
+détection d'un événement
+      ↓
+analyse du contexte
+      ↓
+évaluation de l'importance
+      ↓
+détection d'une opportunité/problème
+      ↓
+proposition d'action
+      ↓
+mission
 ```
 
-**4. `browser.ts` n'a aucune protection anti-injection de prompt**
-- `automationBrowser.ts` utilise `guardUntrustedContent/Fields`. `browser.ts` (0 référence) renvoie au modèle le texte brut des pages : `browser_read_content`, `browser_research` (jusqu'à N pages) et `pageContent` après un clic.
-- Le prompt dit « le contenu web est une donnée », mais rien ne le garantit côté code. Appliquer le même guard à `readPageContent` et aux champs de `ResearchSource`.
+Exemples concrets :
 
-**5. `electron/open-external` ouvre n'importe quelle URL**
-- `shell.openExternal(url)` sans validation permet `file:`, des protocoles custom, etc. Mets une allowlist `http:`, `https:` et `mailto:`.
-- De plus, `handleOpenInNewWindow` appelle `require('electron')` dans le renderer, alors que `nodeIntegration: false`. L'appel lève toujours une exception et tu retombes sur `window.open`. Passe par le preload.
+* « Ton projet contient 17 erreurs TypeScript apparues depuis hier. »
+* « Cette PR introduit une régression probable. »
+* « Trois tâches récurrentes pourraient être automatisées. »
+* « Cette dépendance possède une nouvelle version critique. »
+* « Tu as corrigé ce problème 4 fois : je peux automatiser sa prévention. »
+* « Cette mission échoue systématiquement avec cet outil ; voici une autre stratégie. »
 
-**6. `did-fail-load` affiche une erreur pour les sous-frames**
-- Une pub ou un iframe qui échoue affiche « Impossible de charger cette page ». Teste `ev.isMainFrame` (idem pour `did-navigate-in-page`, qui pollue la barre d'adresse avec des URLs d'iframes).
+**Différenciation : très forte.**
 
-## 2. Corrections de fiabilité
+Leanna possède déjà `PerceptionEngine`, `HeartbeatService`, `TaskManager` et `AutonomousExecutive`; il faut les transformer en véritable moteur d'anticipation plutôt qu'en simple infrastructure d'exécution. 
 
-- **Historique compté en double** : `did-navigate` et `did-stop-loading` appellent tous les deux `recordVisit`, donc chaque page gagne +2 visites et les suggestions sont faussées. N'enregistre qu'à un seul endroit, sur la frame principale.
-- **Bouton « Arrêter le chargement »** : le label change mais `onClick` reste `onRefresh`. Appelle `wv.stop()` quand `loading` est vrai.
-- **`waitForBrowserCondition(url, "url")`** utilise `location.href.includes(urlComplète)`.
-  - Une redirection, un slash final ou un paramètre en plus, et tu attends 10 s pour rien. En Europe, Google redirige souvent vers `consent.google.com`, et le flux de recherche casse.
-  - La condition est vraie dès le commit de navigation, pas à la fin du chargement, d'où ton retry « contenu < 40 caractères ».
-  - Correction : attendre l'événement `did-stop-loading` (ou `did-finish-load`) avec un identifiant de navigation.
-- **Extraction du contenu** :
-  - `cloneNode` détaché + `innerText` se comporte comme `textContent` : les sauts de ligne sont perdus.
-  - Supprimer tous les `header` retire aussi les titres d'articles.
-  - `selector` est injecté brut dans une chaîne JS dans le message d'erreur : utilise `JSON.stringify`.
-  - La limite client est de 8000 caractères et celle du serveur de 15 000 : le flag `truncated` n'est donc jamais vrai, et le modèle ne sait pas que la page est coupée.
-  - Correction : cibler `main, article, [role=main]`, travailler sur le DOM vivant ou injecter Readability, et renvoyer `truncated` depuis le client.
-- **`normalizeUrl` est dupliqué** (client et serveur) avec des comportements différents. Le client n'applique pas la policy réseau. `localhost:3000` sans schéma part en recherche Google, alors que la policy autorise localhost. Mets-le dans un module partagé.
-- **`controlledUrl`** : si Leanna renavigue vers la même URL après que l'utilisateur a bougé, l'effet ne se redéclenche pas (`normalized === currentUrl` ou prop inchangée).
-- **`sourceReliability`** : les regex `^www\.(reuters|bbc…)` ratent `reuters.com` sans `www`, et `new URL()` peut lever. `sourceFreshness` prend la première date trouvée dans 4000 caractères (copyright, date de commentaire…). Lis plutôt `article:published_time`, JSON-LD `datePublished` et `<time datetime>`.
-- **`compareResearchSources`** : deux chiffres différents sont déclarés « contradiction » même s'ils sont complémentaires (« 5 % en 2023, 7 % en 2024 »). Présente-les comme « divergences possibles » et laisse le LLM trancher.
-- **`NON_CONTENT_DOMAINS: "google."`** exclut aussi `docs.google.com`, `developers.google.com` et `cloud.google.com`. Restreins-toi aux domaines de recherche.
-- **DuckDuckGo headless** (`automationBrowser.ts`) : `.result__url` donne l'URL affichée tronquée, pas le lien réel. Lis `a.result__a[href]` et décode le paramètre `uddg`. Il n'y a pas de détection de CAPTCHA ni de page « anomaly », et le User-Agent annonce Chrome 120.
-- **Singletons Puppeteer** (`browser`, `page` globaux) : avec ton `AgentOrchestrator` multi-agents, deux missions se marchent dessus. Utilise un pool de pages ou `browser.createBrowserContext()` par mission, avec un mutex.
+---
 
-## 3. Améliorations de la recherche
+# 2. 🔮 Predictive Agent — prédire avant d'agir
 
-La plus grosse amélioration possible est d'arrêter de scraper des pages de résultats dans la webview visible.
+Je créerais un moteur :
 
-1. **Un `SearchProvider` unique** avec une chaîne de repli : l'API Brave Search, Tavily ou un SearXNG auto-hébergé. Tu utilises déjà `@google/genai`, donc le grounding Google Search de Gemini est aussi une option. Aujourd'hui tu as deux implémentations (Google en webview, DDG en Puppeteer), ce qui est fragile : CAPTCHA, consentement UE, changements de markup. Les résultats deviennent du JSON structuré (titre, URL, extrait, date).
-2. **Lecture serveur en parallèle** pour `browser_research` : `fetch` + Readability sur N pages à la fois, avec cache et dédoublonnage. La webview ne sert qu'à afficher la source que l'utilisateur veut voir. Aujourd'hui, `browser_research` lit les sources une par une et détourne la page de l'utilisateur pendant plusieurs dizaines de secondes. Garde `browser_*` pour les interactions (formulaires, SPA) et les cas où une session connectée est nécessaire.
-3. **Réduire le volume renvoyé au modèle** : `ResearchSource` renvoie `content` complet, plus `facts` et `evidence` qui répètent le même texte. Renvoie des extraits pertinents (passages classés par similarité avec la requête, tu as déjà `SemanticSearch`) plutôt que 8000 caractères par source.
-4. **Requêtes multiples** : décomposer la question en 2–3 sous-requêtes, avec un second tour si la confiance est basse.
-5. **Moteur configurable** et mots-clés dans la barre d'adresse (`g …`, `w …`, `ddg …`), au lieu du Google codé en dur dans les deux `normalizeUrl`. La page d'accueil actuelle est `google.com/webhp?igu=1`.
-6. **Citations vérifiables** : renvoyer pour chaque affirmation l'URL et le passage exact, pour que l'UI puisse les surligner.
+```text
+PredictionEngine
+```
 
-## 4. Améliorations de navigation
+Avant chaque mission importante :
 
-- **Onglets** : le type `BrowserPanelProps` a déjà `onOpenInNewTab`, mais il est inutilisé. Il n'y a qu'une seule webview, donc `target=_blank` ne fait rien (ou ouvre une fenêtre non contrôlée, voir le point 3). Fais un tableau d'onglets avec une webview par onglet (les inactives masquées), et permets à l'agent de choisir l'onglet cible.
-- **Recherche dans la page** (`wv.findInPage`) et **zoom** (`setZoomFactor`).
-- **Favicon** (événement `page-favicon-updated`) et **barre de progression**.
-- **Pages d'erreur dédiées** : DNS, certificat (avec un vrai `certificate-error`), hors-ligne, avec un bouton « Réessayer ».
-- **Favoris** et historique par période (effacer la dernière heure, le dernier jour).
-- **Gestionnaire de téléchargements** (`will-download`), avec dossier du workspace comme cible possible.
-- **Mode lecture** via Readability, utile aussi pour l'agent.
-- **Devtools** (`openDevTools`), très attendu dans un IDE.
+```text
+Objectif
+ ↓
+Historique
+ ↓
+Contexte projet
+ ↓
+Fiabilité outils
+ ↓
+Risques connus
+ ↓
+Prédiction
+```
 
-## 5. Nouvelles fonctionnalités à fort impact pour un IDE
+Il pourrait produire :
 
-1. **Aperçu du projet avec retour console/réseau** : détecte le port du serveur de dev, ouvre-le dans le navigateur, et relaie `console-message` et les erreurs de chargement à l'agent. Leanna peut alors corriger une erreur qu'elle voit réellement. Ajoute l'émulation d'appareils (`enableDeviceEmulation`).
-2. **Capture + vision** : `wv.capturePage()` envoyé à Gemini pour « que vois-tu sur cette page ? » ou pour comparer avec une maquette.
-3. **« Enregistrer dans une base »** : un bouton pour envoyer la page (en Markdown propre) vers tes Notebooks (`SourceIngester`) ou la mémoire du projet. Tu as déjà ces briques côté serveur.
-4. **Confirmation avant les actions sensibles** : le prompt l'exige (mots de passe, paiement), mais je ne vois pas d'application côté code. Un garde-fou dans `browser_click`, `browser_type` et `browser_fill_form` (champ `password`, boutons « payer », domaine de paiement) qui exige une confirmation dans l'UI le rendrait réel.
-5. **Journal d'actions de l'agent** (URL visitées, actions, captures) rejouable, branché sur ton `ExecutionLedger`.
-6. **Mode « recherche approfondie »** avec progression visible (« 3/6 sources lues »), annulable.
+```text
+Probabilité de réussite : 87 %
 
-## Ordre conseillé
+Risques détectés :
+🔴 modification de 14 fichiers
+🟠 test e2e potentiellement fragile
+🟡 dépendance externe
 
-1. Sécurité : points 3, 4 et 5 (un après-midi).
-2. Bugs 1 et 2 (`classifyHost` et `isSponsored`) : petits correctifs, grand effet.
-3. Fiabilité : attente de fin de chargement, extraction du contenu, historique, bouton stop, `isMainFrame`.
-4. `SearchProvider` unique et lecture serveur parallèle.
-5. Onglets, puis aperçu du projet avec console, puis capture + vision.
+Durée estimée : 4m20
+Coût estimé : $0.38
 
-Je peux écrire les patchs pour les points 1, 2, 3 et 6 (avec des tests `node:test` dans le style de `browser.test.ts`), ou commencer par l'architecture du `SearchProvider`. Dis-moi par où tu veux commencer.
+Stratégie recommandée :
+1. analyser
+2. modifier
+3. typecheck
+4. tests ciblés
+5. tests complets
+```
+
+Encore mieux :
+
+### prédiction de l'échec
+
+```text
+Étape 4
+   ↓
+"72 % de risque d'échec"
+   ↓
+Leanna modifie le plan AVANT l'exécution
+```
+
+Ça exploite directement `StrategyMemory`, qui mémorise déjà les performances et échecs des outils. 
+
+---
+
+# 3. 📚 Playbooks appris automatiquement — P0
+
+C'est probablement **la meilleure fonctionnalité d'apprentissage à ajouter**.
+
+Leanna termine une mission :
+
+```text
+Mission réussie
+     ↓
+analyse de la stratégie
+     ↓
+détection d'un pattern réutilisable
+     ↓
+création d'un Playbook
+```
+
+Exemple :
+
+```text
+PLAYBOOK
+"Corriger erreur TypeScript"
+
+Étape 1 : analyser compiler
+Étape 2 : rechercher symboles
+Étape 3 : analyser dépendances
+Étape 4 : modifier
+Étape 5 : typecheck
+Étape 6 : tests
+Étape 7 : rollback si échec
+```
+
+Puis un mois plus tard :
+
+> « J'ai déjà résolu 6 problèmes similaires. Je vais utiliser le Playbook TS-ERROR-001. »
+
+Ton propre document identifie déjà précisément les **Playbooks appris** comme une fonctionnalité manquante. 
+
+---
+
+# 4. 👤 Project Intelligence Profile
+
+Chaque projet devrait avoir son propre cerveau.
+
+Par exemple :
+
+```text
+Leanna
+ ├── Projet A
+ │    ├── conventions
+ │    ├── architecture
+ │    ├── préférences
+ │    ├── patterns
+ │    ├── erreurs connues
+ │    └── stratégies efficaces
+ │
+ ├── Projet B
+ │    └── ...
+```
+
+Leanna apprend automatiquement :
+
+* conventions de code ;
+* architecture ;
+* frameworks ;
+* style ;
+* commandes de build ;
+* tests ;
+* règles Git ;
+* fichiers sensibles ;
+* préférences du projet ;
+* stratégies qui fonctionnent ;
+* stratégies qui échouent.
+
+Ainsi :
+
+> **Leanna ne repart jamais de zéro sur un projet.**
+
+Cette idée apparaît déjà dans la roadmap sous la forme de **profils d'agent par projet**. 
+
+---
+
+# 5. 🔍 AI Project Doctor
+
+Une fonctionnalité extrêmement intéressante pour ton positionnement.
+
+Un bouton :
+
+> **Diagnostiquer mon projet**
+
+Leanna lance automatiquement :
+
+```text
+Architecture
+      ↓
+Code quality
+      ↓
+Security
+      ↓
+Dependencies
+      ↓
+Performance
+      ↓
+Tests
+      ↓
+Git
+      ↓
+Technical debt
+      ↓
+Autonomy
+```
+
+Puis produit :
+
+### PROJECT HEALTH
+
+```text
+Architecture       86/100
+Sécurité           91/100
+Tests              74/100
+Performance        81/100
+Dette technique    68/100
+Maintenabilité     79/100
+
+GLOBAL             80/100
+```
+
+Mais surtout :
+
+> **Leanna crée elle-même les missions nécessaires pour améliorer le score.**
+
+```text
+Score 80
+ ↓
+12 problèmes
+ ↓
+priorisation
+ ↓
+Plan d'amélioration
+ ↓
+missions
+ ↓
+vérification
+ ↓
+score 87
+```
+
+Ça transforme Leanna en **AI Engineering Operating System**.
+
+---
+
+# 6. 🧬 Mission Evolution
+
+Très important pour ton concept d'autonomie.
+
+Une mission ne doit pas seulement apprendre :
+
+> « cette action a échoué ».
+
+Elle doit apprendre :
+
+> **« cette manière de résoudre ce type de problème est mauvaise. »**
+
+Exemple :
+
+```text
+Mission 1
+approche A → échec
+
+Mission 2
+approche A → échec
+
+Mission 3
+approche B → succès
+
+Mission 4 similaire
+      ↓
+Leanna choisit automatiquement B
+```
+
+Tu as déjà une base avec `StrategyMemory`, `SkillScorer`, `LearningEngine` et les statistiques de fiabilité. 
+
+Il faut monter d'un niveau :
+
+```text
+Tool learning
+      ↓
+Strategy learning
+      ↓
+Mission learning
+      ↓
+Goal learning
+```
+
+---
+
+# 7. 🧪 Mission Simulator
+
+Très fort pour Leanna.
+
+Avant de réellement exécuter une mission :
+
+> **SIMULER**
+
+```text
+MISSION
+   ↓
+simulation
+   ↓
+prévision
+```
+
+Leanna affiche :
+
+```text
+Simulation
+
+14 fichiers seraient modifiés
+3 commandes exécutées
+2 agents impliqués
+37 tool calls estimés
+
+Temps : 5m12
+Coût : $0.42
+
+Risques :
+🟠 migration DB
+🔴 suppression potentielle
+🟢 fichiers de test
+
+[Modifier le plan]
+[Exécuter]
+[Annuler]
+```
+
+La roadmap indique déjà que le `DryRunController` existe mais que la simulation globale bout-en-bout reste à câbler. 
+
+**Je la mettrais très haut.**
+
+---
+
+# 8. 🕰️ Time Travel Mission
+
+Une fonctionnalité vraiment différenciante.
+
+Pouvoir ouvrir une mission :
+
+```text
+Mission #1847
+
+10:42 PLAN
+10:43 ANALYZE
+10:44 MODIFY
+10:45 TEST
+10:46 FAILURE
+10:47 REPLAN
+10:49 SUCCESS
+```
+
+Et cliquer :
+
+> **Revenir à l'étape 4**
+
+pour voir :
+
+* état du workspace ;
+* contexte ;
+* prompt ;
+* décision ;
+* outil ;
+* résultat ;
+* preuve ;
+* raisonnement résumé ;
+* coût ;
+* état mémoire.
+
+La roadmap identifie déjà le **time-travel debugging** comme une idée R5. 
+
+---
+
+# 9. 🤖 Agent Swarm dynamique
+
+Pas simplement :
+
+```text
+Coder
+Reviewer
+Tester
+```
+
+mais :
+
+```text
+                  LEANNA
+                     │
+              Mission Manager
+                     │
+        ┌────────────┼────────────┐
+        ↓            ↓            ↓
+    Researcher    Architect     Coder
+        │            │            │
+        └────────────┼────────────┘
+                     ↓
+                  Tester
+                     ↓
+                 Reviewer
+                     ↓
+                  Security
+```
+
+Et surtout :
+
+### Leanna crée dynamiquement l'équipe.
+
+Exemple :
+
+> « Optimise les performances de mon application. »
+
+Leanna décide :
+
+```text
+1 Performance Analyst
+2 Code Architect
+1 Coder
+1 Benchmark Agent
+1 Reviewer
+```
+
+Puis détruit cette équipe après la mission.
+
+Tu possèdes déjà `AgentOrchestrator`, `DelegationManager`, `DynamicAgentRegistry` et les rôles spécialisés. 
+
+Le manque est surtout **l'intelligence de composition dynamique**.
+
+---
+
+# 10. 🧠 Leanna Self-Critique
+
+Après chaque mission :
+
+```text
+Mission terminée
+       ↓
+Reflection
+       ↓
+"Qu'aurais-je pu mieux faire ?"
+       ↓
+analyse
+       ↓
+amélioration
+```
+
+Mais attention : pas une simple réponse LLM.
+
+Créer :
+
+```text
+SelfEvaluationEngine
+```
+
+qui compare :
+
+```text
+PLAN INITIAL
+      vs
+EXÉCUTION RÉELLE
+      vs
+RÉSULTAT
+```
+
+Puis :
+
+```text
+Plan accuracy       82 %
+Tool efficiency     67 %
+Recovery quality    91 %
+Verification        88 %
+Cost efficiency     71 %
+```
+
+Et :
+
+> **« La prochaine mission similaire doit commencer par X. »**
+
+---
+
+# 11. 👁️ Computer Agent
+
+Tu as déjà :
+
+* screen share ;
+* vision ;
+* browser ;
+* automation ;
+* capture écran ;
+* webcam ;
+* Gemini Live. 
+
+Je transformerais ça en véritable :
+
+## Computer Use Agent
+
+Exemple :
+
+> « Regarde mon écran et règle le problème. »
+
+Leanna :
+
+```text
+observe écran
+ ↓
+comprend UI
+ ↓
+identifie problème
+ ↓
+planifie
+ ↓
+clique
+ ↓
+observe
+ ↓
+corrige
+ ↓
+vérifie
+```
+
+Et avec confirmation selon le niveau de risque.
+
+C'est beaucoup plus puissant qu'une simple fonction de vision.
+
+---
+
+# 12. 🎙️ Voice Agent permanent
+
+Pas seulement :
+
+> parler avec Leanna.
+
+Mais :
+
+> **piloter Leanna à la voix.**
+
+Exemple :
+
+> « Leanna, regarde mon projet. »
+
+> « Trouve les trois problèmes les plus importants. »
+
+> « Corrige le premier. »
+
+> « Lance les tests. »
+
+> « Si tout est bon, commit. »
+
+La roadmap mentionne déjà le socle Gemini Live + partage d'écran. 
+
+L'étape suivante est de faire de la voix **une interface de commande agentique complète**.
+
+---
+
+# 13. 📡 Daily AI Briefing
+
+Chaque matin :
+
+```text
+☀️ Bonjour.
+
+Voici ce que Leanna a détecté :
+
+🔴 2 problèmes critiques
+🟠 4 tâches en attente
+🟢 3 améliorations possibles
+
+Projet Leanna :
+• 7 fichiers modifiés
+• 2 erreurs nouvelles
+• dépendance X obsolète
+• test Y instable
+
+Recommandation :
+→ corriger X
+→ mettre à jour Y
+→ lancer audit sécurité
+```
+
+Et surtout :
+
+> **Leanna peut préparer automatiquement les missions.**
+
+Tu as déjà un système de heartbeat, tâches autonomes, observabilité et persistance. 
+
+---
+
+# 14. 🔥 Opportunity Engine
+
+Encore plus intéressant que les notifications.
+
+Leanna cherche activement :
+
+```text
+PROBLÈMES
+OPPORTUNITÉS
+OPTIMISATIONS
+AUTOMATISATIONS
+RISQUES
+```
+
+Exemple :
+
+> « J'ai remarqué que tu fais manuellement cette opération 8 fois par semaine. Je peux créer un workflow. »
+
+C'est une IA qui **cherche du travail utile**.
+
+C'est une vraie différence entre :
+
+### Assistant IA
+
+> attend les demandes.
+
+et
+
+### Agent IA
+
+> **cherche ce qui peut être amélioré.**
+
+---
+
+# 15. 🧩 Natural Language → Automation
+
+Tu dis :
+
+> « Tous les lundi matin, vérifie mes repositories, détecte les issues critiques et prépare-moi un rapport. »
+
+Leanna construit :
+
+```text
+TRIGGER
+Monday 08:00
+   ↓
+GitHub scan
+   ↓
+Issue analysis
+   ↓
+Priority classification
+   ↓
+Security check
+   ↓
+Report generation
+   ↓
+Notification
+```
+
+Et affiche le workflow généré graphiquement.
+
+Ton application possède déjà `WorkflowEngine`, `VisualWorkflowBuilder`, automation et scheduled tasks. 
+
+Il manque surtout le **compilateur langage naturel → workflow agentique robuste**.
+
+---
+
+# 🏆 Mon TOP 10 pour Leanna
+
+Si je devais décider à ta place :
+
+| Priorité | Fonctionnalité                   | Valeur |
+| -------- | -------------------------------- | -----: |
+| 🔴 P0    | **Anticipation Engine**          |  ⭐⭐⭐⭐⭐ |
+| 🔴 P0    | **Playbooks appris**             |  ⭐⭐⭐⭐⭐ |
+| 🔴 P0    | **Project Intelligence Profile** |  ⭐⭐⭐⭐⭐ |
+| 🔴 P0    | **AI Project Doctor**            |  ⭐⭐⭐⭐⭐ |
+| 🔴 P0    | **Mission Simulator**            |  ⭐⭐⭐⭐⭐ |
+| 🟠 P1    | **Predictive Agent**             |  ⭐⭐⭐⭐⭐ |
+| 🟠 P1    | **Opportunity Engine**           |  ⭐⭐⭐⭐⭐ |
+| 🟠 P1    | **Dynamic Agent Swarm**          |   ⭐⭐⭐⭐ |
+| 🟠 P1    | **Mission Time Travel**          |   ⭐⭐⭐⭐ |
+| 🟠 P1    | **Computer Use Agent**           |  ⭐⭐⭐⭐⭐ |
+
+---
+
+# 🧠 Et surtout : je changerais le positionnement
+
+Actuellement, Leanna ressemble conceptuellement à :
+
+```text
+AI IDE
++
+Agent runtime
++
+Notebook
++
+Automation
++
+Memory
++
+Browser
++
+Agents
+```
+
+C'est puissant, mais ça peut devenir difficile à comprendre.
+
+Je positionnerais plutôt Leanna comme :
+
+# **Leanna — AI Autonomous Work Environment**
+
+```text
+                  LEANNA
+                     │
+              ┌──────┴──────┐
+              │             │
+          UNDERSTAND      OBSERVE
+              │             │
+              └──────┬──────┘
+                     ↓
+                THINK / PLAN
+                     ↓
+              ┌──────┴──────┐
+              ↓             ↓
+           ACT             DELEGATE
+              ↓             ↓
+           VERIFY ←─────────┘
+              ↓
+           LEARN
+              ↓
+          ANTICIPATE
+              ↓
+        NEXT MISSION
+```
+
+Et là, **la mémoire, les agents, le navigateur, le Knowledge Graph, les notebooks, la voix, le screen share, les workflows et l'IDE deviennent les organes d'un même système**, au lieu d'apparaître comme une collection de fonctionnalités.
+
+C'est particulièrement important parce que ton audit constate déjà que Leanna possède plusieurs moteurs agentiques parallèles — `AgentBrain`, `AgenticRuntime`, `Mission Planner`, `AutonomousExecutive`, `WorkflowEngine`, etc. 
+
+### La fonctionnalité que je construirais en premier
+
+**Leanna Anticipation Engine + Opportunity Engine + Project Intelligence Profile.**
+
+Cela donnerait quelque chose de réellement nouveau :
+
+> **Leanna observe ton environnement, comprend ton projet, apprend tes habitudes, détecte les problèmes/opportunités, propose des missions et devient progressivement meilleure pour les résoudre.**
+
+C'est beaucoup plus différenciant que d'ajouter simplement « encore un agent » ou « encore un outil ».

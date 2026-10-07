@@ -913,6 +913,7 @@ async function startServer() {
         timestamp: new Date().toISOString(),
         state: leannaCore.getState(),
         tasks: leannaCore.getTasks().slice(0, 50),
+        proposals: leannaCore.getProposals().slice(0, 50),
       }));
     } catch { /* ignore */ }
   });

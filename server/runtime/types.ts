@@ -247,7 +247,32 @@ export type RuntimeEvent =
   | { type: "autonomy:stateChanged"; from: string; to: string; reason: string }
   | { type: "autonomy:health"; status: "healthy" | "degraded"; reason: string }
   | { type: "autonomy:taskCreated"; taskId: string; taskType: string; sourceEventId: string }
-  | { type: "autonomy:taskStateChanged"; taskId: string; taskType: string; from: string; to: string; error?: string };
+  | { type: "autonomy:taskStateChanged"; taskId: string; taskType: string; from: string; to: string; error?: string }
+  | {
+      /**
+       * Proposition proactive émise par l'AnticipationEngine : Leanna a observé
+       * l'environnement, détecté un problème/opportunité et propose une action.
+       * C'est une *suggestion* — l'exécution reste derrière le pipeline existant
+       * (TaskManager → AutonomousExecutive → executeMission → permissions/dry-run).
+       */
+      type: "autonomy:anticipation";
+      /** Identifiant stable de la proposition (dédupliqué par fingerprint). */
+      proposalId: string;
+      /** Classe de signal détecté. */
+      kind: "problem" | "opportunity" | "optimization" | "risk" | "automation";
+      /** Importance normalisée 0..1 (sert au tri/priorisation côté UI). */
+      importance: number;
+      /** Priorité suggérée pour la mission dérivée. */
+      priority: "low" | "medium" | "high" | "critical";
+      /** Message lisible destiné à l'utilisateur. */
+      message: string;
+      /** Ressources concernées (ids de skills, fichiers, workflows…). */
+      affectedResources: string[];
+      /** Action concrète proposée (titre de mission potentielle). */
+      suggestedAction: string;
+      /** La proposition a-t-elle été transformée en tâche de mission ? */
+      queuedAsTask: boolean;
+    };
 
 export type RuntimeEventType = RuntimeEvent["type"];
 export type RuntimeEventHandler<T extends RuntimeEventType = RuntimeEventType> =
