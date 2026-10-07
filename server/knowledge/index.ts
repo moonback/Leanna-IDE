@@ -171,3 +171,16 @@ export {
   type KnowledgeSummary,
   type PackageManager,
 } from "./ProjectProfile.js";
+
+// AI Project Doctor (P0) — diagnostic santé projet + génération de missions d'amélioration
+export {
+  ProjectDoctor,
+  projectDoctor,
+  type HealthReport,
+  type HealthDimension,
+  type HealthIssue,
+  type IssueSeverity,
+  type ImprovementMissionRequest,
+  type SecuritySignal,
+  type ProjectDoctorOptions,
+} from "./ProjectDoctor.js";

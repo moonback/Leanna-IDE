@@ -7,6 +7,7 @@ import {
   projectMemory,
   impactAnalyzer,
   knowledgeGraph,
+  projectDoctor,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -50,6 +51,7 @@ export const knowledgeSkill: Skill = {
     knowledge_impact_analyze: ["read"],
     knowledge_index_status: ["read"],
     knowledge_index_rebuild: ["read", "write"],
+    knowledge_project_doctor: ["read"],
   },
   declarations: [
     {
@@ -368,6 +370,20 @@ export const knowledgeSkill: Skill = {
         required: ["file_path"],
       },
     },
+    {
+      name: "knowledge_project_doctor",
+      description:
+        "🩺 AI Project Doctor : diagnostique la santé du projet (architecture, sécurité, tests, performance, dette technique, maintenabilité, autonomie), produit un score PROJECT HEALTH par dimension + global, liste les problèmes et génère un plan de missions d'amélioration priorisées. Nécessite un projet indexé.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          include_missions: {
+            type: "BOOLEAN",
+            description: "Inclure le plan de missions d'amélioration généré (défaut: true).",
+          },
+        },
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -446,6 +462,9 @@ export const knowledgeSkill: Skill = {
     }),
     knowledge_ast_file_inspect: z.object({
       file_path: z.string().min(1, "Le chemin de fichier ne peut être vide").trim(),
+    }),
+    knowledge_project_doctor: z.object({
+      include_missions: z.boolean().optional().default(true),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1069,6 +1088,28 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR ast_file_inspect: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_project_doctor — AI Project Doctor (P0)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_project_doctor") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_project_doctor, args);
+        log(`projectDoctor diagnose (include_missions=${validated.include_missions})`);
+        const report = projectDoctor.diagnose();
+        return {
+          status: "success",
+          scores: report.scores,
+          global: report.global,
+          issues: report.issues,
+          improvement_missions: validated.include_missions ? report.improvementMissions : undefined,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR projectDoctor: ${e.message}`);
         return { error: e.message };
       }
     }
