@@ -19,7 +19,7 @@
 
 **Navigation** : nouvelle `GlobalSidebar` (`src/components/GlobalSidebar.tsx`) — barre verticale repliable, étiquettes, pastille d'état agent en tête. Deux variantes :
 - `variant="global"` (par défaut) : navigation par route, groupée par capacité (Pilotage · Intelligence · Travail · Mémoire · Observabilité) — remplace l'ancienne `UnifiedSidebar` globale.
-- `variant="ide"` (dans `IdeView`) : rend les outils-panneaux IDE (Explorateur, Recherche, Terminal, GitHub, CI/CD, Données, Outils, IA) à partir de `ideSidebarConfig`, en pilotant les toggles existants `showX`/`onToggleX` ; items `requiresAssistant` grisés hors connexion. Même look étiqueté/repliable.
+- `variant="ide"` (dans `IdeView`) : rend les outils-panneaux IDE (Explorateur, Recherche, Terminal, GitHub, CI/CD, Données, Outils, IA) à partir de `ideSidebarConfig`, en pilotant les toggles existants `showX`/`onToggleX` ; items `requiresAssistant` grisés hors connexion. Même look étiqueté/repliable. **Bloc assistant compact en tête (parité 100 %)** : CTA « Connecter l'IA » hors ligne ; une fois connecté, contrôles Chat · Micro · Mode (Full/Ask) · Déconnecter (replié = Chat + Micro).
 
 L'ancienne `UnifiedSidebar` n'est plus montée (conservée dans le repo pour compat).
 
