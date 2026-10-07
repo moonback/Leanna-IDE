@@ -18,6 +18,7 @@ import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
 import { playbookStore, type PlaybookMissionInput } from "../knowledge/PlaybookStore.js";
+import { projectProfile } from "../knowledge/ProjectProfile.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1508,6 +1509,23 @@ JSON:`;
     void this.persist(mission);
     this.proposeLearning(mission);
     this.proposePlaybook(mission);
+    this.updateProjectProfile(mission);
+  }
+
+  /**
+   * Keep the per-project intelligence profile current (task.md §4, P0): record
+   * the terminal outcome and refresh detected stack / effective-vs-failing
+   * strategies / learned playbooks so the next mission on this project starts
+   * informed. Best-effort — never affects an already terminal mission.
+   */
+  private updateProjectProfile(mission: Mission): void {
+    try {
+      projectProfile.recordMissionOutcome(mission.status === "completed");
+      // Re-aggregate reliability/playbook/knowledge signals (cheap, in-memory reads).
+      projectProfile.refresh();
+    } catch {
+      /* profile maintenance is best-effort */
+    }
   }
 
   /**

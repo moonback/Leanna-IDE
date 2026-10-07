@@ -231,8 +231,12 @@ export function createSelfRootRouter(
         const { knowledgeGraph } = await import('../knowledge/KnowledgeGraph.js');
         const { projectMemory } = await import('../knowledge/ProjectMemory.js');
         const { projectIndexer } = await import('../knowledge/ProjectIndexer.js');
+        const { projectProfile } = await import('../knowledge/ProjectProfile.js');
         knowledgeGraph.load();
         projectMemory.load();
+        // Load this project's intelligence profile immediately so Leanna "never
+        // starts from zero"; refresh again after indexing enriches the knowledge.
+        try { projectProfile.refresh(); } catch { /* best-effort */ }
         projectIndexer.scanAll({
           onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
         }).then((stats: any) => {
@@ -241,6 +245,7 @@ export function createSelfRootRouter(
             durationMs: stats.durationMs,
             cached: stats.cached ?? false,
           });
+          try { projectProfile.refresh(); } catch { /* best-effort */ }
         }).catch(() => {});
         console.log(`[KnowledgeGraph] Rechargement pour: ${newRoot}`);
       } catch { /* silent */ }

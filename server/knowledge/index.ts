@@ -160,3 +160,14 @@ export {
   type PlaybookStep,
   type PlaybookMissionInput,
 } from "./PlaybookStore.js";
+
+// Project Intelligence Profile (P0) — le cerveau par projet (stack, commandes, stratégies)
+export {
+  ProjectProfile,
+  projectProfile,
+  type ProjectIntelligenceProfile,
+  type DetectedStack,
+  type StrategyInsight,
+  type KnowledgeSummary,
+  type PackageManager,
+} from "./ProjectProfile.js";
