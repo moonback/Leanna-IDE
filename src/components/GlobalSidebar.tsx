@@ -24,6 +24,7 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen,
+  Power, MessageCircle, Mic, MicOff, Sparkles, Bot,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
@@ -198,6 +199,22 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
         )}
       </button>
 
+      {/* Assistant connect/mute block — parité IDE (mode="ide" uniquement) */}
+      {mode === 'ide' && (
+        <IdeAssistantBlock
+          collapsed={collapsed}
+          connected={Boolean(props.assistantConnected)}
+          working={Boolean(props.assistantWorking)}
+          muted={Boolean(props.assistantMuted)}
+          sessionMode={props.mode === 'ask' ? 'ask' : 'full'}
+          onConnect={props.onConnectAssistant}
+          onDisconnect={props.onDisconnectAssistant}
+          onToggleChat={props.onToggleChat}
+          onMuteToggle={props.onMuteToggle}
+          onToggleMode={props.onToggleMode}
+        />
+      )}
+
       {/* Grouped navigation (global routes) or tools (IDE) */}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {mode === 'ide' ? (
@@ -262,6 +279,91 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
       {/* Theme marker (invisible, keeps theme reactive for tooling) */}
       <span data-theme-marker={theme} className="sr-only" aria-hidden />
     </nav>
+  );
+}
+
+function IdeAssistantBlock({
+  collapsed, connected, working, muted, sessionMode,
+  onConnect, onDisconnect, onToggleChat, onMuteToggle, onToggleMode,
+}: {
+  collapsed: boolean;
+  connected: boolean;
+  working: boolean;
+  muted: boolean;
+  sessionMode: 'full' | 'ask';
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onToggleChat?: () => void;
+  onMuteToggle?: () => void;
+  onToggleMode?: () => void;
+}) {
+  const dotColor = !connected ? 'var(--text-dimmed)' : working ? 'var(--accent-primary)' : muted ? 'var(--color-warning)' : 'var(--color-success)';
+
+  // Petit bouton d'action réutilisable pour la rangée de contrôles.
+  const Ctrl = ({ icon: Icon, label, onClick, active, tone }: { icon: LucideIcon; label: string; onClick?: () => void; active?: boolean; tone?: string }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex h-7 flex-1 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      style={{ backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)', color: tone ?? 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+    >
+      <Icon size={13} />
+    </button>
+  );
+
+  if (!connected) {
+    // Un seul CTA : connecter l'assistant.
+    return (
+      <div className="mx-2 mb-2">
+        <button
+          type="button"
+          onClick={onConnect}
+          title="Connecter l'assistant IA"
+          aria-label="Connecter l'assistant IA"
+          className="flex w-full items-center justify-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)', border: '1px solid var(--border-base)' }}
+        >
+          <Bot size={14} />
+          {!collapsed && <span>Connecter l'IA</span>}
+        </button>
+      </div>
+    );
+  }
+
+  if (collapsed) {
+    // Replié : état (clic = chat) + micro.
+    return (
+      <div className="mx-2 mb-2 flex flex-col gap-1">
+        <Ctrl icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
+        <Ctrl icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-2 mb-2 rounded-md p-1.5" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}>
+      <div className="mb-1.5 flex items-center gap-1.5 px-1">
+        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dotColor }} aria-hidden />
+        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Assistant {working ? 'actif' : muted ? 'muet' : 'connecté'}</span>
+        <button
+          type="button"
+          onClick={onToggleMode}
+          title={sessionMode === 'full' ? 'Mode : Complet' : 'Mode : Question'}
+          className="ml-auto rounded px-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+          style={{ color: 'var(--text-dimmed)' }}
+        >
+          {sessionMode === 'full' ? 'Full' : 'Ask'}
+        </button>
+      </div>
+      <div className="flex items-center gap-1">
+        <Ctrl icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
+        <Ctrl icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
+        <Ctrl icon={Sparkles} label={sessionMode === 'full' ? 'Mode Complet' : 'Mode Question'} onClick={onToggleMode} />
+        <Ctrl icon={Power} label="Déconnecter l'assistant" onClick={onDisconnect} tone="var(--color-error)" />
+      </div>
+    </div>
   );
 }
 
