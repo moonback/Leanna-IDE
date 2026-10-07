@@ -1,6 +1,6 @@
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
-import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView } from "../mission/index.js";
+import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView, missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Mission — Interface IA ↔ Mission System
@@ -63,6 +63,8 @@ export const missionSkill: Skill = {
     mission_list: ["read"],
     mission_add_goal: ["read", "write"],
     mission_simulate: ["read"],
+    mission_timeline: ["read"],
+    mission_rewind: ["read"],
   },
   declarations: [
     {
@@ -105,6 +107,31 @@ export const missionSkill: Skill = {
           priority: { type: "STRING", description: "Priorité: low, medium, high, critical", enum: ["low", "medium", "high", "critical"] },
         },
         required: ["title", "description"],
+      },
+    },
+    {
+      name: "mission_timeline",
+      description:
+        "🕰️ Mission Time Travel : reconstruit la chronologie complète d'une mission (PLAN → ANALYZE → MODIFY → TEST → FAILURE → REPLAN → SUCCESS) à partir de ses objectifs, actions, réflexions et métriques. Permet de parcourir chaque étape. Lecture seule.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission à inspecter (active ou complétée)." },
+        },
+        required: ["missionId"],
+      },
+    },
+    {
+      name: "mission_rewind",
+      description:
+        "🕰️ Revenir à une étape précise d'une mission : retourne l'instantané de l'étape (décision, outil, arguments, résultat, raisonnement, confiance) et la trace des étapes qui y ont mené. Lecture seule.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission." },
+          step: { type: "NUMBER", description: "Index de l'étape (0-based) tel que retourné par mission_timeline." },
+        },
+        required: ["missionId", "step"],
       },
     },
     {
@@ -184,6 +211,13 @@ export const missionSkill: Skill = {
       description: z.string().min(1).trim(),
       priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
     }),
+    mission_timeline: z.object({
+      missionId: z.string().min(1),
+    }),
+    mission_rewind: z.object({
+      missionId: z.string().min(1),
+      step: z.number().int().min(0),
+    }),
     mission_status: z.object({
       missionId: z.string().min(1),
     }),
@@ -262,6 +296,37 @@ export const missionSkill: Skill = {
           risks: report.risks,
           planComplete: report.planComplete,
           summary: report.summary,
+        };
+      }
+
+      case "mission_timeline": {
+        const { missionId } = validateArgs(missionSkill.inputSchemas!["mission_timeline"], args);
+        const mission = executor.getMission(missionId) ?? executor.listCompletedMissions().find((m) => m.id === missionId);
+        if (!mission) return { error: `Mission ${missionId} non trouvée.` };
+        const timeline = missionTimeTravel.buildTimeline(mission.getState() as unknown as TimelineMissionView);
+        return {
+          status: "success",
+          missionId: timeline.missionId,
+          title: timeline.title,
+          mission_status: timeline.status,
+          event_count: timeline.events.length,
+          events: timeline.events.map((e) => ({ index: e.index, type: e.type, at: e.at, label: e.label, goalTitle: e.goalTitle })),
+          summary: timeline.summary,
+        };
+      }
+
+      case "mission_rewind": {
+        const { missionId, step } = validateArgs(missionSkill.inputSchemas!["mission_rewind"], args);
+        const mission = executor.getMission(missionId) ?? executor.listCompletedMissions().find((m) => m.id === missionId);
+        if (!mission) return { error: `Mission ${missionId} non trouvée.` };
+        const { target, trail } = missionTimeTravel.rewindTo(mission.getState() as unknown as TimelineMissionView, step);
+        if (!target) return { error: `Étape ${step} hors limites pour la mission ${missionId}.` };
+        return {
+          status: "success",
+          missionId,
+          step: target.index,
+          event: target,
+          trail: trail.map((e) => ({ index: e.index, type: e.type, label: e.label })),
         };
       }
 

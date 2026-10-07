@@ -20,7 +20,7 @@
 | 🔮 **Predictive Agent** | `server/knowledge/PredictionEngine.ts` (+ skill `knowledge_predict`) | ✅ 9 tests |
 | 🔥 **Opportunity Engine** | `server/knowledge/OpportunityEngine.ts` (+ skill `knowledge_opportunities`) | ✅ 11 tests |
 | 🤖 **Dynamic Agent Swarm** | `server/agents/SwarmComposer.ts` (+ skill `agent_compose_swarm`) | ✅ 10 tests |
-| 🕰️ **Mission Time Travel** | — | à venir |
+| 🕰️ **Mission Time Travel** | `server/mission/MissionTimeTravel.ts` (+ skills `mission_timeline`/`mission_rewind`) | ✅ 10 tests |
 | 👁️ **Computer Use Agent** | — | à venir |
 
 ---

@@ -59,3 +59,14 @@ export {
   type PlanEstimateView,
   type MissionSimulatorOptions,
 } from "./MissionSimulator.js";
+
+// Mission Time Travel (P1) — reconstruction chronologique + rewind d'une mission
+export {
+  MissionTimeTravel,
+  missionTimeTravel,
+  type MissionTimeline,
+  type TimelineEvent,
+  type TimelineEventType,
+  type StepSnapshot,
+  type TimelineMissionView,
+} from "./MissionTimeTravel.js";
