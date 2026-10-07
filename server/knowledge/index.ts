@@ -227,3 +227,13 @@ export {
   type RecommendedMission,
   type DailyBriefingOptions,
 } from "./DailyBriefing.js";
+
+// NL → Automation (#15) — compilateur langage naturel → workflow agentique
+export {
+  WorkflowCompiler,
+  workflowCompiler,
+  type CompiledWorkflow,
+  type CompiledStep,
+  type CompileResult,
+  type WorkflowCompilerOptions,
+} from "./WorkflowCompiler.js";

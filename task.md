@@ -31,7 +31,7 @@
 | 🧠 **Self-Critique** (#10) | `server/mission/SelfEvaluation.ts` (+ skill `mission_self_critique`) | ✅ 8 tests |
 | 🎙️ **Voice Agent** (#12) | — | à venir |
 | 📡 **Daily AI Briefing** (#13) | `server/knowledge/DailyBriefing.ts` (+ skill `knowledge_daily_briefing`) | ✅ 9 tests |
-| 🧩 **NL → Automation** (#15) | — | à venir |
+| 🧩 **NL → Automation** (#15) | `server/knowledge/WorkflowCompiler.ts` (+ skill `knowledge_compile_workflow`) | ✅ 11 tests |
 
 ---
 

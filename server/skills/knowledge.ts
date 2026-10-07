@@ -12,6 +12,7 @@ import {
   opportunityEngine,
   missionEvolutionStore,
   dailyBriefing,
+  WorkflowCompiler,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -79,6 +80,7 @@ export const knowledgeSkill: Skill = {
     knowledge_opportunities: ["read"],
     knowledge_mission_evolution: ["read"],
     knowledge_daily_briefing: ["read"],
+    knowledge_compile_workflow: ["read"],
   },
   declarations: [
     {
@@ -472,6 +474,19 @@ export const knowledgeSkill: Skill = {
         },
       },
     },
+    {
+      name: "knowledge_compile_workflow",
+      description:
+        "🧩 NL → Automation : compile une demande d'automatisation en langage naturel (ex: « tous les lundis matin, vérifie mes repos, détecte les issues critiques et prépare un rapport ») en un workflow structuré (déclencheur planifié/événement/manuel + étapes ordonnées mappées sur des actions réelles). Retourne la définition prête à créer via workflow_create (après revue). Lecture seule — n'enregistre rien.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          request: { type: "STRING", description: "La demande d'automatisation en langage naturel." },
+          name: { type: "STRING", description: "Nom optionnel du workflow (sinon dérivé des étapes)." },
+        },
+        required: ["request"],
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -573,6 +588,10 @@ export const knowledgeSkill: Skill = {
     knowledge_daily_briefing: z.object({
       max_missions: z.number().int().positive().max(20).optional().default(5),
       include_health: z.boolean().optional().default(true),
+    }),
+    knowledge_compile_workflow: z.object({
+      request: z.string().min(1, "La demande ne peut être vide").trim(),
+      name: z.string().trim().optional(),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1318,6 +1337,26 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR daily_briefing: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_compile_workflow — NL → Automation (#15)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_compile_workflow") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_compile_workflow, args);
+        log(`compile_workflow request='${validated.request.slice(0, 60)}'`);
+        const result = new WorkflowCompiler().compile(validated.request, { name: validated.name });
+        return {
+          status: "success",
+          workflow: result.workflow,
+          warnings: result.warnings,
+          summary: result.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR compile_workflow: ${e.message}`);
         return { error: e.message };
       }
     }
