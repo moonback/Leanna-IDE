@@ -23,6 +23,8 @@
 
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
+import net from "node:net";
+import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,20 +148,82 @@ function compareResearchSources(sources: ResearchSource[]): Pick<ResearchResult,
   return { consensus: consensus.slice(0, 10), contradictions: contradictions.slice(0, 10), confidence: Number(Math.max(0, Math.min(1, quality * 0.45 + diversity * 0.2 + evidenceRate * 0.2 + (consensus.length > 0 ? 0.15 : 0))).toFixed(2)) };
 }
 
-function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOCALHOST" | "LOOPBACK" | "LINK_LOCAL" | "INTERNAL" {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
-  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
-  if (host === "::1" || host === "0.0.0.0" || host === "[::1]") return "LOOPBACK";
-  if (host.startsWith("fe80:") || host.startsWith("fe8") || host.startsWith("fec") || host.startsWith("fed") || host.startsWith("fee") || host.startsWith("fef")) return "LINK_LOCAL";
-  if (host.startsWith("fc") || host.startsWith("fd")) return "PRIVATE_NETWORK";
+export type HostClassification =
+  | "PUBLIC_WEB"
+  | "PRIVATE_NETWORK"
+  | "LOCALHOST"
+  | "LOOPBACK"
+  | "LINK_LOCAL"
+  | "INTERNAL";
 
+/** Classe une adresse IPv4 déjà validée (4 octets). */
+function classifyIpv4(host: string): HostClassification {
   const octets = host.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return "PUBLIC_WEB";
   const [first, second] = octets;
   if (first === 127) return "LOOPBACK";
-  if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || (first === 100 && second >= 64 && second <= 127) || (first === 198 && second >= 18 && second <= 19)) return "PRIVATE_NETWORK";
+  if (first === 0) return "LOOPBACK";
+  if (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 198 && second >= 18 && second <= 19)
+  ) {
+    return "PRIVATE_NETWORK";
+  }
   if (first === 169 && second === 254) return "LINK_LOCAL";
+  return "PUBLIC_WEB";
+}
+
+/** Classe une adresse IPv6 déjà validée (sans crochets). */
+function classifyIpv6(addr: string): HostClassification {
+  const host = addr.toLowerCase();
+  if (host === "::1") return "LOOPBACK";
+  if (host === "::" ) return "LOOPBACK";
+  // IPv4-mapped / IPv4-compatible (::ffff:127.0.0.1, ::ffff:7f00:1, ::127.0.0.1…)
+  const mapped = host.match(/::(?:ffff:)?(?:0*:)?((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (mapped && net.isIPv4(mapped[1])) return classifyIpv4(mapped[1]);
+  const mappedHex = host.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1], 16);
+    const lo = parseInt(mappedHex[2], 16);
+    const v4 = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    if (net.isIPv4(v4)) return classifyIpv4(v4);
+  }
+  // Link-local fe80::/10  → fe8, fe9, fea, feb
+  if (/^fe[89ab]/.test(host)) return "LINK_LOCAL";
+  // Unique local fc00::/7 → fc, fd
+  if (/^f[cd]/.test(host)) return "PRIVATE_NETWORK";
+  return "PUBLIC_WEB";
+}
+
+/**
+ * Classe un hostname pour la policy réseau du navigateur.
+ *
+ * Les tests de préfixe IPv6 (fc/fd/fe8…) ne s'appliquent qu'à de VRAIES adresses
+ * IPv6 (validées par net.isIP), jamais aux noms de domaine — sans quoi des sites
+ * légitimes comme fedex.com ou feedly.com seraient bloqués. Les crochets d'un
+ * hôte IPv6 (`[::1]`) et les formes IPv4-mapped (`::ffff:127.0.0.1`) sont
+ * normalisés pour éviter les contournements SSRF.
+ */
+export function classifyHost(hostname: string): HostClassification {
+  let host = hostname.toLowerCase().replace(/\.$/, "").trim();
+  // Retirer les crochets d'un littéral IPv6 : URL.hostname les conserve.
+  if (host.startsWith("[") && host.endsWith("]")) host = host.slice(1, -1);
+  // Retirer un éventuel scope zone-id IPv6 (fe80::1%eth0).
+  const pct = host.indexOf("%");
+  if (pct !== -1) host = host.slice(0, pct);
+
+  // 1) Vraie adresse IP ? (le seul endroit où les préfixes IPv6 s'appliquent)
+  const ipVersion = net.isIP(host);
+  if (ipVersion === 4) return classifyIpv4(host);
+  if (ipVersion === 6) return classifyIpv6(host);
+
+  // 2) Noms symboliques — aucun test de préfixe lexical ici.
+  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
+  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
+
+  // 3) Tout le reste est traité comme du web public (DNS public).
   return "PUBLIC_WEB";
 }
 
@@ -236,6 +300,32 @@ function canonicalizeLink(url: string): string {
   return parsed.toString();
 }
 
+// Termes publicitaires explicites, à bornes de mots pour éviter les faux
+// positifs (`pub` dans "service-public.fr"/"Publications", `ads` dans
+// "downloads", `annonce` dans "annonceur"…).
+// NB : pas de `\b` final — les termes accentués (« publicité », « sponsorisée »)
+// se terminent par `é`, qui n'est pas un caractère de mot pour `\b` en JS ASCII,
+// ce qui ferait échouer la correspondance. Le `\b` initial suffit à éviter les
+// sous-chaînes (« pub » dans « service-public »).
+const SPONSOR_TEXT_RE =
+  /\b(sponsoris[ée]e?s?|sponsored|publicit[ée]|advertisement|promoted|annonce\s+sponsoris)/i;
+// Paramètres de tracking publicitaire : signal fiable UNIQUEMENT dans l'URL.
+const TRACKING_PARAM_RE = /[?&](utm_[a-z]+|gclid|fbclid|msclkid)=/i;
+
+/**
+ * Détermine si un lien est une publicité / un lien sponsorisé.
+ * - `text` : libellé visible du lien.
+ * - `href` : URL (déjà normalisée).
+ * Les termes publicitaires sont cherchés dans le libellé à bornes de mots ;
+ * les paramètres de tracking sont cherchés dans l'URL. On ne matche jamais
+ * `pub`/`ads` comme sous-chaîne d'un mot.
+ */
+export function isSponsoredLink(text: string, href: string): boolean {
+  if (SPONSOR_TEXT_RE.test(text)) return true;
+  if (TRACKING_PARAM_RE.test(href)) return true;
+  return false;
+}
+
 export function rankLinkCandidates(
   links: Array<{ text?: string; href?: string }>,
   currentUrl?: string
@@ -256,8 +346,7 @@ export function rankLinkCandidates(
       return;
     }
     const text = (link.text ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
-    const lower = `${text} ${href}`.toLowerCase();
-    const isSponsored = /sponsor|advert|annonce|pub|ads\b|promoted|utm_|gclid|fbclid/.test(lower);
+    const isSponsored = isSponsoredLink(text, href);
     const isNavigation = /^(home|accueil|login|sign in|connexion|menu|search|recherche|privacy|terms|contact|about|à propos|next|previous|suivant|précédent)$/i.test(text)
       || /\/login(?:[/?#]|$)|\/signup(?:[/?#]|$)|\/privacy(?:[/?#]|$)|\/terms(?:[/?#]|$)/i.test(href);
     const domain = new URL(href).hostname;
@@ -1024,6 +1113,7 @@ export const browserSkill: Skill = {
       title?: string;
       content?: string;
       contentLength?: number;
+      promptInjection?: ReturnType<typeof guardUntrustedContent>["promptInjection"];
       message: string;
     }> => {
       if (!emit) {
@@ -1060,13 +1150,17 @@ export const browserSkill: Skill = {
       }
 
       if (parsed) {
-        const { content, truncated } = truncateContent(parsed.text ?? "");
+        // Le contenu de page est une donnée externe non fiable : neutraliser
+        // d'éventuelles instructions injectées avant de le renvoyer au modèle.
+        const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
+        const { content, truncated } = truncateContent(guarded.text);
         return {
           status: "success",
           url: parsed.url ?? "",
           title: parsed.title ?? "",
           content,
           contentLength: content.length,
+          promptInjection: guarded.promptInjection,
           message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
         };
       }
@@ -1076,11 +1170,13 @@ export const browserSkill: Skill = {
         return { status: "error", message: text };
       }
 
-      const { content, truncated } = truncateContent(text);
+      const guardedRaw = guardUntrustedContent(text, "browser");
+      const { content, truncated } = truncateContent(guardedRaw.text);
       return {
         status: "success",
         content,
         contentLength: content.length,
+        promptInjection: guardedRaw.promptInjection,
         message: `Contenu extrait (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
       };
     };
@@ -1303,10 +1399,13 @@ export const browserSkill: Skill = {
         if (result.status === "success") {
           const sourceUrl = result.url || url;
           const content = result.content ?? "";
+          // `content` est déjà neutralisé par readPageContent ; le titre est
+          // encore du texte externe libre → le neutraliser aussi.
+          const safeTitle = guardUntrustedContent(result.title ?? "", "browser").text;
           const extracted = extractSourceEvidence(content, query);
           sources.push({
             url: sourceUrl,
-            title: result.title ?? "",
+            title: safeTitle,
             domain: new URL(sourceUrl).hostname,
             content,
             contentLength: result.contentLength ?? content.length,

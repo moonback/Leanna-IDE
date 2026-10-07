@@ -3,6 +3,7 @@ export interface WebviewElement extends HTMLElement {
   src: string;
   loadURL(url: string): void;
   reload(): void;
+  stop(): void;
   goBack(): void;
   goForward(): void;
   canGoBack(): boolean;
@@ -21,12 +22,14 @@ export interface WebviewFailLoadEvent extends Event {
   errorCode: number;
   errorDescription: string;
   validatedURL: string;
+  isMainFrame: boolean;
 }
 
 export interface WebviewNavigateEvent extends Event {
   url: string;
   httpResponseCode: number;
   httpStatusText: string;
+  isMainFrame?: boolean;
 }
 
 export interface BrowserPanelProps {

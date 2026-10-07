@@ -146,38 +146,37 @@ export function BrowserPanel({
   const handleGoForward = useCallback(() => webviewRef.current?.goForward(), []);
   const handleRefresh = useCallback(() => {
     setLoadError(null);
-    webviewRef.current?.reload();
-  }, []);
+    // Si un chargement est en cours, le bouton agit comme « Arrêter ».
+    if (loading) {
+      webviewRef.current?.stop();
+    } else {
+      webviewRef.current?.reload();
+    }
+  }, [loading]);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
   // Référence pour l'intervalle de vérification de la fenêtre externe
   const externalWindowCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleOpenInNewWindow = useCallback(() => {
-    // Dans Electron, on utilise toujours shell.openExternal pour ouvrir dans le navigateur par défaut
-    // window.open() ne fonctionne pas correctement dans Electron pour les fenêtres externes
-    try {
-      const { shell } = require('electron');
-      shell.openExternal(currentUrl);
-      
-      // Avec shell.openExternal, on ne peut pas détecter quand la fenêtre est fermée
-      // L'overlay reste affiché jusqu'à ce que l'utilisateur clique sur "Fermer le message"
+    // Ouvrir dans le navigateur par défaut du système via le pont preload
+    // (validé + allowlist côté main). On n'utilise JAMAIS require('electron')
+    // dans le renderer (nodeIntegration désactivé).
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    if (api?.openExternal) {
+      void api.openExternal(currentUrl);
+      // On ne peut pas détecter la fermeture de la fenêtre externe : l'overlay
+      // reste affiché jusqu'à ce que l'utilisateur clique sur « Fermer le message ».
       externalWindowRef.current = null;
       setIsExternalWindowOpen(true);
-      
-    } catch {
-      // Si on n'est pas dans Electron (mode dev web), essayer window.open
+    } else {
+      // Mode dev web (hors Electron) : repli sur window.open.
       const extWindow = window.open(currentUrl, '_blank', 'noopener,noreferrer');
-      
       if (extWindow) {
         externalWindowRef.current = extWindow;
         setIsExternalWindowOpen(true);
-        
-        // Nettoyer l'intervalle précédent
         if (externalWindowCheckRef.current) {
           clearInterval(externalWindowCheckRef.current);
         }
-        
-        // Vérifier périodiquement si la fenêtre est fermée
         externalWindowCheckRef.current = setInterval(() => {
           if (extWindow.closed) {
             setIsExternalWindowOpen(false);
@@ -190,7 +189,7 @@ export function BrowserPanel({
         }, 500);
       }
     }
-    
+
     onOpenExternal?.();
   }, [currentUrl, onOpenExternal]);
 
@@ -210,13 +209,11 @@ export function BrowserPanel({
     const wv = webviewRef.current;
     if (!wv) return;
 
-    // Les attributs spécifiques Electron qui ne sont pas dans React's WebViewHTMLAttributes
-    // doivent être settés directement sur l'élément natif (évite le warning
-    // "Received false for a non-boolean attribute allowpopups" + erreur TS2322).
-    try {
-      (wv as any).setAttribute?.('allowpopups', 'false');
-      (wv as any).setAttribute?.('webpreferences', 'contextIsolation=yes, javascript=yes');
-    } catch { /* noop */ }
+    // On ne pose PLUS l'attribut `allowpopups` : sa simple présence (même à
+    // "false") active les popups. Les popups/nouvelles fenêtres sont refusées
+    // côté main via setWindowOpenHandler, et les webPreferences sécurisées sont
+    // imposées via will-attach-webview (nodeIntegration:false, contextIsolation,
+    // sandbox:true). Rien à faire ici.
 
     const onDomReady = () => {
       domReadyRef.current = true;
@@ -261,6 +258,9 @@ export function BrowserPanel({
 
     const onFailLoad = (e: Event) => {
       const ev = e as WebviewFailLoadEvent;
+      // N'afficher une erreur que pour la frame principale : une pub ou un
+      // iframe secondaire qui échoue ne doit pas masquer la page.
+      if (ev.isMainFrame === false) return;
       if (ev.errorCode === -3) {
         // ERR_ABORTED — annulation normale (navigation remplacée avant fin de chargement, destroy, etc.)
         setLoading(false);
@@ -276,7 +276,8 @@ export function BrowserPanel({
       setInputValue(ev.url);
       setCanGoBack(wv.canGoBack());
       setCanGoForward(wv.canGoForward());
-      recordVisitRef.current(ev.url, wv.getTitle?.() ?? '');
+      // NB : l'enregistrement dans l'historique se fait uniquement dans
+      // onLoadStop (did-stop-loading) pour éviter un double comptage des visites.
     };
 
     wv.addEventListener('dom-ready', onDomReady);
