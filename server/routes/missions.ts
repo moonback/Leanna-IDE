@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Missions Router — Approbation humaine & curseur d'autonomie
@@ -103,6 +104,50 @@ export function createMissionsRouter(
       const active = (executor.listActiveMissions?.() ?? []).map(serializeMission);
       const completed = (executor.listCompletedMissions?.() ?? []).map(serializeMission);
       return res.json({ missions: [...active, ...completed] });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /** Resolve a mission instance by id from active or completed lists. */
+  const findMission = (executor: any, id: string): any | undefined =>
+    executor.getMission?.(id) ??
+    (executor.listCompletedMissions?.() ?? []).find((m: any) => m.id === id);
+
+  // ── Mission Time Travel : timeline chronologique reconstruite ────────────
+  router.get("/missions/:id/timeline", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    const mission = findMission(executor, req.params.id);
+    if (!mission) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId: req.params.id });
+    }
+    try {
+      const timeline = missionTimeTravel.buildTimeline(mission.getState() as TimelineMissionView);
+      return res.json({ status: "success", timeline });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Rewind : instantané d'une étape + trace y menant ─────────────────────
+  router.get("/missions/:id/timeline/:step", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    const mission = findMission(executor, req.params.id);
+    if (!mission) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId: req.params.id });
+    }
+    const step = Number(req.params.step);
+    if (!Number.isInteger(step) || step < 0) {
+      return res.status(400).json({ error: "Index d'étape invalide." });
+    }
+    try {
+      const { target, trail } = missionTimeTravel.rewindTo(mission.getState() as TimelineMissionView, step);
+      if (!target) {
+        return res.status(404).json({ error: `Étape ${step} hors limites.` });
+      }
+      return res.json({ status: "success", target, trail });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }

@@ -33,6 +33,7 @@ const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
 const MissionControlView = lazy(() => import('./views/MissionControlView.js'));
+const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -499,6 +500,7 @@ function AnimatedRoutes() {
         <Route path="/observability" element={wrap(<ObservabilityView />)} />
         <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
         <Route path="/mission-control" element={wrap(<MissionControlView />)} />
+        <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
       </Routes>
     </AnimatePresence>
   );
