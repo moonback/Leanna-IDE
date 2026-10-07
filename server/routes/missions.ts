@@ -49,6 +49,30 @@ export function createMissionsRouter(
     }
   });
 
+  // ── Simuler une mission (dry-run bout-en-bout, aucun effet de bord) ──────
+  router.post("/missions/simulate", async (req: Request, res: Response) => {
+    if (!handleToolCall) {
+      return res.status(503).json({ error: "Simulation indisponible (handler non configuré)." });
+    }
+    const { title, description, priority } = req.body ?? {};
+    if (typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ error: "Champ 'title' (string) requis." });
+    }
+    try {
+      const result = await handleToolCall("mission_simulate", {
+        title: title.trim(),
+        description: typeof description === "string" && description.trim() ? description.trim() : title.trim(),
+        priority: priority ?? "medium",
+      });
+      if (result && typeof result === "object" && "error" in result) {
+        return res.status(400).json(result);
+      }
+      return res.json(result);
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   const requireExecutor = (res: Response): any | null => {
     const executor = getExecutor();
     if (!executor) {

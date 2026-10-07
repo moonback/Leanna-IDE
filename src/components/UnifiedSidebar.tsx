@@ -20,6 +20,7 @@ import {
   LayoutList,
   LayoutDashboard,
   Milestone,
+  FlaskConical,
   FileText,
   NotebookPen,
   Menu,
@@ -601,6 +602,7 @@ function GlobalNavSection({
   const subItems = [
     { id: 'mission-control', path: '/mission-control', icon: LayoutDashboard, label: 'Mission Control', active: currentPath === '/mission-control', onClick: () => navigate('/mission-control') },
     { id: 'mission-timeline', path: '/mission-timeline', icon: Milestone, label: 'Mission Timeline', active: currentPath === '/mission-timeline', onClick: () => navigate('/mission-timeline') },
+    { id: 'mission-simulation', path: '/mission-simulation', icon: FlaskConical, label: 'Simulation', active: currentPath === '/mission-simulation', onClick: () => navigate('/mission-simulation') },
     { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },

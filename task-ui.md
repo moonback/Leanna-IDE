@@ -9,11 +9,14 @@
 | 🔴 P0 | **Insights / Anticipation** (panneau live des propositions) | ✅ intégré au Mission Control (via `useAutonomyTimeline` étendu aux `proposals`) |
 | 🔴 P0 | **Project Intelligence** (gauges de santé par dimension) | ✅ intégré au Mission Control (via `/api/knowledge/doctor`) |
 | 🔴 P0 | **Mission Timeline** (UI) — timeline cliquable + panneau de détail d'étape (rewind) | ✅ `src/views/MissionTimelineView.tsx` + route `/mission-timeline` + nav |
-| 🔴 P0 | Agent State / Progress (barre d'état) | à venir |
-| 🔴 P0 | Autonomy Center | déjà existant (`/autonomy`) — à enrichir |
-| 🟠 P1 | Simulation / Dry Run UI · Agent Swarm · Time Travel · Explainability | à venir |
+| 🔴 P0 | **Agent State / Progress** (barre d'état permanente : état + pourquoi) | ✅ `src/components/AgentStatusBar.tsx` + `src/hooks/useAgentStatus.ts`, montée dans le shell global |
+| 🔴 P0 | Autonomy Center | ✅ déjà existant (`/autonomy`) |
+| 🟠 P1 | **Simulation / Dry-Run UI** — objectif → simulation → fichiers/commandes/agents/coût/risque + [Modifier/Exécuter/Annuler] | ✅ `src/views/MissionSimulationView.tsx` + route `/mission-simulation` + nav |
+| 🟠 P1 | Agent Swarm · Explainability | à venir |
 
-Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
+**P0 UI terminé (6/6).** P1 : ✅ Simulation/Dry-Run UI — reste visualisation Agent Swarm, Explainability.
+
+Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), `POST /api/missions/simulate` (Mission Simulator dry-run), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
 
 ---
 
