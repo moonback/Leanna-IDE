@@ -47,3 +47,15 @@ export type {
   Confidence,
 } from "./types.js";
 export { DEFAULT_MISSION_CONFIG, createMissionSchema, addGoalSchema } from "./types.js";
+
+// Mission Simulator (P0) — aperçu bout-en-bout d'une mission en dry-run (SIMULER)
+export {
+  MissionSimulator,
+  type SimulationReport,
+  type SimulatedStep,
+  type SimulatorExecutor,
+  type SimulatedMission,
+  type DryRunReportView,
+  type PlanEstimateView,
+  type MissionSimulatorOptions,
+} from "./MissionSimulator.js";

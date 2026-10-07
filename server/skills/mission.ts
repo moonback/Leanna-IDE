@@ -1,6 +1,6 @@
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
-import { Executor, reflectionEngine } from "../mission/index.js";
+import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView } from "../mission/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Mission — Interface IA ↔ Mission System
@@ -62,6 +62,7 @@ export const missionSkill: Skill = {
     mission_cancel: ["read", "write"],
     mission_list: ["read"],
     mission_add_goal: ["read", "write"],
+    mission_simulate: ["read"],
   },
   declarations: [
     {
@@ -88,6 +89,20 @@ export const missionSkill: Skill = {
             description:
               "Si true, exécute la mission en SIMULATION (dry-run global) : aucun effet de bord réel (pas d'écriture de fichier, pas d'exécution shell, pas de mutation réseau). Les lectures/analyses s'exécutent normalement. Utile pour prévisualiser ce que l'agent ferait avant de valider.",
           },
+        },
+        required: ["title", "description"],
+      },
+    },
+    {
+      name: "mission_simulate",
+      description:
+        "🔮 SIMULER une mission avant exécution : planifie la mission bout-en-bout en dry-run (aucun effet de bord réel) et retourne un aperçu — fichiers qui seraient modifiés, commandes qui seraient exécutées, agents impliqués, appels d'outils estimés, temps, coût et niveau de risque. À utiliser pour prévisualiser une tâche complexe avant de la lancer réellement.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING", description: "Titre court de la mission à simuler." },
+          description: { type: "STRING", description: "Description détaillée de ce qui serait accompli." },
+          priority: { type: "STRING", description: "Priorité: low, medium, high, critical", enum: ["low", "medium", "high", "critical"] },
         },
         required: ["title", "description"],
       },
@@ -164,6 +179,11 @@ export const missionSkill: Skill = {
       priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
       dryRun: z.boolean().optional().default(false),
     }),
+    mission_simulate: z.object({
+      title: z.string().min(1).trim(),
+      description: z.string().min(1).trim(),
+      priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
+    }),
     mission_status: z.object({
       missionId: z.string().min(1),
     }),
@@ -208,6 +228,40 @@ export const missionSkill: Skill = {
             ? `Mission créée en DRY-RUN (simulation, sans effet de bord). L'exécution simule les actions ; consulte mission_status puis mission_dryrun_report pour voir ce qui aurait été fait.`
             : `Mission créée et lancée. L'exécution est en cours en arrière-plan. Utilise mission_status pour suivre la progression.`,
           summary: mission.toContextSummary(),
+        };
+      }
+
+      case "mission_simulate": {
+        const { title, description, priority } = validateArgs(
+          missionSkill.inputSchemas!["mission_simulate"],
+          args
+        );
+        const simulator = new MissionSimulator(executor, {
+          getDryRunReport: dryRunReportProvider
+            ? () => dryRunReportProvider!() as DryRunReportView
+            : undefined,
+        });
+        const report = await simulator.simulate({
+          title,
+          description,
+          priority,
+          availableSkills: availableSkillNames,
+        });
+        return {
+          status: "success",
+          missionId: report.missionId,
+          steps: report.steps,
+          filesWouldChange: report.filesWouldChange,
+          commandsWouldRun: report.commandsWouldRun,
+          agentsInvolved: report.agentsInvolved,
+          toolCalls: report.toolCalls,
+          sideEffectsAvoided: report.sideEffectsAvoided,
+          estimatedDurationMs: report.estimatedDurationMs,
+          estimatedCostUsd: report.estimatedCostUsd,
+          riskLevel: report.riskLevel,
+          risks: report.risks,
+          planComplete: report.planComplete,
+          summary: report.summary,
         };
       }
 
