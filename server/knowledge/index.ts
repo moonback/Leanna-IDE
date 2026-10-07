@@ -196,3 +196,13 @@ export {
   type PredictionEstimate,
   type PredictionEngineOptions,
 } from "./PredictionEngine.js";
+
+// Opportunity Engine (P1) — recherche proactive de travail utile (automatisations, optims, risques)
+export {
+  OpportunityEngine,
+  opportunityEngine,
+  type Opportunity,
+  type OpportunityKind,
+  type OpportunityReport,
+  type OpportunityEngineOptions,
+} from "./OpportunityEngine.js";

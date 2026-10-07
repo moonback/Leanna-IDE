@@ -9,6 +9,7 @@ import {
   knowledgeGraph,
   projectDoctor,
   predictionEngine,
+  opportunityEngine,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -54,6 +55,7 @@ export const knowledgeSkill: Skill = {
     knowledge_index_rebuild: ["read", "write"],
     knowledge_project_doctor: ["read"],
     knowledge_predict: ["read"],
+    knowledge_opportunities: ["read"],
   },
   declarations: [
     {
@@ -411,6 +413,18 @@ export const knowledgeSkill: Skill = {
         required: ["title"],
       },
     },
+    {
+      name: "knowledge_opportunities",
+      description:
+        "🔥 Opportunity Engine : cherche activement du travail utile — opérations manuelles répétées à automatiser, optimisations récurrentes, erreurs à prévenir, outils peu fiables, et améliorations de santé du projet. Retourne des opportunités classées par rapport valeur/effort.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          limit: { type: "NUMBER", description: "Nombre max d'opportunités à retourner (défaut: 15)." },
+          include_health: { type: "BOOLEAN", description: "Inclure les opportunités issues du diagnostic de santé (défaut: true). Nécessite un projet indexé." },
+        },
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -500,6 +514,10 @@ export const knowledgeSkill: Skill = {
       errors: z.array(z.string().trim()).optional().default([]),
       estimated_duration_ms: z.number().nonnegative().optional(),
       estimated_cost_usd: z.number().nonnegative().optional(),
+    }),
+    knowledge_opportunities: z.object({
+      limit: z.number().int().positive().max(50).optional().default(15),
+      include_health: z.boolean().optional().default(true),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1178,6 +1196,26 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR predict: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_opportunities — Opportunity Engine (P1)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_opportunities") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_opportunities, args);
+        log(`opportunities scan (limit=${validated.limit}, include_health=${validated.include_health})`);
+        const report = opportunityEngine.scan({ limit: validated.limit, includeHealth: validated.include_health });
+        return {
+          status: "success",
+          count: report.opportunities.length,
+          opportunities: report.opportunities,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR opportunities: ${e.message}`);
         return { error: e.message };
       }
     }

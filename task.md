@@ -18,7 +18,7 @@
 | Fonctionnalité | Module(s) | Statut |
 | --- | --- | --- |
 | 🔮 **Predictive Agent** | `server/knowledge/PredictionEngine.ts` (+ skill `knowledge_predict`) | ✅ 9 tests |
-| 🔥 **Opportunity Engine** | — | à venir |
+| 🔥 **Opportunity Engine** | `server/knowledge/OpportunityEngine.ts` (+ skill `knowledge_opportunities`) | ✅ 11 tests |
 | 🤖 **Dynamic Agent Swarm** | — | à venir |
 | 🕰️ **Mission Time Travel** | — | à venir |
 | 👁️ **Computer Use Agent** | — | à venir |
