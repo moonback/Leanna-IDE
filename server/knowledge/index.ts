@@ -216,3 +216,14 @@ export {
   type ProblemEvolution,
   type ApproachRecommendation,
 } from "./MissionEvolution.js";
+
+// Daily AI Briefing (#13) — digest matinal composé (santé + opportunités + profil)
+export {
+  DailyBriefing,
+  dailyBriefing,
+  type BriefingReport,
+  type BriefingItem,
+  type BriefingSeverity,
+  type RecommendedMission,
+  type DailyBriefingOptions,
+} from "./DailyBriefing.js";

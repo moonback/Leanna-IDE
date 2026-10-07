@@ -11,6 +11,7 @@ import {
   predictionEngine,
   opportunityEngine,
   missionEvolutionStore,
+  dailyBriefing,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -77,6 +78,7 @@ export const knowledgeSkill: Skill = {
     knowledge_predict: ["read"],
     knowledge_opportunities: ["read"],
     knowledge_mission_evolution: ["read"],
+    knowledge_daily_briefing: ["read"],
   },
   declarations: [
     {
@@ -458,6 +460,18 @@ export const knowledgeSkill: Skill = {
         },
       },
     },
+    {
+      name: "knowledge_daily_briefing",
+      description:
+        "☀️ Daily AI Briefing : digest matinal de ce que Leanna a détecté — problèmes critiques, tâches en attente, améliorations possibles — composé depuis la santé du projet, les opportunités et le profil. Propose des missions prêtes à lancer. Lecture seule.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          max_missions: { type: "NUMBER", description: "Nombre max de missions recommandées (défaut: 5)." },
+          include_health: { type: "BOOLEAN", description: "Inclure le diagnostic de santé (défaut: true). Nécessite un projet indexé." },
+        },
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -556,6 +570,10 @@ export const knowledgeSkill: Skill = {
       signature: z.string().trim().optional(),
       objective: z.string().trim().optional(),
     }).refine((v) => v.signature || v.objective, { message: "Fournir 'signature' ou 'objective'." }),
+    knowledge_daily_briefing: z.object({
+      max_missions: z.number().int().positive().max(20).optional().default(5),
+      include_health: z.boolean().optional().default(true),
+    }),
   },
   handleToolCall: async (name, args) => {
     const log = (msg: string) => console.log(`[KnowledgeSkill] ${msg}`);
@@ -1275,6 +1293,31 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR mission_evolution: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_daily_briefing — Daily AI Briefing (#13)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_daily_briefing") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_daily_briefing, args);
+        log(`daily_briefing (max_missions=${validated.max_missions}, include_health=${validated.include_health})`);
+        const report = dailyBriefing.generate({ maxMissions: validated.max_missions, includeHealth: validated.include_health });
+        return {
+          status: "success",
+          greeting: report.greeting,
+          project: report.projectName,
+          health_score: report.healthScore,
+          counts: report.counts,
+          items: report.items,
+          recommended_missions: report.recommendedMissions,
+          highlights: report.highlights,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR daily_briefing: ${e.message}`);
         return { error: e.message };
       }
     }
