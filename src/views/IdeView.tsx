@@ -37,7 +37,7 @@ import { HistoryPanel } from '../components/ide/HistoryPanel.js';
 import { AutomationPanel } from '../components/ide/AutomationPanel.js';
 import { MemoryPanel } from '../components/ide/MemoryPanel.js';
 import { FileExplorer } from '../components/ide/FileExplorerVirtualized.js';
-import { UnifiedSidebar } from '../components/UnifiedSidebar.js';
+import { GlobalSidebar } from '../components/GlobalSidebar.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useFileSystem } from '../hooks/useFileSystem.js';
 import { useIdeSettings } from '../hooks/useIdeSettings.js';
@@ -903,9 +903,9 @@ export default function IdeView() {
   return (
     <div className="Leanna-ide-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
 
-      {/* Sidebar Unifiée */}
-      <UnifiedSidebar
-        context="ide"
+      {/* Sidebar — nouvelle GlobalSidebar en mode IDE (outils-panneaux) */}
+      <GlobalSidebar
+        variant="ide"
         showExplorer={showExplorer}
         showGlobalSearch={showGlobalSearch}
         showRunMenu={showRunMenu}

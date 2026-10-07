@@ -20,7 +20,7 @@ import { LauncherModal } from './components/LauncherModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { Loader2, X } from 'lucide-react';
-import { UnifiedSidebar } from './components/UnifiedSidebar.js';
+import { GlobalSidebar } from './components/GlobalSidebar.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
@@ -467,7 +467,7 @@ function NavSidebar() {
   // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
-  return <UnifiedSidebar context="global" />;
+  return <GlobalSidebar />;
 }
 
 /** Persistent agent status strip — hidden on the IDE (it has its own StatusBar). */
