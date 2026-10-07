@@ -11,6 +11,12 @@ export interface WebviewElement extends HTMLElement {
   getURL(): string;
   getTitle(): string;
   executeJavaScript(code: string): Promise<unknown>;
+  /** Capture le rendu courant du webview. Renvoie un NativeImage Electron. */
+  capturePage(): Promise<{
+    toDataURL(): string;
+    toPNG(): { toString(encoding: string): string };
+    isEmpty(): boolean;
+  }>;
 }
 
 export interface WebviewTitleEvent extends Event {

@@ -1330,6 +1330,32 @@ export function BrowserPanel({
       });
     };
 
+    // ── Capture visuelle : Leanna photographie la page pour l'analyser ───────
+    const handleCapture = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string };
+      const wv = webviewRef.current;
+      if (!wv?.capturePage) {
+        postActionResult(detail.requestId, null, 'Capture non disponible (webview absente).');
+        return;
+      }
+      try {
+        const image = await wv.capturePage();
+        if (image.isEmpty()) {
+          postActionResult(detail.requestId, null, 'Capture vide (page non rendue).');
+          return;
+        }
+        const base64 = image.toPNG().toString('base64');
+        postActionResult(detail.requestId, {
+          image: base64,
+          mimeType: 'image/png',
+          url: wv.getURL?.() ?? '',
+          title: wv.getTitle?.() ?? '',
+        });
+      } catch (err: any) {
+        postActionResult(detail.requestId, null, err?.message ?? 'Erreur de capture.');
+      }
+    };
+
     window.addEventListener('Leanna-browser-navigate', handleNav);
     window.addEventListener('Leanna-browser-scroll', handleScroll);
     window.addEventListener('Leanna-browser-control', handleBrowserControl);
@@ -1353,6 +1379,8 @@ export function BrowserPanel({
     window.addEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
     // Journal console/réseau
     window.addEventListener('Leanna-browser-get-console', handleGetConsole as EventListener);
+    // Capture visuelle
+    window.addEventListener('Leanna-browser-capture', handleCapture as EventListener);
     return () => {
       window.removeEventListener('Leanna-browser-navigate', handleNav);
       window.removeEventListener('Leanna-browser-scroll', handleScroll);
@@ -1376,6 +1404,7 @@ export function BrowserPanel({
       window.removeEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
       window.removeEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
       window.removeEventListener('Leanna-browser-get-console', handleGetConsole as EventListener);
+      window.removeEventListener('Leanna-browser-capture', handleCapture as EventListener);
     };
   }, [navigateTo]);
 

@@ -482,6 +482,11 @@ const getConsoleSchema = z.object({
   limit: z.number().int().positive().max(300).optional().default(100),
 });
 
+// Capture visuelle + analyse par modèle multimodal.
+const captureSchema = z.object({
+  prompt: z.string().max(2000).optional(),
+});
+
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
 
 // J1 — Accessibilité
@@ -812,6 +817,20 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_capture",
+      description:
+        "Capture une image de la page actuellement affichée dans le navigateur intégré et l'analyse avec un modèle de vision. À utiliser pour 'que vois-tu sur cette page ?', vérifier un rendu visuel, comparer avec une maquette, ou diagnostiquer un problème d'affichage que le texte seul ne révèle pas. Fournis un `prompt` pour cibler l'analyse (ex: 'le bouton de connexion est-il visible et bien aligné ?').",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          prompt: {
+            type: "STRING",
+            description: "Question ou consigne d'analyse visuelle. Si omis, une description générale de la page est produite.",
+          },
+        },
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -1011,6 +1030,7 @@ export const browserSkill: Skill = {
     browser_research: researchSchema,
     browser_web_search: webSearchSchema,
     browser_get_console: getConsoleSchema,
+    browser_capture: captureSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1670,6 +1690,58 @@ export const browserSkill: Skill = {
             ? "Aucun message console/réseau pour la page actuelle."
             : `${entries.length} entrée(s) console/réseau (${errorCount} erreur(s)). Analyse-les pour diagnostiquer la page.`,
       };
+    }
+
+    // ── browser_capture ───────────────────────────────────────────────────────
+    // Capture la page affichée puis l'analyse via un modèle multimodal (Gemini).
+    if (name === "browser_capture") {
+      const { prompt } = validateArgs(browserSkill.inputSchemas!["browser_capture"], args);
+
+      const raw = await runBrowserAction({ type: "browser-capture" }, 15_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const shot = raw as { image?: string; mimeType?: string; url?: string; title?: string };
+      if (!shot.image) {
+        return { status: "error", message: "Capture impossible (aucune image renvoyée)." };
+      }
+
+      const analysisPrompt =
+        prompt?.trim() ||
+        "Décris en détail ce que montre cette page : texte visible, éléments d'interface (boutons, champs, menus), couleurs dominantes, organisation spatiale, et tout problème d'affichage éventuel (débordement, superposition, élément manquant).";
+
+      try {
+        // Appel multimodal réel : l'image est passée en inlineData (pas en texte).
+        const { generateText } = await import("../utils/textGeneration.js");
+        const analysis = await generateText({
+          prompt: analysisPrompt,
+          geminiParts: [
+            { inlineData: { mimeType: shot.mimeType ?? "image/png", data: shot.image } },
+            { text: analysisPrompt },
+          ],
+          forceProvider: "gemini",
+          temperature: 0.3,
+          maxOutputTokens: 2048,
+        });
+
+        // La réponse du modèle sur un contenu web = donnée externe → neutralisation.
+        const guarded = guardUntrustedContent(analysis.text, "browser-vision");
+        return {
+          status: "success",
+          url: shot.url ?? "",
+          title: shot.title ?? "",
+          analysis: guarded.text,
+          promptUsed: analysisPrompt,
+          promptInjection: guarded.promptInjection,
+          message: `Analyse visuelle de "${shot.title || shot.url || "la page"}" effectuée.`,
+        };
+      } catch (err: any) {
+        return {
+          status: "error",
+          url: shot.url ?? "",
+          message: `Capture réussie mais analyse visuelle impossible : ${err?.message ?? "erreur inconnue"} (vérifie qu'une clé Gemini est configurée).`,
+        };
+      }
     }
 
     // ── browser_click ─────────────────────────────────────────────────────────

@@ -305,6 +305,9 @@ export function useLiveAPI() {
         case 'browser-get-console':
           window.dispatchEvent(new CustomEvent('Leanna-browser-get-console', { detail: a }));
           break;
+        case 'browser-capture':
+          window.dispatchEvent(new CustomEvent('Leanna-browser-capture', { detail: a }));
+          break;
         case 'open-rich-document':
           window.dispatchEvent(new CustomEvent('Leanna-open-rich-document', { detail: a }));
           break;
