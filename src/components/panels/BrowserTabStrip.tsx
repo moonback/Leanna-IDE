@@ -5,13 +5,14 @@
  * actif, et propose fermeture par onglet + bouton « nouvel onglet ».
  */
 
-import { Loader2, Plus, X } from 'lucide-react';
+import { Globe, Loader2, Plus, X } from 'lucide-react';
 
 export interface TabStripItem {
   id: string;
   title: string;
   url: string;
   loading: boolean;
+  faviconUrl?: string | null;
 }
 
 interface BrowserTabStripProps {
@@ -37,8 +38,11 @@ function tabLabel(item: TabStripItem): string {
 export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab }: BrowserTabStripProps) {
   return (
     <div
-      className="flex items-stretch gap-0.5 px-1.5 pt-1.5 flex-shrink-0 overflow-x-auto"
-      style={{ borderBottom: '1px solid var(--border-base)' }}
+      className="flex items-center gap-1 px-2 py-1.5 flex-shrink-0 overflow-x-auto"
+      style={{
+        borderBottom: '1px solid var(--border-base)',
+        backgroundColor: 'var(--bg-sidebar)',
+      }}
       role="tablist"
       aria-label="Onglets du navigateur"
     >
@@ -53,19 +57,41 @@ export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab
             onClick={() => onSelect(tab.id)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(tab.id); } }}
             onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(tab.id); } }}
-            className="group flex items-center gap-1.5 min-w-[110px] max-w-[200px] px-2 py-1 rounded-t-md cursor-pointer transition"
+            className="group relative flex items-center gap-2 min-w-[120px] max-w-[210px] pl-2.5 pr-1.5 py-1.5 rounded-lg cursor-pointer transition-colors"
             style={{
-              backgroundColor: active ? 'var(--bg-panel)' : 'transparent',
-              borderTop: active ? '1px solid var(--border-base)' : '1px solid transparent',
-              borderLeft: active ? '1px solid var(--border-base)' : '1px solid transparent',
-              borderRight: active ? '1px solid var(--border-base)' : '1px solid transparent',
+              backgroundColor: active ? 'var(--bg-elevated)' : 'transparent',
+              border: `1px solid ${active ? 'var(--border-base)' : 'transparent'}`,
+              boxShadow: active ? 'var(--shadow-xs)' : 'none',
             }}
+            onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
+            onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
             title={tab.url || tabLabel(tab)}
           >
-            {tab.loading && <Loader2 size={11} className="animate-spin" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+            {/* Indicateur d'onglet actif : liseré accent à gauche */}
+            {active && (
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full"
+                style={{ width: 3, height: '55%', backgroundColor: 'var(--accent-primary)' }}
+              />
+            )}
+            {tab.loading ? (
+              <Loader2 size={12} className="animate-spin" style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            ) : tab.faviconUrl ? (
+              <img
+                src={tab.faviconUrl}
+                alt=""
+                width={14}
+                height={14}
+                style={{ flexShrink: 0, borderRadius: 3 }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <Globe size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            )}
             <span
               className="text-xs truncate flex-1"
-              style={{ color: active ? 'var(--text-primary)' : 'var(--text-muted)' }}
+              style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: active ? 500 : 400 }}
             >
               {tabLabel(tab)}
             </span>
@@ -73,11 +99,11 @@ export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition flex-shrink-0"
+                className="flex items-center justify-center w-5 h-5 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--bg-active)] transition flex-shrink-0"
                 title="Fermer l'onglet"
                 aria-label={`Fermer l'onglet ${tabLabel(tab)}`}
               >
-                <X size={11} style={{ color: 'var(--text-muted)' }} />
+                <X size={12} style={{ color: 'var(--text-muted)' }} />
               </button>
             )}
           </div>
@@ -87,11 +113,11 @@ export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab
       <button
         type="button"
         onClick={onNewTab}
-        className="flex items-center justify-center p-1 ml-0.5 rounded hover:bg-[var(--bg-active)] transition flex-shrink-0 self-center"
+        className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--bg-active)] transition flex-shrink-0"
         title="Nouvel onglet"
         aria-label="Nouvel onglet"
       >
-        <Plus size={13} style={{ color: 'var(--text-muted)' }} />
+        <Plus size={14} style={{ color: 'var(--text-muted)' }} />
       </button>
     </div>
   );

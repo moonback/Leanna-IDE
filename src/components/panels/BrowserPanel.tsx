@@ -10,6 +10,7 @@ import { AlertTriangle } from 'lucide-react';
 import { BrowserExternalOverlay } from './BrowserExternalOverlay.js';
 import { BrowserToolbar } from './BrowserToolbar.js';
 import { BrowserTabStrip } from './BrowserTabStrip.js';
+import { BrowserFindBar } from './BrowserFindBar.js';
 import { BrowserTabView } from './BrowserTabView.js';
 import type { BrowserTabHandle, TabStatePatch } from './BrowserTabView.js';
 import { useBrowserHistory } from './useBrowserHistory.js';
@@ -29,6 +30,7 @@ interface BrowserTab {
   canGoBack: boolean;
   canGoForward: boolean;
   loadError: string | null;
+  faviconUrl: string | null;
 }
 
 let tabCounter = 0;
@@ -92,6 +94,7 @@ export function BrowserPanel({
     canGoBack: false,
     canGoForward: false,
     loadError: null,
+    faviconUrl: null,
   }]);
   const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0].id);
 
@@ -172,7 +175,7 @@ export function BrowserPanel({
     const id = newTabId();
     const normalized = (() => { try { return normalizeUrl(url); } catch { return BROWSER_HOME_URL; } })();
     setTabs((prev) => [...prev, {
-      id, url: normalized, title: '', loading: false, canGoBack: false, canGoForward: false, loadError: null,
+      id, url: normalized, title: '', loading: false, canGoBack: false, canGoForward: false, loadError: null, faviconUrl: null,
     }]);
     if (activate) setActiveTabId(id);
     return id;
@@ -262,6 +265,93 @@ export function BrowserPanel({
     }
   }, [loading, activeTabId]);
   const handleHome = useCallback(() => navigateTo(BROWSER_HOME_URL), [navigateTo]);
+
+  // ── Zoom (sur l'onglet actif) ───────────────────────────────────────────────
+  // Niveau de zoom Electron : 0 = 100 %, chaque pas ≈ +20 %. On borne [-3, +3].
+  const [zoomLevel, setZoomLevel] = useState(0);
+  const applyZoom = useCallback((level: number) => {
+    const clamped = Math.max(-3, Math.min(3, level));
+    setZoomLevel(clamped);
+    webviewRef.current?.setZoomLevel(clamped);
+  }, []);
+  const handleZoomIn = useCallback(() => applyZoom(zoomLevel + 0.5), [applyZoom, zoomLevel]);
+  const handleZoomOut = useCallback(() => applyZoom(zoomLevel - 0.5), [applyZoom, zoomLevel]);
+  const handleZoomReset = useCallback(() => applyZoom(0), [applyZoom]);
+  // Réappliquer le zoom courant quand on change d'onglet (chaque webview a son propre zoom).
+  useEffect(() => {
+    webviewRef.current?.setZoomLevel(zoomLevel);
+  }, [activeTabId]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Pourcentage affiché (approximation : 1,2^niveau). */
+  const zoomPercent = Math.round(Math.pow(1.2, zoomLevel) * 100);
+
+  // ── Recherche dans la page ──────────────────────────────────────────────────
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findMatches, setFindMatches] = useState<{ active: number; total: number } | null>(null);
+
+  const runFind = useCallback((text: string, forward = true, findNext = false) => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+    if (!text) {
+      wv.stopFindInPage('clearSelection');
+      setFindMatches(null);
+      return;
+    }
+    wv.findInPage(text, { forward, findNext });
+  }, []);
+
+  const handleFindChange = useCallback((text: string) => {
+    setFindQuery(text);
+    runFind(text, true, false);
+  }, [runFind]);
+
+  const handleFindNext = useCallback(() => runFind(findQuery, true, true), [runFind, findQuery]);
+  const handleFindPrev = useCallback(() => runFind(findQuery, false, true), [runFind, findQuery]);
+
+  const closeFind = useCallback(() => {
+    setFindOpen(false);
+    setFindMatches(null);
+    webviewRef.current?.stopFindInPage('clearSelection');
+  }, []);
+
+  const toggleFind = useCallback(() => {
+    setFindOpen((v) => {
+      if (v) { webviewRef.current?.stopFindInPage('clearSelection'); setFindMatches(null); }
+      return !v;
+    });
+  }, []);
+
+  // Écoute des résultats found-in-page sur la webview active.
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+    const onFound = (e: Event) => {
+      const r = (e as import('./browserTypes.js').WebviewFoundInPageEvent).result;
+      if (r) setFindMatches({ active: r.activeMatchOrdinal, total: r.matches });
+    };
+    wv.addEventListener('found-in-page', onFound);
+    return () => wv.removeEventListener('found-in-page', onFound);
+  }, [activeTabId]);
+
+  // Ctrl/Cmd+F ouvre la recherche dans la page quand le navigateur est monté.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setFindOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ── DevTools (onglet actif) ─────────────────────────────────────────────────
+  const handleToggleDevTools = useCallback(() => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+    if (wv.isDevToolsOpened()) wv.closeDevTools();
+    else wv.openDevTools();
+  }, []);
   // Référence pour l'intervalle de vérification de la fenêtre externe
   const externalWindowCheckRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1416,7 +1506,7 @@ export function BrowserPanel({
       }}
     >
       <BrowserTabStrip
-        tabs={tabs.map((t) => ({ id: t.id, title: t.title, url: t.url, loading: t.loading }))}
+        tabs={tabs.map((t) => ({ id: t.id, title: t.title, url: t.url, loading: t.loading, faviconUrl: t.faviconUrl }))}
         activeTabId={activeTabId}
         onSelect={switchTab}
         onClose={closeTab}
@@ -1444,6 +1534,12 @@ export function BrowserPanel({
         onRefresh={handleRefresh}
         onHome={handleHome}
         onOpenExternal={handleOpenInNewWindow}
+        zoomPercent={zoomPercent}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
+        onToggleFind={toggleFind}
+        onToggleDevTools={handleToggleDevTools}
         getSuggestions={getSuggestions}
         onSelectSuggestion={handleSelectSuggestion}
         onClearHistory={clearHistory}
@@ -1461,17 +1557,29 @@ export function BrowserPanel({
         onRemoveExtension={extensions.removeExtension}
       />
 
+      {/* ── Barre de recherche dans la page ── */}
+      {findOpen && (
+        <BrowserFindBar
+          query={findQuery}
+          matches={findMatches}
+          onChange={handleFindChange}
+          onNext={handleFindNext}
+          onPrev={handleFindPrev}
+          onClose={closeFind}
+        />
+      )}
+
       {/* ── Error banner ── */}
       {loadError && (
         <div
           className="flex items-center gap-2 px-3 py-2 text-sm flex-shrink-0"
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-            borderBottom: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)',
+            backgroundColor: 'var(--color-error-subtle)',
+            borderBottom: '1px solid var(--border-error-subtle)',
             color: 'var(--color-error)',
           }}
         >
-          <AlertTriangle size={12} />
+          <AlertTriangle size={13} className="flex-shrink-0" />
           <span className="flex-1 truncate">{loadError}</span>
         </div>
       )}

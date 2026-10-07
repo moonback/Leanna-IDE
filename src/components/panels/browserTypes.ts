@@ -17,6 +17,29 @@ export interface WebviewElement extends HTMLElement {
     toPNG(): { toString(encoding: string): string };
     isEmpty(): boolean;
   }>;
+  /** Zoom (niveau 0 = 100 %, +0.5 ≈ +50 %). */
+  setZoomLevel(level: number): void;
+  getZoomLevel(): number;
+  /** Recherche dans la page. */
+  findInPage(text: string, options?: { forward?: boolean; findNext?: boolean }): number;
+  stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection'): void;
+  /** Outils de développement de la page. */
+  openDevTools(): void;
+  closeDevTools(): void;
+  isDevToolsOpened(): boolean;
+}
+
+export interface WebviewFaviconEvent extends Event {
+  favicons: string[];
+}
+
+export interface WebviewFoundInPageEvent extends Event {
+  result: {
+    requestId: number;
+    activeMatchOrdinal: number;
+    matches: number;
+    finalUpdate: boolean;
+  };
 }
 
 export interface WebviewTitleEvent extends Event {
