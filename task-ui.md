@@ -13,11 +13,11 @@
 | 🔴 P0 | Autonomy Center | ✅ déjà existant (`/autonomy`) |
 | 🟠 P1 | **Simulation / Dry-Run UI** — objectif → simulation → fichiers/commandes/agents/coût/risque + [Modifier/Exécuter/Annuler] | ✅ `src/views/MissionSimulationView.tsx` + route `/mission-simulation` + nav |
 | 🟠 P1 | **Agent Swarm** — composition dynamique de l'équipe en pipeline (rôle · étape · raison) | ✅ `src/views/AgentSwarmView.tsx` + route `/agent-swarm` + nav |
-| 🟠 P1 | Explainability | à venir |
+| 🟠 P1 | **Explainability — « Pourquoi ? »** — facteurs décisionnels (probabilité, playbook, approche, risques, étape fragile) | ✅ `src/views/ExplainabilityView.tsx` + route `/explainability` + nav |
 
-**P0 UI terminé (6/6).** P1 : ✅ Simulation/Dry-Run UI, ✅ Agent Swarm — reste Explainability.
+**UI terminée : P0 (6/6) + P1 (4/4).** Mission Control · Insights · Project Intelligence · Mission Timeline · Agent State bar · Autonomy Center · Simulation/Dry-Run · Agent Swarm · Explainability.
 
-Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), `POST /api/missions/simulate` (Mission Simulator dry-run), `POST /api/agents/compose-swarm` (SwarmComposer), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
+Backend exposé pour l'UI : `GET /api/knowledge/doctor · /daily-briefing · /opportunities · /profile` (nouveau `insightsRouter`), `GET /api/missions/:id/timeline` et `/timeline/:step` (Mission Time Travel), `POST /api/missions/simulate` (Mission Simulator dry-run), `POST /api/agents/compose-swarm` (SwarmComposer), `POST /api/knowledge/explain` (Predictive Agent + Mission Evolution), et les `proposals` d'anticipation via le WebSocket `/autonomy` existant.
 
 ---
 

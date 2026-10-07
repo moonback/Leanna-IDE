@@ -37,6 +37,7 @@ const MissionControlView = lazy(() => import('./views/MissionControlView.js'));
 const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'));
 const MissionSimulationView = lazy(() => import('./views/MissionSimulationView.js'));
 const AgentSwarmView = lazy(() => import('./views/AgentSwarmView.js'));
+const ExplainabilityView = lazy(() => import('./views/ExplainabilityView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -513,6 +514,7 @@ function AnimatedRoutes() {
         <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
         <Route path="/mission-simulation" element={wrap(<MissionSimulationView />)} />
         <Route path="/agent-swarm"   element={wrap(<AgentSwarmView />)} />
+        <Route path="/explainability" element={wrap(<ExplainabilityView />)} />
       </Routes>
     </AnimatePresence>
   );

@@ -4,7 +4,28 @@ import {
   dailyBriefing,
   opportunityEngine,
   projectProfile,
+  predictionEngine,
+  missionEvolutionStore,
 } from '../../knowledge/index.js';
+
+/**
+ * Signature coarse (objectif seul), cohérente avec le keying de problème côté
+ * Executor / MissionEvolution, pour relier une prédiction à l'historique
+ * d'approches de la même classe de problème.
+ */
+function coarseSignature(objective: string): string {
+  const t = objective.toLowerCase();
+  const kw =
+    /perf|optimi/.test(t) ? 'perf'
+      : /refactor|clean/.test(t) ? 'refactor'
+        : /test/.test(t) ? 'test'
+          : /secur|sécur/.test(t) ? 'security'
+            : /doc/.test(t) ? 'docs'
+              : /fix|bug|corrige|erreur|error/.test(t) ? 'fix'
+                : 'generic';
+  const fam = /ts|typescript|type/.test(t) ? 'ts-error' : /fix|bug|erreur|error/.test(t) ? 'error' : 'objective';
+  return `${fam}:${kw}`;
+}
 
 /**
  * Insights router — expose les moteurs d'intelligence projet (P0/P1) à l'UI
@@ -46,6 +67,45 @@ router.get('/opportunities', (req: Request, res: Response) => {
     return res.json({ status: 'success', report });
   } catch (e: any) {
     return res.json({ status: 'degraded', report: null, error: e.message });
+  }
+});
+
+// POST /api/knowledge/explain — « pourquoi ? » : facteurs décisionnels
+// Compose la prédiction (Predictive Agent) et l'historique d'approches
+// (Mission Evolution) en facteurs décisionnels exploitables. Lecture seule.
+router.post('/explain', (req: Request, res: Response) => {
+  const { objective, description, plannedSkills, errors } = req.body as {
+    objective?: string; description?: string; plannedSkills?: string[]; errors?: string[];
+  };
+  if (!objective || typeof objective !== 'string' || !objective.trim()) {
+    return res.status(400).json({ error: "Le paramètre 'objective' est requis." });
+  }
+  try {
+    const prediction = predictionEngine.predict({
+      objective: { title: objective.trim(), description, errors },
+      plannedSkills: Array.isArray(plannedSkills) ? plannedSkills : [],
+    });
+    const signature = coarseSignature(objective);
+    const evolution = missionEvolutionStore.recommendApproach(signature);
+
+    // Facteurs décisionnels lisibles (le « pourquoi » exploitable, pas le
+    // raisonnement interne du modèle).
+    const factors: Array<{ label: string; detail: string; tone: 'positive' | 'warning' | 'neutral' }> = [];
+    factors.push({ label: 'Probabilité de réussite', detail: `${prediction.successPercent}% (confiance ${Math.round(prediction.confidence * 100)}%)`, tone: prediction.successPercent >= 70 ? 'positive' : prediction.successPercent >= 50 ? 'neutral' : 'warning' });
+    if (prediction.playbookId) factors.push({ label: 'Playbook éprouvé', detail: `${prediction.playbookId} — stratégie déjà réussie réutilisée`, tone: 'positive' });
+    if (evolution.recommended) factors.push({ label: 'Approche gagnante', detail: `${Math.round(evolution.recommended.successRate * 100)}% sur ${evolution.recommended.attempts} essais`, tone: 'positive' });
+    for (const avoid of evolution.avoid) factors.push({ label: 'Approche à éviter', detail: `${avoid.label} (${avoid.failures} échec(s))`, tone: 'warning' });
+    if (prediction.weakestStep) factors.push({ label: 'Étape la plus fragile', detail: `${prediction.weakestStep.skillName} — ${Math.round(prediction.weakestStep.failureRisk * 100)}% de risque`, tone: 'warning' });
+
+    return res.json({
+      status: 'success',
+      signature,
+      prediction,
+      evolution,
+      factors,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
   }
 });
 
