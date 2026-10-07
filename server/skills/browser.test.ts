@@ -61,6 +61,7 @@ describe("browser", () => {
         "browser_summarize_page",
         "browser_research",
         "browser_web_search",
+        "browser_get_console",
         "browser_get_accessibility_snapshot",
         "browser_click_by_role",
         "browser_type_by_label",

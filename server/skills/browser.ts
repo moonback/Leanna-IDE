@@ -476,6 +476,12 @@ const webSearchSchema = z.object({
   read: z.boolean().optional().default(true),
 });
 
+// Journal console/réseau de la page courante du navigateur intégré.
+const getConsoleSchema = z.object({
+  level: z.enum(["all", "warn", "error"]).optional().default("all"),
+  limit: z.number().int().positive().max(300).optional().default(100),
+});
+
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
 
 // J1 — Accessibilité
@@ -788,6 +794,24 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_get_console",
+      description:
+        "Lit le journal console (console.log/warn/error) et les erreurs réseau de la page actuellement affichée dans le navigateur intégré. Essentiel pour déboguer un aperçu de projet : après avoir ouvert ta page de dev avec browser_navigate, utilise cet outil pour voir les erreurs JS/réseau réelles et les corriger. Filtre par niveau et limite le nombre d'entrées.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          level: {
+            type: "STRING",
+            description: "Niveau minimum : 'all' (défaut), 'warn' (warnings + erreurs), ou 'error' (erreurs JS + réseau uniquement).",
+          },
+          limit: {
+            type: "NUMBER",
+            description: "Nombre maximum d'entrées récentes à retourner (défaut 100, max 300).",
+          },
+        },
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -986,6 +1010,7 @@ export const browserSkill: Skill = {
     browser_summarize_page: summarizePageSchema,
     browser_research: researchSchema,
     browser_web_search: webSearchSchema,
+    browser_get_console: getConsoleSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1609,6 +1634,41 @@ export const browserSkill: Skill = {
         confidence: comparison.confidence,
         errors: errors.length ? errors : undefined,
         message: `${sources.length} source(s) lue(s) en parallèle pour "${query}". Consensus: ${comparison.consensus.length}, contradictions: ${comparison.contradictions.length}, confiance: ${(comparison.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`,
+      };
+    }
+
+    // ── browser_get_console ───────────────────────────────────────────────────
+    // Lit le journal console + erreurs réseau de la page affichée.
+    if (name === "browser_get_console") {
+      const { level, limit } = validateArgs(browserSkill.inputSchemas!["browser_get_console"], args);
+      const raw = await runBrowserAction({ type: "browser-get-console", level, limit }, 10_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const payload = raw as {
+        url?: string;
+        total?: number;
+        returned?: number;
+        entries?: Array<{ level: string; message: string; source?: string; line?: number; ts: number }>;
+      };
+      const rawEntries = Array.isArray(payload.entries) ? payload.entries : [];
+      // Le texte des messages = données externes non fiables → neutralisation.
+      const entries = rawEntries.map((entry) => ({
+        ...entry,
+        message: guardUntrustedContent(entry.message, "browser-console").text,
+      }));
+      const errorCount = entries.filter((entry) => entry.level === "error" || entry.level === "network").length;
+      return {
+        status: "success",
+        url: payload.url ?? "",
+        total: payload.total ?? entries.length,
+        returned: entries.length,
+        errorCount,
+        entries,
+        message:
+          entries.length === 0
+            ? "Aucun message console/réseau pour la page actuelle."
+            : `${entries.length} entrée(s) console/réseau (${errorCount} erreur(s)). Analyse-les pour diagnostiquer la page.`,
       };
     }
 

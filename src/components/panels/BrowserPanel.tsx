@@ -92,6 +92,14 @@ export function BrowserPanel({
   useEffect(() => { recordVisitRef.current = recordVisit; }, [recordVisit]);
   useEffect(() => { updateTitleRef.current = updateTitle; }, [updateTitle]);
 
+  /**
+   * Tampon circulaire des messages console + échecs de ressources de la page
+   * courante. Permet à Leanna de « voir » les erreurs JS/réseau d'un aperçu de
+   * projet et de les corriger. Vidé à chaque navigation de la frame principale.
+   */
+  const consoleBufferRef = useRef<Array<{ level: string; message: string; source?: string; line?: number; ts: number }>>([]);
+  const MAX_CONSOLE_ENTRIES = 300;
+
   // ── Navigation interne ──────────────────────────────────────────────────────
 
   const navigateTo = useCallback((raw: string) => {
@@ -256,22 +264,48 @@ export function BrowserPanel({
       }));
     };
 
+    /** Ajoute une entrée au tampon console en respectant la taille max. */
+    const pushConsole = (entry: { level: string; message: string; source?: string; line?: number }) => {
+      const buf = consoleBufferRef.current;
+      buf.push({ ...entry, ts: Date.now() });
+      if (buf.length > MAX_CONSOLE_ENTRIES) buf.splice(0, buf.length - MAX_CONSOLE_ENTRIES);
+    };
+
+    // console.log/warn/error de la page → tampon.
+    const onConsoleMessage = (e: Event) => {
+      const ev = e as unknown as { level: number; message: string; line: number; sourceId: string };
+      // Electron : level 0=verbose/log, 1=info, 2=warning, 3=error.
+      const level = ev.level === 3 ? 'error' : ev.level === 2 ? 'warn' : ev.level === 1 ? 'info' : 'log';
+      pushConsole({ level, message: String(ev.message ?? ''), source: ev.sourceId, line: ev.line });
+    };
+
     const onFailLoad = (e: Event) => {
       const ev = e as WebviewFailLoadEvent;
-      // N'afficher une erreur que pour la frame principale : une pub ou un
-      // iframe secondaire qui échoue ne doit pas masquer la page.
-      if (ev.isMainFrame === false) return;
+      // Les échecs de sous-ressources (iframe, pub, script, image…) sont des
+      // erreurs réseau utiles à l'agent : on les journalise sans masquer la page.
+      if (ev.isMainFrame === false) {
+        if (ev.errorCode !== -3) {
+          pushConsole({ level: 'network', message: `Échec ressource (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
+        }
+        return;
+      }
       if (ev.errorCode === -3) {
         // ERR_ABORTED — annulation normale (navigation remplacée avant fin de chargement, destroy, etc.)
         setLoading(false);
         return;
       }
+      pushConsole({ level: 'network', message: `Échec chargement page (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
       setLoading(false);
       setLoadError(`Impossible de charger cette page (${ev.errorDescription})`);
     };
 
     const onNavigate = (e: Event) => {
       const ev = e as WebviewNavigateEvent;
+      // Navigation de la frame principale → nouvelle page : vider le tampon
+      // console (did-navigate-in-page conserve les logs de la même page).
+      if (ev.isMainFrame !== false && e.type === 'did-navigate') {
+        consoleBufferRef.current = [];
+      }
       setCurrentUrl(ev.url);
       setInputValue(ev.url);
       setCanGoBack(wv.canGoBack());
@@ -287,6 +321,7 @@ export function BrowserPanel({
     wv.addEventListener('did-fail-load', onFailLoad);
     wv.addEventListener('did-navigate', onNavigate);
     wv.addEventListener('did-navigate-in-page', onNavigate);
+    wv.addEventListener('console-message', onConsoleMessage);
 
     return () => {
       wv.removeEventListener('dom-ready', onDomReady);
@@ -297,6 +332,7 @@ export function BrowserPanel({
       wv.removeEventListener('did-fail-load', onFailLoad);
       wv.removeEventListener('did-navigate', onNavigate);
       wv.removeEventListener('did-navigate-in-page', onNavigate);
+      wv.removeEventListener('console-message', onConsoleMessage);
     };
     // `partition` : un changement de profil remonte le <webview> (nouvelle
     // partition de session) ; on doit réabonner les listeners au nouvel élément.
@@ -1273,6 +1309,27 @@ export function BrowserPanel({
       }
     };
 
+    // ── Journal console/réseau : Leanna lit les erreurs de la page ───────────
+    const handleGetConsole = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; level?: string; limit?: number };
+      let entries = consoleBufferRef.current.slice();
+      const level = detail.level ?? 'all';
+      if (level === 'error') {
+        entries = entries.filter((x) => x.level === 'error' || x.level === 'network');
+      } else if (level === 'warn') {
+        entries = entries.filter((x) => x.level === 'error' || x.level === 'network' || x.level === 'warn');
+      }
+      const limit = Math.max(1, Math.min(detail.limit ?? 100, 300));
+      // Les plus récents en priorité.
+      const sliced = entries.slice(-limit);
+      postActionResult(detail.requestId, {
+        url: webviewRef.current?.getURL?.() ?? '',
+        total: consoleBufferRef.current.length,
+        returned: sliced.length,
+        entries: sliced,
+      });
+    };
+
     window.addEventListener('Leanna-browser-navigate', handleNav);
     window.addEventListener('Leanna-browser-scroll', handleScroll);
     window.addEventListener('Leanna-browser-control', handleBrowserControl);
@@ -1294,6 +1351,8 @@ export function BrowserPanel({
     window.addEventListener('Leanna-browser-get-element-attribute', handleGetElementAttribute as EventListener);
     window.addEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
     window.addEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
+    // Journal console/réseau
+    window.addEventListener('Leanna-browser-get-console', handleGetConsole as EventListener);
     return () => {
       window.removeEventListener('Leanna-browser-navigate', handleNav);
       window.removeEventListener('Leanna-browser-scroll', handleScroll);
@@ -1316,6 +1375,7 @@ export function BrowserPanel({
       window.removeEventListener('Leanna-browser-get-element-attribute', handleGetElementAttribute as EventListener);
       window.removeEventListener('Leanna-browser-fill-form', handleFillForm as EventListener);
       window.removeEventListener('Leanna-browser-select-option', handleSelectOption as EventListener);
+      window.removeEventListener('Leanna-browser-get-console', handleGetConsole as EventListener);
     };
   }, [navigateTo]);
 
