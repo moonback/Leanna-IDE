@@ -10,6 +10,7 @@ import {
   projectDoctor,
   predictionEngine,
   opportunityEngine,
+  missionEvolutionStore,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -42,6 +43,25 @@ const DETAIL_VALUES: ContextDetailLevel[] = ["compact", "standard", "verbose"];
 
 const IMPACT_MODES: ImpactMode[] = ["quick", "standard", "deep", "reverse"];
 
+/**
+ * Coarse objective-only problem signature, consistent with the Executor's
+ * problemSignature() keying so a planner can look up the evolution of the same
+ * problem class it is about to tackle. No error families here (objective only).
+ */
+function deriveCoarseSignature(objective: string): string {
+  const t = objective.toLowerCase();
+  const kw =
+    /perf|optimi/.test(t) ? "perf"
+      : /refactor|clean/.test(t) ? "refactor"
+        : /test/.test(t) ? "test"
+          : /secur|sécur/.test(t) ? "security"
+            : /doc/.test(t) ? "docs"
+              : /fix|bug|corrige|erreur|error/.test(t) ? "fix"
+                : "generic";
+  const fam = /ts|typescript|type/.test(t) ? "ts-error" : /fix|bug|erreur|error/.test(t) ? "error" : "objective";
+  return `${fam}:${kw}`;
+}
+
 export const knowledgeSkill: Skill = {
   name: "knowledge",
   permissions: ["read"],
@@ -56,6 +76,7 @@ export const knowledgeSkill: Skill = {
     knowledge_project_doctor: ["read"],
     knowledge_predict: ["read"],
     knowledge_opportunities: ["read"],
+    knowledge_mission_evolution: ["read"],
   },
   declarations: [
     {
@@ -425,6 +446,18 @@ export const knowledgeSkill: Skill = {
         },
       },
     },
+    {
+      name: "knowledge_mission_evolution",
+      description:
+        "🧬 Mission Evolution : pour une classe de problème (signature), recommande l'APPROCHE (séquence d'outils) qui a le mieux marché historiquement et signale celles à éviter (échecs répétés). Permet à Leanna de choisir automatiquement l'approche gagnante au lieu de répéter une approche défaillante.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          signature: { type: "STRING", description: "Signature de la classe de problème (ex: 'ts-error:fix'). Soit signature, soit objective requis." },
+          objective: { type: "STRING", description: "Objectif en langage naturel — une signature coarse en est dérivée si 'signature' n'est pas fourni." },
+        },
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -519,6 +552,10 @@ export const knowledgeSkill: Skill = {
       limit: z.number().int().positive().max(50).optional().default(15),
       include_health: z.boolean().optional().default(true),
     }),
+    knowledge_mission_evolution: z.object({
+      signature: z.string().trim().optional(),
+      objective: z.string().trim().optional(),
+    }).refine((v) => v.signature || v.objective, { message: "Fournir 'signature' ou 'objective'." }),
   },
   handleToolCall: async (name, args) => {
     const log = (msg: string) => console.log(`[KnowledgeSkill] ${msg}`);
@@ -1216,6 +1253,28 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR opportunities: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_mission_evolution — Mission Evolution (#6)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_mission_evolution") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_mission_evolution, args);
+        const signature = validated.signature ?? deriveCoarseSignature(validated.objective ?? "");
+        log(`mission_evolution recommend signature='${signature}'`);
+        const rec = missionEvolutionStore.recommendApproach(signature);
+        return {
+          status: "success",
+          signature: rec.signature,
+          recommended: rec.recommended,
+          avoid: rec.avoid,
+          reason: rec.reason,
+        };
+      } catch (e: any) {
+        log(`ERROR mission_evolution: ${e.message}`);
         return { error: e.message };
       }
     }

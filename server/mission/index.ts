@@ -70,3 +70,11 @@ export {
   type StepSnapshot,
   type TimelineMissionView,
 } from "./MissionTimeTravel.js";
+
+// Self-Critique (#10) — évaluation plan vs exécution vs résultat
+export {
+  SelfEvaluationEngine,
+  selfEvaluationEngine,
+  type SelfEvaluation,
+  type SelfEvalMissionView,
+} from "./SelfEvaluation.js";

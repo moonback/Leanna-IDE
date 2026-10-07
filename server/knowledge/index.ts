@@ -206,3 +206,13 @@ export {
   type OpportunityReport,
   type OpportunityEngineOptions,
 } from "./OpportunityEngine.js";
+
+// Mission Evolution (#6) — apprentissage de la meilleure APPROCHE par classe de problème
+export {
+  MissionEvolutionStore,
+  missionEvolutionStore,
+  approachIdFromSteps,
+  type ApproachRecord,
+  type ProblemEvolution,
+  type ApproachRecommendation,
+} from "./MissionEvolution.js";

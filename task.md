@@ -23,6 +23,16 @@
 | 🕰️ **Mission Time Travel** | `server/mission/MissionTimeTravel.ts` (+ skills `mission_timeline`/`mission_rewind`) | ✅ 10 tests |
 | 👁️ **Computer Use Agent** | `server/autonomy/ComputerUseAgent.ts` (boucle observe→act→verify, gating par risque) | ✅ 10 tests |
 
+### 🚧 Bonus — Autres fonctionnalités du document
+
+| Fonctionnalité | Module(s) | Statut |
+| --- | --- | --- |
+| 🧬 **Mission Evolution** (#6) | `server/knowledge/MissionEvolution.ts` (+ skill `knowledge_mission_evolution`) | ✅ 7 tests |
+| 🧠 **Self-Critique** (#10) | `server/mission/SelfEvaluation.ts` (+ skill `mission_self_critique`) | ✅ 8 tests |
+| 🎙️ **Voice Agent** (#12) | — | à venir |
+| 📡 **Daily AI Briefing** (#13) | — | à venir |
+| 🧩 **NL → Automation** (#15) | — | à venir |
+
 ---
 
 Leanna est déjà **très riche en briques IA** : runtime agentique, missions, mémoire, Knowledge Graph, RAG, agents spécialisés, navigateur, vision, voix, workflows, GitHub, apprentissage de fiabilité, sécurité et observabilité. 

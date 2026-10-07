@@ -19,6 +19,8 @@ import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
 import { playbookStore, type PlaybookMissionInput } from "../knowledge/PlaybookStore.js";
 import { projectProfile } from "../knowledge/ProjectProfile.js";
+import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation.js";
+import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -83,6 +85,8 @@ export class Executor {
   private readonly missionRuns = new Map<string, Promise<void>>();
   /** Candidate lessons/proposals; never auto-applied by mission finalization. */
   private readonly learningResults = new Map<string, LearningResult>();
+  /** Self-critique evaluations per mission (plan vs execution vs result). */
+  private readonly selfEvaluations = new Map<string, import("./SelfEvaluation.js").SelfEvaluation>();
 
   /**
    * Missions mises en pause par l'utilisateur.
@@ -441,6 +445,11 @@ export class Executor {
   /** Returns post-mission learning proposals for review by the policy/UI. */
   getLearningResult(missionId: string): LearningResult | undefined {
     return this.learningResults.get(missionId);
+  }
+
+  /** Returns the self-critique evaluation for a finalized mission, if any. */
+  getSelfEvaluation(missionId: string): import("./SelfEvaluation.js").SelfEvaluation | undefined {
+    return this.selfEvaluations.get(missionId);
   }
 
   /**
@@ -1510,6 +1519,51 @@ JSON:`;
     this.proposeLearning(mission);
     this.proposePlaybook(mission);
     this.updateProjectProfile(mission);
+    this.selfCritique(mission);
+    this.recordEvolution(mission);
+  }
+
+  /**
+   * Self-Critique (task.md §10): compare plan vs execution vs result, score the
+   * run, and surface "next time start with X". Best-effort; emits an event for
+   * the UI. Does not mutate the mission.
+   */
+  private selfCritique(mission: Mission): void {
+    try {
+      const evaluation = selfEvaluationEngine.evaluate(mission.getState() as unknown as SelfEvalMissionView);
+      this.selfEvaluations.set(mission.id, evaluation);
+      this.emit("mission_self_critique", {
+        missionId: mission.id,
+        overall: evaluation.overall,
+        scores: evaluation.scores,
+        nextTimeStartWith: evaluation.nextTimeStartWith,
+      });
+    } catch (error) {
+      this.emit("mission_self_critique_failed", { missionId: mission.id, error: String(error) });
+    }
+  }
+
+  /**
+   * Mission Evolution (task.md §6): record which APPROACH (ordered successful
+   * skills) worked or failed for this problem CLASS, so a future similar mission
+   * auto-selects the winning approach instead of repeating a failing one. Learns
+   * from both success and failure. Best-effort.
+   */
+  private recordEvolution(mission: Mission): void {
+    try {
+      const state = mission.getState();
+      const signature = problemSignature(state.title, state.context.errors.map((e) => e.error));
+      const steps = Object.values(state.goals)
+        .filter((g) => g.parentId !== null || Object.values(state.goals).length === 1)
+        .flatMap((g) => [...g.plannedActions].sort((a, b) => a.order - b.order))
+        .filter((a) => a.status === "completed" || a.status === "failed")
+        .map((a) => a.skillName)
+        .filter(Boolean);
+      if (steps.length === 0) return;
+      missionEvolutionStore.recordOutcome({ signature, steps, success: mission.status === "completed" });
+    } catch {
+      /* evolution learning is best-effort */
+    }
   }
 
   /**
@@ -1777,6 +1831,40 @@ JSON:`;
       this.eventEmitter(event, data);
     }
   }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Stable problem-class signature from a mission title + known errors. Resource-
+ * independent (no paths/ids) so repeated instances of the same problem class
+ * share one signature — the key philosophy used by PlaybookStore triggers and
+ * exploited by MissionEvolutionStore to compare approaches across missions.
+ */
+function problemSignature(title: string, errors: string[]): string {
+  const normErr = errors.map((e) =>
+    e.toLowerCase()
+      .replace(/[a-z]:\\[^:\s"']+/g, "<path>")
+      .replace(/\/[^:\s"']{10,}/g, "<path>")
+      .replace(/\d+/g, "<n>")
+      .trim(),
+  );
+  const fam =
+    normErr.find((e) => /ts<n>|typescript|type/.test(e)) ? "ts-error"
+      : normErr.find((e) => /test|assert|expect/.test(e)) ? "test-failure"
+        : normErr.find((e) => /lint|eslint/.test(e)) ? "lint-error"
+          : normErr.length > 0 ? "error"
+            : "objective";
+  const t = title.toLowerCase();
+  const kw =
+    /perf|optimi/.test(t) ? "perf"
+      : /refactor|clean/.test(t) ? "refactor"
+        : /test/.test(t) ? "test"
+          : /secur|sécur/.test(t) ? "security"
+            : /doc/.test(t) ? "docs"
+              : /fix|bug|corrige|erreur|error/.test(t) ? "fix"
+                : "generic";
+  return `${fam}:${kw}`;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────

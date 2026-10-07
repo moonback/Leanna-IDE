@@ -1,6 +1,6 @@
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
-import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView, missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
+import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView, missionTimeTravel, type TimelineMissionView, selfEvaluationEngine, type SelfEvalMissionView } from "../mission/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Skill Mission — Interface IA ↔ Mission System
@@ -65,6 +65,7 @@ export const missionSkill: Skill = {
     mission_simulate: ["read"],
     mission_timeline: ["read"],
     mission_rewind: ["read"],
+    mission_self_critique: ["read"],
   },
   declarations: [
     {
@@ -132,6 +133,18 @@ export const missionSkill: Skill = {
           step: { type: "NUMBER", description: "Index de l'étape (0-based) tel que retourné par mission_timeline." },
         },
         required: ["missionId", "step"],
+      },
+    },
+    {
+      name: "mission_self_critique",
+      description:
+        "🧠 Auto-critique d'une mission terminée : compare le PLAN INITIAL, l'EXÉCUTION RÉELLE et le RÉSULTAT, et retourne des scores (plan accuracy, tool efficiency, recovery quality, verification, cost efficiency) + une recommandation « la prochaine mission similaire doit commencer par X ». Lecture seule.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission terminée à auto-évaluer." },
+        },
+        required: ["missionId"],
       },
     },
     {
@@ -217,6 +230,9 @@ export const missionSkill: Skill = {
     mission_rewind: z.object({
       missionId: z.string().min(1),
       step: z.number().int().min(0),
+    }),
+    mission_self_critique: z.object({
+      missionId: z.string().min(1),
     }),
     mission_status: z.object({
       missionId: z.string().min(1),
@@ -327,6 +343,22 @@ export const missionSkill: Skill = {
           step: target.index,
           event: target,
           trail: trail.map((e) => ({ index: e.index, type: e.type, label: e.label })),
+        };
+      }
+
+      case "mission_self_critique": {
+        const { missionId } = validateArgs(missionSkill.inputSchemas!["mission_self_critique"], args);
+        const mission = executor.getMission(missionId) ?? executor.listCompletedMissions().find((m) => m.id === missionId);
+        if (!mission) return { error: `Mission ${missionId} non trouvée.` };
+        const evaluation = selfEvaluationEngine.evaluate(mission.getState() as unknown as SelfEvalMissionView);
+        return {
+          status: "success",
+          missionId,
+          scores: evaluation.scores,
+          overall: evaluation.overall,
+          notes: evaluation.notes,
+          nextTimeStartWith: evaluation.nextTimeStartWith,
+          summary: evaluation.summary,
         };
       }
 
