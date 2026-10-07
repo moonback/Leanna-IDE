@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen,
-  Power, MessageCircle, Mic, MicOff, Sparkles, Bot,
+  Power, MessageCircle, Mic, MicOff, Sparkles, Bot, ArrowLeft,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
@@ -172,7 +172,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
         </button>
       </div>
 
+      
+
       {/* Agent status pill */}
+       {mode === 'ide' && (
       <button
         type="button"
         onClick={() => navigate('/mission-control')}
@@ -198,7 +201,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
           </span>
         )}
       </button>
-
+       )}
       {/* Assistant connect/mute block — parité IDE (mode="ide" uniquement) */}
       {mode === 'ide' && (
         <IdeAssistantBlock
@@ -214,7 +217,22 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
           onToggleMode={props.onToggleMode}
         />
       )}
-
+{/* Bascule IDE ↔ Mission Control (mode IDE uniquement) */}
+      {mode === 'ide' && (
+        <button
+          type="button"
+          onClick={() => navigate('/mission-control')}
+          title="Ouvrir Mission Control"
+          aria-label="Revenir à Mission Control"
+          className="mx-2 mb-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+          style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-panel)'; }}
+        >
+          <ArrowLeft size={14} className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+          {!collapsed && <span className="truncate">Mission Control</span>}
+        </button>
+      )}
       {/* Grouped navigation (global routes) or tools (IDE) */}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {mode === 'ide' ? (
