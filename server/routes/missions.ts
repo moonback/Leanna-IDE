@@ -122,8 +122,12 @@ export function createMissionsRouter(
   };
 
   /** Sérialise une Mission (instance) vers la forme attendue par le frontend. */
-  const serializeMission = (mission: any) => {
+  const serializeMission = (mission: any, executor?: any) => {
     const state = mission.getState();
+    // L'état de pause est suivi dans l'Executor (pas dans mission.status, qui
+    // reste "in_progress" pendant une pause). On l'expose explicitement pour que
+    // l'UI puisse proposer la bonne action (pause vs reprise).
+    const paused = typeof executor?.isPaused === "function" ? executor.isPaused(state.id) === true : false;
     const goalsRecord = state.goals ?? {};
     // Sous-objectifs = tous les goals ayant un parent (on exclut la racine).
     const goals = Object.values(goalsRecord)
@@ -146,6 +150,7 @@ export function createMissionsRouter(
       id: state.id,
       title: state.title,
       status: state.status,
+      paused,
       priority: state.priority,
       goals,
       activeGoalId: state.activeGoalId,
@@ -164,8 +169,8 @@ export function createMissionsRouter(
     const executor = requireExecutor(res);
     if (!executor) return;
     try {
-      const active = (executor.listActiveMissions?.() ?? []).map(serializeMission);
-      const completed = (executor.listCompletedMissions?.() ?? []).map(serializeMission);
+      const active = (executor.listActiveMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
+      const completed = (executor.listCompletedMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
       return res.json({ missions: [...active, ...completed] });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });

@@ -3,8 +3,10 @@ import { motion, useReducedMotion } from 'motion/react';
 import {
   History, RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
   AlertTriangle, RotateCcw, CheckCircle2, CircleDot, Target, ShieldAlert,
+  Pause, Play, XCircle, Trash2,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { missionApi } from '../services/ideApi.js';
 
 // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
 
@@ -44,7 +46,12 @@ interface MissionListItem {
   id: string;
   title: string;
   status: string;
+  /** Pause suivie côté Executor (le statut reste "in_progress" pendant une pause). */
+  paused?: boolean;
 }
+
+/** Statuts terminaux : plus d'action de pilotage, seule la suppression reste. */
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
 const EVENT_META: Record<TimelineEventType, { icon: React.FC<{ size?: number; style?: React.CSSProperties }>; color: string }> = {
   plan:          { icon: FlagTriangleRight, color: 'var(--accent-primary)' },
@@ -72,13 +79,14 @@ export default function MissionTimelineView() {
   const [timeline, setTimeline] = useState<MissionTimeline | null>(null);
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
 
   const loadMissions = useCallback(async () => {
     try {
       const data = await fetch('/api/missions').then((r) => r.json()).catch(() => null);
-      const list: MissionListItem[] = (data?.missions ?? []).map((m: any) => ({ id: m.id, title: m.title, status: m.status }));
+      const list: MissionListItem[] = (data?.missions ?? []).map((m: any) => ({ id: m.id, title: m.title, status: m.status, paused: m.paused === true }));
       setMissions(list);
       setSelectedId((prev) => prev ?? list[0]?.id ?? null);
     } catch { /* best-effort */ }
@@ -96,6 +104,47 @@ export default function MissionTimelineView() {
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Exécute une action de pilotage (pause/resume/cancel/delete) avec mise à jour
+   * optimiste : on reflète l'état cible localement, puis on resynchronise depuis
+   * le serveur (source de vérité). En cas d'échec, le `loadMissions` final remet
+   * la liste dans l'état réel — pas de rollback manuel fragile.
+   */
+  const runMissionAction = useCallback(
+    async (
+      missionId: string,
+      op: 'pause' | 'resume' | 'cancel' | 'delete',
+      optimistic: (m: MissionListItem) => MissionListItem | null,
+    ) => {
+      setBusyIds((prev) => new Set(prev).add(missionId));
+      // Optimiste : applique la transition visuelle immédiatement.
+      setMissions((prev) =>
+        prev
+          .map((m) => (m.id === missionId ? optimistic(m) : m))
+          .filter((m): m is MissionListItem => m !== null),
+      );
+      try {
+        if (op === 'pause') await missionApi.pauseMission(missionId);
+        else if (op === 'resume') await missionApi.resumeMission(missionId);
+        else if (op === 'cancel') await missionApi.cancelMission(missionId);
+        else await missionApi.deleteMission(missionId);
+      } finally {
+        // Resynchronise avec l'état serveur (succès comme échec).
+        await loadMissions();
+        if (op === 'delete' && selectedIdRef.current === missionId) {
+          setSelectedId(null);
+          setTimeline(null);
+        }
+        setBusyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(missionId);
+          return next;
+        });
+      }
+    },
+    [loadMissions],
+  );
 
   useEffect(() => { void loadMissions(); }, [loadMissions]);
   useEffect(() => { if (selectedId) void loadTimeline(selectedId); }, [selectedId, loadTimeline]);
@@ -142,25 +191,16 @@ export default function MissionTimelineView() {
           <aside className="flex w-56 flex-shrink-0 flex-col gap-1.5 overflow-y-auto" aria-label="Liste des missions">
             {missions.length === 0 ? (
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucune mission. Lancez une mission pour voir sa timeline.</p>
-            ) : missions.map((m) => {
-              const active = m.id === selectedId;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setSelectedId(m.id)}
-                  className="rounded-md px-2.5 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-                  style={{
-                    backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-panel)',
-                    border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-base)'}`,
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <span className="block truncate font-medium">{m.title}</span>
-                  <span className="mt-0.5 block text-xs capitalize" style={{ color: 'var(--text-muted)' }}>{m.status}</span>
-                </button>
-              );
-            })}
+            ) : missions.map((m) => (
+              <MissionPickerItem
+                key={m.id}
+                mission={m}
+                active={m.id === selectedId}
+                busy={busyIds.has(m.id)}
+                onSelect={() => setSelectedId(m.id)}
+                onAction={runMissionAction}
+              />
+            ))}
           </aside>
 
           {/* Middle — timeline */}
@@ -211,6 +251,107 @@ export default function MissionTimelineView() {
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Clique une étape de la timeline pour « revenir » à cet instant : décision, outil, arguments, résultat et raisonnement.</p>
             )}
           </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mission picker item + contextual controls ──────────────────────────────
+
+/** Petit bouton d'action de pilotage (pause/reprise/annulation/suppression). */
+function ControlButton({ title, icon: Icon, tone, disabled, onClick }: {
+  title: string;
+  icon: React.FC<{ size?: number; style?: React.CSSProperties }>;
+  tone: 'neutral' | 'danger';
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const color = tone === 'danger' ? 'var(--color-error)' : 'var(--accent-secondary)';
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-40"
+      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}
+    >
+      <Icon size={12} />
+    </button>
+  );
+}
+
+function MissionPickerItem({ mission, active, busy, onSelect, onAction }: {
+  mission: MissionListItem;
+  active: boolean;
+  busy: boolean;
+  onSelect: () => void;
+  onAction: (
+    id: string,
+    op: 'pause' | 'resume' | 'cancel' | 'delete',
+    optimistic: (m: MissionListItem) => MissionListItem | null,
+  ) => void;
+}) {
+  const terminal = TERMINAL_STATUSES.has(mission.status);
+  const statusLabel = mission.paused && !terminal ? 'en pause' : mission.status;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      className="cursor-pointer rounded-md px-2.5 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+      style={{
+        backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-panel)',
+        border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+        color: 'var(--text-primary)',
+      }}
+    >
+      <span className="block truncate font-medium">{mission.title}</span>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="truncate text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
+          {busy ? <Loader2 size={11} className="inline animate-spin" /> : statusLabel}
+        </span>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {terminal ? (
+            <ControlButton
+              title="Supprimer la mission"
+              icon={Trash2}
+              tone="danger"
+              disabled={busy}
+              onClick={() => onAction(mission.id, 'delete', () => null)}
+            />
+          ) : (
+            <>
+              {mission.paused ? (
+                <ControlButton
+                  title="Reprendre"
+                  icon={Play}
+                  tone="neutral"
+                  disabled={busy}
+                  onClick={() => onAction(mission.id, 'resume', (m) => ({ ...m, paused: false }))}
+                />
+              ) : (
+                <ControlButton
+                  title="Mettre en pause"
+                  icon={Pause}
+                  tone="neutral"
+                  disabled={busy}
+                  onClick={() => onAction(mission.id, 'pause', (m) => ({ ...m, paused: true }))}
+                />
+              )}
+              <ControlButton
+                title="Annuler la mission"
+                icon={XCircle}
+                tone="danger"
+                disabled={busy}
+                onClick={() => onAction(mission.id, 'cancel', (m) => ({ ...m, status: 'cancelled', paused: false }))}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
