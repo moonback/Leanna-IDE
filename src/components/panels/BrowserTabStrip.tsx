@@ -5,13 +5,14 @@
  * actif, et propose fermeture par onglet + bouton « nouvel onglet ».
  */
 
-import { Loader2, Plus, X } from 'lucide-react';
+import { Globe, Loader2, Plus, X } from 'lucide-react';
 
 export interface TabStripItem {
   id: string;
   title: string;
   url: string;
   loading: boolean;
+  faviconUrl?: string | null;
 }
 
 interface BrowserTabStripProps {
@@ -62,7 +63,20 @@ export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab
             }}
             title={tab.url || tabLabel(tab)}
           >
-            {tab.loading && <Loader2 size={11} className="animate-spin" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+            {tab.loading ? (
+              <Loader2 size={11} className="animate-spin" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            ) : tab.faviconUrl ? (
+              <img
+                src={tab.faviconUrl}
+                alt=""
+                width={13}
+                height={13}
+                style={{ flexShrink: 0, borderRadius: 2 }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <Globe size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            )}
             <span
               className="text-xs truncate flex-1"
               style={{ color: active ? 'var(--text-primary)' : 'var(--text-muted)' }}

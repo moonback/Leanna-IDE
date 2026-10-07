@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bot,
   Clock,
+  Code2,
   ExternalLink,
   Globe,
   History,
@@ -11,8 +12,11 @@ import {
   Loader2,
   Lock,
   RefreshCw,
+  Search,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -39,6 +43,15 @@ interface BrowserToolbarProps {
   onRefresh: () => void;
   onHome: () => void;
   onOpenExternal: () => void;
+  /** Zoom. */
+  zoomPercent: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
+  /** Recherche dans la page. */
+  onToggleFind: () => void;
+  /** Bascule les outils de développement de la page. */
+  onToggleDevTools: () => void;
   /** Fournit les suggestions d'autocomplétion pour une saisie. */
   getSuggestions: (query: string) => BrowserHistoryEntry[];
   /** Navigue vers l'URL d'une suggestion sélectionnée. */
@@ -93,6 +106,12 @@ export function BrowserToolbar({
   onRefresh,
   onHome,
   onOpenExternal,
+  zoomPercent,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  onToggleFind,
+  onToggleDevTools,
   getSuggestions,
   onSelectSuggestion,
   onClearHistory,
@@ -228,6 +247,7 @@ export function BrowserToolbar({
           {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
         </ToolbarButton>
         <ToolbarButton label="Page d'accueil" onClick={onHome}><Home size={13} /></ToolbarButton>
+        <ToolbarButton label="Rechercher dans la page (Ctrl+F)" onClick={onToggleFind}><Search size={13} /></ToolbarButton>
         <ToolbarButton label="Ouvrir dans une nouvelle fenêtre" onClick={onOpenExternal}><ExternalLink size={13} /></ToolbarButton>
 
         <div ref={containerRef} className="relative flex flex-1 min-w-0">
@@ -315,6 +335,20 @@ export function BrowserToolbar({
             </ul>
           )}
         </div>
+
+        <ToolbarButton label="Dézoomer" onClick={onZoomOut}><ZoomOut size={13} /></ToolbarButton>
+        <button
+          type="button"
+          onClick={onZoomReset}
+          className="px-1 rounded transition hover:bg-[var(--bg-active)] text-xs tabular-nums"
+          style={{ color: 'var(--text-muted)', minWidth: 38 }}
+          title="Réinitialiser le zoom"
+          aria-label={`Zoom ${zoomPercent} %, cliquer pour réinitialiser`}
+        >
+          {zoomPercent}%
+        </button>
+        <ToolbarButton label="Zoomer" onClick={onZoomIn}><ZoomIn size={13} /></ToolbarButton>
+        <ToolbarButton label="Outils de développement" onClick={onToggleDevTools}><Code2 size={13} /></ToolbarButton>
       </div>
     </div>
   );

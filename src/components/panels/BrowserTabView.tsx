@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import type {
   WebviewElement,
   WebviewFailLoadEvent,
+  WebviewFaviconEvent,
   WebviewNavigateEvent,
   WebviewTitleEvent,
 } from './browserTypes.js';
@@ -33,6 +34,7 @@ export interface TabStatePatch {
   canGoBack?: boolean;
   canGoForward?: boolean;
   loadError?: string | null;
+  faviconUrl?: string | null;
 }
 
 export interface BrowserTabHandle {
@@ -161,12 +163,20 @@ export function BrowserTabView({
       const ev = e as WebviewNavigateEvent;
       if (ev.isMainFrame !== false && e.type === 'did-navigate') {
         consoleBufferRef.current = [];
+        // Nouvelle page : réinitialiser le favicon jusqu'à ce que la page en fournisse un.
+        onStateRef.current(tabId, { faviconUrl: null });
       }
       onStateRef.current(tabId, {
         url: ev.url,
         canGoBack: wv.canGoBack(),
         canGoForward: wv.canGoForward(),
       });
+    };
+    const onFaviconUpdate = (e: Event) => {
+      const favicons = (e as WebviewFaviconEvent).favicons;
+      if (Array.isArray(favicons) && favicons[0]) {
+        onStateRef.current(tabId, { faviconUrl: favicons[0] });
+      }
     };
 
     wv.addEventListener('dom-ready', onDomReady);
@@ -177,6 +187,7 @@ export function BrowserTabView({
     wv.addEventListener('did-navigate', onNavigate);
     wv.addEventListener('did-navigate-in-page', onNavigate);
     wv.addEventListener('console-message', onConsoleMessage);
+    wv.addEventListener('page-favicon-updated', onFaviconUpdate);
 
     // Si cet onglet est actif au montage, exposer immédiatement sa webview.
     if (activeRef.current) onActiveWebviewRef.current?.(wv);
@@ -192,6 +203,7 @@ export function BrowserTabView({
       wv.removeEventListener('did-navigate', onNavigate);
       wv.removeEventListener('did-navigate-in-page', onNavigate);
       wv.removeEventListener('console-message', onConsoleMessage);
+      wv.removeEventListener('page-favicon-updated', onFaviconUpdate);
     };
     // partition : un changement de profil remonte la <webview> ; on réabonne.
   }, [tabId, partition]);
