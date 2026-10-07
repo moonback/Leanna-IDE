@@ -12,6 +12,8 @@ import { BrowserToolbar } from './BrowserToolbar.js';
 import { useBrowserHistory } from './useBrowserHistory.js';
 import { useBrowserProfiles } from './useBrowserProfiles.js';
 import { useBrowserExtensions } from './useBrowserExtensions.js';
+import { useBrowserTabs } from './useBrowserTabs.js';
+import { BrowserTabStrip } from './BrowserTabStrip.js';
 import type {
   BrowserPanelProps,
   WebviewElement,
@@ -46,6 +48,16 @@ export function BrowserPanel({
 }: BrowserPanelProps) {
   const webviewRef = useRef<WebviewElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /** Onglets (version légère : une seule webview montée = l'onglet actif). */
+  const {
+    tabs,
+    activeTabId,
+    newTab,
+    closeTab,
+    activateTab,
+    updateActiveTab,
+  } = useBrowserTabs(defaultUrl);
 
   /** Historique de navigation persistant + suggestions d'autocomplétion */
   const { recordVisit, updateTitle, getSuggestions, clearHistory } = useBrowserHistory();
@@ -92,6 +104,12 @@ export function BrowserPanel({
   useEffect(() => { recordVisitRef.current = recordVisit; }, [recordVisit]);
   useEffect(() => { updateTitleRef.current = updateTitle; }, [updateTitle]);
 
+  // Réfs stables pour appeler la gestion d'onglets depuis les effets webview.
+  const updateActiveTabRef = useRef(updateActiveTab);
+  const newTabRef = useRef(newTab);
+  useEffect(() => { updateActiveTabRef.current = updateActiveTab; }, [updateActiveTab]);
+  useEffect(() => { newTabRef.current = newTab; }, [newTab]);
+
   /**
    * Tampon circulaire des messages console + échecs de ressources de la page
    * courante. Permet à Leanna de « voir » les erreurs JS/réseau d'un aperçu de
@@ -126,6 +144,20 @@ export function BrowserPanel({
     return () => clearTimeout(timer);
   }, [controlledUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Changement d'onglet : recharger l'URL mémorisée ────────────────────────
+  // Ne se déclenche QUE lorsque l'identifiant d'onglet actif change réellement
+  // (pas quand l'URL de l'onglet actif est mise à jour après un chargement),
+  // afin d'éviter toute boucle navigate ↔ updateActiveTab.
+  const lastActiveTabIdRef = useRef(activeTabId);
+  useEffect(() => {
+    if (lastActiveTabIdRef.current === activeTabId) return;
+    lastActiveTabIdRef.current = activeTabId;
+    const target = tabs.find((t) => t.id === activeTabId);
+    if (target && target.url) {
+      navigateTo(target.url);
+    }
+  }, [activeTabId, tabs, navigateTo]);
+
   // ── Handlers clavier barre d'adresse ───────────────────────────────────────
 
   const handleInputKeyDown = useCallback(
@@ -149,6 +181,21 @@ export function BrowserPanel({
     },
     [navigateTo],
   );
+
+  /** Nouvel onglet (page d'accueil). */
+  const handleNewTab = useCallback(() => {
+    newTab(BROWSER_HOME_URL);
+  }, [newTab]);
+
+  // Abonnement aux popups relayées par le main process → nouvel onglet.
+  useEffect(() => {
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    if (!api?.onBrowserOpenUrl) return;
+    const unsubscribe = api.onBrowserOpenUrl((url) => {
+      newTabRef.current(url);
+    });
+    return unsubscribe;
+  }, []);
 
   const handleGoBack = useCallback(() => webviewRef.current?.goBack(), []);
   const handleGoForward = useCallback(() => webviewRef.current?.goForward(), []);
@@ -247,6 +294,8 @@ export function BrowserPanel({
 
       // Enregistrer la visite dans l'historique de navigation persistant.
       recordVisitRef.current(url, wv.getTitle?.() ?? '');
+      // Mémoriser l'URL (et le titre courant) sur l'onglet actif.
+      updateActiveTabRef.current({ url, title: wv.getTitle?.() ?? undefined });
 
       // Notifier l'app (utilisé par le skill pour confirmer la navigation)
       window.dispatchEvent(new CustomEvent('Leanna-browser-navigated', {
@@ -259,6 +308,8 @@ export function BrowserPanel({
       setPageTitle(title);
       // Garder l'historique à jour avec le titre réel de la page.
       updateTitleRef.current(wv.getURL(), title);
+      // Mémoriser le titre sur l'onglet actif.
+      updateActiveTabRef.current({ title });
       window.dispatchEvent(new CustomEvent('Leanna-browser-title-updated', {
         detail: { title, url: wv.getURL() },
       }));
@@ -1424,6 +1475,14 @@ export function BrowserPanel({
         backgroundColor: 'var(--bg-panel)',
       }}
     >
+      <BrowserTabStrip
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onActivate={activateTab}
+        onClose={closeTab}
+        onNewTab={handleNewTab}
+      />
+
       <BrowserToolbar
         pageTitle={pageTitle}
         assistantNavActive={assistantNavActive}

@@ -40,6 +40,11 @@ export interface ElectronAPI {
   browserExtensionsLoad?: (partition: string, extPath?: string) => Promise<BrowserExtensionsLoadResult>;
   /** Retire une extension par son identifiant. */
   browserExtensionsRemove?: (partition: string, extensionId: string) => Promise<BrowserExtensionsRemoveResult>;
+  /**
+   * S'abonne aux URLs relayées par le main process (popups refusés → onglet).
+   * Retourne une fonction de désabonnement.
+   */
+  onBrowserOpenUrl?: (callback: (url: string) => void) => () => void;
 }
 
 declare global {

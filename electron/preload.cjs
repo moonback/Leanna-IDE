@@ -55,4 +55,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Retire une extension par son identifiant.
   browserExtensionsRemove: (partition, extensionId) =>
     ipcRenderer.invoke('electron/browser-extensions-remove', partition, extensionId),
+
+  // S'abonne aux demandes d'ouverture d'URL relayées par le main process
+  // (popups/target=_blank refusés par setWindowOpenHandler → ouverts en onglet).
+  // Retourne une fonction de désabonnement.
+  onBrowserOpenUrl: (callback) => {
+    const listener = (_event, url) => {
+      if (typeof url === 'string') callback(url);
+    };
+    ipcRenderer.on('browser-open-url', listener);
+    return () => ipcRenderer.removeListener('browser-open-url', listener);
+  },
 });
