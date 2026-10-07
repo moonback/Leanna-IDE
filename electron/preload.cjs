@@ -56,3 +56,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   browserExtensionsRemove: (partition, extensionId) =>
     ipcRenderer.invoke('electron/browser-extensions-remove', partition, extensionId),
 });
+
+// ── Relais main → renderer : ouverture d'URL (popup/target=_blank refusé) ─────
+// Le main refuse les popups (setWindowOpenHandler) et renvoie l'URL ici ; on la
+// rediffuse en CustomEvent pour que le navigateur intégré l'ouvre dans un onglet.
+ipcRenderer.on('browser-open-url', (_event, url) => {
+  try {
+    window.dispatchEvent(new CustomEvent('Leanna-browser-open-url', { detail: { url } }));
+  } catch { /* noop */ }
+});

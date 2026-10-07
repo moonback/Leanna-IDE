@@ -23,6 +23,9 @@
 
 import { Skill, validateArgs } from "./base.js";
 import { z } from "zod";
+import net from "node:net";
+import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { createWebSearchProvider } from "./webSearchProvider.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,20 +149,82 @@ function compareResearchSources(sources: ResearchSource[]): Pick<ResearchResult,
   return { consensus: consensus.slice(0, 10), contradictions: contradictions.slice(0, 10), confidence: Number(Math.max(0, Math.min(1, quality * 0.45 + diversity * 0.2 + evidenceRate * 0.2 + (consensus.length > 0 ? 0.15 : 0))).toFixed(2)) };
 }
 
-function classifyHost(hostname: string): "PUBLIC_WEB" | "PRIVATE_NETWORK" | "LOCALHOST" | "LOOPBACK" | "LINK_LOCAL" | "INTERNAL" {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
-  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
-  if (host === "::1" || host === "0.0.0.0" || host === "[::1]") return "LOOPBACK";
-  if (host.startsWith("fe80:") || host.startsWith("fe8") || host.startsWith("fec") || host.startsWith("fed") || host.startsWith("fee") || host.startsWith("fef")) return "LINK_LOCAL";
-  if (host.startsWith("fc") || host.startsWith("fd")) return "PRIVATE_NETWORK";
+export type HostClassification =
+  | "PUBLIC_WEB"
+  | "PRIVATE_NETWORK"
+  | "LOCALHOST"
+  | "LOOPBACK"
+  | "LINK_LOCAL"
+  | "INTERNAL";
 
+/** Classe une adresse IPv4 déjà validée (4 octets). */
+function classifyIpv4(host: string): HostClassification {
   const octets = host.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return "PUBLIC_WEB";
   const [first, second] = octets;
   if (first === 127) return "LOOPBACK";
-  if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || (first === 100 && second >= 64 && second <= 127) || (first === 198 && second >= 18 && second <= 19)) return "PRIVATE_NETWORK";
+  if (first === 0) return "LOOPBACK";
+  if (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 198 && second >= 18 && second <= 19)
+  ) {
+    return "PRIVATE_NETWORK";
+  }
   if (first === 169 && second === 254) return "LINK_LOCAL";
+  return "PUBLIC_WEB";
+}
+
+/** Classe une adresse IPv6 déjà validée (sans crochets). */
+function classifyIpv6(addr: string): HostClassification {
+  const host = addr.toLowerCase();
+  if (host === "::1") return "LOOPBACK";
+  if (host === "::" ) return "LOOPBACK";
+  // IPv4-mapped / IPv4-compatible (::ffff:127.0.0.1, ::ffff:7f00:1, ::127.0.0.1…)
+  const mapped = host.match(/::(?:ffff:)?(?:0*:)?((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (mapped && net.isIPv4(mapped[1])) return classifyIpv4(mapped[1]);
+  const mappedHex = host.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1], 16);
+    const lo = parseInt(mappedHex[2], 16);
+    const v4 = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    if (net.isIPv4(v4)) return classifyIpv4(v4);
+  }
+  // Link-local fe80::/10  → fe8, fe9, fea, feb
+  if (/^fe[89ab]/.test(host)) return "LINK_LOCAL";
+  // Unique local fc00::/7 → fc, fd
+  if (/^f[cd]/.test(host)) return "PRIVATE_NETWORK";
+  return "PUBLIC_WEB";
+}
+
+/**
+ * Classe un hostname pour la policy réseau du navigateur.
+ *
+ * Les tests de préfixe IPv6 (fc/fd/fe8…) ne s'appliquent qu'à de VRAIES adresses
+ * IPv6 (validées par net.isIP), jamais aux noms de domaine — sans quoi des sites
+ * légitimes comme fedex.com ou feedly.com seraient bloqués. Les crochets d'un
+ * hôte IPv6 (`[::1]`) et les formes IPv4-mapped (`::ffff:127.0.0.1`) sont
+ * normalisés pour éviter les contournements SSRF.
+ */
+export function classifyHost(hostname: string): HostClassification {
+  let host = hostname.toLowerCase().replace(/\.$/, "").trim();
+  // Retirer les crochets d'un littéral IPv6 : URL.hostname les conserve.
+  if (host.startsWith("[") && host.endsWith("]")) host = host.slice(1, -1);
+  // Retirer un éventuel scope zone-id IPv6 (fe80::1%eth0).
+  const pct = host.indexOf("%");
+  if (pct !== -1) host = host.slice(0, pct);
+
+  // 1) Vraie adresse IP ? (le seul endroit où les préfixes IPv6 s'appliquent)
+  const ipVersion = net.isIP(host);
+  if (ipVersion === 4) return classifyIpv4(host);
+  if (ipVersion === 6) return classifyIpv6(host);
+
+  // 2) Noms symboliques — aucun test de préfixe lexical ici.
+  if (host === "localhost" || host.endsWith(".localhost")) return "LOCALHOST";
+  if (host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") return "INTERNAL";
+
+  // 3) Tout le reste est traité comme du web public (DNS public).
   return "PUBLIC_WEB";
 }
 
@@ -169,6 +234,28 @@ function assertAllowedBrowserUrl(url: string): void {
   const localhostAllowed = NETWORK_POLICY === "PUBLIC_WEB_AND_LOCALHOST" && classification === "LOCALHOST";
   if (classification !== "PUBLIC_WEB" && !localhostAllowed) {
     throw new Error(`Destination ${classification} interdite par la policy ${NETWORK_POLICY}.`);
+  }
+}
+
+/**
+ * Garde SSRF STRICTE pour les récupérations serveur (fetch côté Node) :
+ * seul le web public en http(s) est autorisé — jamais localhost ni IP privée,
+ * contrairement à la webview visible qui peut viser un serveur de dev local.
+ * Lève une erreur explicite sinon.
+ */
+export function assertPublicHttpUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`URL malformée : ${String(url).slice(0, 60)}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Schéma non autorisé pour une récupération serveur : ${parsed.protocol}`);
+  }
+  const classification = classifyHost(parsed.hostname);
+  if (classification !== "PUBLIC_WEB") {
+    throw new Error(`Destination ${classification} interdite pour une récupération serveur.`);
   }
 }
 
@@ -236,6 +323,32 @@ function canonicalizeLink(url: string): string {
   return parsed.toString();
 }
 
+// Termes publicitaires explicites, à bornes de mots pour éviter les faux
+// positifs (`pub` dans "service-public.fr"/"Publications", `ads` dans
+// "downloads", `annonce` dans "annonceur"…).
+// NB : pas de `\b` final — les termes accentués (« publicité », « sponsorisée »)
+// se terminent par `é`, qui n'est pas un caractère de mot pour `\b` en JS ASCII,
+// ce qui ferait échouer la correspondance. Le `\b` initial suffit à éviter les
+// sous-chaînes (« pub » dans « service-public »).
+const SPONSOR_TEXT_RE =
+  /\b(sponsoris[ée]e?s?|sponsored|publicit[ée]|advertisement|promoted|annonce\s+sponsoris)/i;
+// Paramètres de tracking publicitaire : signal fiable UNIQUEMENT dans l'URL.
+const TRACKING_PARAM_RE = /[?&](utm_[a-z]+|gclid|fbclid|msclkid)=/i;
+
+/**
+ * Détermine si un lien est une publicité / un lien sponsorisé.
+ * - `text` : libellé visible du lien.
+ * - `href` : URL (déjà normalisée).
+ * Les termes publicitaires sont cherchés dans le libellé à bornes de mots ;
+ * les paramètres de tracking sont cherchés dans l'URL. On ne matche jamais
+ * `pub`/`ads` comme sous-chaîne d'un mot.
+ */
+export function isSponsoredLink(text: string, href: string): boolean {
+  if (SPONSOR_TEXT_RE.test(text)) return true;
+  if (TRACKING_PARAM_RE.test(href)) return true;
+  return false;
+}
+
 export function rankLinkCandidates(
   links: Array<{ text?: string; href?: string }>,
   currentUrl?: string
@@ -256,8 +369,7 @@ export function rankLinkCandidates(
       return;
     }
     const text = (link.text ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
-    const lower = `${text} ${href}`.toLowerCase();
-    const isSponsored = /sponsor|advert|annonce|pub|ads\b|promoted|utm_|gclid|fbclid/.test(lower);
+    const isSponsored = isSponsoredLink(text, href);
     const isNavigation = /^(home|accueil|login|sign in|connexion|menu|search|recherche|privacy|terms|contact|about|à propos|next|previous|suivant|précédent)$/i.test(text)
       || /\/login(?:[/?#]|$)|\/signup(?:[/?#]|$)|\/privacy(?:[/?#]|$)|\/terms(?:[/?#]|$)/i.test(href);
     const domain = new URL(href).hostname;
@@ -354,6 +466,31 @@ const researchSchema = z.object({
   query: z.string().min(1, "Requête de recherche requise"),
   engine: searchEngineEnum.optional().default("google"),
   maxSources: z.number().int().positive().max(5).default(3),
+});
+
+// Recherche web 100 % serveur (sans détourner la webview visible).
+const webSearchSchema = z.object({
+  query: z.string().min(1, "Requête de recherche requise"),
+  maxSources: z.number().int().positive().max(6).default(4),
+  // Si false, renvoie seulement les résultats (titre/url/extrait) sans lire les pages.
+  read: z.boolean().optional().default(true),
+});
+
+// Journal console/réseau de la page courante du navigateur intégré.
+const getConsoleSchema = z.object({
+  level: z.enum(["all", "warn", "error"]).optional().default("all"),
+  limit: z.number().int().positive().max(300).optional().default(100),
+});
+
+// Capture visuelle + analyse par modèle multimodal.
+const captureSchema = z.object({
+  prompt: z.string().max(2000).optional(),
+});
+
+// Ouvre une URL dans un nouvel onglet du navigateur intégré.
+const newTabSchema = z.object({
+  url: z.string().min(1, "URL requise"),
+  activate: z.boolean().optional().default(true),
 });
 
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
@@ -645,6 +782,80 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_web_search",
+      description:
+        "RECHERCHE WEB RAPIDE CÔTÉ SERVEUR. Effectue une recherche et lit les pages EN PARALLÈLE directement sur le serveur (fetch + extraction), SANS détourner le navigateur visible de l'utilisateur. Beaucoup plus rapide et robuste que browser_research pour collecter de l'information factuelle. Retourne des sources structurées (titre, url, extrait, contenu, fiabilité, fraîcheur) avec consensus/contradictions. Préfère cet outil à browser_research sauf si une session connectée ou une interaction (formulaire, SPA) est nécessaire.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          query: {
+            type: "STRING",
+            description: "Le sujet ou la question à rechercher.",
+          },
+          maxSources: {
+            type: "NUMBER",
+            description: "Nombre de pages à lire en parallèle (défaut 4, max 6).",
+          },
+          read: {
+            type: "BOOLEAN",
+            description: "Si false, renvoie seulement les résultats (titre/url/extrait) sans lire le contenu des pages. Défaut : true.",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "browser_get_console",
+      description:
+        "Lit le journal console (console.log/warn/error) et les erreurs réseau de la page actuellement affichée dans le navigateur intégré. Essentiel pour déboguer un aperçu de projet : après avoir ouvert ta page de dev avec browser_navigate, utilise cet outil pour voir les erreurs JS/réseau réelles et les corriger. Filtre par niveau et limite le nombre d'entrées.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          level: {
+            type: "STRING",
+            description: "Niveau minimum : 'all' (défaut), 'warn' (warnings + erreurs), ou 'error' (erreurs JS + réseau uniquement).",
+          },
+          limit: {
+            type: "NUMBER",
+            description: "Nombre maximum d'entrées récentes à retourner (défaut 100, max 300).",
+          },
+        },
+      },
+    },
+    {
+      name: "browser_capture",
+      description:
+        "Capture une image de la page actuellement affichée dans le navigateur intégré et l'analyse avec un modèle de vision. À utiliser pour 'que vois-tu sur cette page ?', vérifier un rendu visuel, comparer avec une maquette, ou diagnostiquer un problème d'affichage que le texte seul ne révèle pas. Fournis un `prompt` pour cibler l'analyse (ex: 'le bouton de connexion est-il visible et bien aligné ?').",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          prompt: {
+            type: "STRING",
+            description: "Question ou consigne d'analyse visuelle. Si omis, une description générale de la page est produite.",
+          },
+        },
+      },
+    },
+    {
+      name: "browser_new_tab",
+      description:
+        "Ouvre une URL dans un NOUVEL onglet du navigateur intégré (le navigateur supporte plusieurs onglets). Utile pour comparer des pages ou garder plusieurs sources ouvertes sans perdre l'onglet courant. Par défaut le nouvel onglet devient actif ; mets activate=false pour l'ouvrir en arrière-plan.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          url: {
+            type: "STRING",
+            description: "L'URL à ouvrir dans le nouvel onglet (URL complète, domaine, ou terme de recherche).",
+          },
+          activate: {
+            type: "BOOLEAN",
+            description: "Si true (défaut), le nouvel onglet devient actif. false pour l'ouvrir en arrière-plan.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -842,6 +1053,10 @@ export const browserSkill: Skill = {
     browser_inspect: inspectSchema,
     browser_summarize_page: summarizePageSchema,
     browser_research: researchSchema,
+    browser_web_search: webSearchSchema,
+    browser_get_console: getConsoleSchema,
+    browser_capture: captureSchema,
+    browser_new_tab: newTabSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1024,6 +1239,7 @@ export const browserSkill: Skill = {
       title?: string;
       content?: string;
       contentLength?: number;
+      promptInjection?: ReturnType<typeof guardUntrustedContent>["promptInjection"];
       message: string;
     }> => {
       if (!emit) {
@@ -1060,13 +1276,17 @@ export const browserSkill: Skill = {
       }
 
       if (parsed) {
-        const { content, truncated } = truncateContent(parsed.text ?? "");
+        // Le contenu de page est une donnée externe non fiable : neutraliser
+        // d'éventuelles instructions injectées avant de le renvoyer au modèle.
+        const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
+        const { content, truncated } = truncateContent(guarded.text);
         return {
           status: "success",
           url: parsed.url ?? "",
           title: parsed.title ?? "",
           content,
           contentLength: content.length,
+          promptInjection: guarded.promptInjection,
           message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
         };
       }
@@ -1076,11 +1296,13 @@ export const browserSkill: Skill = {
         return { status: "error", message: text };
       }
 
-      const { content, truncated } = truncateContent(text);
+      const guardedRaw = guardUntrustedContent(text, "browser");
+      const { content, truncated } = truncateContent(guardedRaw.text);
       return {
         status: "success",
         content,
         contentLength: content.length,
+        promptInjection: guardedRaw.promptInjection,
         message: `Contenu extrait (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
       };
     };
@@ -1303,10 +1525,13 @@ export const browserSkill: Skill = {
         if (result.status === "success") {
           const sourceUrl = result.url || url;
           const content = result.content ?? "";
+          // `content` est déjà neutralisé par readPageContent ; le titre est
+          // encore du texte externe libre → le neutraliser aussi.
+          const safeTitle = guardUntrustedContent(result.title ?? "", "browser").text;
           const extracted = extractSourceEvidence(content, query);
           sources.push({
             url: sourceUrl,
-            title: result.title ?? "",
+            title: safeTitle,
             domain: new URL(sourceUrl).hostname,
             content,
             contentLength: result.contentLength ?? content.length,
@@ -1346,6 +1571,219 @@ export const browserSkill: Skill = {
             ? `${sources.length} source(s) lue(s) pour "${query}". Consensus: ${research.consensus.length}, contradictions: ${research.contradictions.length}, confiance: ${(research.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`
             : `Aucune source n'a pu être lue pour "${query}".`,
       };
+    }
+
+    // ── browser_web_search ──────────────────────────────────────────────────
+    // Recherche + lecture 100 % serveur, en parallèle, sans détourner la webview.
+    if (name === "browser_web_search") {
+      const { query, maxSources, read } = validateArgs(browserSkill.inputSchemas!["browser_web_search"], args);
+      const provider = createWebSearchProvider();
+
+      let hits;
+      try {
+        hits = await provider.search(query, Math.max(maxSources * 2, 8));
+      } catch (err: any) {
+        return {
+          status: "error",
+          query,
+          message: `Recherche web impossible : ${err?.message ?? "erreur inconnue"}. Essaie browser_research (via la webview) en repli.`,
+        };
+      }
+
+      // Dédupliquer par domaine pour diversifier les sources.
+      const seenDomains = new Set<string>();
+      const picked: typeof hits = [];
+      for (const h of hits) {
+        let domain: string;
+        try { domain = new URL(h.url).hostname.replace(/^www\./, ""); } catch { continue; }
+        if (isSponsoredLink(h.title, h.url)) continue;
+        if (seenDomains.has(domain)) continue;
+        seenDomains.add(domain);
+        picked.push(h);
+        if (picked.length >= maxSources) break;
+      }
+
+      if (picked.length === 0) {
+        return {
+          status: "error",
+          query,
+          message: `Recherche effectuée pour "${query}" mais aucun résultat exploitable.`,
+        };
+      }
+
+      // Mode « liens seulement » : neutraliser titres/extraits et renvoyer.
+      if (!read) {
+        const results = picked.map((h) => ({
+          title: guardUntrustedContent(h.title, "web-search").text,
+          url: h.url,
+          snippet: guardUntrustedContent(h.snippet, "web-search").text,
+        }));
+        return {
+          status: "success",
+          query,
+          mode: "links",
+          results,
+          message: `${results.length} résultat(s) pour "${query}" (sans lecture des pages).`,
+        };
+      }
+
+      // Lecture EN PARALLÈLE des pages sélectionnées.
+      const pages = await provider.fetchPages(picked.map((h) => h.url));
+      const sources: ResearchSource[] = [];
+      const errors: Array<{ url: string; message: string }> = [];
+
+      pages.forEach((page, i) => {
+        const hit = picked[i];
+        if (!page.ok || page.text.trim().length < 40) {
+          errors.push({ url: hit.url, message: page.error ?? "contenu vide" });
+          return;
+        }
+        // Contenu + titre = données externes non fiables → neutralisation.
+        const safeContent = guardUntrustedContent(page.text, "web-search").text;
+        const safeTitle = guardUntrustedContent(page.title || hit.title, "web-search").text;
+        const sourceUrl = page.finalUrl || hit.url;
+        const extracted = extractSourceEvidence(safeContent, query);
+        let domain = "";
+        try { domain = new URL(sourceUrl).hostname; } catch { domain = ""; }
+        sources.push({
+          url: sourceUrl,
+          title: safeTitle,
+          domain,
+          content: safeContent,
+          contentLength: safeContent.length,
+          reliability: sourceReliability(sourceUrl, safeContent),
+          freshness: sourceFreshness(safeContent, sourceUrl),
+          facts: extracted.facts,
+          evidence: extracted.evidence,
+          contradictions: [],
+        });
+      });
+
+      if (sources.length === 0) {
+        return {
+          status: "error",
+          query,
+          errors: errors.length ? errors : undefined,
+          message: `Aucune page lisible pour "${query}".`,
+        };
+      }
+
+      const comparison = compareResearchSources(sources);
+      return {
+        status: "success",
+        query,
+        mode: "read",
+        sourcesRead: sources.length,
+        sources,
+        consensus: comparison.consensus,
+        contradictions: comparison.contradictions,
+        confidence: comparison.confidence,
+        errors: errors.length ? errors : undefined,
+        message: `${sources.length} source(s) lue(s) en parallèle pour "${query}". Consensus: ${comparison.consensus.length}, contradictions: ${comparison.contradictions.length}, confiance: ${(comparison.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`,
+      };
+    }
+
+    // ── browser_get_console ───────────────────────────────────────────────────
+    // Lit le journal console + erreurs réseau de la page affichée.
+    if (name === "browser_get_console") {
+      const { level, limit } = validateArgs(browserSkill.inputSchemas!["browser_get_console"], args);
+      const raw = await runBrowserAction({ type: "browser-get-console", level, limit }, 10_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const payload = raw as {
+        url?: string;
+        total?: number;
+        returned?: number;
+        entries?: Array<{ level: string; message: string; source?: string; line?: number; ts: number }>;
+      };
+      const rawEntries = Array.isArray(payload.entries) ? payload.entries : [];
+      // Le texte des messages = données externes non fiables → neutralisation.
+      const entries = rawEntries.map((entry) => ({
+        ...entry,
+        message: guardUntrustedContent(entry.message, "browser-console").text,
+      }));
+      const errorCount = entries.filter((entry) => entry.level === "error" || entry.level === "network").length;
+      return {
+        status: "success",
+        url: payload.url ?? "",
+        total: payload.total ?? entries.length,
+        returned: entries.length,
+        errorCount,
+        entries,
+        message:
+          entries.length === 0
+            ? "Aucun message console/réseau pour la page actuelle."
+            : `${entries.length} entrée(s) console/réseau (${errorCount} erreur(s)). Analyse-les pour diagnostiquer la page.`,
+      };
+    }
+
+    // ── browser_capture ───────────────────────────────────────────────────────
+    // Capture la page affichée puis l'analyse via un modèle multimodal (Gemini).
+    if (name === "browser_capture") {
+      const { prompt } = validateArgs(browserSkill.inputSchemas!["browser_capture"], args);
+
+      const raw = await runBrowserAction({ type: "browser-capture" }, 15_000);
+      if (typeof raw === "string") {
+        return { status: "error", message: raw };
+      }
+      const shot = raw as { image?: string; mimeType?: string; url?: string; title?: string };
+      if (!shot.image) {
+        return { status: "error", message: "Capture impossible (aucune image renvoyée)." };
+      }
+
+      const analysisPrompt =
+        prompt?.trim() ||
+        "Décris en détail ce que montre cette page : texte visible, éléments d'interface (boutons, champs, menus), couleurs dominantes, organisation spatiale, et tout problème d'affichage éventuel (débordement, superposition, élément manquant).";
+
+      try {
+        // Appel multimodal réel : l'image est passée en inlineData (pas en texte).
+        const { generateText } = await import("../utils/textGeneration.js");
+        const analysis = await generateText({
+          prompt: analysisPrompt,
+          geminiParts: [
+            { inlineData: { mimeType: shot.mimeType ?? "image/png", data: shot.image } },
+            { text: analysisPrompt },
+          ],
+          forceProvider: "gemini",
+          temperature: 0.3,
+          maxOutputTokens: 2048,
+        });
+
+        // La réponse du modèle sur un contenu web = donnée externe → neutralisation.
+        const guarded = guardUntrustedContent(analysis.text, "browser-vision");
+        return {
+          status: "success",
+          url: shot.url ?? "",
+          title: shot.title ?? "",
+          analysis: guarded.text,
+          promptUsed: analysisPrompt,
+          promptInjection: guarded.promptInjection,
+          message: `Analyse visuelle de "${shot.title || shot.url || "la page"}" effectuée.`,
+        };
+      } catch (err: any) {
+        return {
+          status: "error",
+          url: shot.url ?? "",
+          message: `Capture réussie mais analyse visuelle impossible : ${err?.message ?? "erreur inconnue"} (vérifie qu'une clé Gemini est configurée).`,
+        };
+      }
+    }
+
+    // ── browser_new_tab ───────────────────────────────────────────────────────
+    if (name === "browser_new_tab") {
+      const { url, activate } = validateArgs(browserSkill.inputSchemas!["browser_new_tab"], args);
+      return withEmit(emit, (fire) => {
+        const normalized = normalizeUrl(url); // peut throw → capté par withEmit
+        fire({ type: "open-browser" });
+        fire({ type: "browser-new-tab", url: normalized, activate });
+        return {
+          status: "success",
+          url: normalized,
+          activate,
+          message: `Nouvel onglet ${activate ? "actif" : "en arrière-plan"} ouvert sur : ${normalized}`,
+        };
+      });
     }
 
     // ── browser_click ─────────────────────────────────────────────────────────

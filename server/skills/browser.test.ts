@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { browserSkill, normalizeUrl, rankLinkCandidates } from "./browser.js";
+import { browserSkill, normalizeUrl, rankLinkCandidates, classifyHost, isSponsoredLink } from "./browser.js";
 
 describe("browser", () => {
   describe("URL policy and link ranking", () => {
@@ -60,6 +60,10 @@ describe("browser", () => {
         "browser_inspect",
         "browser_summarize_page",
         "browser_research",
+        "browser_web_search",
+        "browser_get_console",
+        "browser_capture",
+        "browser_new_tab",
         "browser_get_accessibility_snapshot",
         "browser_click_by_role",
         "browser_type_by_label",
@@ -655,6 +659,79 @@ describe("browser", () => {
           );
         }
       }
+    });
+  });
+
+  describe("classifyHost (SSRF policy)", () => {
+    it("treats legitimate domains starting with fc/fd/fe8… as public web", () => {
+      // Ces domaines commencent par des préfixes IPv6 mais ne sont PAS des IP.
+      for (const host of ["fedex.com", "fda.gov", "fcc.gov", "feedly.com", "fdhosting.com"]) {
+        assert.equal(classifyHost(host), "PUBLIC_WEB", `${host} doit être PUBLIC_WEB`);
+      }
+    });
+
+    it("classifies ordinary public domains and subdomains as public web", () => {
+      for (const host of ["example.com", "docs.google.com", "developers.google.com"]) {
+        assert.equal(classifyHost(host), "PUBLIC_WEB");
+      }
+    });
+
+    it("blocks loopback, private, and link-local IPv4", () => {
+      assert.equal(classifyHost("127.0.0.1"), "LOOPBACK");
+      assert.equal(classifyHost("10.0.0.1"), "PRIVATE_NETWORK");
+      assert.equal(classifyHost("192.168.1.10"), "PRIVATE_NETWORK");
+      assert.equal(classifyHost("172.16.0.1"), "PRIVATE_NETWORK");
+      assert.equal(classifyHost("169.254.169.254"), "LINK_LOCAL");
+    });
+
+    it("blocks IPv6 loopback, ULA and link-local, with or without brackets", () => {
+      assert.equal(classifyHost("::1"), "LOOPBACK");
+      assert.equal(classifyHost("[::1]"), "LOOPBACK");
+      assert.equal(classifyHost("fd00::1"), "PRIVATE_NETWORK");
+      assert.equal(classifyHost("[fd00::1]"), "PRIVATE_NETWORK");
+      assert.equal(classifyHost("fe80::1"), "LINK_LOCAL");
+      assert.equal(classifyHost("[fe80::1]"), "LINK_LOCAL");
+    });
+
+    it("blocks IPv4-mapped IPv6 loopback (SSRF bypass)", () => {
+      assert.equal(classifyHost("[::ffff:127.0.0.1]"), "LOOPBACK");
+      assert.equal(classifyHost("::ffff:127.0.0.1"), "LOOPBACK");
+      assert.equal(classifyHost("[::ffff:7f00:1]"), "LOOPBACK");
+    });
+
+    it("rejects mapped-loopback and private hosts through normalizeUrl", () => {
+      for (const url of [
+        "http://[::ffff:127.0.0.1]/",
+        "http://[fd00::1]/",
+        "http://[fe80::1]/",
+      ]) {
+        assert.throws(() => normalizeUrl(url), /interdite|PRIVATE|LOOPBACK|LINK_LOCAL/);
+      }
+    });
+
+    it("still allows legitimate fc/fd-prefixed domains through normalizeUrl", () => {
+      assert.equal(normalizeUrl("https://fedex.com/track"), "https://fedex.com/track");
+      assert.equal(normalizeUrl("https://feedly.com"), "https://feedly.com");
+    });
+  });
+
+  describe("isSponsoredLink (precision)", () => {
+    it("does not flag official sources containing 'pub'/'ads' as substrings", () => {
+      assert.equal(isSponsoredLink("Service Public", "https://www.service-public.fr/"), false);
+      assert.equal(isSponsoredLink("PubMed Central", "https://pubmed.ncbi.nlm.nih.gov/"), false);
+      assert.equal(isSponsoredLink("Publications", "https://example.org/publications"), false);
+      assert.equal(isSponsoredLink("Downloads", "https://example.org/downloads"), false);
+    });
+
+    it("flags explicit sponsored labels", () => {
+      assert.equal(isSponsoredLink("Annonce sponsorisée", "https://ads.example.net/x"), true);
+      assert.equal(isSponsoredLink("Sponsored", "https://example.net/x"), true);
+      assert.equal(isSponsoredLink("Publicité", "https://example.net/x"), true);
+    });
+
+    it("flags links carrying ad tracking parameters", () => {
+      assert.equal(isSponsoredLink("Résultat", "https://example.com/p?gclid=abc"), true);
+      assert.equal(isSponsoredLink("Résultat", "https://example.com/p?utm_source=ad"), true);
     });
   });
 });

@@ -201,6 +201,78 @@ function createWindow(splash, splashMinEnd) {
     systemPreferences.askForMediaAccess('camera');
   }
 
+  // ── Durcissement sécurité du <webview> du navigateur intégré ───────────────
+  // Le navigateur intégré charge des pages web arbitraires. Sans gardes, Electron
+  // accorderait par défaut caméra/micro/géoloc/notifications, autoriserait les
+  // popups et les téléchargements silencieux. On verrouille tout cela.
+  const { session: hardenSession } = require('electron');
+
+  // Seules les partitions de profils navigateur sont autorisées sur le <webview>.
+  const ALLOWED_WEBVIEW_PARTITION = /^persist:browser-[\w-]+$/;
+
+  // Permissions refusées par défaut aux pages chargées dans le navigateur.
+  const DENIED_WEBVIEW_PERMISSIONS = new Set([
+    'media',            // caméra + micro
+    'geolocation',
+    'notifications',
+    'midi',
+    'midiSysex',
+    'pointerLock',
+    'fullscreen',       // laissé à false par prudence ; ajustable si besoin
+    'openExternal',
+    'hid',
+    'serial',
+    'usb',
+  ]);
+
+  // Mémorise les partitions déjà équipées d'un handler de permissions.
+  const permissionGuardedPartitions = new Set();
+
+  function guardPartitionPermissions(partition) {
+    if (!partition || permissionGuardedPartitions.has(partition)) return;
+    permissionGuardedPartitions.add(partition);
+    try {
+      const ses = hardenSession.fromPartition(partition);
+      ses.setPermissionRequestHandler((_wc, permission, callback) => {
+        callback(!DENIED_WEBVIEW_PERMISSIONS.has(permission));
+      });
+      ses.setPermissionCheckHandler((_wc, permission) => !DENIED_WEBVIEW_PERMISSIONS.has(permission));
+      // Téléchargements : refusés par défaut dans le navigateur intégré.
+      ses.on('will-download', (event) => {
+        log('[webview] Téléchargement bloqué (non supporté dans le navigateur intégré).');
+        event.preventDefault();
+      });
+    } catch (e) {
+      log('[webview] Échec de pose des gardes de permission:', e.message);
+    }
+  }
+
+  // Verrouille les webPreferences de chaque <webview> au moment de son attache.
+  win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Pas de preload, pas d'intégration Node, isolation du contexte obligatoire.
+    delete webPreferences.preload;
+    delete webPreferences.preloadURL;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+
+    // La partition doit être une partition de profil navigateur connue.
+    if (!ALLOWED_WEBVIEW_PARTITION.test(params.partition || '')) {
+      log('[webview] Partition refusée:', params.partition);
+      event.preventDefault();
+      return;
+    }
+    guardPartitionPermissions(params.partition);
+  });
+
+  // Certificats invalides : ne jamais passer outre dans le navigateur intégré.
+  win.webContents.on('certificate-error', (event, _url, _error, _cert, callback) => {
+    callback(false);
+  });
+
   return win;
 }
 
@@ -261,6 +333,28 @@ app.whenReady().then(() => {
 
   const win = createWindow(splash, splashMinEnd);
 
+  // Durcissement : interdire aux pages du <webview> d'ouvrir des popups ou de
+  // nouvelles fenêtres non contrôlées, et bloquer la navigation du shell lui-même.
+  app.on('web-contents-created', (_event, contents) => {
+    // Toute tentative d'ouverture de fenêtre (window.open, target=_blank) est refusée.
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) {
+        // Relayer au renderer : il pourra proposer d'ouvrir dans un onglet/externe.
+        try { win.webContents.send('browser-open-url', url); } catch (_) { /* noop */ }
+      }
+      return { action: 'deny' };
+    });
+    // Empêcher le shell principal (fenêtre React) de naviguer ailleurs que l'app.
+    if (contents === win.webContents) {
+      contents.on('will-navigate', (navEvent, navUrl) => {
+        const startBase = process.env.ELECTRON_START_URL || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || 4000}`;
+        if (!navUrl.startsWith(startBase)) {
+          navEvent.preventDefault();
+        }
+      });
+    }
+  });
+
   // Créer le tray une fois la fenêtre prête
   createTray(win);
 
@@ -314,8 +408,23 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('electron/open-external', async function (_event, url) {
+    // Allowlist stricte : seuls http(s) et mailto sont ouverts dans le navigateur
+    // par défaut du système. Bloque file:, les protocoles custom, javascript:, etc.
+    if (typeof url !== 'string' || !url.trim()) {
+      return { success: false, error: 'URL invalide.' };
+    }
+    let scheme;
+    try {
+      scheme = new URL(url).protocol.toLowerCase();
+    } catch {
+      return { success: false, error: 'URL malformée.' };
+    }
+    if (scheme !== 'http:' && scheme !== 'https:' && scheme !== 'mailto:') {
+      log('[open-external] Schéma refusé:', scheme);
+      return { success: false, error: `Schéma non autorisé : ${scheme}` };
+    }
     await shell.openExternal(url);
-    return true;
+    return { success: true };
   });
 
   ipcMain.handle('electron/get-project-root', async function () {
