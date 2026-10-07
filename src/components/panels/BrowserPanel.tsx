@@ -1444,7 +1444,6 @@ export function BrowserPanel({
         onRefresh={handleRefresh}
         onHome={handleHome}
         onOpenExternal={handleOpenInNewWindow}
-        onNewTab={() => { openTab(BROWSER_HOME_URL, true); onOpenInNewTab?.(BROWSER_HOME_URL); }}
         getSuggestions={getSuggestions}
         onSelectSuggestion={handleSelectSuggestion}
         onClearHistory={clearHistory}

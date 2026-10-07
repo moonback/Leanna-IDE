@@ -35,11 +35,6 @@ function tabLabel(item: TabStripItem): string {
 }
 
 export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab }: BrowserTabStripProps) {
-  // Un seul onglet : barre masquée pour ne pas encombrer l'UI.
-  if (tabs.length <= 1) {
-    return null;
-  }
-
   return (
     <div
       className="flex items-stretch gap-0.5 px-1.5 pt-1.5 flex-shrink-0 overflow-x-auto"
@@ -74,15 +69,17 @@ export function BrowserTabStrip({ tabs, activeTabId, onSelect, onClose, onNewTab
             >
               {tabLabel(tab)}
             </span>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
-              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition flex-shrink-0"
-              title="Fermer l'onglet"
-              aria-label={`Fermer l'onglet ${tabLabel(tab)}`}
-            >
-              <X size={11} style={{ color: 'var(--text-muted)' }} />
-            </button>
+            {tabs.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition flex-shrink-0"
+                title="Fermer l'onglet"
+                aria-label={`Fermer l'onglet ${tabLabel(tab)}`}
+              >
+                <X size={11} style={{ color: 'var(--text-muted)' }} />
+              </button>
+            )}
           </div>
         );
       })}
