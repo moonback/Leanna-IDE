@@ -3,8 +3,9 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   CheckCircle2, AlertCircle, Loader2, ChevronDown, X, Clock,
   FileText, FilePen, Search, Trash2, Globe, Brain, Users,
-  Database, LayoutGrid, Terminal, Info,
+  Database, LayoutGrid, Terminal, Info, Copy, Check,
 } from 'lucide-react';
+// (icône Filter non utilisée : les chips suffisent visuellement)
 import type { ActivityStep, ReasoningState } from '../../hooks/useLiveAPI.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -277,11 +278,45 @@ const ReasoningPanel = memo(function ReasoningPanel({ reasoning }: { reasoning?:
   );
 });
 
+// ─── FilterChip ───────────────────────────────────────────────────────────────
+
+const FilterChip = memo(function FilterChip({
+  label, count, active, color = 'var(--text-muted)', onClick,
+}: {
+  label: string; count: number; active: boolean; color?: string; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className="flex items-center gap-1 px-1.5 py-px rounded text-xs tracking-wide font-mono whitespace-nowrap flex-shrink-0 transition-colors"
+      style={{
+        color: active ? color : 'var(--text-muted)',
+        backgroundColor: active
+          ? 'color-mix(in srgb, ' + color + ' 14%, transparent)'
+          : 'transparent',
+        border: '1px solid ' + (active
+          ? 'color-mix(in srgb, ' + color + ' 35%, transparent)'
+          : 'var(--border-base)'),
+      }}
+    >
+      <span>{label}</span>
+      <span className="tabular-nums" style={{ opacity: 0.7 }}>{count}</span>
+    </button>
+  );
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+type StepFilter = 'all' | 'errors' | ToolCategory;
 
 export function AgentProgressBar({ steps, connected, onClear, reasoning }: AgentProgressBarProps) {
   const [expanded, setExpanded] = useState(false);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<StepFilter>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
   const reduceMotion = useReducedMotion();
@@ -292,6 +327,34 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
   const errorCount  = useMemo(() => steps.filter(s => s.status === 'error').length, [steps]);
   const total       = steps.length;
   const pct         = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
+  // Catégories présentes dans les étapes, pour construire les chips de filtre dynamiquement.
+  const presentCats = useMemo(() => {
+    const set = new Set<ToolCategory>();
+    for (const s of steps) set.add(getCat(s.tool));
+    return [...set];
+  }, [steps]);
+
+  const visibleSteps = useMemo(() => {
+    if (filter === 'all') return steps;
+    if (filter === 'errors') return steps.filter(s => s.status === 'error');
+    return steps.filter(s => getCat(s.tool) === filter);
+  }, [steps, filter]);
+
+  // Revenir à "Tout" si le filtre actif ne correspond plus à aucune étape.
+  useEffect(() => {
+    if (filter === 'all') return;
+    if (filter === 'errors' && errorCount === 0) setFilter('all');
+    else if (filter !== 'errors' && !presentCats.includes(filter)) setFilter('all');
+  }, [filter, errorCount, presentCats]);
+
+  const copyDetail = useCallback((step: ActivityStep) => {
+    const text = step.detail ?? step.label;
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopiedId(step.id);
+      setTimeout(() => setCopiedId(c => (c === step.id ? null : c)), 1400);
+    });
+  }, []);
 
   const totalDur = useMemo(() => {
     if (!steps.length) return '0s';
@@ -317,6 +380,17 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
   useEffect(() => {
     if (isWorking && steps.length <= 2) setExpanded(true);
   }, [isWorking, steps.length]);
+
+  // En cas d'erreur, ouvrir le tiroir et déplier automatiquement la première
+  // étape échouée pour que l'utilisateur voie immédiatement ce qui a cassé.
+  useEffect(() => {
+    if (errorCount === 0) return;
+    const firstError = steps.find(s => s.status === 'error' && s.detail);
+    if (firstError) {
+      setExpanded(true);
+      setExpandedStepId(prev => prev ?? firstError.id);
+    }
+  }, [errorCount, steps]);
 
   useEffect(() => {
     if (!isWorking) return;
@@ -344,6 +418,15 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           animate={{ width: `${pct}%` }}
           transition={uiSpring}
         />
+        {/* Portion d'erreur : segment rouge superposé, proportionnel aux échecs. */}
+        {errorCount > 0 && total > 0 && (
+          <motion.div
+            className="absolute inset-y-0 right-0 rounded"
+            style={{ backgroundColor: 'var(--color-error)', opacity: 0.85 }}
+            animate={{ width: `${Math.round((errorCount / total) * 100)}%` }}
+            transition={uiSpring}
+          />
+        )}
         {/* Splash-style shimmer sweep, omitted when motion is reduced. */}
         {isWorking && !reduceMotion && (
           <motion.div
@@ -438,7 +521,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
           />
           {!isWorking && onClear && (
             <button
-              onClick={e => { e.stopPropagation(); onClear(); }}
+              onClick={e => { e.stopPropagation(); setFilter('all'); setExpandedStepId(null); onClear(); }}
               className="p-0.5 rounded hover:bg-[var(--bg-hover)] active:bg-[var(--bg-active)] active:scale-90 transition-all"
               title="Effacer"
               aria-label="Effacer l'historique"
@@ -474,15 +557,51 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
               </span>
             </div>
 
+            {/* Filtres : affichés seulement s'il y a de quoi filtrer */}
+            {(presentCats.length > 1 || errorCount > 0) && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 overflow-x-auto border-b"
+                style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-surface)' }}
+                role="group"
+                aria-label="Filtrer les étapes"
+              >
+                <FilterChip
+                  label="Tout" count={total} active={filter === 'all'}
+                  onClick={() => setFilter('all')}
+                />
+                {errorCount > 0 && (
+                  <FilterChip
+                    label="Erreurs" count={errorCount} active={filter === 'errors'}
+                    color="var(--color-error)" onClick={() => setFilter('errors')}
+                  />
+                )}
+                {presentCats.map(cat => (
+                  <FilterChip
+                    key={cat}
+                    label={CAT_LABEL[cat]}
+                    count={steps.filter(s => getCat(s.tool) === cat).length}
+                    active={filter === cat}
+                    color={CAT_COLOR[cat]}
+                    onClick={() => setFilter(cat)}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Timeline */}
             <div
               ref={listRef}
               className="overflow-y-auto px-2 py-1"
               style={{ maxHeight: '200px' }}
             >
-              {steps.map((step, i) => {
+              {visibleSteps.length === 0 && (
+                <div className="px-2 py-3 text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
+                  Aucune étape pour ce filtre
+                </div>
+              )}
+              {visibleSteps.map((step, i) => {
                 const status    = getStepStatus(step);
-                const isLast    = i === steps.length - 1;
+                const isLast    = i === visibleSteps.length - 1;
                 const catColor  = CAT_COLOR[getCat(step.tool)];
                 const dur       = stepDuration(step);
                 const isExp     = expandedStepId === step.id;
@@ -507,9 +626,23 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
 
                     {/* Content */}
                     <motion.div
-                      className="flex-1 min-w-0 pb-1.5 cursor-pointer rounded px-1 -mx-1 hover:bg-white/[0.03] transition-colors group"
-                      onClick={() => setExpandedStepId(isExp ? null : step.id)}
-                      whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+                      className="flex-1 min-w-0 pb-1.5 cursor-pointer rounded px-1 -mx-1 hover:bg-[color-mix(in_srgb,var(--text-primary)_4%,transparent)] transition-colors group"
+                      onClick={() => step.detail && setExpandedStepId(isExp ? null : step.id)}
+                      onKeyDown={e => {
+                        if (step.detail && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          setExpandedStepId(isExp ? null : step.id);
+                        }
+                      }}
+                      tabIndex={step.detail ? 0 : -1}
+                      role={step.detail ? 'button' : undefined}
+                      aria-expanded={step.detail ? isExp : undefined}
+                      aria-label={step.detail ? `${step.label} — voir le détail` : undefined}
+                      whileTap={reduceMotion || !step.detail ? undefined : { scale: 0.99 }}
+                      style={status === 'error' ? {
+                        backgroundColor: 'color-mix(in srgb, var(--color-error) 7%, transparent)',
+                        boxShadow: 'inset 2px 0 0 var(--color-error)',
+                      } : undefined}
                     >
                       <div className="flex items-baseline gap-1.5 min-w-0">
                         <CatIcon tool={step.tool} size={9} />
@@ -519,7 +652,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                             color: status === 'running' ? 'var(--text-primary)'
                               : status === 'error' ? 'var(--color-error)'
                               : 'var(--text-secondary)',
-                            fontWeight: status === 'running' ? 600 : 400,
+                            fontWeight: status === 'running' || status === 'error' ? 600 : 400,
                           }}
                         >
                           {step.label}
@@ -530,6 +663,19 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                             ? <span className="text-xs tracking-wide tabular-nums font-mono flex-shrink-0" style={{ color: catColor }}>{msElapsed(step.timestamp)}</span>
                             : null
                         }
+                        {step.detail && (
+                          <button
+                            onClick={e => { e.stopPropagation(); copyDetail(step); }}
+                            className="p-0.5 rounded flex-shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
+                            title="Copier le détail"
+                            aria-label="Copier le détail de l'étape"
+                            style={{ color: copiedId === step.id ? 'var(--color-success)' : 'var(--text-dimmed)' }}
+                          >
+                            {copiedId === step.id
+                              ? <Check style={{ width: 9, height: 9 }} />
+                              : <Copy style={{ width: 9, height: 9 }} />}
+                          </button>
+                        )}
                         {step.detail && (
                           <Info style={{ width: 8, height: 8, flexShrink: 0, color: 'var(--text-dimmed)' }} className="opacity-0 group-hover:opacity-60 transition-opacity" />
                         )}
