@@ -153,37 +153,66 @@ export class ContractNetNegotiator {
     task: NegotiationTask,
     from: AgentRole = this.initiator
   ): Promise<NegotiationOutcome> {
+    const shortId = task.taskId.slice(0, 8);
+    const t0 = Date.now();
+    log.info(
+      `🔔 Négociation ouverte "${task.title}" (${shortId}) par [${from}] — ` +
+        `capacités requises: [${task.requiredCapabilities.join(", ") || "—"}], ` +
+        `fenêtre ${this.biddingWindowMs}ms`
+    );
     this.openCalls.set(task.taskId, []);
 
     await this.announce(task, from);
     await this.wait(this.biddingWindowMs);
+
+    const liveBidCount = this.openCalls.get(task.taskId)?.length ?? 0;
 
     // Repli déterministe : si aucun agent vivant n'a enchéri pendant la fenêtre,
     // faire concourir les rôles enregistrés (bids dérivés de leurs capacités).
     // L'enchère est encore ouverte ici, donc `autoBidFor` → `submitBid` est accepté.
     // On n'écrase jamais des bids vivants : le repli ne se déclenche QUE sur une
     // enchère restée vide.
-    if ((this.openCalls.get(task.taskId)?.length ?? 0) === 0 && this.fallbackBidders) {
+    let usedFallback = false;
+    if (liveBidCount === 0 && this.fallbackBidders) {
       const roles = this.fallbackBidders().filter((role) => role !== from);
       if (roles.length > 0) {
+        usedFallback = true;
         log.info(
-          `🤖 Aucun ench\u00e9risseur vivant pour "${task.title}" (${task.taskId.slice(0, 8)}) — ` +
-            `repli automatique sur ${roles.length} r\u00f4le(s) enregistr\u00e9(s)`
+          `🤖 Aucun ench\u00e9risseur vivant pour "${task.title}" (${shortId}) — ` +
+            `repli automatique sur ${roles.length} r\u00f4le(s) enregistr\u00e9(s) : [${roles.join(", ")}]`
         );
         this.autoBidFor(roles, task);
+      } else {
+        log.debug(`Repli configuré mais aucun rôle candidat (hors initiateur) pour ${shortId}`);
       }
+    } else if (liveBidCount > 0) {
+      log.info(`🙋 ${liveBidCount} offre(s) vivante(s) reçue(s) pour "${task.title}" (${shortId}) — pas de repli`);
     }
 
     const rawBids = this.openCalls.get(task.taskId) ?? [];
     this.openCalls.delete(task.taskId);
 
     const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
+
+    // Classement complet (DEBUG) pour vérifier POURQUOI un rôle gagne/perd.
+    if (scored.length > 0) {
+      const ranking = scored
+        .map(
+          (b, i) =>
+            `${i + 1}. ${b.role} score=${b.score.toFixed(3)} ` +
+            `(skill=${b.skillMatch.toFixed(2)} conf=${b.confidence.toFixed(2)} load=${b.loadPenalty.toFixed(2)}` +
+            `${b.eligible ? "" : " INÉLIGIBLE"})`
+        )
+        .join(" | ");
+      log.debug(`📊 Classement ${shortId} [${usedFallback ? "repli" : "vivant"}] : ${ranking}`);
+    }
+
     const best = scored.find((b) => b.eligible) ?? null;
 
     if (!best) {
       log.warn(
-        `🪧 Aucune offre éligible pour la tâche "${task.title}" (${task.taskId.slice(0, 8)}) — ` +
-          `${rawBids.length} bid(s) reçu(s), tous disqualifiés`
+        `🪧 Aucune offre éligible pour la tâche "${task.title}" (${shortId}) — ` +
+          `${rawBids.length} bid(s) reçu(s), tous disqualifiés (${Date.now() - t0}ms)`
       );
       return { taskId: task.taskId, winner: null, winningScore: null, bids: scored, awarded: false };
     }
@@ -192,7 +221,8 @@ export class ContractNetNegotiator {
 
     log.info(
       `🏆 Marché attribué à [${best.role}] pour "${task.title}" ` +
-        `(score ${best.score.toFixed(3)}, ${scored.length} bid(s))`
+        `(score ${best.score.toFixed(3)}, ${scored.length} bid(s), ` +
+        `source=${usedFallback ? "repli" : "vivant"}, award=${awarded ? "ok" : "ÉCHEC"}, ${Date.now() - t0}ms)`
     );
 
     return {

@@ -118,8 +118,8 @@ function toolFailureKey(name: string, args: unknown): string {
 const AUDIO_RATE_LIMIT_BYTES_PER_SEC = 100 * 1024; // 100 KB/s
 /** Durée de la fenêtre glissante pour mesurer le débit audio, en ms. */
 const AUDIO_RATE_WINDOW_MS = 1000;
-/** Nombre de violations avant de logguer un avertissement groupé. */
-const AUDIO_RATE_VIOLATION_LOG_INTERVAL = 10;
+/** Intervalle minimum entre deux résumés console du rate-limiter audio, en ms. */
+const AUDIO_RATE_SUMMARY_THROTTLE_MS = 5000;
 
 /**
  * Détermine si une erreur sur un tool call mérite d'être retentée.
@@ -239,6 +239,8 @@ export function attachLiveWebSocket(
       bytesInWindow: 0,         // bytes reçus dans la fenêtre
       violations: 0,            // compteur total de violations (ignoré pour reset)
       droppedChunks: 0,         // chunks abandonnés dans la fenêtre courante
+      lastSummaryLogAt: 0,      // throttle du résumé console (ms epoch)
+      clientNotified: false,    // le client a-t-il déjà été prévenu de la limite ?
     };
 
     // ── Context window monitoring ────────────────────────────────────────
@@ -1183,8 +1185,18 @@ export function attachLiveWebSocket(
             const elapsed = now - audioRateState.windowStart;
 
             if (elapsed >= AUDIO_RATE_WINDOW_MS) {
-              if (audioRateState.droppedChunks > 0) {
-                console.warn(`[AudioRateLimit] ${audioRateState.droppedChunks} chunk(s) abandonnés dans la fenêtre précédente (${Math.round(audioRateState.bytesInWindow / 1024)} KB/s)`);
+              // Résumé console throttlé : au plus une ligne toutes les
+              // AUDIO_RATE_SUMMARY_THROTTLE_MS, pour ne pas noyer les logs en cas
+              // de dépassement soutenu (ex. flux audio continu).
+              if (
+                audioRateState.droppedChunks > 0 &&
+                now - audioRateState.lastSummaryLogAt >= AUDIO_RATE_SUMMARY_THROTTLE_MS
+              ) {
+                console.warn(
+                  `[AudioRateLimit] ${audioRateState.droppedChunks} chunk(s) abandonnés sur la dernière seconde ` +
+                    `(${Math.round(audioRateState.bytesInWindow / 1024)} KB/s, total ${audioRateState.violations} violation(s))`
+                );
+                audioRateState.lastSummaryLogAt = now;
               }
               audioRateState.windowStart = now;
               audioRateState.bytesInWindow = 0;
@@ -1197,8 +1209,12 @@ export function attachLiveWebSocket(
             if (audioRateState.bytesInWindow + chunkBytes > AUDIO_RATE_LIMIT_BYTES_PER_SEC) {
               audioRateState.violations++;
               audioRateState.droppedChunks++;
-              if (audioRateState.violations % AUDIO_RATE_VIOLATION_LOG_INTERVAL === 1) {
-                console.warn(`[AudioRateLimit] Violation #${audioRateState.violations} — débit > ${AUDIO_RATE_LIMIT_BYTES_PER_SEC / 1024} KB/s`);
+              // Notifier le client UNE SEULE FOIS (première violation) : inutile de
+              // répéter, l'UI affiche l'état « limité » tant que ça dure. Les détails
+              // chiffrés sont dans le résumé console throttlé ci-dessus.
+              if (!audioRateState.clientNotified) {
+                audioRateState.clientNotified = true;
+                console.warn(`[AudioRateLimit] Débit audio > ${AUDIO_RATE_LIMIT_BYTES_PER_SEC / 1024} KB/s — chunks limités (résumé périodique ci-dessous)`);
                 try {
                   clientWs.send(JSON.stringify({
                     type: 'audio_rate_limited',

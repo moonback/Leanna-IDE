@@ -62,7 +62,17 @@ const INFERENCE_RULES: InferenceRule[] = [
   },
   // ── Implémentation / code ──
   {
-    keywords: ["implémenter", "implementer", "implément", "implement", "coder", "développer", "developper", "fonctionnalité", "fonctionnalite", "feature", "composant"],
+    keywords: [
+      "implémenter", "implementer", "implément", "implement", "coder", "développer", "developper",
+      "fonctionnalité", "fonctionnalite", "feature", "composant",
+      // Ajouts : vocabulaire courant d'implémentation backend/frontend que le
+      // fallback générique (read/analyze) ne couvrait pas, ce qui rendait le
+      // scoring contract-net non-discriminant (tous les agents à skillMatch égal).
+      "ajout", "ajouter", "ajoute", "créer", "creer", "crée", "cree", "create",
+      "endpoint", "route", "api", "handler", "contrôleur", "controleur", "controller",
+      "service", "crud", "migration", "schéma de données", "schema de donnees",
+      "intégrer", "integrer", "intégration", "integration", "brancher", "câbler", "cabler",
+    ],
     capabilities: ["write_project_file", "modify_project_file", "verify_typecheck"],
   },
   // ── Rédaction ──

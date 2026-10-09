@@ -232,9 +232,17 @@ export class AgentBrain {
    */
   private composeTeamForPlan(plan: BrainPlan): SwarmHandle | null {
     try {
+      const planRoles = Array.from(new Set(plan.stages.map((s) => s.agentRole)));
       const plannedSkills = Array.from(
         new Set(plan.stages.flatMap((s) => [...(s.skills ?? []), ...(s.tools ?? [])]))
       );
+      log.info(
+        `🐝 Composition de swarm pour "${plan.goal}" (plan ${plan.id.slice(0, 8)}) — ` +
+          `rôles du plan: [${planRoles.join(", ")}], ` +
+          `${plannedSkills.length} skill(s)/outil(s) planifié(s)`
+      );
+      log.debug(`🐝 Skills planifiés dérivés du plan : [${plannedSkills.join(", ")}]`);
+
       const handle = swarmComposer.compose({
         objective: { title: plan.goal, description: plan.understanding.intent },
         plannedSkills,
@@ -251,7 +259,13 @@ export class AgentBrain {
         detail: `Pipeline : ${handle.pipeline.join(" → ")}`,
         timestamp: new Date().toISOString(),
       });
-      log.info(`🐝 Équipe composée pour "${plan.goal}" : ${handle.pipeline.join(" → ")}`);
+      log.info(
+        `🐝 Équipe composée (${handle.members.length} agents) : ${handle.pipeline.join(" → ")}`
+      );
+      // Détail du raisonnement de recrutement (DEBUG) : pourquoi chaque membre.
+      for (const m of handle.members) {
+        log.debug(`   └─ ${m.role} [${m.stage}] — ${m.rationale}`);
+      }
       return handle;
     } catch (err: any) {
       log.warn(`Composition de swarm ignorée (best-effort) : ${err?.message ?? err}`);

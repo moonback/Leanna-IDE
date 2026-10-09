@@ -10,6 +10,7 @@ import type { AIProvider } from '../../context/UserProfileContext.js';
 
 export const OPENROUTER_MODELS = [
   // ── Coding agents ─────────────────────────────────────────────────────────
+  { id: 'openai/gpt-6-luna',                               name: 'GPT-6-Luna',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
   { id: 'openai/gpt-5.6-luna',                               name: 'GPT-5.6',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
   { id: 'z-ai/glm-5.3-flash',                                name: 'GLM 5.3 Flash',         provider: 'ZAI',         free: false, desc: 'Multimodal, efficace pour le code et les tâches agentiques, 1M ctx' },
   { id: 'deepseek/deepseek-v4-flash-0731',                   name: 'DeepSeek V4 Flash',     provider: 'DeepSeek',    free: false, desc: 'MoE 284B sparce, adapté code et raisonnement, GA release, 1.3M ctx' },

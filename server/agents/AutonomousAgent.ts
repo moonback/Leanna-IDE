@@ -355,6 +355,34 @@ export class AutonomousAgent {
       `📋 [${this.agentName}] Reçu task_request de [${message.from}]: "${payload.title}"${isAutonomous ? " [mode autonome]" : ""}`
     );
 
+    // Un `task_request` CORRÉLÉ (via bus.request) attend une réponse synchrone :
+    // on exécute et on répond dans le même handler. Un `task_request` NON corrélé
+    // (ex. award d'une enchère contract-net publié via bus.publish) ne doit PAS
+    // bloquer le producteur : sinon la négociation attendrait toute l'exécution
+    // de l'agent (plusieurs minutes) au lieu de rendre la main après l'attribution.
+    // On détache alors l'exécution (fire-and-forget) pour qu'elle tourne réellement
+    // en arrière-plan, et le handler du bus retourne immédiatement.
+    const awaited = Boolean(message.correlationId);
+    if (awaited) {
+      await this.runRequestedTask(message, payload, isAutonomous);
+    } else {
+      // Exécution détachée : l'agent travaille en arrière-plan, l'award rend la main.
+      void this.runRequestedTask(message, payload, isAutonomous).catch((err) => {
+        log.error(`❌ [${this.agentName}] Tâche détachée en échec: ${(err as Error).message}`);
+      });
+    }
+  }
+
+  /**
+   * Exécute une tâche reçue par `task_request` puis publie la réponse sur le bus.
+   * Extrait de `handleTaskRequest` pour pouvoir être exécuté soit en attente
+   * (requête corrélée), soit détaché (award d'enchère non corrélé).
+   */
+  private async runRequestedTask(
+    message: AgentMessage,
+    payload: TaskRequestPayload,
+    isAutonomous: boolean
+  ): Promise<void> {
     const agentDef = getAgentDefinitionOrThrow(this.role);
 
     const task: AgentTask = {
