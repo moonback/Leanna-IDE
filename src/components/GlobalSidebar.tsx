@@ -529,7 +529,7 @@ function Group({
   return (
     <section className="mb-0.5" aria-label={label || undefined}>
       {collapsed ? (
-        !first && <div className="mx-3 my-2 h-px" style={{ backgroundColor: 'var(--border-base)' }} aria-hidden />
+        !first && <div className="" style={{ backgroundColor: 'var(--border-base)' }} aria-hidden />
       ) : label ? (
         <button
           type="button"
@@ -739,28 +739,48 @@ function AgentPill({
   );
 }
 
-/** Bouton d'action compact (défini hors du composant : pas de remontage à chaque rendu). */
+/** Bouton d'action compact (défini hors du composant : pas de remontage à chaque rendu).
+ *  Tooltip rendu en portail (jamais coupé par l'overflow de la barre), état
+ *  désactivé explicite et retour tactile respectant prefers-reduced-motion. */
 function Ctrl({
-  icon: Icon, label, onClick, active, tone, reduceMotion,
-}: { icon: LucideIcon; label: string; onClick?: () => void; active?: boolean; tone?: string; reduceMotion: boolean }) {
+  icon: Icon, label, onClick, active, tone, reduceMotion, disabled = false, pressed,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+  active?: boolean;
+  tone?: string;
+  reduceMotion: boolean;
+  disabled?: boolean;
+  pressed?: boolean;
+}) {
+  const tip = useTooltip(label, true, reduceMotion);
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      whileHover={reduceMotion ? undefined : { y: -1 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.92 }}
-      className={`flex h-8 flex-1 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)] ${FOCUS_RING}`}
-      style={{
-        backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)',
-        color: tone ?? 'var(--text-secondary)',
-        border: '1px solid var(--border-base)',
-      }}
-    >
-      <Icon size={14} />
-    </motion.button>
+    <>
+      <motion.button
+        ref={tip.ref}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        aria-pressed={pressed ?? active}
+        onPointerEnter={tip.show}
+        onPointerLeave={tip.hide}
+        onFocus={tip.show}
+        onBlur={tip.hide}
+        whileHover={reduceMotion || disabled ? undefined : { y: -1 }}
+        whileTap={reduceMotion || disabled ? undefined : { scale: 0.92 }}
+        className={`flex h-8 flex-1 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${FOCUS_RING}`}
+        style={{
+          backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)',
+          color: tone ?? 'var(--text-secondary)',
+          border: '1px solid var(--border-base)',
+        }}
+      >
+        <Icon size={14} />
+      </motion.button>
+      {tip.tooltip}
+    </>
   );
 }
 
@@ -808,7 +828,7 @@ function IdeAssistantBlock({
   if (collapsed) {
     return (
       <div className="mx-2 mb-2 flex flex-shrink-0 flex-col gap-1">
-        <Ctrl reduceMotion={reduceMotion} icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
+        {/* <Ctrl reduceMotion={reduceMotion} icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" /> */}
         <Ctrl reduceMotion={reduceMotion} icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
       </div>
     );
