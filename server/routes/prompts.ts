@@ -33,25 +33,43 @@ import {
   resolveBasePromptsDir,
   resolveOverridesDir,
 } from '../runtime/prompts/promptOverrides.js';
+import { estimateTokens } from '../utils/tokenOptimizer.js';
 
 interface PromptFileMeta {
   name: string;
   size: number;
   modified: string;
+  /** Estimation du nombre de tokens du contenu (tiktoken avec repli heuristique). */
+  tokens: number;
+  /** Nombre de lignes du contenu. */
+  lines: number;
   /** true si le fichier a été personnalisé (override présent). */
   overridden: boolean;
 }
 
-/** Métadonnées (taille/date) du chemin effectif d'un fichier. */
+/** Compte les tokens d'un texte via l'estimateur serveur (tiktoken). */
+function countTokens(text: string): number {
+  try {
+    return estimateTokens(text);
+  } catch {
+    // Repli heuristique si tiktoken indisponible : ~4 caractères par token.
+    return Math.ceil((text?.length ?? 0) / 4);
+  }
+}
+
+/** Métadonnées (taille / date / tokens / lignes) du chemin effectif d'un fichier. */
 function metaFor(name: string): PromptFileMeta | null {
   const p = effectivePathFor(name);
   if (!p) return null;
   try {
     const stat = fs.statSync(p);
+    const content = fs.readFileSync(p, 'utf-8');
     return {
       name,
       size: stat.size,
       modified: stat.mtime.toISOString(),
+      tokens: countTokens(content),
+      lines: content ? content.split('\n').length : 0,
       overridden: isOverridden(name),
     };
   } catch {
@@ -68,10 +86,12 @@ export function createPromptsRouter(): Router {
       const files = listPromptNames()
         .map(metaFor)
         .filter((m): m is PromptFileMeta => m !== null);
+      const totalTokens = files.reduce((sum, f) => sum + f.tokens, 0);
       res.json({
         status: 'success',
         baseDir: resolveBasePromptsDir(),
         overridesDir: resolveOverridesDir(),
+        totalTokens,
         files,
       });
     } catch (e: any) {
@@ -100,6 +120,8 @@ export function createPromptsRouter(): Router {
         content,
         size: stat.size,
         modified: stat.mtime.toISOString(),
+        tokens: countTokens(content),
+        lines: content ? content.split('\n').length : 0,
         overridden: isOverridden(name),
       });
     } catch (e: any) {
@@ -135,6 +157,8 @@ export function createPromptsRouter(): Router {
         name,
         size: stat.size,
         modified: stat.mtime.toISOString(),
+        tokens: countTokens(content),
+        lines: content ? content.split('\n').length : 0,
         overridden: true,
         note: 'Modification enregistrée. Elle s\'appliquera au prochain démarrage de session.',
       });

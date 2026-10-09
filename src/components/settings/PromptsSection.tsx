@@ -2,10 +2,19 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileCog, FileText, Save, RotateCcw, RefreshCw, Search,
-  AlertTriangle, Check, Loader2, Undo2, PencilLine,
+  AlertTriangle, Check, Loader2, Undo2, PencilLine, Code2, Eye,
+  Copy, Download, Hash,
 } from 'lucide-react';
 import { Section } from './SettingsPrimitives.js';
 import { useToast } from '../ui/Toast.js';
+import { useProfile } from '../../context/UserProfileContext.js';
+import { MarkdownPromptEditor } from './MarkdownPromptEditor.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { formatTokenCount, formatExactTokenCount } from '../../utils/tokenFormatting.js';
+
+// Thèmes de l'app considérés comme sombres (pour accorder l'éditeur Monaco).
+const DARK_THEMES = new Set(['dark', 'cyberpunk', 'high-contrast']);
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -13,8 +22,21 @@ interface PromptFileMeta {
   name: string;
   size: number;
   modified: string;
+  /** Estimation du nombre de tokens (fournie par le serveur via tiktoken). */
+  tokens?: number;
+  /** Nombre de lignes du fichier. */
+  lines?: number;
   /** true si le fichier a été personnalisé (override enregistré). */
   overridden?: boolean;
+}
+
+/**
+ * Estimation locale des tokens pendant la frappe (le serveur recalcule la
+ * valeur exacte à la sauvegarde). Heuristique ~4 caractères/token, cohérente
+ * avec le reste de l'app.
+ */
+function estimateTokensLocal(text: string): number {
+  return Math.ceil((text?.length ?? 0) / 4);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,6 +69,8 @@ function prettyLabel(name: string): string {
 
 export function PromptsSection() {
   const { success, error: toastError } = useToast();
+  const { profile } = useProfile();
+  const dark = DARK_THEMES.has(profile.theme);
 
   const [files, setFiles] = useState<PromptFileMeta[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -58,6 +82,7 @@ export function PromptsSection() {
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [query, setQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
   const dirty = content !== originalContent;
 
@@ -95,10 +120,15 @@ export function PromptsSection() {
       const data = await res.json();
       setContent(data.content ?? '');
       setOriginalContent(data.content ?? '');
-      // Synchronise l'état "personnalisé" renvoyé par le serveur.
-      if (typeof data.overridden === 'boolean') {
-        setFiles(prev => prev.map(f => f.name === name ? { ...f, overridden: data.overridden } : f));
-      }
+      // Synchronise l'état renvoyé par le serveur (override, tokens, lignes).
+      setFiles(prev => prev.map(f => f.name === name
+        ? {
+            ...f,
+            overridden: typeof data.overridden === 'boolean' ? data.overridden : f.overridden,
+            tokens: typeof data.tokens === 'number' ? data.tokens : f.tokens,
+            lines: typeof data.lines === 'number' ? data.lines : f.lines,
+          }
+        : f));
     } catch (err: any) {
       toastError(`Lecture impossible : ${err.message}`);
       setContent('');
@@ -139,9 +169,16 @@ export function PromptsSection() {
       }
       const data = await res.json();
       setOriginalContent(content);
-      // Rafraîchit les métadonnées (taille / date / override) du fichier modifié.
+      // Rafraîchit les métadonnées (taille / date / tokens / lignes / override).
       setFiles(prev => prev.map(f => f.name === selected
-        ? { ...f, size: data.size ?? f.size, modified: data.modified ?? f.modified, overridden: true }
+        ? {
+            ...f,
+            size: data.size ?? f.size,
+            modified: data.modified ?? f.modified,
+            tokens: typeof data.tokens === 'number' ? data.tokens : f.tokens,
+            lines: typeof data.lines === 'number' ? data.lines : f.lines,
+            overridden: true,
+          }
         : f));
       success(`"${selected}" enregistré ✓ — effectif au prochain démarrage de session.`);
     } catch (err: any) {
@@ -175,17 +212,49 @@ export function PromptsSection() {
     }
   }, [selected, loadFile, success, toastError]);
 
-  // Raccourci Ctrl/Cmd+S pour enregistrer.
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-      e.preventDefault();
-      handleSave();
-    }
-  }, [handleSave]);
-
   const handleRevert = useCallback(() => {
     setContent(originalContent);
   }, [originalContent]);
+
+  // ── Copier le contenu dans le presse-papier ───────────────────────────────────
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      success('Contenu copié dans le presse-papier.');
+    } catch {
+      toastError('Copie impossible (presse-papier indisponible).');
+    }
+  }, [content, success, toastError]);
+
+  // ── Télécharger le fichier .md ─────────────────────────────────────────────────
+
+  const handleDownload = useCallback(() => {
+    if (!selected) return;
+    try {
+      const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = selected;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toastError('Téléchargement impossible.');
+    }
+  }, [selected, content, toastError]);
+
+  // Aperçu rendu (pipeline sûr identique au chat : marked + sanitize).
+  const previewHtml = useMemo(() => {
+    if (viewMode !== 'preview') return '';
+    try {
+      return sanitizeMarkdownHtml(renderChatMarkdown(content));
+    } catch {
+      return '<p>Erreur lors du rendu Markdown.</p>';
+    }
+  }, [viewMode, content]);
 
   // ── Liste filtrée ─────────────────────────────────────────────────────────────
 
@@ -200,6 +269,18 @@ export function PromptsSection() {
   const lineCount = content ? content.split('\n').length : 0;
   const charCount = content.length;
 
+  // Tokens du fichier affiché : valeur serveur (exacte) quand rien n'est modifié,
+  // estimation locale pendant la frappe.
+  const liveTokens = dirty
+    ? estimateTokensLocal(content)
+    : (selectedMeta?.tokens ?? estimateTokensLocal(content));
+
+  // Total des tokens de tous les fichiers (pour le badge de section).
+  const totalTokens = useMemo(
+    () => files.reduce((sum, f) => sum + (f.tokens ?? 0), 0),
+    [files],
+  );
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -207,7 +288,7 @@ export function PromptsSection() {
       icon={FileCog}
       title="Prompts Système (.md)"
       description="Affichez et modifiez les fichiers Markdown qui composent le prompt système de l'assistant"
-      badge={`${files.length} fichier${files.length !== 1 ? 's' : ''}`}
+      badge={`${files.length} fichier${files.length !== 1 ? 's' : ''} · ~${formatTokenCount(totalTokens)} tokens`}
     >
       {/* Avertissement : contenu sensible */}
       <div
@@ -219,7 +300,7 @@ export function PromptsSection() {
       >
         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-warning)' }} />
         <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-          Ces fichiers définissent le comportement de base de l'assistant (sécurité, autonomie, persona…).
+           comportement de base de l'assistant (sécurité, autonomie, persona…).
           Une modification s'applique au prochain démarrage de session. Modifiez avec précaution.
         </p>
       </div>
@@ -288,12 +369,24 @@ export function PromptsSection() {
                     className="h-3.5 w-3.5 flex-shrink-0"
                     style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)' }}
                   />
-                  <span
-                    className="flex-1 truncate text-xs font-medium"
-                    style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
-                    title={f.name}
-                  >
-                    {f.name}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span
+                      className="truncate text-xs font-medium"
+                      style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                      title={f.name}
+                    >
+                      {f.name}
+                    </span>
+                    {typeof f.tokens === 'number' && (
+                      <span
+                        className="flex items-center gap-0.5 text-[10px] font-mono tabular-nums"
+                        style={{ color: 'var(--text-dimmed)' }}
+                        title={`${formatExactTokenCount(f.tokens)} tokens estimés`}
+                      >
+                        <Hash className="h-2.5 w-2.5 opacity-60" />
+                        {formatTokenCount(f.tokens)} tokens
+                      </span>
+                    )}
                   </span>
                   {f.overridden && !isDirtyFile && (
                     <PencilLine
@@ -350,6 +443,61 @@ export function PromptsSection() {
                 </div>
 
                 <div className="flex flex-shrink-0 items-center gap-1.5">
+                  {/* Bascule Éditer / Aperçu */}
+                  <div
+                    className="flex items-center rounded-lg p-0.5"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('edit')}
+                      title="Éditer (coloration syntaxique)"
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all"
+                      style={{
+                        backgroundColor: viewMode === 'edit' ? 'var(--accent-primary)' : 'transparent',
+                        color: viewMode === 'edit' ? '#fff' : 'var(--text-muted)',
+                      }}
+                    >
+                      <Code2 className="h-3 w-3" /> Éditer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('preview')}
+                      title="Aperçu du Markdown rendu"
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all"
+                      style={{
+                        backgroundColor: viewMode === 'preview' ? 'var(--accent-primary)' : 'transparent',
+                        color: viewMode === 'preview' ? '#fff' : 'var(--text-muted)',
+                      }}
+                    >
+                      <Eye className="h-3 w-3" /> Aperçu
+                    </button>
+                  </div>
+
+                  {/* Copier */}
+                  <motion.button
+                    type="button"
+                    onClick={handleCopy}
+                    whileTap={{ scale: 0.95 }}
+                    title="Copier le contenu dans le presse-papier"
+                    className="flex items-center justify-center rounded-lg border px-2 py-1 text-xs font-medium transition-all hover:opacity-80"
+                    style={{ borderColor: 'var(--border-base)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)' }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </motion.button>
+
+                  {/* Télécharger */}
+                  <motion.button
+                    type="button"
+                    onClick={handleDownload}
+                    whileTap={{ scale: 0.95 }}
+                    title="Télécharger le fichier .md"
+                    className="flex items-center justify-center rounded-lg border px-2 py-1 text-xs font-medium transition-all hover:opacity-80"
+                    style={{ borderColor: 'var(--border-base)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)' }}
+                  >
+                    <Download className="h-3 w-3" />
+                  </motion.button>
+
                   {selectedMeta?.overridden && (
                     <motion.button
                       type="button"
@@ -389,7 +537,7 @@ export function PromptsSection() {
                 </div>
               </div>
 
-              {/* Zone d'édition */}
+              {/* Zone d'édition / aperçu */}
               <div className="relative">
                 {loadingFile && (
                   <div
@@ -399,34 +547,44 @@ export function PromptsSection() {
                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
                   </div>
                 )}
-                <textarea
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  spellCheck={false}
-                  rows={22}
-                  className="w-full resize-y rounded-xl px-3 py-2.5 text-xs font-mono outline-none transition-all duration-150"
-                  style={{
-                    backgroundColor: 'var(--bg-input)',
-                    border: '1px solid var(--border-base)',
-                    color: 'var(--text-primary)',
-                    lineHeight: '1.6',
-                    minHeight: '320px',
-                  }}
-                  onFocus={e => {
-                    e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-subtle)';
-                  }}
-                  onBlur={e => {
-                    e.currentTarget.style.borderColor = 'var(--border-base)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
+
+                {viewMode === 'edit' ? (
+                  <MarkdownPromptEditor
+                    value={content}
+                    onChange={setContent}
+                    dark={dark}
+                    height="420px"
+                    readOnly={loadingFile}
+                    onSave={handleSave}
+                  />
+                ) : (
+                  <div
+                    className="markdown-body overflow-y-auto custom-scrollbar rounded-xl px-5 py-4"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      border: '1px solid var(--border-base)',
+                      color: 'var(--text-primary)',
+                      height: '420px',
+                    }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML assaini via sanitizeMarkdownHtml
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  />
+                )}
               </div>
 
               {/* Barre d'état */}
               <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                <span className="font-mono">{lineCount} lignes · {charCount} car.</span>
+                <span className="flex items-center gap-2 font-mono tabular-nums">
+                  <span>{lineCount} lignes · {charCount} car.</span>
+                  <span
+                    className="flex items-center gap-0.5"
+                    style={{ color: 'var(--accent-primary)' }}
+                    title={`${formatExactTokenCount(liveTokens)} tokens${dirty ? ' (estimation en cours de frappe)' : ' (estimation serveur)'}`}
+                  >
+                    <Hash className="h-3 w-3 opacity-70" />
+                    {dirty ? '~' : ''}{formatTokenCount(liveTokens)} tokens
+                  </span>
+                </span>
                 <AnimatePresence mode="wait">
                   {dirty ? (
                     <motion.span
