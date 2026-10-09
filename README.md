@@ -107,7 +107,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 | 🧠 | [Cerveau de l'agent](#-cerveau-de-lagent-agent-brain) | 🛡️ | [Safety Gate Jev](#safety-gate-jev) |
 | ⚡ | [Runtime agentique & budget](#-runtime-agentique--budget-transactionnel) | 🤖 | [Architecture multi-agents](#-architecture-multi-agents) |
 | 🎯 | [Système de missions & estimation](#-système-de-missions) | 🧩 | [Rôles d'agents (20)](#rôles-dagents-20-rôles-statiques) |
-| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
+| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🐝 | [Swarm](#composition-déquipe--swarmcomposer) & [Contract-Net dynamique](#négociation--contract-net) |
 | 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
 | 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) |
@@ -226,7 +226,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Interaction IA** | Chat, sélection de modèle, Live audio, visibilité des tokens, tâches en arrière-plan | ✅ |
 | **Ingénierie logicielle** | Inspecter/lire/modifier le code, analyser dépendances, vérifier, Git/GitHub, terminal contrôlé, audits de sécurité | ✅ |
 | **Exécution autonome** | Missions, planification, multi-étapes, suivi d'état, vérification, récupération, budgets bornés | ✅ |
-| **Multi-agents** | 20 rôles statiques + rôles dynamiques, orchestration, délégation, swarm, contract-net | ✅ |
+| **Multi-agents** | 20 rôles statiques + rôles dynamiques, orchestration, délégation, swarm, contract-net (routage dynamique vers le meilleur agent) | ✅ |
 | **Autonomie proactive** | Anticipation (observe→détecte→propose), Computer Use, Smart Skills, heartbeat adaptatif | ✅ |
 | **Connaissance** | Graphe de connaissances, AST (tree-sitter), call-graph, dépendances, impact, mémoire de stratégie | ✅ |
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
@@ -926,6 +926,46 @@ score = 0.60·skillMatch + 0.25·confidence − 0.15·loadPenalty
 Un bid n'est **éligible** que si `skillMatch > 0`. L'initiateur par défaut est un
 pseudo-rôle neutre `orchestrator` : aucun agent n'y est abonné, donc tous (y
 compris `architect`) reçoivent l'appel d'offres sans biais d'émetteur.
+
+#### Routage dynamique « en production » & repli déterministe
+
+Le contract-net n'est pas qu'un moteur théorique : il **attribue dynamiquement
+une tâche à l'agent le mieux-noté** au lieu d'un routage statique imposé par
+l'appelant. `AgentOrchestrator.delegateTask()` (et `delegateAutonomously()`)
+accepte un `role` **optionnel** — quand il est omis, les capacités requises sont
+déduites (`inferRequiredCapabilities`), la négociation élit le gagnant, puis la
+tâche est **exécutée par le chemin standard** (résultat traçable, pas un simple
+award fire-and-forget). Exposé via `POST /api/agents/delegate-autonomous` (champ
+`role` facultatif).
+
+```text
+delegateTask({ title, description })        ← aucun rôle imposé
+   │
+   ├─ inferRequiredCapabilities(...)         capacités déduites du texte
+   ├─ contractNetNegotiator.negotiate(...)   appel d'offres → meilleur-match
+   └─ executor.execute(task)                 exécution du gagnant (traçable)
+```
+
+**Repli déterministe (`fallbackBidders`).** En production, rien ne garantit
+qu'une flotte d'`AutonomousAgent` soit abonnée au bus pour répondre aux appels
+d'offres ; sans répondeur, la négociation renverrait toujours « aucun gagnant ».
+Le singleton `contractNetNegotiator` est donc câblé avec un repli sur l'ensemble
+des rôles enregistrés (`listAgentRoles`) : si **aucun bid vivant** n'arrive
+pendant la fenêtre, les rôles enregistrés concourent automatiquement via
+`autoBidFor` (bids dérivés de leurs capacités). Garanties :
+
+* un gagnant éligible est produit dès qu'un rôle couvre les capacités requises,
+  **même sans flotte montée** ;
+* les **bids vivants priment toujours** — le repli n'agit que sur une enchère
+  restée vide ;
+* l'**initiateur est exclu** du repli (pas d'auto-attribution biaisée) ;
+* si aucun rôle ne couvre les capacités, le résultat reste « aucun gagnant »
+  (pas de routage au hasard).
+
+> Pour le chemin conversationnel, l'outil `agent_delegate` conserve un `role`
+> **requis** ; le modèle dispose de l'outil dédié `agent_negotiate` lorsqu'il
+> hésite entre plusieurs agents. Preuves : `ContractNetNegotiator.test.ts`
+> (repli) et `AgentOrchestrator.negotiation.test.ts` (bascule rôle-implicite).
 
 ### Délégation structurée — DelegationManager
 

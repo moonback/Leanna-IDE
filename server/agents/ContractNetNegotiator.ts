@@ -22,7 +22,7 @@ import { randomUUID } from "crypto";
 import type { AgentRole } from "./types.js";
 import type { AgentMessage, TaskRequestPayload } from "./AgentCommunication.js";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
-import { getAgentDefinition } from "./roles.js";
+import { getAgentDefinition, listAgentRoles } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ContractNetNegotiator");
@@ -89,6 +89,23 @@ export interface NegotiatorOptions {
   weights?: Partial<ScoringWeights>;
   /** Initiateur par défaut des appels d'offres. */
   initiator?: AgentRole;
+  /**
+   * Repli déterministe : fournisseur paresseux des rôles candidats qui
+   * enchérissent AUTOMATIQUEMENT lorsque, à la fin de la fenêtre d'enchères,
+   * aucun bid vivant n'est arrivé.
+   *
+   * En production, rien ne garantit qu'une flotte d'`AutonomousAgent` soit
+   * abonnée au bus pour répondre aux `call_for_proposals` ; sans répondeur,
+   * `negotiate()` renverrait toujours `winner: null`. Ce repli fait concourir
+   * les rôles enregistrés via `autoBidFor` (bids dérivés de leurs capacités +
+   * métriques runtime), de sorte que la négociation produise un gagnant éligible
+   * dès qu'un rôle couvre les capacités requises — **sans** jamais écraser des
+   * bids vivants (il n'intervient que si l'enchère est restée vide).
+   *
+   * `undefined` (défaut) = pas de repli : comportement strictement inchangé,
+   * la négociation dépend uniquement des agents abonnés.
+   */
+  fallbackBidders?: () => AgentRole[];
 }
 
 const DEFAULT_WEIGHTS: ScoringWeights = { skill: 0.6, confidence: 0.25, load: 0.15 };
@@ -112,6 +129,7 @@ export class ContractNetNegotiator {
   private readonly biddingWindowMs: number;
   private readonly weights: ScoringWeights;
   private readonly initiator: AgentRole;
+  private readonly fallbackBidders?: () => AgentRole[];
 
   /** Enchères ouvertes : taskId → bids reçus. */
   private openCalls: Map<string, Bid[]> = new Map();
@@ -121,6 +139,7 @@ export class ContractNetNegotiator {
     this.biddingWindowMs = options.biddingWindowMs ?? 500;
     this.weights = { ...DEFAULT_WEIGHTS, ...options.weights };
     this.initiator = options.initiator ?? NEGOTIATION_INITIATOR;
+    this.fallbackBidders = options.fallbackBidders;
   }
 
   // ─── API publique ──────────────────────────────────────────────────────────
@@ -138,6 +157,22 @@ export class ContractNetNegotiator {
 
     await this.announce(task, from);
     await this.wait(this.biddingWindowMs);
+
+    // Repli déterministe : si aucun agent vivant n'a enchéri pendant la fenêtre,
+    // faire concourir les rôles enregistrés (bids dérivés de leurs capacités).
+    // L'enchère est encore ouverte ici, donc `autoBidFor` → `submitBid` est accepté.
+    // On n'écrase jamais des bids vivants : le repli ne se déclenche QUE sur une
+    // enchère restée vide.
+    if ((this.openCalls.get(task.taskId)?.length ?? 0) === 0 && this.fallbackBidders) {
+      const roles = this.fallbackBidders().filter((role) => role !== from);
+      if (roles.length > 0) {
+        log.info(
+          `🤖 Aucun ench\u00e9risseur vivant pour "${task.title}" (${task.taskId.slice(0, 8)}) — ` +
+            `repli automatique sur ${roles.length} r\u00f4le(s) enregistr\u00e9(s)`
+        );
+        this.autoBidFor(roles, task);
+      }
+    }
 
     const rawBids = this.openCalls.get(task.taskId) ?? [];
     this.openCalls.delete(task.taskId);
@@ -347,4 +382,16 @@ function clamp01(value: number): number {
 
 // ─── Singleton ──────────────────────────────────────────────────────────────
 
-export const contractNetNegotiator = new ContractNetNegotiator();
+/**
+ * Singleton de production : branché sur le bus singleton, avec un **repli
+ * déterministe** sur l'ensemble des rôles enregistrés (statiques + dynamiques).
+ *
+ * Ainsi, même en l'absence d'une flotte d'`AutonomousAgent` abonnée au bus, une
+ * négociation produit toujours un gagnant éligible dès qu'un rôle couvre les
+ * capacités requises — ce qui rend le contract-net exploitable « en production »
+ * pour attribuer dynamiquement une tâche au meilleur agent. Les bids vivants,
+ * quand il y en a, priment toujours (le repli n'agit que sur une enchère vide).
+ */
+export const contractNetNegotiator = new ContractNetNegotiator(agentMessageBus, {
+  fallbackBidders: () => listAgentRoles() as AgentRole[],
+});

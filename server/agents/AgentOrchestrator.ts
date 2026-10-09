@@ -185,16 +185,32 @@ export class AgentOrchestrator {
    * Retourne immédiatement avec l'ID de la tâche (exécution async).
    */
   async delegateTask(params: {
-    role: AgentRole;
+    /**
+     * Rôle cible. **Optionnel** : si omis, l'agent est choisi dynamiquement par
+     * négociation contract-net (le mieux-noté sur compétences + charge +
+     * fiabilité) au lieu d'un routage statique imposé par l'appelant.
+     */
+    role?: AgentRole;
     title: string;
     description: string;
     files?: string[];
     instructions?: string;
     priority?: TaskPriority;
     timeoutMs?: number;
+    /**
+     * Capacités requises pour la négociation (utilisées uniquement quand `role`
+     * est omis). Déduites du titre/description/instructions si absentes.
+     */
+    requiredCapabilities?: string[];
   }): Promise<AgentTask> {
-    const agent = getAgentDefinitionOrThrow(params.role);
-    const currentRunning = this.executor.getRunningCount(params.role);
+    // ─── Routage dynamique (contract-net) quand aucun rôle n'est imposé ───
+    // L'appel d'offres élit le meilleur agent ; on EXÉCUTE ensuite le gagnant par
+    // le chemin standard (ci-dessous), de sorte que la tâche produise un résultat
+    // traçable — on ne s'appuie pas sur l'award fire-and-forget du négociateur.
+    const role = params.role ?? (await this.resolveRoleByNegotiation(params));
+
+    const agent = getAgentDefinitionOrThrow(role);
+    const currentRunning = this.executor.getRunningCount(role);
 
     log.info(`📋 Délégation → ${agent.name}: "${params.title}" (priorité: ${params.priority ?? "medium"})`);
 
@@ -207,7 +223,7 @@ export class AgentOrchestrator {
 
     const task: AgentTask = {
       id: randomUUID(),
-      role: params.role,
+      role,
       title: params.title,
       description: params.description,
       priority: params.priority ?? "medium",
@@ -232,6 +248,56 @@ export class AgentOrchestrator {
     });
 
     return task;
+  }
+
+  /**
+   * Choisit dynamiquement le rôle cible par appel d'offres contract-net quand
+   * aucun rôle n'est imposé à `delegateTask`. Les capacités requises sont
+   * fournies explicitement ou déduites du texte de la tâche. Lève une erreur
+   * explicite si aucun agent éligible ne se présente (plutôt que de router au
+   * hasard). N'exécute PAS la tâche : seul le choix du rôle est retourné —
+   * l'exécution réelle reste au chemin standard de `delegateTask`.
+   */
+  private async resolveRoleByNegotiation(params: {
+    title: string;
+    description: string;
+    instructions?: string;
+    files?: string[];
+    priority?: TaskPriority;
+    requiredCapabilities?: string[];
+  }): Promise<AgentRole> {
+    const requiredCapabilities =
+      params.requiredCapabilities && params.requiredCapabilities.length > 0
+        ? params.requiredCapabilities
+        : inferRequiredCapabilities(`${params.title} ${params.description}`, params.instructions);
+
+    log.info(
+      `📣 Routage dynamique (contract-net) pour "${params.title}" — ` +
+        `capacités requises: ${requiredCapabilities.join(", ")}`
+    );
+
+    const outcome = await contractNetNegotiator.negotiate({
+      taskId: randomUUID(),
+      title: params.title,
+      description: params.description,
+      requiredCapabilities,
+      files: params.files ?? [],
+      instructions: params.instructions,
+      priority: params.priority ?? "medium",
+    });
+
+    if (!outcome.winner) {
+      throw new Error(
+        `Aucun agent éligible pour "${params.title}" (capacités requises: ` +
+          `${requiredCapabilities.join(", ") || "—"}). Précise un rôle ou reformule la tâche.`
+      );
+    }
+
+    log.info(
+      `🏆 Rôle attribué par négociation : [${outcome.winner}] ` +
+        `(score ${outcome.winningScore?.toFixed(3) ?? "—"}, ${outcome.bids.length} bid(s))`
+    );
+    return outcome.winner;
   }
 
   // ─── Délégation par négociation (contract-net) ─────────────────────────────
@@ -550,22 +616,26 @@ export class AgentOrchestrator {
    * qui peut lui-même sous-déléguer à d'autres agents.
    */
   async delegateAutonomously(params: {
-    role: AgentRole;
+    /** Optionnel : si omis, le rôle est choisi par négociation contract-net. */
+    role?: AgentRole;
     title: string;
     description: string;
     files?: string[];
     instructions?: string;
     priority?: TaskPriority;
     timeoutMs?: number;
+    requiredCapabilities?: string[];
   }): Promise<AgentTask> {
-    // Utiliser le chemin standard (crée la tâche et notifie via AgentExecutor)
+    // Utiliser le chemin standard (crée la tâche et notifie via AgentExecutor).
+    // Si `role` est omis, delegateTask élit l'agent par contract-net.
     const task = await this.delegateTask(params);
 
-    // Notifier le bus de messages que l'orchestrateur a délégué cette tâche
+    // Notifier le bus avec le rôle RÉELLEMENT attribué (task.role), qui peut
+    // provenir de la négociation plutôt que de l'appelant.
     await agentMessageBus
       .broadcast("planner", "task_delegated_by_orchestrator", {
         taskId: task.id,
-        role: params.role,
+        role: task.role,
         title: params.title,
       })
       .catch(() => {});

@@ -31,13 +31,17 @@ const CollaborateSchema = z.object({
 });
 
 const DelegateSchema = z.object({
-  role: z.string().min(1, "role requis"),
+  // `role` optionnel : si omis, l'agent est choisi par négociation contract-net
+  // (le mieux-noté sur compétences + charge + fiabilité).
+  role: z.string().min(1).optional(),
   title: z.string().min(1, "title requis"),
   description: z.string().min(1, "description requis"),
   files: z.array(z.string()).optional(),
   instructions: z.string().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   timeoutMs: z.number().int().min(0).optional(),
+  // Capacités requises pour la négociation (utilisées seulement si `role` est omis).
+  requiredCapabilities: z.array(z.string()).optional(),
 });
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive

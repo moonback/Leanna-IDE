@@ -216,6 +216,102 @@ describe("ContractNetNegotiator ↔ AutonomousAgent (auto-bid)", () => {
   });
 });
 
+// ─── Repli déterministe : production sans flotte abonnée ──────────────────────
+
+describe("ContractNetNegotiator — repli déterministe (fallbackBidders)", () => {
+  it("élit un gagnant éligible même sans aucun agent abonné au bus", async () => {
+    // Aucune instance d'AutonomousAgent n'est démarrée → aucun répondeur vivant.
+    // Le repli fait concourir les rôles enregistrés passés en fallbackBidders.
+    const bus = new AgentMessageBus();
+    const negotiator = new ContractNetNegotiator(bus, {
+      biddingWindowMs: 20,
+      fallbackBidders: () => ["coder", "researcher", "writer"],
+    });
+
+    // tester n'est pas dans la liste ; researcher couvre les capacités requises.
+    const task = makeTask({
+      taskId: "fallback-task",
+      requiredCapabilities: ["knowledge_search_entities", "knowledge_memory_list"],
+    });
+
+    let awarded: string | null = null;
+    bus.subscribe("researcher", "task_request", async (msg: AgentMessage) => {
+      awarded = msg.to as string;
+    });
+
+    const outcome = await negotiator.negotiate(task, "architect");
+
+    assert.equal(outcome.winner, "researcher", "le repli doit élire le meilleur match");
+    assert.equal(outcome.awarded, true, "un task_request doit être publié vers le gagnant");
+    assert.equal(awarded, "researcher");
+    assert.ok(outcome.bids.length > 0, "le repli a produit des bids");
+  });
+
+  it("ne déclenche PAS le repli quand des bids vivants arrivent (ils priment)", async () => {
+    const bus = new AgentMessageBus();
+    let fallbackCalls = 0;
+    const negotiator = new ContractNetNegotiator(bus, {
+      biddingWindowMs: 40,
+      fallbackBidders: () => {
+        fallbackCalls++;
+        return ["coder", "researcher", "writer"];
+      },
+    });
+
+    const task = makeTask({ taskId: "live-wins", requiredCapabilities: ["verify_full", "run_project_command"] });
+    const promise = negotiator.negotiate(task, "architect");
+
+    // Un bid vivant arrive pendant la fenêtre.
+    negotiator.submitBid(task.taskId, { role: "tester", skillMatch: 1, confidence: 0.5, loadPenalty: 0.1 });
+
+    const outcome = await promise;
+
+    assert.equal(outcome.winner, "tester", "le bid vivant doit l'emporter");
+    assert.equal(fallbackCalls, 0, "le repli ne doit pas être consulté quand un bid vivant existe");
+  });
+
+  it("exclut l'initiateur de la liste de repli (pas d'auto-attribution biaisée)", async () => {
+    const bus = new AgentMessageBus();
+    const negotiator = new ContractNetNegotiator(bus, {
+      biddingWindowMs: 20,
+      // architect couvrirait les capacités, mais c'est lui l'initiateur ici.
+      fallbackBidders: () => ["architect", "researcher"],
+    });
+
+    const task = makeTask({
+      taskId: "exclude-initiator",
+      requiredCapabilities: ["knowledge_search_entities", "knowledge_impact_analyze"],
+    });
+
+    const outcome = await negotiator.negotiate(task, "architect");
+
+    assert.ok(
+      !outcome.bids.some((b) => b.role === "architect"),
+      "l'initiateur ne doit pas enchérir via le repli"
+    );
+    assert.notEqual(outcome.winner, "architect");
+  });
+
+  it("retourne winner=null si le repli ne couvre aucune capacité requise", async () => {
+    const bus = new AgentMessageBus();
+    const negotiator = new ContractNetNegotiator(bus, {
+      biddingWindowMs: 20,
+      // writer ne possède aucune capacité de knowledge → tous inéligibles.
+      fallbackBidders: () => ["writer"],
+    });
+
+    const task = makeTask({
+      taskId: "no-match",
+      requiredCapabilities: ["knowledge_search_entities", "knowledge_memory_list"],
+    });
+
+    const outcome = await negotiator.negotiate(task, "architect");
+
+    assert.equal(outcome.winner, null, "aucun rôle du repli ne couvre les capacités");
+    assert.equal(outcome.awarded, false);
+  });
+});
+
 interface AgentRoleCapture {
   role: string | null;
   taskId: string | null;
