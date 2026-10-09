@@ -749,6 +749,10 @@ function OrbLiveWindow() {
         <Suspense fallback={<LoadingFallback />}>
           <OrbLiveView />
         </Suspense>
+        {/* Sélecteur de source d'écran : nécessaire pour que le partage d'écran
+            fonctionne aussi dans la fenêtre orb (sinon toggleScreenShare reste
+            bloqué sur « en attente de source »). */}
+        <ScreenShareSourcePicker />
       </ScreenShareProvider>
     </LiveAPIContext.Provider>
   );
