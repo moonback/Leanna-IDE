@@ -39,6 +39,33 @@ export function useWorkspaceState() {
 
   useEffect(() => { void fetchWorkspace(); }, [fetchWorkspace]);
 
+  // Rafraîchir quand le projet actif change (ouverture, changement, clear) ou
+  // au retour sur la fenêtre. Sans cela, le hook reste figé sur l'état du
+  // montage : si l'écran est monté avant qu'un projet soit connecté, il affiche
+  // « aucun workspace » même une fois le projet ouvert.
+  useEffect(() => {
+    const onWorkspaceChanged = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { workspace?: string | null } | undefined;
+      // Workspace explicitement désactivé → vider sans refetch.
+      if (detail && detail.workspace === null) {
+        setWorkspace(null);
+        return;
+      }
+      // Laisser le serveur basculer SELF_ROOT avant de relire /api/workspace.
+      setTimeout(() => { void fetchWorkspace(); }, 150);
+    };
+    const onFocus = () => { void fetchWorkspace(); };
+
+    window.addEventListener('Leanna-workspace-changed', onWorkspaceChanged as EventListener);
+    window.addEventListener('Leanna-sandbox-changed', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('Leanna-workspace-changed', onWorkspaceChanged as EventListener);
+      window.removeEventListener('Leanna-sandbox-changed', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchWorkspace]);
+
   return {
     workspace,
     loading,
