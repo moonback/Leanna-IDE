@@ -19,7 +19,7 @@ import { ToolRegistry } from "../ToolRegistry.js";
 import { EventBus } from "../EventBus.js";
 import { adaptSkill, adaptAllSkills, createToolCallProxy } from "./SkillAdapter.js";
 import type { LegacySkill } from "./SkillAdapter.js";
-import type { ToolCallMetrics } from "../types.js";
+import type { ToolCallMetrics, ToolSource } from "../types.js";
 import type { Skill } from "../../skills/base.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -50,7 +50,7 @@ export class SkillManagerV2 {
    * Enregistre une skill legacy dans le nouveau système.
    * Convertit ses déclarations en ToolDefinitions et les enregistre dans le ToolRegistry.
    */
-  registerSkill(skill: LegacySkill): void {
+  registerSkill(skill: LegacySkill, source?: ToolSource): void {
     // Éviter les doublons
     const previousSkill = this.skills.find((s) => s.name === skill.name);
     if (previousSkill) {
@@ -63,20 +63,24 @@ export class SkillManagerV2 {
     }
 
     this.skills.push(skill);
-    const definitions = adaptSkill(skill);
+    // Détection auto de la provenance quand l'appelant ne la précise pas : les
+    // skills chargées dynamiquement passent toujours une source explicite
+    // (mcp/custom) ; les autres sont `builtin` par défaut via l'adaptateur.
+    const definitions = adaptSkill(skill, source ? { source } : {});
     this.registry.registerAll(definitions);
   }
 
   /**
    * Enregistre toutes les skills d'un coup (démarrage).
+   * Ces skills sont les skills statiques livrées avec l'application → `builtin`.
    */
   registerAllSkills(skills: LegacySkill[]): void {
-    const definitions = adaptAllSkills(skills);
+    const definitions = adaptAllSkills(skills, { source: "builtin" });
     this.registry.registerAll(definitions);
     this.skills = [...skills];
 
     console.log(
-      `[SkillManagerV2] ${definitions.length} outil(s) enregistrés depuis ${skills.length} skill(s): ${skills.map((s) => s.name).join(", ")}`
+      `[SkillManagerV2] ${definitions.length} outil(s) builtin enregistrés depuis ${skills.length} skill(s): ${skills.map((s) => s.name).join(", ")}`
     );
   }
 
@@ -338,7 +342,7 @@ export class SkillManagerV2 {
         handleToolCall: managementSkill.handleToolCall.bind(managementSkill),
         permissions: managementSkill.permissions as any,
         toolPermissions: managementSkill.toolPermissions as any,
-      });
+      }, "custom");
 
       // Charger les déclarations des custom skills actifs
       const declarations = await getCustomSkillDeclarations();
@@ -350,7 +354,7 @@ export class SkillManagerV2 {
           return handleCustomSkillCall(name, args);
         },
       };
-      this.registerSkill(customSkillProxy);
+      this.registerSkill(customSkillProxy, "custom");
       console.log(`[SkillManagerV2] ✓ ${declarations.length} custom skill(s) chargé(s) depuis la BDD.`);
     } catch (err: any) {
       // Non critique — les custom skills ne bloquent pas le démarrage

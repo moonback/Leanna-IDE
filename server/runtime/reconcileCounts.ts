@@ -17,8 +17,9 @@
 
 import type { AgentRuntime } from "./AgentRuntime.js";
 import { listAgentDefinitions } from "../agents/roles.js";
-import { resolveToolAttribution, getToolCategory } from "../agents/toolAgentMapper.js";
+import { getToolCategory } from "../agents/toolAgentMapper.js";
 import { defaultAgents } from "./agents/index.js";
+import { buildToolInventory, formatSourceBreakdown, type ToolInventory } from "./ToolInventory.js";
 
 export interface ReconciliationReport {
   delegationAgents: number;
@@ -46,6 +47,13 @@ export interface ReconciliationReport {
    * savoir EXACTEMENT quels outils retombent sur « system », pour les traiter.
    */
   unattributedTools: { tool: string; detectedCategory?: string }[];
+  /**
+   * Inventaire canonique dérivé du ToolRegistry : source de vérité unique dont
+   * TOUS les compteurs d'outils ci-dessus sont extraits. Expose la ventilation
+   * par provenance (builtin/mcp/custom), qui explique mécaniquement les écarts
+   * entre les snapshots de compteurs pris à des instants différents du boot.
+   */
+  inventory: ToolInventory;
 }
 
 /**
@@ -61,10 +69,11 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
   // (B) Flotte runtime : plugins enregistrés dans AgentRuntime.
   const runtimeAgentIds = new Set(defaultAgents.map((a) => a.metadata.id));
 
-  // (C) Outils réellement exécutables : source de vérité = ToolRegistry.
-  const executableToolNames = new Set(
-    runtime.tools.getDeclarations().map((d) => d.name)
-  );
+  // (C) Inventaire canonique : SOURCE DE VÉRITÉ UNIQUE. Tous les compteurs
+  // d'outils ci-dessous en sont dérivés, au lieu de re-parcourir le registre
+  // avec des logiques parallèles (cause historique des écarts inexpliqués).
+  const inventory = buildToolInventory(runtime.tools);
+  const executableToolNames = new Set(inventory.records.map((r) => r.id));
 
   // (D) Capabilities distinctes déclarées par tous les rôles (= base du mapping UI).
   const mappedCapabilities = new Set<string>();
@@ -82,35 +91,25 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     .filter((role) => !runtimeAgentIds.has(role))
     .sort();
 
-  // Asymétrie 3 : attribution réelle des outils exécutables.
-  // On interroge la MÊME cascade que le renderer (resolveToolAttribution) :
-  //   explicit → capability → category → unattributed.
-  // Seul `unattributed` retombe sur `system` : c'est le vrai chiffre honnête,
-  // et non plus « tout ce qui n'est pas une capability ».
-  let explicitlyAttributedTools = 0;
-  let capabilityAttributedTools = 0;
-  let categoryAttributedTools = 0;
-  let unmappedExecutableTools = 0;
-  const unattributedTools: { tool: string; detectedCategory?: string }[] = [];
-  for (const tool of executableToolNames) {
-    switch (resolveToolAttribution(tool).source) {
-      case "explicit": explicitlyAttributedTools++; break;
-      case "capability": capabilityAttributedTools++; break;
-      case "category": categoryAttributedTools++; break;
-      default: {
-        unmappedExecutableTools++;
-        const detectedCategory = getToolCategory(tool);
-        unattributedTools.push(detectedCategory ? { tool, detectedCategory } : { tool });
-        break;
-      }
-    }
-  }
-  unattributedTools.sort((a, b) => a.tool.localeCompare(b.tool));
+  // Asymétrie 3 : attribution réelle des outils exécutables, LUE depuis
+  // l'inventaire (qui a déjà résolu la cascade explicit → capability → category
+  // → unattributed pour chaque outil). Un seul parcours, une seule vérité.
+  const explicitlyAttributedTools = inventory.summary.byAttribution.explicit;
+  const capabilityAttributedTools = inventory.summary.byAttribution.capability;
+  const categoryAttributedTools = inventory.summary.byAttribution.category;
+  const unmappedExecutableTools = inventory.summary.byAttribution.unattributed;
+  const unattributedTools = inventory.records
+    .filter((r) => r.attributionSource === "unattributed")
+    .map((r) => {
+      const detectedCategory = getToolCategory(r.id);
+      return detectedCategory ? { tool: r.id, detectedCategory } : { tool: r.id };
+    })
+    .sort((a, b) => a.tool.localeCompare(b.tool));
 
   const report: ReconciliationReport = {
     delegationAgents: delegationDefs.length,
     runtimeAgents: runtime.listAgents().length,
-    executableTools: runtime.tools.size,
+    executableTools: inventory.summary.total,
     mappedCapabilities: mappedCapabilities.size,
     orphanCapabilities,
     delegationOnlyRoles,
@@ -119,6 +118,7 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     capabilityAttributedTools,
     explicitlyAttributedTools,
     unattributedTools,
+    inventory,
   };
 
   // ── Log lisible : les 4 populations, explicitement nommées ──────────────────
@@ -126,9 +126,29 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     "[Reconcile] Populations distinctes au démarrage :\n" +
     `  • Agents de délégation (roles.ts)      : ${report.delegationAgents}\n` +
     `  • Agents runtime (AgentRuntime plugins) : ${report.runtimeAgents}\n` +
-    `  • Outils exécutables (ToolRegistry)     : ${report.executableTools}\n` +
+    `  • Outils exécutables (ToolRegistry)     : ${report.executableTools} (${formatSourceBreakdown(inventory.summary)})\n` +
     `  • Capabilities mappées UI (roles.ts)    : ${report.mappedCapabilities}`
   );
+
+  // ── Ventilation canonique par provenance ────────────────────────────────────
+  // C'est CE log qui dissipe l'écart « 225 → 229 » : le premier chiffre était un
+  // snapshot des outils builtin pris avant l'enregistrement MCP/custom ; le
+  // total final est builtin + mcp + custom, désormais explicite.
+  console.log(
+    "[Reconcile] Inventaire canonique des outils (par provenance) :\n" +
+    `  • builtin : ${inventory.summary.bySource.builtin}\n` +
+    `  • mcp     : ${inventory.summary.bySource.mcp}\n` +
+    `  • custom  : ${inventory.summary.bySource.custom}\n` +
+    `  • unknown : ${inventory.summary.bySource.unknown}\n` +
+    `  → total exécutable : ${inventory.summary.total} ` +
+    `(dont ${inventory.summary.sideEffecting} à effet de bord)`
+  );
+  if (inventory.summary.bySource.unknown > 0) {
+    console.warn(
+      `[Reconcile] ⚠️ ${inventory.summary.bySource.unknown} outil(s) de provenance « unknown » ` +
+      `(enregistrés sans source explicite). À tagguer à la source d'enregistrement.`
+    );
+  }
 
   // ── Attribution réelle des outils (cascade explicit → capability → category) ─
   console.log(

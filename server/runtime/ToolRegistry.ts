@@ -224,8 +224,16 @@ export class ToolRegistry {
    */
   register(definition: ToolDefinition): void {
     const name = definition.declaration.name;
+    // Horodatage posé par le registre (pas par l'adaptateur) : il reflète
+    // l'ordre d'enregistrement RÉEL, ce qui permet d'expliquer les snapshots de
+    // compteurs pris à des instants différents du bootstrap. On préserve une
+    // valeur déjà fournie (ré-enregistrement idempotent) uniquement si présente.
+    const stamped: ToolDefinition =
+      definition.registeredAt === undefined
+        ? { ...definition, registeredAt: Date.now() }
+        : definition;
     this.tools.set(name, {
-      definition,
+      definition: stamped,
       metrics: { calls: 0, failures: 0, totalMs: 0 },
     });
   }

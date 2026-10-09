@@ -9,6 +9,7 @@ import { Router, Request, Response } from "express";
 import type { AgentRuntime } from "../AgentRuntime.js";
 import type { LeannaCore } from "../../autonomy/LeannaCore.js";
 import { strategyMemory } from "../../knowledge/StrategyMemory.js";
+import { buildToolInventory } from "../ToolInventory.js";
 
 export function createMetricsRouter(runtime: AgentRuntime, autonomy?: LeannaCore): Router {
   const router = Router();
@@ -79,6 +80,41 @@ export function createMetricsRouter(runtime: AgentRuntime, autonomy?: LeannaCore
       res.json({
         metrics: runtime.tools.getToolMetrics(),
         history: runtime.tools.getCallHistory(limit),
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/v2/metrics/inventory — inventaire canonique des outils.
+  //
+  // Source de vérité unique : chaque outil exécutable du ToolRegistry avec son
+  // identifiant stable, propriétaire, provenance (builtin/mcp/custom), état,
+  // permissions, niveau d'autorisation et attribution d'agent. Les totaux
+  // (summary) en sont DÉRIVÉS, ce qui rend les écarts de compteurs de démarrage
+  // auditables au lieu d'être mystérieux.
+  //
+  // Filtres optionnels : ?source=builtin|mcp|custom|unknown · ?sideEffect=true
+  router.get("/inventory", (req: Request, res: Response) => {
+    try {
+      const inventory = buildToolInventory(runtime.tools);
+      let records = inventory.records;
+
+      const source = req.query.source as string | undefined;
+      if (source) {
+        records = records.filter((r) => r.source === source);
+      }
+      if (req.query.sideEffect === "true") {
+        records = records.filter((r) => r.hasSideEffect);
+      } else if (req.query.sideEffect === "false") {
+        records = records.filter((r) => !r.hasSideEffect);
+      }
+
+      res.json({
+        timestamp: new Date(inventory.capturedAt).toISOString(),
+        summary: inventory.summary,
+        count: records.length,
+        tools: records,
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

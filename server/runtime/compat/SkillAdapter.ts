@@ -13,7 +13,7 @@
  *   Nouveau runtime
  */
 
-import type { ToolDefinition, ToolDeclaration, ToolPermission } from "../types.js";
+import type { ToolDefinition, ToolDeclaration, ToolPermission, ToolSource } from "../types.js";
 import { normalizePermissions } from "../types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -92,6 +92,12 @@ function adaptDeclaration(
     category: options.category ?? skill.name,
     timeoutMs: options.timeoutMs ?? inferTimeout(decl.name),
     permissions: resolvePermissions(skill, decl, options),
+    // Provenance : explicite via options.source, sinon déduite du marqueur MCP
+    // (un outil portant `_mcpServerId` vient forcément d'un serveur MCP), sinon
+    // `builtin` par défaut (cas des skills statiques). L'owner garde la
+    // granularité fine : id du serveur MCP s'il existe, sinon nom de la skill.
+    source: options.source ?? ((decl as any)._mcpServerId ? "mcp" : "builtin"),
+    owner: (decl as any)._mcpServerId ?? skill.name,
   };
 }
 
@@ -302,4 +308,9 @@ export interface AdaptOptions {
   permissions?: ToolDefinition["permissions"];
   /** Contexte à passer aux handlers */
   context?: any;
+  /**
+   * Provenance à assigner aux outils produits. Prime sur la déduction par
+   * marqueur MCP. Laisser indéfini pour la détection automatique.
+   */
+  source?: ToolSource;
 }

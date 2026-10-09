@@ -303,7 +303,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       await mcpBridge.initialize();
       const syncMcpSkill = () => {
         try {
-          sm.registerSkill(mcpBridge.toSkill());
+          sm.registerSkill(mcpBridge.toSkill(), "mcp");
         } catch (e) {
           console.warn(`[Bootstrap] ⚠️ Ré-enregistrement skill MCP échoué:`, (e as Error).message);
         }

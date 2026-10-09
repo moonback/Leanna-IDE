@@ -98,6 +98,21 @@ export interface ToolDeclaration {
   parameters: Record<string, unknown>;
 }
 
+/**
+ * Provenance d'un outil au moment de son enregistrement dans le ToolRegistry.
+ *
+ * C'est la clé qui rend l'inventaire TRAÇABLE : chaque outil sait d'où il vient,
+ * ce qui explique mécaniquement les écarts de compteurs au démarrage (p. ex.
+ * « 225 outils builtin au premier log » vs « 229 outils exécutables au total »
+ * = + les outils `mcp` et `custom` enregistrés après le snapshot builtin).
+ *
+ *   - `builtin` : skills statiques livrées avec l'application (server/skills/*).
+ *   - `mcp`     : outils exposés par un serveur MCP via le bridge.
+ *   - `custom`  : skills définies par l'utilisateur et chargées depuis la BDD.
+ *   - `unknown` : provenance non renseignée (défaut rétrocompatible).
+ */
+export type ToolSource = "builtin" | "mcp" | "custom" | "unknown";
+
 export interface ToolDefinition {
   declaration: ToolDeclaration;
   handler: ToolHandler;
@@ -107,6 +122,21 @@ export interface ToolDefinition {
   timeoutMs?: number;
   /** Catégorie pour le filtrage */
   category?: string;
+  /**
+   * Provenance de l'outil (builtin / mcp / custom). Posée au moment de
+   * l'enregistrement. Absente = `unknown` (comportement historique inchangé).
+   */
+  source?: ToolSource;
+  /**
+   * Propriétaire logique : nom de la skill (ou id du serveur MCP) qui a
+   * enregistré l'outil. Donne la granularité fine au-delà de `source`.
+   */
+  owner?: string;
+  /**
+   * Horodatage (epoch ms) de l'enregistrement effectif dans le ToolRegistry.
+   * Posé par le registre, pas par l'adaptateur, pour refléter l'ordre réel.
+   */
+  registeredAt?: number;
   /**
    * Attribution d'agent (source de vérité côté ToolRegistry).
    *

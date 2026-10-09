@@ -34,7 +34,12 @@ let dryRunReportProvider: (() => unknown) | null = null;
 export function initMissionSystem(exec: Executor, skills: string[]): void {
   executor = exec;
   availableSkillNames = skills;
-  console.log(`[MissionSkill] ✓ Mission System initialisé (${skills.length} skills disponibles)`);
+  // NB : `skills` n'est PAS un inventaire de skills, mais la liste des NOMS
+  // D'OUTILS autorisés en mission autonome (outils exécutables moins les outils
+  // `browser_*` pilotés par la webview, cf. MISSION_WEB_TOOL_ALLOWLIST dans
+  // server.ts). Le libellé le dit explicitement pour ne plus laisser croire à
+  // une 3e population de « skills » incohérente avec les compteurs d'outils.
+  console.log(`[MissionSkill] ✓ Mission System initialisé (${skills.length} outils autorisés en mission)`);
 }
 
 /**
