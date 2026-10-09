@@ -33,6 +33,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quit: () =>
     ipcRenderer.invoke('electron/quit'),
 
+  // Ouvre la fenêtre dédiée « Présence vocale » (orb + live vocal) sur /orb-live.
+  openOrbWindow: () =>
+    ipcRenderer.invoke('electron/open-orb-window'),
+
+  // Relaie une action de la fenêtre orb vers la fenêtre IDE principale.
+  //   name   : nom de l'événement (ex: 'Leanna-action')
+  //   detail : charge utile de l'événement
+  //   focusIde : ramène l'IDE au premier plan si true
+  forwardToIde: (name, detail, focusIde) =>
+    ipcRenderer.invoke('electron/forward-to-ide', { name, detail, focusIde }),
+
+  // S'abonne aux actions relayées depuis une autre fenêtre (reçues par l'IDE).
+  // Retourne une fonction de désabonnement.
+  onRemoteEvent: (callback) => {
+    const listener = (_event, payload) => {
+      try { callback(payload); } catch (_) { /* noop */ }
+    };
+    ipcRenderer.on('leanna-remote-event', listener);
+    return () => ipcRenderer.removeListener('leanna-remote-event', listener);
+  },
+
   // Clone un dépôt git distant dans un dossier local.
   // repoUrl  : URL HTTPS ou SSH du dépôt (ex: https://github.com/user/repo.git)
   // targetDir: dossier parent optionnel (défaut: ~/Documents/Leanna-Projects)

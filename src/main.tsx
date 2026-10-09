@@ -20,6 +20,7 @@ import { LauncherModal } from './components/LauncherModal.js';
 import { EnvSetupModal } from './components/EnvSetupModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
+import { installIdeRemoteForwarder, installIdeRemoteReceiver } from './lib/ideRemoteBridge.js';
 import { Loader2, X } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
@@ -39,6 +40,7 @@ const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'))
 const MissionSimulationView = lazy(() => import('./views/MissionSimulationView.js'));
 const AgentSwarmView = lazy(() => import('./views/AgentSwarmView.js'));
 const ExplainabilityView = lazy(() => import('./views/ExplainabilityView.js'));
+const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -526,6 +528,10 @@ function Layout() {
   const { profile } = useProfile();
   useAgentEventStream();
 
+  // Reçoit les actions relayées depuis la fenêtre « Présence vocale » (orb) et
+  // les rejoue localement, pour que l'orb pilote cet IDE.
+  useEffect(() => installIdeRemoteReceiver(), []);
+
   // ── Cleanup global resources on unmount ─────────────────────────────────
   useEffect(() => {
     // Install beforeunload cleanup (only once)
@@ -721,6 +727,48 @@ function Layout() {
   );
 }
 
+/**
+ * OrbLiveWindow — Racine autonome pour la fenêtre Electron dédiée (/orb-live).
+ *
+ * Monte son PROPRE LiveAPIProvider : la session vocale y est donc totalement
+ * indépendante de la fenêtre principale (process renderer distinct). Aucune
+ * sidebar ni Layout global — uniquement la vue orb plein écran.
+ */
+function OrbLiveWindow() {
+  const liveAPI = useLiveAPI();
+
+  // Relaie les actions IDE de cette fenêtre (session live propre) vers l'IDE.
+  useEffect(() => installIdeRemoteForwarder(), []);
+
+  return (
+    <LiveAPIContext.Provider value={liveAPI}>
+      <ScreenShareProvider
+        onFrame={liveAPI.sendVideoFrame}
+        connected={liveAPI.connected}
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <OrbLiveView />
+        </Suspense>
+        {/* Sélecteur de source d'écran : nécessaire pour que le partage d'écran
+            fonctionne aussi dans la fenêtre orb (sinon toggleScreenShare reste
+            bloqué sur « en attente de source »). */}
+        <ScreenShareSourcePicker />
+      </ScreenShareProvider>
+    </LiveAPIContext.Provider>
+  );
+}
+
+/**
+ * AppRoot — Aiguille entre l'application complète (Layout) et la fenêtre orb
+ * dédiée selon le chemin courant. La fenêtre /orb-live ne doit PAS monter le
+ * Layout global (sidebar, routes, orb flottant) : c'est une surface isolée.
+ */
+function AppRoot() {
+  const { pathname } = useLocation();
+  if (pathname === '/orb-live') return <OrbLiveWindow />;
+  return <Layout />;
+}
+
 class RootErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
@@ -800,7 +848,7 @@ appRoot.render(
             <ConfirmDialogProvider>
               <BrowserRouter>
                 <AuthGate>
-                  <Layout />
+                  <AppRoot />
                 </AuthGate>
               </BrowserRouter>
             </ConfirmDialogProvider>
