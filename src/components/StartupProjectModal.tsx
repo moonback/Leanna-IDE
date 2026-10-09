@@ -85,6 +85,10 @@ export function StartupProjectModal() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Quand true : la sélection est imposée (ex. après « Changer de projet »).
+  // On ne peut PAS revenir en arrière vers l'ancien projet : ni bouton fermer,
+  // ni Échap, ni clic sur le fond. Seule l'ouverture d'un projet ferme la modale.
+  const [forceSelection, setForceSelection] = useState(false);
   const { error: toastError } = useToast();
 
   const shouldReduceMotion = useReducedMotion();
@@ -154,20 +158,24 @@ export function StartupProjectModal() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (cloneStatus === 'cloning' || loading) return;
+      // Sélection imposée : Échap ne permet pas de revenir en arrière.
+      if (forceSelection) return;
       handleClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // handleClose dépend de currentPath via la closure ; isOpen + statuts suffisent au re-bind.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, cloneStatus, loading, currentPath]);
+  }, [isOpen, cloneStatus, loading, currentPath, forceSelection]);
 
   // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
-    const handleOpenModal = async () => {
+    const handleOpenModal = async (e: Event) => {
       // Attendre un peu pour que le workspace soit fermé côté serveur
       await new Promise(resolve => setTimeout(resolve, 100));
       await fetchWorkspaces();
+      const forced = !!(e as CustomEvent).detail?.force;
+      setForceSelection(forced);
       setIsOpen(true);
       setError(null);
     };
@@ -219,6 +227,7 @@ export function StartupProjectModal() {
     window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
     setCurrentPath(newRoot);
+    setForceSelection(false);
     setIsOpen(false);
   }, []);
 
@@ -533,17 +542,19 @@ export function StartupProjectModal() {
               >
                 <Settings className="w-4 h-4" />
               </motion.button>
-              <motion.button
-                type="button"
-                onClick={handleClose}
-                whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
-                title={currentPath ? "Fermer" : "Quitter"}
-              >
-                <X className="w-4 h-4" />
-              </motion.button>
+              {!forceSelection && (
+                <motion.button
+                  type="button"
+                  onClick={handleClose}
+                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                  title={currentPath ? "Fermer" : "Quitter"}
+                >
+                  <X className="w-4 h-4" />
+                </motion.button>
+              )}
             </div>
           </div>
 
@@ -1046,16 +1057,7 @@ export function StartupProjectModal() {
                   Nouveau projet
                 </motion.button>
               )}
-              {currentPath && (
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                >
-                  Fermer
-                </button>
-              )}
+              
               {activeTab === 'open' && (
                 <motion.button
                   type="button"

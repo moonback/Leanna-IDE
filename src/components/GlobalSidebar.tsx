@@ -32,6 +32,7 @@ import {
   Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, LogOut, FolderInput,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
+import { useConfirm } from './ui/ConfirmDialog.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
 import type { UnifiedSidebarProps } from './sidebar/types.js';
@@ -197,6 +198,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   const { pathname } = useLocation();
   const reduceMotion = useReducedMotion() ?? false;
   const { theme } = useTheme();
+  const { confirm } = useConfirm();
   const agent = useAgentStatus();
   const navRef = useRef<HTMLElement>(null);
 
@@ -269,6 +271,15 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
   /* Changer de projet racine : ferme les onglets, désactive le workspace, ouvre la modale. */
   const handleSwitchWorkspace = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Changer de projet',
+      message: 'Changer de projet va fermer les onglets ouverts et désactiver le workspace courant. Continuer ?',
+      confirmLabel: 'Changer de projet',
+      cancelLabel: 'Annuler',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
+
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
     try {
       const res = await fetch('/api/self-root/clear', { method: 'POST' });
@@ -276,8 +287,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
     } catch (e) {
       console.error('[GlobalSidebar] Échec de la désactivation du workspace:', e);
     }
-    window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
-  }, []);
+    // `force: true` → la modale de sélection ne doit PAS permettre de revenir en
+    // arrière (pas de bouton fermer, pas d'Échap) : l'ancien projet est déjà fermé.
+    window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher', { detail: { force: true } }));
+  }, [confirm]);
 
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
 
@@ -423,7 +436,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   ))}
             </div>
 
-            {/* Pied : changer de projet + paramètres + quitter */}
+            {/* Pied : changer de projet + paramètres */}
             <div className="mt-auto flex-shrink-0 border-t px-2 py-1" style={{ borderColor: 'var(--border-base)' }}>
               <NavButton
                 item={{ id: 'switch-workspace', path: '', label: 'Changer de projet', icon: FolderInput }}
@@ -440,20 +453,9 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                     onClick={() => navigate('/settings')}
                   />
                 </div>
-                {!collapsed && (
-                  <QuitButton onClick={handleQuit} reduceMotion={reduceMotion} />
-                )}
+                
               </div>
-              {collapsed && (
-                <div className="mt-0.5">
-                  <NavButton
-                    item={{ id: 'quit', path: '', label: 'Quitter', icon: LogOut }}
-                    active={false}
-                    collapsed
-                    onClick={handleQuit}
-                  />
-                </div>
-              )}
+              
             </div>
 
             {/* Marqueur de thème (invisible, garde le thème réactif pour l'outillage) */}
@@ -517,21 +519,7 @@ function IconButton({
   );
 }
 
-function QuitButton({ onClick, reduceMotion }: { onClick: () => void; reduceMotion: boolean }) {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      aria-label="Quitter"
-      title="Quitter"
-      whileTap={reduceMotion ? undefined : { scale: 0.92 }}
-      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--color-error)] ${FOCUS_RING}`}
-      style={{ color: 'var(--text-muted)' }}
-    >
-      <LogOut size={16} />
-    </motion.button>
-  );
-}
+
 
 /** Groupe repliable : en-tête cliquable, hauteur animée, séparateur en mode icônes. */
 function Group({
