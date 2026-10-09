@@ -124,15 +124,58 @@ interface MarkdownPromptEditorProps {
   readOnly?: boolean;
   /** Appelé avec (ctrl/cmd+S) pour déclencher la sauvegarde. */
   onSave?: () => void;
+  /**
+   * Optimise un extrait sélectionné via l'IA. Reçoit le texte sélectionné et
+   * le mode ('auto' = réglages courants ; 'manual' = l'appelant demande une
+   * instruction précise à l'utilisateur). Doit renvoyer le texte de
+   * remplacement, ou null pour annuler. L'éditeur applique lui-même le
+   * remplacement (en préservant l'historique d'annulation).
+   */
+  onOptimizeSelection?: (args: { selection: string; mode: 'auto' | 'manual' }) => Promise<string | null>;
 }
 
 export function MarkdownPromptEditor({
-  value, onChange, dark, height = '360px', readOnly = false, onSave,
+  value, onChange, dark, height = '360px', readOnly = false, onSave, onOptimizeSelection,
 }: MarkdownPromptEditorProps) {
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+  const onOptimizeSelectionRef = useRef(onOptimizeSelection);
+  onOptimizeSelectionRef.current = onOptimizeSelection;
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+
+  /**
+   * Récupère la sélection courante, appelle le parent pour obtenir le texte
+   * optimisé, puis remplace la sélection par ce texte via executeEdits (ce qui
+   * conserve l'undo et déclenche onChange automatiquement).
+   */
+  const runSelectionOptimize = useCallback(async (mode: 'auto' | 'manual') => {
+    const editor = editorRef.current;
+    const handler = onOptimizeSelectionRef.current;
+    if (!editor || !handler) return;
+
+    const selection = editor.getSelection();
+    const model = editor.getModel();
+    if (!selection || !model || selection.isEmpty()) return;
+
+    const selectedText = model.getValueInRange(selection);
+    if (!selectedText.trim()) return;
+
+    const replacement = await handler({ selection: selectedText, mode });
+    if (replacement == null) return; // annulé ou échec
+
+    // Remplace la sélection. pushUndoStop garde l'opération annulable d'un coup.
+    editor.pushUndoStop();
+    editor.executeEdits('optimize-selection', [
+      { range: selection, text: replacement, forceMoveMarkers: true },
+    ]);
+    editor.pushUndoStop();
+    editor.focus();
+  }, []);
 
   const handleMount = useCallback((editor: any, monaco: any) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
     defineThemes(monaco);
     monaco.editor.setTheme(dark ? THEME_DARK : THEME_LIGHT);
 
@@ -140,7 +183,27 @@ export function MarkdownPromptEditor({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       onSaveRef.current?.();
     });
-  }, [dark]);
+
+    // ── Actions du menu contextuel (clic droit) sur une sélection ────────────
+    // Visibles uniquement quand du texte est sélectionné (editorHasSelection).
+    editor.addAction({
+      id: 'leanna-optimize-selection-auto',
+      label: '✨ Optimiser la sélection (auto)',
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 1.5,
+      precondition: 'editorHasSelection',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyO],
+      run: () => { void runSelectionOptimize('auto'); },
+    });
+    editor.addAction({
+      id: 'leanna-optimize-selection-manual',
+      label: '✨ Optimiser la sélection (demande précise)…',
+      contextMenuGroupId: '1_modification',
+      contextMenuOrder: 1.6,
+      precondition: 'editorHasSelection',
+      run: () => { void runSelectionOptimize('manual'); },
+    });
+  }, [dark, runSelectionOptimize]);
 
   return (
     <div
