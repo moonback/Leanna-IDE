@@ -227,7 +227,6 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const collapsed = pinnedCollapsed && !hovered;
-  const isOverlay = pinnedCollapsed && hovered; // déplié temporairement par-dessus la page
 
   /* Halo de survol partagé. */
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -287,11 +286,12 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   return (
     <SidebarContext.Provider value={ctx}>
       <LayoutGroup id="leanna-global-sidebar">
-        {/* Emplacement réservé : seule la préférence épinglée pousse la page. */}
+        {/* Emplacement réservé : il suit l'état réellement affiché (survol inclus)
+            pour que le contenu central s'adapte à la largeur de la barre. */}
         <motion.div
           className="relative h-full flex-shrink-0"
           initial={false}
-          animate={{ width: pinnedCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+          animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
           transition={spring}
         >
           <motion.nav
@@ -301,7 +301,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             initial={false}
             animate={{
               width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
-              boxShadow: isOverlay ? '8px 0 32px -12px rgba(0,0,0,0.45)' : '0 0 0 0 rgba(0,0,0,0)',
+              boxShadow: '0 0 0 0 rgba(0,0,0,0)',
             }}
             transition={spring}
             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
