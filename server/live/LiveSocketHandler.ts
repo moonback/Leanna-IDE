@@ -26,6 +26,12 @@ import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge
 import { Supervisor } from '../autonomy/index.js';
 import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
+import {
+  ToolCallTracker, getToolDeliveryMode, getAckAfterMs,
+  raceWithAbort, raceWithDeadline, abortableSleep, ToolCancelledError,
+  summarizeForNotify, withScheduling, buildAckResponse, applyToolBehavior,
+  LONG_RUNNING_TOOLS, SLOW_TOOLS_NO_RETRY,
+} from './toolExecution.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;
@@ -142,13 +148,6 @@ function isRetryableToolError(err: unknown): boolean {
   return true;
 }
 
-/**
- * Attend `ms` millisecondes (pour le backoff entre retries).
- */
-function sleepMs(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
 function estimateToolTokens(declaration: any): number {
@@ -229,6 +228,7 @@ export function attachLiveWebSocket(
 
     const busyStateRef = { activeDescription: null as string | null };
     const getBusyDescription = () => busyStateRef.activeDescription;
+    const toolTracker = new ToolCallTracker();
 
     // ── Rate limiter audio WebSocket ─────────────────────────────────────────
     // Fenêtre glissante : on accumule les bytes envoyés dans la dernière seconde.
@@ -608,11 +608,14 @@ export function attachLiveWebSocket(
 
       // Retire les marqueurs internes (_mcpServerId) : l'API Gemini n'accepte
       // que name/description/parameters dans une functionDeclaration.
-      const cleanDeclarations = filteredDeclarations.map((d: any) => {
-        if (!d || !d._mcpServerId) return d;
-        const { _mcpServerId, ...rest } = d;
-        return rest;
-      });
+      const cleanDeclarations = applyToolBehavior(
+        filteredDeclarations.map((d: any) => {
+          if (!d || !d._mcpServerId) return d;
+          const { _mcpServerId, ...rest } = d;
+          return rest;
+        }),
+        getToolDeliveryMode(),
+      );
       const tools = cleanDeclarations.length > 0 ? [{ functionDeclarations: cleanDeclarations }] : undefined;
       const toolTokensEstimate = filteredDeclarations.reduce((sum, d) => sum + estimateToolTokens(d), 0);
       const tokensEconomises = estimateToolTokensTotal(skillManager.getToolDeclarations()) - toolTokensEstimate;
@@ -941,6 +944,19 @@ export function attachLiveWebSocket(
 
             if (message.serverContent?.interrupted) clientWs.send(JSON.stringify({ interrupted: true }));
 
+            // ── Annulation côté Gemini ───────────────────────────────────────
+            // On n'annule PAS sur `interrupted` seul : couper la parole du modèle
+            // ne doit pas tuer un audit de 2 minutes parti en arrière-plan.
+            // Gemini envoie `toolCallCancellation` quand il abandonne réellement
+            // un appel — c'est le seul signal qui déclenche l'abort.
+            if ((message as any).toolCallCancellation?.ids?.length) {
+              const cancelled = toolTracker.cancel((message as any).toolCallCancellation.ids);
+              if (cancelled.length > 0) {
+                console.warn(`[ToolCancel] Gemini a annulé ${cancelled.length} appel(s): ${cancelled.join(', ')}`);
+                try { clientWs.send(JSON.stringify({ tool_cancelled: cancelled })); } catch { /* WS fermé */ }
+              }
+            }
+
             if (message.toolCall) {
               handleToolCall(
                 message.toolCall, session, clientWs, sessionMode, busyStateRef, voiceName,
@@ -962,6 +978,7 @@ export function attachLiveWebSocket(
                     autoSummarizeContext?.();
                   }
                 },
+                toolTracker,
               ).catch(e =>
                 console.error('[handleToolCall] Erreur non catchée:', e),
               );
@@ -991,6 +1008,7 @@ export function attachLiveWebSocket(
             }
           },
           onclose: (e: any) => {
+            toolTracker.close('gemini_session_closed');
             const closeCode = e?.code;
             const closeReasonText = e?.reason;
             let closeReason = 'unknown';
@@ -1445,6 +1463,7 @@ export function attachLiveWebSocket(
       });
 
       clientWs.on('close', () => {
+        toolTracker.close('client_disconnected');
         console.log('Client disconnected');
         activeGeminiSessions.delete(session);
         flushAssistantBuffer();
@@ -1609,6 +1628,21 @@ function capToolResponse(
 }
 
 // ── handleToolCall ─────────────────────────────────────────────────────────────
+//
+// Exécution NON BLOQUANTE des tool calls. Un outil lent ne gèle plus la voix.
+//
+// Principes :
+//   • Chaque appel est enregistré dans `toolTracker` avec un AbortController ;
+//     son `signal` est passé au contexte de l'outil (`context.signal`) pour que
+//     les handlers qui le lisent puissent s'interrompre réellement.
+//   • Les outils workspace (PROJECT_SCOPED_TOOLS) s'exécutent EN SÉRIE et dans
+//     l'ordre ; tout le reste d'un même lot part EN PARALLÈLE.
+//   • Mode `blocking` : on attend tous les résultats avant de reprendre la voix.
+//   • Mode `ack` (défaut) : si un outil long dépasse le délai, on renvoie un ack
+//     `status:"running"` pour libérer la voix ; le vrai résultat est annoncé plus
+//     tard en texte via `notifyLiveAPI` ([BACKGROUND TASK UPDATE]).
+//   • Mode `nonblocking` : géré en amont (déclarations NON_BLOCKING) ; ici il se
+//     comporte comme `ack` côté serveur.
 async function handleToolCall(
   toolCall: any,
   session: any,
@@ -1627,12 +1661,15 @@ async function handleToolCall(
   },
   failTracker?: Map<string, number>,
   onToolResultTokens?: (tokens: number) => void,
+  toolTracker: ToolCallTracker = new ToolCallTracker(),
 ): Promise<void> {
-  const functionResponses: any[] = [];
   const skillManager = deps?.skillManager;
   const browserReadPending = deps?.browserReadPending;
   const browserActionPending = deps?.browserActionPending;
   const currentProfile = deps?.getCurrentProfile?.() ?? {};
+
+  const deliveryMode = getToolDeliveryMode();
+  const ackAfterMs = getAckAfterMs();
 
   const WRITE_TOOLS = new Set([
     'write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file',
@@ -1640,15 +1677,17 @@ async function handleToolCall(
   ]);
 
   // Outils qui opèrent sur le workspace (lecture, écriture, exploration). Ils
-  // exigent un SELF_ROOT verrouillé et un sandbox prêt (cf. garde de démarrage).
+  // exigent un SELF_ROOT verrouillé et un sandbox prêt (cf. garde de démarrage),
+  // et DOIVENT rester sérialisés entre eux pour préserver l'ordre des écritures.
   const PROJECT_SCOPED_TOOLS = new Set([
     ...WRITE_TOOLS,
     'read_project_file', 'read_file_outline', 'list_project_files', 'search_in_files',
     'analyze_project_file', 'open_project_file',
   ]);
 
-  const context = {
+  const makeContext = (signal: AbortSignal) => ({
     voiceName,
+    signal,
     notifyLiveAPI: (message: string) => {
       try { session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[BACKGROUND TASK UPDATE] ${message}` }] }] }); } catch (e) { console.error('Failed to notify Live API:', e); }
     },
@@ -1661,7 +1700,9 @@ async function handleToolCall(
     browserReadPending,
     browserActionPending,
     supervisor: sessionSupervisor,
-  };
+  });
+
+  const sendSafe = (data: any) => { try { clientWs.send(JSON.stringify(data)); } catch { /* WS fermé */ } };
 
   try { clientWs.send(JSON.stringify({ busy: true })); } catch {}
   if (busyStateRef) {
@@ -1669,243 +1710,318 @@ async function handleToolCall(
     busyStateRef.activeDescription = `l'exécution de l'outil "${firstCallName}"`;
   }
 
-  for (const call of toolCall.functionCalls) {
-    try {
-      // ── Court-circuit des échecs répétitifs ──────────────────────────────
-      // Si le même outil a déjà échoué REPEATED_FAILURE_LIMIT fois avec des
-      // arguments identiques, on ne le ré-exécute pas : on renvoie un résumé
-      // compact. Les arguments sont probablement invalides et chaque nouvelle
-      // tentative ne ferait qu'empiler un payload d'erreur dans le contexte.
-      const failKey = toolFailureKey(call.name, call.args);
-      if (failTracker && (failTracker.get(failKey) ?? 0) >= REPEATED_FAILURE_LIMIT) {
-        functionResponses.push({
-          id: call.id,
-          name: call.name,
-          response: {
-            error: `[COURT-CIRCUIT] "${call.name}" a déjà échoué ${REPEATED_FAILURE_LIMIT}× avec les mêmes arguments. ` +
-              `Arrête de réessayer : les arguments sont probablement invalides. ` +
-              `Change d'approche (lis le fichier/contexte, corrige les arguments) ou abandonne cette sous-tâche.`,
-            shortCircuited: true,
-          },
-        });
-        clientWs.send(JSON.stringify({ tool_used: call.name, info: `[COURT-CIRCUIT — ${REPEATED_FAILURE_LIMIT} échecs identiques]` }));
-        continue;
-      }
+  // Résultats immédiats à injecter à Gemini (une seule fois, à la fin).
+  const immediateResponses: any[] = [];
+  // Appels basculés en arrière-plan (mode ack) : on les attend après coup pour
+  // annoncer leur résultat en texte, sans bloquer la reprise de la voix.
+  const backgroundPromises: Promise<void>[] = [];
 
-      // ── Garde de démarrage (anti-race condition) ─────────────────────────
-      // Les outils liés au projet (lecture/écriture/exploration) ne doivent pas
-      // s'exécuter avant que le workspace soit verrouillé (SELF_ROOT) et que le
-      // sandbox soit prêt. Sinon, un appel lancé trop tôt échoue avec « Aucun
-      // workspace ouvert », puis le planificateur reboucle. On renvoie une
-      // erreur explicitement RETRYABLE pour que l'agent réessaie proprement.
-      if (PROJECT_SCOPED_TOOLS.has(call.name)) {
-        const sandboxState = getSandboxState();
-        const workspaceReady = !!SELF_ROOT && sandboxState !== 'INITIALIZING';
-        if (!workspaceReady) {
-          const reason = !SELF_ROOT
-            ? 'aucun workspace ouvert (SELF_ROOT non verrouillé)'
-            : `sandbox ${sandboxState}`;
-          functionResponses.push({
-            id: call.id,
-            name: call.name,
-            response: {
-              error: `[DÉMARRAGE] Workspace pas encore prêt (${reason}). Réessaie cet outil dans un instant.`,
-              retryable: true,
-              workspaceReady: false,
-            },
-          });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[EN ATTENTE — workspace non prêt: ${reason}]` }));
-          continue;
-        }
-      }
+  type GuardResult = { settled: true; response: any } | { settled: false };
 
-      // Ask mode guard
-      if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
-        const filePath = (call.args?.path || call.args?.newPath || '') as string;
-        const isAllowed = call.name === 'write_project_file' && filePath.endsWith('.md');
-        if (!isAllowed) {
-          functionResponses.push({ id: call.id, name: call.name, response: { error: 'Mode Ask actif : modification de fichiers interdite.' } });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Mode Ask]' }));
-          continue;
-        }
-      }
-
-      clientWs.send(JSON.stringify({ tool_start: call.name, args: call.args }));
-
-      // Supervisor guard
-      if (WRITE_TOOLS.has(call.name)) {
-        const blockedPath = (call.args?.path || call.args?.newPath || '') as string;
-        if (sessionSupervisor.isMissionPaused() || (blockedPath && sessionSupervisor.isFileBlocked(blockedPath))) {
-          const reason = sessionSupervisor.isMissionPaused()
-            ? 'La mission est en pause après escalade.'
-            : `Le fichier "${blockedPath}" est en boucle de correction.`;
-          functionResponses.push({ id: call.id, name: call.name, response: { error: `[SUPERVISOR] Écriture bloquée. ${reason}` } });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Supervisor] ${reason}` }));
-          continue;
-        }
-        if (contextGate.active && !isContextReady(contextGate, call.name, call.args)) {
-          const pending = Array.from(contextGate.requiredFiles)
-            .filter((file) => !contextGate.readFiles.has(file))
-            .slice(0, 4)
-            .join(', ');
-          const reason = pending
-            ? `Lis d'abord les fichiers pertinents: ${pending}.`
-            : 'Lis le contexte pertinent et relance knowledge_build_context avant de modifier.';
-          functionResponses.push({ id: call.id, name: call.name, response: {
-            error: `[CONTEXT GATE] Écriture suspendue: confiance ${contextGate.confidence ?? 0}% (${contextGate.risk ?? 'unknown'}). ${reason}`,
-            confidence: contextGate.confidence,
-            risk: contextGate.risk,
-            requiredFiles: Array.from(contextGate.requiredFiles),
-          } });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Contexte insuffisant] ${reason}` }));
-          continue;
-        }
-      }
-
-      // request_tools meta-tool
-      if (call.name === 'request_tools' && skillManager) {
-        const category = String(call.args?.category || '').trim().toLowerCase();
-        const { loaded, tools: loadedToolNames } = await skillManager.discoverAndLoad(category);
-        if (loaded.length > 0 || category === 'all') {
-          try {
-            session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[SYSTEM] Outils "${category}" chargés (${loadedToolNames.length} outils): ${loadedToolNames.join(', ')}. Tu peux maintenant les utiliser.` }] }] });
-          } catch { /* ignore */ }
-          functionResponses.push({ id: call.id, name: call.name, response: { status: 'success', loaded: category, skills: loaded, tools: loadedToolNames, message: `Outils "${category}" chargés et disponibles.` } });
-        } else {
-          functionResponses.push({ id: call.id, name: call.name, response: { error: `Catégorie inconnue ou déjà chargée: "${category}".` } });
-        }
-        continue;
-      }
-
-      // Agent role guard
-      if (call.name === 'agent_delegate' && (currentProfile as any).agents?.enabled !== false && (currentProfile as any).agents?.allowedRoles?.length) {
-        const requestedRole = String(call.args?.role || '').toLowerCase();
-        if (!(currentProfile as any).agents.allowedRoles.includes(requestedRole)) {
-          functionResponses.push({ id: call.id, name: call.name, response: { error: `Rôle "${requestedRole}" non autorisé. Rôles disponibles: ${(currentProfile as any).agents.allowedRoles.join(', ')}.` } });
-          clientWs.send(JSON.stringify({ tool_used: call.name, info: `[BLOQUÉ - Rôle "${requestedRole}" désactivé]` }));
-          continue;
-        }
-      }
-
-      // Git guard
-      if (call.name.startsWith('git_')) {
-        functionResponses.push({ id: call.id, name: call.name, response: { error: 'Git est entièrement désactivé.' } });
-        clientWs.send(JSON.stringify({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' }));
-        continue;
-      }
-
-      // Reasoning guard
-      if (call.name.startsWith('reasoning_') && (currentProfile as any).reasoningEnabled === false) {
-        functionResponses.push({ id: call.id, name: call.name, response: { error: 'Le raisonnement structuré est désactivé.' } });
-        continue;
-      }
-
-      if (!skillManager) {
-        functionResponses.push({ id: call.id, name: call.name, response: { error: 'SkillManager non disponible.' } });
-        continue;
-      }
-
-      // ── Retry logic pour erreurs transientes ─────────────────────────────
-      // MAX_RETRIES=2, délai initial RETRY_DELAY_MS=1000ms, backoff exponentiel.
-      // Seules les erreurs réseau/IO/timeout sont retentées (pas les erreurs métier).
-      let response: unknown = undefined;
-      for (let attempt = 0; attempt <= TOOL_MAX_RETRIES; attempt++) {
-        try {
-          response = await skillManager.handleToolCall(call.name, call.args, context);
-          break; // Succès — sortir de la boucle
-        } catch (toolErr: any) {
-          const retryable = isRetryableToolError(toolErr);
-          const remaining = TOOL_MAX_RETRIES - attempt;
-
-          if (!retryable || remaining === 0) {
-            // Erreur non-retryable ou plus de tentatives — propager
-            throw toolErr;
-          }
-
-          // Backoff exponentiel : 1s → 2s
-          const delay = Math.min(TOOL_RETRY_DELAY_MS * Math.pow(2, attempt), 8000);
-          console.warn(`[ToolRetry] ${call.name} — tentative ${attempt + 1}/${TOOL_MAX_RETRIES + 1} échouée (${toolErr.message}). Retry dans ${delay}ms...`);
-          try {
-            clientWs.send(JSON.stringify({
-              tool_retry: call.name,
-              attempt: attempt + 1,
-              maxRetries: TOOL_MAX_RETRIES,
-              error: toolErr.message,
-              retryIn: delay,
-            }));
-          } catch { /* ignore si WS fermé */ }
-          await sleepMs(delay);
-        }
-      }
-
-      const success = !(response && (response as any).error && !(response as any).status);
-      try { skillManager.recordToolUsage(call.name, success); } catch {}
-
-      // Suivi des échecs répétitifs : on incrémente le compteur par signature
-      // sur échec, on le réinitialise sur succès (l'outil redevient « sain »).
-      if (failTracker) {
-        if (success) {
-          failTracker.delete(failKey);
-        } else {
-          failTracker.set(failKey, (failTracker.get(failKey) ?? 0) + 1);
-        }
-      }
-
-      updateContextGate(contextGate, call.name, call.args, response);
-
-      functionResponses.push({ id: call.id, name: call.name, response });
-      clientWs.send(JSON.stringify({
-        tool_used: call.name,
-        info: JSON.stringify(call.args),
-        ...(call.name === 'security_audit' ? { result: response } : {}),
-      }));
-
-      // Auto-verify
-      const WRITE_TOOLS_VERIFY = ['write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file'];
-      const VERIFY_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-      const verifyPath = call.name === 'rename_project_file' ? call.args?.newPath : call.args?.path;
-      const verifyExt = verifyPath ? path.extname(verifyPath).toLowerCase() : '';
-      if (WRITE_TOOLS_VERIFY.includes(call.name) && verifyPath && VERIFY_EXTENSIONS.has(verifyExt)) {
-        try {
-          const verifyResult = await skillManager.handleToolCall('verify_file', { path: verifyPath }, context);
-          functionResponses.push({ id: `${call.id}_verify`, name: 'verify_file', response: verifyResult });
-          clientWs.send(JSON.stringify({ tool_used: 'verify_file', info: JSON.stringify({ path: verifyPath }) }));
-          const evaluation = await sessionSupervisor.evaluateVerifyResult(verifyPath, verifyResult);
-          if (evaluation.needsCorrection && evaluation.directive) {
-            setTimeout(() => {
-              try {
-                sessionSupervisor.injectDirective(evaluation.directive!);
-                clientWs.send(JSON.stringify({ supervisor_action: 'correction_injected', file: verifyPath, attempt: sessionSupervisor.getStats().totalCorrections }));
-              } catch (e) { console.error('[Supervisor] Injection échouée:', e); }
-            }, 100);
-          }
-        } catch (verifyErr: any) {
-          functionResponses.push({ id: `${call.id}_verify`, name: 'verify_file', response: { error: `Auto-verify échoué: ${verifyErr.message}` } });
-        }
-      }
-    } catch (e: any) {
-      console.error(`Error executing tool ${call.name}:`, e);
-      // Un throw non rattrapé est aussi un échec : il compte dans le suivi des
-      // échecs répétitifs pour que le court-circuit s'applique à ce cas également.
-      if (failTracker) {
-        const thrownKey = toolFailureKey(call.name, call.args);
-        failTracker.set(thrownKey, (failTracker.get(thrownKey) ?? 0) + 1);
-      }
-      functionResponses.push({ id: call.id, name: call.name, response: { error: e.message } });
+  /**
+   * Applique tous les gardes synchrones (court-circuit, démarrage, ask, supervisor,
+   * context gate, request_tools, agent/git/reasoning). Renvoie une réponse
+   * immédiate si l'appel est tranché sans exécution, sinon `{ settled: false }`.
+   */
+  const applyGuards = async (call: any, failKey: string): Promise<GuardResult> => {
+    // Court-circuit des échecs répétitifs
+    if (failTracker && (failTracker.get(failKey) ?? 0) >= REPEATED_FAILURE_LIMIT) {
+      sendSafe({ tool_used: call.name, info: `[COURT-CIRCUIT — ${REPEATED_FAILURE_LIMIT} échecs identiques]` });
+      return { settled: true, response: {
+        error: `[COURT-CIRCUIT] "${call.name}" a déjà échoué ${REPEATED_FAILURE_LIMIT}× avec les mêmes arguments. ` +
+          `Arrête de réessayer : les arguments sont probablement invalides. ` +
+          `Change d'approche (lis le fichier/contexte, corrige les arguments) ou abandonne cette sous-tâche.`,
+        shortCircuited: true,
+      } };
     }
-  }
 
+    // Garde de démarrage (anti-race condition)
+    if (PROJECT_SCOPED_TOOLS.has(call.name)) {
+      const sandboxState = getSandboxState();
+      const workspaceReady = !!SELF_ROOT && sandboxState !== 'INITIALIZING';
+      if (!workspaceReady) {
+        const reason = !SELF_ROOT
+          ? 'aucun workspace ouvert (SELF_ROOT non verrouillé)'
+          : `sandbox ${sandboxState}`;
+        sendSafe({ tool_used: call.name, info: `[EN ATTENTE — workspace non prêt: ${reason}]` });
+        return { settled: true, response: {
+          error: `[DÉMARRAGE] Workspace pas encore prêt (${reason}). Réessaie cet outil dans un instant.`,
+          retryable: true,
+          workspaceReady: false,
+        } };
+      }
+    }
+
+    // Ask mode guard
+    if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
+      const filePath = (call.args?.path || call.args?.newPath || '') as string;
+      const isAllowed = call.name === 'write_project_file' && filePath.endsWith('.md');
+      if (!isAllowed) {
+        sendSafe({ tool_used: call.name, info: '[BLOQUÉ - Mode Ask]' });
+        return { settled: true, response: { error: 'Mode Ask actif : modification de fichiers interdite.' } };
+      }
+    }
+
+    sendSafe({ tool_start: call.name, args: call.args });
+
+    // Supervisor guard + Context gate
+    if (WRITE_TOOLS.has(call.name)) {
+      const blockedPath = (call.args?.path || call.args?.newPath || '') as string;
+      if (sessionSupervisor.isMissionPaused() || (blockedPath && sessionSupervisor.isFileBlocked(blockedPath))) {
+        const reason = sessionSupervisor.isMissionPaused()
+          ? 'La mission est en pause après escalade.'
+          : `Le fichier "${blockedPath}" est en boucle de correction.`;
+        sendSafe({ tool_used: call.name, info: `[BLOQUÉ - Supervisor] ${reason}` });
+        return { settled: true, response: { error: `[SUPERVISOR] Écriture bloquée. ${reason}` } };
+      }
+      if (contextGate.active && !isContextReady(contextGate, call.name, call.args)) {
+        const pending = Array.from(contextGate.requiredFiles)
+          .filter((file) => !contextGate.readFiles.has(file))
+          .slice(0, 4)
+          .join(', ');
+        const reason = pending
+          ? `Lis d'abord les fichiers pertinents: ${pending}.`
+          : 'Lis le contexte pertinent et relance knowledge_build_context avant de modifier.';
+        sendSafe({ tool_used: call.name, info: `[BLOQUÉ - Contexte insuffisant] ${reason}` });
+        return { settled: true, response: {
+          error: `[CONTEXT GATE] Écriture suspendue: confiance ${contextGate.confidence ?? 0}% (${contextGate.risk ?? 'unknown'}). ${reason}`,
+          confidence: contextGate.confidence,
+          risk: contextGate.risk,
+          requiredFiles: Array.from(contextGate.requiredFiles),
+        } };
+      }
+    }
+
+    // request_tools meta-tool
+    if (call.name === 'request_tools' && skillManager) {
+      const category = String(call.args?.category || '').trim().toLowerCase();
+      const { loaded, tools: loadedToolNames } = await skillManager.discoverAndLoad(category);
+      if (loaded.length > 0 || category === 'all') {
+        try {
+          session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[SYSTEM] Outils "${category}" chargés (${loadedToolNames.length} outils): ${loadedToolNames.join(', ')}. Tu peux maintenant les utiliser.` }] }] });
+        } catch { /* ignore */ }
+        return { settled: true, response: { status: 'success', loaded: category, skills: loaded, tools: loadedToolNames, message: `Outils "${category}" chargés et disponibles.` } };
+      }
+      return { settled: true, response: { error: `Catégorie inconnue ou déjà chargée: "${category}".` } };
+    }
+
+    // Agent role guard
+    if (call.name === 'agent_delegate' && (currentProfile as any).agents?.enabled !== false && (currentProfile as any).agents?.allowedRoles?.length) {
+      const requestedRole = String(call.args?.role || '').toLowerCase();
+      if (!(currentProfile as any).agents.allowedRoles.includes(requestedRole)) {
+        sendSafe({ tool_used: call.name, info: `[BLOQUÉ - Rôle "${requestedRole}" désactivé]` });
+        return { settled: true, response: { error: `Rôle "${requestedRole}" non autorisé. Rôles disponibles: ${(currentProfile as any).agents.allowedRoles.join(', ')}.` } };
+      }
+    }
+
+    // Git guard
+    if (call.name.startsWith('git_')) {
+      sendSafe({ tool_used: call.name, info: '[BLOQUÉ - Git désactivé]' });
+      return { settled: true, response: { error: 'Git est entièrement désactivé.' } };
+    }
+
+    // Reasoning guard
+    if (call.name.startsWith('reasoning_') && (currentProfile as any).reasoningEnabled === false) {
+      return { settled: true, response: { error: 'Le raisonnement structuré est désactivé.' } };
+    }
+
+    if (!skillManager) {
+      return { settled: true, response: { error: 'SkillManager non disponible.' } };
+    }
+
+    return { settled: false };
+  };
+
+  /**
+   * Exécute réellement l'outil (après gardes), avec retry et abort. Enregistre
+   * l'usage, met à jour le failTracker + le context gate, émet les événements
+   * client, et lance l'auto-verify. Renvoie la réponse à injecter à Gemini.
+   */
+  const runTool = async (call: any, failKey: string, signal: AbortSignal): Promise<any> => {
+    const context = makeContext(signal);
+    // Les outils lents sont exclus du retry (coût prohibitif, erreur rarement transiente).
+    const maxRetries = SLOW_TOOLS_NO_RETRY.has(call.name) ? 0 : TOOL_MAX_RETRIES;
+
+    let response: unknown = undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await raceWithAbort(
+          Promise.resolve(skillManager!.handleToolCall(call.name, call.args, context)),
+          signal,
+          'tool_cancelled',
+        );
+        break;
+      } catch (toolErr: any) {
+        if (toolErr instanceof ToolCancelledError) throw toolErr;
+        const retryable = isRetryableToolError(toolErr);
+        const remaining = maxRetries - attempt;
+        if (!retryable || remaining === 0) throw toolErr;
+        const delay = Math.min(TOOL_RETRY_DELAY_MS * Math.pow(2, attempt), 8000);
+        console.warn(`[ToolRetry] ${call.name} — tentative ${attempt + 1}/${maxRetries + 1} échouée (${toolErr.message}). Retry dans ${delay}ms...`);
+        sendSafe({ tool_retry: call.name, attempt: attempt + 1, maxRetries, error: toolErr.message, retryIn: delay });
+        await abortableSleep(delay, signal);
+      }
+    }
+
+    const success = !(response && (response as any).error && !(response as any).status);
+    try { skillManager!.recordToolUsage(call.name, success); } catch {}
+
+    if (failTracker) {
+      if (success) failTracker.delete(failKey);
+      else failTracker.set(failKey, (failTracker.get(failKey) ?? 0) + 1);
+    }
+
+    updateContextGate(contextGate, call.name, call.args, response);
+
+    sendSafe({
+      tool_used: call.name,
+      info: JSON.stringify(call.args),
+      ...(call.name === 'security_audit' ? { result: response } : {}),
+    });
+
+    // ── Auto-verify ──────────────────────────────────────────────────────
+    // On ne renvoie PLUS de functionResponse `<id>_verify` à Gemini (cet id
+    // n'existe pas côté modèle). Seule la correction du Supervisor est injectée,
+    // si elle est nécessaire. L'auto-verify ne bloque pas la réponse principale.
+    const WRITE_TOOLS_VERIFY = ['write_project_file', 'modify_project_file', 'patch_project_file', 'rename_project_file'];
+    const VERIFY_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+    const verifyPath = call.name === 'rename_project_file' ? call.args?.newPath : call.args?.path;
+    const verifyExt = verifyPath ? path.extname(verifyPath).toLowerCase() : '';
+    if (success && WRITE_TOOLS_VERIFY.includes(call.name) && verifyPath && VERIFY_EXTENSIONS.has(verifyExt)) {
+      try {
+        const verifyResult = await skillManager!.handleToolCall('verify_file', { path: verifyPath }, context);
+        sendSafe({ tool_used: 'verify_file', info: JSON.stringify({ path: verifyPath }) });
+        const evaluation = await sessionSupervisor.evaluateVerifyResult(verifyPath, verifyResult);
+        if (evaluation.needsCorrection && evaluation.directive) {
+          setTimeout(() => {
+            try {
+              sessionSupervisor.injectDirective(evaluation.directive!);
+              sendSafe({ supervisor_action: 'correction_injected', file: verifyPath, attempt: sessionSupervisor.getStats().totalCorrections });
+            } catch (e) { console.error('[Supervisor] Injection échouée:', e); }
+          }, 100);
+        }
+      } catch (verifyErr: any) {
+        console.warn(`[AutoVerify] Échec de la vérification de ${verifyPath}: ${verifyErr.message}`);
+      }
+    }
+
+    return response;
+  };
+
+  /**
+   * Pipeline complet d'un appel : gardes → (si non tranché) exécution avec
+   * décision de livraison (blocking / ack). Pousse la réponse immédiate dans
+   * `immediateResponses` et, le cas échéant, planifie l'annonce en arrière-plan.
+   */
+  const processCall = async (call: any): Promise<void> => {
+    const failKey = toolFailureKey(call.name, call.args);
+    try {
+      const guard = await applyGuards(call, failKey);
+      if (guard.settled) {
+        immediateResponses.push({ id: call.id, name: call.name, response: guard.response });
+        return;
+      }
+
+      const controller = toolTracker.register(call.id, call.name);
+      const signal = controller.signal;
+      const work = runTool(call, failKey, signal);
+
+      const canBackground =
+        (deliveryMode === 'ack' || deliveryMode === 'nonblocking') &&
+        LONG_RUNNING_TOOLS.has(call.name);
+
+      if (!canBackground) {
+        // Mode blocking, ou outil rapide : on attend le résultat.
+        try {
+          const response = await work;
+          immediateResponses.push({ id: call.id, name: call.name, response });
+        } finally {
+          toolTracker.complete(call.id);
+        }
+        return;
+      }
+
+      // Mode ack : course entre le travail et le délai de bascule.
+      const raced = await raceWithDeadline(work, ackAfterMs, signal).catch((e) => {
+        if (e instanceof ToolCancelledError) return { timedOut: false, value: { error: 'Annulé.', cancelled: true } } as const;
+        throw e;
+      });
+
+      if (!raced.timedOut) {
+        // L'outil a fini avant le délai : résultat normal.
+        toolTracker.complete(call.id);
+        immediateResponses.push({ id: call.id, name: call.name, response: raced.value });
+        return;
+      }
+
+      // Dépassement du délai : on renvoie un ack `status:"running"` pour libérer
+      // la voix, et on planifie l'annonce du vrai résultat en arrière-plan.
+      // `scheduling: INTERRUPT` signale au modèle qu'il peut reprendre la parole
+      // immédiatement (champ renseigné à la racine ET dans la réponse).
+      immediateResponses.push(withScheduling(buildAckResponse(call), 'INTERRUPT'));
+      sendSafe({ tool_background_start: call.name, id: call.id });
+
+      backgroundPromises.push(
+        work.then(
+          (response) => {
+            toolTracker.complete(call.id);
+            sendSafe({ tool_background_done: call.name, id: call.id });
+            const summary = summarizeForNotify(response);
+            try {
+              session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[BACKGROUND TASK UPDATE] Résultat de "${call.name}" (id ${call.id}) :\n${summary}` }] }] });
+            } catch (e) { console.error('[Background] Notification échouée:', e); }
+          },
+          (err) => {
+            toolTracker.complete(call.id);
+            if (err instanceof ToolCancelledError) {
+              console.warn(`[Background] "${call.name}" (${call.id}) annulé: ${err.reason}`);
+              return;
+            }
+            sendSafe({ tool_background_done: call.name, id: call.id, error: true });
+            try {
+              session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[BACKGROUND TASK UPDATE] L'outil "${call.name}" (id ${call.id}) a échoué : ${err?.message ?? String(err)}` }] }] });
+            } catch (e) { console.error('[Background] Notification d\'erreur échouée:', e); }
+          },
+        ),
+      );
+    } catch (e: any) {
+      toolTracker.complete(call.id);
+      if (e instanceof ToolCancelledError) {
+        console.warn(`[handleToolCall] "${call.name}" annulé: ${e.reason}`);
+        immediateResponses.push({ id: call.id, name: call.name, response: { error: 'Appel annulé.', cancelled: true } });
+        return;
+      }
+      console.error(`Error executing tool ${call.name}:`, e);
+      if (failTracker) {
+        failTracker.set(failKey, (failTracker.get(failKey) ?? 0) + 1);
+      }
+      immediateResponses.push({ id: call.id, name: call.name, response: { error: e.message } });
+    }
+  };
+
+  // ── Ordonnancement : workspace en série, le reste en parallèle ──────────────
+  const calls: any[] = Array.isArray(toolCall.functionCalls) ? toolCall.functionCalls : [];
+  const serialCalls = calls.filter((c) => PROJECT_SCOPED_TOOLS.has(c.name));
+  const parallelCalls = calls.filter((c) => !PROJECT_SCOPED_TOOLS.has(c.name));
+
+  const serialChain = (async () => {
+    for (const call of serialCalls) {
+      await processCall(call);
+    }
+  })();
+  const parallelAll = Promise.all(parallelCalls.map((call) => processCall(call)));
+
+  await Promise.all([serialChain, parallelAll]);
+
+  // La voix peut reprendre dès maintenant : `busy` repasse à false même si des
+  // tâches continuent en arrière-plan.
   try { clientWs.send(JSON.stringify({ busy: false })); } catch {}
   if (busyStateRef) busyStateRef.activeDescription = null;
 
-  if (functionResponses.length > 0) {
+  if (immediateResponses.length > 0) {
     // ── Cap (C) + comptabilisation des tokens (B) ──────────────────────────
-    // On tronque chaque résultat trop volumineux AVANT injection, puis on
-    // estime les tokens réellement envoyés dans la session pour que le moniteur
-    // de contexte reflète la taille réelle (les payloads d'outils n'apparaissent
-    // pas dans usageMetadata de Gemini).
     let injectedTokens = 0;
-    for (const fr of functionResponses) {
+    for (const fr of immediateResponses) {
       const capped = capToolResponse(fr.response, fr.name);
       if (capped.truncated) {
         fr.response = capped.response;
@@ -1913,14 +2029,7 @@ async function handleToolCall(
           `[ContextGuard] ✂️ Résultat "${fr.name}" tronqué: ` +
           `${capped.originalChars} → ${MAX_TOOL_RESULT_CHARS} caractères.`,
         );
-        try {
-          clientWs.send(JSON.stringify({
-            type: 'tool_result_truncated',
-            tool: fr.name,
-            originalChars: capped.originalChars,
-            keptChars: MAX_TOOL_RESULT_CHARS,
-          }));
-        } catch { /* ignore si WS fermé */ }
+        sendSafe({ type: 'tool_result_truncated', tool: fr.name, originalChars: capped.originalChars, keptChars: MAX_TOOL_RESULT_CHARS });
       }
       try {
         const serialized = typeof fr.response === 'string' ? fr.response : JSON.stringify(fr.response);
@@ -1928,11 +2037,16 @@ async function handleToolCall(
       } catch { /* non sérialisable : ignoré dans l'estimation */ }
     }
 
-    session.sendToolResponse({ functionResponses });
+    session.sendToolResponse({ functionResponses: immediateResponses });
 
-    // Remonter les tokens injectés au moniteur de contexte de la connexion.
     if (injectedTokens > 0) {
       try { onToolResultTokens?.(injectedTokens); } catch { /* ignore */ }
     }
+  }
+
+  // Les tâches de fond continuent après le retour ; on ne les attend pas (elles
+  // annoncent leur résultat elles-mêmes). On évite juste une promesse non gérée.
+  if (backgroundPromises.length > 0) {
+    void Promise.allSettled(backgroundPromises);
   }
 }

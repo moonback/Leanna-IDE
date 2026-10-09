@@ -49,8 +49,25 @@ export function buildSystemInstruction(profile: ProfileConfig = {}): string {
     extraSections,
   };
 
-  return buildSystemPrompt(builderConfig);
+  const prompt = buildSystemPrompt(builderConfig);
+
+  // ── Outils non bloquants (mode `ack`) ──────────────────────────────────────
+  // En mode ack, un outil long bascule en arrière-plan et renvoie
+  // `status:"running"`. Le modèle doit savoir réagir sans inventer de résultat.
+  return prompt + BACKGROUND_TOOLS_INSTRUCTION;
 }
+
+/**
+ * Instruction injectée pour le comportement des outils en arrière-plan (mode ack).
+ * Appliquée dans tous les cas : inoffensive si le serveur tourne en mode blocking
+ * (aucun `status:"running"` ni `[BACKGROUND TASK UPDATE]` ne sera jamais émis).
+ */
+const BACKGROUND_TOOLS_INSTRUCTION =
+  `\n\n## Outils en arrière-plan\n` +
+  `Quand un outil répond status:"running", il continue en arrière-plan : dis en une\n` +
+  `phrase que tu t'en occupes, puis poursuis la conversation normalement. N'invente\n` +
+  `jamais son résultat. Quand un message [BACKGROUND TASK UPDATE] arrive, annonce\n` +
+  `brièvement le résultat à voix haute.`;
 
 /**
  * Façade V2 de compatibilité vers la source canonique.
