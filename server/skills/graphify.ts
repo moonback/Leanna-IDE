@@ -47,10 +47,21 @@ export function getGraphifyCwd(): string {
 export function executeGraphify(
   args: string[],
   cwd?: string,
-  timeoutMs = 25000
-): Promise<{ success: boolean; output: string; error?: string }> {
+  timeoutMs = 25000,
+  signal?: AbortSignal
+): Promise<{ success: boolean; output: string; error?: string; cancelled?: boolean }> {
   const binary = getGraphifyBinaryPath();
   const targetCwd = cwd || getGraphifyCwd();
+
+  // Déjà annulé avant même de lancer : on évite de spawn un process pour rien.
+  if (signal?.aborted) {
+    return Promise.resolve({
+      success: false,
+      output: "",
+      cancelled: true,
+      error: "Commande graphify annulée avant exécution (kill-switch).",
+    });
+  }
 
   return new Promise((resolve) => {
     execFile(
@@ -61,17 +72,24 @@ export function executeGraphify(
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         env: { ...process.env },
+        // Kill-switch temps-réel : Node tue le sous-processus graphify dès que
+        // le signal se déclenche (annulation de la tâche de fond).
+        signal,
       },
       (err, stdout, stderr) => {
         const outStr = (stdout || "").trim();
         const errStr = (stderr || "").trim();
 
         if (err) {
+          const aborted = (err as any).name === "AbortError" || signal?.aborted;
           const combinedMsg = errStr || outStr || err.message;
           resolve({
             success: false,
             output: outStr,
-            error: `Erreur d'exécution graphify (${err.name}): ${combinedMsg}`,
+            cancelled: aborted || undefined,
+            error: aborted
+              ? "Commande graphify interrompue par le kill-switch (annulation)."
+              : `Erreur d'exécution graphify (${err.name}): ${combinedMsg}`,
           });
         } else {
           resolve({
@@ -252,8 +270,9 @@ export const graphifySkill: Skill = {
     },
   ],
 
-  handleToolCall: async (name: string, rawArgs: any) => {
+  handleToolCall: async (name: string, rawArgs: any, context?: any) => {
     const cwd = getGraphifyCwd();
+    const signal: AbortSignal | undefined = context?.signal;
 
     switch (name) {
       case "graphify_query": {
@@ -392,10 +411,12 @@ export const graphifySkill: Skill = {
         const args = ["update", "."];
         if (force) args.push("--force");
 
-        const result = await executeGraphify(args, cwd, 60000);
+        const result = await executeGraphify(args, cwd, 60000, signal);
         return {
-          status: result.success ? "success" : "error",
-          message: result.success ? "Graphe de connaissances mis à jour avec succès." : result.error,
+          status: result.cancelled ? "cancelled" : (result.success ? "success" : "error"),
+          message: result.cancelled
+            ? "Mise à jour du graphe annulée (kill-switch)."
+            : (result.success ? "Graphe de connaissances mis à jour avec succès." : result.error),
           output: result.output,
         };
       }

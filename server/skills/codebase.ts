@@ -267,7 +267,7 @@ export const codebaseSkill: Skill = {
 
     switch (name) {
       case "generate_codebase_markdown":
-        return await handleGenerateCodebaseMarkdown(args);
+        return await handleGenerateCodebaseMarkdown(args, toolContext.signal);
 
       case "open_ide":
         toolContext.emitIdeAction?.({ type: "open-ide" });

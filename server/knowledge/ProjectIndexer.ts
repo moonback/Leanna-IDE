@@ -79,6 +79,22 @@ export interface ScanAllOptions {
     total: number;
     file?: string;
   }) => void;
+  /**
+   * Signal d'annulation coopératif. Le scan vérifie `signal.aborted` entre les
+   * fichiers (boucles incrémentale et de parsing complet) et lève
+   * `ScanCancelledError` dès qu'il est déclenché. Le travail déjà effectué sur
+   * le fichier courant n'est pas interrompu en plein milieu (parsing synchrone),
+   * mais la boucle s'arrête au fichier suivant.
+   */
+  signal?: AbortSignal;
+}
+
+/** Levée par scanAll quand l'annulation (ScanAllOptions.signal) est déclenchée. */
+export class ScanCancelledError extends Error {
+  constructor() {
+    super('Ré-indexation annulée (kill-switch).');
+    this.name = 'ScanCancelledError';
+  }
 }
 
 export class ProjectIndexer {
@@ -291,6 +307,7 @@ export class ProjectIndexer {
           // ~2s (le vrai coût observé), au lieu d'une seule.
           const changedFiles = [...addedFiles, ...modifiedFiles];
           for (let i = 0; i < changedFiles.length; i++) {
+            if (options.signal?.aborted) throw new ScanCancelledError();
             const changedPath = changedFiles[i];
             options.onProgress?.({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
             await this.scanFile(changedPath, { skipRelationRefresh: true });
@@ -333,6 +350,7 @@ export class ProjectIndexer {
     const astResults = new Map<string, ASTFileResult>();
     let totalEntities = 0;
     for (let i = 0; i < files.length; i++) {
+      if (options.signal?.aborted) throw new ScanCancelledError();
       const relativePath = files[i];
       options.onProgress?.({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
       try {

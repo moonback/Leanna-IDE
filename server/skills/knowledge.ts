@@ -619,8 +619,9 @@ export const knowledgeSkill: Skill = {
       transcript: z.string().min(1, "La transcription ne peut être vide").trim(),
     }),
   },
-  handleToolCall: async (name, args) => {
+  handleToolCall: async (name, args, context?: any) => {
     const log = (msg: string) => console.log(`[KnowledgeSkill] ${msg}`);
+    const signal: AbortSignal | undefined = context?.signal;
 
     // ─────────────────────────────────────────────────────────────────────────
     // knowledge_build_context
@@ -1069,7 +1070,15 @@ export const knowledgeSkill: Skill = {
 
         const start = Date.now();
         const mod = await import("../knowledge/ProjectIndexer.js");
-        await mod.projectIndexer.scanAll();
+        try {
+          await mod.projectIndexer.scanAll({ signal });
+        } catch (scanErr: any) {
+          if (scanErr instanceof mod.ScanCancelledError || signal?.aborted) {
+            log("reindex annulé (kill-switch).");
+            return { status: "cancelled", cancelled: true, message: "Ré-indexation annulée (kill-switch)." };
+          }
+          throw scanErr;
+        }
         const duration = ((Date.now() - start) / 1000).toFixed(2);
 
         const stats = knowledgeGraph.getStats();

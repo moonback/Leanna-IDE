@@ -141,19 +141,20 @@ function isRegistryUnreachable(error: any): boolean {
   );
 }
 
-async function runNpmAudit(root: string, mode: "offline" | "online") {
+async function runNpmAudit(root: string, mode: "offline" | "online", signal?: AbortSignal) {
   const npmArgs = mode === "offline"
     ? ["audit", "--json", "--offline"]
     : ["audit", "--json"];
   const { stdout } = await execFileAsync(
     process.platform === "win32" ? "npm.cmd" : "npm",
     npmArgs,
-    { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000, shell: false },
+    // Kill-switch temps-réel : tue le sous-processus `npm audit` à l'annulation.
+    { cwd: root, timeout: AUDIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 2_000_000, shell: false, signal },
   );
   return parseNpmAuditOutput(stdout);
 }
 
-async function auditDependencies(root: string, requestedMode: "auto" | "offline" | "online"): Promise<DependencyAudit> {
+async function auditDependencies(root: string, requestedMode: "auto" | "offline" | "online", signal?: AbortSignal): Promise<DependencyAudit> {
   const packageManager = detectPackageManager(root);
 
   if (packageManager === "none") {
@@ -188,7 +189,7 @@ async function auditDependencies(root: string, requestedMode: "auto" | "offline"
 
   for (const mode of modes) {
     try {
-      const parsed = await runNpmAudit(root, mode);
+      const parsed = await runNpmAudit(root, mode, signal);
       if (!parsed) {
         lastError = new Error("Réponse npm audit illisible");
         continue;
@@ -281,13 +282,22 @@ export const securityAuditSkill: Skill = {
     includeTests: z.boolean().optional().default(false),
     dependencyMode: z.enum(["auto", "offline", "online"]).optional().default("auto"),
   }) },
-  handleToolCall: async (name, args) => {
+  handleToolCall: async (name, args, context?: any) => {
     if (name !== "security_audit") throw new Error(`Unknown tool in security_audit: ${name}`);
     const { includeTests, dependencyMode } = validateArgs(securityAuditSkill.inputSchemas!.security_audit, args ?? {}, name);
     const root = getProjectRoot();
     if (!root) {
       return { error: "Aucun workspace ouvert pour effectuer un audit de sécurité." };
     }
+    const signal: AbortSignal | undefined = context?.signal;
+    const cancelledResult = () => ({
+      status: "cancelled" as const,
+      ok: false,
+      readOnly: true,
+      cancelled: true,
+      message: "Audit de sécurité annulé (kill-switch).",
+    });
+    if (signal?.aborted) return cancelledResult();
     const auditStartedAt = Date.now();
 
     const { files: candidateFiles, skipped } = collectFiles(root);
@@ -295,7 +305,12 @@ export const securityAuditSkill: Skill = {
     let skippedByFilter = 0;
     const issues: SecurityIssue[] = [];
 
+    // Le scan statique est synchrone par fichier : on vérifie le signal
+    // d'annulation à chaque itération pour sortir rapidement d'un gros projet
+    // si la tâche de fond est annulée (on ne contrôle pas le kill d'un seul
+    // readFileSync, mais la boucle s'arrête au fichier suivant).
     for (const file of candidateFiles) {
+      if (signal?.aborted) return cancelledResult();
       const relative = path.relative(root, file).replace(/\\/g, "/");
       if (!includeTests && /(^|\/)([^/]*\.)?(test|spec)\.[^/]+$/i.test(relative)) {
         skippedByFilter++;
@@ -309,7 +324,8 @@ export const securityAuditSkill: Skill = {
       }
     }
 
-    const dependencies = await auditDependencies(root, dependencyMode);
+    if (signal?.aborted) return cancelledResult();
+    const dependencies = await auditDependencies(root, dependencyMode, signal);
     const summary = summarizeIssues(issues);
     const dependencyHigh = Number(dependencies.vulnerabilities.high || 0)
       + Number(dependencies.vulnerabilities.critical || 0);

@@ -26,6 +26,8 @@ export interface ImageGenerationOptions {
   resolution?: string;
   aspectRatio?: string;
   quality?: string;
+  /** Signal d'annulation : interrompt la requête HTTP si la tâche est annulée. */
+  signal?: AbortSignal;
 }
 
 export interface ImageGenerationResult {
@@ -68,6 +70,11 @@ export async function generateImage(
   const qualityHint = options.quality === "high" ? " Ultra high quality, detailed." : "";
   const fullPrompt = `${prompt}${styleHint}${qualityHint}`.trim();
 
+  if (options.signal?.aborted) {
+    log.warn("generateImage: annulé avant l'appel réseau (kill-switch).");
+    return null;
+  }
+
   try {
     const response = await fetch(`${OPENROUTER_BASE_URL}/images/generations`, {
       method: "POST",
@@ -84,6 +91,8 @@ export async function generateImage(
         response_format: "b64_json",
         ...(options.aspectRatio ? { size: options.aspectRatio } : {}),
       }),
+      // Kill-switch temps-réel : abort la requête HTTP OpenRouter à l'annulation.
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -106,6 +115,10 @@ export async function generateImage(
       cost: data.usage?.total_cost ?? 0,
     };
   } catch (e: any) {
+    if (e?.name === "AbortError" || options.signal?.aborted) {
+      log.warn("generateImage: requête OpenRouter interrompue par le kill-switch (annulation).");
+      return null;
+    }
     log.error(`generateImage: erreur réseau — ${e.message}`);
     return null;
   }
