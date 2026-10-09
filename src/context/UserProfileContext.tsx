@@ -79,6 +79,8 @@ export interface UserProfile {
   vadEnabled: boolean;        // Activer la détection de voix (économie bande passante)
   vadThreshold: number;       // Seuil d'amplitude pour détecter la voix (0-100)
   vadSilenceDuration: number; // Durée de silence en ms avant d'arrêter l'envoi (300-2000)
+  // Présence vocale continue
+  voiceAlwaysOn: boolean;     // Connecter la session vocale au démarrage et la maintenir (reconnexion auto)
   // Model hyperparameters
   temperature:      number;  // 0.0–2.0, contrôle la créativité
   topP:             number;  // 0.0–1.0, nucleus sampling
@@ -121,6 +123,8 @@ const DEFAULT_PROFILE: UserProfile = {
   vadEnabled: true,        // Activé par défaut (économie bande passante)
   vadThreshold: 35,        // Seuil d'amplitude optimal pour la voix humaine
   vadSilenceDuration: 800, // 800ms de silence avant d'arrêter l'envoi
+  // Présence vocale continue
+  voiceAlwaysOn: false,    // Désactivé par défaut : l'utilisateur l'active explicitement
   // Model hyperparameters
   temperature:      0.9,
   topP:             0.95,

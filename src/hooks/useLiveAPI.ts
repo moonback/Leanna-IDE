@@ -30,7 +30,33 @@ export interface LogEntry {
   timestamp: Date;
 }
 
+/**
+ * Snapshot du prompt système + contexte réellement injecté dans la session
+ * Gemini Live, émis par le serveur (message WS `prompt_debug`) à l'ouverture
+ * de session. Consommé par le PromptInspectorPanel.
+ */
+export interface PromptDebugState {
+  mode: string;
+  workspace: string;
+  systemText: string;
+  memoryContext: string;
+  knowledgeContext: string;
+  notebookContext: string;
+  combined: string;
+  stats: {
+    systemChars: number;
+    memoryChars: number;
+    knowledgeChars: number;
+    notebookChars: number;
+    combinedChars: number;
+    combinedTokensEst: number;
+  };
+  tools: string[];
+  generatedAt: string;
+}
+
 export type { TranscriptRole, TranscriptEntry, ContextSource, ActivityStep, ModifiedFile, TokenUsage, TokenUsageSession, ReasoningState, ReasoningStep, PromptContextState, ContextAlertLevel };
+// PromptDebugState est déclaré plus bas dans ce fichier ; il est exporté via sa déclaration `export interface`.
 
 export function useLiveAPI() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -38,6 +64,9 @@ export function useLiveAPI() {
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTaskViewModel[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowViewModel[]>([]);
   const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
+  const [promptDebug, setPromptDebug] = useState<PromptDebugState | null>(null);
+  const [systemOverride, setSystemOverride] = useState<{ applied: boolean; chars: number; truncated: boolean; at: string } | null>(null);
+  const [systemReplace, setSystemReplace] = useState<{ applied: boolean; chars: number; truncated: boolean; at: string } | null>(null);
 
   // ── Configuration résumé automatique ───────────────────────────────────────
   const [autoSummarizeEnabled, setAutoSummarizeEnabled] = useState(true);
@@ -210,6 +239,58 @@ export function useLiveAPI() {
 
   // Define onMessage handler for WS events
   const handleWebSocketMessage = useCallback((msg: any) => {
+    if (msg.type === 'prompt_debug') {
+      setPromptDebug({
+        mode: typeof msg.mode === 'string' ? msg.mode : 'full',
+        workspace: typeof msg.workspace === 'string' ? msg.workspace : '',
+        systemText: typeof msg.systemText === 'string' ? msg.systemText : '',
+        memoryContext: typeof msg.memoryContext === 'string' ? msg.memoryContext : '',
+        knowledgeContext: typeof msg.knowledgeContext === 'string' ? msg.knowledgeContext : '',
+        notebookContext: typeof msg.notebookContext === 'string' ? msg.notebookContext : '',
+        combined: typeof msg.combined === 'string' ? msg.combined : '',
+        stats: {
+          systemChars: msg.stats?.systemChars ?? 0,
+          memoryChars: msg.stats?.memoryChars ?? 0,
+          knowledgeChars: msg.stats?.knowledgeChars ?? 0,
+          notebookChars: msg.stats?.notebookChars ?? 0,
+          combinedChars: msg.stats?.combinedChars ?? 0,
+          combinedTokensEst: msg.stats?.combinedTokensEst ?? 0,
+        },
+        tools: Array.isArray(msg.tools) ? msg.tools.filter((t: unknown) => typeof t === 'string') : [],
+        generatedAt: typeof msg.generatedAt === 'string' ? msg.generatedAt : new Date().toISOString(),
+      });
+      return;
+    }
+    if (msg.type === 'system_prompt_override_ack') {
+      if (msg.reset || !msg.applied) {
+        setSystemOverride(null);
+        addLog(msg.error ? `Échec de l'override du prompt : ${msg.error}` : 'Prompt système réinitialisé pour la conversation.', msg.error ? 'error' : 'action');
+      } else {
+        setSystemOverride({
+          applied: true,
+          chars: msg.chars ?? 0,
+          truncated: msg.truncated === true,
+          at: new Date().toISOString(),
+        });
+        addLog(`Prompt système modifié pour la conversation (${msg.chars ?? 0} car.${msg.truncated ? ', tronqué' : ''}).`, 'action');
+      }
+      return;
+    }
+    if (msg.type === 'system_prompt_replace_ack') {
+      if (msg.reset || !msg.applied) {
+        setSystemReplace(null);
+        addLog(msg.error ? `Échec du remplacement du prompt : ${msg.error}` : 'Prompt système d\u2019origine restauré — reconnexion…', msg.error ? 'error' : 'action');
+      } else {
+        setSystemReplace({
+          applied: true,
+          chars: msg.chars ?? 0,
+          truncated: msg.truncated === true,
+          at: new Date().toISOString(),
+        });
+        addLog(`Prompt système remplacé (${msg.chars ?? 0} car.${msg.truncated ? ', tronqué' : ''}) — reconnexion de la session…`, 'action');
+      }
+      return;
+    }
     if (msg.tool_used) {
       let args: Record<string, unknown> = {};
       try { args = typeof msg.info === 'string' ? JSON.parse(msg.info) : (msg.info ?? {}); } catch { /* trace sans arguments structurés */ }
@@ -240,7 +321,7 @@ export function useLiveAPI() {
     }
     if (msg.type === 'ide-action' && msg.action) {
       const a = msg.action;
-      window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: a }));
+      window.dispatchEvent(new CustomEvent('Leanna-action', { detail: a }));
       switch (a.type) {
         case 'browser-scroll':
           window.dispatchEvent(new CustomEvent('Leanna-browser-scroll', { detail: a }));
@@ -350,7 +431,7 @@ export function useLiveAPI() {
         'create_project_directory', 'rename_project_file', 'delete_project_file', 'delete_project_folder',
         'analyze_project_file', 'get_workspace_info', 'generate_codebase_markdown'];
       if (IDE_TOOLS.includes(msg.tool_start)) {
-        window.dispatchEvent(new CustomEvent('Leanna-ide-action', { detail: { type: 'open-ide' } }));
+        window.dispatchEvent(new CustomEvent('Leanna-action', { detail: { type: 'open-ide' } }));
       }
       startActivity(msg.tool_start, msg.args);
       // Dispatch for AgentPanel real-time tool tracking
@@ -563,6 +644,26 @@ export function useLiveAPI() {
     // Ne rien envoyer si tout est vide
     if (!ctx.openFile && !ctx.selection && (!ctx.openFiles || ctx.openFiles.length === 0) && (!ctx.tsErrors || ctx.tsErrors.length === 0)) return;
     sendRawMessage({ type: 'voice_context', ...ctx });
+  }, [sendRawMessage]);
+
+  // ── Override du prompt système à la volée ────────────────────────────────────
+  // Applique une édition du prompt système à la conversation EN COURS. Le serveur
+  // l'injecte comme directive système forte (le systemInstruction Gemini étant
+  // figé à la connexion). `reset: true` ou un texte vide revient au prompt d'origine.
+  const sendSystemPromptOverride = useCallback((text: string, opts?: { reset?: boolean }) => {
+    const reset = opts?.reset === true;
+    sendRawMessage({ type: 'system_prompt_override', text, reset });
+    if (reset) setSystemOverride(null);
+  }, [sendRawMessage]);
+
+  // ── Remplacement complet du prompt système (reconnexion) ──────────────────────
+  // Réécrit intégralement le prompt système pour la conversation : le serveur
+  // l'enregistre puis déclenche une reconnexion de la session Gemini Live, qui
+  // repart avec le nouveau systemInstruction. `reset: true` restaure le prompt
+  // d'origine. Les garde-fous de sécurité restent toujours appliqués côté serveur.
+  const sendSystemPromptReplace = useCallback((text: string, opts?: { reset?: boolean }) => {
+    const reset = opts?.reset === true;
+    sendRawMessage({ type: 'system_prompt_replace', text, reset });
   }, [sendRawMessage]);
 
   // ── Résumé automatique du contexte ─────────────────────────────────────────
@@ -792,6 +893,11 @@ export function useLiveAPI() {
       reasoning,
       tokenUsage,
       promptContext,
+      promptDebug,
+      systemOverride,
+      sendSystemPromptOverride,
+      systemReplace,
+      sendSystemPromptReplace,
       summarizeContext,
       // ── Monitoring latence vocale ────────────────────────────────────────
       lastLatencyMs,

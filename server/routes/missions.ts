@@ -1,4 +1,6 @@
 import { Router, Request, Response } from "express";
+import { missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
+import { projectDoctor } from "../knowledge/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Missions Router — Approbation humaine & curseur d'autonomie
@@ -48,6 +50,68 @@ export function createMissionsRouter(
     }
   });
 
+  // ── Diagnostiquer : créer les missions d'amélioration du Project Doctor ──
+  // Lance le diagnostic puis matérialise les missions proposées via le chemin
+  // mission_create existant (validation, skills, executor, permissions).
+  router.post("/missions/doctor/create", async (req: Request, res: Response) => {
+    if (!handleToolCall) {
+      return res.status(503).json({ error: "Création de mission indisponible (handler non configuré)." });
+    }
+    try {
+      const report = projectDoctor.diagnose();
+      const requestedMax = Number(req.body?.max);
+      const max = Number.isInteger(requestedMax) && requestedMax > 0 ? Math.min(requestedMax, 10) : 5;
+      const missions = report.improvementMissions.slice(0, max);
+      const created: Array<{ missionId: string; title: string }> = [];
+      const failed: Array<{ title: string; error: string }> = [];
+
+      for (const m of missions) {
+        try {
+          const result = await handleToolCall("mission_create", {
+            title: m.title,
+            description: m.description,
+            priority: m.priority,
+          });
+          if (result && typeof result === "object" && "missionId" in result) {
+            created.push({ missionId: String((result as any).missionId), title: m.title });
+          } else {
+            failed.push({ title: m.title, error: (result as any)?.error ?? "Création refusée." });
+          }
+        } catch (err) {
+          failed.push({ title: m.title, error: (err as Error).message });
+        }
+      }
+
+      return res.json({ status: "success", global: report.global, created, failed, proposed: missions.length });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Simuler une mission (dry-run bout-en-bout, aucun effet de bord) ──────
+  router.post("/missions/simulate", async (req: Request, res: Response) => {
+    if (!handleToolCall) {
+      return res.status(503).json({ error: "Simulation indisponible (handler non configuré)." });
+    }
+    const { title, description, priority } = req.body ?? {};
+    if (typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ error: "Champ 'title' (string) requis." });
+    }
+    try {
+      const result = await handleToolCall("mission_simulate", {
+        title: title.trim(),
+        description: typeof description === "string" && description.trim() ? description.trim() : title.trim(),
+        priority: priority ?? "medium",
+      });
+      if (result && typeof result === "object" && "error" in result) {
+        return res.status(400).json(result);
+      }
+      return res.json(result);
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   const requireExecutor = (res: Response): any | null => {
     const executor = getExecutor();
     if (!executor) {
@@ -58,8 +122,12 @@ export function createMissionsRouter(
   };
 
   /** Sérialise une Mission (instance) vers la forme attendue par le frontend. */
-  const serializeMission = (mission: any) => {
+  const serializeMission = (mission: any, executor?: any) => {
     const state = mission.getState();
+    // L'état de pause est suivi dans l'Executor (pas dans mission.status, qui
+    // reste "in_progress" pendant une pause). On l'expose explicitement pour que
+    // l'UI puisse proposer la bonne action (pause vs reprise).
+    const paused = typeof executor?.isPaused === "function" ? executor.isPaused(state.id) === true : false;
     const goalsRecord = state.goals ?? {};
     // Sous-objectifs = tous les goals ayant un parent (on exclut la racine).
     const goals = Object.values(goalsRecord)
@@ -82,6 +150,7 @@ export function createMissionsRouter(
       id: state.id,
       title: state.title,
       status: state.status,
+      paused,
       priority: state.priority,
       goals,
       activeGoalId: state.activeGoalId,
@@ -100,9 +169,53 @@ export function createMissionsRouter(
     const executor = requireExecutor(res);
     if (!executor) return;
     try {
-      const active = (executor.listActiveMissions?.() ?? []).map(serializeMission);
-      const completed = (executor.listCompletedMissions?.() ?? []).map(serializeMission);
+      const active = (executor.listActiveMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
+      const completed = (executor.listCompletedMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
       return res.json({ missions: [...active, ...completed] });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /** Resolve a mission instance by id from active or completed lists. */
+  const findMission = (executor: any, id: string): any | undefined =>
+    executor.getMission?.(id) ??
+    (executor.listCompletedMissions?.() ?? []).find((m: any) => m.id === id);
+
+  // ── Mission Time Travel : timeline chronologique reconstruite ────────────
+  router.get("/missions/:id/timeline", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    const mission = findMission(executor, req.params.id);
+    if (!mission) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId: req.params.id });
+    }
+    try {
+      const timeline = missionTimeTravel.buildTimeline(mission.getState() as TimelineMissionView);
+      return res.json({ status: "success", timeline });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Rewind : instantané d'une étape + trace y menant ─────────────────────
+  router.get("/missions/:id/timeline/:step", (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    const mission = findMission(executor, req.params.id);
+    if (!mission) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId: req.params.id });
+    }
+    const step = Number(req.params.step);
+    if (!Number.isInteger(step) || step < 0) {
+      return res.status(400).json({ error: "Index d'étape invalide." });
+    }
+    try {
+      const { target, trail } = missionTimeTravel.rewindTo(mission.getState() as TimelineMissionView, step);
+      if (!target) {
+        return res.status(404).json({ error: `Étape ${step} hors limites.` });
+      }
+      return res.json({ status: "success", target, trail });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }

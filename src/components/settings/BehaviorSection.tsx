@@ -1,6 +1,7 @@
+import { AnimatePresence, motion } from 'motion/react';
 import { Languages } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { Section, SectionDivider, Field, ChipGroup, ToggleSwitch, TextInput } from './SettingsPrimitives.js';
+import { Section, SectionDivider, Field, ChipGroup, ToggleSwitch, RangeSlider } from './SettingsPrimitives.js';
 import { LANGUAGES, RESPONSE_STYLES } from './constants.js';
 
 export function BehaviorSection() {
@@ -27,6 +28,20 @@ export function BehaviorSection() {
           />
         </Field>
 
+        <SectionDivider label="Présence vocale" />
+
+        <Field
+          label="Présence vocale continue"
+          hint="Ouvre la session vocale au démarrage et la rétablit automatiquement si elle se ferme. Leanna reste à l'écoute et peut parler d'elle-même."
+        >
+          <ToggleSwitch
+            value={profile.voiceAlwaysOn}
+            onChange={v => setField('voiceAlwaysOn', v)}
+            label="Toujours active"
+            hint={profile.voiceAlwaysOn ? 'La session vocale se connecte et se maintient seule' : 'Connexion vocale manuelle'}
+          />
+        </Field>
+
         <SectionDivider label="Mode Muet Automatique" />
        
         <Field label="Activer le mode muet automatique" hint="Coupe le micro automatiquement après une période d'inactivité">
@@ -38,17 +53,28 @@ export function BehaviorSection() {
           />
         </Field>
        
-        <Field label="Délai avant muet (secondes)" hint="Temps d'inactivité avant de couper le micro (5–300s)">
-          <TextInput
-            value={String(profile.autoMuteTimeout)}
-            onChange={v => setField('autoMuteTimeout', Math.min(300, Math.max(5, parseInt(v) || 40)))}
-            placeholder="40"
-            type="number"
-            min="5"
-            max="300"
-            style={{ width: '80px' }}
-          />
-        </Field>
+        <AnimatePresence initial={false}>
+          {profile.autoMuteEnabled && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: 'hidden' }}
+            >
+              <Field label="Délai avant muet" hint="Temps d'inactivité avant de couper le micro (5–300s)">
+                <RangeSlider
+                  value={profile.autoMuteTimeout}
+                  onChange={v => setField('autoMuteTimeout', v)}
+                  min={5}
+                  max={300}
+                  step={5}
+                  format={v => `${v} s`}
+                />
+              </Field>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <SectionDivider label="Détecteur d'Activité Vocale (VAD)" />
 
@@ -61,29 +87,39 @@ export function BehaviorSection() {
           />
         </Field>
 
-        <Field label="Seuil d'activation de la voix (0-100)" hint="Sensibilité minimale pour détecter la voix humaine">
-          <TextInput
-            value={String(profile.vadThreshold)}
-            onChange={v => setField('vadThreshold', Math.min(100, Math.max(0, parseInt(v) || 35)))}
-            placeholder="35"
-            type="number"
-            min="0"
-            max="100"
-            style={{ width: '80px' }}
-          />
-        </Field>
+        <AnimatePresence initial={false}>
+          {profile.vadEnabled && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: 'hidden' }}
+              className="flex flex-col gap-4"
+            >
+              <Field label="Seuil d'activation de la voix" hint="Sensibilité minimale pour détecter la voix humaine (0–100)">
+                <RangeSlider
+                  value={profile.vadThreshold}
+                  onChange={v => setField('vadThreshold', v)}
+                  min={0}
+                  max={100}
+                  step={1}
+                />
+              </Field>
 
-        <Field label="Durée de silence avant coupure (ms)" hint="Temps de silence avant d'arrêter la transmission (300-2000ms)">
-          <TextInput
-            value={String(profile.vadSilenceDuration)}
-            onChange={v => setField('vadSilenceDuration', Math.min(2000, Math.max(300, parseInt(v) || 800)))}
-            placeholder="800"
-            type="number"
-            min="300"
-            max="2000"
-            style={{ width: '80px' }}
-          />
-        </Field>
+              <Field label="Durée de silence avant coupure" hint="Temps de silence avant d'arrêter la transmission (300–2000 ms)">
+                <RangeSlider
+                  value={profile.vadSilenceDuration}
+                  onChange={v => setField('vadSilenceDuration', v)}
+                  min={300}
+                  max={2000}
+                  step={50}
+                  format={v => `${v} ms`}
+                />
+              </Field>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <SectionDivider label="Interface de Chat" />
 
         <Field label="Suggestions rapides" hint="Affiche des chips de raccourcis (Expliquer ce fichier, Écrire des tests…) au-dessus du champ de saisie quand il est vide">

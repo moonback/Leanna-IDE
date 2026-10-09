@@ -217,11 +217,13 @@ const routingRules: PromptRule[] = [
     when: ctx => ctx.agents.enabled,
     content: `Évaluer les règles de délégation dans cet ordre strict (la première applicable tranche) :
 1. Agents désactivés → agir directement dans la sandbox ; aucune délégation.
-2. Demande explicite de délégation → déléguer au rôle demandé s'il est autorisé.
+2. Demande explicite de délégation vers un rôle précis → déléguer au rôle demandé s'il est autorisé (\`agent_delegate\`).
 3. Opération de fichier sans expertise (créer dossier, déplacer/renommer, modification documentaire ponctuelle) → agir directement.
 4. Code trivial et isolé (typo, commentaire, libellé, correction locale sans changement de comportement) → agir directement, puis vérifier.
-5. Code non trivial (nouvelle fonctionnalité, bug, refactor, API, tests, sécurité, plusieurs fichiers) → déléguer au rôle spécialisé.
-6. Document complexe ou spécialisé → déléguer au rôle rédactionnel approprié.`,
+5. Code non trivial (nouvelle fonctionnalité, bug, refactor, API, tests, sécurité, plusieurs fichiers) → déléguer :
+   a. Rôle cible ÉVIDENT (un seul agent clairement le mieux placé) → \`agent_delegate\` vers ce rôle.
+   b. Rôle cible NON ÉVIDENT (tu hésites entre plusieurs agents, ou plusieurs compétences pourraient convenir) → \`agent_negotiate\` : la tâche est mise aux enchères et le meilleur-match (compétences + charge) la remporte automatiquement.
+6. Document complexe ou spécialisé → déléguer au rôle rédactionnel approprié (\`agent_delegate\`, ou \`agent_negotiate\` si le rôle n'est pas évident).`,
     source: "agents-system.md",
   },
   {
@@ -232,6 +234,12 @@ const routingRules: PromptRule[] = [
     content: `Le système multi-agents est désactivé. L'assistant agit seul. \`agent_delegate\` et \`agent_orchestrate\` ne sont pas disponibles. Toutes les modifications sont isolées dans la Sandbox.`,
     source: "SystemPromptBuilder.ts (solo mode)",
     conflictsWith: ["routing.deterministic-router"],
+    // Départage déterministe (C5) : ces deux règles sont mutuellement exclusives
+    // (gardées par des `when` complémentaires) et ne coexistent jamais. On
+    // déclare quand même une restrictiveness distincte pour que le départage
+    // soit déterministe si elles venaient à collisionner — le mode solo, qui
+    // interdit la délégation, est le plus restrictif et gagne.
+    restrictiveness: 1,
   },
 ];
 
@@ -337,12 +345,24 @@ const styleRules: PromptRule[] = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
+ * Marque une liste de règles comme immuables (garde-fous système).
+ * Appliqué aux P0 SAFETY et P1 AUTHORITY : après seal() du registre, elles ne
+ * peuvent plus être override/unregister. (C2)
+ */
+function asImmutable(rules: PromptRule[]): PromptRule[] {
+  return rules.map(r => ({ ...r, immutable: true }));
+}
+
+/**
  * Toutes les règles core, dans l'ordre P0 → P7.
  * Utiliser registerAll(CORE_RULES) pour les charger dans un RuleRegistry.
+ *
+ * Les P0 (SAFETY) et P1 (AUTHORITY) sont marquées `immutable` : ce sont les
+ * garde-fous inviolables, protégés contre toute mutation post-boot.
  */
 export const CORE_RULES: PromptRule[] = [
-  ...safetyRules,
-  ...authorityRules,
+  ...asImmutable(safetyRules),
+  ...asImmutable(authorityRules),
   ...runtimeRules,
   ...taskRules,
   ...routingRules,

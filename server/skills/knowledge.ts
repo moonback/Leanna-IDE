@@ -7,6 +7,13 @@ import {
   projectMemory,
   impactAnalyzer,
   knowledgeGraph,
+  projectDoctor,
+  predictionEngine,
+  opportunityEngine,
+  missionEvolutionStore,
+  dailyBriefing,
+  WorkflowCompiler,
+  voiceCommandInterpreter,
 } from "../knowledge/index.js";
 import type { ContextStrategy, ContextDetailLevel } from "../knowledge/UnderstandingEngine.js";
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
@@ -39,6 +46,25 @@ const DETAIL_VALUES: ContextDetailLevel[] = ["compact", "standard", "verbose"];
 
 const IMPACT_MODES: ImpactMode[] = ["quick", "standard", "deep", "reverse"];
 
+/**
+ * Coarse objective-only problem signature, consistent with the Executor's
+ * problemSignature() keying so a planner can look up the evolution of the same
+ * problem class it is about to tackle. No error families here (objective only).
+ */
+function deriveCoarseSignature(objective: string): string {
+  const t = objective.toLowerCase();
+  const kw =
+    /perf|optimi/.test(t) ? "perf"
+      : /refactor|clean/.test(t) ? "refactor"
+        : /test/.test(t) ? "test"
+          : /secur|sécur/.test(t) ? "security"
+            : /doc/.test(t) ? "docs"
+              : /fix|bug|corrige|erreur|error/.test(t) ? "fix"
+                : "generic";
+  const fam = /ts|typescript|type/.test(t) ? "ts-error" : /fix|bug|erreur|error/.test(t) ? "error" : "objective";
+  return `${fam}:${kw}`;
+}
+
 export const knowledgeSkill: Skill = {
   name: "knowledge",
   permissions: ["read"],
@@ -50,6 +76,13 @@ export const knowledgeSkill: Skill = {
     knowledge_impact_analyze: ["read"],
     knowledge_index_status: ["read"],
     knowledge_index_rebuild: ["read", "write"],
+    knowledge_project_doctor: ["read"],
+    knowledge_predict: ["read"],
+    knowledge_opportunities: ["read"],
+    knowledge_mission_evolution: ["read"],
+    knowledge_daily_briefing: ["read"],
+    knowledge_compile_workflow: ["read"],
+    knowledge_voice_command: ["read"],
   },
   declarations: [
     {
@@ -368,6 +401,106 @@ export const knowledgeSkill: Skill = {
         required: ["file_path"],
       },
     },
+    {
+      name: "knowledge_project_doctor",
+      description:
+        "🩺 AI Project Doctor : diagnostique la santé du projet (architecture, sécurité, tests, performance, dette technique, maintenabilité, autonomie), produit un score PROJECT HEALTH par dimension + global, liste les problèmes et génère un plan de missions d'amélioration priorisées. Nécessite un projet indexé.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          include_missions: {
+            type: "BOOLEAN",
+            description: "Inclure le plan de missions d'amélioration généré (défaut: true).",
+          },
+        },
+      },
+    },
+    {
+      name: "knowledge_predict",
+      description:
+        "🔮 Predictive Agent : AVANT d'exécuter, prédit la probabilité de réussite d'un objectif, les risques, la durée/coût estimés, la stratégie recommandée (réutilise un Playbook appris si disponible) et l'étape la plus fragile. Exploite la fiabilité historique des outils. Fournir l'objectif et la séquence de skills envisagée.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING", description: "Titre / objectif de la mission à prédire." },
+          description: { type: "STRING", description: "Description détaillée (optionnelle)." },
+          planned_skills: {
+            type: "ARRAY",
+            description: "Séquence ordonnée des skills/outils envisagés (ex: ['read_code','str_replace','run_typecheck']).",
+            items: { type: "STRING" },
+          },
+          errors: {
+            type: "ARRAY",
+            description: "Messages d'erreur connus liés à l'objectif (améliore la correspondance de Playbook).",
+            items: { type: "STRING" },
+          },
+          estimated_duration_ms: { type: "NUMBER", description: "Durée estimée en ms (optionnelle)." },
+          estimated_cost_usd: { type: "NUMBER", description: "Coût estimé en USD (optionnel)." },
+        },
+        required: ["title"],
+      },
+    },
+    {
+      name: "knowledge_opportunities",
+      description:
+        "🔥 Opportunity Engine : cherche activement du travail utile — opérations manuelles répétées à automatiser, optimisations récurrentes, erreurs à prévenir, outils peu fiables, et améliorations de santé du projet. Retourne des opportunités classées par rapport valeur/effort.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          limit: { type: "NUMBER", description: "Nombre max d'opportunités à retourner (défaut: 15)." },
+          include_health: { type: "BOOLEAN", description: "Inclure les opportunités issues du diagnostic de santé (défaut: true). Nécessite un projet indexé." },
+        },
+      },
+    },
+    {
+      name: "knowledge_mission_evolution",
+      description:
+        "🧬 Mission Evolution : pour une classe de problème (signature), recommande l'APPROCHE (séquence d'outils) qui a le mieux marché historiquement et signale celles à éviter (échecs répétés). Permet à Leanna de choisir automatiquement l'approche gagnante au lieu de répéter une approche défaillante.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          signature: { type: "STRING", description: "Signature de la classe de problème (ex: 'ts-error:fix'). Soit signature, soit objective requis." },
+          objective: { type: "STRING", description: "Objectif en langage naturel — une signature coarse en est dérivée si 'signature' n'est pas fourni." },
+        },
+      },
+    },
+    {
+      name: "knowledge_daily_briefing",
+      description:
+        "☀️ Daily AI Briefing : digest matinal de ce que Leanna a détecté — problèmes critiques, tâches en attente, améliorations possibles — composé depuis la santé du projet, les opportunités et le profil. Propose des missions prêtes à lancer. Lecture seule.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          max_missions: { type: "NUMBER", description: "Nombre max de missions recommandées (défaut: 5)." },
+          include_health: { type: "BOOLEAN", description: "Inclure le diagnostic de santé (défaut: true). Nécessite un projet indexé." },
+        },
+      },
+    },
+    {
+      name: "knowledge_compile_workflow",
+      description:
+        "🧩 NL → Automation : compile une demande d'automatisation en langage naturel (ex: « tous les lundis matin, vérifie mes repos, détecte les issues critiques et prépare un rapport ») en un workflow structuré (déclencheur planifié/événement/manuel + étapes ordonnées mappées sur des actions réelles). Retourne la définition prête à créer via workflow_create (après revue). Lecture seule — n'enregistre rien.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          request: { type: "STRING", description: "La demande d'automatisation en langage naturel." },
+          name: { type: "STRING", description: "Nom optionnel du workflow (sinon dérivé des étapes)." },
+        },
+        required: ["request"],
+      },
+    },
+    {
+      name: "knowledge_voice_command",
+      description:
+        "🎙️ Voice Agent : interprète une transcription vocale en une SÉQUENCE ordonnée de commandes agentiques (diagnostic, correction, tests, commit, mission, ouverture de fichier…) avec cibles (« le premier », « les trois »), conditions (« si tout est bon, commit ») et drapeau de confirmation pour les actions risquées. Mappe chaque commande sur un skill réel. Lecture seule — ne fait que planifier.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          transcript: { type: "STRING", description: "La transcription de la commande vocale." },
+        },
+        required: ["transcript"],
+      },
+    },
   ],
   inputSchemas: {
     knowledge_build_context: z.object({
@@ -384,20 +517,28 @@ export const knowledgeSkill: Skill = {
     }),
     knowledge_search_entities: z.object({
       query: z.string().min(1, "La requête ne peut être vide").trim(),
+      // Le LLM (ou le runtime) envoie parfois type_filter: "" au lieu d'omettre
+      // le champ. On normalise toute chaîne vide/espaces en `undefined` AVANT la
+      // validation de l'enum, qui n'accepte pas de valeur vide.
       type_filter: z
-        .enum([
-          "class",
-          "function",
-          "interface",
-          "enum",
-          "type",
-          "constant",
-          "variable",
-          "component",
-          "method",
-          "import",
-          "export",
-        ])
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+          z
+            .enum([
+              "class",
+              "function",
+              "interface",
+              "enum",
+              "type",
+              "constant",
+              "variable",
+              "component",
+              "method",
+              "import",
+              "export",
+            ])
+            .optional(),
+        )
         .optional(),
     }),
     knowledge_memory_search: z.object({
@@ -446,6 +587,36 @@ export const knowledgeSkill: Skill = {
     }),
     knowledge_ast_file_inspect: z.object({
       file_path: z.string().min(1, "Le chemin de fichier ne peut être vide").trim(),
+    }),
+    knowledge_project_doctor: z.object({
+      include_missions: z.boolean().optional().default(true),
+    }),
+    knowledge_predict: z.object({
+      title: z.string().min(1, "L'objectif ne peut être vide").trim(),
+      description: z.string().trim().optional(),
+      planned_skills: z.array(z.string().trim()).optional().default([]),
+      errors: z.array(z.string().trim()).optional().default([]),
+      estimated_duration_ms: z.number().nonnegative().optional(),
+      estimated_cost_usd: z.number().nonnegative().optional(),
+    }),
+    knowledge_opportunities: z.object({
+      limit: z.number().int().positive().max(50).optional().default(15),
+      include_health: z.boolean().optional().default(true),
+    }),
+    knowledge_mission_evolution: z.object({
+      signature: z.string().trim().optional(),
+      objective: z.string().trim().optional(),
+    }).refine((v) => v.signature || v.objective, { message: "Fournir 'signature' ou 'objective'." }),
+    knowledge_daily_briefing: z.object({
+      max_missions: z.number().int().positive().max(20).optional().default(5),
+      include_health: z.boolean().optional().default(true),
+    }),
+    knowledge_compile_workflow: z.object({
+      request: z.string().min(1, "La demande ne peut être vide").trim(),
+      name: z.string().trim().optional(),
+    }),
+    knowledge_voice_command: z.object({
+      transcript: z.string().min(1, "La transcription ne peut être vide").trim(),
     }),
   },
   handleToolCall: async (name, args) => {
@@ -1069,6 +1240,169 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR ast_file_inspect: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_project_doctor — AI Project Doctor (P0)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_project_doctor") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_project_doctor, args);
+        log(`projectDoctor diagnose (include_missions=${validated.include_missions})`);
+        const report = projectDoctor.diagnose();
+        return {
+          status: "success",
+          scores: report.scores,
+          global: report.global,
+          issues: report.issues,
+          improvement_missions: validated.include_missions ? report.improvementMissions : undefined,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR projectDoctor: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_predict — Predictive Agent (P1)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_predict") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_predict, args);
+        log(`predict objective='${validated.title}' skills=${validated.planned_skills.length}`);
+        const report = predictionEngine.predict(
+          {
+            objective: { title: validated.title, description: validated.description, errors: validated.errors },
+            plannedSkills: validated.planned_skills,
+          },
+          { durationMs: validated.estimated_duration_ms, costUsd: validated.estimated_cost_usd },
+        );
+        return {
+          status: "success",
+          success_probability: report.successProbability,
+          success_percent: report.successPercent,
+          risk_level: report.riskLevel,
+          risks: report.risks,
+          recommended_strategy: report.recommendedStrategy,
+          playbook_id: report.playbookId,
+          weakest_step: report.weakestStep,
+          steps: report.steps,
+          confidence: report.confidence,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR predict: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_opportunities — Opportunity Engine (P1)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_opportunities") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_opportunities, args);
+        log(`opportunities scan (limit=${validated.limit}, include_health=${validated.include_health})`);
+        const report = opportunityEngine.scan({ limit: validated.limit, includeHealth: validated.include_health });
+        return {
+          status: "success",
+          count: report.opportunities.length,
+          opportunities: report.opportunities,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR opportunities: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_mission_evolution — Mission Evolution (#6)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_mission_evolution") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_mission_evolution, args);
+        const signature = validated.signature ?? deriveCoarseSignature(validated.objective ?? "");
+        log(`mission_evolution recommend signature='${signature}'`);
+        const rec = missionEvolutionStore.recommendApproach(signature);
+        return {
+          status: "success",
+          signature: rec.signature,
+          recommended: rec.recommended,
+          avoid: rec.avoid,
+          reason: rec.reason,
+        };
+      } catch (e: any) {
+        log(`ERROR mission_evolution: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_daily_briefing — Daily AI Briefing (#13)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_daily_briefing") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_daily_briefing, args);
+        log(`daily_briefing (max_missions=${validated.max_missions}, include_health=${validated.include_health})`);
+        const report = dailyBriefing.generate({ maxMissions: validated.max_missions, includeHealth: validated.include_health });
+        return {
+          status: "success",
+          greeting: report.greeting,
+          project: report.projectName,
+          health_score: report.healthScore,
+          counts: report.counts,
+          items: report.items,
+          recommended_missions: report.recommendedMissions,
+          highlights: report.highlights,
+          summary: report.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR daily_briefing: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_compile_workflow — NL → Automation (#15)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_compile_workflow") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_compile_workflow, args);
+        log(`compile_workflow request='${validated.request.slice(0, 60)}'`);
+        const result = new WorkflowCompiler().compile(validated.request, { name: validated.name });
+        return {
+          status: "success",
+          workflow: result.workflow,
+          warnings: result.warnings,
+          summary: result.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR compile_workflow: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_voice_command — Voice Agent (#12)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_voice_command") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_voice_command, args);
+        log(`voice_command transcript='${validated.transcript.slice(0, 60)}'`);
+        const result = voiceCommandInterpreter.interpret(validated.transcript);
+        return {
+          status: "success",
+          wake_word: result.wakeWord,
+          commands: result.commands,
+          unrecognized: result.unrecognized,
+          summary: result.summary,
+        };
+      } catch (e: any) {
+        log(`ERROR voice_command: ${e.message}`);
         return { error: e.message };
       }
     }

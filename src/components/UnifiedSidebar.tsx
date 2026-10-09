@@ -18,6 +18,11 @@ import {
   Settings,
   BrainCircuit,
   LayoutList,
+  LayoutDashboard,
+  Milestone,
+  FlaskConical,
+  Network,
+  HelpCircle,
   FileText,
   NotebookPen,
   Menu,
@@ -597,6 +602,11 @@ function GlobalNavSection({
   }, [currentPath, showHistory, showAutomation, showMemory, showNotebooks]);
 
   const subItems = [
+    { id: 'mission-control', path: '/mission-control', icon: LayoutDashboard, label: 'Mission Control', active: currentPath === '/mission-control', onClick: () => navigate('/mission-control') },
+    { id: 'mission-timeline', path: '/mission-timeline', icon: Milestone, label: 'Mission Timeline', active: currentPath === '/mission-timeline', onClick: () => navigate('/mission-timeline') },
+    { id: 'mission-simulation', path: '/mission-simulation', icon: FlaskConical, label: 'Simulation', active: currentPath === '/mission-simulation', onClick: () => navigate('/mission-simulation') },
+    { id: 'agent-swarm', path: '/agent-swarm', icon: Network, label: 'Agent Swarm', active: currentPath === '/agent-swarm', onClick: () => navigate('/agent-swarm') },
+    { id: 'explainability', path: '/explainability', icon: HelpCircle, label: 'Pourquoi ?', active: currentPath === '/explainability', onClick: () => navigate('/explainability') },
     { id: 'history', path: '/history', icon: History, label: 'Historique', active: showHistory, onClick: onToggleHistory },
     { id: 'memories', path: '/memories', icon: BrainCircuit, label: 'Mémoires', active: showMemory, onClick: onToggleMemory },
     { id: 'automation', path: '/automation', icon: Zap, label: 'Tâches', active: showAutomation, onClick: onToggleAutomation },

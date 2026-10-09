@@ -195,6 +195,17 @@ const SENSITIVE_TOOL_ATTRIBUTION: Record<
   delete_custom_skill: { preferred: 'coder', allowed: ['coder'], risk: 'dangerous' },
   // Exécution de workflow complet — chaîne d'actions avec effets de bord.
   workflow_run: { preferred: 'planner', allowed: ['planner', 'coder'], risk: 'exec' },
+  // Diagnostic — consultation des journaux structurés agents/assistant. Lecture
+  // seule : aucun risque, mais attribution explicite car aucune catégorie ne le
+  // matche (retombait sur le rôle neutre "system"). Diagnostic = debugger.
+  assistant_logs: { preferred: 'debugger', allowed: ['debugger', 'reviewer'] },
+  // Génération du document de structure projet (codebase.md). Écrit un fichier :
+  // risque "write". Outil de documentation d'architecture → architect/writer.
+  generate_codebase_markdown: {
+    preferred: 'architect',
+    allowed: ['architect', 'writer', 'documentation'],
+    risk: 'write',
+  },
 };
 
 /**
@@ -281,7 +292,11 @@ export const TOOL_CATEGORIES: Record<string, {
     label: 'Recherche et analyse',
     description: 'Collecte d\'informations et analyse technique',
     typicalRoles: ['researcher', 'architect', 'planner'],
-    keywords: ['research', 'analyze', 'collect', 'synthesize', 'understand', 'impact'],
+    // `lookup` capte les outils de consultation documentaire externe en lecture
+    // seule (ex. lookup_topic → résumé Wikipédia) qui ne matchaient aucune
+    // catégorie et retombaient sur le rôle neutre "system". Attribution
+    // purement UI : aucun impact sur les permissions (cf. PermissionPolicy).
+    keywords: ['research', 'analyze', 'collect', 'synthesize', 'understand', 'impact', 'lookup'],
   },
   
   // Catégories Planification & Orchestration
@@ -310,6 +325,18 @@ export const TOOL_CATEGORIES: Record<string, {
     description: 'Navigation web, capture d\'écran et interaction automatisée',
     typicalRoles: ['researcher', 'vision'],
     keywords: ['automation', 'browser', 'navigate', 'click', 'screenshot', 'inspect', 'extract'],
+  },
+  // Skills personnalisés définis par l'utilisateur (custom_<nom>) + leur gestion
+  // CRUD (list/create/update/delete/toggle_custom_skill). Attribution
+  // DÉTERMINISTE par catégorie : garantit qu'un custom skill — présent ou futur —
+  // n'est jamais « non attribué » (ce qui ferait échouer l'audit strict au boot).
+  // Le segment 'custom' matche tout tool `custom_*` ; 'skill' matche les outils
+  // de gestion `*_custom_skill(s)`.
+  custom: {
+    label: 'Skills personnalisés',
+    description: 'Skills définis par l\'utilisateur et leur gestion',
+    typicalRoles: ['coder', 'writer'],
+    keywords: ['custom', 'skill'],
   },
   vision: {
     label: 'Analyse visuelle',
@@ -425,29 +452,26 @@ export function getPrimaryAgentForTool(tool: string): AgentRole {
   if (!isInitialized) {
     initializeToolAgentMapper();
   }
-  
-  // Priorité 1 : attribution explicite du ToolRegistry (source de vérité).
-  const explicit = toolAttributionCache.get(tool);
-  if (explicit) {
-    return explicit.preferred;
-  }
-  
-  // Priorité 2 : mapping dérivé des capabilities de rôle.
-  const byCapability = toolToPrimaryAgentCache.get(tool);
-  if (byCapability) {
-    return byCapability;
-  }
 
-  // Priorité 3 : attribution sémantique par catégorie (ENSEMBLE d'agents).
-  // On NE choisit PAS un propriétaire unique : l'outil appartient à plusieurs
-  // agents. On renvoie le rôle d'affichage `multi` (« plusieurs agents »),
-  // l'ensemble réel restant accessible via getAgentsForTool().
+  // Priorité 1a — cache explicite.
+  const explicit = toolAttributionCache.get(tool);
+  if (explicit) return explicit.preferred;
+
+  // Priorité 1b — fallback statique sur le socle sensible (même garantie
+  // que resolveToolAttribution : indépendant du timing du bootstrap).
+  const sensitive = resolveSensitiveExplicit(tool);
+  if (sensitive) return sensitive;
+
+  // Priorité 2 — capability de rôle.
+  const byCapability = toolToPrimaryAgentCache.get(tool);
+  if (byCapability) return byCapability;
+
+  // Priorité 3 — ensemble d'agents par catégorie (rôle d'affichage « multi »).
   const byCategory = getCategoryRolesForTool(tool);
   if (byCategory && byCategory.length > 0) {
     return byCategory.length === 1 ? byCategory[0] : MULTI_ROLE;
   }
 
-  // Dernier recours : rôle neutre. On ne ment jamais sur l'agent.
   return UNATTRIBUTED_ROLE;
 }
 
@@ -458,7 +482,23 @@ export function getPrimaryAgentForTool(tool: string): AgentRole {
  * honnête côté UI et diagnostic.
  */
 export type AttributionSource = 'explicit' | 'capability' | 'category' | 'unattributed';
-
+/**
+ * Fallback direct sur SENSITIVE_TOOL_ATTRIBUTION.
+ *
+ * `applyToolRegistryAttribution()` alimente le cache explicite depuis ce socle,
+ * mais cette population dépend du bootstrap : elle doit être appelée APRÈS
+ * l'enregistrement de tous les outils dans le ToolRegistry. Si `resolveToolAttribution`
+ * ou `getPrimaryAgentForTool` est appelée avant (ex : Reconcile de démarrage),
+ * le cache est vide et les outils du socle sensible retombent à tort sur
+ * l'heuristique de catégorie — voire sur `system` quand aucun keyword ne matche.
+ *
+ * Ce fallback garantit qu'un outil du socle sensible est TOUJOURS reconnu comme
+ * `explicit`, indépendamment du timing du bootstrap. Il préserve la priorité 1
+ * (explicite > capability > catégorie) sans dépendre de l'ordre d'appel.
+ */
+function resolveSensitiveExplicit(tool: string): AgentRole | undefined {
+  return SENSITIVE_TOOL_ATTRIBUTION[tool]?.preferred;
+}
 /**
  * Résout l'attribution d'un outil ET sa provenance, sans effet de bord.
  * Reflète exactement la cascade de priorités de `getPrimaryAgentForTool`.
@@ -467,12 +507,22 @@ export function resolveToolAttribution(tool: string): { role: AgentRole; source:
   if (!isInitialized) {
     initializeToolAgentMapper();
   }
+
+  // Priorité 1a — cache explicite (ToolRegistry + socle sensible déjà appliqués).
   const explicit = toolAttributionCache.get(tool);
   if (explicit) return { role: explicit.preferred, source: 'explicit' };
 
+  // Priorité 1b — fallback statique sur le socle sensible : garantit la
+  // reconnaissance explicite même si applyToolRegistryAttribution() n'a pas
+  // encore été appelée (Reconcile de démarrage, tests unitaires isolés, etc.).
+  const sensitive = resolveSensitiveExplicit(tool);
+  if (sensitive) return { role: sensitive, source: 'explicit' };
+
+  // Priorité 2 — mapping dérivé des capabilities de rôle.
   const byCapability = toolToPrimaryAgentCache.get(tool);
   if (byCapability) return { role: byCapability, source: 'capability' };
 
+  // Priorité 3 — attribution sémantique par catégorie (heuristique).
   const byCategory = getCategoryRolesForTool(tool);
   if (byCategory && byCategory.length > 0) return { role: byCategory[0], source: 'category' };
 

@@ -17,10 +17,12 @@ import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { LauncherModal } from './components/LauncherModal.js';
+import { EnvSetupModal } from './components/EnvSetupModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { Loader2, X } from 'lucide-react';
-import { UnifiedSidebar } from './components/UnifiedSidebar.js';
+import { GlobalSidebar } from './components/GlobalSidebar.js';
+import { AgentStatusBar } from './components/AgentStatusBar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -32,6 +34,11 @@ const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
+const MissionControlView = lazy(() => import('./views/MissionControlView.js'));
+const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'));
+const MissionSimulationView = lazy(() => import('./views/MissionSimulationView.js'));
+const AgentSwarmView = lazy(() => import('./views/AgentSwarmView.js'));
+const ExplainabilityView = lazy(() => import('./views/ExplainabilityView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -255,13 +262,13 @@ function IdeNavigationBridge() {
           navigate('/ide');
         }
         if (typeof detail.path === 'string') {
-          sessionStorage.setItem('Leanna-ide-pending-file', JSON.stringify({
+          sessionStorage.setItem('Leanna-pending-file', JSON.stringify({
             path: detail.path,
             line: detail.line,
             column: detail.column,
           }));
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('Leanna-ide-open-file', {
+            window.dispatchEvent(new CustomEvent('Leanna-open-file', {
               detail: { path: detail.path, line: detail.line, column: detail.column },
             }));
           }, 300);
@@ -274,16 +281,16 @@ function IdeNavigationBridge() {
           navigate('/ide');
         }
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('Leanna-ide-file-changed', {
+          window.dispatchEvent(new CustomEvent('Leanna-file-changed', {
             detail: { path: detail.path },
           }));
         }, 300);
       }
     };
 
-    window.addEventListener('Leanna-ide-action', handleAction as EventListener);
+    window.addEventListener('Leanna-action', handleAction as EventListener);
     return () => {
-      window.removeEventListener('Leanna-ide-action', handleAction as EventListener);
+      window.removeEventListener('Leanna-action', handleAction as EventListener);
       window.removeEventListener('Leanna-user-nav', handleNavClick);
     };
   }, [navigate, location.pathname]);
@@ -461,7 +468,14 @@ function NavSidebar() {
   // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
-  return <UnifiedSidebar context="global" />;
+  return <GlobalSidebar />;
+}
+
+/** Persistent agent status strip — hidden on the IDE (it has its own StatusBar). */
+function GlobalAgentStatusBar() {
+  const { pathname } = useLocation();
+  if (pathname === '/' || pathname === '/ide') return null;
+  return <AgentStatusBar />;
 }
 
 // ── Animated route transitions (Phase 3.5) ─────────────────────────────────
@@ -497,6 +511,11 @@ function AnimatedRoutes() {
         <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
         <Route path="/observability" element={wrap(<ObservabilityView />)} />
         <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
+        <Route path="/mission-control" element={wrap(<MissionControlView />)} />
+        <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
+        <Route path="/mission-simulation" element={wrap(<MissionSimulationView />)} />
+        <Route path="/agent-swarm"   element={wrap(<AgentSwarmView />)} />
+        <Route path="/explainability" element={wrap(<ExplainabilityView />)} />
       </Routes>
     </AnimatePresence>
   );
@@ -533,6 +552,128 @@ function Layout() {
     return () => window.removeEventListener('Leanna-settings-saved', handleSettingsSaved);
   }, [liveAPI.connected, liveAPI.disconnect, liveAPI.connect]);
 
+  // ── Suivi de l'ouverture d'un workspace ────────────────────────────────────
+  // La présence vocale continue ne doit s'activer qu'APRÈS qu'un projet est
+  // ouvert (pas au démarrage « sans projet »). On détecte l'état initial via
+  // /api/workspace puis on écoute l'événement d'activation de workspace.
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkWorkspace = async () => {
+      try {
+        const token = localStorage.getItem('Leanna_api_token');
+        const res = await fetch('/api/workspace', {
+          headers: token ? { 'x-Leanna-token': token } : {},
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Un workspace est « ouvert » si le serveur renvoie un chemin existant.
+        const open = Boolean(data?.workspace) && data?.exists !== false;
+        if (!cancelled) setWorkspaceOpen(open);
+      } catch {
+        /* best-effort : sans réponse, on reste « fermé » */
+      }
+    };
+
+    void checkWorkspace();
+
+    // Changement de workspace : l'événement porte `detail.workspace`.
+    //   - chemin non vide → projet ouvert
+    //   - null / absent   → projet fermé (ex. clic « changer de workspace » qui
+    //                        appelle /api/self-root/clear). Même convention que
+    //                        IdeView / FileExplorer / NotebookList.
+    const onWorkspaceChanged = (e: Event) => {
+      const workspace = (e as CustomEvent)?.detail?.workspace;
+      setWorkspaceOpen(Boolean(workspace));
+    };
+    // Mode « sans projet » explicite (launcher → Notebooks) → fermé.
+    const onNoWorkspace = () => setWorkspaceOpen(false);
+
+    window.addEventListener('Leanna-workspace-changed', onWorkspaceChanged);
+    window.addEventListener('Leanna-no-workspace-mode', onNoWorkspace);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('Leanna-workspace-changed', onWorkspaceChanged);
+      window.removeEventListener('Leanna-no-workspace-mode', onNoWorkspace);
+    };
+  }, []);
+
+  // ── Présence vocale continue (voiceAlwaysOn) ───────────────────────────────
+  // Quand l'utilisateur active ce mode ET qu'un workspace est ouvert, Leanna
+  // ouvre la session vocale et la rétablit automatiquement si elle se ferme,
+  // avec un backoff borné pour ne jamais marteler le serveur. On réutilise
+  // exactement le même pipeline que la connexion manuelle (aucun second flux
+  // audio). Tant qu'aucun projet n'est ouvert, l'auto-connexion reste inactive.
+  const voiceAlwaysOn = profile.voiceAlwaysOn === true && workspaceOpen;
+  useEffect(() => {
+    if (!voiceAlwaysOn) return;
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const MAX_BACKOFF_MS = 30_000;
+
+    const ensureConnected = () => {
+      if (cancelled) return;
+      // Déjà connecté (ou en cours) : rien à faire, on réarme un contrôle plus tard.
+      if (liveAPI.connected || liveAPI.connecting) {
+        attempts = 0;
+        return;
+      }
+      try {
+        liveAPI.connect([], 'full');
+      } catch {
+        /* connect est best-effort ; l'erreur est tracée par le hook */
+      }
+    };
+
+    // Première tentative immédiate.
+    ensureConnected();
+
+    // Contrôle périodique : si la session est tombée, on la relance avec un
+    // backoff exponentiel borné (0 → 1s → 2s → … → 30s max).
+    const scheduleCheck = () => {
+      if (cancelled) return;
+      const delay = liveAPI.connected
+        ? 5_000 // connecté : simple surveillance légère
+        : Math.min(MAX_BACKOFF_MS, 1_000 * 2 ** Math.min(attempts, 5));
+      retryTimer = setTimeout(() => {
+        if (cancelled) return;
+        if (!liveAPI.connected && !liveAPI.connecting) {
+          attempts += 1;
+          ensureConnected();
+        } else {
+          attempts = 0;
+        }
+        scheduleCheck();
+      }, delay);
+    };
+    scheduleCheck();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+    // On ne dépend volontairement que de voiceAlwaysOn + des callbacks stables :
+    // la boucle interne lit liveAPI.connected/connecting à chaque tick, évitant
+    // de recréer l'effet (et de couper la session) à chaque changement d'état.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceAlwaysOn, liveAPI.connect]);
+
+  // ── Fermeture de la présence vocale quand le projet est fermé ──────────────
+  // Si le mode « toujours active » est demandé mais que le workspace vient de se
+  // fermer (changement/réinitialisation de projet), on coupe la session ouverte
+  // automatiquement : la présence vocale ne doit pas survivre à un projet fermé.
+  // On ne touche QUE le cas piloté par la présence (profil voiceAlwaysOn actif) ;
+  // une connexion manuelle hors de ce mode n'est jamais coupée ici.
+  const voiceAlwaysOnPref = profile.voiceAlwaysOn === true;
+  useEffect(() => {
+    if (voiceAlwaysOnPref && !workspaceOpen && liveAPI.connected) {
+      liveAPI.disconnect();
+    }
+  }, [voiceAlwaysOnPref, workspaceOpen, liveAPI.connected, liveAPI.disconnect]);
+
   const handleScreenShareChange = useCallback((active: boolean) => {
     // Notify AI about screen share state changes
     if (liveAPI.connected) {
@@ -556,6 +697,7 @@ function Layout() {
           <NavSidebar />
           <main id="main-content" className="app-content" tabIndex={-1}>
             <IdeNavigationBridge />
+            <GlobalAgentStatusBar />
             <AnimatedRoutes />
           </main>
         </div>
@@ -572,6 +714,8 @@ function Layout() {
         <StartupProjectModal />
         {/* Écran de choix IDE / Notebook affiché après le splash */}
         <LauncherModal />
+        {/* Assistant de première configuration des clés .env (après le splash) */}
+        <EnvSetupModal />
       </ScreenShareProvider>
     </LiveAPIContext.Provider>
   );

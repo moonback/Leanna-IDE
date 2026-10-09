@@ -47,3 +47,34 @@ export type {
   Confidence,
 } from "./types.js";
 export { DEFAULT_MISSION_CONFIG, createMissionSchema, addGoalSchema } from "./types.js";
+
+// Mission Simulator (P0) — aperçu bout-en-bout d'une mission en dry-run (SIMULER)
+export {
+  MissionSimulator,
+  type SimulationReport,
+  type SimulatedStep,
+  type SimulatorExecutor,
+  type SimulatedMission,
+  type DryRunReportView,
+  type PlanEstimateView,
+  type MissionSimulatorOptions,
+} from "./MissionSimulator.js";
+
+// Mission Time Travel (P1) — reconstruction chronologique + rewind d'une mission
+export {
+  MissionTimeTravel,
+  missionTimeTravel,
+  type MissionTimeline,
+  type TimelineEvent,
+  type TimelineEventType,
+  type StepSnapshot,
+  type TimelineMissionView,
+} from "./MissionTimeTravel.js";
+
+// Self-Critique (#10) — évaluation plan vs exécution vs résultat
+export {
+  SelfEvaluationEngine,
+  selfEvaluationEngine,
+  type SelfEvaluation,
+  type SelfEvalMissionView,
+} from "./SelfEvaluation.js";

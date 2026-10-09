@@ -15,7 +15,7 @@ import { authenticateRequest, authenticateToken, ensureApiToken } from "./server
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
 
-import { knowledgeGraph, projectIndexer, projectMemory } from "./server/knowledge/index.js";
+import { knowledgeGraph, projectMemory } from "./server/knowledge/index.js";
 
 import { loadGeminiKeys, createGeminiClient } from "./server/utils/geminiKeyPool.js";
 import { encrypt } from "./server/utils/crypto.js";
@@ -23,7 +23,7 @@ import { setTextGenerationProfile, generateText } from "./server/utils/textGener
 
 // Routeurs modulaires
 import healthRouter from "./server/routes/health.js";
-import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter } from "./server/routes/knowledge/index.js";
+import { knowledgeRouter, memoryRouter, impactRouter, understandingRouter, insightsRouter } from "./server/routes/knowledge/index.js";
 
 // Sprint 1 — routeurs extraits de server.ts
 import { createAgentBuilderRouter } from "./server/routes/agent-builder.js";
@@ -36,6 +36,7 @@ import { createCheckpointRouter } from "./server/routes/checkpoint.js";
 import ideRouter from "./server/routes/ide.js";
 import { createBrowserRouter } from "./server/routes/browser.js";
 import { attachLiveWebSocket } from "./server/live/LiveSocketHandler.js";
+import { VoicePresence, voicePresenceEnabled, voicePresenceOptionsFromEnv } from "./server/live/VoicePresence.js";
 import { attachNotebookLiveWebSocket } from "./server/live/NotebookLiveSocketHandler.js";
 import { createExportRouter } from "./server/routes/export.js";
 
@@ -122,7 +123,7 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 1000);
 });
 
-import { setKnowledgeBroadcaster, broadcastKnowledgeProgress } from "./server/utils/knowledgeBroadcaster.js";
+import { setKnowledgeBroadcaster } from "./server/utils/knowledgeBroadcaster.js";
 import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaster.js";
 
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
@@ -158,37 +159,15 @@ import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaste
       });
     }
 
-    // 5. Indexation du Knowledge Graph — seulement si un projet est actif
+    // 5. Indexation du Knowledge Graph — seulement si un projet est actif.
+    // Séquence COMPLÈTE (scan → watcher incrémental → extraction documents →
+    // watcher documents) factorisée dans activateProjectKnowledge, partagée
+    // avec la connexion de workspace à chaud (routes/self-root.ts). Garantit
+    // qu'un projet activé par le sélecteur reçoit exactement le même traitement
+    // qu'un projet actif au démarrage.
     if (hasProject()) {
-      projectIndexer.scanAll({
-        onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
-      }).then((stats: any) => {
-        broadcastKnowledgeProgress('done', stats.totalFiles, stats.totalFiles, {
-          totalEntities: stats.totalEntities,
-          durationMs: stats.durationMs,
-          cached: stats.cached ?? false,
-        });
-        if (stats.cached) {
-          console.log(`[KnowledgeGraph] ⚡ Projet inchangé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (chargé depuis le cache en ${stats.durationMs}ms)`);
-        } else {
-          console.log(`[KnowledgeGraph] ✅ Projet indexé: ${stats.totalFiles} fichiers, ${stats.totalEntities} entités (${(stats.durationMs / 1000).toFixed(1)}s)`);
-        }
-        // 5b. Activer l'indexation incrémentale via FileWatcher
-        projectIndexer.startWatching();
-
-        // 6. Extraction automatique des documents du workspace
-        import("./server/knowledge/WorkspaceIndexer.js").then(({ workspaceIndexer }) => {
-          workspaceIndexer.extractAll().then((docStats: any) => {
-            console.log(`[WorkspaceIndexer] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`);
-            // 6b. Activer l'extraction incrémentale
-            workspaceIndexer.startWatching();
-          }).catch((e: any) => {
-            console.error('[WorkspaceIndexer] ❌ Erreur extraction:', e.message);
-          });
-        });
-      }).catch((e: any) => {
-        console.error('[KnowledgeGraph] ❌ Erreur indexation:', e.message);
-      });
+      const { activateProjectKnowledge } = await import("./server/knowledge/activateProject.js");
+      activateProjectKnowledge();
     } else {
       console.log('[KnowledgeGraph] ⏸️ Aucun projet actif — indexation différée.');
     }
@@ -274,6 +253,7 @@ import { timeSkill } from "./server/skills/time.js";
 import { verifySkill } from "./server/skills/verify.js";
 import { securityAuditSkill } from "./server/skills/securityAudit.js";
 import { weatherSkill } from "./server/skills/weather.js";
+import { utilitiesSkill } from "./server/skills/utilities.js";
 import { projectSkill } from "./server/skills/project.js";
 import { agentsSkill } from "./server/skills/agents.js";
 import { missionSkill } from "./server/skills/mission.js";
@@ -297,17 +277,23 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
     memorySkill, hierarchicalMemorySkill, reasoningSkill, systemSkill, timeSkill,
-    verifySkill, securityAuditSkill, weatherSkill, projectSkill, agentsSkill,
+    verifySkill, securityAuditSkill, weatherSkill, utilitiesSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill, imageGenerationSkill, graphifySkill, telegramSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
-  onReady: async (r, sm) => {
-    // Charger les custom skills après l'initialisation de base
+  beforeAudits: async (_r, sm) => {
+    // Charger les custom skills AVANT les audits de boot (attribution,
+    // audit déterministe fail-closed, réconciliation). Les enregistrer ici —
+    // et non dans onReady — garantit qu'ils sont comptés et audités comme
+    // n'importe quel autre outil : sans cela, l'audit tournait sur un total
+    // sous-évalué (anomalie 224 vs 228) et les custom skills échappaient au
+    // contrôle d'attribution.
     await sm.loadCustomSkills();
     const customSkillsReloadInterval = Number(process.env.LEANNA_CUSTOM_SKILLS_RELOAD_INTERVAL_MS ?? 30_000);
     sm.startCustomSkillsHotReload(Number.isFinite(customSkillsReloadInterval) ? customSkillsReloadInterval : 30_000);
-
+  },
+  onReady: async (r, sm) => {
     // ── Brancher les serveurs MCP à l'assistant ───────────────────────────────
     // 1) Connecter les serveurs configurés (.Leanna/mcp.json).
     // 2) Enregistrer la skill "mcp" pour exposer leurs outils au LLM.
@@ -367,15 +353,27 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         }))
       );
 
-      const skillNames = declarations.map((d: any) => d.name);
+      // Liste des outils proposés aux missions autonomes. On EXCLUT les outils
+      // navigateur pilotés par la webview Electron (browser_navigate,
+      // browser_research, browser_read_content, browser_capture, …) : ils
+      // dépendent du contexte UI (emitIdeAction) absent en mission et échouent
+      // systématiquement, gaspillant des tours. On conserve browser_web_search,
+      // qui est 100 % côté serveur (fetch + extraction) et donc utilisable.
+      const MISSION_WEB_TOOL_ALLOWLIST = new Set<string>(["browser_web_search"]);
+      const skillNames = declarations
+        .map((d: any) => d.name)
+        .filter((name: string) => !name.startsWith("browser_") || MISSION_WEB_TOOL_ALLOWLIST.has(name));
 
       // Persistance des missions (Supabase). No-op si non configuré.
       const missionStore = new MissionStore();
       executor.setStore(missionStore);
 
       // Curseur d'autonomie (suggest/ask/auto) + .leannaignore.
-      const rawMode = (process.env.LEANNA_AUTONOMY_MODE || "ask").toLowerCase();
-      const autonomyMode = (["suggest", "ask", "auto"].includes(rawMode) ? rawMode : "ask") as
+      // Défaut = "auto" : Leanna agit seule. Les actions DANGEREUSES (dangerous)
+      // restent toutefois humaines-par-défaut même en auto (voir AutonomyPolicy),
+      // sauf si LEANNA_AUTO_ALLOW_DANGEROUS="true".
+      const rawMode = (process.env.LEANNA_AUTONOMY_MODE || "auto").toLowerCase();
+      const autonomyMode = (["suggest", "ask", "auto"].includes(rawMode) ? rawMode : "auto") as
         | "suggest"
         | "ask"
         | "auto";
@@ -456,7 +454,12 @@ const leannaCore = new LeannaCore(runtimeV2, {
         title: `Autonomy: ${goal.description}`,
         description: goal.description,
         priority: goal.priority,
-        availableSkills: skillManager.getToolDeclarations().map((tool: any) => tool.name),
+        // Même exclusion que le câblage principal : pas d'outil navigateur
+        // dépendant de la webview (seul browser_web_search est serveur).
+        availableSkills: skillManager
+          .getToolDeclarations()
+          .map((tool: any) => tool.name)
+          .filter((name: string) => !name.startsWith("browser_") || name === "browser_web_search"),
         budget: goal.budget,
         dryRun: runtimeV2.tools.getDryRun().isEnabled(),
       });
@@ -578,6 +581,12 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.VITE_SERVER_PORT) || 4000;
 
+  // Présence vocale (annonces proactives). Déclarée ici pour être accessible à
+  // la fois par le câblage du broadcaster (plus bas) et par la route de debug
+  // /api/debug/voice-test. Reste null tant que LEANNA_VOICE_PRESENCE n'est pas
+  // activé ou avant sa construction.
+  let voicePresence: VoicePresence | null = null;
+
   // --- Rate limiters, middlewares, fichiers statiques — extraits dans server/config/rateLimits.ts ---
   const isDev = process.env.NODE_ENV !== 'production';
   const rateLimitDeps: RateLimitDeps = {
@@ -695,6 +704,39 @@ async function startServer() {
   app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);
 
+  // ── Routes de debug (dev uniquement par défaut) ──────────────────────────
+  // Activation : LEANNA_DEBUG_ROUTES="true" force l'exposition ; "false" la
+  // désactive ; non défini → exposée uniquement hors production (isDev).
+  // Ces routes ne sont JAMAIS montées dans un build de production sans un
+  // opt-in explicite, pour ne pas offrir de surface d'attaque supplémentaire.
+  const debugRoutesFlag = String(process.env.LEANNA_DEBUG_ROUTES ?? "").toLowerCase();
+  const debugRoutesEnabled = debugRoutesFlag === "true" || (debugRoutesFlag !== "false" && isDev);
+  if (debugRoutesEnabled) {
+    // Déclencher une annonce vocale à la demande : valide la présence vocale
+    // (Lot 3) sans attendre un vrai événement. Protégée par requireAuth comme
+    // toutes les routes /api/*. Texte et confiance optionnels via query string.
+    //
+    //   curl -X POST "http://localhost:4000/api/debug/voice-test?text=Bonjour"
+    app.post("/api/debug/voice-test", (req: express.Request, res: express.Response) => {
+      if (!voicePresence) {
+        res.status(409).json({
+          ok: false,
+          error:
+            "Présence vocale inactive. Définis LEANNA_VOICE_PRESENCE=\"true\" dans .env puis relance le serveur.",
+        });
+        return;
+      }
+      const rawText = typeof req.query.text === "string" ? req.query.text : "";
+      const text = rawText.trim() || "Test de la présence vocale. Je suis bien à l'écoute.";
+      const rawConf = Number(req.query.confidence);
+      const confidence = Number.isFinite(rawConf) && rawConf >= 0 && rawConf <= 1 ? rawConf : 1.0;
+      // announce() est best-effort et borné par le seuil de confiance configuré.
+      void voicePresence.announce(text, confidence);
+      res.json({ ok: true, announced: text, confidence });
+    });
+    console.log(`[Server] ✓ Routes de debug activées (/api/debug/*).`);
+  }
+
   app.use("/api/upload-document", createUploadDocumentRouter(() => currentProfile));
   app.use("/api/documents", createDocumentsRouter(() => currentProfile));
   app.use("/api/skills", createSkillsRouter(skillManager, runtime));
@@ -715,6 +757,7 @@ async function startServer() {
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);
   app.use("/api/knowledge", understandingRouter);
+  app.use("/api/knowledge", insightsRouter);
 
   app.use("/api/notebooks/:id/chat", rateBundle.notebookChatLimiter);
   app.use("/api/notebooks/:id/embeddings/reindex", rateBundle.notebookEmbeddingLimiter);
@@ -913,6 +956,7 @@ async function startServer() {
         timestamp: new Date().toISOString(),
         state: leannaCore.getState(),
         tasks: leannaCore.getTasks().slice(0, 50),
+        proposals: leannaCore.getProposals().slice(0, 50),
       }));
     } catch { /* ignore */ }
   });
@@ -983,6 +1027,20 @@ async function startServer() {
     }
   }, 500);
 
+  // ── Présence vocale (annonces proactives) ───────────────────────────────
+  // Optionnelle (LEANNA_VOICE_PRESENCE="true"). Quand active, Leanna annonce à
+  // voix haute les événements internes importants (santé dégradée, tâche en
+  // échec définitif). Elle ne fait QUE parler : aucune action à effet de bord
+  // ne passe par ce canal. Best-effort : toute erreur reste silencieuse.
+  voicePresence = voicePresenceEnabled()
+    ? new VoicePresence(getGeminiAI, () => currentProfile, voicePresenceOptionsFromEnv())
+    : null;
+  if (voicePresence) {
+    // Démarrage best-effort ; l'échec n'empêche pas le serveur de tourner.
+    void voicePresence.start();
+    console.log(`[Server] ✓ Présence vocale activée (annonces proactives).`);
+  }
+
   // ── Autonomy: broadcaster d'événements autonomy:* vers /autonomy ──
   // Timeline temps réel de l'état/tâches autonomes sur un canal dédié en lecture
   // seule (message typé + timestamp ISO), sans impacter les sessions Gemini Live.
@@ -991,6 +1049,33 @@ async function startServer() {
     for (const client of autonomyWss.clients) {
       if (client.readyState === WebSocket.OPEN) {
         try { client.send(payload); } catch { /* ignore */ }
+      }
+    }
+
+    // Annonces vocales proactives, dérivées de la même timeline. On n'annonce
+    // que des événements à forte valeur, avec une confiance élevée, pour éviter
+    // tout bavardage.
+    if (voicePresence) {
+      try {
+        const p = message.payload as Record<string, unknown>;
+        if (message.event === "autonomy:health" && p?.status === "degraded") {
+          const reason = typeof p.reason === "string" ? p.reason : "raison inconnue";
+          void voicePresence.announce(
+            `Attention : la santé du runtime est dégradée. ${reason}`,
+            0.9,
+          );
+        } else if (
+          message.event === "autonomy:taskStateChanged" &&
+          p?.to === "dead_letter"
+        ) {
+          const taskType = typeof p.taskType === "string" ? p.taskType : "inconnue";
+          void voicePresence.announce(
+            `Une tâche autonome est en échec définitif : ${taskType}.`,
+            0.85,
+          );
+        }
+      } catch {
+        /* l'annonce vocale est best-effort et ne doit jamais casser la timeline */
       }
     }
   });

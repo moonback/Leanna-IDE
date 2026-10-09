@@ -10,6 +10,7 @@ import type {  PlannedAction,  ReflectionResult,
   MissionPlan,
   MissionState,
   Goal,
+  GoalStatus,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
@@ -17,7 +18,18 @@ import { setTelemetryContext, clearTelemetryContext } from "../utils/textGenerat
 import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
+import { playbookStore, type PlaybookMissionInput } from "../knowledge/PlaybookStore.js";
+import { projectProfile } from "../knowledge/ProjectProfile.js";
+import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation.js";
+import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
+
+// Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
+// pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
+// coupait souvent le contexte au mauvais endroit — par ex. le résumé d'un
+// typecheck en échec — et poussait le LLM à mal juger. 1200 laisse de la marge
+// tout en bornant la taille de la preuve.
+const SUMMARY_RESULT_MAX_CHARS = 1200;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -81,6 +93,8 @@ export class Executor {
   private readonly missionRuns = new Map<string, Promise<void>>();
   /** Candidate lessons/proposals; never auto-applied by mission finalization. */
   private readonly learningResults = new Map<string, LearningResult>();
+  /** Self-critique evaluations per mission (plan vs execution vs result). */
+  private readonly selfEvaluations = new Map<string, import("./SelfEvaluation.js").SelfEvaluation>();
 
   /**
    * Missions mises en pause par l'utilisateur.
@@ -344,6 +358,24 @@ export class Executor {
     this.missionRuns.set(mission.id, run);
     void run.finally(() => this.missionRuns.delete(mission.id));
 
+    // Watchdog : arrêt forcé si la mission dépasse le timeout global configuré.
+    const timeoutMs = missionConfig.missionTimeoutMs;
+    if (timeoutMs > 0) {
+      const watchdog = setTimeout(() => {
+        if (!mission.isCompleted() && this.activeMissions.has(mission.id)) {
+          console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms). Arrêt.`);
+          mission.completeActiveGoal({ success: false, summary: "Timeout global de mission." });
+          this.finalizeMission(mission);
+          telemetryService.endMissionTrace(mission.id, false);
+          telemetryService.clearMissionBudget(mission.id);
+          this.emit("mission_timeout", { missionId: mission.id });
+        }
+      }, timeoutMs);
+      // Ne pas garder le process Node en vie uniquement pour ce timer.
+      if (typeof watchdog.unref === "function") watchdog.unref();
+      void run.finally(() => clearTimeout(watchdog));
+    }
+
     return mission;
   }
 
@@ -439,6 +471,11 @@ export class Executor {
   /** Returns post-mission learning proposals for review by the policy/UI. */
   getLearningResult(missionId: string): LearningResult | undefined {
     return this.learningResults.get(missionId);
+  }
+
+  /** Returns the self-critique evaluation for a finalized mission, if any. */
+  getSelfEvaluation(missionId: string): import("./SelfEvaluation.js").SelfEvaluation | undefined {
+    return this.selfEvaluations.get(missionId);
   }
 
   /**
@@ -563,16 +600,23 @@ export class Executor {
       await this.executeGoalsScheduled(mission, subGoalIds, availableSkills);
     }
 
-    // Compléter la mission si pas déjà fait
+    // Compléter la mission si pas déjà fait.
     if (!mission.isCompleted()) {
       const allGoals = Object.values(mission.getState().goals);
-      const allSuccess = allGoals
-        .filter((g) => g.parentId !== null)
-        .every((g) => g.status === "completed");
+      const subGoals = allGoals.filter((g) => g.parentId !== null);
+      const isTerminal = (s: GoalStatus) =>
+        s === "completed" || s === "failed" || s === "cancelled";
+      const allTerminal = subGoals.every((g) => isTerminal(g.status));
+      const allCompleted = subGoals.length > 0 && subGoals.every((g) => g.status === "completed");
+      const anyCriticalFailed = subGoals.some(
+        (g) => (g.status === "failed" || g.status === "blocked") && g.priority === "critical"
+      );
+      // Succès si tout est complété, ou si tout est terminal sans échec critique.
+      const success = allCompleted || (allTerminal && !anyCriticalFailed);
 
       mission.completeActiveGoal({
-        success: allSuccess,
-        summary: allSuccess
+        success,
+        summary: success
           ? `Mission "${mission.getState().title}" complétée avec succès.`
           : `Mission terminée avec des objectifs échoués.`,
         lessonsLearned: this.extractLessons(mission),
@@ -843,6 +887,37 @@ export class Executor {
   }
 
   /**
+   * Détecte les cycles dans le graphe de dépendances `dependsOn` restreint à
+   * `goalIds`. Retourne l'ensemble des objectifs impliqués dans au moins un
+   * cycle. Parcours DFS avec coloriage (0=non vu, 1=en cours, 2=terminé).
+   */
+  private detectDependencyCycles(mission: Mission, goalIds: string[]): Set<string> {
+    const inCycle = new Set<string>();
+    const state = new Map<string, 0 | 1 | 2>();
+
+    const visit = (id: string, path: string[]): void => {
+      const s = state.get(id) ?? 0;
+      if (s === 2) return;
+      if (s === 1) {
+        const idx = path.indexOf(id);
+        if (idx >= 0) for (const pid of path.slice(idx)) inCycle.add(pid);
+        return;
+      }
+      state.set(id, 1);
+      path.push(id);
+      const goal = mission.getGoal(id);
+      for (const dep of goal?.dependsOn ?? []) {
+        if (goalIds.includes(dep)) visit(dep, path);
+      }
+      path.pop();
+      state.set(id, 2);
+    };
+
+    for (const id of goalIds) visit(id, []);
+    return inCycle;
+  }
+
+  /**
    * Ordonnance les sous-objectifs par vagues selon leurs dépendances.
    * Chaque vague exécute EN PARALLÈLE tous les objectifs dont les dépendances
    * (dependsOn) sont déjà complétées. S'arrête si un objectif critique échoue.
@@ -861,6 +936,23 @@ export class Executor {
       })
     );
     let criticalFailure = false;
+
+    // Détection proactive des cycles de dépendances `dependsOn`. Sans ça, des
+    // objectifs mutuellement dépendants ne deviennent jamais exécutables et la
+    // boucle se termine en les marquant tous bloqués sans raison précise.
+    const cycles = this.detectDependencyCycles(mission, [...remaining]);
+    if (cycles.size > 0) {
+      console.warn(`[Executor] ⚠️ Cycle(s) de dépendances détecté(s): ${[...cycles].join(", ")}`);
+      for (const id of cycles) {
+        mission.blockGoal(id, "Dépendance circulaire détectée.");
+        remaining.delete(id);
+        this.emit("goal_blocked", {
+          missionId: mission.id,
+          goalId: id,
+          reason: "Dépendance circulaire détectée.",
+        });
+      }
+    }
 
     const isDone = (id: string): boolean => {
       const g = mission.getGoal(id);
@@ -1028,6 +1120,31 @@ export class Executor {
         });
         return this.createDefaultReflection(action.id, false);
       }
+
+      // Validation structurelle des arguments produits par le LLM contre le
+      // schéma de l'outil. Évite d'exécuter un skill avec un JSON invalide
+      // (champ requis manquant, type incorrect, champ inconnu) qui échouerait
+      // côté handler après avoir déjà consommé des tokens.
+      if (action.args && Object.keys(action.args).length > 0) {
+        const check = this.validateArgs(action.skillName, action.args);
+        if (!check.valid) {
+          const reason = `Arguments invalides pour ${action.skillName}: ${check.errors.join(" ; ")}`;
+          console.log(`[Executor]    ✗ ${reason}`);
+          mission.recordActionResult(action.id, { error: reason }, false);
+          this.scorer.recordUsage(action.skillName, false, Date.now() - startTime);
+          try { strategyMemory.recordSkillOutcome(action.skillName, false, Date.now() - startTime); } catch { /* best-effort */ }
+          this.emit("action_completed", {
+            missionId: mission.id,
+            goalId,
+            actionId: action.id,
+            skill: action.skillName,
+            success: false,
+            error: reason,
+            durationMs: Date.now() - startTime,
+          });
+          return this.createDefaultReflection(action.id, false);
+        }
+      }
     }
 
     // Curseur d'autonomie : décider si l'action peut s'exécuter, doit être
@@ -1070,15 +1187,11 @@ export class Executor {
     try {
       const dryRun = mission.getConfig().dryRun;
       result = await this.skillHandler!(action.skillName, action.args, { dryRun });
-      success = !!(
-        result === null ||
-        result === undefined ||
-        (typeof result !== "object") ||
-        (typeof result === "object" && !("error" in result))
-      );
+      const failure = Executor.detectSkillFailure(result);
+      success = failure === null;
       if (!success) {
-        error = (result as any)?.error ?? "Erreur retournée par le skill";
-        console.log(`[Executor]    ✗ ${action.skillName} échoué (result.error): ${error}`);
+        error = failure ?? "Erreur retournée par le skill";
+        console.log(`[Executor]    ✗ ${action.skillName} échoué (result): ${error}`);
       } else {
         console.log(`[Executor]    ✓ ${action.skillName} réussi`);
       }
@@ -1162,6 +1275,55 @@ export class Executor {
     const params = schema?.parameters as any;
     if (!params || typeof params !== "object") return false;
     return Array.isArray(params.required) && params.required.length > 0;
+  }
+
+  /**
+   * Valide les arguments produits par le LLM contre le schéma JSON de l'outil :
+   * champs requis présents, pas de champ inconnu, types cohérents. Retourne la
+   * liste des erreurs (vide = valide). Sans schéma/propriétés, on considère valide.
+   */
+  private validateArgs(
+    skillName: string,
+    args: Record<string, unknown>
+  ): { valid: boolean; errors: string[] } {
+    const schema = this.toolSchemas.get(skillName);
+    const params = schema?.parameters as
+      | { type?: string; properties?: Record<string, { type?: string }>; required?: string[] }
+      | undefined;
+    if (!params?.properties) return { valid: true, errors: [] };
+
+    const errors: string[] = [];
+    const required = Array.isArray(params.required) ? params.required : [];
+    for (const req of required) {
+      if (args[req] === undefined || args[req] === null || args[req] === "") {
+        errors.push(`Champ requis manquant: "${req}"`);
+      }
+    }
+    for (const [key, value] of Object.entries(args)) {
+      if (!(key in params.properties)) {
+        errors.push(`Champ inconnu: "${key}"`);
+        continue;
+      }
+      const expected = params.properties[key]?.type;
+      if (expected && !this.matchesJsonType(value, expected)) {
+        errors.push(`Type invalide pour "${key}": attendu ${expected}, reçu ${typeof value}`);
+      }
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  /** Vérifie qu'une valeur correspond à un type JSON Schema élémentaire. */
+  private matchesJsonType(value: unknown, expected: string): boolean {
+    switch (expected) {
+      case "string":  return typeof value === "string";
+      case "number":  return typeof value === "number" && Number.isFinite(value);
+      case "integer": return Number.isInteger(value as number);
+      case "boolean": return typeof value === "boolean";
+      case "array":   return Array.isArray(value);
+      case "object":  return typeof value === "object" && value !== null && !Array.isArray(value);
+      case "null":    return value === null;
+      default:        return true;
+    }
   }
 
   /**
@@ -1331,12 +1493,70 @@ JSON:`;
 
   private summarizeResult(result: unknown): string {
     if (result === null || result === undefined) return "ok (vide)";
-    if (typeof result === "string") return result.slice(0, 300);
+    if (typeof result === "string") return result.slice(0, SUMMARY_RESULT_MAX_CHARS);
     try {
-      return JSON.stringify(result).slice(0, 300);
+      return JSON.stringify(result).slice(0, SUMMARY_RESULT_MAX_CHARS);
     } catch {
-      return String(result).slice(0, 300);
+      return String(result).slice(0, SUMMARY_RESULT_MAX_CHARS);
     }
+  }
+
+  /**
+   * Détecte un échec de skill à partir de son résultat.
+   *
+   * Historiquement, un skill n'était considéré en échec que s'il renvoyait une
+   * clé `error` à la racine. Or de nombreux skills de vérification
+   * (`verify_typecheck`, `verify_file`, `verify_lint`…) signalent leur échec
+   * via `ok: false` ou `status: "failed"` SANS clé `error`. Résultat : une
+   * compilation TypeScript en échec était loggée « ✓ réussi » puis contredite
+   * par le vérificateur LLM (qui lisait `status: failed` dans la preuve),
+   * faisant échouer toute la mission de façon incohérente.
+   *
+   * On reconnaît désormais explicitement ces conventions d'échec. Un résultat
+   * qui ne déclare aucun de ces champs reste considéré comme un succès
+   * (comportement permissif inchangé pour les skills « best-effort »).
+   *
+   * @returns `null` si succès, sinon un message d'échec lisible.
+   */
+  static detectSkillFailure(result: unknown): string | null {
+    if (result === null || result === undefined) return null;
+    if (typeof result !== "object") return null;
+    const r = result as Record<string, unknown>;
+
+    // 1. Clé d'erreur explicite (convention historique).
+    if ("error" in r && r.error) {
+      return typeof r.error === "string" ? r.error : "Erreur retournée par le skill";
+    }
+
+    // 2. Drapeau booléen de succès explicitement faux.
+    if (r.ok === false || r.success === false) {
+      return (
+        (typeof r.message === "string" && r.message) ||
+        (typeof r.stderr === "string" && r.stderr) ||
+        "Le skill a signalé un échec (ok/success = false)."
+      );
+    }
+
+    // 3. Champ `status` explicitement en échec.
+    if (typeof r.status === "string") {
+      const s = r.status.toLowerCase();
+      if (s === "failed" || s === "error" || s === "failure") {
+        return (
+          (typeof r.message === "string" && r.message) ||
+          `Le skill a renvoyé status="${r.status}".`
+        );
+      }
+    }
+
+    // 4. Codes d'échec process (exitCode non nul, status HTTP >= 400).
+    if (typeof r.exitCode === "number" && r.exitCode !== 0) {
+      return `Le skill a terminé avec exitCode=${r.exitCode}.`;
+    }
+    if (typeof r.statusCode === "number" && r.statusCode >= 400) {
+      return `Le skill a renvoyé un statut HTTP ${r.statusCode}.`;
+    }
+
+    return null;
   }
 
   private parseJsonObject(raw: string): Record<string, unknown> {
@@ -1447,14 +1667,32 @@ JSON:`;
     }
 
     // 2e passe : résoudre les dépendances (exprimées par titre) en IDs de goals.
+    // Les dépendances non résolues (titre inconnu) sont signalées explicitement
+    // au lieu d'être silencieusement supprimées.
     plans.forEach((plan, index) => {
       const deps = plan.dependsOn ?? [];
       if (deps.length === 0) return;
       const goal = mission.getGoal(ids[index]);
       if (!goal) return;
-      goal.dependsOn = deps
-        .map((d) => titleToId.get(String(d).trim().toLowerCase()))
-        .filter((id): id is string => !!id && id !== ids[index]);
+
+      const resolved: string[] = [];
+      const unresolved: string[] = [];
+      for (const d of deps) {
+        const id = titleToId.get(String(d).trim().toLowerCase());
+        if (id && id !== ids[index]) resolved.push(id);
+        else if (!id) unresolved.push(String(d));
+      }
+      goal.dependsOn = resolved;
+      if (unresolved.length > 0) {
+        console.warn(
+          `[Executor] ⚠️ Dépendances non résolues pour "${plan.title}": ${unresolved.join(", ")}`
+        );
+        this.emit("goal_unresolved_deps", {
+          missionId: mission.id,
+          goalId: ids[index],
+          unresolved,
+        });
+      }
     });
 
     return ids;
@@ -1506,6 +1744,116 @@ JSON:`;
     // Persistance finale (statut terminal).
     void this.persist(mission);
     this.proposeLearning(mission);
+    this.proposePlaybook(mission);
+    this.updateProjectProfile(mission);
+    this.selfCritique(mission);
+    this.recordEvolution(mission);
+  }
+
+  /**
+   * Self-Critique (task.md §10): compare plan vs execution vs result, score the
+   * run, and surface "next time start with X". Best-effort; emits an event for
+   * the UI. Does not mutate the mission.
+   */
+  private selfCritique(mission: Mission): void {
+    try {
+      const evaluation = selfEvaluationEngine.evaluate(mission.getState() as unknown as SelfEvalMissionView);
+      this.selfEvaluations.set(mission.id, evaluation);
+      this.emit("mission_self_critique", {
+        missionId: mission.id,
+        overall: evaluation.overall,
+        scores: evaluation.scores,
+        nextTimeStartWith: evaluation.nextTimeStartWith,
+      });
+    } catch (error) {
+      this.emit("mission_self_critique_failed", { missionId: mission.id, error: String(error) });
+    }
+  }
+
+  /**
+   * Mission Evolution (task.md §6): record which APPROACH (ordered successful
+   * skills) worked or failed for this problem CLASS, so a future similar mission
+   * auto-selects the winning approach instead of repeating a failing one. Learns
+   * from both success and failure. Best-effort.
+   */
+  private recordEvolution(mission: Mission): void {
+    try {
+      const state = mission.getState();
+      const signature = problemSignature(state.title, state.context.errors.map((e) => e.error));
+      const steps = Object.values(state.goals)
+        .filter((g) => g.parentId !== null || Object.values(state.goals).length === 1)
+        .flatMap((g) => [...g.plannedActions].sort((a, b) => a.order - b.order))
+        .filter((a) => a.status === "completed" || a.status === "failed")
+        .map((a) => a.skillName)
+        .filter(Boolean);
+      if (steps.length === 0) return;
+      missionEvolutionStore.recordOutcome({ signature, steps, success: mission.status === "completed" });
+    } catch {
+      /* evolution learning is best-effort */
+    }
+  }
+
+  /**
+   * Keep the per-project intelligence profile current (task.md §4, P0): record
+   * the terminal outcome and refresh detected stack / effective-vs-failing
+   * strategies / learned playbooks so the next mission on this project starts
+   * informed. Best-effort — never affects an already terminal mission.
+   */
+  private updateProjectProfile(mission: Mission): void {
+    try {
+      projectProfile.recordMissionOutcome(mission.status === "completed");
+      // Re-aggregate reliability/playbook/knowledge signals (cheap, in-memory reads).
+      projectProfile.refresh();
+    } catch {
+      /* profile maintenance is best-effort */
+    }
+  }
+
+  /**
+   * Learn a reusable Playbook from a *successful* mission (task.md §3, P0).
+   * Complements proposeLearning: LearningEngine stores prose lessons, this stores
+   * a replayable ordered skill sequence keyed by a stable trigger signature so
+   * Leanna can later say « j'ai déjà résolu N problèmes similaires » and reuse
+   * the strategy. Guarded and best-effort — never flips a terminal mission.
+   */
+  private proposePlaybook(mission: Mission): void {
+    try {
+      if (mission.status !== "completed") return;
+      const state = mission.getState();
+      const input: PlaybookMissionInput = {
+        id: mission.id,
+        title: state.title,
+        status: state.status,
+        goals: Object.fromEntries(
+          Object.entries(state.goals).map(([id, goal]) => [id, {
+            status: goal.status,
+            dependsOn: goal.dependsOn,
+            completedAt: goal.completedAt,
+            parentId: goal.parentId,
+            plannedActions: goal.plannedActions.map((action) => ({
+              skillName: action.skillName,
+              order: action.order,
+              status: action.status,
+            })),
+          }]),
+        ),
+        errors: state.context.errors.map((error) => ({ action: error.action, error: error.error })),
+        relevantFiles: state.context.relevantFiles,
+      };
+      const playbook = playbookStore.learnFromMission(input);
+      if (playbook) {
+        this.emit("mission_playbook_learned", {
+          missionId: mission.id,
+          playbookId: playbook.id,
+          triggerSignature: playbook.triggerSignature,
+          steps: playbook.steps.length,
+          timesLearned: playbook.timesLearned,
+        });
+      }
+    } catch (error) {
+      // Playbook learning must never turn an already terminal mission into a failure.
+      this.emit("mission_playbook_failed", { missionId: mission.id, error: String(error) });
+    }
   }
 
   /**
@@ -1710,6 +2058,40 @@ JSON:`;
       this.eventEmitter(event, data);
     }
   }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Stable problem-class signature from a mission title + known errors. Resource-
+ * independent (no paths/ids) so repeated instances of the same problem class
+ * share one signature — the key philosophy used by PlaybookStore triggers and
+ * exploited by MissionEvolutionStore to compare approaches across missions.
+ */
+function problemSignature(title: string, errors: string[]): string {
+  const normErr = errors.map((e) =>
+    e.toLowerCase()
+      .replace(/[a-z]:\\[^:\s"']+/g, "<path>")
+      .replace(/\/[^:\s"']{10,}/g, "<path>")
+      .replace(/\d+/g, "<n>")
+      .trim(),
+  );
+  const fam =
+    normErr.find((e) => /ts<n>|typescript|type/.test(e)) ? "ts-error"
+      : normErr.find((e) => /test|assert|expect/.test(e)) ? "test-failure"
+        : normErr.find((e) => /lint|eslint/.test(e)) ? "lint-error"
+          : normErr.length > 0 ? "error"
+            : "objective";
+  const t = title.toLowerCase();
+  const kw =
+    /perf|optimi/.test(t) ? "perf"
+      : /refactor|clean/.test(t) ? "refactor"
+        : /test/.test(t) ? "test"
+          : /secur|sécur/.test(t) ? "security"
+            : /doc/.test(t) ? "docs"
+              : /fix|bug|corrige|erreur|error/.test(t) ? "fix"
+                : "generic";
+  return `${fam}:${kw}`;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────

@@ -319,3 +319,71 @@ export const ideApi = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Mission control API — pilote la boucle humaine depuis l'UI.
+//
+// Câble les routes déjà exposées par server/routes/missions.ts :
+//   POST   /api/missions/:id/pause   → met une mission active en pause
+//   POST   /api/missions/:id/resume  → reprend une mission en pause
+//   POST   /api/missions/:id/cancel  → annule une mission active
+//   DELETE /api/missions/:id         → supprime une mission (annule si active)
+//
+// Chaque route renvoie 404 si l'action n'est pas applicable (mission introuvable,
+// déjà terminée, etc.). On remonte un booléen `ok` pour permettre une mise à jour
+// optimiste + rollback côté appelant, sans jeter sur les 404 attendus.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Résultat normalisé d'une action de mission (ok = l'action a été appliquée). */
+export interface MissionActionResult {
+  ok: boolean;
+  /** Statut renvoyé par le serveur quand l'action a réussi (ex. "paused"). */
+  status?: string;
+  /** Message d'erreur serveur en cas d'échec (404/400/5xx). */
+  error?: string;
+}
+
+async function missionAction(
+  missionId: string,
+  op: 'pause' | 'resume' | 'cancel',
+): Promise<MissionActionResult> {
+  const response = await fetchWithRetry(
+    `/api/missions/${encodeURIComponent(missionId)}/${op}`,
+    { method: 'POST', headers: getAuthHeaders() },
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    return { ok: false, error: data?.error ?? `HTTP ${response.status}` };
+  }
+  return { ok: data?.ok !== false, status: data?.status };
+}
+
+export const missionApi = {
+  /** Met une mission active en pause. */
+  pauseMission(missionId: string): Promise<MissionActionResult> {
+    return missionAction(missionId, 'pause');
+  },
+
+  /** Reprend une mission actuellement en pause. */
+  resumeMission(missionId: string): Promise<MissionActionResult> {
+    return missionAction(missionId, 'resume');
+  },
+
+  /** Annule une mission active (transition terminale). */
+  cancelMission(missionId: string): Promise<MissionActionResult> {
+    return missionAction(missionId, 'cancel');
+  },
+
+  /** Supprime une mission (annulée au préalable si encore active). */
+  async deleteMission(missionId: string): Promise<MissionActionResult> {
+    const response = await fetchWithRetry(
+      `/api/missions/${encodeURIComponent(missionId)}`,
+      { method: 'DELETE', headers: getAuthHeaders() },
+    );
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { ok: false, error: data?.error ?? `HTTP ${response.status}` };
+    }
+    return { ok: data?.deleted === true || data?.ok === true };
+  },
+};
+

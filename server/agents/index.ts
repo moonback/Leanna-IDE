@@ -99,6 +99,17 @@ export type {
 // Routage avancé
 export type { RoutingStrategy } from "./AgentCommunication.js";
 
+// Négociation contract-net (bid/award) par-dessus le bus de messages
+export { ContractNetNegotiator, contractNetNegotiator, NEGOTIATION_INITIATOR } from "./ContractNetNegotiator.js";
+export type {
+  NegotiationTask,
+  Bid,
+  ScoredBid,
+  NegotiationOutcome,
+  ScoringWeights,
+  NegotiatorOptions,
+} from "./ContractNetNegotiator.js";
+
 // Surveillance et traçage du MessageBus
 export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor.js";
 export type { 
@@ -130,3 +141,13 @@ export type {
   ProjectDomain,
   ComplexityLevel,
 } from "./brain/types.js";
+
+// Dynamic Agent Swarm (P1) — composition dynamique d'une équipe d'agents par objectif
+export { SwarmComposer, swarmComposer } from "./SwarmComposer.js";
+export type {
+  TeamComposition,
+  SwarmHandle,
+  SwarmMember,
+  SwarmStage,
+  SwarmComposeInput,
+} from "./SwarmComposer.js";

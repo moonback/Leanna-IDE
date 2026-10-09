@@ -5,7 +5,7 @@ import {
   Trash2, Power, GripVertical, Minus, PanelRight, Maximize2, Minimize2,
   Download, MessageSquare, MoreVertical, ArrowDown,
   Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
-  FileText, Terminal, FlaskConical,
+  FileText, Terminal, FlaskConical, Volume2, FileSearch,
 } from 'lucide-react';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -19,6 +19,7 @@ import { useFileMention } from '../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../hooks/useSlashCommand.js';
 import { DocumentUpload, DropZoneOverlay, useDocumentDrop, type DocumentResult } from './DocumentUpload.js';
 import { SkillPicker } from './SkillPicker.js';
+import { PromptInspectorPanel } from './PromptInspectorPanel.js';
 import type { CustomSkill } from '../../hooks/useCustomSkills.js';
 import type { TranscriptEntry, ContextSource } from '../../hooks/useLiveAPI.js';
 
@@ -1004,7 +1005,9 @@ export function ChatPanel({
   const {
     connected, connecting, connect, disconnect,
     sendTextMessage, sendRawMessage, transcript, clearTranscript,
-    activity, isBusy, muted, toggleMute, reasoning,
+    activity, isBusy, muted, toggleMute, reasoning, promptDebug,
+    systemOverride, sendSystemPromptOverride,
+    systemReplace, sendSystemPromptReplace,
   } = useLiveAPIContext();
   const { profile } = useProfile();
 
@@ -1020,6 +1023,7 @@ export function ChatPanel({
     catch { return false; }
   });
   const [showMenu, setShowMenu] = useState(false);
+  const [showPromptInspector, setShowPromptInspector] = useState(false);
 
   // ── Toast state ─────────────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; icon?: React.ReactNode } | null>(null);
@@ -1251,6 +1255,46 @@ export function ChatPanel({
     }
   }, [transcript, profile, showToast]);
 
+  // ── Test de la présence vocale ───────────────────────────────────────────
+  // Déclenche une annonce vocale via l'endpoint de debug protégé. Permet de
+  // vérifier d'un clic que Leanna parle bien (Lot 3), sans attendre un
+  // événement interne. Le cookie d'auth est joint automatiquement par le
+  // navigateur ; aucune manipulation de token côté client.
+  const handleVoiceTest = useCallback(async () => {
+    const voiceIcon = <Volume2 size={13} style={{ color: 'var(--accent-primary)' }} />;
+    try {
+      const res = await fetch('/api/debug/voice-test', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.ok) {
+        showToast('Test vocal déclenché — Leanna va parler', voiceIcon);
+      } else if (res.status === 404) {
+        showToast(
+          'Test vocal indisponible (routes de debug désactivées)',
+          <X size={13} style={{ color: 'var(--color-error)' }} />,
+        );
+      } else if (res.status === 409) {
+        showToast(
+          'Présence vocale inactive (LEANNA_VOICE_PRESENCE)',
+          <X size={13} style={{ color: 'var(--color-error)' }} />,
+        );
+      } else {
+        showToast(
+          `Échec du test vocal${data?.error ? ` : ${data.error}` : ''}`,
+          <X size={13} style={{ color: 'var(--color-error)' }} />,
+        );
+      }
+    } catch (err) {
+      console.error('[ChatPanel] Voice test failed:', err);
+      showToast(
+        'Échec du test vocal (réseau)',
+        <X size={13} style={{ color: 'var(--color-error)' }} />,
+      );
+    }
+  }, [showToast]);
+
   // Last assistant message index (for retry button)
   const lastAssistantIdx = useMemo(() => {
     for (let i = transcript.length - 1; i >= 0; i--) {
@@ -1269,6 +1313,23 @@ export function ChatPanel({
             message={toast.message}
             icon={toast.icon}
             onDone={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Inspecteur du prompt système + contexte */}
+      <AnimatePresence>
+        {showPromptInspector && (
+          <PromptInspectorPanel
+            promptDebug={promptDebug}
+            connected={connected}
+            chatWidth={docked ? width : width + 48}
+            chatFullscreen={fullscreen}
+            override={systemOverride}
+            onApplyOverride={sendSystemPromptOverride}
+            replaced={systemReplace}
+            onReplace={sendSystemPromptReplace}
+            onClose={() => setShowPromptInspector(false)}
           />
         )}
       </AnimatePresence>
@@ -1508,6 +1569,25 @@ export function ChatPanel({
                         <div className="h-px mx-3 my-1" style={{ backgroundColor: 'var(--border-base)' }} />
                       </>
                     )}
+
+                    <div className="px-3 pt-1 pb-1">
+                      <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                        Outils
+                      </span>
+                    </div>
+
+                    <MenuButton
+                      icon={<Volume2 size={13} style={{ color: 'var(--accent-primary)' }} />}
+                      label="Tester la voix"
+                      onClick={() => { void handleVoiceTest(); setShowMenu(false); }}
+                    />
+                    <MenuButton
+                      icon={<FileSearch size={13} style={{ color: 'var(--accent-primary)' }} />}
+                      label="Inspecter le prompt"
+                      onClick={() => { setShowPromptInspector(true); setShowMenu(false); }}
+                    />
+
+                    <div className="h-px mx-3 my-1" style={{ backgroundColor: 'var(--border-base)' }} />
 
                     <div className="px-3 pt-1 pb-1">
                       <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-dimmed)' }}>

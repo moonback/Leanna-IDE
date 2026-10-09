@@ -44,10 +44,24 @@ export class AutonomyPolicy {
   private permissions: Map<string, ToolPermission[]> = new Map();
   private ignorePatterns: string[] = [];
   private workspaceRoot: string;
+  /**
+   * En mode "auto", autorise-t-on les actions marquées « dangerous » sans
+   * approbation humaine ? Par défaut false : les actions dangereuses restent
+   * humaines-par-défaut, même quand Leanna agit seule.
+   */
+  private allowDangerousInAuto: boolean;
 
-  constructor(params: { mode?: AutonomyMode; workspaceRoot: string }) {
+  constructor(params: {
+    mode?: AutonomyMode;
+    workspaceRoot: string;
+    /** Override explicite ; sinon lu depuis LEANNA_AUTO_ALLOW_DANGEROUS. */
+    allowDangerousInAuto?: boolean;
+  }) {
     this.mode = params.mode ?? "ask";
     this.workspaceRoot = params.workspaceRoot;
+    this.allowDangerousInAuto =
+      params.allowDangerousInAuto ??
+      String(process.env.LEANNA_AUTO_ALLOW_DANGEROUS ?? "").toLowerCase() === "true";
     this.loadIgnoreFile();
   }
 
@@ -120,6 +134,20 @@ export class AutonomyPolicy {
         };
       case "auto":
       default:
+        // Filet de sécurité : même en mode auto, les actions DANGEREUSES
+        // (git push, suppressions, exécution shell système…) restent
+        // humaines-par-défaut. Elles ne passent en "allow" que si l'opérateur
+        // a explicitement activé LEANNA_AUTO_ALLOW_DANGEROUS="true".
+        if (this.isDangerous(skillName) && !this.allowDangerousInAuto) {
+          return {
+            decision: "ask",
+            reason:
+              "Mode auto : action marquée « dangerous » — approbation humaine requise " +
+              "(définir LEANNA_AUTO_ALLOW_DANGEROUS=true pour l'autoriser).",
+            sideEffect: true,
+            ignoredPaths: [],
+          };
+        }
         return {
           decision: "allow",
           reason: "Mode auto : action autorisée.",
@@ -141,6 +169,18 @@ export class AutonomyPolicy {
     if (perms === undefined) return true; // outil inconnu → prudence
     if (perms.length === 0) return true; // permissions non déclarées → prudence
     return perms.some((p) => (SIDE_EFFECT_PERMISSIONS as readonly string[]).includes(p));
+  }
+
+  /**
+   * Un outil est « dangereux » s'il déclare explicitement la permission
+   * `dangerous` (ex. git push, suppressions récursives, exécution shell
+   * système). Un outil aux permissions non déclarées n'est PAS présumé
+   * dangereux ici : la prudence s'exerce déjà via hasSideEffect().
+   */
+  private isDangerous(skillName: string): boolean {
+    const perms = this.permissions.get(skillName);
+    if (!perms || perms.length === 0) return false;
+    return perms.includes("dangerous");
   }
 
   /** Extrait les chemins des arguments et retourne ceux qui matchent .leannaignore. */

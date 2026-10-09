@@ -21,7 +21,7 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { getDocumentStore } from "./DocumentStore.js";
-import { isSandboxActive, getSandboxRoot } from "../utils/sandbox.js";
+import { isDocumentExtractionEnabled } from "./knowledgeSettings.js";
 import { fileWatcher } from "./FileWatcher.js";
 import type { FileChangeEvent } from "./FileWatcher.js";
 import { broadcastKnowledgeProgress } from "../utils/knowledgeBroadcaster.js";
@@ -138,9 +138,14 @@ export class WorkspaceIndexer {
 
   /**
    * Retourne la racine du workspace actif.
+   *
+   * On extrait TOUJOURS depuis la racine réelle (SELF_ROOT), jamais le sandbox.
+   * Sinon getDocumentStore(sandboxRoot) persistait les documents dans
+   * `.Leanna/sandbox/.Leanna/documents.json` — un emplacement transitoire effacé
+   * à chaque re-synchronisation du sandbox — alors que la lecture au démarrage
+   * se fait sous `<SELF_ROOT>/.Leanna/documents.json`, d'où leur disparition.
    */
   private getRoot(): string {
-    if (isSandboxActive()) return getSandboxRoot();
     return SELF_ROOT;
   }
 
@@ -152,6 +157,14 @@ export class WorkspaceIndexer {
    */
   async extractAll(): Promise<ExtractionStats> {
     const startTime = Date.now();
+
+    // Respecter le réglage utilisateur (défense en profondeur : même si une
+    // route appelle extractAll() directement, le flag Settings est honoré).
+    if (!isDocumentExtractionEnabled()) {
+      log.info("⏭️ Extraction documentaire désactivée dans les paramètres — ignorée.");
+      return { totalFiles: 0, totalExtracted: 0, totalSections: 0, totalWords: 0, skipped: 0, errors: 0, durationMs: 0 };
+    }
+
     const root = this.getRoot();
 
     if (!root) {
@@ -205,6 +218,7 @@ export class WorkspaceIndexer {
    * Extrait un seul fichier document (appel incrémental).
    */
   async extractFile(relativePath: string): Promise<ExtractedDocument | null> {
+    if (!isDocumentExtractionEnabled()) return null;
     const root = this.getRoot();
     if (!root) return null;
 

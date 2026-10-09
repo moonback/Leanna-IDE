@@ -10,6 +10,7 @@ import {
   orchestrateSchema,
   listAgentTasksSchema,
   hasAgent,
+  swarmComposer,
 } from "../agents/index.js";
 import { SkillValidationError } from "./base.js";
 import type { AgentRole } from "../agents/index.js";
@@ -127,6 +128,7 @@ export const agentsSkill: Skill = {
   toolPermissions: {
     // Lancement / contrôle d'exécution multi-agents (effet de bord).
     agent_delegate: ["exec"],
+    agent_negotiate: ["exec"],
     agent_orchestrate: ["exec"],
     agent_cancel: ["exec"],
     agent_cancel_orchestration: ["exec"],
@@ -144,6 +146,7 @@ export const agentsSkill: Skill = {
     agent_delegation_matrix: ["read"],
     agent_bus_metrics: ["read"],
     agent_message_history: ["read"],
+    agent_compose_swarm: ["read"],
   },
   declarations: [
     // ─── Outils existants ─────────────────────────────────────────────────────
@@ -162,6 +165,28 @@ export const agentsSkill: Skill = {
           priority:    { type: "STRING", description: "Priorité : low, medium (défaut), high, critical" },
         },
         required: ["role", "title", "description"],
+      },
+    },
+    {
+      name: "agent_negotiate",
+      description:
+        "Met une sous-tâche AUX ENCHÈRES entre agents (contract-net) au lieu de choisir le rôle à l'avance. " +
+        "À utiliser quand tu ne sais PAS quel agent est le mieux placé, ou quand plusieurs pourraient convenir : " +
+        "le système diffuse un appel d'offres, les agents spécialisés enchérissent selon leurs compétences et leur " +
+        "charge, et le MEILLEUR-MATCH remporte automatiquement la tâche. " +
+        "Fournis requiredCapabilities si tu les connais (ex: run_project_command, verify_full) ; sinon elles sont " +
+        "déduites du titre et de la description. Retourne le gagnant et le détail des offres.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          title:        { type: "STRING", description: "Titre court de la tâche à mettre aux enchères" },
+          description:  { type: "STRING", description: "Description détaillée de la tâche" },
+          requiredCapabilities: { type: "ARRAY", items: { type: "STRING" }, description: "Capacités/outils requis (optionnel). Ex: run_project_command, verify_full, knowledge_search_entities. Si omis, déduites automatiquement du texte." },
+          files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents (optionnel)" },
+          instructions:{ type: "STRING", description: "Instructions supplémentaires (optionnel)" },
+          priority:     { type: "STRING", description: "Priorité : low, medium (défaut), high, critical" },
+        },
+        required: ["title", "description"],
       },
     },
     {
@@ -382,10 +407,33 @@ export const agentsSkill: Skill = {
         required: ["goal"],
       },
     },
+    {
+      name: "agent_compose_swarm",
+      description:
+        "🤖 Dynamic Agent Swarm — compose dynamiquement l'ÉQUIPE d'agents spécialisés adaptée à un objectif (recherche → conception → implémentation → tests → revue → sécurité → optimisation → doc), ordonnée en pipeline. Lecture seule : prévisualise la composition de l'équipe avant de lancer une orchestration. N'invente aucun rôle.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          objective: { type: "STRING", description: "L'objectif de la mission (ex: « Optimise les performances de mon application »)." },
+          description: { type: "STRING", description: "Détails additionnels (optionnel)." },
+          planned_skills: { type: "ARRAY", items: { type: "STRING" }, description: "Skills envisagés pour affiner la composition (optionnel)." },
+          max_members: { type: "NUMBER", description: "Taille max de l'équipe (défaut 6)." },
+        },
+        required: ["objective"],
+      },
+    },
   ],
 
   inputSchemas: {
     agent_delegate:                   delegateTaskSchema,
+    agent_negotiate:                  z.object({
+      title: z.string().min(1, "Le titre est requis").trim(),
+      description: z.string().min(1, "La description est requise").trim(),
+      requiredCapabilities: z.array(z.string()).optional().default([]),
+      files: z.array(z.string()).optional().default([]),
+      instructions: z.string().optional(),
+      priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
+    }),
     agent_orchestrate:                orchestrateSchema,
     agent_status:                     z.object({ taskId: z.string().min(1) }),
     agent_list_tasks:                 listAgentTasksSchema,
@@ -410,6 +458,12 @@ export const agentsSkill: Skill = {
       mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
       maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
       maxReplans: z.number().int().min(0).max(5).optional().default(2),
+    }),
+    agent_compose_swarm:              z.object({
+      objective: z.string().min(1, "L'objectif est requis").trim(),
+      description: z.string().trim().optional(),
+      planned_skills: z.array(z.string().trim()).optional().default([]),
+      max_members: z.number().int().min(1).max(12).optional().default(6),
     }),
   },
 
@@ -494,6 +548,40 @@ export const agentsSkill: Skill = {
           message: `Tâche déléguée à l'agent "${v.role}".`,
           taskId: task.id, role: task.role, title: task.title, status: task.status,
           hint: `Utilise agent_status avec "${task.id}" pour suivre la progression.`,
+        };
+      }
+
+      case "agent_negotiate": {
+        const v = validateArgs(agentsSkill.inputSchemas!["agent_negotiate"], args, name);
+        const outcome = await agentOrchestrator.negotiateTask({
+          title: v.title,
+          description: v.description,
+          requiredCapabilities: v.requiredCapabilities,
+          files: v.files,
+          instructions: v.instructions,
+          priority: v.priority,
+        });
+        console.log(
+          `[AgentsSkill]   ✓ Enchère ${outcome.taskId.slice(0, 8)} — gagnant: ${outcome.winner ?? "aucun"}`
+        );
+        if (!outcome.winner) {
+          return {
+            success: false,
+            message: `Aucun agent éligible n'a remporté l'enchère pour "${v.title}".`,
+            taskId: outcome.taskId,
+            winner: null,
+            bids: outcome.bids,
+            hint: "Aucune offre avec une correspondance de compétences suffisante. Précise requiredCapabilities ou reformule la tâche.",
+          };
+        }
+        return {
+          success: true,
+          message: `Enchère remportée par l'agent "${outcome.winner}" pour "${v.title}".`,
+          taskId: outcome.taskId,
+          winner: outcome.winner,
+          winningScore: outcome.winningScore,
+          bids: outcome.bids,
+          hint: `La tâche a été attribuée à "${outcome.winner}" et s'exécute en arrière-plan. Utilise agent_status avec "${outcome.taskId}".`,
         };
       }
 
@@ -616,6 +704,22 @@ export const agentsSkill: Skill = {
             capabilities: a.capabilities,
             maxConcurrency: a.maxConcurrency, defaultTimeoutMs: a.defaultTimeoutMs,
           })),
+        };
+      }
+
+      case "agent_compose_swarm": {
+        const v = validateArgs(agentsSkill.inputSchemas!["agent_compose_swarm"], args);
+        const composition = swarmComposer.plan({
+          objective: { title: v.objective, description: v.description },
+          plannedSkills: v.planned_skills,
+          maxMembers: v.max_members,
+        });
+        return {
+          status: "success",
+          objective: composition.objective,
+          members: composition.members,
+          pipeline: composition.pipeline,
+          summary: composition.summary,
         };
       }
 
