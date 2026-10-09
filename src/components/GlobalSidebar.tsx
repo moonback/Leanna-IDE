@@ -29,7 +29,7 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, LogOut, FolderInput,
+  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
@@ -266,8 +266,6 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
     (path: string) => (path === '/ide' ? pathname === '/' || pathname === '/ide' : pathname === path),
     [pathname],
   );
-
-  const handleQuit = () => { window.close(); };
 
   /* Changer de projet racine : ferme les onglets, désactive le workspace, ouvre la modale. */
   const handleSwitchWorkspace = useCallback(async () => {
