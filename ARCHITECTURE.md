@@ -192,7 +192,7 @@ server.ts                    # 2. Initialise tout et démarre le serveur HTTP
 
 Domaines d'API montés (voir [API_DOCS.md](API_DOCS.md) pour le détail des endpoints) :
 
-`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/missions` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/ftp` · `/api/marketplace`
+`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/missions` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/marketplace`
 
 ### Runtime et Skill System
 
@@ -358,7 +358,6 @@ Voir [DB_SCHEMA.md](DB_SCHEMA.md) pour le détail complet des tables et relation
 | **OpenRouter** | REST via `OPENROUTER_API_KEY` | Modèles alternatifs (GPT-4o-mini, etc.) pour analyse de code |
 | **MCP Servers** | `server/mcp/` bridge | Extensibilité via le Model Context Protocol |
 | **Puppeteer** | `puppeteer` (headless Chrome) | Automatisation web, captures d'écran, scraping |
-| **FTP** | `basic-ftp` | Connexions FTP (sécurité : IPs privées bloquées par défaut) |
 
 ### Pool de clés Gemini
 

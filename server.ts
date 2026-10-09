@@ -52,7 +52,6 @@ import { createSummarizeContextRouter } from "./server/routes/summarize-context.
 import { createWorkspaceRouter } from "./server/routes/workspace.js";
 import { createMissionsRouter } from "./server/routes/missions.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
-import { createFtpRouter } from "./server/routes/ftp.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import pm2Router from "./server/routes/pm2.js";
 import { initSandboxWatchWSS } from "./server/routes/sandbox-watch.js";
@@ -701,7 +700,6 @@ async function startServer() {
       .then((n: number) => { if (n > 0) console.log(`[SelfRoot] ⏸️ ${n} mission(s) interrompue(s) en attente de décision.`); })
       .catch((e: unknown) => console.warn(`[SelfRoot] ⚠️ Détection des missions interrompues échouée:`, e));
   }));
-  app.use("/api/ftp", createFtpRouter());
   app.use("/api/safeguards", safeguardsRouter);
 
   // ── Routes de debug (dev uniquement par défaut) ──────────────────────────

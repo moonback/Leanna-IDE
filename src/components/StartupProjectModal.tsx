@@ -5,7 +5,7 @@ import {
   FolderOpen, Upload, ShieldAlert, Loader2,
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
-  Github, Terminal, FolderDown, Server, RefreshCw, Send, Settings,
+  Github, Terminal, FolderDown, Settings,
   FolderClock, Layers,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
@@ -58,7 +58,7 @@ export function StartupProjectModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'recent' | 'open' | 'new' | 'clone' | 'ftp'>('open');
+  const [activeTab, setActiveTab] = useState<'recent' | 'open' | 'new' | 'clone'>('open');
 
   // Onglet "Ouvrir"
   const [inputPath, setInputPath] = useState('');
@@ -82,36 +82,6 @@ export function StartupProjectModal() {
   const cloneLogsEndRef = useRef<HTMLDivElement>(null);
   const cloneAbortRef   = useRef<(() => void) | null>(null);
   const returningFromSettingsRef = useRef(false);
-
-  // Onglet "FTP"
-  const [ftpHost, setFtpHost] = useState('');
-  const [ftpPort, setFtpPort] = useState('21');
-  const [ftpUser, setFtpUser] = useState('');
-  const [ftpPassword, setFtpPassword] = useState('');
-  const [ftpRemotePath, setFtpRemotePath] = useState('/');
-  const [ftpSecure, setFtpSecure] = useState(false);
-  const [ftpStatus, setFtpStatus] = useState<'idle' | 'testing' | 'downloading' | 'done' | 'error'>('idle');
-  const [ftpTestResult, setFtpTestResult] = useState<{ ok: boolean; info?: string; error?: string } | null>(null);
-  const [ftpLogs, setFtpLogs] = useState<Array<{ level: string; message: string }>>([]);
-  const ftpLogsEndRef = useRef<HTMLDivElement>(null);
-  const ftpAbortRef   = useRef<(() => void) | null>(null);
-
-  interface SavedFtpServer {
-    id: string; name: string; host: string; port: number;
-    user: string; remotePath: string; secure: boolean;
-    lastConnected: string; localMirrorPath?: string;
-  }
-  const [savedFtpServers, setSavedFtpServers] = useState<SavedFtpServer[]>([]);
-
-  const fetchFtpServers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/ftp/servers');
-      if (res.ok) {
-        const data = await res.json();
-        setSavedFtpServers(data.servers ?? []);
-      }
-    } catch { /* silent */ }
-  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,14 +153,14 @@ export function StartupProjectModal() {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (cloneStatus === 'cloning' || ftpStatus === 'downloading' || loading) return;
+      if (cloneStatus === 'cloning' || loading) return;
       handleClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // handleClose dépend de currentPath via la closure ; isOpen + statuts suffisent au re-bind.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, cloneStatus, ftpStatus, loading, currentPath]);
+  }, [isOpen, cloneStatus, loading, currentPath]);
 
   // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
@@ -258,13 +228,6 @@ export function StartupProjectModal() {
       cloneLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [cloneLogs, cloneStatus]);
-
-  // Auto-scroll des logs FTP vers le bas
-  useEffect(() => {
-    if (ftpStatus === 'downloading') {
-      ftpLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [ftpLogs, ftpStatus]);
 
   // Validation de l'URL de clone (format uniquement, côté client)
   const validateCloneUrl = (url: string): string | null => {
@@ -348,105 +311,6 @@ export function StartupProjectModal() {
     cloneAbortRef.current?.();
     setCloneStatus('idle');
     setCloneLogs([]);
-  };
-
-  // ── FTP handlers ────────────────────────────────────────────────────────────
-
-  const ftpConfig = useCallback(() => ({
-    host: ftpHost.trim(),
-    port: parseInt(ftpPort, 10) || 21,
-    user: ftpUser.trim(),
-    password: ftpPassword,
-    remotePath: ftpRemotePath.trim() || '/',
-    secure: ftpSecure,
-  }), [ftpHost, ftpPort, ftpUser, ftpPassword, ftpRemotePath, ftpSecure]);
-
-  const handleFtpTest = useCallback(async () => {
-    setFtpTestResult(null);
-    setFtpStatus('testing');
-    try {
-      const res = await fetch('/api/ftp/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ftpConfig()),
-      });
-      const data = await res.json();
-      setFtpTestResult(data.ok
-        ? { ok: true, info: data.serverInfo }
-        : { ok: false, error: data.error });
-      if (data.ok) await fetchFtpServers();
-    } catch (err: any) {
-      setFtpTestResult({ ok: false, error: err.message || 'Erreur réseau' });
-    } finally {
-      setFtpStatus('idle');
-    }
-  }, [ftpConfig, fetchFtpServers]);
-
-  const handleFtpDownload = useCallback(async () => {
-    setFtpStatus('downloading');
-    setFtpLogs([]);
-    setFtpTestResult(null);
-
-    let aborted = false;
-    const controller = new AbortController();
-    ftpAbortRef.current = () => { aborted = true; controller.abort(); };
-
-    try {
-      const res = await fetch('/api/ftp/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ftpConfig()),
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        const txt = await res.text().catch(() => 'Erreur réseau');
-        setFtpStatus('error');
-        setFtpLogs(prev => [...prev, { level: 'error', message: txt }]);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done || aborted) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-        for (const part of parts) {
-          const dataLine = part.split('\n').find(l => l.startsWith('data:'));
-          if (!dataLine) continue;
-          try {
-            const event = JSON.parse(dataLine.slice(5).trim());
-            if (event.type === 'log') {
-              setFtpLogs(prev => [...prev, { level: event.level ?? 'info', message: event.message ?? '' }]);
-            } else if (event.type === 'done') {
-              setFtpStatus('done');
-              await activate(event.newRoot);
-              await fetchWorkspaces();
-              await fetchFtpServers();
-            } else if (event.type === 'error') {
-              setFtpStatus('error');
-              setFtpLogs(prev => [...prev, { level: 'error', message: event.error ?? 'Erreur inconnue' }]);
-            }
-          } catch { /* SSE malformée */ }
-        }
-      }
-    } catch (err: any) {
-      if (!aborted) {
-        setFtpStatus('error');
-        setFtpLogs(prev => [...prev, { level: 'error', message: err.message || 'Erreur réseau' }]);
-      }
-    }
-  }, [ftpConfig, activate, fetchWorkspaces]);
-
-  const handleCancelFtp = () => {
-    ftpAbortRef.current?.();
-    setFtpStatus('idle');
-    setFtpLogs([]);
   };
 
   const handleBrowse = async () => {
@@ -685,7 +549,7 @@ export function StartupProjectModal() {
 
           {/* Navigation Tabs */}
           <div
-            className={`grid grid-cols-2 ${workspaces.length > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0`}
+            className={`grid grid-cols-2 ${workspaces.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0`}
             style={{
               backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
               border: '1px solid var(--border-base)',
@@ -697,7 +561,6 @@ export function StartupProjectModal() {
                 : []),
               { id: 'open' as const, label: 'Ouvrir local', count: undefined, icon: FolderOpen },
               { id: 'clone' as const, label: 'Cloner', count: undefined, icon: Github },
-              { id: 'ftp' as const, label: 'FTP', count: undefined, icon: Server },
             ]).map(({ id, label, count, icon: Icon }) => {
               const selected = activeTab === id;
               return (
@@ -707,7 +570,6 @@ export function StartupProjectModal() {
                   onClick={() => {
                     setActiveTab(id);
                     if (id === 'clone') { setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }
-                    if (id === 'ftp') { setFtpStatus('idle'); setFtpLogs([]); setFtpTestResult(null); fetchFtpServers(); }
                   }}
                   className="relative py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                   style={{
@@ -812,19 +674,6 @@ export function StartupProjectModal() {
                                 >
                                   <GitBranch className="w-2.5 h-2.5" />
                                   {ws.gitBranch || 'git'}
-                                </span>
-                              )}
-                              {ws.name?.startsWith('FTP:') && (
-                                <span
-                                  className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.2 rounded"
-                                  style={{
-                                    backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-                                    border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                                    color: 'var(--accent-primary)',
-                                  }}
-                                >
-                                  <Server className="w-2.5 h-2.5" />
-                                  FTP
                                 </span>
                               )}
                             </div>
@@ -1149,239 +998,6 @@ export function StartupProjectModal() {
               </div>
             )}
 
-            {/* ── FTP Tab ── */}
-            {activeTab === 'ftp' && (
-              <div className="space-y-4">
-
-                {/* ── Saved FTP servers ── */}
-                {savedFtpServers.length > 0 && ftpStatus === 'idle' && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                      Serveurs enregistrés
-                    </p>
-                    {savedFtpServers.map(srv => (
-                      <div
-                        key={srv.id}
-                        className="group flex items-center justify-between gap-2 p-2.5 rounded-xl border transition-all cursor-pointer hover:border-[var(--accent-primary)]"
-                        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-base)' }}
-                        onClick={() => {
-                          setFtpHost(srv.host);
-                          setFtpPort(String(srv.port));
-                          setFtpUser(srv.user);
-                          setFtpRemotePath(srv.remotePath);
-                          setFtpSecure(srv.secure);
-                          setFtpPassword('');
-                          setFtpTestResult(null);
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--accent-primary)' }}>
-                            <Server className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{srv.name}</p>
-                            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>
-                              {srv.user}@{srv.host}:{srv.port}{srv.remotePath !== '/' ? srv.remotePath : ''}
-                              {srv.secure ? ' · FTPS' : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <span className="text-xs opacity-50 hidden sm:block" style={{ color: 'var(--text-muted)' }}>
-                            {new Date(srv.lastConnected).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await fetch(`/api/ftp/servers/${srv.id}`, { method: 'DELETE' });
-                              await fetchFtpServers();
-                            }}
-                            className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 transition-all"
-                            style={{ color: 'var(--text-muted)' }}
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                          <ArrowRight className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: 'var(--accent-primary)' }} />
-                        </div>
-                      </div>
-                    ))}
-                    <div className="border-t pt-2" style={{ borderColor: 'var(--border-base)' }} />
-                  </div>
-                )}
-
-                {/* Connection form — hidden while downloading */}
-                {ftpStatus !== 'downloading' && ftpStatus !== 'done' && (
-                  <>
-                    {/* Host + Port */}
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-primary)' }}>Hôte FTP</label>
-                        <input
-                          type="text"
-                          value={ftpHost}
-                          onChange={e => setFtpHost(e.target.value)}
-                          placeholder="ftp.example.com"
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
-                          spellCheck={false}
-                        />
-                      </div>
-                      <div style={{ width: '72px' }}>
-                        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-primary)' }}>Port</label>
-                        <input
-                          type="number"
-                          value={ftpPort}
-                          onChange={e => setFtpPort(e.target.value)}
-                          min={1} max={65535}
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* User + Password */}
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-primary)' }}>Utilisateur</label>
-                        <input
-                          type="text"
-                          value={ftpUser}
-                          onChange={e => setFtpUser(e.target.value)}
-                          placeholder="anonymous"
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
-                          autoComplete="username"
-                          spellCheck={false}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-primary)' }}>Mot de passe</label>
-                        <input
-                          type="password"
-                          value={ftpPassword}
-                          onChange={e => setFtpPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
-                          autoComplete="current-password"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Remote path */}
-                    <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-primary)' }}>Chemin distant</label>
-                      <input
-                        type="text"
-                        value={ftpRemotePath}
-                        onChange={e => setFtpRemotePath(e.target.value)}
-                        placeholder="/var/www/mon-projet"
-                        className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                        style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)', outline: 'none' }}
-                        spellCheck={false}
-                      />
-                    </div>
-
-                    {/* FTPS toggle */}
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <div
-                        onClick={() => setFtpSecure(v => !v)}
-                        className={`w-8 h-4 rounded-full transition-colors relative ${ftpSecure ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-panel)]'}`}
-                        style={{ border: '1px solid var(--border-base)' }}
-                      >
-                        <span
-                          className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"
-                          style={{ left: ftpSecure ? '14px' : '2px' }}
-                        />
-                      </div>
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>FTPS (connexion sécurisée)</span>
-                    </label>
-
-                    {/* Test result badge */}
-                    <AnimatePresence>
-                      {ftpStatus === 'testing' && (
-                        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Test de connexion…
-                        </div>
-                      )}
-                      {ftpTestResult && ftpStatus === 'idle' && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`flex items-center gap-2 p-2 rounded-lg text-xs font-medium ${
-                            ftpTestResult.ok
-                              ? 'text-emerald-400 bg-emerald-500/10'
-                              : 'text-red-400 bg-red-500/10'
-                          }`}
-                        >
-                          {ftpTestResult.ok
-                            ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                            : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
-                          <span>
-                            {ftpTestResult.ok
-                              ? `Connexion réussie — ${ftpTestResult.info}`
-                              : ftpTestResult.error}
-                          </span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Info notice */}
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
-                      <Server className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 opacity-60" />
-                      <p>
-                        Les fichiers FTP seront copiés dans un dossier miroir local. Vous pourrez ensuite
-                        pousser les modifications vers le serveur via le panneau FTP dans l'IDE.
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {/* Download log terminal */}
-                {(ftpStatus === 'downloading' || ftpStatus === 'error' || ftpStatus === 'done') && (
-                  <div
-                    className="rounded-xl p-3 font-mono text-xs overflow-y-auto space-y-0.5"
-                    style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', maxHeight: '220px' }}
-                  >
-                    {ftpLogs.map((log, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          color: log.level === 'error' ? 'var(--color-error)'
-                            : log.level === 'warn' ? '#f59e0b'
-                            : 'var(--text-secondary)',
-                        }}
-                      >
-                        {log.message}
-                      </div>
-                    ))}
-                    {ftpStatus === 'downloading' && (
-                      <div className="flex items-center gap-1.5 pt-1" style={{ color: 'var(--text-muted)' }}>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Téléchargement en cours…</span>
-                      </div>
-                    )}
-                    <div ref={ftpLogsEndRef} />
-                  </div>
-                )}
-
-                {ftpStatus === 'error' && (
-                  <button
-                    type="button"
-                    onClick={() => { setFtpStatus('idle'); setFtpLogs([]); }}
-                    className="text-xs underline"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    ← Modifier les paramètres
-                  </button>
-                )}
-              </div>
-            )}
-
             {/* Message d'erreur global */}
             <AnimatePresence>
               {error && (
@@ -1491,62 +1107,6 @@ export function StartupProjectModal() {
                   style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
                 >
                   <Github className="w-3.5 h-3.5" />
-                  Réessayer
-                </motion.button>
-              )}
-
-              {/* ── FTP footer buttons ── */}
-              {activeTab === 'ftp' && ftpStatus === 'idle' && (
-                <>
-                  <motion.button
-                    type="button"
-                    onClick={handleFtpTest}
-                    disabled={!ftpHost.trim() || !ftpUser.trim()}
-                    whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 transition-all"
-                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Tester
-                  </motion.button>
-                  <motion.button
-                    type="button"
-                    onClick={handleFtpDownload}
-                    disabled={!ftpHost.trim() || !ftpUser.trim()}
-                    whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50 transition-all shadow-md"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Connecter et ouvrir
-                  </motion.button>
-                </>
-              )}
-              {activeTab === 'ftp' && ftpStatus === 'downloading' && (
-                <motion.button
-                  type="button"
-                  onClick={handleCancelFtp}
-                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Annuler
-                </motion.button>
-              )}
-              {activeTab === 'ftp' && ftpStatus === 'error' && (
-                <motion.button
-                  type="button"
-                  onClick={() => { setFtpStatus('idle'); setFtpLogs([]); }}
-                  whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
-                >
-                  <Server className="w-3.5 h-3.5" />
                   Réessayer
                 </motion.button>
               )}

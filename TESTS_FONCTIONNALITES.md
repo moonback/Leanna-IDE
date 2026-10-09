@@ -367,13 +367,6 @@
 | Montre les logs d'un processus PM2. | Logs affichés | ⬜ |
 | Redémarre un processus PM2. | Processus redémarré | ⬜ |
 
-### FTP
-
-| Question / commande à poser | Résultat attendu | Statut |
-|---|---|---|
-| Connecte-toi à un serveur FTP. | Connexion établie | ⬜ |
-| Liste les fichiers d'un répertoire FTP. | Liste des fichiers | ⬜ |
-
 ---
 
 ## 🛒 24. Marketplace

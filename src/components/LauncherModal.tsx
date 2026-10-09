@@ -25,7 +25,7 @@ import { ideApi } from '../services/ideApi.js';
  *
  * Permet de :
  *   - Reprendre instantanément le dernier projet actif
- *   - Explorer et ouvrir un autre dossier, clone ou FTP
+ *   - Explorer et ouvrir un autre dossier ou cloner un dépôt
  *   - Lancer l'environnement Notebooks
  */
 
@@ -346,7 +346,7 @@ export function LauncherModal() {
                     icon={<FolderOpen className="w-5 h-5" />}
                     title="Autre projet / Nouveau"
                     badge="Explorateur"
-                    description="Ouvrir un dossier local, cloner un dépôt GitHub ou configurer un workspace FTP distant."
+                    description="Ouvrir un dossier local ou cloner un dépôt GitHub."
                     buttonText="Parcourir les projets"
                     accentColor="var(--accent-primary)"
                     onClick={openWorkspaceSwitcher}

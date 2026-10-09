@@ -144,7 +144,7 @@ boucles autonomes deviendraient silencieusement orphelines. → Voir Recommandat
   `resolveSandboxWriteTarget → assertSandboxReady` (codebaseHelpers.ts) **sans fallback vers
   SELF_ROOT** → écritures bloquées (fail-closed) au boot.
 - `activateSandbox()` (→ `READY`) n'est appelé que par `switchSandboxProject`, lui-même
-  déclenché par la sélection de projet (`routes/self-root.ts`, `routes/ftp.ts`,
+  déclenché par la sélection de projet (`routes/self-root.ts`,
   `skills/project.ts`), **jamais dans `server.ts` au boot**. Les missions autonomes écrivent
   donc via le sandbox une fois un projet ouvert ; il n'existe pas de chemin d'écriture
   parallèle qui le contourne.

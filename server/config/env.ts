@@ -116,7 +116,6 @@ export const envSchema = z
     ENABLE_CHAIN_OF_THOUGHT: booleanFlag,
     FORCE_TIERED_TOOLS: booleanFlag,
     SELF_HEAL_READONLY: booleanFlag,
-    ALLOW_FTP_PRIVATE_IPS: booleanFlag,
 
     // ── Autonomie ──
     LEANNA_AUTONOMY_MODE: z.preprocess(

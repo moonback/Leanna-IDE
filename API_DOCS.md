@@ -65,7 +65,6 @@ Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `
 - [PM2](#pm2)
 - [MCP](#mcp)
 - [Export](#export)
-- [FTP](#ftp)
 - [Marketplace](#marketplace)
 - [WebSockets](#websockets)
 
@@ -2249,28 +2248,6 @@ Installe un serveur MCP depuis l'annuaire Harbor : récupère le manifeste, le c
 Exporte des données (conversations, mémoires…) dans différents formats.
 
 **Authentification :** Oui
-
----
-
-## FTP
-
-### `POST /api/ftp/connect`
-
-Établit une connexion FTP.
-
-**Authentification :** Oui
-
-**Body :** `{ "host": "ftp.example.com", "user": "user", "password": "pass", "port": 21 }`
-
-> Par défaut, les IPs privées (RFC 1918) sont bloquées. Définir `ALLOW_FTP_PRIVATE_IPS=true` pour les autoriser.
-
----
-
-### `GET /api/ftp/list`
-
-Liste les fichiers d'un répertoire FTP.
-
-**Authentification :** Oui · **Query params :** `path` (string)
 
 ---
 
