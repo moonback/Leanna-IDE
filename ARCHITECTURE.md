@@ -4,6 +4,8 @@
 
 Leanna est une application full-stack monoprocessus en développement et deux processus en production Electron. Le frontend React est servi par le même serveur Express qui expose l'API REST et les WebSockets. En mode desktop, Electron embarque le tout dans un processus Node.js unique.
 
+Sous le runtime d'agent, un **Noyau P0** transactionnel (`server/core/`) rend l'exécution de mission durable et idempotente : il snapshot l'état avant d'agir, vérifie par la **preuve** (pas par la narration du modèle), puis commit ou rollback. Il persiste localement sous `.Leanna/core/` et survit donc à un crash sans Supabase. Voir la section [Noyau P0](#noyau-p0-noyau-transactionnel-durable).
+
 ```mermaid
 graph TD
     subgraph Client["Client (Navigateur / Electron Renderer)"]
@@ -20,9 +22,19 @@ graph TD
 
         subgraph WS["WebSocket Servers"]
             WS_LIVE["/live — Gemini Live"]
+            WS_NOTEBOOK["/notebook-live — RAG vocal"]
             WS_SANDBOX["/sandbox-watch"]
             WS_AUTONOMY["/autonomy — timeline"]
             WS_TERMINAL["/terminal"]
+        end
+
+        subgraph CORE["Noyau P0 (server/core/)"]
+            MSM["Mission State Machine\n(durable, 13 états)"]
+            LEDGER["Execution Ledger\n(idempotence)"]
+            CKPT["Checkpoint Manager\n(snapshot/rollback)"]
+            EVID["Evidence Engine\n(preuve > narration)"]
+            SUP["Leanna Supervisor\n(autorité unique)"]
+            GATE["Jev Safety Gate"]
         end
 
         subgraph SKILLS["Skill Manager V2"]
@@ -32,7 +44,7 @@ graph TD
         end
 
         subgraph AGENTS["Agent Orchestrator"]
-            FLEET["Agent Fleet\n(coder/architect/tester…)"]
+            FLEET["Agent Fleet\n(20 rôles : coder/architect/ui_ux…)"]
             BUS["Message Bus"]
             PERSIST["Agent Persistence"]
         end
@@ -61,6 +73,7 @@ graph TD
     UI --> API
     UI --> WS_CLIENT
     WS_CLIENT --> WS_LIVE
+    WS_CLIENT --> WS_NOTEBOOK
     WS_CLIENT --> WS_SANDBOX
     WS_CLIENT --> WS_AUTONOMY
     WS_CLIENT --> WS_TERMINAL
@@ -70,6 +83,13 @@ graph TD
     RATE --> AGENTS
     RATE --> KNOWLEDGE
 
+    SUP --> MSM
+    SUP --> CKPT
+    SUP --> EVID
+    LEDGER --> RUNTIME
+    GATE --> RUNTIME
+    AGENTS --> CORE
+
     SKILLS --> GEMINI
     SKILLS --> SUPABASE
     SKILLS --> GITHUB_API
@@ -77,6 +97,8 @@ graph TD
     SKILLS --> MCP
 
     WS_LIVE --> GEMINI
+    WS_NOTEBOOK --> GEMINI
+    WS_NOTEBOOK --> NB
     AGENTS --> SKILLS
     PERSIST --> SUPABASE
     NB --> SUPABASE
@@ -192,7 +214,7 @@ server.ts                    # 2. Initialise tout et démarre le serveur HTTP
 
 Domaines d'API montés (voir [API_DOCS.md](API_DOCS.md) pour le détail des endpoints) :
 
-`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/missions` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/marketplace`
+`/api/health` · `/api/ide` · `/api/sandbox` · `/api/agents` (+ `/api/v2/agents`, `/api/v2/metrics`, `/api/v2/metrics/autonomy`) · `/api/agent-builder` · `/api/agent-registration` · `/api/custom-agents` · `/api/missions` · `/api/workflows` · `/api/conversations` · `/api/memories` · `/api/memory/hierarchical` · `/api/skills` · `/api/custom-skills` · `/api/git` · `/api/github` · `/api/profile` + `/api/tokens` · `/api/openrouter` · `/api/gemini-keys` · `/api/notebooks` · `/api/documents` · `/api/upload-document` · `/api/automation` · `/api/terminal` · `/api/browser` · `/api/tts` · `/api/knowledge` · `/api/tools` · `/api/observability` · `/api/audit` · `/api/checkpoint` · `/api/safeguards` · `/api/self-root` · `/api/workspace` · `/api/lists` · `/api/telegram` · `/api/pm2` · `/api/mcp` · `/api/export` · `/api/marketplace`
 
 ### Runtime et Skill System
 
@@ -201,8 +223,10 @@ server/runtime/
 ├── bootstrap.ts             # bootstrapRuntimeSync() — point d'entrée unique
 ├── ToolRegistry             # Registre de tous les outils disponibles
 ├── reconcileCounts.ts       # Diagnostic démarrage : populations + attribution outils
-├── agents/                  # Plugins AgentRuntime (15 = 7 rédaction + 8 ingénierie)
+├── agents/                  # Plugins AgentRuntime (20 = 7 rédaction + 8 ingénierie + 5 web/qualité)
+│   ├── writing.agents.ts     # 7 rôles rédaction (exécuteur LLM one-shot)
 │   ├── engineering.agents.ts # 8 rôles ingénierie bridgés à la boucle agentique
+│   ├── specialized.agents.ts # 5 rôles Web & Qualité bridgés à la boucle agentique
 │   └── agenticBridge.ts      # Pont plugin → runtime agentique (provider injecté)
 ├── Observability.ts         # Métriques et événements du runtime
 ├── compat/SkillManagerV2.ts # Adaptateur de compatibilité (migration progressive)
@@ -212,6 +236,47 @@ server/runtime/
 ```
 
 Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
+
+### Noyau P0 (noyau transactionnel durable)
+
+`server/core/` contient le **noyau P0**, socle d'industrialisation qui rend
+l'exécution de mission **durable, idempotente et transactionnelle**. Tout persiste
+localement sous `.Leanna/core/` (aucune dépendance Supabase requise pour survivre à
+un crash). Dix briques, assemblées par la fabrique unique `createCoreKernel`
+(`kernel.ts`) :
+
+```
+server/core/
+├── MissionStateMachine.ts   # 13 états durables + transitions validées (pure, aucune I/O)
+├── DurableMissionStore.ts   # persistance atomique .Leanna/core/missions/<id>.json
+├── ExecutionLedger.ts       # idempotence + reprise sûre après crash (.Leanna/core/ledger/actions.jsonl)
+├── CheckpointManager.ts     # snapshot / commit / rollback de fichiers (.Leanna/core/checkpoints/)
+├── EvidenceEngine.ts        # preuve d'exécution (prime sur la narration LLM, .Leanna/core/evidence/)
+├── LeannaSupervisor.ts      # autorité unique de mission (pilote le cycle transactionnel)
+├── LedgerGuard.ts           # adaptateur ToolRegistry.setIdempotencyGuard
+├── JevSafetyGate.ts         # jugement sémantique de risque via Jev (ToolRegistry.setSafetyGate)
+├── AgenticMissionRunner.ts  # couture Supervisor ↔ AgenticRuntime
+└── kernel.ts                # createCoreKernel + activation par env
+```
+
+Le `LeannaSupervisor.runMission()` orchestre un **cycle transactionnel** par
+tentative : `PREPARE → SNAPSHOT (checkpoint) → ACT (runner) → VERIFY (preuve) →
+COMMIT ou ROLLBACK → récupération`. La machine à états garantit l'ordre légal des
+transitions (13 états : `CREATED`, `PLANNING`, `READY`, `RUNNING`, `VERIFYING`,
+`RECOVERING`, `WAITING_APPROVAL`, `PAUSED`, `COMMITTING`, `COMPLETED`, `FAILED`,
+`ESCALATED`, `CANCELLED`), toute transition illégale levant `IllegalTransitionError`.
+
+Le noyau est **non intrusif par défaut** : les gardes ne sont branchées sur le
+`ToolRegistry` que si un registre est fourni et que l'activation est demandée.
+
+| Garde | Variable d'env | Comportement |
+|---|---|---|
+| Idempotence (`LedgerGuard`) | `LEANNA_IDEMPOTENCY` (`true`/`1`) | Déduit `sideEffect` des permissions ; `skip`/`block`/`execute` à la reprise |
+| Safety Gate (`JevSafetyGate`) | `LEANNA_SAFETY_GATE` (`off`/`audit`/`enforce`) | Jugement Jev typé ; `enforce` est **fail-closed** (`review` et `block` refusés) |
+
+Le `JevSafetyGate` s'appuie sur `server/utils/jevGating.ts` (politique pure
+`decideGate` + `GATE_THRESHOLDS`) et `jevDecisions.ts` (questions typées). Un
+pré-filtre évite tout appel réseau pour les outils de lecture / mémoire / mission.
 
 ### Runtime autonome événementiel
 
@@ -264,24 +329,30 @@ server/agents/
 
 L'orchestrateur implémente une boucle **Observe → Decide → Act** par rôle. Les agents communiquent via le `MessageBus` interne. Chaque tâche peut être sous-déléguée automatiquement (`delegateAutonomously`).
 
-**Rôles statiques** (définis dans `server/agents/roles.ts`, 15 au total) :
+**Rôles statiques** (définis dans `server/agents/roles.ts`, **20 au total**, déclarés dans `STATIC_AGENT_ROLES` de `server/agents/types.ts`) :
 
-- *Code & ingénierie* : `coder`, `refactor`, `debugger`, `reviewer`, `tester`, `security`, `architect`, `vision`
-- *Rédaction & documents* : `writer`, `formatter`, `researcher`, `proofreader`, `translator`, `summarizer`, `planner`
+- *Code & ingénierie* (8) : `coder`, `refactor`, `debugger`, `reviewer`, `tester`, `security`, `architect`, `vision`
+- *Rédaction & documents* (7) : `writer`, `formatter`, `researcher`, `proofreader`, `translator`, `summarizer`, `planner`
+- *Web & Qualité* (5) : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`
 
-Des rôles **dynamiques** supplémentaires peuvent être enregistrés à l'exécution via l'Agent Builder (`POST /api/agent-registration/register`).
+Des rôles **dynamiques** supplémentaires peuvent être enregistrés à l'exécution via l'Agent Builder (`POST /api/agent-registration/register`). Le type `AgentRole` est une union `(typeof STATIC_AGENT_ROLES)[number] | string`.
 
 #### Deux points d'entrée, une seule boucle d'exécution
 
-Les 15 rôles sont exécutables par **deux chemins** qui convergent vers la **même** boucle agentique `plan → act → verify` :
+Les 20 rôles sont exécutables par **deux chemins** qui convergent vers la **même** boucle agentique `plan → act → verify` :
 
 1. **Orchestrateur** (`delegateTask` / `orchestrate`) → `AgentRuntimeExecutor` → runtime agentique.
 2. **`AgentRuntime.submit()`** → plugin runtime (`server/runtime/agents/`).
 
-Historiquement, seuls les 7 rôles de rédaction étaient des plugins `AgentRuntime` ; les 8 rôles d'ingénierie n'étaient exécutables que via l'orchestrateur (d'où l'ancien écart « 15 rôles / 7 plugins runtime »). Les 8 plugins d'ingénierie (`server/runtime/agents/engineering.agents.ts`) comblent l'écart **sans dupliquer la logique** : leur `execute` délègue à la boucle agentique partagée via le pont `agenticBridge.ts` (`setAgenticRuntimeProvider`, branché une fois au bootstrap). Résultat : **15 rôles de délégation = 15 plugins runtime**, un seul concept d'exécution.
+Les 20 rôles de délégation correspondent désormais à **20 plugins runtime**, répartis en trois familles selon leur sémantique d'exécution — sans jamais dupliquer la logique métier (les métadonnées sont toujours dérivées de `roles.ts`, source de vérité unique) :
 
-- Les 7 agents de rédaction utilisent l'exécuteur LLM par défaut de `defineAgent` (un appel modèle, adapté aux documents).
-- Les 8 agents d'ingénierie passent par `plan → act → verify` avec budget transactionnel et vérification.
+| Famille | Module | Rôles | Sémantique d'exécution |
+|---|---|---|---|
+| Rédaction | `writing.agents.ts` | 7 | Exécuteur LLM one-shot (`defineAgent`), adapté aux documents |
+| Ingénierie | `engineering.agents.ts` | 8 | Boucle `plan → act → verify` (budget transactionnel + vérification) |
+| Web & Qualité | `specialized.agents.ts` | 5 | Boucle `plan → act → verify` (audit WCAG, SEO, profiling, doc, revue UI/UX) |
+
+Les familles ingénierie et Web & Qualité délèguent à la boucle agentique partagée via le pont `agenticBridge.ts` (`setAgenticRuntimeProvider` / `runViaAgentic`, branché une fois au bootstrap). L'ancien écart « 15 rôles / 7 plugins runtime » signalé par `reconcileCounts` est donc entièrement comblé : **20 rôles de délégation = 20 plugins runtime**, un seul concept d'exécution.
 
 #### Attribution outil → agent (observabilité)
 
@@ -311,6 +382,7 @@ Le token est auto-généré (256 bits, URL-safe base64) au premier démarrage si
 | Endpoint | Usage | Auth |
 |---|---|---|
 | `/live` | Session Gemini Live bidirectionnelle (texte, audio, vidéo, tool calls) | Cookie `Leanna_token` |
+| `/notebook-live` | Assistant vocal notebook (RAG groundé : `notebook_search` + `generate_document`) | Cookie `Leanna_token` |
 | `/sandbox-watch` | Notifications temps réel des fichiers modifiés dans le sandbox | Cookie `Leanna_token` |
 | `/autonomy` | Timeline temps réel du runtime autonome (lecture seule, événements `autonomy:*` + snapshot initial) | Cookie `Leanna_token` |
 | `/terminal` | Terminal PTY interactif | Token query/cookie |
@@ -402,7 +474,8 @@ Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les test
 **Couverture actuelle :**
 - ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
 - ✅ **Routes REST** : 118 tests d'intégration (22 fichiers `server/routes/*.test.ts`)
-- ✅ **Global** : 855+ tests automatisés (`node --import tsx --test server/**/*.test.ts`)
+- ✅ **Noyau P0** : `server/core/*.test.ts` (machine à états, ledger, checkpoints, evidence, supervisor, safety gate, kernel)
+- ✅ **Global** : 1193+ tests automatisés (`node --import tsx --test server/**/*.test.ts`)
 
 ### Tests unitaires (Skills)
 

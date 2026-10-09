@@ -10,7 +10,7 @@ x-leanna-token: <Leanna_API_TOKEN>
 
 Le token est défini dans `.env` (ou auto-généré au premier démarrage). La comparaison est effectuée en temps constant (`crypto.timingSafeEqual`) pour prévenir les timing attacks.
 
-Les WebSockets `/live` et `/sandbox-watch` valident le token via le **cookie** `Leanna_token`, posé automatiquement par le premier appel REST authentifié.
+Les WebSockets `/live`, `/notebook-live`, `/sandbox-watch` et `/autonomy` valident le token via le **cookie** `Leanna_token`, posé automatiquement par le premier appel REST authentifié.
 
 **Codes HTTP communs :**
 
@@ -133,6 +133,8 @@ Voir [AUTONOMY.md](AUTONOMY.md) pour la configuration, l’arrêt propre et la r
 Le Mission System pilote l'exécution orientée objectif et le curseur d'autonomie (`suggest` / `ask` / `auto`). Les routes ci-dessous exposent la création de missions, le cycle de vie (pause / reprise / annulation / suppression), la file d'approbations humaines (mode `ask`) et la lecture/modification du mode d'autonomie.
 
 L'`Executor` est initialisé de façon asynchrone au bootstrap : tant qu'il n'est pas prêt, les routes qui en dépendent renvoient `503`.
+
+> **Noyau P0 (transactionnel).** Lorsqu'il est activé, l'exécution de mission est gouvernée par le **noyau P0** (`server/core/`, voir [ARCHITECTURE.md](ARCHITECTURE.md#noyau-p0-noyau-transactionnel-durable)) : machine à états durable (13 états), checkpoints snapshot/rollback, moteur de preuve et superviseur unique. Il n'expose **pas** d'endpoint HTTP dédié — il s'active par variables d'environnement (`LEANNA_IDEMPOTENCY`, `LEANNA_SAFETY_GATE`) et se branche sur le `ToolRegistry` au bootstrap. Les routes ci-dessous restent le contrat HTTP du Mission System.
 
 ### `POST /api/missions`
 
@@ -748,12 +750,13 @@ Liste tous les rôles d'agents disponibles (statiques + dynamiques enregistrés 
 {
   "roles": [
     "coder", "refactor", "debugger", "reviewer", "tester", "security", "architect", "vision",
-    "writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner"
+    "writer", "formatter", "researcher", "proofreader", "translator", "summarizer", "planner",
+    "ui_ux", "seo", "documentation", "accessibility", "performance"
   ]
 }
 ```
 
-Les 15 rôles ci-dessus sont **statiques** (définis dans `server/agents/roles.ts`, toujours disponibles). Des rôles **dynamiques** additionnels peuvent apparaître s'ils ont été créés via l'Agent Builder / `POST /api/agent-registration/register`.
+Les **20** rôles ci-dessus sont **statiques** (déclarés dans `STATIC_AGENT_ROLES` de `server/agents/types.ts`, définis dans `server/agents/roles.ts`, toujours disponibles), répartis en trois groupes : *Code & ingénierie* (8), *Rédaction & documents* (7) et *Web & Qualité* (5 : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`). Des rôles **dynamiques** additionnels peuvent apparaître s'ils ont été créés via l'Agent Builder / `POST /api/agent-registration/register`.
 
 ---
 
@@ -900,7 +903,7 @@ Endpoints du runtime V2 (nouveau système coexistant). Même logique, nouveau To
 
 ## Agents dynamiques (Builder / Registration / Custom)
 
-Trois routeurs gèrent le cycle de vie des agents créés à l'exécution (au-delà des 15 rôles statiques).
+Trois routeurs gèrent le cycle de vie des agents créés à l'exécution (au-delà des 20 rôles statiques).
 
 ### `POST /api/agent-builder/generate`
 
@@ -2296,6 +2299,25 @@ Session Gemini Live bidirectionnelle. Gère le texte, l'audio, la vidéo et les 
 { "type": "agent_event", "event": "task_started", "taskId": "uuid", "role": "coder" }
 { "type": "mission_event", "event": "step_completed", ... }
 ```
+
+---
+
+### `WS /notebook-live`
+
+Assistant vocal **du notebook**, indépendant de `/live`. Session Gemini Live audio bidirectionnelle dédiée à l'interrogation et à la génération de documents à partir des sources d'un notebook (chat groundé avec citations). Les résultats d'outils passent par le garde d'injection de prompt avant de revenir au modèle.
+
+**Chemin :** `/notebook-live?notebookId=<id>&sources=<csv optionnel>`
+
+**Auth :** Cookie `Leanna_token` (identique au handler `/live`)
+
+**Outils exposés au modèle :**
+
+| Outil | Description |
+|---|---|
+| `notebook_search` | Recherche RAG hybride (`ragEngine.searchHybrid`) dans les sources ; renvoie contexte groundé + citations |
+| `generate_document` | Génère un document dérivé (résumé, FAQ, guide d'étude, briefing, rapport…) ; enregistré dans l'historique des générations |
+
+La génération longue retourne immédiatement une annonce vocale, puis injecte un tour de confirmation une fois le document prêt. Handler : `server/live/NotebookLiveSocketHandler.ts` (`attachNotebookLiveWebSocket`).
 
 ---
 
