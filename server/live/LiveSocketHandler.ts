@@ -1676,6 +1676,13 @@ async function handleToolCall(
     'delete_project_file', 'delete_project_folder', 'create_project_directory',
   ]);
 
+  // Extensions de fichiers que l'assistant peut CRÉER en mode Ask (via
+  // write_project_file). Limité aux formats documentaires / données : le code
+  // source du projet reste protégé en mode question.
+  const ASK_MODE_WRITABLE_EXTENSIONS = new Set([
+    '.md', '.txt', '.csv', '.json', '.yaml', '.yml', '.html',
+  ]);
+
   // Outils qui opèrent sur le workspace (lecture, écriture, exploration). Ils
   // exigent un SELF_ROOT verrouillé et un sandbox prêt (cf. garde de démarrage),
   // et DOIVENT rester sérialisés entre eux pour préserver l'ordre des écritures.
@@ -1755,10 +1762,16 @@ async function handleToolCall(
     // Ask mode guard
     if (mode === 'ask' && WRITE_TOOLS.has(call.name)) {
       const filePath = (call.args?.path || call.args?.newPath || '') as string;
-      const isAllowed = call.name === 'write_project_file' && filePath.endsWith('.md');
+      // En mode Ask, seule la CRÉATION de livrables documentaires/données est
+      // autorisée (via write_project_file). Le code source du projet reste
+      // protégé : les autres outils d'écriture (modify/patch/rename/delete) et
+      // les extensions non documentaires sont bloqués.
+      const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+      const isAllowed = call.name === 'write_project_file'
+        && ASK_MODE_WRITABLE_EXTENSIONS.has(ext);
       if (!isAllowed) {
         sendSafe({ tool_used: call.name, info: '[BLOQUÉ - Mode Ask]' });
-        return { settled: true, response: { error: 'Mode Ask actif : modification de fichiers interdite.' } };
+        return { settled: true, response: { error: 'Mode Ask actif : seule la création de documents (md, txt, csv, json, yaml, html) est autorisée.' } };
       }
     }
 
