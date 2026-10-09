@@ -1018,6 +1018,7 @@ interface ChatPanelProps {
   onPendingMessageConsumed?: () => void;
   onDockedChange?: (docked: boolean) => void;
   onWidthChange?: (width: number) => void;
+  onFullscreenChange?: (fullscreen: boolean) => void;
   initialDocked?: boolean;
   onClose?: () => void;
 }
@@ -1027,6 +1028,7 @@ export function ChatPanel({
   onPendingMessageConsumed,
   onDockedChange,
   onWidthChange,
+  onFullscreenChange,
   initialDocked = false,
   onClose,
 }: ChatPanelProps = {}) {
@@ -1098,6 +1100,10 @@ export function ChatPanel({
   }, [showInput]);
 
   useEffect(() => { onDockedChange?.(docked); }, [docked, onDockedChange]);
+
+  // Remonte l'état plein écran au parent (IdeView) pour qu'il rétrécisse la
+  // shell IDE à la moitié gauche quand le chat occupe la moitié droite.
+  useEffect(() => { onFullscreenChange?.(fullscreen); }, [fullscreen, onFullscreenChange]);
 
   // Notify parent of initial width
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1368,9 +1374,11 @@ export function ChatPanel({
         style={{
           top:    fullscreen ? '0' : docked ? '0'    : '80px',
           right:  fullscreen ? '0' : docked ? '0'    : '24px',
-          left:   fullscreen ? '0' : undefined,
+          // Plein écran = moitié droite : le code reste visible à gauche (left: 50vw),
+          // le chat occupe la moitié droite (width: 50vw).
+          left:   fullscreen ? '50vw' : undefined,
           bottom: fullscreen ? '0' : docked ? '32px' : '40px',
-          width:  fullscreen ? '100vw' : `${width}px`,
+          width:  fullscreen ? '50vw' : `${width}px`,
           height: fullscreen
             ? '100vh'
             : minimized
@@ -1383,7 +1391,8 @@ export function ChatPanel({
           zIndex:    fullscreen ? 99999 : 9990,
           backgroundColor: 'var(--bg-panel)',
           border:     fullscreen || docked ? 'none' : '1px solid var(--border-base)',
-          borderLeft: !fullscreen && docked ? '1px solid var(--border-base)' : undefined,
+          // Bordure gauche en plein écran (demi-droite) pour séparer du code à gauche.
+          borderLeft: (fullscreen || docked) ? '1px solid var(--border-base)' : undefined,
           borderRadius: fullscreen ? '0' : docked ? '0' : RADII.xl,
           x: fullscreen || docked ? 0 : mx,
           y: fullscreen || docked ? 0 : my,
@@ -1699,11 +1708,6 @@ export function ChatPanel({
                 ref={messagesRef}
                 onScroll={handleMessagesScroll}
                 className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar"
-                style={{
-                  maxWidth: fullscreen ? '860px' : undefined,
-                  margin: fullscreen ? '0 auto' : undefined,
-                  width: fullscreen ? '100%' : undefined,
-                }}
               >
                 <div ref={messagesInnerRef} className="space-y-4">
 

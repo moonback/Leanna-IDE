@@ -179,6 +179,7 @@ export default function IdeView() {
   const [showSkillsMonitor, setShowSkillsMonitor] = useState(false);
   const [showChat, setShowChat] = useState(true); // Ouvert par défaut au démarrage
   const [chatDocked, setChatDocked] = useState(false);
+  const [chatFullscreen, setChatFullscreen] = useState(false); // Chat en plein écran (moitié droite)
   const [chatWidth, setChatWidth] = useState(400); // Largeur du ChatPanel
   const [pendingChatMessage, setPendingChatMessage] = useState<{ text: string; displayText?: string } | null>(null);
   const [showAgents, setShowAgents] = useState(false);
@@ -276,6 +277,7 @@ export default function IdeView() {
     if (!connected) {
       setShowChat(false);
       setChatDocked(false);
+      setChatFullscreen(false);
       setShowAgents(false);
       setShowFleet(false);
       setShowSkillsMonitor(false);
@@ -901,7 +903,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="Leanna-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+    <div className="Leanna-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatFullscreen ? '50vw' : showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
 
       {/* Sidebar — nouvelle GlobalSidebar en mode IDE (outils-panneaux) */}
       <GlobalSidebar
@@ -1389,6 +1391,7 @@ export default function IdeView() {
           onPendingMessageConsumed={() => setPendingChatMessage(null)}
           onDockedChange={setChatDocked}
           onWidthChange={setChatWidth}
+          onFullscreenChange={setChatFullscreen}
           initialDocked={chatDocked}
           onClose={() => setShowChat(false)}
         />

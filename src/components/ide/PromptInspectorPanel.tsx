@@ -109,9 +109,9 @@ export function PromptInspectorPanel({
     }
   };
 
-  // Marge réservée à droite = largeur du ChatPanel, sauf s'il est en plein
-  // écran (l'inspecteur se superpose alors par-dessus, à gauche).
-  const rightReserve = chatFullscreen ? 0 : chatWidth;
+  // Marge réservée à droite = largeur du ChatPanel. En plein écran le chat
+  // occupe la moitié droite (50vw) : l'inspecteur réserve donc cette moitié.
+  const rightReserve = chatFullscreen ? '50vw' : chatWidth;
 
   return (
       <motion.div
