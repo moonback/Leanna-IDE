@@ -1,16 +1,16 @@
-# Graph Report - Leanna-ide  (2026-10-06)
+# Graph Report - Leanna-ide  (2026-10-09)
 
 ## Corpus Check
-- 298 files · ~317,353 words
+- 318 files · ~350,950 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2191 nodes · 3179 edges · 211 communities (143 shown, 50 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 72 edges (avg confidence: 0.84)
+- 2418 nodes · 3493 edges · 233 communities (162 shown, 55 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 76 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e571b806`
+- Built from commit: `f8f5ba7a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,7 +36,7 @@
 - Button.tsx
 - 3. Couleurs sémantiques
 - MemoriesView.tsx
-- useTerminal.ts
+- MissionControlView.tsx
 - 15. Outils de vérification
 - SourceListFull.tsx
 - AgentPanel.tsx
@@ -50,7 +50,7 @@
 - AgentBuilderPanel.tsx
 - ChatMessage
 - useChatStream.ts
-- UnifiedSidebar.tsx
+- GlobalSidebar.tsx
 - motion.ts
 - usePendingApprovals.ts
 - WorkspacePanel.tsx
@@ -107,13 +107,15 @@
 - sanitizeMarkdownHtml.ts
 - ScreenSharePanel.tsx
 - DataSection.tsx
+- ProfileSection.tsx
 - ChatPanel.tsx
 - agentActivityStore.ts
+- SystemPromptSection.tsx
 - ./SandboxDiffViewer.js
 - useFileSystem.ts
 - ../components/ide/GitHubPanel.js
 - SettingsView.tsx
-- getAgentTasks
+- UnifiedTimeline.tsx
 - FileExplorerVirtualized.tsx
 - generation/constants.ts
 - useNotebookLive.ts
@@ -125,7 +127,7 @@
 - ExplorerDock.tsx
 - 17. Recovery : il faut distinguer quatre niveaux
 - 9. Le cycle d'apprentissage
-- latencyProbe.ts
+- AgentProgressBar.tsx
 - NotebooksView.tsx
 - BottomDock.tsx
 - useSafeguardsConfig.ts
@@ -133,7 +135,7 @@
 - MissionCreatedPrompt.tsx
 - 13. Le système de permissions est déjà bien pensé
 - 1. Verdict global
-- AgentProgressBar.tsx
+- ActivityStep
 - 27. Mon plan de transformation
 - useChatPersistence.ts
 - CustomSkillsSection.tsx
@@ -144,9 +146,9 @@
 - 3. Le problème majeur : Leanna possède trop de “cerveaux”
 - 4. Architecture cible que je recommande
 - 7. Le vrai gros manque : le transactionnel
-- api/types.ts
+- MissionTimelineView.tsx
 - UserProfileContext.tsx
-- sandboxApi.ts
+- sources/constants.ts
 - StartupProjectModal.tsx
 - useWebSocket.ts
 - helpers.tsx
@@ -164,17 +166,39 @@
 - WorkflowsPanel.tsx
 - LiveSkillsMonitor.tsx
 - WorkflowPanel.tsx
+- useAgentStatus.ts
+- ExplainabilityView.tsx
+- MissionSimulationView.tsx
+- ideApi.ts
 - ./GitHubRepositoryImportModal.js
 - SlidePreviewModal.tsx
 - TemplateSelectorModal.tsx
 - GitHubView.tsx
-- ideApi.ts
-- FileExplorer.tsx
+- BrowserPanel.tsx
+- missionTimeline/types.ts
+- EnvSetupModal.tsx
+- BrowserTabView.tsx
+- AgentSwarmView.tsx
+- ActivityFeed.tsx
+- ideApi
+- mix
+- NotebookChat.tsx
 - AuditPanel.tsx
 - McpPanel.tsx
 - Skeleton.tsx
+- useAutonomyTimeline.ts
 - notebook.ts
+- BrowserTabHandle
+- NotebookDetail.tsx
+- PromptInspectorPanel.tsx
+- useBrowserProfiles.ts
+- SourceListFull.test.tsx
+- BrowserTabStrip.tsx
+- BrowserExtensionsMenu.tsx
+- BrowserFindBar.tsx
+- MissionPlanSummary
 - CommandPalette.tsx
+- useIdeSettings
 - TokenCounter.tsx
 - Toast.tsx
 - DocumentUpload.tsx
@@ -211,40 +235,40 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `../components/ide/RichDocumentViewer.js` - 50 edges
-2. `apiVoid()` - 22 edges
-3. `./DocumentsView.js` - 22 edges
-4. `../components/ide/GitHubPanel.js` - 21 edges
-5. `api()` - 20 edges
-6. `SpringTransition` - 19 edges
-7. `./SandboxDiffViewer.js` - 19 edges
-8. `FileExplorer` - 18 edges
-9. `ChatMessage` - 17 edges
-10. `./GitHubRepositoryImportModal.js` - 14 edges
+2. `WebviewElement` - 23 edges
+3. `apiVoid()` - 22 edges
+4. `./DocumentsView.js` - 22 edges
+5. `../components/ide/GitHubPanel.js` - 21 edges
+6. `api()` - 20 edges
+7. `BrowserPanel()` - 20 edges
+8. `SpringTransition` - 19 edges
+9. `./SandboxDiffViewer.js` - 19 edges
+10. `FileExplorer` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `StatusBar` --indirect_call--> `getAgentTasks()`  [INFERRED]
   src/components/ide/StatusBar.tsx → src/stores/agentActivityStore.ts
-- `UnifiedTimeline()` --indirect_call--> `getAgentTasks()`  [INFERRED]
-  src/components/ide/UnifiedTimeline.tsx → src/stores/agentActivityStore.ts
-- `UnifiedTimeline()` --indirect_call--> `subscribe()`  [INFERRED]
-  src/components/ide/UnifiedTimeline.tsx → src/stores/agentActivityStore.ts
-- `Props` --references--> `SourceItem`  [EXTRACTED]
-  src/components/notebooks/SourcePanel.tsx → src/components/notebooks/sources/constants.ts
+- `UseSourceListOptions` --references--> `SourceItem`  [EXTRACTED]
+  src/components/notebooks/sources/useSourceList.ts → src/components/notebooks/sources/constants.ts
 - `AgentPanel()` --indirect_call--> `getToolActivities()`  [INFERRED]
   src/components/panels/AgentPanel.tsx → src/stores/agentActivityStore.ts
+- `BrowserTabViewProps` --references--> `WebviewElement`  [EXTRACTED]
+  src/components/panels/BrowserTabView.tsx → src/components/panels/browserTypes.ts
+- `AgentStatusBar()` --calls--> `useAgentStatus()`  [EXTRACTED]
+  src/components/AgentStatusBar.tsx → src/hooks/useAgentStatus.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (211 total, 50 thin omitted)
+## Communities (233 total, 55 thin omitted)
 
 ### Community 0 - "Modal.tsx"
 Cohesion: 0.07
 Nodes (31): FOOTER_ALIGN, getPortalTarget(), LAYER_Z, Modal, ModalBody(), ModalBodyProps, ModalContext, ModalContextValue (+23 more)
 
 ### Community 1 - "AutonomyTimeline.tsx"
-Cohesion: 0.12
-Nodes (19): autonomyScope(), AutonomyTimeline(), AutonomyTimelineProps, describeEvent(), EVENT_LABELS, eventColor(), EventIcon(), timeAgo() (+11 more)
+Cohesion: 0.21
+Nodes (10): autonomyScope(), AutonomyTimeline(), AutonomyTimelineProps, describeEvent(), EVENT_LABELS, eventColor(), EventIcon(), timeAgo() (+2 more)
 
 ### Community 2 - "settings/constants.ts"
 Cohesion: 0.16
@@ -255,8 +279,8 @@ Cohesion: 0.16
 Nodes (17): AppCard(), AppCardProps, cpuColor(), formatMB(), formatUptimeSeconds(), memColor(), PM2StatusPanel(), PM2StatusPanelProps (+9 more)
 
 ### Community 4 - "useLiveAPI.ts"
-Cohesion: 0.22
-Nodes (13): ModifiedFile, ReasoningStep, toolLabel(), useActivity(), LogType, useLiveAPI(), ContextAlertLevel, INITIAL_PROMPT_CONTEXT (+5 more)
+Cohesion: 0.12
+Nodes (23): ModifiedFile, ReasoningStep, toolLabel(), useActivity(), LogType, useLiveAPI(), ContextAlertLevel, INITIAL_PROMPT_CONTEXT (+15 more)
 
 ### Community 5 - "SkillsPanel.tsx"
 Cohesion: 0.40
@@ -275,8 +299,8 @@ Cohesion: 0.16
 Nodes (13): Tab(), TabPanel(), TabPanelProps, TabProps, Tabs, TabsContext, TabsContextValue, TabsList() (+5 more)
 
 ### Community 9 - "IdeView.tsx"
-Cohesion: 0.13
-Nodes (13): ../components/panels/VisionPanel.js, VisionPanel, VisionPanelProps, useEditorActions(), useIdeSettings(), IdeView, DocumentsView, GitHubPanel (+5 more)
+Cohesion: 0.15
+Nodes (11): ../components/panels/VisionPanel.js, VisionPanel, VisionPanelProps, useEditorActions(), IdeView, DocumentsView, GitHubPanel, _importMeta (+3 more)
 
 ### Community 10 - "logger.ts"
 Cohesion: 0.17
@@ -299,7 +323,7 @@ Cohesion: 0.08
 Nodes (48): CATEGORY_ICONS, CATEGORY_LABELS, fmt(), ImportDropzone(), MarketplacePanel(), MarketplacePanelProps, PackageCard(), PackageDetail() (+40 more)
 
 ### Community 15 - "main.tsx"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (8): dispatchAgentEvent(), useAgentEventStream(), AppWindow, configuredApiToken, InflightEntry, Layout(), cleanupGlobalResources(), installBeforeUnloadCleanup()
 
 ### Community 16 - "audit.md"
@@ -322,17 +346,17 @@ Nodes (10): 3.1 Tokens existants, 3.2.1 Surfaces interactives (hover / active), 
 Cohesion: 0.28
 Nodes (6): MemoriesView, MemoryPanelProps, MemoriesView, MemoriesView(), Memory, timeAgo()
 
-### Community 21 - "useTerminal.ts"
-Cohesion: 0.33
-Nodes (8): getServerPort(), getTerminalWebSocketUrl(), isElectron(), TerminalActions, TerminalMessage, TerminalSize, TerminalState, useTerminal()
+### Community 21 - "MissionControlView.tsx"
+Cohesion: 0.11
+Nodes (16): MissionControlView, ActionStatus, BriefingReport, DiagnoseResult, DIMENSION_LABELS, HealthDimension, HealthDimensionsCard(), HealthGlobalCard() (+8 more)
 
 ### Community 22 - "15. Outils de vérification"
 Cohesion: 0.25
 Nodes (8): 15.1 Tailles typographiques arbitraires, 15.2 Couleurs hexadécimales, 15.3 Rayons arbitraires, 15.4 Ombres arbitraires, 15.5 Ancienne librairie d'animation, 15.6 Backdrop blur non standard, 15.7 Valeurs RGB/RGBA en dur, 15. Outils de vérification
 
 ### Community 23 - "SourceListFull.tsx"
-Cohesion: 0.13
-Nodes (18): TapScaleProps, ACCEPTED_EXTENSIONS, SourceItem, TYPE_COLORS, TYPE_ICONS, Props, cardWrapperStyle(), hoverEnter() (+10 more)
+Cohesion: 0.21
+Nodes (14): TapScaleProps, Props, SourceItem, TYPE_COLORS, TYPE_ICONS, Props, cardWrapperStyle(), hoverEnter() (+6 more)
 
 ### Community 24 - "AgentPanel.tsx"
 Cohesion: 0.14
@@ -367,20 +391,20 @@ Cohesion: 0.09
 Nodes (28): AgentBuilderPanel(), AgentBuilderPanelProps, AVAILABLE_TOOLS, AVATAR_OPTIONS, CAPABILITY_PRESETS, COLOR_OPTIONS, EMPTY_DRAFT, MODEL_OPTIONS (+20 more)
 
 ### Community 33 - "ChatMessage"
-Cohesion: 0.14
-Nodes (15): Props, Personality, Props, MessageItem, Props, Props, Props, ChatMessage (+7 more)
+Cohesion: 0.17
+Nodes (13): Props, MessageItem, Props, Props, Props, ChatMessage, ChatThreadSummary, Citation (+5 more)
 
 ### Community 34 - "useChatStream.ts"
-Cohesion: 0.20
-Nodes (18): streamSSE(), ChatStreamData, CONTEXT_SUGGESTIONS, PERSONALITIES, SLASH_COMMANDS, useChatGenerators(), GenerationSnapshot, loadGenerationStateFor() (+10 more)
+Cohesion: 0.15
+Nodes (23): streamSSE(), StreamSSEOptions, ChatMessage, ChatStreamData, ChatThread, Citation, DeepDiveStreamData, GeneratedDoc (+15 more)
 
-### Community 35 - "UnifiedSidebar.tsx"
-Cohesion: 0.10
-Nodes (19): SidebarSectionProps, SubmenuItemProps, AgentStatusBlockProps, AGENT_ITEM_IDS, buildAIMenuItems(), AIMenuItem, AssistantActions, AssistantState (+11 more)
+### Community 35 - "GlobalSidebar.tsx"
+Cohesion: 0.06
+Nodes (32): buildToolGroups(), GlobalSidebar(), GlobalSidebarProps, IconButton(), NAV_GROUPS, NavButton(), NavGroup, NavItem (+24 more)
 
 ### Community 36 - "motion.ts"
-Cohesion: 0.11
-Nodes (16): CreateNotebookModalProps, ImportActionProps, ImportToNotebookButtonProps, SPRING_MOMENTUM, SPRING_SNAPPY, SPRING_UI, SPRING_UI_SLOW, NotebookSummary (+8 more)
+Cohesion: 0.14
+Nodes (11): CreateNotebookModalProps, ImportActionProps, ImportToNotebookButtonProps, SPRING_MOMENTUM, SPRING_SNAPPY, SPRING_UI, SPRING_UI_SLOW, NotebookSummary (+3 more)
 
 ### Community 37 - "usePendingApprovals.ts"
 Cohesion: 0.15
@@ -419,8 +443,8 @@ Cohesion: 0.40
 Nodes (5): 5. Rayons, Autorisé, Hiérarchie, Interdit, Règles
 
 ### Community 46 - "WebviewElement"
-Cohesion: 0.19
-Nodes (8): BROWSER_HOME_URL, BrowserPanel(), normalizeUrl(), BrowserPanelProps, WebviewElement, WebviewFailLoadEvent, WebviewNavigateEvent, WebviewTitleEvent
+Cohesion: 0.15
+Nodes (3): BrowserPanel(), normalizeUrl(), WebviewElement
 
 ### Community 47 - "ListsView.tsx"
 Cohesion: 0.40
@@ -431,8 +455,8 @@ Cohesion: 0.28
 Nodes (8): authHeaders(), DirectoryMetadata, DirectoryServer, McpDirectory(), McpDirectoryProps, originLabel(), ServerCard(), TransportFilter
 
 ### Community 52 - "realtimeCache.ts"
-Cohesion: 0.08
-Nodes (26): TreeEntry, CacheConfig, CacheEntry, cleanupRealtimeCacheListeners(), DEFAULT_CONFIG, EventCallback, eventCallbacks, FileEvent (+18 more)
+Cohesion: 0.05
+Nodes (49): countEntries(), FileExplorer, FileExplorerProps, filterTree(), nextSort(), sortEntries(), sortLabel(), SortMode (+41 more)
 
 ### Community 53 - "PdfPreview.tsx"
 Cohesion: 0.67
@@ -443,8 +467,12 @@ Cohesion: 0.29
 Nodes (5): DocumentsData, HealthData, PHASE_LABELS, ReindexProgress, TabId
 
 ### Community 56 - "EnvSection.tsx"
-Cohesion: 0.22
-Nodes (6): EnvApiResponse, EnvFieldType, EnvSectionData, EnvSelectOption, EnvVarMeta, TYPE_ICON
+Cohesion: 0.18
+Nodes (7): EnvApiResponse, EnvFieldType, EnvSectionData, EnvSelectOption, EnvVarMeta, TYPE_ICON, TYPE_LABEL
+
+### Community 57 - "BrowserToolbar.tsx"
+Cohesion: 0.29
+Nodes (6): BrowserProfileSwitcherProps, BrowserToolbar(), BrowserToolbarProps, prettifyUrl(), BrowserHistoryEntry, BrowserProfile
 
 ### Community 58 - "P0 — obligatoire"
 Cohesion: 0.25
@@ -459,16 +487,16 @@ Cohesion: 0.50
 Nodes (4): 8.1 Librairie, 8.2 Migration, 8.3 Accessibilité, 8. Animation
 
 ### Community 67 - "useResumeConfirmations.ts"
-Cohesion: 0.19
-Nodes (18): InterruptedMissionsSection, finalizeGoals(), MissionPanel(), clearResumeConfirmation(), confirmations, emit(), EMPTY, ensureInitialized() (+10 more)
+Cohesion: 0.17
+Nodes (19): InterruptedMissionsSection, finalizeGoals(), MissionPanel(), clearResumeConfirmation(), confirmations, emit(), EMPTY, ensureInitialized() (+11 more)
 
 ### Community 71 - "AutomationView.tsx"
 Cohesion: 0.29
 Nodes (4): AutomationPanelProps, AutomationView, AutomationView, ScheduledTask
 
 ### Community 74 - "TerminalPanel.tsx"
-Cohesion: 0.15
-Nodes (15): DEFAULT_COMMANDS, ExecutionMode, FavoriteCommand, formatAnsiText(), loadFavoriteCommands(), saveFavoriteCommands(), SearchBar, SearchBarProps (+7 more)
+Cohesion: 0.11
+Nodes (24): DEFAULT_COMMANDS, deriveShellLabel(), ExecutionMode, FavoriteCommand, formatAnsiText(), loadFavoriteCommands(), saveFavoriteCommands(), SearchBar (+16 more)
 
 ### Community 75 - "TextRenderer"
 Cohesion: 0.67
@@ -490,13 +518,17 @@ Nodes (16): DocumentsView, ./DocumentsView.js, CATEGORY_COLORS, DocumentItem, Do
 Cohesion: 0.18
 Nodes (13): ChatMarkdown, MarkdownPreview, MarkdownPreviewProps, Props, SourcesSummaryCard(), RenderedContent(), ALLOWED_ATTRIBUTES, ALLOWED_TAGS (+5 more)
 
+### Community 95 - "ProfileSection.tsx"
+Cohesion: 0.67
+Nodes (3): initials(), ProfileSection(), QUICK_ROLES
+
 ### Community 97 - "ChatPanel.tsx"
 Cohesion: 0.05
 Nodes (40): BreathingDots, BUBBLE_STYLES, ChatMessage, ChatPanel(), ChatPanelProps, clampWithRubberband(), DragSession, InputArea() (+32 more)
 
 ### Community 98 - "agentActivityStore.ts"
-Cohesion: 0.16
-Nodes (23): agentTasks, cleanup(), clearCompletedTasks(), clearCompletedTools(), destroyActivityStore(), FALLBACK_TOOL_TO_AGENT, formatToolLabel(), getAgentForTool() (+15 more)
+Cohesion: 0.15
+Nodes (24): agentTasks, cleanup(), clearCompletedTasks(), clearCompletedTools(), destroyActivityStore(), FALLBACK_TOOL_TO_AGENT, formatToolLabel(), getAgentForTool() (+16 more)
 
 ### Community 100 - "./SandboxDiffViewer.js"
 Cohesion: 0.07
@@ -511,16 +543,16 @@ Cohesion: 0.12
 Nodes (18): ../components/ide/GitHubPanel.js, Commit, CommitDetail, CommitDetailPanel(), CommitFile, FILE_STATUS, GitHubPanel(), GitHubPanelProps (+10 more)
 
 ### Community 106 - "SettingsView.tsx"
-Cohesion: 0.38
-Nodes (5): SettingsView, getActiveLabel(), getSectionDescription(), NAV_GROUPS, SettingsView()
+Cohesion: 0.28
+Nodes (6): SettingsView, getActiveLabel(), getSectionDescription(), NAV_GROUPS, SECURE_ITEMS, SettingsView()
 
-### Community 107 - "getAgentTasks"
-Cohesion: 0.27
-Nodes (10): AgentActivity, AgentActivityOverlay(), AgentActivityOverlayProps, MissionActivity, AgentsSidebarButton(), AgentsSidebarButtonProps, AgentPanel(), AgentTaskEntry (+2 more)
+### Community 107 - "UnifiedTimeline.tsx"
+Cohesion: 0.17
+Nodes (15): AgentActivity, AgentActivityOverlay(), AgentActivityOverlayProps, MissionActivity, AgentsSidebarButton(), AgentsSidebarButtonProps, Phase, PHASE_META (+7 more)
 
 ### Community 108 - "FileExplorerVirtualized.tsx"
-Cohesion: 0.05
-Nodes (56): buildNodes(), canDropInto(), collator, collectDirChangeCounts(), collectSearchExpanded(), countFiles(), createDiffLookup(), DataNode (+48 more)
+Cohesion: 0.06
+Nodes (46): buildNodes(), canDropInto(), collator, collectDirChangeCounts(), collectSearchExpanded(), countFiles(), createDiffLookup(), DataNode (+38 more)
 
 ### Community 109 - "generation/constants.ts"
 Cohesion: 0.20
@@ -531,16 +563,16 @@ Cohesion: 0.21
 Nodes (11): NotebookVoicePanel(), Props, GeneratedDocInfo, NotebookLiveStatus, NotebookLiveTranscriptEntry, useNotebookLive(), UseNotebookLiveOptions, floatToPcm16() (+3 more)
 
 ### Community 111 - "SpringTransition"
-Cohesion: 0.21
-Nodes (8): Props, Props, Props, Suggestion, ScrimStyle, SpringTransition, UploadFileStatus, Props
+Cohesion: 0.28
+Nodes (6): Props, Props, Props, Suggestion, ScrimStyle, SpringTransition
 
 ### Community 112 - "22. P1 — autonomie avancée"
 Cohesion: 0.29
 Nodes (7): 22. P1 — autonomie avancée, P1.1, P1.2, P1.3, P1.4, P1.5, P1.6
 
 ### Community 113 - "MissionPanel.tsx"
-Cohesion: 0.10
-Nodes (20): ActionEntry, ActionRow(), ApprovalCard(), confidenceColor(), confidenceIcon(), decisionBadge(), formatDuration(), GoalCard() (+12 more)
+Cohesion: 0.12
+Nodes (19): ActionEntry, ActionRow(), ApprovalCard(), confidenceColor(), confidenceIcon(), decisionBadge(), formatDuration(), GoalCard() (+11 more)
 
 ### Community 114 - "SourceViewer.tsx"
 Cohesion: 0.29
@@ -558,9 +590,9 @@ Nodes (5): 17. Recovery : il faut distinguer quatre niveaux, Niveau 1 — Retry,
 Cohesion: 0.40
 Nodes (5): 9. Le cycle d'apprentissage, Learning, Memory, Policy, Strategy
 
-### Community 119 - "latencyProbe.ts"
-Cohesion: 0.29
-Nodes (7): flushProbe(), LatencyReport, probe(), ProbeEntry, ProbeStep, session, STEP_ORDER
+### Community 119 - "AgentProgressBar.tsx"
+Cohesion: 0.15
+Nodes (19): AgentProgressBar(), CAT_COLOR, CAT_LABEL, CatIcon, COMPLEXITY_LABEL, FilterChip, formatMs(), getCat() (+11 more)
 
 ### Community 120 - "NotebooksView.tsx"
 Cohesion: 0.50
@@ -582,9 +614,9 @@ Nodes (3): 13. Le système de permissions est déjà bien pensé, Capability att
 Cohesion: 0.67
 Nodes (3): 1. Verdict global, Mon diagnostic, État actuel de Leanna
 
-### Community 127 - "AgentProgressBar.tsx"
-Cohesion: 0.05
-Nodes (50): ActivityFeed(), ActivityFeedProps, classifyTool(), deduplicateSteps(), FeedEntry, FeedRow(), getColor(), getIcon() (+42 more)
+### Community 127 - "ActivityStep"
+Cohesion: 0.12
+Nodes (20): ActivityFeedProps, AgentProgressBarProps, AssistantActivityBar(), AssistantActivityBarProps, elapsed(), getMeta(), StepRow, TOOL_META (+12 more)
 
 ### Community 128 - "27. Mon plan de transformation"
 Cohesion: 0.67
@@ -610,17 +642,17 @@ Nodes (3): 5.1 ToolRegistry, 5. Ce qui est déjà très bon, À conserver absolu
 Cohesion: 0.67
 Nodes (3): 8. Le deuxième gros problème : autonomie ≠ simple exécution automatique, Autonomie, Réaction
 
-### Community 138 - "api/types.ts"
-Cohesion: 0.21
-Nodes (10): StreamSSEOptions, ChatMessage, ChatThread, Citation, DeepDiveStreamData, GeneratedDoc, GenerateStreamData, Note (+2 more)
+### Community 138 - "MissionTimelineView.tsx"
+Cohesion: 0.13
+Nodes (14): MissionTimelineView, EVENT_META, humanDuration(), MissionListItem, MissionPickerItem(), MissionTimeline, MissionTimelineView(), statusTone() (+6 more)
 
 ### Community 139 - "UserProfileContext.tsx"
 Cohesion: 0.13
 Nodes (14): AgentRole, AgentsConfig, AIProvider, CustomAgentConfig, DEFAULT_PROFILE, Language, load(), ProfileContext (+6 more)
 
-### Community 140 - "sandboxApi.ts"
-Cohesion: 0.20
-Nodes (15): cachedGet(), CacheEntry, CacheKey, caches, cleanupSandboxListeners(), fetchWithRetry(), getAuthHeaders(), handleSandboxChanged() (+7 more)
+### Community 140 - "sources/constants.ts"
+Cohesion: 0.19
+Nodes (10): SourcePanel(), ACCEPTED_EXTENSIONS, UploadFileStatus, Props, Props, UploadApi, useSourceList(), UseSourceListOptions (+2 more)
 
 ### Community 141 - "StartupProjectModal.tsx"
 Cohesion: 0.32
@@ -647,12 +679,12 @@ Cohesion: 0.18
 Nodes (12): AuditReport, formatBytes(), formatUptime(), HealthScoreRing(), MemBar(), memColor(), relativeTime(), scoreColor() (+4 more)
 
 ### Community 153 - "EmptyEditorState.tsx"
-Cohesion: 0.14
-Nodes (16): ActionCard, EmptyEditorState, EmptyEditorStateProps, GeminiStatus, GitInfo, IconType, InterruptedMissionCard, Kbd (+8 more)
+Cohesion: 0.12
+Nodes (20): ActionCard, basename(), dirname(), EmptyEditorState, EmptyEditorStateProps, GeminiStatus, GitInfo, IconType (+12 more)
 
 ### Community 154 - "useGenerationQueue.ts"
-Cohesion: 0.30
-Nodes (11): GeneratePanel(), Props, SlidePreviewModal, Suggestion, Props, DocRef, GeneratedDoc, QueuedGeneration (+3 more)
+Cohesion: 0.33
+Nodes (10): GeneratePanel(), Props, Suggestion, Props, DocRef, GeneratedDoc, QueuedGeneration, SourceItem (+2 more)
 
 ### Community 155 - "useEnsureNotebook.ts"
 Cohesion: 0.43
@@ -670,13 +702,29 @@ Nodes (11): fmtDuration(), fmtTime(), LiveSkillsMonitor(), SKILL_META, SkillMeta
 Cohesion: 0.23
 Nodes (12): ActiveRun, formatElapsed(), statusColor(), statusIcon(), statusLabel(), StepRunState, stepStatusIcon(), timeAgo() (+4 more)
 
+### Community 163 - "useAgentStatus.ts"
+Cohesion: 0.23
+Nodes (11): AgentStatusBar(), STATE_ICON, AgentState, AgentStatus, fromAutonomy(), fromMissionEvent(), MissionSignal, STATE_META (+3 more)
+
+### Community 164 - "ExplainabilityView.tsx"
+Cohesion: 0.18
+Nodes (11): ExplainabilityView, ExplainabilityView(), ExplainResponse, Factor, FactorTone, Prediction, PRESETS, RISK_META (+3 more)
+
+### Community 165 - "MissionSimulationView.tsx"
+Cohesion: 0.17
+Nodes (8): MissionSimulationView, formatDuration(), MissionSimulationView(), PRESETS, RISK_META, RiskLevel, SimulatedStep, SimulationReport
+
+### Community 166 - "ideApi.ts"
+Cohesion: 0.19
+Nodes (12): CacheEntry, fetchWithRetry(), FileContentResponse, FileCountResponse, getAuthHeaders(), missionAction(), MissionActionResult, missionApi (+4 more)
+
 ### Community 167 - "./GitHubRepositoryImportModal.js"
 Cohesion: 0.13
 Nodes (13): ./GitHubRepositoryImportModal.js, DEFAULT_CODE_EXTENSIONS, DEFAULT_EXTENSIONS, GitHubRepositoryImportModalProps, GitHubUser, LANGUAGE_COLORS, Notebook, PRESET_EXTENSIONS (+5 more)
 
 ### Community 168 - "SlidePreviewModal.tsx"
-Cohesion: 0.17
-Nodes (10): DENSITIES, DensityKey, GeneratedDoc, Props, RatioKey, RATIOS, ThemeKey, THEMES (+2 more)
+Cohesion: 0.15
+Nodes (11): SlidePreviewModal, DENSITIES, DensityKey, GeneratedDoc, Props, RatioKey, RATIOS, ThemeKey (+3 more)
 
 ### Community 169 - "TemplateSelectorModal.tsx"
 Cohesion: 0.30
@@ -686,25 +734,73 @@ Nodes (9): ICON_MAP, Props, TemplateSelectorModal(), DOCUMENT_TEMPLATES, Documen
 Cohesion: 0.20
 Nodes (11): GitHubView, Commit, CommitDetail, CommitFile, GitHubView(), Issue, openExternal(), PullRequest (+3 more)
 
-### Community 177 - "ideApi.ts"
-Cohesion: 0.10
-Nodes (16): OVERLAY_FADE, WorkspaceItem, FALLBACK_STATUS, getElectronAPI(), SelfRootSection(), SelfRootStatus, WorkspaceItem, CacheEntry (+8 more)
+### Community 171 - "BrowserPanel.tsx"
+Cohesion: 0.24
+Nodes (9): BROWSER_HOME_URL, BrowserTab, newTabId(), useBrowserExtensions(), UseBrowserExtensionsResult, isTrackableUrl(), loadHistory(), persistHistory() (+1 more)
 
-### Community 178 - "FileExplorer.tsx"
-Cohesion: 0.27
-Nodes (8): countEntries(), FileExplorer, FileExplorerProps, filterTree(), nextSort(), sortEntries(), sortLabel(), SortMode
+### Community 172 - "missionTimeline/types.ts"
+Cohesion: 0.17
+Nodes (8): EVENT_META, IconComp, MissionListItem, MissionTimeline, StepSnapshot, TERMINAL_STATUSES, TimelineEvent, TimelineEventType
+
+### Community 173 - "EnvSetupModal.tsx"
+Cohesion: 0.24
+Nodes (8): ALL_SPECS, KEY_GROUPS, KeySpec, REQUIRED_KEYS, EnvApiResponse, EnvSectionData, EnvVarMeta, OVERLAY_FADE
+
+### Community 174 - "BrowserTabView.tsx"
+Cohesion: 0.25
+Nodes (9): BrowserTabViewProps, ConsoleEntry, TabStatePatch, BrowserPanelProps, WebviewFailLoadEvent, WebviewFaviconEvent, WebviewFoundInPageEvent, WebviewNavigateEvent (+1 more)
+
+### Community 175 - "AgentSwarmView.tsx"
+Cohesion: 0.18
+Nodes (7): AgentSwarmView, PRESETS, STAGE_META, SwarmComposition, SwarmMember, SwarmStage, ViewMode
+
+### Community 176 - "ActivityFeed.tsx"
+Cohesion: 0.33
+Nodes (9): ActivityFeed(), classifyTool(), deduplicateSteps(), FeedEntry, FeedRow(), getColor(), getIcon(), getTypeLabel() (+1 more)
+
+### Community 177 - "ideApi"
+Cohesion: 0.17
+Nodes (8): OVERLAY_FADE, WorkspaceItem, FALLBACK_STATUS, getElectronAPI(), SelfRootSection(), SelfRootStatus, WorkspaceItem, ideApi
+
+### Community 178 - "mix"
+Cohesion: 0.22
+Nodes (10): DiffStats(), EmptyState(), focusSiblingRow(), HighlightMatch(), mix(), Pill(), plural(), SandboxBadge() (+2 more)
+
+### Community 179 - "NotebookChat.tsx"
+Cohesion: 0.31
+Nodes (6): Props, CONTEXT_SUGGESTIONS, PERSONALITIES, Personality, SLASH_COMMANDS, Props
 
 ### Community 180 - "AuditPanel.tsx"
-Cohesion: 0.18
-Nodes (10): AuditPanel, AuditPanelProps, scoreColor(), statusIcon(), stepIcon(), AuditReport, AuditStep, AuditStepStatus (+2 more)
+Cohesion: 0.27
+Nodes (7): AuditPanel, AuditPanelProps, scoreColor(), statusIcon(), stepIcon(), AuditReport, AuditStep
 
 ### Community 181 - "McpPanel.tsx"
 Cohesion: 0.20
 Nodes (10): EMPTY_FORM, formatTimestamp(), McpMetric, McpMetricsSummary, McpPanel(), McpServer, McpTool, NewServerForm (+2 more)
 
+### Community 183 - "useAutonomyTimeline.ts"
+Cohesion: 0.20
+Nodes (9): AnticipationProposal, AutonomyConnectionStatus, AutonomyState, AutonomyTask, EventMessage, IncomingMessage, SnapshotMessage, UseAutonomyTimelineOptions (+1 more)
+
 ### Community 184 - "notebook.ts"
 Cohesion: 0.20
 Nodes (9): AudioOverview, ChatMessage, Citation, GeneratedDoc, NotebookData, NotebookSummary, NoteItem, SourceItem (+1 more)
+
+### Community 186 - "NotebookDetail.tsx"
+Cohesion: 0.32
+Nodes (7): NotebookData, NotebookDetail(), NoteEditorCenter(), Props, StudioTab, Tab, useFluidTransition()
+
+### Community 187 - "PromptInspectorPanel.tsx"
+Cohesion: 0.38
+Nodes (6): formatChars(), PromptInspectorPanel(), PromptInspectorPanelProps, TabDef, TabId, PromptDebugState
+
+### Community 188 - "useBrowserProfiles.ts"
+Cohesion: 0.48
+Nodes (6): DEFAULT_PROFILE, loadActiveId(), loadProfiles(), partitionFor(), persist(), useBrowserProfiles()
+
+### Community 190 - "BrowserTabStrip.tsx"
+Cohesion: 0.50
+Nodes (4): BrowserTabStrip(), BrowserTabStripProps, tabLabel(), TabStripItem
 
 ### Community 194 - "CommandPalette.tsx"
 Cohesion: 0.31
@@ -723,8 +819,8 @@ Cohesion: 0.25
 Nodes (4): DocumentResult, DocumentUploadProps, DropZoneOverlayProps, UseDocumentDropOptions
 
 ### Community 206 - "client.ts"
-Cohesion: 0.12
-Nodes (23): api(), ApiError, ApiOptions, apiVoid(), extractErrorMessage(), safeJson(), useResource(), UseResourceOptions (+15 more)
+Cohesion: 0.17
+Nodes (17): api(), ApiError, ApiOptions, apiVoid(), extractErrorMessage(), safeJson(), useResource(), UseResourceOptions (+9 more)
 
 ### Community 209 - "AssistantLogsPanel.tsx"
 Cohesion: 0.29
@@ -810,25 +906,29 @@ Nodes (3): COMMON_ACTIONS, VisualWorkflowBuilderProps, WorkflowStepForm
 Cohesion: 0.33
 Nodes (4): HierarchicalMemoryItem, HierarchicalStats, HierarchicalTier, TIER_COLORS
 
+### Community 269 - "electron.d.ts"
+Cohesion: 0.29
+Nodes (6): BrowserExtensionInfo, BrowserExtensionsListResult, BrowserExtensionsLoadResult, BrowserExtensionsRemoveResult, ElectronAPI, Window
+
 ## Knowledge Gaps
-- **822 isolated node(s):** `EVENT_LABELS`, `AutonomyTimelineProps`, `ConfirmRequest`, `OPERATION_LABELS`, `Props` (+817 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1136 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **50 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **904 isolated node(s):** `STATE_ICON`, `EVENT_LABELS`, `AutonomyTimelineProps`, `ConfirmRequest`, `OPERATION_LABELS` (+899 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1254 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **55 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
+- **Why does `useAutonomyTimeline()` connect `useAgentStatus.ts` to `AutonomyTimeline.tsx`, `MissionControlView.tsx`, `useAutonomyTimeline.ts`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `api()` connect `client.ts` to `useChatStream.ts`, `motion.ts`, `useGenerationQueue.ts`, `SlidePreviewModal.tsx`, `sources/constants.ts`, `AudioOverviewPanel.tsx`, `NotebookChat.tsx`, `SourceViewer.tsx`, `NotebookDetail.tsx`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Why does `../components/ide/RichDocumentViewer.js` connect `../components/ide/RichDocumentViewer.js` to `sanitizeMarkdownHtml.ts`, `getColor`, `TextRenderer`, `IdeView.tsx`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
-- **Why does `api()` connect `client.ts` to `ChatMessage`, `useChatStream.ts`, `motion.ts`, `SlidePreviewModal.tsx`, `AudioOverviewPanel.tsx`, `SourceViewer.tsx`, `useGenerationQueue.ts`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **What connects `EVENT_LABELS`, `AutonomyTimelineProps`, `ConfirmRequest` to the rest of the system?**
-  _822 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **What connects `STATE_ICON`, `EVENT_LABELS`, `AutonomyTimelineProps` to the rest of the system?**
+  _904 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Modal.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.07394957983193277 - nodes in this community are weakly interconnected._
-- **Should `AutonomyTimeline.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.11857707509881422 - nodes in this community are weakly interconnected._
-- **Should `IdeView.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.1286549707602339 - nodes in this community are weakly interconnected._
+- **Should `useLiveAPI.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.11822660098522167 - nodes in this community are weakly interconnected._
 - **Should `MarketplacePanel.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.07966457023060797 - nodes in this community are weakly interconnected._

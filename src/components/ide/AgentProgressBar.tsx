@@ -22,21 +22,20 @@ type ToolCategory = 'file-read' | 'file-write' | 'file-delete' | 'search' | 'web
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function msElapsed(ts: Date): string {
-  if (!(ts instanceof Date)) ts = new Date(ts);
-  const ms = Date.now() - ts.getTime();
+function formatMs(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(1)}s`;
   return `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s`;
 }
 
+function msElapsed(ts: Date): string {
+  if (!(ts instanceof Date)) ts = new Date(ts);
+  return formatMs(Date.now() - ts.getTime());
+}
+
 function msBetween(a: Date, b: Date): string {
-  const ms = new Date(b).getTime() - new Date(a).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  return `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s`;
+  return formatMs(new Date(b).getTime() - new Date(a).getTime());
 }
 
 function stepDuration(step: ActivityStep): string | null {
@@ -317,8 +316,12 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [filter, setFilter] = useState<StepFilter>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyFailedId, setCopyFailedId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const [, setTick] = useState(0);
+  // Horloge vivante : incrémentée à chaque tick pendant l'exécution. Sert de
+  // dépendance aux durées « en cours » pour qu'elles se rafraîchissent réellement.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduceMotion = useReducedMotion();
 
   const runningStep = useMemo(() => [...steps].reverse().find(s => s.status === 'running'), [steps]);
@@ -348,20 +351,45 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
     else if (filter !== 'errors' && !presentCats.includes(filter)) setFilter('all');
   }, [filter, errorCount, presentCats]);
 
-  const copyDetail = useCallback((step: ActivityStep) => {
+  const copyDetail = useCallback(async (step: ActivityStep) => {
     const text = step.detail ?? step.label;
-    void navigator.clipboard?.writeText(text).then(() => {
-      setCopiedId(step.id);
-      setTimeout(() => setCopiedId(c => (c === step.id ? null : c)), 1400);
-    });
+    const flash = (ok: boolean) => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (ok) { setCopiedId(step.id); setCopyFailedId(null); }
+      else { setCopyFailedId(step.id); setCopiedId(null); }
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopiedId(c => (c === step.id ? null : c));
+        setCopyFailedId(c => (c === step.id ? null : c));
+        copyTimeoutRef.current = null;
+      }, 1400);
+    };
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard-unavailable');
+      await navigator.clipboard.writeText(text);
+      flash(true);
+    } catch {
+      flash(false);
+    }
   }, []);
 
+  // Nettoie le timeout du retour visuel de copie au démontage.
+  useEffect(() => () => {
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+  }, []);
+
+  // Dépend de nowTick : pendant l'exécution, le tick (toutes les 500ms) force
+  // le recalcul avec l'horloge courante, donc la durée globale avance réellement.
   const totalDur = useMemo(() => {
     if (!steps.length) return '0s';
-    const first = new Date(steps[0].timestamp);
-    const last  = new Date(steps[steps.length - 1].timestamp);
-    return msBetween(first, isWorking ? new Date() : last);
-  }, [steps, isWorking]);
+    const first = new Date(steps[0].timestamp).getTime();
+    const end   = isWorking ? nowTick : new Date(steps[steps.length - 1].timestamp).getTime();
+    return formatMs(Math.max(0, end - first));
+  }, [steps, isWorking, nowTick]);
+
+  // Progression indéterminée : on travaille mais aucune étape n'est encore
+  // terminée (ou une seule étape longue tourne). On préfère une barre animée
+  // sans valeur plutôt qu'un faux pourcentage immobile.
+  const indeterminate = isWorking && doneCount === 0;
 
   // Critically-damped default spring for state-driven UI (§4 / Quick Reference).
   // Reduced motion gets a short, non-bouncy fade/step instead of a spring.
@@ -390,7 +418,8 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
 
   useEffect(() => {
     if (!isWorking) return;
-    const id = setInterval(() => setTick(t => t + 1), 500);
+    setNowTick(Date.now());
+    const id = setInterval(() => setNowTick(Date.now()), 500);
     return () => clearInterval(id);
   }, [isWorking]);
 
@@ -407,30 +436,56 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
       <div
         className="relative h-[5px] w-full overflow-hidden rounded"
         style={{ backgroundColor: 'color-mix(in srgb, var(--text-primary) 6%, transparent)' }}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={indeterminate ? undefined : pct}
+        aria-valuetext={indeterminate ? 'Progression en cours, pourcentage inconnu' : `${pct}%`}
+        aria-label="Progression de l'agent"
       >
-        <motion.div
-          className="absolute inset-y-0 left-0 rounded"
-          style={{ backgroundColor: accentColor }}
-          animate={{ width: `${pct}%` }}
-          transition={uiSpring}
-        />
-        {/* Portion d'erreur : segment rouge superposé, proportionnel aux échecs. */}
-        {errorCount > 0 && total > 0 && (
-          <motion.div
-            className="absolute inset-y-0 right-0 rounded"
-            style={{ backgroundColor: 'var(--color-error)', opacity: 0.85 }}
-            animate={{ width: `${Math.round((errorCount / total) * 100)}%` }}
-            transition={uiSpring}
-          />
-        )}
-        {/* Splash-style shimmer sweep, omitted when motion is reduced. */}
-        {isWorking && !reduceMotion && (
-          <motion.div
-            className="absolute inset-y-0 w-1/4"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)' }}
-            animate={{ left: ['-25%', '100%'] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
-          />
+        {indeterminate ? (
+          /* Progression réelle inconnue : barre indéterminée (balayage animé),
+             jamais un pourcentage inventé. */
+          reduceMotion ? (
+            <div
+              className="absolute inset-y-0 left-0 rounded"
+              style={{ width: '40%', backgroundColor: accentColor, opacity: 0.7 }}
+            />
+          ) : (
+            <motion.div
+              className="absolute inset-y-0 rounded"
+              style={{ width: '40%', backgroundColor: accentColor }}
+              animate={{ left: ['-40%', '100%'] }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )
+        ) : (
+          <>
+            <motion.div
+              className="absolute inset-y-0 left-0 rounded"
+              style={{ backgroundColor: accentColor }}
+              animate={{ width: `${pct}%` }}
+              transition={uiSpring}
+            />
+            {/* Portion d'erreur : segment rouge superposé, proportionnel aux échecs. */}
+            {errorCount > 0 && total > 0 && (
+              <motion.div
+                className="absolute inset-y-0 right-0 rounded"
+                style={{ backgroundColor: 'var(--color-error)', opacity: 0.85 }}
+                animate={{ width: `${Math.round((errorCount / total) * 100)}%` }}
+                transition={uiSpring}
+              />
+            )}
+            {/* Splash-style shimmer sweep, omitted when motion is reduced. */}
+            {isWorking && !reduceMotion && (
+              <motion.div
+                className="absolute inset-y-0 w-1/4"
+                style={{ background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)' }}
+                animate={{ left: ['-25%', '100%'] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -448,7 +503,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
         transition={{ duration: 0.1 }}
       >
         {/* Status dot / spinner */}
-A        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--bg-surface)_80%,transparent)] border border-[var(--border-base)] shadow-sm">
+        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--bg-surface)_80%,transparent)] border border-[var(--border-base)] shadow-sm">
           {isWorking ? (
             <Loader2
               className={reduceMotion ? 'flex-shrink-0' : 'animate-spin flex-shrink-0'}
@@ -663,15 +718,17 @@ A        <div className="flex items-center justify-center w-5 h-5 rounded-full b
                         }
                         {step.detail && (
                           <button
-                            onClick={e => { e.stopPropagation(); copyDetail(step); }}
+                            onClick={e => { e.stopPropagation(); void copyDetail(step); }}
                             className="p-0.5 rounded flex-shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity"
-                            title="Copier le détail"
-                            aria-label="Copier le détail de l'étape"
-                            style={{ color: copiedId === step.id ? 'var(--color-success)' : 'var(--text-dimmed)' }}
+                            title={copyFailedId === step.id ? 'Échec de la copie' : 'Copier le détail'}
+                            aria-label={copyFailedId === step.id ? 'Échec de la copie du détail' : 'Copier le détail de l\'étape'}
+                            style={{ color: copiedId === step.id ? 'var(--color-success)' : copyFailedId === step.id ? 'var(--color-error)' : 'var(--text-dimmed)' }}
                           >
                             {copiedId === step.id
                               ? <Check style={{ width: 9, height: 9 }} />
-                              : <Copy style={{ width: 9, height: 9 }} />}
+                              : copyFailedId === step.id
+                                ? <AlertCircle style={{ width: 9, height: 9 }} />
+                                : <Copy style={{ width: 9, height: 9 }} />}
                           </button>
                         )}
                         {step.detail && (
