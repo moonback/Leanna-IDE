@@ -377,17 +377,13 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
     }
   }, [steps.length, expanded]);
 
-  useEffect(() => {
-    if (isWorking && steps.length <= 2) setExpanded(true);
-  }, [isWorking, steps.length]);
-
-  // En cas d'erreur, ouvrir le tiroir et déplier automatiquement la première
-  // étape échouée pour que l'utilisateur voie immédiatement ce qui a cassé.
+  // En cas d'erreur, pré-sélectionner la première étape échouée pour qu'elle
+  // soit dépliée dès que l'utilisateur ouvre le tiroir — sans forcer l'ouverture,
+  // la barre reste réduite par défaut.
   useEffect(() => {
     if (errorCount === 0) return;
     const firstError = steps.find(s => s.status === 'error' && s.detail);
     if (firstError) {
-      setExpanded(true);
       setExpandedStepId(prev => prev ?? firstError.id);
     }
   }, [errorCount, steps]);
@@ -452,16 +448,18 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
         transition={{ duration: 0.1 }}
       >
         {/* Status dot / spinner */}
-        {isWorking ? (
-          <Loader2
-            className={reduceMotion ? 'flex-shrink-0' : 'animate-spin flex-shrink-0'}
-            style={{ width: 12, height: 12, color: 'var(--accent-primary)' }}
-          />
-        ) : errorCount > 0 ? (
-          <AlertCircle style={{ width: 12, height: 12, color: 'var(--color-warning)', flexShrink: 0 }} />
-        ) : (
-          <CheckCircle2 style={{ width: 12, height: 12, color: 'var(--color-success)', flexShrink: 0 }} />
-        )}
+A        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--bg-surface)_80%,transparent)] border border-[var(--border-base)] shadow-sm">
+          {isWorking ? (
+            <Loader2
+              className={reduceMotion ? 'flex-shrink-0' : 'animate-spin flex-shrink-0'}
+              style={{ width: 12, height: 12, color: 'var(--accent-primary)' }}
+            />
+          ) : errorCount > 0 ? (
+            <AlertCircle style={{ width: 12, height: 12, color: 'var(--color-warning)', flexShrink: 0 }} />
+          ) : (
+            <CheckCircle2 style={{ width: 12, height: 12, color: 'var(--color-success)', flexShrink: 0 }} />
+          )}
+        </div>
 
         {/* Main label */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
