@@ -590,6 +590,53 @@ describe("AgentBrain.executeGoal (scheduler DAG)", () => {
     const researcherCount = executedRoles.filter((r) => r === "researcher").length;
     assert.equal(researcherCount, 1, `researcher exécuté ${researcherCount} fois (attendu 1)`);
   });
+
+  it("compose une équipe (swarm) pilotée par le plan et l'expose dans le résultat", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom(
+      [
+        { ...makeStage("coder", "stage-1"), status: "pending", tools: ["modify_project_file", "write_project_file"] },
+        { ...makeStage("tester", "stage-2"), status: "pending", dependsOn: ["stage-1"], tools: ["run_project_command"] },
+      ],
+      // L'objectif mentionne la sécurité → le SwarmComposer doit recruter `security`.
+      "Corriger la faille de sécurité d'authentification"
+    );
+    const orch = new MockOrchestrator(() => ({ success: true, filesModified: ["src/auth.ts"] }));
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(
+      makeInput("Corriger la faille de sécurité d'authentification", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 })
+    );
+
+    // L'équipe est composée, exposée dans le résultat, et dérive du plan réel.
+    assert.ok(result.team, "le résultat doit exposer l'équipe composée");
+    assert.ok(result.team!.pipeline.length > 0, "le pipeline de l'équipe ne doit pas être vide");
+    assert.ok(
+      result.team!.pipeline.includes("security"),
+      `l'objectif « sécurité » doit recruter l'agent security — pipeline: ${result.team!.pipeline.join(" → ")}`
+    );
+    // Backbone : la recherche amorce toujours l'équipe.
+    assert.ok(result.team!.pipeline.includes("researcher"), "researcher amorce le pipeline");
+    assert.ok(result.team!.summary.includes("Équipe composée"), "le résumé markdown de l'équipe est présent");
+  });
+
+  it("dissout l'équipe même quand la mission échoue (finally)", async () => {
+    const understanding = makeUnderstanding("backend");
+    const plan = makePlanFrom([{ ...makeStage("coder", "stage-1"), status: "pending" }], "Implémenter une fonctionnalité");
+    // La délégation échoue toujours → mission en échec, mais l'équipe doit être exposée
+    // (compose a eu lieu) et dissoute proprement (pas d'exception propagée).
+    const orch = new MockOrchestrator(() => ({ success: false, error: "échec" }));
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(
+      makeInput("Implémenter une fonctionnalité", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 })
+    );
+
+    assert.equal(result.success, false, "mission en échec");
+    assert.ok(result.team, "l'équipe est composée même sur une mission qui échoue");
+    // dissolve() sur des rôles statiques est un no-op sûr : aucune exception, pipeline conservé.
+    assert.ok(result.team!.pipeline.length > 0);
+  });
 });
 
 function sleepMs(ms: number): Promise<void> {

@@ -897,6 +897,26 @@ research → design → build → verify → review → security → optimize �
 L'équipe est plafonnée (défaut 6 membres) tout en préservant la colonne vertébrale
 `build` / `verify` / `review`.
 
+**Pilotée par le plan réel (par mission).** `AgentBrain.executeGoal()` compose
+l'équipe **à partir du plan validé** — l'objectif (`plan.goal` + intention
+comprise) et les skills/outils que les étapes comptent réellement exécuter
+(`plan.stages.flatMap(skills + tools)`), pas d'un texte libre. L'équipe est
+**instanciée au démarrage de l'exécution** et **dissoute dans un `finally`**
+(succès, échec ou exception), puis exposée dans `BrainExecutionResult.team`. Un
+événement d'observabilité « Équipe composée / dissoute » est publié sur le flux
+d'événements. Comme les rôles statiques sont partagés, `dissolve()` est un no-op
+sûr ; seuls des rôles créés dynamiquement pour la mission seraient désenregistrés.
+
+```text
+executeGoal(goal)
+   │
+   ├─ planGoal(...)                      plan validé (DAG + rôles figés)
+   ├─ swarmComposer.compose({ objective, plannedSkills })   ← dérivé du plan réel
+   │     → événement « Équipe composée », result.team
+   ├─ scheduler.execute(stages)          exécution du DAG
+   └─ finally → handle.dissolve()        libération de fin de mission
+```
+
 ### Négociation — Contract-Net
 
 `ContractNetNegotiator` implémente le protocole contract-net :

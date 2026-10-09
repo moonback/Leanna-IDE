@@ -12,7 +12,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 
 | Version | Date | Changements majeurs |
 |---|---|---|
-| **1.6.0** | 2026-10-09 | **Noyau P0 transactionnel** livré (`server/core/` : machine à états durable 13 états, `ExecutionLedger` idempotent, `CheckpointManager` snapshot/rollback, `EvidenceEngine`, `LeannaSupervisor`, `LedgerGuard`, `JevSafetyGate`, `kernel.createCoreKernel`). **20 rôles statiques** (ajout du groupe Web & Qualité : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`) = **20 plugins runtime**. Autonomie proactive (`AnticipationEngine`, `ComputerUseAgent`, `SmartSkills`). Nouvelle **Phase R7 — 20 fonctionnalités & optimisations**. **R7 #6 livré** : contract-net en production (routage dynamique vers l'agent le mieux-noté + repli déterministe `fallbackBidders`). |
+| **1.6.0** | 2026-10-09 | **Noyau P0 transactionnel** livré (`server/core/` : machine à états durable 13 états, `ExecutionLedger` idempotent, `CheckpointManager` snapshot/rollback, `EvidenceEngine`, `LeannaSupervisor`, `LedgerGuard`, `JevSafetyGate`, `kernel.createCoreKernel`). **20 rôles statiques** (ajout du groupe Web & Qualité : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`) = **20 plugins runtime**. Autonomie proactive (`AnticipationEngine`, `ComputerUseAgent`, `SmartSkills`). Nouvelle **Phase R7 — 20 fonctionnalités & optimisations**. **R7 #5 & #6 livrés** : composition de swarm pilotée par le Brain (compose/dissolve par mission) + contract-net en production (routage dynamique + repli déterministe `fallbackBidders`). |
 | **1.4.0** | 2026-10-04 | Sandbox d'exécution des skills tiers : `SkillWorker`, `agentDefinitionSchema` (Zod + HMAC-SHA256), `AgentLoader` hardened, `DynamicAgentRegistry.registerAgent()`, `McpBridge.sanitizePathArgs()`. 32 nouveaux tests. |
 | **1.3.0** | 2026-09-25 | Re-audit post-`AGENTIC_RUNTIME` et `AUTONOMY_IMPLEMENTATION`. 11 items migrés 📋/🟡 → ✅. KPI actualisés. |
 | 1.3.0 | 2026-09-04 | Refonte complète : audit du code, 5 paris, 6 phases R0→R6, registre de risques. |
@@ -267,7 +267,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 | # | Fonctionnalité / optimisation | S'appuie sur | Prio | Effort | Statut |
 |---|---|---|---|---|---|
-| 5 | **Composition de swarm pilotée par le Brain** : brancher `SwarmComposer.compose()` sur le plan réel pour instancier/dissoudre l'équipe par mission | `SwarmComposer`, `AgentBrain` | P1 | L | 📋 |
+| 5 | ✅ ~~**Composition de swarm pilotée par le Brain** : brancher `SwarmComposer.compose()` sur le plan réel pour instancier/dissoudre l'équipe par mission~~ | `SwarmComposer`, `AgentBrain` | P1 | L | ✅ Livré — `AgentBrain.executeGoal` compose l'équipe à partir du **plan validé** (objectif + skills/outils réellement planifiés par les étapes : `plan.stages.flatMap(skills+tools)`), publie l'événement d'observabilité « Équipe composée », expose la composition dans `BrainExecutionResult.team`, et la **dissout dans un `finally`** (succès, échec ou exception). `dissolve()` reste un no-op sûr sur rôles statiques. Tests : `AgentBrain.test.ts` (équipe composée & exposée, dissolution sur échec). |
 | 6 | ✅ ~~**Contract-net en production** : utiliser `ContractNetNegotiator` pour attribuer dynamiquement les tâches aux agents les mieux notés, au lieu d'un routage statique~~ | `ContractNetNegotiator`, `AgentMessageBus` | P1 | L | ✅ Livré — repli déterministe `fallbackBidders` (singleton câblé sur `listAgentRoles`, garantit un gagnant éligible même sans flotte abonnée) ; `AgentOrchestrator.delegateTask`/`delegateAutonomously` basculent sur la négociation quand aucun rôle n'est imposé (`resolveRoleByNegotiation` + `inferRequiredCapabilities`), puis exécutent le gagnant par le chemin standard. HTTP `POST /api/agents/delegate-autonomous` accepte `role` optionnel. Tests : `ContractNetNegotiator.test.ts` (repli), `AgentOrchestrator.negotiation.test.ts` (bascule rôle-implicite). |
 | 7 | **Dashboard du bus de messages** : exposer `MessageBusMonitor` (health, alertes, flux, métriques agrégées) dans l'UI avec le rendu ASCII en live | `MessageBusMonitor` | P2 | M | 📋 |
 | 8 | **Scoring par-rôle du contract-net** : remplacer le proxy `successRate` global par une fiabilité par rôle issue de `StrategyMemory` | `ContractNetNegotiator.estimateConfidence`, `StrategyMemory` | P2 | M | 📋 |
@@ -299,7 +299,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | 19 | **Harness d'évaluation d'agents** : dossier `eval/`, tâches de référence, fixtures de réponses modèles, scoring reproductible, détection de régression en CI | `mission-harness.test.ts`, `AgentTaskRunnerContract` | P0 | XL | 📋 |
 | 20 | **Rapport post-mission Markdown unifié** : agréger `EvidenceBundle` + diffs + coût + durée + corrections en un artefact lisible, promu en source notebook | `EvidenceEngine`, `TelemetryService`, `DocumentStore` | P1 | M | 🟡 faits disponibles, agrégation à écrire |
 
-> Récapitulatif R7 : **20 items** · P0 ×3 · P1 ×9 · P2 ×8. Chacun transforme un composant **déjà présent** en valeur visible ou en gain de performance — pas de dépendance à une brique inexistante. **Premier item livré : #6 Contract-net en production ✅** (routage dynamique vers l'agent le mieux-noté + repli déterministe).
+> Récapitulatif R7 : **20 items** · P0 ×3 · P1 ×9 · P2 ×8. Chacun transforme un composant **déjà présent** en valeur visible ou en gain de performance — pas de dépendance à une brique inexistante. **Items déjà livrés : #5 Composition de swarm pilotée par le Brain ✅** et **#6 Contract-net en production ✅**.
 
 ---
 
@@ -390,6 +390,10 @@ node --import tsx --test server/mcp/mcpBridgeSanitize.test.ts
 node --import tsx --test server/agents/ContractNetNegotiator.test.ts
 node --import tsx --test server/agents/AgentOrchestrator.negotiation.test.ts
 node --import tsx --test server/agents/DelegationNegotiation.test.ts
+
+# R7 #5 — Composition de swarm pilotée par le Brain (compose/dissolve par mission)
+node --import tsx --test server/agents/brain/AgentBrain.test.ts
+node --import tsx --test server/agents/SwarmComposer.test.ts
 ```
 
 Un item ✅ **sans** test exécutable associé est un bug de cette roadmap — signalez-le.

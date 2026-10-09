@@ -14,6 +14,7 @@ import { BrainPlanValidator } from "./BrainPlanValidator.js";
 import { BrainScheduler } from "./BrainScheduler.js";
 import { agentOrchestrator, type AgentOrchestrator } from "../AgentOrchestrator.js";
 import { agentEventStream } from "../AgentEventStream.js";
+import { swarmComposer, type SwarmHandle } from "../SwarmComposer.js";
 import { createLogger } from "../../utils/logger.js";
 import type { AgentTask } from "../types.js";
 
@@ -124,6 +125,13 @@ export class AgentBrain {
     const plan = await this.planGoal(input);
     plan.status = "executing";
 
+    // ── Composition de swarm pilotée par le plan réel ────────────────────────
+    // L'équipe est composée à partir de l'objectif ET des skills/outils que le
+    // plan validé compte réellement exécuter (pas d'un texte libre). Elle est
+    // instanciée ici, avant toute étape, et dissoute dans le `finally` ci-dessous
+    // — garantissant la libération même en cas d'exception.
+    const team = this.composeTeamForPlan(plan);
+
     // Contexte partagé accumulé au fil de l'exécution (et des réplanifications)
     const ctx: BrainRunContext = {
       verifications: [],
@@ -135,76 +143,142 @@ export class AgentBrain {
       understanding: plan.understanding,
     };
 
-    const scheduler = new BrainScheduler((stage, deps) => this.executeStage(stage, plan, ctx, deps));
+    try {
+      const scheduler = new BrainScheduler((stage, deps) => this.executeStage(stage, plan, ctx, deps));
 
-    // Exécution initiale du DAG complet
-    let report = await scheduler.execute(plan.stages);
+      // Exécution initiale du DAG complet
+      let report = await scheduler.execute(plan.stages);
 
-    // ── Réplanification à chaud du sous-graphe restant (garde-fou anti-boucle) ──
-    const maxReplans = input.maxReplans ?? 2;
-    let replans = 0;
-    while (report.failed.length > 0 && replans < maxReplans) {
-      replans++;
-      const replanned = await this.replanSubgraph(plan, report, ctx, replans, maxReplans);
-      if (!replanned) {
-        log.warn(`🛑 Réplanification impossible — arrêt propre après ${replans} tentative(s)`);
-        break;
+      // ── Réplanification à chaud du sous-graphe restant (garde-fou anti-boucle) ──
+      const maxReplans = input.maxReplans ?? 2;
+      let replans = 0;
+      while (report.failed.length > 0 && replans < maxReplans) {
+        replans++;
+        const replanned = await this.replanSubgraph(plan, report, ctx, replans, maxReplans);
+        if (!replanned) {
+          log.warn(`🛑 Réplanification impossible — arrêt propre après ${replans} tentative(s)`);
+          break;
+        }
+        report = await scheduler.execute(plan.stages);
       }
-      report = await scheduler.execute(plan.stages);
+
+      // ── Synthèse du résultat ────────────────────────────────────────────────
+      const totalDurationMs = Date.now() - startTime;
+      const allCompleted = plan.stages.every((s) => s.status === "completed");
+      const anyCompleted = plan.stages.some((s) => s.status === "completed");
+      const globalSuccess = allCompleted;
+
+      plan.status = allCompleted ? "completed" : anyCompleted ? "incomplete" : "failed";
+
+      const stageResults = plan.stages.map(
+        (s) => ctx.stageResults.get(s.id) ?? { stage: s, result: s.result, durationMs: s.durationMs ?? 0 }
+      );
+
+      const failedStage = plan.stages.find((s) => s.status === "failed" || s.status === "skipped");
+      const summary = globalSuccess
+        ? `Objectif accompli avec succès en ${plan.stages.length} étapes (${plan.stages.map((s) => s.agentRole).join(" → ")}). ${ctx.filesModified.size} fichier(s) mis à jour, validés et sans régression.`
+        : `Exécution ${plan.status === "incomplete" ? "partielle" : "en échec"} — difficulté sur l'étape : ${failedStage?.title ?? "inconnue"}${replans > 0 ? ` (après ${replans} réplanification(s))` : ""}.`;
+
+      const deliverables = [
+        ...Array.from(ctx.filesModified).map((f) => `Fichier modifié : ${f}`),
+        ...ctx.verifications.map((v) => v.summary),
+      ];
+
+      const result: BrainExecutionResult = {
+        planId: plan.id,
+        goal: input.goal,
+        success: globalSuccess,
+        understanding: plan.understanding,
+        stages: stageResults,
+        filesModified: Array.from(ctx.filesModified),
+        verifications: ctx.verifications,
+        corrections: ctx.corrections,
+        totalDurationMs,
+        summary,
+        deliverables,
+        team: team ?? undefined,
+      };
+
+      this.results.set(plan.id, result);
+
+      agentEventStream.publish({
+        type: "agent_event",
+        event: "orchestration_completed",
+        taskId: plan.id,
+        role: "planner",
+        title: `[Agent Brain] ${globalSuccess ? "Objectif validé" : plan.status === "incomplete" ? "Partiellement accompli" : "Échec"} : ${plan.goal}`,
+        status: globalSuccess ? "completed" : "failed",
+        agentName: "Agent Brain",
+        detail: summary,
+        timestamp: new Date().toISOString(),
+      });
+
+      log.info(`🏁 Exécution Brain terminée (${totalDurationMs}ms). Statut: ${plan.status} — ${replans} réplanification(s)`);
+      return result;
+    } finally {
+      // Dissolution de l'équipe en fin de mission (succès, échec OU exception).
+      // Pour des rôles statiques partagés, dissolve() est un no-op sûr ; seuls
+      // les rôles créés dynamiquement pour la mission seraient désenregistrés.
+      this.dissolveTeam(plan, team);
     }
+  }
 
-    // ── Synthèse du résultat ────────────────────────────────────────────────
-    const totalDurationMs = Date.now() - startTime;
-    const allCompleted = plan.stages.every((s) => s.status === "completed");
-    const anyCompleted = plan.stages.some((s) => s.status === "completed");
-    const globalSuccess = allCompleted;
+  /**
+   * Compose l'équipe de la mission à partir du PLAN RÉEL : l'objectif
+   * (`plan.goal` + intention comprise) et les skills/outils que les étapes
+   * comptent exécuter (`stage.skills` + `stage.tools`). Publie un événement
+   * d'observabilité. Best-effort : une erreur de composition ne fait jamais
+   * échouer la mission (retourne `null`).
+   */
+  private composeTeamForPlan(plan: BrainPlan): SwarmHandle | null {
+    try {
+      const plannedSkills = Array.from(
+        new Set(plan.stages.flatMap((s) => [...(s.skills ?? []), ...(s.tools ?? [])]))
+      );
+      const handle = swarmComposer.compose({
+        objective: { title: plan.goal, description: plan.understanding.intent },
+        plannedSkills,
+      });
 
-    plan.status = allCompleted ? "completed" : anyCompleted ? "incomplete" : "failed";
+      agentEventStream.publish({
+        type: "agent_event",
+        event: "task_progress",
+        taskId: plan.id,
+        role: "planner",
+        title: `[Agent Brain] Équipe composée (${handle.members.length} agents)`,
+        status: "running",
+        agentName: "Agent Brain",
+        detail: `Pipeline : ${handle.pipeline.join(" → ")}`,
+        timestamp: new Date().toISOString(),
+      });
+      log.info(`🐝 Équipe composée pour "${plan.goal}" : ${handle.pipeline.join(" → ")}`);
+      return handle;
+    } catch (err: any) {
+      log.warn(`Composition de swarm ignorée (best-effort) : ${err?.message ?? err}`);
+      return null;
+    }
+  }
 
-    const stageResults = plan.stages.map(
-      (s) => ctx.stageResults.get(s.id) ?? { stage: s, result: s.result, durationMs: s.durationMs ?? 0 }
-    );
-
-    const failedStage = plan.stages.find((s) => s.status === "failed" || s.status === "skipped");
-    const summary = globalSuccess
-      ? `Objectif accompli avec succès en ${plan.stages.length} étapes (${plan.stages.map((s) => s.agentRole).join(" → ")}). ${ctx.filesModified.size} fichier(s) mis à jour, validés et sans régression.`
-      : `Exécution ${plan.status === "incomplete" ? "partielle" : "en échec"} — difficulté sur l'étape : ${failedStage?.title ?? "inconnue"}${replans > 0 ? ` (après ${replans} réplanification(s))` : ""}.`;
-
-    const deliverables = [
-      ...Array.from(ctx.filesModified).map((f) => `Fichier modifié : ${f}`),
-      ...ctx.verifications.map((v) => v.summary),
-    ];
-
-    const result: BrainExecutionResult = {
-      planId: plan.id,
-      goal: input.goal,
-      success: globalSuccess,
-      understanding: plan.understanding,
-      stages: stageResults,
-      filesModified: Array.from(ctx.filesModified),
-      verifications: ctx.verifications,
-      corrections: ctx.corrections,
-      totalDurationMs,
-      summary,
-      deliverables,
-    };
-
-    this.results.set(plan.id, result);
-
-    agentEventStream.publish({
-      type: "agent_event",
-      event: "orchestration_completed",
-      taskId: plan.id,
-      role: "planner",
-      title: `[Agent Brain] ${globalSuccess ? "Objectif validé" : plan.status === "incomplete" ? "Partiellement accompli" : "Échec"} : ${plan.goal}`,
-      status: globalSuccess ? "completed" : "failed",
-      agentName: "Agent Brain",
-      detail: summary,
-      timestamp: new Date().toISOString(),
-    });
-
-    log.info(`🏁 Exécution Brain terminée (${totalDurationMs}ms). Statut: ${plan.status} — ${replans} réplanification(s)`);
-    return result;
+  /** Dissout l'équipe de la mission (best-effort, jamais bloquant). */
+  private dissolveTeam(plan: BrainPlan, team: SwarmHandle | null): void {
+    if (!team) return;
+    try {
+      const { dissolved } = team.dissolve();
+      agentEventStream.publish({
+        type: "agent_event",
+        event: "task_progress",
+        taskId: plan.id,
+        role: "planner",
+        title: `[Agent Brain] Équipe dissoute`,
+        status: "completed",
+        agentName: "Agent Brain",
+        detail: dissolved.length > 0 ? `Rôles dynamiques libérés : ${dissolved.join(", ")}` : `Équipe de rôles statiques — rien à libérer`,
+        timestamp: new Date().toISOString(),
+      });
+      log.info(`🧹 Équipe dissoute pour "${plan.goal}"${dissolved.length ? ` (libérés : ${dissolved.join(", ")})` : ""}`);
+    } catch (err: any) {
+      log.warn(`Dissolution de swarm ignorée (best-effort) : ${err?.message ?? err}`);
+    }
   }
 
   /**

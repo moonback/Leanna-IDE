@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentRole, TaskPriority, TaskResult } from "../types.js";
+import type { TeamComposition } from "../SwarmComposer.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Brain Types — Architecture Cognitive Supérieure
@@ -132,6 +133,13 @@ export interface BrainExecutionResult {
   totalDurationMs: number;
   summary: string;
   deliverables: string[];
+  /**
+   * Équipe composée dynamiquement pour la mission par le `SwarmComposer`
+   * (pipeline de rôles dérivé de l'objectif + des skills réellement planifiés).
+   * L'équipe est instanciée au démarrage de l'exécution et dissoute à la fin
+   * (voir `AgentBrain.executeGoal`). `undefined` si la composition a échoué.
+   */
+  team?: TeamComposition;
 }
 
 // ─── Schémas Zod pour validation des entrées API et Outils ───────────────────
