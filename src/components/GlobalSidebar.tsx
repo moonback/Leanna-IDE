@@ -29,9 +29,10 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput,
+  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
+import { openOrbLive } from './OrbLiveView.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
@@ -434,8 +435,14 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   ))}
             </div>
 
-            {/* Pied : changer de projet + paramètres */}
+            {/* Pied : présence vocale + changer de projet + paramètres */}
             <div className="mt-auto flex-shrink-0 border-t px-2 py-1" style={{ borderColor: 'var(--border-base)' }}>
+              <NavButton
+                item={{ id: 'orb-live', path: '', label: 'Présence vocale', icon: Radio }}
+                active={false}
+                collapsed={collapsed}
+                onClick={openOrbLive}
+              />
               <NavButton
                 item={{ id: 'switch-workspace', path: '', label: 'Changer de projet', icon: FolderInput }}
                 active={false}

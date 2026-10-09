@@ -13,6 +13,7 @@ import { LiveAPIContext } from './context/LiveAPIContext.js';
 import { ScreenShareProvider, useScreenShare } from './context/ScreenShareContext.js';
 import { useLiveAPI } from './hooks/useLiveAPI.js';
 import { FloatingOrb } from './components/FloatingOrb.js';
+import { OrbLiveView } from './components/OrbLiveView.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
@@ -716,6 +717,8 @@ function Layout() {
         <LauncherModal />
         {/* Assistant de première configuration des clés .env (après le splash) */}
         <EnvSetupModal />
+        {/* Présence vocale plein écran (orb + live), ouverte depuis la sidebar */}
+        <OrbLiveView />
       </ScreenShareProvider>
     </LiveAPIContext.Provider>
   );
