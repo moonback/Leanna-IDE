@@ -3,10 +3,11 @@ import { useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronDown, Loader2, CheckCircle2, AlertCircle,
-  Lightbulb, Pencil, ShieldCheck, Bot, Target,
+  Bot, Target,
 } from 'lucide-react';
 import type { ActivityStep, ReasoningState } from '../../hooks/useActivity.js';
 import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
+import { type Phase, PHASE_META, PHASE_ORDER, toolToPhase } from './activityPhases.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UnifiedTimeline — timeline « en cours » unique dans le chat.
@@ -18,37 +19,6 @@ import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
 // agentActivityStore (source unique côté agents). Objectif : une seule source de
 // vérité visuelle, moins de bruit.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-type Phase = 'planning' | 'writing' | 'verification';
-
-const PHASE_META: Record<Phase, { label: string; icon: typeof Lightbulb; color: string }> = {
-  planning:     { label: 'Planification', icon: Lightbulb,   color: 'var(--color-warning)' },
-  writing:      { label: 'Écriture',      icon: Pencil,      color: 'var(--accent-primary)' },
-  verification: { label: 'Vérification',  icon: ShieldCheck, color: 'var(--color-success)' },
-};
-
-const PHASE_ORDER: Phase[] = ['planning', 'writing', 'verification'];
-
-/** Classe un outil dans l'une des trois phases de la timeline. */
-function toolToPhase(tool: string): Phase {
-  // Skills personnalisés : traités comme une ACTION (ils exécutent une
-  // instruction utilisateur). Court-circuit AVANT les regex ci-dessous pour
-  // éviter qu'un skill nommé p.ex. custom_search_* ne tombe en « Planification ».
-  if (tool.startsWith('custom_')) {
-    return 'writing';
-  }
-  if (/reason|think|plan|search|find|grep|list|analyze|memory|knowledge|get_workspace|read_file_outline/.test(tool)) {
-    return 'planning';
-  }
-  if (/write|modify|patch|create|delete|rename|git_|commit|push|stage/.test(tool)) {
-    return 'writing';
-  }
-  if (/test|verify|validate|read_project_file|open_project_file|lint|check/.test(tool)) {
-    return 'verification';
-  }
-  // Par défaut : écriture (action) si non classé.
-  return 'writing';
-}
 
 interface UnifiedTimelineProps {
   steps: ActivityStep[];
