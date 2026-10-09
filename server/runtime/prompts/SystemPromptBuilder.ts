@@ -36,6 +36,7 @@ import process from "node:process";
 
 import { PromptRegistry }   from "../PromptRegistry.js";
 import { loadPromptTemplates, loadPromptMeta } from "./loader.js";
+import { listPromptNames, effectivePathFor } from "./promptOverrides.js";
 import { ContextResolver }  from "./ContextResolver.js";
 import { RuleRegistry }     from "./RuleRegistry.js";
 import { ConflictResolver } from "./ConflictResolver.js";
@@ -123,9 +124,12 @@ export class SystemPromptBuilder {
    * Appeler une seule fois au démarrage (ou laisser build() le faire lazily).
    */
   loadTemplates(promptsDir?: string): void {
-    const dir = promptsDir ?? SystemPromptBuilder.resolvePromptsDir();
-    loadPromptTemplates(this.legacyRegistry, dir);
-    this.syncSectionsFromLegacy(dir);
+    // Sans dossier explicite, on laisse le loader résoudre les prompts en mode
+    // « override-first » (union bundle + overrides modifiables sous userData),
+    // pour que les éditions faites via /api/prompts prennent effet. Un dossier
+    // explicite (tests) court-circuite ce mécanisme.
+    loadPromptTemplates(this.legacyRegistry, promptsDir);
+    this.syncSectionsFromLegacy(promptsDir);
     this.registerSoloModeSection();
 
     // Boot terminé : sceller le registre de règles. Les garde-fous P0/P1
@@ -433,10 +437,15 @@ export class SystemPromptBuilder {
    * n'a pas explicitement déclaré un scope. Cela évite qu'un bloc spécialisé
    * fuite dans tous les contextes (ask, coding, browser…) par défaut.
    */
-  private syncSectionsFromLegacy(promptsDir: string): void {
-    if (!fs.existsSync(promptsDir)) return;
+  private syncSectionsFromLegacy(promptsDir?: string): void {
+    const explicit = Boolean(promptsDir);
+    if (explicit && !fs.existsSync(promptsDir as string)) return;
 
-    const files = fs.readdirSync(promptsDir).filter((f: string) => f.endsWith(".md"));
+    // Mode override-first (défaut) : union bundle + overrides modifiables ;
+    // chaque fichier est lu depuis son chemin effectif (override prioritaire).
+    const files = explicit
+      ? fs.readdirSync(promptsDir as string).filter((f: string) => f.endsWith(".md"))
+      : listPromptNames();
     const meta  = loadPromptMeta(promptsDir);
 
     for (const file of files) {
@@ -444,7 +453,9 @@ export class SystemPromptBuilder {
       if (this.sectionRegistry.has(id)) continue; // déjà enregistrée
 
       try {
-        const filePath = path.join(promptsDir, file);
+        const filePath = explicit
+          ? path.join(promptsDir as string, file)
+          : (effectivePathFor(file) ?? path.join(SystemPromptBuilder.resolvePromptsDir(), file));
         const raw      = fs.readFileSync(filePath, "utf-8");
         const content  = this.legacyRegistry.has(id)
           ? this.legacyRegistry.render(id, { compact: true })
@@ -531,7 +542,7 @@ export class SystemPromptBuilder {
     for (const critical of SystemPromptBuilder.CRITICAL_SECTIONS) {
       if (!this.sectionRegistry.has(critical) && !this.legacyRegistry.has(critical)) {
         throw new Error(
-          `[SystemPromptBuilder] Section critique "${critical}" absente de ${promptsDir} : ` +
+          `[SystemPromptBuilder] Section critique "${critical}" absente de ${promptsDir ?? SystemPromptBuilder.resolvePromptsDir()} : ` +
           `démarrage interrompu (fail-closed).`,
         );
       }

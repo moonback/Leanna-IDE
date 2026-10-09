@@ -31,6 +31,7 @@ import { createAgentRegistrationRouter } from "./server/routes/agent-registratio
 import { createCustomAgentsRouter } from "./server/routes/custom-agents-router.js";
 import { createGeminiKeysRouter } from "./server/routes/gemini-keys.js";
 import { createEnvRouter } from "./server/routes/env.js";
+import { createPromptsRouter } from "./server/routes/prompts.js";
 import { createSandboxRouter, createVerifyExitCodeRouter } from "./server/routes/sandbox.js";
 import { createCheckpointRouter } from "./server/routes/checkpoint.js";
 import ideRouter from "./server/routes/ide.js";
@@ -797,6 +798,7 @@ async function startServer() {
   app.use("/api/marketplace", createMarketplaceRouter());
   app.use("/api/gemini-keys", createGeminiKeysRouter());
   app.use("/api/env", createEnvRouter());
+  app.use("/api/prompts", createPromptsRouter());
   app.use("/api/sandbox", createSandboxRouter());
   app.use("/api/checkpoint", createCheckpointRouter());
   app.use("/api/ide", ideRouter);

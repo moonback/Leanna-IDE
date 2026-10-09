@@ -25,6 +25,7 @@ import {
   CustomSkillsSection,
   KnowledgeHealthSection,
   SystemPromptSection,
+  PromptsSection,
   SkillsDocumentationSection,
   HierarchicalMemorySection,
   TelegramSection,
@@ -46,6 +47,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna Leanna identité' },
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
+      { id: 'prompts-settings', icon: FileCog, label: 'Prompts (.md)', keywords: 'prompts markdown md fichiers base autonomy safety security persona editer modifier runtime template' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'skills-doc-settings', icon: BookOpen, label: 'Documentation Skills', keywords: 'documentation doc skills outils tools paramètres schéma tester interactif auto-généré' },
@@ -481,6 +483,7 @@ export default function SettingsView() {
                 {activeSection === 'profile-settings' && <ProfileSection />}
                 {activeSection === 'ai-settings' && <AiSection />}
                 {activeSection === 'systemprompt-settings' && <SystemPromptSection />}
+                {activeSection === 'prompts-settings' && <PromptsSection />}
                 {activeSection === 'agents-settings' && <AgentsSection />}
                 {activeSection === 'custom-skills-settings' && <CustomSkillsSection />}
                 {activeSection === 'openrouter-settings' && <OpenRouterSection />}
@@ -513,6 +516,7 @@ function getSectionDescription(id: string): string {
     'profile-settings': 'Personnalisez votre identité pour des échanges adaptés.',
     'ai-settings': 'Configurez le nom et la voix de votre assistant IA.',
     'systemprompt-settings': 'Personnalisez les instructions système de l\'assistant.',
+    'prompts-settings': 'Affichez et modifiez les fichiers Markdown du prompt système (server/runtime/prompts).',
     'agents-settings': 'Activez ou désactivez les agents spécialisés (coder, test, docs, etc.).',
     'custom-skills-settings': 'Créez et gérez vos skills personnalisés stockés en BDD.',
     'openrouter-settings': 'Sélectionnez votre provider et modèle pour les requêtes texte.',

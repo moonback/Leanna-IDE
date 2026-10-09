@@ -13,6 +13,7 @@ export { SafeguardsSection } from './SafeguardsSection.js';
 export { CustomSkillsSection } from './CustomSkillsSection.js';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection.js';
 export { SystemPromptSection } from './SystemPromptSection.js';
+export { PromptsSection } from './PromptsSection.js';
 export { SkillsDocumentationSection } from './SkillsDocumentationSection.js';
 export { HierarchicalMemorySection } from './HierarchicalMemorySection.js';
 export { TelegramSection } from './TelegramSection.js';

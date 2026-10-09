@@ -28,6 +28,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { PromptRegistry } from "../PromptRegistry.js";
 import type { RuleScope } from "./types/rules.js";
+import { listPromptNames, effectivePathFor } from "./promptOverrides.js";
 
 const __dirname_compat = typeof __dirname !== "undefined"
   ? __dirname
@@ -94,19 +95,27 @@ export function loadPromptTemplates(
   registry:   PromptRegistry,
   promptsDir?: string,
 ): number {
+  // Quand aucun dossier explicite n'est fourni, on s'appuie sur la résolution
+  // override-first (union bundle + overrides modifiables). Un `promptsDir`
+  // explicite (tests, cas spéciaux) court-circuite les overrides.
+  const explicit = Boolean(promptsDir);
   const dir = promptsDir ?? __dirname_compat;
   let count = 0;
 
-  if (!fs.existsSync(dir)) {
+  if (explicit && !fs.existsSync(dir)) {
     console.warn(`[PromptLoader] Dossier introuvable: ${dir}`);
     return 0;
   }
 
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
+  const files = explicit
+    ? fs.readdirSync(dir).filter((f) => f.endsWith(".md"))
+    : listPromptNames();
 
   for (const file of files) {
     try {
-      const filePath = path.join(dir, file);
+      const filePath = explicit
+        ? path.join(dir, file)
+        : (effectivePathFor(file) ?? path.join(dir, file));
       const raw      = fs.readFileSync(filePath, "utf-8");
       const id       = file.replace(/\.md$/, "");
       const meta     = parseFrontMatter(raw);
@@ -140,16 +149,21 @@ export function loadPromptTemplates(
  * @returns Map<id, ParsedFrontMatter> pour chaque .md trouvé.
  */
 export function loadPromptMeta(promptsDir?: string): Map<string, ParsedFrontMatter> {
-  const dir    = promptsDir ?? __dirname_compat;
-  const result = new Map<string, ParsedFrontMatter>();
+  const explicit = Boolean(promptsDir);
+  const dir      = promptsDir ?? __dirname_compat;
+  const result   = new Map<string, ParsedFrontMatter>();
 
-  if (!fs.existsSync(dir)) return result;
+  if (explicit && !fs.existsSync(dir)) return result;
 
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
+  const files = explicit
+    ? fs.readdirSync(dir).filter((f) => f.endsWith(".md"))
+    : listPromptNames();
 
   for (const file of files) {
     try {
-      const filePath = path.join(dir, file);
+      const filePath = explicit
+        ? path.join(dir, file)
+        : (effectivePathFor(file) ?? path.join(dir, file));
       const raw      = fs.readFileSync(filePath, "utf-8");
       const id       = file.replace(/\.md$/, "");
       result.set(id, parseFrontMatter(raw));
