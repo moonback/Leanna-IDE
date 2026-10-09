@@ -12,12 +12,62 @@ export function createSelfRootRouter(
    * sont absorbées par l'appelant.
    */
   onWorkspaceConnected?: () => void,
+  /**
+   * Déconnecte les ressources runtime liées au projet courant (sessions Gemini
+   * Live actives, registres browser en attente). Injecté par server.ts qui
+   * détient ces états. Appelé AVANT de basculer vers un autre projet (change)
+   * et lors de la désactivation (clear). Best-effort.
+   */
+  disconnectActiveProject?: () => void,
 ): Router {
   const router = Router();
 
   /** Notifie best-effort que le workspace est connecté (jamais bloquant). */
   const notifyWorkspaceConnected = () => {
     try { onWorkspaceConnected?.(); } catch { /* best-effort */ }
+  };
+
+  /**
+   * Déconnecte proprement l'ANCIEN projet : coupe les serveurs MCP, tue les
+   * terminaux (ancien cwd) et ferme les sessions Live / vide les registres
+   * browser via le callback injecté. À appeler AVANT de basculer vers un autre
+   * projet ou de repasser en mode « aucun projet ». Best-effort, jamais bloquant.
+   */
+  const teardownOldProject = async (): Promise<void> => {
+    // 1. Terminaux : tuer les shells de l'ancien projet (ancien cwd).
+    try {
+      const { closeAllTerminals } = await import('./terminal.js');
+      closeAllTerminals();
+    } catch (e: any) {
+      console.warn('[SelfRoot] Fermeture des terminaux échouée:', e?.message ?? e);
+    }
+
+    // 2. Sessions Live + registres browser (détenus par server.ts).
+    try { disconnectActiveProject?.(); } catch (e: any) {
+      console.warn('[SelfRoot] Déconnexion des sessions actives échouée:', e?.message ?? e);
+    }
+
+    // 3. MCP : couper les serveurs de l'ancien projet.
+    try {
+      const { mcpBridge } = await import('../mcp/index.js');
+      await mcpBridge.shutdown();
+    } catch (e: any) {
+      console.warn('[SelfRoot] Arrêt du bridge MCP échoué:', e?.message ?? e);
+    }
+  };
+
+  /**
+   * Reconnecte le bridge MCP pour le projet ACTIF courant (lit le mcp.json du
+   * nouveau projet, spawn les serveurs avec le bon cwd). À appeler APRÈS que
+   * SELF_ROOT a été basculé vers le nouveau projet. Best-effort.
+   */
+  const reconnectMcpForActiveProject = async (): Promise<void> => {
+    try {
+      const { mcpBridge } = await import('../mcp/index.js');
+      await mcpBridge.initialize();
+    } catch (e: any) {
+      console.warn('[SelfRoot] Reconnexion du bridge MCP échouée:', e?.message ?? e);
+    }
   };
 
   // GET /api/self-root/status
@@ -211,12 +261,21 @@ export function createSelfRootRouter(
       }
       if (!approved) return res.status(403).json({ error: 'Changement refusé par l\'utilisateur.' });
 
+      // Déconnecter l'ANCIEN projet avant toute bascule : serveurs MCP,
+      // terminaux (ancien cwd) et sessions Live. Sans cela, l'ancien projet
+      // resterait « connecté » (processus vivants) en parallèle du nouveau.
+      await teardownOldProject();
+
       const { switchSandboxProject } = await import('../utils/sandbox.js');
 
       // La transition verrouille synchroniquement les écritures, recopie le
       // sandbox, redémarre le watcher, puis seulement publie l'état READY.
       const newRoot = await switchSandboxProject(newPath.trim());
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
+
+      // Reconnecter MCP pour le NOUVEAU projet (lit <newRoot>/.Leanna/mcp.json
+      // et spawn les serveurs avec le bon cwd).
+      await reconnectMcpForActiveProject();
 
       // Persister l'URL du site et nom si fournis
       const { setWorkspaceSiteUrl, addOrUpdateWorkspace } = await import('../utils/selfRoot.js');
@@ -247,6 +306,10 @@ export function createSelfRootRouter(
   // POST /api/self-root/clear — effacer le projet persisté (pour re-sélection)
   router.post('/clear', async (_req: Request, res: Response) => {
     try {
+      // Déconnecter l'ancien projet (MCP, terminaux, sessions Live) avant de
+      // repasser en mode « aucun projet » : aucun processus ne doit survivre.
+      await teardownOldProject();
+
       const { resetSelfRoot } = await import('../utils/selfRoot.js');
       resetSelfRoot();
       // Désactiver le sandbox
@@ -310,11 +373,17 @@ export function createSelfRootRouter(
         );
       }
 
+      // Déconnecter l'ancien projet avant la bascule (MCP, terminaux, sessions).
+      await teardownOldProject();
+
       // Activer le nouveau projet (même flux que /change)
       const { switchSandboxProject } = await import('../utils/sandbox.js');
 
       const newRoot = await switchSandboxProject(finalPath);
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
+
+      // Reconnecter MCP pour le nouveau projet.
+      await reconnectMcpForActiveProject();
 
       // Persister l'URL du site si fournie
       if (siteUrl !== undefined) {
@@ -492,10 +561,16 @@ export function createSelfRootRouter(
           sendLog(`🔌 Activation du workspace…`);
 
           try {
+            // Déconnecter l'ancien projet avant la bascule.
+            await teardownOldProject();
+
             const { switchSandboxProject } = await import('../utils/sandbox.js');
 
             const newRoot = await switchSandboxProject(projectPath);
             sendLog(`📦 Sandbox READY: ${newRoot}`);
+
+            // Reconnecter MCP pour le nouveau projet.
+            await reconnectMcpForActiveProject();
 
             try {
               const { activateProjectKnowledge } = await import('../knowledge/activateProject.js');
@@ -681,9 +756,15 @@ export function createSelfRootRouter(
           sendLog(`🔌 Activation du workspace…`);
 
           try {
+            // Déconnecter l'ancien projet avant la bascule.
+            await teardownOldProject();
+
             const { switchSandboxProject } = await import('../utils/sandbox.js');
             const newRoot = await switchSandboxProject(clonePath);
             sendLog(`📦 Sandbox READY: ${newRoot}`);
+
+            // Reconnecter MCP pour le nouveau projet.
+            await reconnectMcpForActiveProject();
 
             const { addOrUpdateWorkspace } = await import('../utils/selfRoot.js');
             addOrUpdateWorkspace(newRoot, undefined, repoName);

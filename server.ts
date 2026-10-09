@@ -703,6 +703,25 @@ async function startServer() {
       .resumePending(skillNames)
       .then((n: number) => { if (n > 0) console.log(`[SelfRoot] ⏸️ ${n} mission(s) interrompue(s) en attente de décision.`); })
       .catch((e: unknown) => console.warn(`[SelfRoot] ⚠️ Détection des missions interrompues échouée:`, e));
+  }, () => {
+    // Déconnexion runtime de l'ancien projet lors d'un changement/clear de
+    // racine : fermer les sessions Gemini Live actives et purger les registres
+    // d'actions browser en attente (sinon ils restent liés à l'ancien projet).
+    try {
+      for (const s of activeGeminiSessions) {
+        try { s.close(); } catch { /* déjà fermée */ }
+      }
+      activeGeminiSessions.clear();
+    } catch { /* best-effort */ }
+    const rejectPending = (map: Map<string, { reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>) => {
+      for (const [, entry] of map) {
+        try { clearTimeout(entry.timer); } catch { /* ignore */ }
+        try { entry.reject(new Error('Projet changé — action annulée.')); } catch { /* ignore */ }
+      }
+      map.clear();
+    };
+    try { rejectPending(browserReadPending); } catch { /* best-effort */ }
+    try { rejectPending(browserActionPending); } catch { /* best-effort */ }
   }));
   app.use("/api/safeguards", safeguardsRouter);
 

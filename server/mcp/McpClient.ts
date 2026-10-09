@@ -298,12 +298,22 @@ export class McpClient extends EventEmitter {
       useShell = true;
     }
 
+    // cwd = racine du projet actif (SELF_ROOT) si disponible, sinon cwd du
+    // process. Sans cela, les serveurs MCP héritent du cwd du serveur Leanna et
+    // travaillent sur le mauvais répertoire après un changement de projet.
+    let projectCwd: string | undefined;
+    try {
+      const { SELF_ROOT } = await import('../utils/selfRoot.js');
+      projectCwd = SELF_ROOT || undefined;
+    } catch { /* selfRoot indisponible (tests) : fallback cwd process */ }
+
     const spawnOptions: import('child_process').SpawnOptions = {
       env: mergedEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       // shell:true uniquement pour les wrappers .cmd Windows (args déjà quotés).
       shell: useShell,
+      ...(projectCwd ? { cwd: projectCwd } : {}),
     };
 
     this.process = spawn(finalCommand, finalArgs, spawnOptions);

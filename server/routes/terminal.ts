@@ -272,5 +272,29 @@ export function setupTerminalWebSocket(wss: WebSocketServer, apiToken: string | 
   });
 }
 
+/**
+ * Ferme TOUS les terminaux actifs : tue les processus shell et clôt les
+ * WebSockets associés. Appelé lors d'un changement de projet racine pour que
+ * les shells de l'ancien projet (qui gardent l'ancien cwd) ne survivent pas.
+ * Best-effort : les erreurs individuelles sont absorbées.
+ */
+export function closeAllTerminals(): void {
+  const count = terminalProcesses.size;
+  for (const [ws, proc] of terminalProcesses.entries()) {
+    try { proc.stdin?.end(); } catch { /* ignore */ }
+    try { proc.kill(); } catch { /* ignore */ }
+    try {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'close', code: 0, reason: 'workspace-changed' }));
+        ws.close(1000, 'workspace-changed');
+      }
+    } catch { /* ignore */ }
+  }
+  terminalProcesses.clear();
+  if (count > 0) {
+    console.log(`[Terminal] ${count} terminal(aux) fermé(s) suite au changement de projet.`);
+  }
+}
+
 // Exporter les fonctions
 export { terminalProcesses, getDefaultShell };
