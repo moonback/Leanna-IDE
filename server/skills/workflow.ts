@@ -17,6 +17,12 @@ export interface WorkflowStep {
   onError?: "stop" | "skip" | "retry";
   /** Nombre max de retries si onError = 'retry' */
   maxRetries?: number;
+  /**
+   * Durée maximale d'exécution de l'étape en ms. Au-delà, la tentative est
+   * considérée comme échouée (puis retry/skip/stop selon onError).
+   * Par défaut: aucun timeout (l'action s'exécute jusqu'à son terme).
+   */
+  timeoutMs?: number;
 }
 
 export interface WorkflowDefinition {
@@ -88,6 +94,8 @@ const workflowStepSchema = z.object({
   condition: z.string().optional(),
   onError: z.enum(["stop", "skip", "retry"]).optional().default("stop"),
   maxRetries: z.number().int().min(0).max(5).optional().default(2),
+  // Plafond raisonnable (1h) pour éviter qu'une étape bloque indéfiniment un run planifié.
+  timeoutMs: z.number().int().min(1_000).max(3_600_000).optional(),
 });
 
 export const createWorkflowSchema = z.object({
@@ -497,6 +505,27 @@ function evaluateCondition(
 
 // ─── Workflow execution engine ────────────────────────────────────────────────
 
+/**
+ * Exécute une promesse avec un timeout optionnel. Si `timeoutMs` est fourni et
+ * dépassé, la promesse de résultat est rejetée avec une erreur explicite.
+ * Note : l'action sous-jacente n'est pas annulée (pas d'AbortController côté
+ * skills), mais son résultat est ignoré et l'étape est marquée en échec.
+ */
+function withStepTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) return promise;
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Étape dépassée après ${timeoutMs}ms (timeout)`)),
+      timeoutMs,
+    );
+    if (typeof timer.unref === "function") timer.unref();
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 /** Référence au handleToolCall du SkillManager, injectée au démarrage */
 let skillHandler: ((name: string, args: any) => Promise<any>) | null = null;
 
@@ -582,8 +611,8 @@ export async function executeWorkflow(workflow: WorkflowDefinition): Promise<Wor
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        console.log(`[Workflow]   ▷ Étape "${step.id}" → ${step.action}${attempt > 0 ? ` (retry ${attempt})` : ""}`);
-        result = await skillHandler(step.action, resolvedArgs);
+        console.log(`[Workflow]   ▷ Étape "${step.id}" → ${step.action}${attempt > 0 ? ` (retry ${attempt})` : ""}${step.timeoutMs ? ` [timeout ${step.timeoutMs}ms]` : ""}`);
+        result = await withStepTimeout(skillHandler(step.action, resolvedArgs), step.timeoutMs);
 
         // Vérifier si le skill a retourné une erreur
         if (result && typeof result === "object" && result.error) {
@@ -683,6 +712,7 @@ export async function createWorkflow(input: z.input<typeof createWorkflowSchema>
       condition: s.condition,
       onError: s.onError || "stop",
       maxRetries: s.maxRetries,
+      timeoutMs: s.timeoutMs,
     })),
     schedule: parsedInput.schedule,
     enabled: true,

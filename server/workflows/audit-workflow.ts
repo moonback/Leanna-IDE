@@ -20,7 +20,7 @@ export const AUDIT_WORKFLOW_DEFINITION = {
   name: AUDIT_WORKFLOW_NAME,
   description:
     "Audit automatique complet : vérifie l'état Git, génère le codebase.md, vérifie la compilation TypeScript, " +
-    "exécute les tests, scanne les pistes d'amélioration, vérifie les propositions en attente, " +
+    "exécute les tests, lance un audit de sécurité (SAST + dépendances), recense les missions en cours, " +
     "et sauvegarde un rapport détaillé en mémoire. S'exécute toutes les 24h.",
   schedule: "24h",
   steps: [
@@ -60,18 +60,20 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       maxRetries: 0,
     },
     {
-      id: "scan-improvements",
-      action: "scan_for_improvements",
-      args: { maxResults: 10 },
-      label: "Scan des pistes d'amélioration (TODO/FIXME, tests manquants, fichiers volumineux)",
+      id: "security-audit",
+      action: "security_audit",
+      args: {},
+      label: "Audit de sécurité en lecture seule (SAST, secrets, dépendances npm)",
       onError: "skip" as const,
       maxRetries: 0,
+      // Scan SAST + audit npm sur l'ensemble du projet : peut dépasser 60s.
+      timeoutMs: 300_000,
     },
     {
-      id: "check-proposals",
-      action: "list_evolution_proposals",
-      args: { status: "pending" },
-      label: "Vérification des propositions d'évolution en attente",
+      id: "check-missions",
+      action: "mission_list",
+      args: {},
+      label: "Liste des missions actives et récemment terminées",
       onError: "skip" as const,
       maxRetries: 0,
     },
@@ -93,8 +95,8 @@ export const AUDIT_WORKFLOW_DEFINITION = {
           "Codebase.md: {{steps.generate-codebase.status}} | " +
           "TypeCheck: {{steps.typecheck.status}} ({{steps.typecheck.result.message}}) | " +
           "Tests: {{steps.run-tests.status}} | " +
-          "Scan: {{steps.scan-improvements.status}} ({{steps.scan-improvements.result.count}} pistes) | " +
-          "Propositions pending: {{steps.check-proposals.result.count}} | " +
+          "Sécurité: {{steps.security-audit.status}} ({{steps.security-audit.result.summary.total}} alertes, {{steps.security-audit.result.summary.critical}} critiques) | " +
+          "Missions: {{steps.check-missions.result.total}} suivies | " +
           "Derniers commits: {{steps.git-log-recent.status}}",
       },
       label: "Sauvegarde du rapport d'audit complet en mémoire",
