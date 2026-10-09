@@ -8,6 +8,8 @@ import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 import { useOrbState } from '../hooks/useOrbState.js';
 import { useScreenShare } from '../context/ScreenShareContext.js';
 import { useProfile } from '../context/UserProfileContext.js';
+import { useAgentStatus } from '../hooks/useAgentStatus.js';
+import { AgentVisualizer } from '../components/agents/AgentVisualizer.js';
 import {
   initActivityStore, destroyActivityStore, subscribe,
   getAgentTasks, getToolActivities,
@@ -41,6 +43,7 @@ export default function OrbLiveView() {
   const reduceMotion = useReducedMotion() ?? false;
   const { profile } = useProfile();
   const orb = useOrbState();
+  const agent = useAgentStatus();
   const { status, connect, disconnect, muted, toggleMute, sendTextMessage } = useLiveAPIContext();
   const { isSharing, toggleScreenShare } = useScreenShare();
 
@@ -191,6 +194,15 @@ export default function OrbLiveView() {
 
         {/* Scène centrale */}
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 px-6 py-6">
+          {/* Personnage pixel-art de l'agent — reflète l'état d'exécution réel
+              (IDLE/THINKING/EDITING/SEARCHING/WAITING) via le canal autonomy. */}
+          <div className="flex flex-col items-center gap-1.5">
+            <AgentVisualizer visualState={agent.visualState} size={96} label={agent.reason} />
+            <span className="text-[11px] font-medium uppercase tracking-[0.15em]" style={{ color: 'var(--text-dimmed)' }}>
+              {agent.label}
+            </span>
+          </div>
+
           <Orb amp={orb.amp} accentColor={orb.accentColor} status={orb.status} muted={muted} onClick={handleToggleConnection} reduceMotion={reduceMotion} />
 
           <div className="flex flex-col items-center gap-2.5">
