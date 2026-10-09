@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ObservabilityView — Cost & Token Dashboard
  *
  * Affiche :
@@ -6,366 +6,23 @@
  * - Consommation par modèle (tableau + barres)
  * - Consommation par agent/rôle
  * - Top missions par coût
+ * - Santé & fiabilité : métriques runtime réelles (latence, taux de succès)
  * - Budget guardrails : configuration et statut
  * - Historique des 100 derniers appels modèle
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   BarChart2, RefreshCw, DollarSign, Cpu, Zap,
-  AlertTriangle, CheckCircle2, Clock, TrendingUp,
-  Shield, Trash2, Plus, Info,
+  Clock, TrendingUp, Shield, Info, Activity, Database,
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useToast } from '../components/ui/Toast.js';
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface DashboardOverview {
-  totalTokens: number;
-  totalCost: number;
-  totalCalls: number;
-}
-
-interface ModelStat {
-  model: string;
-  tokens: number;
-  cost: number;
-  calls: number;
-  avgTokensPerCall: number;
-  avgCostPerCall: number;
-}
-
-interface AgentStat {
-  role: string;
-  tokens: number;
-  cost: number;
-  calls: number;
-}
-
-interface MissionStat {
-  missionId: string;
-  tokens: number;
-  cost: number;
-}
-
-interface Dashboard {
-  overview: DashboardOverview;
-  byModel: ModelStat[];
-  byAgent: AgentStat[];
-  byMission: MissionStat[];
-}
-
-interface UsageRecord {
-  id: string;
-  missionId?: string;
-  taskId?: string;
-  agentRole?: string;
-  provider: 'gemini' | 'openrouter';
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  costUsd: number;
-  timestamp: string;
-}
-
-interface BudgetConfig {
-  maxTokens?: number;
-  maxCostUsd?: number;
-}
-
-interface BudgetStatus {
-  tokensUsed: number;
-  costUsd: number;
-  exceeded: boolean;
-  reason?: string;
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function fmt(n: number, decimals = 0): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toFixed(decimals);
-}
-
-function fmtCost(usd: number): string {
-  if (usd < 0.001) return `< $0.001`;
-  if (usd < 1) return `$${usd.toFixed(4)}`;
-  return `$${usd.toFixed(2)}`;
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}j`;
-}
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  accent = false,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className="flex flex-col gap-1 rounded-xl border p-4"
-      style={{
-        backgroundColor: 'var(--bg-panel)',
-        borderColor: accent ? 'var(--accent-secondary)' : 'var(--border-base)',
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-md"
-          style={{ backgroundColor: 'var(--accent-subtle)' }}
-        >
-          <Icon className="h-3.5 w-3.5" style={{ color: 'var(--accent-secondary)' }} />
-        </div>
-        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-          {label}
-        </span>
-      </div>
-      <span className="text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        {value}
-      </span>
-      {sub && (
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {sub}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function BarRow({
-  label,
-  tokens,
-  cost,
-  calls,
-  maxCost,
-}: {
-  label: string;
-  tokens: number;
-  cost: number;
-  calls: number;
-  maxCost: number;
-}) {
-  const pct = maxCost > 0 ? Math.round((cost / maxCost) * 100) : 0;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-mono truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }}>
-          {label}
-        </span>
-        <div className="flex items-center gap-3 shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
-          <span>{fmt(tokens)} tokens</span>
-          <span className="font-medium" style={{ color: 'var(--accent-secondary)' }}>
-            {fmtCost(cost)}
-          </span>
-          <span>{calls} appels</span>
-        </div>
-      </div>
-      <div
-        className="h-1.5 w-full rounded-full overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-secondary)' }}
-      >
-        <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: 'var(--accent-secondary)' }}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function BudgetPanel() {
-  const { success: toastSuccess, error: toastError } = useToast();
-  const [missionId, setMissionId] = useState('');
-  const [maxTokens, setMaxTokens] = useState('');
-  const [maxCostUsd, setMaxCostUsd] = useState('');
-  const [checking, setChecking] = useState('');
-  const [status, setStatus] = useState<{ missionId: string; budget: BudgetStatus } | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const handleSetBudget = useCallback(async () => {
-    if (!missionId.trim()) return;
-    const body: BudgetConfig = {};
-    if (maxTokens) body.maxTokens = parseInt(maxTokens, 10);
-    if (maxCostUsd) body.maxCostUsd = parseFloat(maxCostUsd);
-    if (!body.maxTokens && !body.maxCostUsd) {
-      toastError('Fournissez au moins une limite (tokens ou coût).');
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/observability/budget/${missionId.trim()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toastSuccess('Budget configuré avec succès.');
-        setMissionId('');
-        setMaxTokens('');
-        setMaxCostUsd('');
-      } else {
-        toastError(data.error || 'Erreur lors de la configuration du budget.');
-      }
-    } catch {
-      toastError('Erreur réseau.');
-    } finally {
-      setSaving(false);
-    }
-  }, [missionId, maxTokens, maxCostUsd, toastSuccess, toastError]);
-
-  const handleCheck = useCallback(async () => {
-    if (!checking.trim()) return;
-    try {
-      const res = await fetch(`/api/observability/budget/${checking.trim()}`);
-      const data = await res.json();
-      if (data.success) setStatus(data);
-      else toastError(data.error || 'Mission introuvable.');
-    } catch {
-      toastError('Erreur réseau.');
-    }
-  }, [checking, toastError]);
-
-  const handleClear = useCallback(async (mid: string) => {
-    try {
-      await fetch(`/api/observability/budget/${mid}`, { method: 'DELETE' });
-      setStatus(null);
-      toastSuccess('Budget supprimé.');
-    } catch {
-      toastError('Erreur réseau.');
-    }
-  }, [toastSuccess, toastError]);
-
-  return (
-    <div className="rounded-xl border p-4 flex flex-col gap-4" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
-      <div className="flex items-center gap-2">
-        <Shield className="h-4 w-4" style={{ color: 'var(--accent-secondary)' }} />
-        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Budget Guardrails</span>
-        <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)' }}>
-          Arrêt automatique au dépassement
-        </span>
-      </div>
-
-      {/* Configurer un budget */}
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Configurer un plafond de mission</span>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input
-            value={missionId}
-            onChange={e => setMissionId(e.target.value)}
-            placeholder="ID de mission"
-            className="rounded-lg border px-3 py-1.5 text-xs"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          />
-          <input
-            value={maxTokens}
-            onChange={e => setMaxTokens(e.target.value)}
-            placeholder="Max tokens (ex: 100000)"
-            type="number"
-            className="rounded-lg border px-3 py-1.5 text-xs"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          />
-          <input
-            value={maxCostUsd}
-            onChange={e => setMaxCostUsd(e.target.value)}
-            placeholder="Max coût USD (ex: 1.50)"
-            type="number"
-            step="0.01"
-            className="rounded-lg border px-3 py-1.5 text-xs"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          />
-        </div>
-        <button
-          onClick={handleSetBudget}
-          disabled={saving || !missionId.trim()}
-          className="self-start flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity disabled:opacity-50"
-          style={{ backgroundColor: 'var(--accent-secondary)', color: 'var(--bg-base)' }}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {saving ? 'Enregistrement…' : 'Appliquer le budget'}
-        </button>
-      </div>
-
-      {/* Vérifier un budget */}
-      <div className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: 'var(--border-base)' }}>
-        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Vérifier le statut d'un budget</span>
-        <div className="flex gap-2">
-          <input
-            value={checking}
-            onChange={e => setChecking(e.target.value)}
-            placeholder="ID de mission"
-            className="flex-1 rounded-lg border px-3 py-1.5 text-xs"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          />
-          <button
-            onClick={handleCheck}
-            disabled={!checking.trim()}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity disabled:opacity-50"
-            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-base)' }}
-          >
-            Vérifier
-          </button>
-        </div>
-
-        {status && (
-          <div
-            className="rounded-lg border p-3 flex flex-col gap-1.5"
-            style={{
-              borderColor: status.budget.exceeded ? 'var(--color-red-500, #ef4444)' : 'var(--border-base)',
-              backgroundColor: status.budget.exceeded ? 'rgba(239,68,68,0.07)' : 'var(--bg-secondary)',
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                {status.budget.exceeded
-                  ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                  : <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
-                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                  Mission: {status.missionId.slice(0, 12)}…
-                </span>
-              </div>
-              <button onClick={() => handleClear(status.missionId)} title="Supprimer le budget">
-                <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-              </button>
-            </div>
-            <div className="text-xs grid grid-cols-2 gap-1" style={{ color: 'var(--text-muted)' }}>
-              <span>Tokens consommés : <strong style={{ color: 'var(--text-primary)' }}>{fmt(status.budget.tokensUsed)}</strong></span>
-              <span>Coût : <strong style={{ color: 'var(--accent-secondary)' }}>{fmtCost(status.budget.costUsd)}</strong></span>
-            </div>
-            {status.budget.exceeded && status.budget.reason && (
-              <span className="text-xs text-red-400">{status.budget.reason}</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import type { Dashboard, UsageRecord, RuntimeSnapshot, HealthInfo } from '../components/observability/types.js';
+import { fmt, fmtCost, timeAgo } from '../components/observability/format.js';
+import { StatCard, BarRow } from '../components/observability/cards.js';
+import { RuntimeHealthPanel } from '../components/observability/RuntimeHealthPanel.js';
+import { BudgetPanel } from '../components/observability/BudgetPanel.js';
 
 // ─── Main View ───────────────────────────────────────────────────────────────
 
@@ -373,16 +30,20 @@ export default function ObservabilityView() {
   const { error: toastError } = useToast();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [records, setRecords] = useState<UsageRecord[]>([]);
+  const [runtime, setRuntime] = useState<{ available: boolean; snapshot: RuntimeSnapshot | null }>({ available: false, snapshot: null });
+  const [health, setHealth] = useState<HealthInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'usage' | 'budget'>('overview');
+  const [tab, setTab] = useState<'overview' | 'health' | 'usage' | 'budget'>('overview');
   const [period, setPeriod] = useState<'day' | 'hour'>('day');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const [dashRes, usageRes] = await Promise.all([
-        fetch('/api/observability/dashboard'),
+      const [dashRes, usageRes, runtimeRes, healthRes] = await Promise.all([
+        fetch(`/api/observability/dashboard?period=${period}`),
         fetch('/api/observability/usage?limit=100'),
+        fetch('/api/observability/runtime'),
+        fetch('/api/observability/health'),
       ]);
       if (dashRes.ok) {
         const data = await dashRes.json();
@@ -392,12 +53,20 @@ export default function ObservabilityView() {
         const data = await usageRes.json();
         if (data.success) setRecords(data.records.reverse());
       }
+      if (runtimeRes.ok) {
+        const data = await runtimeRes.json();
+        if (data.success) setRuntime({ available: !!data.available, snapshot: data.snapshot ?? null });
+      }
+      if (healthRes.ok) {
+        const data = await healthRes.json();
+        if (data.success) setHealth({ status: data.status, telemetry: data.telemetry });
+      }
     } catch {
       toastError('Impossible de charger les données d\'observabilité.');
     } finally {
       setLoading(false);
     }
-  }, [toastError]);
+  }, [toastError, period]);
 
   useEffect(() => {
     fetchDashboard();
@@ -417,6 +86,20 @@ export default function ObservabilityView() {
         badge="V1.1"
         actions={
           <div className="flex items-center gap-2">
+            {/* Statut de persistance Supabase (depuis /health) */}
+            {health && (
+              <span
+                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                title={health.telemetry.supabaseConnected ? 'Télémétrie persistée dans Supabase' : 'Supabase non configuré : télémétrie en mémoire uniquement'}
+              >
+                <Database
+                  className="h-3.5 w-3.5"
+                  style={{ color: health.telemetry.supabaseConnected ? 'var(--color-success)' : 'var(--text-dimmed)' }}
+                />
+                {health.telemetry.supabaseConnected ? 'Supabase' : 'En mémoire'}
+              </span>
+            )}
             {/* Period toggle */}
             <div className="flex rounded-lg overflow-hidden border text-xs" style={{ borderColor: 'var(--border-base)' }}>
               {(['day', 'hour'] as const).map(p => (
@@ -452,6 +135,7 @@ export default function ObservabilityView() {
       >
         {([
           { key: 'overview', label: 'Vue d\'ensemble', icon: TrendingUp },
+          { key: 'health', label: 'Santé & Fiabilité', icon: Activity },
           { key: 'usage', label: 'Historique', icon: Clock },
           { key: 'budget', label: 'Budget Guardrails', icon: Shield },
         ] as const).map(({ key, label, icon: Icon }) => (
@@ -487,20 +171,24 @@ export default function ObservabilityView() {
                 icon={Zap}
                 label="Tokens totaux"
                 value={fmt(dashboard?.overview.totalTokens ?? 0)}
-                sub={`${period === 'day' ? 'dernières 24h' : 'dernière heure'}`}
+                sub={period === 'day' ? 'dernières 24h' : 'dernière heure'}
               />
               <StatCard
                 icon={DollarSign}
                 label="Coût total"
                 value={fmtCost(dashboard?.overview.totalCost ?? 0)}
                 accent
-                sub="USD"
+                sub={dashboard?.overview.avgCostPerCall
+                  ? `${fmtCost(dashboard.overview.avgCostPerCall)} / appel`
+                  : 'USD'}
               />
               <StatCard
                 icon={Cpu}
                 label="Appels LLM"
                 value={fmt(dashboard?.overview.totalCalls ?? 0)}
-                sub="model calls"
+                sub={dashboard?.overview.avgTokensPerCall
+                  ? `${fmt(dashboard.overview.avgTokensPerCall)} tokens / appel`
+                  : 'model calls'}
               />
             </div>
 
@@ -606,6 +294,11 @@ export default function ObservabilityView() {
               </div>
             ) : null}
           </>
+        )}
+
+        {/* Santé & fiabilité tab (métriques runtime réelles) */}
+        {!loading && tab === 'health' && (
+          <RuntimeHealthPanel snapshot={runtime.snapshot} available={runtime.available} />
         )}
 
         {/* Usage history tab */}

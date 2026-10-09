@@ -675,7 +675,11 @@ async function startServer() {
   app.use("/api/v2/metrics", createMetricsRouter(runtimeV2, leannaCore));
 
   // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
-  const observabilityRouter = (await import("./server/routes/observability.js")).default;
+  const observabilityModule = await import("./server/routes/observability.js");
+  const observabilityRouter = observabilityModule.default;
+  // Injecte le snapshot runtime (latence, fiabilité, mémoire) pour l'endpoint
+  // /api/observability/runtime, sans coupler le routeur au bootstrap.
+  observabilityModule.setRuntimeSnapshotProvider(() => observability.getSnapshot());
   app.use("/api/observability", observabilityRouter);
 
   app.use("/api", createProfileRouter(() => currentProfile, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile, getWorkspaceRoot, updateEnvFile));

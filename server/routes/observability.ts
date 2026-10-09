@@ -12,9 +12,25 @@
 
 import { Router, type Request, type Response } from 'express';
 import { telemetryService } from '../observability/TelemetryService.js';
+import type { PerformanceSnapshot } from '../runtime/Observability.js';
 import { z } from 'zod';
 
 const router = Router();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Runtime snapshot provider (injecté depuis server.ts)
+//
+// Le routeur n'a pas de référence directe à l'instance Observability du runtime
+// (créée au bootstrap). On l'injecte via ce setter pour exposer les métriques
+// runtime réelles (latence, fiabilité, mémoire) sans coupler le routeur au
+// cycle de vie du serveur.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let runtimeSnapshotProvider: (() => PerformanceSnapshot) | null = null;
+
+export function setRuntimeSnapshotProvider(provider: () => PerformanceSnapshot): void {
+  runtimeSnapshotProvider = provider;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Validation Schemas
@@ -40,16 +56,23 @@ const setBudgetSchema = z.object({
  * GET /api/observability/dashboard
  * Returns aggregated statistics for the dashboard.
  */
-router.get('/dashboard', (_req: Request, res: Response) => {
+router.get('/dashboard', (req: Request, res: Response) => {
   try {
-    const stats = telemetryService.getAggregatedStats('day');
-    
+    // Honore le paramètre de période choisi dans l'UI (24h / 1h). Auparavant
+    // figé sur 'day', ce qui rendait le sélecteur du front sans effet.
+    const period = req.query.period === 'hour' ? 'hour' : 'day';
+    const stats = telemetryService.getAggregatedStats(period);
+    const totalCalls = Object.values(stats.byModel).reduce((sum, m) => sum + m.calls, 0);
+
     // Transform to dashboard-friendly format
     const dashboard = {
+      period,
       overview: {
         totalTokens: stats.totalTokens,
         totalCost: stats.totalCost,
-        totalCalls: Object.values(stats.byModel).reduce((sum, m) => sum + m.calls, 0),
+        totalCalls,
+        avgCostPerCall: totalCalls > 0 ? stats.totalCost / totalCalls : 0,
+        avgTokensPerCall: totalCalls > 0 ? Math.round(stats.totalTokens / totalCalls) : 0,
       },
       byModel: Object.entries(stats.byModel)
         .map(([model, data]) => ({
@@ -87,6 +110,33 @@ router.get('/dashboard', (_req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch dashboard data',
+      details: (error as Error).message,
+    });
+  }
+});
+
+/**
+ * GET /api/observability/runtime
+ * Returns the live runtime performance snapshot (latency percentiles, task
+ * reliability, tool failure rate, memory, uptime, active agents).
+ *
+ * Ces métriques proviennent de l'instance Observability branchée sur l'EventBus
+ * du runtime. Si le provider n'est pas injecté (runtime non démarré), on renvoie
+ * `available: false` plutôt que des valeurs factices.
+ */
+router.get('/runtime', (_req: Request, res: Response) => {
+  try {
+    if (!runtimeSnapshotProvider) {
+      res.json({ success: true, available: false, snapshot: null });
+      return;
+    }
+    const snapshot = runtimeSnapshotProvider();
+    res.json({ success: true, available: true, snapshot });
+  } catch (error) {
+    console.error('[ObservabilityRouter] Runtime snapshot error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch runtime snapshot',
       details: (error as Error).message,
     });
   }

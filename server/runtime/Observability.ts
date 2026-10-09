@@ -38,6 +38,12 @@ export interface PerformanceSnapshot {
     totalCalls: number;
     avgLatencyMs: number;
     failureRate: number;
+    /** Percentiles réels calculés sur l'échantillon de latences conservé. */
+    p50LatencyMs: number;
+    p95LatencyMs: number;
+    p99LatencyMs: number;
+    /** Taille de l'échantillon ayant servi aux percentiles (transparence). */
+    latencySampleSize: number;
   };
   agents: {
     active: number;
@@ -134,6 +140,10 @@ export class Observability {
         failureRate: this.totalToolCalls > 0
           ? Math.round((this.toolFailures / this.totalToolCalls) * 100) / 100
           : 0,
+        p50LatencyMs: this.percentile(this.toolLatencies, 50),
+        p95LatencyMs: this.percentile(this.toolLatencies, 95),
+        p99LatencyMs: this.percentile(this.toolLatencies, 99),
+        latencySampleSize: this.toolLatencies.length,
       },
       agents: {
         active: this.agentMetrics.size,
@@ -209,5 +219,20 @@ export class Observability {
     if (arr.length > Observability.MAX_SAMPLES) {
       arr.splice(0, Math.floor(Observability.MAX_SAMPLES / 2));
     }
+  }
+
+  /**
+   * Percentile (interpolation linéaire) calculé sur l'échantillon fourni.
+   * Retourne 0 si l'échantillon est vide — jamais une valeur inventée.
+   */
+  private percentile(samples: number[], p: number): number {
+    if (samples.length === 0) return 0;
+    const sorted = [...samples].sort((a, b) => a - b);
+    if (sorted.length === 1) return Math.round(sorted[0]);
+    const rank = (p / 100) * (sorted.length - 1);
+    const lo = Math.floor(rank);
+    const hi = Math.ceil(rank);
+    const frac = rank - lo;
+    return Math.round(sorted[lo] + (sorted[hi] - sorted[lo]) * frac);
   }
 }
