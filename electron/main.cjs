@@ -442,6 +442,72 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
+  // ── Fenêtre dédiée « Présence vocale » (orb + live) ────────────────────────
+  // Ouvre une vraie fenêtre Electron sur la route /orb-live. Session live
+  // indépendante (process renderer distinct). Fenêtre unique : si elle existe
+  // déjà, on la ramène au premier plan au lieu d'en créer une seconde.
+  let orbWindow = null;
+  ipcMain.handle('electron/open-orb-window', function () {
+    if (orbWindow && !orbWindow.isDestroyed()) {
+      if (orbWindow.isMinimized()) orbWindow.restore();
+      orbWindow.focus();
+      return true;
+    }
+
+    orbWindow = new BrowserWindow({
+      width: 440,
+      height: 760,
+      minWidth: 360,
+      minHeight: 520,
+      show: false,
+      title: 'Leanna — Présence vocale',
+      backgroundColor: '#09090b',
+      autoHideMenuBar: true,
+      icon: getWindowIcon(),
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+        preload: path.join(__dirname, 'preload.cjs'),
+      },
+    });
+
+    const port = process.env.VITE_SERVER_PORT || 4000;
+    const base = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
+    orbWindow.loadURL(`${base}/orb-live`);
+
+    orbWindow.webContents.on('did-finish-load', () => {
+      if (orbWindow && !orbWindow.isDestroyed()) orbWindow.show();
+    });
+    orbWindow.on('closed', () => { orbWindow = null; });
+
+    return true;
+  });
+
+  // ── Pont inter-fenêtres : relaie une action depuis la fenêtre orb vers l'IDE ──
+  // La fenêtre orb a sa propre session live ; quand l'assistant y déclenche une
+  // action IDE (ouvrir un fichier, naviguer, piloter le navigateur…), on la
+  // transmet à la fenêtre principale qui la rejoue localement.
+  //   payload: { name: string, detail?: any, focusIde?: boolean }
+  ipcMain.handle('electron/forward-to-ide', function (_event, payload) {
+    try {
+      if (!win || win.isDestroyed()) return false;
+      const name = payload && typeof payload.name === 'string' ? payload.name : null;
+      if (!name) return false;
+      win.webContents.send('leanna-remote-event', { name, detail: payload.detail ?? null });
+      // Les actions qui ouvrent du contenu dans l'IDE méritent de ramener la
+      // fenêtre principale au premier plan.
+      if (payload && payload.focusIde) {
+        if (win.isMinimized()) win.restore();
+        if (!win.isVisible()) win.show();
+        win.focus();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  });
+
   ipcMain.handle('electron/quit', function () {
     app.isQuitting = true;
     app.quit();

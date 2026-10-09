@@ -29,7 +29,7 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput,
+  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
@@ -290,6 +290,17 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
     window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher', { detail: { force: true } }));
   }, [confirm]);
 
+  /* Ouvre la présence vocale (orb + live) dans une fenêtre dédiée. En Electron,
+     une vraie BrowserWindow via IPC ; en dev web, repli sur un onglet /orb-live. */
+  const handleOpenOrbWindow = useCallback(() => {
+    const api = (window as unknown as { electronAPI?: { openOrbWindow?: () => Promise<unknown> } }).electronAPI;
+    if (api?.openOrbWindow) {
+      void api.openOrbWindow();
+    } else {
+      window.open('/orb-live', '_blank', 'noopener,noreferrer,width=440,height=760');
+    }
+  }, []);
+
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
 
   const spring = reduceMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 420, damping: 40, mass: 0.9 };
@@ -434,8 +445,14 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   ))}
             </div>
 
-            {/* Pied : changer de projet + paramètres */}
+            {/* Pied : présence vocale + changer de projet + paramètres */}
             <div className="mt-auto flex-shrink-0 border-t px-2 py-1" style={{ borderColor: 'var(--border-base)' }}>
+              <NavButton
+                item={{ id: 'orb-live', path: '', label: 'Présence vocale', icon: Radio }}
+                active={false}
+                collapsed={collapsed}
+                onClick={handleOpenOrbWindow}
+              />
               <NavButton
                 item={{ id: 'switch-workspace', path: '', label: 'Changer de projet', icon: FolderInput }}
                 active={false}
