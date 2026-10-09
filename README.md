@@ -24,9 +24,9 @@
 
 <br>
 
-<sub>Le projet Leanna est une plateforme desktop local-first dédiée à l’exécution d’agents IA autonomes, structurée autour d’un cycle de compréhension, planification, exécution, observation, vérification et récupération.
+<sub>Leanna est une plateforme desktop local-first dédiée à l’exécution sécurisée et transparente d’agents IA autonomes. Conçue pour offrir un contrôle total, l'application orchestre des tâches complexes via un cycle strict : Comprendre, Planifier, Agir, Observer, Vérifier et Récupérer.
 
-Rien ne quitte la machine sans action explicite. Chaque action à effet de bord traverse une chaîne d'autorisation (permissions, sandbox, dry-run, Safety Gate Jev, approbations). Le succès n'est jamais déclaré par un modèle : il est prouvé par l'état du workspace.</sub>
+Rien ne quitte votre machine sans action explicite. Chaque action à effet de bord traverse une chaîne de sécurité rigoureuse (permissions, sandbox, dry-run, Safety Gate Jev).</sub>
 
 <br><br>
 
