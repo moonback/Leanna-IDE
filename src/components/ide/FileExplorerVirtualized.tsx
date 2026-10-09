@@ -104,7 +104,6 @@ const SKELETON_WIDTHS = [96, 130, 84, 148, 72, 118, 104, 140, 90, 124];
 
 const EVENTS = {
   workspaceChanged: 'Leanna-workspace-changed',
-  openWorkspaceSwitcher: 'Leanna-open-workspace-switcher',
   sandboxChanged: 'Leanna-sandbox-changed',
   sandboxFileChanged: 'Leanna-sandbox-file-changed',
 } as const;
@@ -124,7 +123,6 @@ const STATUS_LETTER: Record<DiffInfo['status'], string> = {
 const LABELS = {
   explorer: 'Explorer',
   root: 'Racine',
-  switchProject: 'Changer de projet racine',
   ignore: "Chemins interdits à l'agent (.leannaignore)",
   parent: 'Parent',
   parentTitle: "Remonter d'un niveau",
@@ -1309,19 +1307,6 @@ const FileExplorer = memo(function FileExplorer({
   const noSearchResults = !loading && processedTree.length === 0 && isSearching;
   const isEmpty = !loading && processedTree.length === 0 && !isSearching && !onlyHiddenEntries;
 
-  const handleSwitchWorkspace = useCallback(async () => {
-    // Ferme les onglets et désactive le workspace courant
-    window.dispatchEvent(new CustomEvent(EVENTS.workspaceChanged, { detail: { workspace: null } }));
-    try {
-      const res = await fetch('/api/self-root/clear', { method: 'POST' });
-      if (!res.ok) console.error('[FileExplorer] Failed to clear workspace:', res.status);
-    } catch (e) {
-      console.error('[FileExplorer] Failed to clear workspace:', e);
-    }
-    // Ouvre la modale de sélection
-    window.dispatchEvent(new CustomEvent(EVENTS.openWorkspaceSwitcher));
-  }, []);
-
   // ── Rendu ─────────────────────────────────────────────────────────────────
   return (
     <div
@@ -1339,16 +1324,6 @@ const FileExplorer = memo(function FileExplorer({
         style={{ borderColor: 'var(--border-base)', minHeight: '44px' }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={handleSwitchWorkspace}
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--bg-panel)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)]"
-            style={{ color: 'var(--accent-primary)' }}
-            title={LABELS.switchProject}
-            aria-label={LABELS.switchProject}
-          >
-            <FolderInput size={14} />
-          </button>
           <div className="min-w-0">
             <span
               className="text-xs font-semibold uppercase tracking-wider"
