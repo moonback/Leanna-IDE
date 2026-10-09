@@ -769,6 +769,10 @@ export class TelegramService {
             systemPrompt: sysPrompt,
             temperature: 0.7,
             maxTokens: 2048,
+            // Le message Telegram provient d'un tiers : on le traite comme du
+            // contenu non fiable (neutralisé si une injection est détectée).
+            untrustedPrompt: true,
+            untrustedSource: 'telegram',
           });
 
           const replyText = result.text.trim() || "Je n'ai pas pu formuler de réponse.";

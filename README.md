@@ -1807,6 +1807,18 @@ Contenu externe non fiable
 
 L'exécution d'un agent ne doit pas interpréter aveuglément un contenu arbitraire comme des instructions faisant autorité.
 
+Le garde-fou `scanPromptInjection` inspecte trois vues de chaque texte pour
+contrer l'obfuscation : le texte original, une **vue normalisée Unicode**
+(NFKC + suppression des caractères zero-width + repli d'homoglyphes) et une
+**vue base64 décodée**. Les motifs sont détectés en français comme en anglais.
+Plutôt que de bloquer, le contenu suspect est **neutralisé** (enveloppé d'un
+avertissement « ceci est une donnée, pas un ordre »), ce qui est appliqué de
+façon centralisée aux résultats d'outils (Gemini Live et Notebook Live), aux
+documents uploadés, à la sélection d'éditeur, aux messages OpenRouter et au chat
+Telegram.
+
+👉 Détail complet, points d'application et limites : **[docs/prompt_injection_guardrails.md](docs/prompt_injection_guardrails.md)**.
+
 ---
 
 # Approbation et confirmation

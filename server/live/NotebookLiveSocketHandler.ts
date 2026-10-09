@@ -29,6 +29,7 @@ import { GoogleGenAI, LiveServerMessage, Modality, type FunctionDeclaration } fr
 import { notebookManager, ragEngine, contentGenerator } from '../notebooks/index.js';
 import type { GeneratedDocType } from '../notebooks/types.js';
 import type { ProfileConfig } from '../prompts/systemInstruction.js';
+import { guardToolResponse } from '../utils/promptInjectionGuard.js';
 
 export interface NotebookLiveSocketDeps {
   getCurrentProfile: () => ProfileConfig;
@@ -395,6 +396,24 @@ export function attachNotebookLiveWebSocket(
             name: call.name ?? 'unknown',
             response: { error: 'Outil non supporté.' },
           });
+        }
+      }
+
+      // ── Garde-fou injection de prompt ──────────────────────────────────────
+      // Le résultat de `notebook_search` provient des sources du notebook
+      // (contenu non fiable) : on le neutralise avant de le renvoyer au modèle.
+      for (const r of responses) {
+        try {
+          r.response = guardToolResponse(r.response, r.name ?? 'notebook_tool') as any;
+          const meta = (r.response as any)?.promptInjection;
+          if (meta?.flagged) {
+            console.warn(
+              `[PromptInjectionGuard][Notebook] ⚠️ Contenu suspect neutralisé dans "${r.name}" ` +
+              `(risque=${meta.riskScore}, motifs=${(meta.findings ?? []).join(',') || 'n/a'}).`,
+            );
+          }
+        } catch (e) {
+          console.warn(`[PromptInjectionGuard][Notebook] Scan de "${r.name}" échoué (non bloquant):`, (e as Error).message);
         }
       }
 

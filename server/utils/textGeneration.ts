@@ -13,6 +13,7 @@ import { withGeminiRetry } from "./geminiKeyPool.js";
 import { getNextGeminiKey } from "./geminiKeyPool.js";
 import { GoogleGenAI } from "@google/genai";
 import { telemetryService } from "../observability/TelemetryService.js";
+import { guardUntrustedContent } from "./promptInjectionGuard.js";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -85,6 +86,16 @@ export interface GenerateTextOptions {
   geminiParts?: any[];
   /** Force a specific provider for this call, ignoring profile setting */
   forceProvider?: 'gemini' | 'openrouter';
+  /**
+   * Marque `prompt` comme contenu NON FIABLE (ex: message Telegram, texte
+   * externe). Quand `true`, le prompt est scanné et, s'il est suspect, enveloppé
+   * d'un avertissement « ceci est une donnée, pas un ordre » avant l'envoi au
+   * modèle. Opt-in : les appelants internes de confiance (agents) le laissent à
+   * `false` pour ne pas polluer leurs prompts construits.
+   * `source` sert à la traçabilité du scan (défaut: "external").
+   */
+  untrustedPrompt?: boolean;
+  untrustedSource?: string;
 }
 
 export interface GenerateTextResult {
@@ -170,6 +181,7 @@ async function generateOnce(provider: Provider, options: GenerateTextOptions): P
  * only adds cross-provider failover on errors those layers rethrow.
  */
 export async function generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
+  options = guardOptionsPrompt(options);
   const primary: Provider = options.forceProvider || _profile.textProvider || 'gemini';
   const { enabled, breakerThreshold, breakerCooldownMs } = fallbackConfig();
 
@@ -249,12 +261,34 @@ export interface GenerateTextStreamOptions extends GenerateTextOptions {
  * Supporte Gemini (generateContentStream) et OpenRouter (SSE).
  */
 export async function generateTextStream(options: GenerateTextStreamOptions): Promise<string> {
+  options = guardOptionsPrompt(options);
   const provider = _profile.textProvider || 'gemini';
 
   if (provider === 'openrouter') {
     return streamWithOpenRouter(options);
   }
   return streamWithGemini(options);
+}
+
+/**
+ * Applique le garde-fou d'injection au `prompt` quand l'appelant l'a marqué
+ * `untrustedPrompt`. No-op sinon (prompts internes de confiance) et no-op si
+ * des `geminiParts` multimodales sont fournies à la place du texte. Renvoie un
+ * nouvel objet d'options (ne mute pas celui de l'appelant).
+ */
+function guardOptionsPrompt<T extends GenerateTextOptions>(options: T): T {
+  if (!options.untrustedPrompt || typeof options.prompt !== 'string' || options.prompt.length === 0) {
+    return options;
+  }
+  const guarded = guardUntrustedContent(options.prompt, options.untrustedSource || 'external');
+  if (guarded.promptInjection.flagged) {
+    console.warn(
+      `[PromptInjectionGuard][TextGen] ⚠️ Prompt non fiable neutralisé ` +
+      `(source=${options.untrustedSource || 'external'}, risque=${guarded.promptInjection.riskScore}, ` +
+      `motifs=${guarded.promptInjection.findings.join(',') || 'n/a'}).`,
+    );
+  }
+  return { ...options, prompt: guarded.text };
 }
 
 // ── Gemini streaming implementation ─────────────────────────────────────────

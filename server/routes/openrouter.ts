@@ -1,6 +1,34 @@
 import { Router, Request, Response } from 'express';
+import { guardUntrustedContent } from '../utils/promptInjectionGuard.js';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+/**
+ * Neutralise le contenu non fiable d'un tableau de messages de chat avant de le
+ * transmettre à OpenRouter : les messages `user`/`tool` peuvent contenir du
+ * contenu externe (fichiers, pages web, sorties d'outil) porteur d'injection.
+ * On ne touche pas aux messages `system`/`assistant` (origine de confiance).
+ * Jamais bloquant : on préfixe un avertissement « donnée, pas un ordre » et on
+ * remonte un verdict agrégé pour l'observabilité.
+ */
+function guardChatMessages(messages: any[]): { messages: any[]; flagged: boolean; maxRisk: number } {
+  let flagged = false;
+  let maxRisk = 0;
+  const guarded = messages.map((m) => {
+    if (!m || typeof m !== 'object') return m;
+    const role = m.role;
+    if ((role === 'user' || role === 'tool') && typeof m.content === 'string') {
+      const res = guardUntrustedContent(m.content, `openrouter:${role}`);
+      if (res.promptInjection.flagged) {
+        flagged = true;
+        maxRisk = Math.max(maxRisk, res.promptInjection.riskScore);
+      }
+      return { ...m, content: res.text };
+    }
+    return m;
+  });
+  return { messages: guarded, flagged, maxRisk };
+}
 
 export function createOpenRouterRouter(_getProfile: () => any): Router {
   const router = Router();
@@ -58,10 +86,18 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
       return;
     }
 
+    // ── Garde-fou injection de prompt ────────────────────────────────────────
+    // Neutralise le contenu non fiable des messages user/tool avant tout envoi.
+    const { messages: guardedMessages, flagged: injectionFlagged, maxRisk: injectionRisk } =
+      guardChatMessages(messages);
+    if (injectionFlagged) {
+      console.warn(`[PromptInjectionGuard][OpenRouter] ⚠️ Contenu suspect neutralisé dans les messages (risque max=${injectionRisk}).`);
+    }
+
     const { optimizeMessagesWithLLM, getBudgetForModel } = await import('../utils/tokenOptimizer.js');
     const budget = getBudgetForModel(model || 'default');
     const { messages: optimizedMessages, trimmed, summarized, summaryMethod, summaryTokensCost } =
-      await optimizeMessagesWithLLM(messages, budget, { apiKey: key, model: 'openai/gpt-4o-mini' });
+      await optimizeMessagesWithLLM(guardedMessages, budget, { apiKey: key, model: 'openai/gpt-4o-mini' });
 
     try {
       const controller = new AbortController();
@@ -91,7 +127,8 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
       }
       const data = await response.json();
       const optimization = trimmed > 0 ? { trimmedMessages: trimmed, summarized, summaryMethod, summaryTokensCost } : undefined;
-      res.json({ status: 'success', data, optimization });
+      const promptInjection = injectionFlagged ? { flagged: true, maxRisk: injectionRisk } : undefined;
+      res.json({ status: 'success', data, optimization, promptInjection });
     } catch (e: any) {
       if (e.name === 'AbortError') res.status(504).json({ status: 'error', error: 'Délai d\'attente OpenRouter dépassé (30s)' });
       else res.status(500).json({ status: 'error', error: e.message || 'Erreur réseau OpenRouter' });
