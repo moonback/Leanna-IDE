@@ -1799,6 +1799,35 @@ button {
 }
 
 /* ═══════════════════════════════════════════════
+   AGENT VISUALIZER — animation de spritesheet pixel-art
+   Déplace background-position par pas (steps) pour balayer les frames
+   horizontales d'une spritesheet. Paramétré par --agent-frames.
+   Rendu net pour le pixel-art via image-rendering: pixelated.
+═══════════════════════════════════════════════ */
+.agent-sprite {
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  /* La spritesheet occupe (frames * 100%) en largeur ; chaque frame = 100%. */
+  background-size: calc(var(--agent-frames, 1) * 100%) 100%;
+  background-position: 0 0;
+}
+.agent-sprite--animated {
+  animation: agent-sprite-play var(--agent-duration, 800ms)
+    steps(var(--agent-frames, 1)) infinite;
+}
+@keyframes agent-sprite-play {
+  from { background-position: 0 0; }
+  /* 100% de la largeur de l'élément * frames → balaye toutes les frames. */
+  to { background-position: calc(var(--agent-frames, 1) * -100%) 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-sprite--animated {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    REDUCED MOTION — Accessibilité
    Neutralise les animations non essentielles.
 ═══════════════════════════════════════════════ */

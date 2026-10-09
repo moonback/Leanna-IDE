@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AgentVisualState } from '../components/agents/visualState.js';
 
 /** Autonomy event types mirrored from the server autonomy:* taxonomy. */
 export type AutonomyEventType =
@@ -36,6 +37,12 @@ export interface AutonomyState {
   lastWakeAt?: number;
   health: 'healthy' | 'degraded';
   recentFailures: string[];
+  /**
+   * Server-authoritative pixel-art visual state (see server AgentVisualState).
+   * Optional for backward compatibility: older servers omit it, in which case
+   * the client derives the visual state from `status` (see useAgentStatus).
+   */
+  visualState?: AgentVisualState;
 }
 
 export interface AutonomyTask {
@@ -164,7 +171,16 @@ export function useAutonomyTimeline({
 
       // Mettre à jour l'état dérivé à partir des événements pertinents.
       if (data.event === 'autonomy:stateChanged' && typeof data.payload?.to === 'string') {
-        setState((prev) => (prev ? { ...prev, status: data.payload.to as string } : prev));
+        const nextStatus = data.payload.to as string;
+        const nextVisual =
+          typeof data.payload?.visualState === 'string'
+            ? (data.payload.visualState as AgentVisualState)
+            : undefined;
+        setState((prev) =>
+          prev
+            ? { ...prev, status: nextStatus, ...(nextVisual ? { visualState: nextVisual } : {}) }
+            : prev,
+        );
       }
       if (data.event === 'autonomy:health' && typeof data.payload?.status === 'string') {
         setState((prev) => (prev ? { ...prev, health: data.payload.status as AutonomyState['health'] } : prev));

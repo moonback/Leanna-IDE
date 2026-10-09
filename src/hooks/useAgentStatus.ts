@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAutonomyTimeline } from './useAutonomyTimeline.js';
+import { toVisualState, type AgentVisualState } from '../components/agents/visualState.js';
 
 /**
  * useAgentStatus — derives a single, human-readable agent state for the global
@@ -39,6 +40,12 @@ export interface AgentStatus {
   active: boolean;
   /** Live connection to the autonomy channel. */
   connected: boolean;
+  /**
+   * Pixel-art visual state driving the agent character animation. Prefers the
+   * server-provided value (autonomy snapshot/event `visualState`) when present,
+   * otherwise derived from `state` + the current skill hint via `toVisualState`.
+   */
+  visualState: AgentVisualState;
 }
 
 const STATE_META: Record<AgentState, { label: string; color: string }> = {
@@ -70,6 +77,8 @@ interface MissionSignal {
   state: AgentState;
   reason: string;
   progress?: number;
+  /** Skill/action name, used to refine EDITING vs SEARCHING visual state. */
+  skill?: string;
   /** Terminal missions stop winning over autonomy after a short grace period. */
   terminal: boolean;
   at: number;
@@ -80,7 +89,7 @@ function fromMissionEvent(event: string, data: Record<string, unknown>): Mission
   const title = typeof data.title === 'string' ? data.title : '';
   const progress = typeof data.progress === 'number' ? data.progress : undefined;
   const now = Date.now();
-  const base = (state: AgentState, reason: string, terminal = false): MissionSignal => ({ state, reason, progress, terminal, at: now });
+  const base = (state: AgentState, reason: string, terminal = false, skill?: string): MissionSignal => ({ state, reason, progress, skill, terminal, at: now });
 
   switch (event) {
     case 'mission_started':
@@ -95,7 +104,7 @@ function fromMissionEvent(event: string, data: Record<string, unknown>): Mission
     case 'action_completed': {
       const skill = typeof data.skill === 'string' ? data.skill : typeof data.action === 'string' ? data.action : '';
       const verify = /test|typecheck|lint|verify/i.test(skill);
-      return base(verify ? 'verifying' : 'executing', skill ? `${verify ? 'Vérification' : 'Exécution'} : ${skill}` : 'Exécution en cours');
+      return base(verify ? 'verifying' : 'executing', skill ? `${verify ? 'Vérification' : 'Exécution'} : ${skill}` : 'Exécution en cours', false, skill);
     }
     case 'approval_required':
       return base('waiting', 'En attente de votre approbation');
@@ -140,11 +149,13 @@ export function useAgentStatus(): AgentStatus {
   let state: AgentState;
   let reason: string;
   let progress: number | undefined;
+  let skillHint: string | undefined;
 
   if (missionWins && mission) {
     state = mission.state;
     reason = mission.reason;
     progress = mission.progress;
+    skillHint = mission.skill;
   } else {
     state = fromAutonomy(autonomy?.status, autonomy?.health);
     reason =
@@ -160,6 +171,13 @@ export function useAgentStatus(): AgentStatus {
   const meta = STATE_META[state];
   const active = state !== 'idle';
 
+  // Prefer the server-authoritative visual state (autonomy snapshot/event) when
+  // present; otherwise derive it from the semantic state + skill hint. The
+  // server value is ignored while a mission signal wins, since the mission's
+  // concrete skill is the most accurate "what is it doing right now".
+  const serverVisual = !missionWins ? autonomy?.visualState : undefined;
+  const visualState: AgentVisualState = serverVisual ?? toVisualState(state, skillHint);
+
   return {
     state,
     label: meta.label,
@@ -168,5 +186,6 @@ export function useAgentStatus(): AgentStatus {
     progress,
     active,
     connected: connection === 'open',
+    visualState,
   };
 }
