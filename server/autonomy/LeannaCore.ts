@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { AgentRuntime, EventBus } from "../runtime/index.js";
-import type { RuntimeEvent } from "../runtime/types.js";
+import type { RuntimeEvent, AgentVisualState } from "../runtime/types.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
 import { AnticipationEngine, anticipationConfigFromEnv, type AnticipationEngineConfig, type AnticipationProposal } from "./AnticipationEngine.js";
@@ -30,6 +30,40 @@ export interface LeannaRuntimeState {
   lastReflectionAt?: number;
   health: "healthy" | "degraded";
   recentFailures: string[];
+  /** État visuel pixel-art dérivé du statut (voir visualStateFromStatus). */
+  visualState: AgentVisualState;
+}
+
+/**
+ * Projette un statut runtime (+ santé) vers un état visuel pixel-art. Source de
+ * vérité serveur du mapping. Le client applique une projection équivalente en
+ * repli si le serveur n'émet pas `visualState` (rétrocompatibilité).
+ *
+ *   watching           → THINKING  (observation de l'environnement)
+ *   executing          → EDITING   (une tâche autonome tourne)
+ *   stopping           → WAITING
+ *   error / degraded   → WAITING   (anomalie, attention requise)
+ *   idle/sleeping/starting → IDLE
+ */
+export function visualStateFromStatus(
+  status: LeannaRuntimeStatus,
+  health: "healthy" | "degraded" = "healthy",
+): AgentVisualState {
+  if (health === "degraded") return "WAITING";
+  switch (status) {
+    case "watching":
+      return "THINKING";
+    case "executing":
+      return "EDITING";
+    case "stopping":
+    case "error":
+      return "WAITING";
+    case "idle":
+    case "sleeping":
+    case "starting":
+    default:
+      return "IDLE";
+  }
 }
 
 /**
@@ -109,6 +143,7 @@ export class LeannaCore {
     pendingEvents: 0,
     health: "healthy",
     recentFailures: [],
+    visualState: "IDLE",
   };
 
   constructor(private readonly runtime: AgentRuntime, options: LeannaCoreOptions = {}) {
@@ -239,6 +274,7 @@ export class LeannaCore {
       ...this.state,
       activeTasks: this.taskManager.list().filter((task) => task.status === "running").length,
       recentFailures: [...this.state.recentFailures],
+      visualState: visualStateFromStatus(this.state.status, this.state.health),
     };
   }
 
@@ -336,7 +372,9 @@ export class LeannaCore {
     const from = this.state.status;
     if (from === to) return;
     this.state.status = to;
-    this.events.emit({ type: "autonomy:stateChanged", from, to, reason });
+    const visualState = visualStateFromStatus(to, this.state.health);
+    this.state.visualState = visualState;
+    this.events.emit({ type: "autonomy:stateChanged", from, to, reason, visualState });
   }
 
   private eventId(event: RuntimeEvent): string {

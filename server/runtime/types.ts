@@ -37,6 +37,19 @@ export const VALID_TRANSITIONS: Record<TaskState, TaskState[]> = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Agent Visual State (pixel-art visualizer)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * État visuel « lisible pour l'humain » projeté depuis le statut runtime de
+ * l'autonomie, utilisé pour animer le personnage pixel-art de l'agent côté
+ * client. La source de vérité du mapping serveur est `visualStateFromStatus`
+ * (voir server/autonomy/LeannaCore.ts) ; le client sait aussi dériver sa propre
+ * valeur si le serveur ne la fournit pas.
+ */
+export type AgentVisualState = "IDLE" | "THINKING" | "EDITING" | "SEARCHING" | "WAITING";
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Agent Plugin Interface
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -274,7 +287,19 @@ export type RuntimeEvent =
   | { type: "memory:hierarchical:stored"; tier: string; id: string }
   | { type: "memory:hierarchical:promoted"; fromTier: string; toTier: string; sourceId: string; newId: string }
   | { type: "autonomy:heartbeat"; attentionRequired: boolean; state: "active" | "idle" | "sleep"; reason: string }
-  | { type: "autonomy:stateChanged"; from: string; to: string; reason: string }
+  | {
+      type: "autonomy:stateChanged";
+      from: string;
+      to: string;
+      reason: string;
+      /**
+       * État visuel pixel-art dérivé du statut runtime, destiné à piloter
+       * l'animation du personnage de l'agent côté client (AgentVisualizer).
+       * Optionnel pour rétrocompatibilité : les anciens clients l'ignorent et
+       * dérivent eux-mêmes l'état visuel depuis `to`.
+       */
+      visualState?: AgentVisualState;
+    }
   | { type: "autonomy:health"; status: "healthy" | "degraded"; reason: string }
   | { type: "autonomy:taskCreated"; taskId: string; taskType: string; sourceEventId: string }
   | { type: "autonomy:taskStateChanged"; taskId: string; taskType: string; from: string; to: string; error?: string }

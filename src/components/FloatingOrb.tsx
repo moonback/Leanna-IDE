@@ -2,6 +2,8 @@ import { useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useOrbState } from '../hooks/useOrbState.js';
+import { useAgentStatus } from '../hooks/useAgentStatus.js';
+import { AgentVisualizer } from './agents/AgentVisualizer.js';
 // import { OrbCore } from './orb/OrbCore.js';
 
 /**
@@ -14,6 +16,7 @@ import { useOrbState } from '../hooks/useOrbState.js';
 export function FloatingOrb() {
   const orb = useOrbState();
   const { profile } = useProfile();
+  const agent = useAgentStatus();
 
   const constraintRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(() => {
@@ -60,7 +63,8 @@ export function FloatingOrb() {
         aria-label={`Leanna ${statusLabel}`}
         tabIndex={0}
       >
-        {/* <OrbCore orb={orb} size="sm" /> */}
+        {/* Personnage pixel-art piloté par l'état réel de l'agent (visualState). */}
+        <AgentVisualizer visualState={agent.visualState} size={56} />
 
         {/* Status dot */}
         <motion.div
