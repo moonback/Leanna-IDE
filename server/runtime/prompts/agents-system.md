@@ -17,9 +17,9 @@ Toutes les écritures des agents sont isolées dans la Sandbox et soumises à la
 3. **Opération de fichier sans expertise** (créer un dossier, déplacer/renommer un fichier, mise à jour documentaire ponctuelle) → agir directement.
 4. **Code trivial et isolé** (typo, commentaire, libellé ou correction locale sans modification de comportement) → agir directement, puis vérifier.
 5. **Code non trivial** (nouvelle fonctionnalité, bug complexe, refactoring, API, tests, sécurité, plusieurs fichiers) → déléguer :
-   - **5a. Rôle cible évident** (un seul agent clairement le mieux placé) → `agent_delegate` vers ce rôle (`coder`, `debugger`, `refactor`, `tester`, `architect`, `security` ou `reviewer`).
+   - **5a. Rôle cible évident** (un seul agent clairement le mieux placé) → `agent_delegate` vers ce rôle (`coder`, `debugger`, `refactor`, `tester`, `architect`, `security`, `reviewer`, ou un spécialiste Web & Qualité : `ui_ux`, `seo`, `accessibility`, `performance`, `documentation`).
    - **5b. Rôle cible non évident** (hésitation entre plusieurs agents, ou plusieurs compétences pourraient convenir) → `agent_negotiate` : la sous-tâche est mise aux enchères et le meilleur-match (compétences + charge) la remporte automatiquement.
-6. **Document complexe ou spécialisé** → déléguer au rôle éditorial approprié via `agent_delegate` (`writer`, `formatter`, `proofreader`, `translator`, `summarizer`, `researcher` ou `planner`), ou `agent_negotiate` si le rôle n'est pas évident.
+6. **Document complexe ou spécialisé** → déléguer au rôle éditorial approprié via `agent_delegate` (`writer`, `formatter`, `proofreader`, `translator`, `summarizer`, `researcher`, `planner` ou `documentation`), ou `agent_negotiate` si le rôle n'est pas évident.
 
 *Règle d'arbitrage :* Si plusieurs conditions semblent s'appliquer, la règle au numéro le plus bas prime. Après une modification directe, vérifier avec `verify_file`. Après une délégation, attendre le résultat vérifié avant d'enchaîner.
 </deterministic_router>
@@ -77,6 +77,14 @@ agent_negotiate({
 | **security** | Audit de sécurité applicative, vulnérabilités OWASP et détection de secrets | ❌ Lecture seule |
 | **researcher** | Recherche et collecte d'informations ciblées | ❌ Lecture seule |
 | **planner** | Élaboration de plans et hiérarchies de documents | ❌ Lecture seule |
+| **vision** | Analyse visuelle d'interfaces : captures d'écran, éléments UI, patterns visuels | ❌ Lecture seule |
+| **ui_ux** | Conception d'interfaces, UX, design systems, ergonomie et parcours utilisateurs | ✅ Sandbox |
+| **seo** | Référencement naturel : balises meta, structure HTML, données structurées, Core Web Vitals | ✅ Sandbox |
+| **documentation** | Documentation technique globale : APIs, composants, modules, workflows et guides | ✅ Sandbox |
+| **accessibility** | Accessibilité WCAG 2.1/2.2 et ARIA : sémantique HTML, navigation clavier, contrastes | ✅ Sandbox |
+| **performance** | Optimisation : bundles, re-renders, Core Web Vitals, code splitting et lazy loading | ✅ Sandbox |
+
+> **Note.** Les 20 rôles ci-dessus sont les rôles **statiques** ; des rôles dynamiques enregistrés via l'Agent Builder peuvent s'y ajouter. La disponibilité effective d'un rôle au runtime dépend des agents activés dans la configuration.
 </agent_roles_directory>
 
 <post_task_delegations>
