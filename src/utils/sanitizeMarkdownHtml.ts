@@ -18,7 +18,7 @@ import { marked } from 'marked';
 export const ALLOWED_TAGS = new Set([
   'a', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4',
   'h5', 'h6', 'hr', 'li', 'ol', 'p', 'pre', 'strong', 'table', 'tbody',
-  'td', 'th', 'thead', 'tr', 'ul', 'sup', 'sub', 'span', 'img',
+  'td', 'th', 'thead', 'tr', 'ul', 'sup', 'sub', 'span', 'img', 'button',
 ]);
 
 // Allowed attributes per tag
@@ -30,8 +30,15 @@ export const ALLOWED_TAGS = new Set([
 export const ALLOWED_ATTRIBUTES: Record<string, Set<string>> = {
   a: new Set(['href', 'title']),
   code: new Set(['class']),
-  span: new Set(['class']),
+  span: new Set(['class', 'aria-hidden']),
   img: new Set(['src', 'alt', 'title', 'width', 'height']),
+  // Enriched code blocks: <pre class="code-block" data-lang="…">
+  pre: new Set(['class', 'data-lang']),
+  li: new Set(['class']),
+  // « Copier le code » button inside code-block headers.
+  // 'data-code' carries the (already text-only) raw code read by the React layer.
+  // 'type' is forced to "button" below so a sanitized button can never submit a form.
+  button: new Set(['class', 'type', 'data-code', 'aria-label']),
 };
 
 /**
@@ -183,6 +190,14 @@ export function sanitizeMarkdownHtml(html: string): string {
   for (const link of Array.from(template.content.querySelectorAll('a[href]'))) {
     link.setAttribute('rel', 'noopener noreferrer');
     link.setAttribute('target', '_blank');
+  }
+
+  // Force every surviving <button> to type="button" so a sanitized button can
+  // never act as a form submitter. The only buttons we emit are the "copy code"
+  // controls in code-block headers; this keeps that guarantee defensive even if
+  // a model emits raw <button> HTML.
+  for (const button of Array.from(template.content.querySelectorAll('button'))) {
+    button.setAttribute('type', 'button');
   }
 
   // Constrain rendered images so a large generated image stays inside the chat

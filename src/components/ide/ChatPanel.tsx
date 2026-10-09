@@ -7,8 +7,8 @@ import {
   Copy, CheckCheck, RefreshCw, Sparkles, Hash, Loader2,
   FileText, Terminal, FlaskConical, Volume2, FileSearch,
 } from 'lucide-react';
-import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile, type UserProfile } from '../../context/UserProfileContext.js';
 import { UnifiedTimeline } from './UnifiedTimeline.js';
@@ -132,10 +132,11 @@ function useMessageQueue(
 // ─── Markdown renderer ────────────────────────────────────────────────────────
 
 const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const html = useMemo(() => {
     try {
-      const result = marked.parse(text, { gfm: true, breaks: true });
-      return typeof result === 'string' ? sanitizeMarkdownHtml(result) : '';
+      return sanitizeMarkdownHtml(renderChatMarkdown(text));
     } catch {
       const escaped = String(text)
         .replace(/&/g, '&amp;')
@@ -145,8 +146,35 @@ const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
     }
   }, [text]);
 
+  // Délégation du clic sur les boutons « Copier » des blocs de code.
+  // L'écouteur est posé sur le conteneur réel (et non via onClick JSX) : les
+  // vrais éléments interactifs sont les <button> enfants, nativement
+  // focusables et activables au clavier. Le texte brut est porté par
+  // data-code (restitué décodé via dataset.code).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onClick = (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button.code-copy-btn');
+      if (!btn || !el.contains(btn)) return;
+      const code = btn.dataset.code ?? '';
+      navigator.clipboard.writeText(code).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'Copié';
+        btn.classList.add('is-copied');
+        setTimeout(() => {
+          btn.textContent = prev ?? 'Copier';
+          btn.classList.remove('is-copied');
+        }, 1600);
+      }).catch(() => { /* presse-papiers indisponible : ignore silencieusement */ });
+    };
+    el.addEventListener('click', onClick);
+    return () => el.removeEventListener('click', onClick);
+  }, [html]);
+
   return (
     <div
+      ref={containerRef}
       className="chat-markdown"
       // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}

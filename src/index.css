@@ -1366,6 +1366,52 @@ button {
 .chat-markdown li::marker {
   color: var(--accent-primary);
 }
+/* Listes imbriquées : resserrer les marges verticales. */
+.chat-markdown li > ul,
+.chat-markdown li > ol {
+  margin: 0.2em 0;
+}
+
+/* ── Cases à cocher GFM (- [ ] / - [x]) ── */
+.chat-markdown li.task-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin-left: -1.1em;
+}
+.chat-markdown .task-checkbox {
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  margin-top: 0.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75em;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-base);
+  color: var(--accent-primary);
+}
+.chat-markdown .task-checkbox.is-checked {
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+.chat-markdown li.task-item .task-text {
+  flex: 1;
+}
+
+/* ── del / sup / sub ── */
+.chat-markdown del {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.chat-markdown sup,
+.chat-markdown sub {
+  font-size: 0.75em;
+  line-height: 0;
+}
 
 .chat-markdown code {
   font-family: var(--font-mono);
@@ -1380,16 +1426,146 @@ button {
   background-color: var(--bg-base);
   border: 1px solid var(--border-base);
   border-radius: 10px;
-  padding: 0.6em 0.8em;
-  margin: 0.5em 0;
-  overflow-x: auto;
+  margin: 0.6em 0;
+  overflow: hidden;
   font-size: var(--text-xs);
+}
+
+/* Bloc de code enrichi : en-tête (langage + bouton copier) + corps défilable. */
+.chat-markdown pre.code-block {
+  padding: 0;
+}
+.chat-markdown .code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  padding: 0.35em 0.6em 0.35em 0.75em;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  border-bottom: 1px solid var(--border-base);
+  user-select: none;
+}
+.chat-markdown .code-block-lang {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dimmed);
+}
+.chat-markdown .code-copy-btn {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.3em 0.6em;
+  border-radius: 6px;
+  border: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-input) 60%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chat-markdown .code-copy-btn:hover {
+  background: var(--accent-subtle);
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  color: var(--text-primary);
+}
+.chat-markdown .code-copy-btn.is-copied {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
+}
+.chat-markdown .code-block-body {
+  display: block;
+  padding: 0.7em 0.85em;
+  overflow-x: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-size: inherit;
+  line-height: 1.55;
+  white-space: pre;
 }
 .chat-markdown pre code {
   background: transparent;
   border: none;
   padding: 0;
   font-size: inherit;
+}
+
+/* ── Coloration syntaxique ──
+   Les classes pointent vers des variables --tok-* surchargées par thème
+   (voir blocs par data-theme ci-dessous). Les valeurs de secours ici
+   correspondent au thème sombre, au cas où un thème n'en définirait pas. */
+.chat-markdown .tok-comment  { color: var(--tok-comment, var(--text-dimmed)); font-style: italic; }
+.chat-markdown .tok-string   { color: var(--tok-string, #9ece6a); }
+.chat-markdown .tok-number   { color: var(--tok-number, #ff9e64); }
+.chat-markdown .tok-keyword  { color: var(--tok-keyword, #bb9af7); }
+.chat-markdown .tok-function { color: var(--tok-function, #7aa2f7); }
+.chat-markdown .tok-property { color: var(--tok-property, #7dcfff); }
+.chat-markdown .tok-tag      { color: var(--tok-tag, #f7768e); }
+.chat-markdown .tok-attr     { color: var(--tok-attr, #e0af68); }
+.chat-markdown .tok-variable { color: var(--tok-variable, #e0af68); }
+.chat-markdown .tok-punct    { color: var(--tok-punct, var(--text-muted)); }
+
+/* ── Palettes de coloration par thème ── */
+:root[data-theme="dark"] {
+  --tok-comment:  #6b7389;
+  --tok-string:   #9ece6a;
+  --tok-number:   #ff9e64;
+  --tok-keyword:  #bb9af7;
+  --tok-function: #7aa2f7;
+  --tok-property: #7dcfff;
+  --tok-tag:      #f7768e;
+  --tok-attr:     #e0af68;
+  --tok-variable: #e0af68;
+  --tok-punct:    #9aa5ce;
+}
+:root[data-theme="light"] {
+  --tok-comment:  #8a919e;
+  --tok-string:   #0a7d33;
+  --tok-number:   #b45309;
+  --tok-keyword:  #7c3aed;
+  --tok-function: #2563eb;
+  --tok-property: #0369a1;
+  --tok-tag:      #c026d3;
+  --tok-attr:     #b45309;
+  --tok-variable: #b45309;
+  --tok-punct:    #475569;
+}
+:root[data-theme="cyberpunk"] {
+  --tok-comment:  #5c6a8a;
+  --tok-string:   #00f0ff;
+  --tok-number:   #ff8a00;
+  --tok-keyword:  #ff2e97;
+  --tok-function: #38bdf8;
+  --tok-property: #7dfadb;
+  --tok-tag:      #ff5277;
+  --tok-attr:     #ffd166;
+  --tok-variable: #ffd166;
+  --tok-punct:    #8592a6;
+}
+:root[data-theme="sepia"] {
+  --tok-comment:  #9c8360;
+  --tok-string:   #2e7d32;
+  --tok-number:   #cb4b16;
+  --tok-keyword:  #8250df;
+  --tok-function: #1565c0;
+  --tok-property: #0e7490;
+  --tok-tag:      #c2410c;
+  --tok-attr:     #b58900;
+  --tok-variable: #b58900;
+  --tok-punct:    #7d6444;
+}
+:root[data-theme="high-contrast"] {
+  --tok-comment:  #cccccc;
+  --tok-string:   #00ff00;
+  --tok-number:   #ffaa00;
+  --tok-keyword:  #ffff00;
+  --tok-function: #00ffff;
+  --tok-property: #00ffff;
+  --tok-tag:      #ff5577;
+  --tok-attr:     #ffaa00;
+  --tok-variable: #ffaa00;
+  --tok-punct:    #ffffff;
 }
 
 .chat-markdown blockquote {
