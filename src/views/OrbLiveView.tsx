@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Mic, MicOff, Power, PhoneOff, Send, Sparkles, Loader2, Radio,
   MonitorUp, MonitorX, Keyboard, Target, Bot, Zap, CheckCircle2, XCircle, Activity,
+  ChevronRight, Clock, Wrench, ListChecks, History,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 import { useOrbState } from '../hooks/useOrbState.js';
@@ -10,7 +11,7 @@ import { useScreenShare } from '../context/ScreenShareContext.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import {
   initActivityStore, destroyActivityStore, subscribe,
-  getAgentTasks, getToolActivities,
+  getAgentTasks, getToolActivities, getAgentDisplayName,
   type AgentTaskEntry,
 } from '../stores/agentActivityStore.js';
 
@@ -30,6 +31,13 @@ import {
 
 // ─── Suivi des missions (reprend la logique de AgentActivityOverlay) ───────────
 
+interface MissionEventLog {
+  at: number;
+  event: string;
+  label: string;
+  confidence?: number;
+}
+
 interface MissionActivity {
   missionId: string;
   title: string;
@@ -37,7 +45,14 @@ interface MissionActivity {
   confidence: number;
   currentGoal?: string;
   lastAction?: string;
+  startedAt: number;
+  updatedAt: number;
+  goalsCompleted: number;
+  actionsCompleted: number;
+  log: MissionEventLog[];
 }
+
+const MISSION_LOG_MAX = 12;
 
 function useMissionActivity(): MissionActivity[] {
   const [missions, setMissions] = useState<MissionActivity[]>([]);
@@ -46,22 +61,46 @@ function useMissionActivity(): MissionActivity[] {
     const handler = (e: Event) => {
       const d = (e as CustomEvent).detail;
       if (!d || d.type !== 'mission_event') return;
+      const now = Date.now();
+      const pushLog = (m: MissionActivity, label: string, confidence?: number): MissionEventLog[] =>
+        [...m.log, { at: now, event: d.event, label, confidence }].slice(-MISSION_LOG_MAX);
+
       setMissions(prev => {
         const existing = prev.find(m => m.missionId === d.missionId);
         switch (d.event) {
           case 'mission_started':
             if (existing) return prev;
-            return [...prev, { missionId: d.missionId, title: d.title ?? 'Mission', status: 'in_progress', confidence: 0.5 }];
+            return [...prev, {
+              missionId: d.missionId, title: d.title ?? 'Mission', status: 'in_progress', confidence: 0.5,
+              startedAt: now, updatedAt: now, goalsCompleted: 0, actionsCompleted: 0,
+              log: [{ at: now, event: d.event, label: 'Mission démarrée' }],
+            }];
           case 'goal_started':
-            return prev.map(m => m.missionId === d.missionId ? { ...m, currentGoal: d.goalTitle ?? d.goalId } : m);
+            return prev.map(m => m.missionId === d.missionId ? {
+              ...m, currentGoal: d.goalTitle ?? d.goalId, updatedAt: now,
+              log: pushLog(m, `Objectif : ${d.goalTitle ?? d.goalId}`),
+            } : m);
+          case 'goal_completed':
+            return prev.map(m => m.missionId === d.missionId ? {
+              ...m, goalsCompleted: m.goalsCompleted + 1, updatedAt: now,
+              log: pushLog(m, `Objectif terminé : ${d.goalTitle ?? d.goalId ?? ''}`.trim()),
+            } : m);
           case 'action_completed':
-            return prev.map(m => m.missionId === d.missionId
-              ? { ...m, confidence: d.confidence ?? m.confidence, lastAction: d.skill } : m);
+            return prev.map(m => m.missionId === d.missionId ? {
+              ...m,
+              confidence: d.confidence ?? m.confidence,
+              lastAction: d.skill,
+              actionsCompleted: m.actionsCompleted + 1,
+              updatedAt: now,
+              log: pushLog(m, d.skill ? `Action : ${d.skill}` : 'Action terminée', d.confidence),
+            } : m);
           case 'mission_completed':
           case 'mission_cancelled':
           case 'mission_failed':
-            return prev.map(m => m.missionId === d.missionId
-              ? { ...m, status: d.success ? 'completed' : 'failed' } : m);
+            return prev.map(m => m.missionId === d.missionId ? {
+              ...m, status: d.success ? 'completed' : 'failed', updatedAt: now,
+              log: pushLog(m, d.success ? 'Mission terminée' : 'Mission interrompue'),
+            } : m);
           default:
             return prev;
         }
@@ -72,6 +111,35 @@ function useMissionActivity(): MissionActivity[] {
   }, []);
 
   return missions;
+}
+
+// ─── Formatage de durée (ms → libellé compact) ─────────────────────────────────
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)}s`;
+  const m = Math.floor(s / 60);
+  const rem = Math.round(s % 60);
+  return `${m}m${rem.toString().padStart(2, '0')}s`;
+}
+
+function formatClock(ts: number): string {
+  try {
+    return new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+/** Sérialise les arguments d'un outil de façon sûre (tronqué, sans planter sur les cycles). */
+function safeStringify(value: unknown): string {
+  try {
+    const json = JSON.stringify(value, null, 2);
+    return json.length > 600 ? json.slice(0, 600) + '\n…' : json;
+  } catch {
+    return String(value);
+  }
 }
 
 // ─── Visualiseur audio ─────────────────────────────────────────────────────────
@@ -204,6 +272,13 @@ export default function OrbLiveView() {
   const [draft, setDraft] = useState('');
   const [elapsed, setElapsed] = useState(0);
 
+  // Suivi détaillé : cartes dépliées (agents / missions) et nombre d'outils affichés.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showAllTools, setShowAllTools] = useState(false);
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
   const connected = status === 'connected';
   const connecting = status === 'connecting';
 
@@ -244,8 +319,22 @@ export default function OrbLiveView() {
     const rank: Record<string, number> = { running: 0, pending: 1, failed: 2, completed: 3, cancelled: 4 };
     return [...agentTasks].sort((a, b) => (rank[a.status] - rank[b.status]) || (b.timestamp - a.timestamp));
   }, [agentTasks]);
-  const recentTools = useMemo(() => [...toolActivities].slice(-8).reverse(), [toolActivities]);
+  const allToolsReversed = useMemo(() => [...toolActivities].reverse(), [toolActivities]);
+  const recentTools = useMemo(
+    () => (showAllTools ? allToolsReversed.slice(0, 30) : allToolsReversed.slice(0, 8)),
+    [allToolsReversed, showAllTools],
+  );
   const activeMissions = useMemo(() => missions.filter(m => m.status === 'in_progress'), [missions]);
+
+  // Compteurs d'en-tête détaillés.
+  const runningAgentsCount = useMemo(
+    () => sortedAgents.filter(a => a.status === 'running' || a.status === 'pending').length,
+    [sortedAgents],
+  );
+  const runningToolsCount = useMemo(
+    () => toolActivities.filter(t => t.status === 'running').length,
+    [toolActivities],
+  );
 
   const hasActivity = sortedAgents.length > 0 || recentTools.length > 0 || activeMissions.length > 0;
 
@@ -330,15 +419,20 @@ export default function OrbLiveView() {
         <div className="flex flex-shrink-0 items-center gap-1.5 px-4 py-1.5" style={{ borderBottom: '1px solid var(--border-base)' }}>
           <Activity className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} />
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Activité</span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2.5">
             {activeMissions.length > 0 && (
-              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent-primary)' }} title="Missions en cours">
                 <Target className="h-3 w-3" />{activeMissions.length}
               </span>
             )}
-            {sortedAgents.filter(a => a.status === 'running' || a.status === 'pending').length > 0 && (
-              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-accent-alt)' }}>
-                <Bot className="h-3 w-3" />{sortedAgents.filter(a => a.status === 'running' || a.status === 'pending').length}
+            {runningAgentsCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-accent-alt)' }} title="Agents actifs">
+                <Bot className="h-3 w-3" />{runningAgentsCount}
+              </span>
+            )}
+            {runningToolsCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-success)' }} title="Outils en exécution">
+                <Wrench className="h-3 w-3" />{runningToolsCount}
               </span>
             )}
           </div>
@@ -356,7 +450,9 @@ export default function OrbLiveView() {
               {activeMissions.length > 0 && (
                 <section className="flex flex-col gap-1.5">
                   <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Missions</h3>
-                  {activeMissions.map(m => (
+                  {activeMissions.map(m => {
+                    const isOpen = !!expanded[`mission:${m.missionId}`];
+                    return (
                     <div key={m.missionId} className="rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}>
                       <div className="flex items-center gap-2">
                         <Target className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
@@ -366,6 +462,20 @@ export default function OrbLiveView() {
                           {Math.round(m.confidence * 100)}%
                         </span>
                       </div>
+
+                      {/* Métriques : objectifs, actions, durée écoulée */}
+                      <div className="mt-1.5 ml-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="flex items-center gap-1" title="Objectifs terminés">
+                          <ListChecks className="h-3 w-3" />{m.goalsCompleted} obj.
+                        </span>
+                        <span className="flex items-center gap-1" title="Actions terminées">
+                          <Zap className="h-3 w-3" />{m.actionsCompleted} act.
+                        </span>
+                        <span className="flex items-center gap-1" title="Durée depuis le démarrage">
+                          <Clock className="h-3 w-3" />{formatDuration(m.updatedAt - m.startedAt)}
+                        </span>
+                      </div>
+
                       {m.currentGoal && (
                         <div className="mt-1 ml-5 flex items-center gap-1.5">
                           <Loader2 className="h-2.5 w-2.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
@@ -378,8 +488,35 @@ export default function OrbLiveView() {
                           <span className="truncate font-mono text-xs" style={{ color: 'var(--text-dimmed)' }}>{m.lastAction}</span>
                         </div>
                       )}
+
+                      {/* Historique déroulant des événements de la mission */}
+                      {m.log.length > 0 && (
+                        <>
+                          <button type="button" onClick={() => toggleExpanded(`mission:${m.missionId}`)}
+                            className="mt-1.5 ml-5 flex items-center gap-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)] rounded"
+                            style={{ color: 'var(--text-muted)' }} aria-expanded={isOpen}>
+                            <ChevronRight className="h-3 w-3 transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }} />
+                            <History className="h-3 w-3" />
+                            {isOpen ? 'Masquer l\'historique' : `Historique (${m.log.length})`}
+                          </button>
+                          {isOpen && (
+                            <ol className="mt-1 ml-5 flex flex-col gap-1 border-l pl-3" style={{ borderColor: 'var(--border-base)' }}>
+                              {[...m.log].reverse().map((ev, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-xs">
+                                  <span className="font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>{formatClock(ev.at)}</span>
+                                  <span className="flex-1" style={{ color: 'var(--text-muted)' }}>{ev.label}</span>
+                                  {typeof ev.confidence === 'number' && (
+                                    <span className="font-mono" style={{ color: 'var(--text-dimmed)' }}>{Math.round(ev.confidence * 100)}%</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </section>
               )}
 
@@ -390,6 +527,8 @@ export default function OrbLiveView() {
                   <AnimatePresence initial={false}>
                     {sortedAgents.map(task => {
                       const active = task.status === 'running' || task.status === 'pending';
+                      const isOpen = !!expanded[`agent:${task.id}`];
+                      const hasMoreSteps = task.steps.length > 1;
                       return (
                         <motion.div key={task.id} initial={reduceMotion ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                           className="rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}>
@@ -398,27 +537,76 @@ export default function OrbLiveView() {
                               : task.status === 'completed' ? <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
                               : <XCircle className="h-3.5 w-3.5 flex-shrink-0" style={{ color: statusColor(task.status) }} />}
                             <span className="flex-1 truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{task.agentName}</span>
+                            {task.durationMs != null && (
+                              <span className="flex items-center gap-1 font-mono text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }} title="Durée">
+                                <Clock className="h-3 w-3" />{formatDuration(task.durationMs)}
+                              </span>
+                            )}
                             <span className="rounded px-1.5 py-0.5 text-xs font-semibold"
                               style={{ backgroundColor: 'color-mix(in srgb, ' + statusColor(task.status) + ' 14%, transparent)', color: statusColor(task.status) }}>
                               {task.status}
                             </span>
                           </div>
-                          <span className="mt-0.5 ml-5 block truncate text-xs" style={{ color: 'var(--text-muted)' }}>{task.title}</span>
+
+                          {/* Rôle technique + titre de la tâche */}
+                          <div className="mt-0.5 ml-5 flex items-center gap-1.5">
+                            {task.role && (
+                              <span className="rounded px-1 py-px font-mono text-[10px] uppercase tracking-wide" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-dimmed)' }}>
+                                {task.role}
+                              </span>
+                            )}
+                            <span className="flex-1 truncate text-xs" style={{ color: 'var(--text-muted)' }}>{task.title}</span>
+                          </div>
+
                           {task.progress && (
                             <div className="mt-1 ml-5">
-                              <div className="h-1 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--border-base)' }}>
+                              <div className="flex items-center justify-between">
+                                <span className="truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>{task.progress.label}</span>
+                                <span className="ml-2 font-mono text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                                  {task.progress.current}/{task.progress.total}
+                                </span>
+                              </div>
+                              <div className="mt-0.5 h-1 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--border-base)' }}>
                                 <motion.div className="h-full rounded-full" style={{ backgroundColor: 'var(--color-accent-alt)' }}
                                   animate={{ width: `${Math.round(task.progress.current / Math.max(1, task.progress.total) * 100)}%` }} />
                               </div>
-                              <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                                {task.progress.current}/{task.progress.total} · {task.progress.label}
-                              </span>
                             </div>
                           )}
+
+                          {/* Résumé (si terminé) */}
+                          {task.summary && (
+                            <p className="mt-1 ml-5 text-xs" style={{ color: 'var(--text-muted)' }}>{task.summary}</p>
+                          )}
+
+                          {/* Dernière étape + historique dépliable */}
                           {task.steps.length > 0 && (
-                            <span className="mt-0.5 ml-5 block truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                              {task.steps[task.steps.length - 1]}
-                            </span>
+                            <>
+                              <div className="mt-0.5 ml-5 flex items-center gap-1.5">
+                                <Zap className="h-2.5 w-2.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                                <span className="flex-1 truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                                  {task.steps[task.steps.length - 1]}
+                                </span>
+                              </div>
+                              {hasMoreSteps && (
+                                <button type="button" onClick={() => toggleExpanded(`agent:${task.id}`)}
+                                  className="mt-1 ml-5 flex items-center gap-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)] rounded"
+                                  style={{ color: 'var(--text-muted)' }} aria-expanded={isOpen}>
+                                  <ChevronRight className="h-3 w-3 transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }} />
+                                  <History className="h-3 w-3" />
+                                  {isOpen ? 'Masquer les étapes' : `Toutes les étapes (${task.steps.length})`}
+                                </button>
+                              )}
+                              {isOpen && hasMoreSteps && (
+                                <ol className="mt-1 ml-5 flex flex-col gap-1 border-l pl-3" style={{ borderColor: 'var(--border-base)' }}>
+                                  {task.steps.map((step, i) => (
+                                    <li key={i} className="flex items-start gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                                      <span className="font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>{(i + 1).toString().padStart(2, '0')}</span>
+                                      <span className="flex-1">{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
+                            </>
                           )}
                         </motion.div>
                       );
@@ -430,23 +618,69 @@ export default function OrbLiveView() {
               {/* Actions / outils récents */}
               {recentTools.length > 0 && (
                 <section className="flex flex-col gap-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Actions récentes</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>Actions récentes</h3>
+                    <span className="font-mono text-xs" style={{ color: 'var(--text-dimmed)' }}>{allToolsReversed.length}</span>
+                  </div>
                   <AnimatePresence initial={false}>
-                    {recentTools.map(tool => (
+                    {recentTools.map(tool => {
+                      const isOpen = !!expanded[`tool:${tool.id}`];
+                      const durationMs = tool.endTimestamp ? tool.endTimestamp - tool.timestamp : undefined;
+                      const hasDetails = !!(tool.result || (tool.args && Object.keys(tool.args).length > 0));
+                      return (
                       <motion.div key={tool.id} initial={reduceMotion ? false : { opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-2 rounded-md px-2.5 py-1.5" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}>
-                        {tool.status === 'running'
-                          ? <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-                          : <CheckCircle2 className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
-                        <span className="flex-1 truncate font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>{tool.label}</span>
-                        {tool.status === 'done' && tool.endTimestamp && (
-                          <span className="font-mono text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
-                            {Math.max(0, Math.round((tool.endTimestamp - tool.timestamp) / 100) / 10)}s
+                        className="rounded-md px-2.5 py-1.5" style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}>
+                        <div className="flex items-center gap-2">
+                          {tool.status === 'running'
+                            ? <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                            : <CheckCircle2 className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
+                          <span className="flex-1 truncate font-mono text-xs" style={{ color: 'var(--text-secondary)' }} title={tool.tool}>{tool.label}</span>
+                          <span className="rounded px-1 py-px text-[10px] font-medium" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-dimmed)' }} title="Agent attribué">
+                            {getAgentDisplayName(tool.agentId)}
                           </span>
+                          {tool.status === 'done' && durationMs != null && (
+                            <span className="font-mono text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                              {formatDuration(durationMs)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 ml-5 flex items-center gap-2">
+                          <span className="font-mono text-[10px] tabular-nums" style={{ color: 'var(--text-dimmed)' }}>{formatClock(tool.timestamp)}</span>
+                          {hasDetails && (
+                            <button type="button" onClick={() => toggleExpanded(`tool:${tool.id}`)}
+                              className="flex items-center gap-0.5 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)] rounded"
+                              style={{ color: 'var(--text-muted)' }} aria-expanded={isOpen}>
+                              <ChevronRight className="h-2.5 w-2.5 transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }} />
+                              {isOpen ? 'Masquer' : 'Détails'}
+                            </button>
+                          )}
+                        </div>
+                        {isOpen && hasDetails && (
+                          <div className="mt-1 ml-5 flex flex-col gap-1">
+                            {tool.args && Object.keys(tool.args).length > 0 && (
+                              <pre className="max-h-24 overflow-auto rounded px-2 py-1 font-mono text-[10px] leading-snug custom-scrollbar"
+                                style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
+                                {safeStringify(tool.args)}
+                              </pre>
+                            )}
+                            {tool.result && (
+                              <div className="rounded px-2 py-1 text-[11px] leading-snug" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}>
+                                {tool.result.length > 300 ? tool.result.slice(0, 300) + '…' : tool.result}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </motion.div>
-                    ))}
+                      );
+                    })}
                   </AnimatePresence>
+                  {allToolsReversed.length > 8 && (
+                    <button type="button" onClick={() => setShowAllTools(v => !v)}
+                      className="mt-0.5 self-start text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)] rounded"
+                      style={{ color: 'var(--accent-primary)' }}>
+                      {showAllTools ? 'Réduire' : `Voir plus (${allToolsReversed.length - recentTools.length})`}
+                    </button>
+                  )}
                 </section>
               )}
             </>

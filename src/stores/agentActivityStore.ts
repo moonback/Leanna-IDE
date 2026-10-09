@@ -380,6 +380,14 @@ export function destroyActivityStore() {
   console.log('[agentActivityStore] ✅ Nettoyé avec succès');
 }
 
+/**
+ * Nom lisible d'un agent à partir de son rôle (ex: 'writer' → 'Rédacteur').
+ * Retourne le rôle brut si inconnu. Exporté pour l'affichage du suivi d'activité.
+ */
+export function getAgentDisplayName(role: string): string {
+  return ROLE_TO_AGENT_NAME[role] ?? role;
+}
+
 export function getToolActivities(): ToolActivityEntry[] {
   return toolActivities;
 }
