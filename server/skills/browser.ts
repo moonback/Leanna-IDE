@@ -1124,6 +1124,7 @@ export const browserSkill: Skill = {
 
   handleToolCall: async (name: string, args: any, context?: any) => {
     const emit = context?.emitIdeAction as ((action: any) => void) | undefined;
+    const signal: AbortSignal | undefined = context?.signal;
 
     // Helper générique pour les actions async (click/type/snapshot/inspect/get-links)
     // qui utilisent le registre browserActionPending de server.ts.
@@ -1569,8 +1570,12 @@ export const browserSkill: Skill = {
       // 4. Visiter et lire chaque source
       const sources: ResearchSource[] = [];
       const errors: Array<{ url: string; message: string }> = [];
+      let researchCancelled = false;
 
       for (const url of candidates) {
+        // Annulation coopérative entre deux sources : on s'arrête avant d'ouvrir
+        // la suivante et on renvoie ce qui a déjà été collecté.
+        if (signal?.aborted) { researchCancelled = true; break; }
         emit({ type: "browser-navigate", url });
         await waitForBrowserCondition(url, "url", 10_000);
         const result = await readPageContentWithRetry(null, 2, 1200);
@@ -1608,7 +1613,10 @@ export const browserSkill: Skill = {
       };
 
       return {
-        status: sources.length > 0 ? "success" : "error",
+        status: researchCancelled
+          ? (sources.length > 0 ? "partial" : "cancelled")
+          : (sources.length > 0 ? "success" : "error"),
+        cancelled: researchCancelled || undefined,
         query,
         engine,
         searchUrl,
@@ -1618,10 +1626,11 @@ export const browserSkill: Skill = {
         contradictions: research.contradictions,
         confidence: research.confidence,
         errors: errors.length ? errors : undefined,
-        message:
-          sources.length > 0
+        message: researchCancelled
+          ? `Recherche interrompue (kill-switch) après ${sources.length} source(s) lue(s) sur "${query}".`
+          : (sources.length > 0
             ? `${sources.length} source(s) lue(s) pour "${query}". Consensus: ${research.consensus.length}, contradictions: ${research.contradictions.length}, confiance: ${(research.confidence * 100).toFixed(0)}%. Cite les preuves par URL/titre.`
-            : `Aucune source n'a pu être lue pour "${query}".`,
+            : `Aucune source n'a pu être lue pour "${query}".`),
       };
     }
 

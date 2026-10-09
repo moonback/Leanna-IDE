@@ -54,10 +54,12 @@ async function analyzeCodebaseWithOpenRouter(codebaseMarkdown: string): Promise<
 
 // ─── Reader Handlers ──────────────────────────────────────────────────────────
 
-export async function handleGenerateCodebaseMarkdown(args: any) {
+export async function handleGenerateCodebaseMarkdown(args: any, signal?: AbortSignal) {
   if (!getProjectRoot()) {
     return { error: "Aucun workspace ouvert. Sélectionnez ou créez un projet d'abord." };
   }
+  const cancelled = () => ({ status: "cancelled" as const, cancelled: true, message: "Génération de codebase.md annulée (kill-switch)." });
+  if (signal?.aborted) return cancelled();
   const codebasePath = resolveWritePath("codebase.md");
   if (!codebasePath) {
     return { error: "Sandbox indisponible : génération de codebase.md refusée tant que le sandbox n'est pas READY." };
@@ -87,6 +89,9 @@ export async function handleGenerateCodebaseMarkdown(args: any) {
 
   const fileDetails: string[] = [];
   for (const relativePath of files) {
+    // La boucle de détail est la principale source de latence sur un gros
+    // projet : on sort proprement si la tâche de fond est annulée.
+    if (signal?.aborted) return cancelled();
     fileDetails.push(`### ${relativePath}`);
     try {
       const absolutePath = path.join(getProjectRoot(), relativePath);
@@ -103,10 +108,12 @@ export async function handleGenerateCodebaseMarkdown(args: any) {
     }
   }
 
+  if (signal?.aborted) return cancelled();
+
   let markdown = header + fileDetails.join("\n");
   let analysis: string | null = null;
   let analysisStatus = "disabled";
-  if (analyzeWithOpenRouter) {
+  if (analyzeWithOpenRouter && !signal?.aborted) {
     try {
       analysis = await analyzeCodebaseWithOpenRouter(markdown);
       analysisStatus = analysis ? "success" : "missing-api-key";

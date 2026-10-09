@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
   BarChart2, Settings, PanelLeftClose, PanelLeftOpen,
-  Power, MessageCircle, Mic, MicOff, Sparkles, Bot, ArrowLeft, LogOut,
+  Power, MessageCircle, Mic, MicOff, Sparkles, Bot, ArrowLeft, LogOut, FolderInput,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
@@ -148,6 +148,19 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   const handleQuit = () => {
     window.close();
   };
+
+  // Changer de projet racine : ferme les onglets, désactive le workspace actif
+  // côté serveur, puis ouvre la modale de sélection de workspace.
+  const handleSwitchWorkspace = useCallback(async () => {
+    window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: null } }));
+    try {
+      const res = await fetch('/api/self-root/clear', { method: 'POST' });
+      if (!res.ok) console.error('[GlobalSidebar] Échec de la désactivation du workspace:', res.status);
+    } catch (e) {
+      console.error('[GlobalSidebar] Échec de la désactivation du workspace:', e);
+    }
+    window.dispatchEvent(new CustomEvent('Leanna-open-workspace-switcher'));
+  }, []);
 
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
 
@@ -299,8 +312,16 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
         )}
       </div>
 
-      {/* Footer — settings */}
+      {/* Footer — changer de projet + settings */}
       <div className="border-t mt-auto px-2 py-0" style={{ borderColor: 'var(--border-base)' }}>
+        <div className="pt-1">
+          <NavButton
+            item={{ id: 'switch-workspace', path: '', label: 'Changer de projet', icon: FolderInput }}
+            active={false}
+            collapsed={collapsed}
+            onClick={handleSwitchWorkspace}
+          />
+        </div>
         <div className="flex items-center gap-1">
           <div className="flex-1">
             <NavButton

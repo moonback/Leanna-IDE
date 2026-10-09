@@ -112,7 +112,8 @@ export const projectSkill: Skill = {
     },
   ],
 
-  handleToolCall: async (name, args: Record<string, unknown>) => {
+  handleToolCall: async (name, args: Record<string, unknown>, context?: any) => {
+    const signal: AbortSignal | undefined = context?.signal;
     try {
       switch (name) {
         case "project_list_frameworks": {
@@ -184,6 +185,9 @@ export const projectSkill: Skill = {
               timeout: SCAFFOLD_TIMEOUT_MS,
               maxBuffer: MAX_BUFFER,
               // Pas de shell: true - Node.js 20+ gère .cmd directement
+              // Kill-switch temps-réel : tue le sous-processus de scaffolding à
+              // l'annulation de la tâche de fond.
+              signal,
               env: {
                 ...process.env,
                 // Forcer le mode non-interactif pour les outils CLI
@@ -194,11 +198,14 @@ export const projectSkill: Skill = {
             stdout = result.stdout ?? "";
             stderr = result.stderr ?? "";
           } catch (execErr: any) {
+            const aborted = execErr?.name === "AbortError" || signal?.aborted;
             return {
-              status: "error",
-              error: execErr.killed
-                ? `Timeout dépassé (${SCAFFOLD_TIMEOUT_MS / 1000}s) — le scaffolding a été interrompu.`
-                : execErr.message,
+              status: aborted ? "cancelled" : "error",
+              error: aborted
+                ? "Scaffolding interrompu par le kill-switch (annulation)."
+                : (execErr.killed
+                  ? `Timeout dépassé (${SCAFFOLD_TIMEOUT_MS / 1000}s) — le scaffolding a été interrompu.`
+                  : execErr.message),
               stdout: (execErr.stdout ?? "").slice(0, 3000),
               stderr: (execErr.stderr ?? "").slice(0, 3000),
             };

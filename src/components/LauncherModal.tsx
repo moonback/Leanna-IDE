@@ -31,6 +31,8 @@ import { ideApi } from '../services/ideApi.js';
 
 const LAUNCHER_DONE_KEY = 'Leanna-launcher-done';
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
+/** Clé sessionStorage : la réouverture automatique du dernier projet a déjà été tentée pour cette session. */
+const AUTO_REOPEN_KEY = 'Leanna-auto-reopen-done';
 
 const OVERLAY_FADE = { duration: 0.25, ease: 'easeOut' as const };
 
@@ -52,6 +54,46 @@ export function LauncherModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [lastWorkspace, setLastWorkspace] = useState<WorkspaceItem | null>(null);
   const [isOpeningLast, setIsOpeningLast] = useState(false);
+  // Quand le launcher est rouvert explicitement par l'utilisateur, on désactive
+  // la réouverture automatique du dernier projet pour laisser le choix.
+  const [forceManual, setForceManual] = useState(false);
+
+  const openWorkspace = useCallback(
+    async (workspace: WorkspaceItem, options?: { silent?: boolean }): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/self-root/change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: workspace.path,
+            userConfirmed: true,
+            siteUrl: workspace.siteUrl || '',
+          }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+          sessionStorage.removeItem(NO_WORKSPACE_KEY);
+          ideApi.invalidateCache();
+          window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+          window.dispatchEvent(
+            new CustomEvent('Leanna-workspace-changed', {
+              detail: { workspace: data.newRoot || workspace.path },
+            }),
+          );
+          setIsOpen(false);
+          navigate('/ide');
+          return true;
+        }
+      } catch (e) {
+        if (!options?.silent) {
+          console.error('Erreur lors de la réouverture du dernier projet:', e);
+        }
+      }
+      return false;
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     if (sessionStorage.getItem(LAUNCHER_DONE_KEY) === '1') {
@@ -82,9 +124,31 @@ export function LauncherModal() {
     fetchRecent();
   }, []);
 
+  // Réouverture automatique du dernier projet au démarrage.
+  // Dès que le launcher est ouvert et que le dernier workspace est connu, on
+  // bascule directement dans l'IDE sur ce projet — sauf si l'utilisateur a
+  // explicitement rouvert le launcher (forceManual) ou si l'auto-ouverture a
+  // déjà été tentée pour cette session.
+  useEffect(() => {
+    if (!isOpen || forceManual || !lastWorkspace || isOpeningLast) return;
+    if (sessionStorage.getItem(AUTO_REOPEN_KEY) === '1') return;
+    sessionStorage.setItem(AUTO_REOPEN_KEY, '1');
+    setIsOpeningLast(true);
+    void (async () => {
+      try {
+        await openWorkspace(lastWorkspace, { silent: true });
+      } finally {
+        setIsOpeningLast(false);
+      }
+    })();
+  }, [isOpen, forceManual, lastWorkspace, isOpeningLast, openWorkspace]);
+
   // Réouverture événementielle
   useEffect(() => {
     const handleReopen = () => {
+      // Demande explicite : on reste sur l'écran de choix, pas d'auto-ouverture.
+      setForceManual(true);
+      sessionStorage.setItem(AUTO_REOPEN_KEY, '1');
       setIsOpen(true);
       fetch('/api/self-root/workspaces')
         .then((r) => (r.ok ? r.json() : null))
@@ -103,38 +167,13 @@ export function LauncherModal() {
     if (!lastWorkspace || isOpeningLast) return;
     setIsOpeningLast(true);
     try {
-      const res = await fetch('/api/self-root/change', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: lastWorkspace.path,
-          userConfirmed: true,
-          siteUrl: lastWorkspace.siteUrl || '',
-        }),
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
-        sessionStorage.removeItem(NO_WORKSPACE_KEY);
-        ideApi.invalidateCache();
-        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
-        window.dispatchEvent(
-          new CustomEvent('Leanna-workspace-changed', {
-            detail: { workspace: data.newRoot || lastWorkspace.path },
-          }),
-        );
-        setIsOpen(false);
-        navigate('/ide');
-        return;
-      }
-    } catch (e) {
-      console.error('Erreur lors de la réouverture du dernier projet:', e);
+      const ok = await openWorkspace(lastWorkspace);
+      if (!ok) openWorkspaceSwitcher();
     } finally {
       setIsOpeningLast(false);
     }
-
-    openWorkspaceSwitcher();
-  }, [lastWorkspace, isOpeningLast, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastWorkspace, isOpeningLast, openWorkspace]);
 
   const openWorkspaceSwitcher = useCallback(() => {
     sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');

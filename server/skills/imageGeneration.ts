@@ -144,6 +144,7 @@ export const imageGenerationSkill: Skill = {
         aspectRatio,
         quality: "high",
         resolution: "2K",
+        signal: context?.signal,
       });
     } catch (e: any) {
       log.error(`generate_image: échec de l'appel — ${e?.message}`);
