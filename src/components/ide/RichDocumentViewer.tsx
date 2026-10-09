@@ -6,8 +6,8 @@
  */
 
 import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer,
@@ -784,8 +784,9 @@ function TextRenderer({ block }: { block: TextBlock }) {
   const html = useMemo(() => {
     if (!useMarkdown) return null;
     try {
-      const result = marked.parse(block.content, { gfm: true, breaks: true });
-      return typeof result === 'string' ? sanitizeMarkdownHtml(result) : null;
+      // Pipeline unifié (comme le chat et la preview IDE) : rendu synchrone
+      // forcé via renderChatMarkdown, puis sanitisation.
+      return sanitizeMarkdownHtml(renderChatMarkdown(block.content));
     } catch {
       return null;
     }

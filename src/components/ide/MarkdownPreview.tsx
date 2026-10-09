@@ -1,23 +1,21 @@
 import React, { useMemo } from 'react';
-import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
 
 interface MarkdownPreviewProps {
   content: string;
 }
 
-// Configure marked for safe rendering
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-});
-
 export const MarkdownPreview = React.memo(function MarkdownPreview({ content }: MarkdownPreviewProps) {
   const html = useMemo(() => {
     try {
-      // marked.parse is synchronous when no async extensions are used
-      const result = marked.parse(content);
-      return typeof result === 'string' ? sanitizeMarkdownHtml(result) : '';
+      // On réutilise exactement le même pipeline que les bulles de chat
+      // (renderChatMarkdown → sanitizeMarkdownHtml) : rendu synchrone forcé
+      // ({ async: false }) et renderer custom correctement configuré via
+      // marked.use(). Appeler marked.parse() directement ici configurait le
+      // singleton marked différemment (setOptions concurrent) et pouvait casser
+      // le binding `this.parser` du renderer listitem → « Erreur de rendu ».
+      return sanitizeMarkdownHtml(renderChatMarkdown(content));
     } catch {
       return '<p>Erreur lors du rendu Markdown.</p>';
     }

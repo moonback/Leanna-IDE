@@ -10,8 +10,8 @@ import {
   Image as ImageIcon, Paperclip, Download, Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { marked } from 'marked';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
 import { api } from './api/client.js';
 
 interface SourceData {
@@ -302,8 +302,9 @@ function RenderedContent({ content, type }: { content: string; type?: string }) 
     try {
       const isMarkdownLike = type === 'markdown' || type === 'text';
       if (isMarkdownLike) {
-        const result = marked.parse(content, { gfm: true, breaks: true });
-        return typeof result === 'string' ? sanitizeMarkdownHtml(result) : '';
+        // Pipeline unifié (comme le chat et la preview IDE) : rendu synchrone
+        // forcé via renderChatMarkdown, puis sanitisation.
+        return sanitizeMarkdownHtml(renderChatMarkdown(content));
       }
       // Fallback: wrap in <pre> for other text types
       const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
