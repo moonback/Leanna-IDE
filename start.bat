@@ -3,8 +3,25 @@
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title LEANNA OS ^| Autonomous AI Workspace
-mode con: cols=92 lines=38
 color 0B
+
+:: ============================================================
+:: FENETRE MAXIMISEE
+:: ============================================================
+:: Maximiser la fenetre de la console via un script VBS temporaire
+:: (envoie Alt+Espace puis x = commande "Agrandir" du menu systeme)
+set "FS_VBS=%TEMP%\leanna_maximize.vbs"
+(
+    echo Set WshShell = CreateObject^("WScript.Shell"^)
+    echo WScript.Sleep 150
+    echo WshShell.AppActivate "LEANNA OS ^| Autonomous AI Workspace"
+    echo WScript.Sleep 150
+    echo WshShell.SendKeys "% x"
+) > "%FS_VBS%" 2>nul
+if exist "%FS_VBS%" (
+    cscript //nologo "%FS_VBS%" >nul 2>&1
+    del "%FS_VBS%" >nul 2>&1
+)
 
 :: ============================================================
 :: LEANNA OS - PREMIUM LAUNCHER
@@ -62,7 +79,16 @@ echo.
 echo     %YELLOW%▸ 04%RST%   %WHITE%%BOLD%DEPENDENCY MANAGER%RST%
 echo             %GREY%Nettoyer node_modules et reinstaller%RST%
 echo.
-echo     %RED%▸ 05%RST%   %WHITE%%BOLD%EXIT%RST%
+echo     %TEAL%▸ 05%RST%   %WHITE%%BOLD%BUILD INSTALLER (WIN)%RST%
+echo             %GREY%Generer l'installateur Windows ^(npm run dist:win^)%RST%
+echo.
+echo     %TEAL%▸ 06%RST%   %WHITE%%BOLD%BUILD PORTABLE (WIN)%RST%
+echo             %GREY%Generer un build non empaquete ^(npm run pack:win^)%RST%
+echo.
+echo     %PURPLE%▸ 07%RST%   %WHITE%%BOLD%CREDITS%RST%
+echo             %GREY%A propos de Leanna OS%RST%
+echo.
+echo     %RED%▸ 08%RST%   %WHITE%%BOLD%EXIT%RST%
 echo             %GREY%Fermer le launcher%RST%
 echo.
 echo  %CYAN%  ────────────────────────────────────────────────────────────────%RST%
@@ -71,9 +97,12 @@ echo  %DIM%   ⚙  Runtime  %RST%%GREY%Node.js  ·  Electron  ·  Vite%RST%
 echo  %CYAN%  ────────────────────────────────────────────────────────────────%RST%
 echo.
 
-choice /c 12345 /n /m "  %TEAL%LEANNA ❯%RST% Selectionner une option [1-5] : "
+choice /c 12345678 /n /m "  %TEAL%LEANNA ❯%RST% Selectionner une option [1-8] : "
 
-if errorlevel 5 exit /b 0
+if errorlevel 8 exit /b 0
+if errorlevel 7 goto :credits
+if errorlevel 6 goto :pack_win
+if errorlevel 5 goto :dist_win
 if errorlevel 4 goto :clean_deps
 if errorlevel 3 goto :pm2_process
 if errorlevel 2 goto :dev_process
@@ -256,6 +285,119 @@ echo  %GREY%   pm2 monit       %RST%%DIM%Supervision%RST%
 echo  %GREY%   pm2 restart all %RST%%DIM%Redemarrage%RST%
 echo  %GREY%   pm2 stop all    %RST%%DIM%Arret%RST%
 echo  %CYAN%  ╰──────────────────────────────────────────────────────────────╯%RST%
+echo.
+pause
+goto :menu
+
+:: ============================================================
+:: BUILD INSTALLER WINDOWS (dist:win)
+:: ============================================================
+
+:dist_win
+set "BUILD_CMD=dist:win"
+set "BUILD_LABEL=BUILD INSTALLER (WIN)"
+set "BUILD_DESC=Generation de l'installateur Windows"
+goto :build_win
+
+:: ============================================================
+:: BUILD PORTABLE WINDOWS (pack:win)
+:: ============================================================
+
+:pack_win
+set "BUILD_CMD=pack:win"
+set "BUILD_LABEL=BUILD PORTABLE (WIN)"
+set "BUILD_DESC=Generation d'un build non empaquete (dossier)"
+goto :build_win
+
+:: ============================================================
+:: PIPELINE DE BUILD WINDOWS COMMUN
+:: ============================================================
+
+:build_win
+set "STEP=0"
+set "TOTAL=3"
+cls
+call :banner
+echo.
+echo  %TEAL%  ╭───────────────────────── WINDOWS BUILD ──────────────────────╮%RST%
+echo.
+call :step "Verification de Node.js"
+where node >nul 2>&1
+if errorlevel 1 (
+    call :fatal "Node.js est introuvable." "Installez Node.js LTS puis relancez."
+    goto :menu
+)
+for /f "delims=" %%v in ('node --version 2^>nul') do set "NODE_VERSION=%%v"
+call :ok "Node.js !NODE_VERSION!"
+
+call :step "Verification des dependances"
+if not exist "node_modules\" (
+    echo.
+    call :info "Installation des dependances en cours..."
+    call npm install --no-fund --no-audit
+    if errorlevel 1 (
+        call :fatal "Installation des dependances echouee." "Verifiez le reseau et les logs npm."
+        goto :menu
+    )
+    call :ok "Dependances installees"
+) else (
+    call :ok "node_modules disponible"
+)
+
+call :step "!BUILD_DESC!"
+echo.
+echo  %TEAL%  ╰──────────────────────────────────────────────────────────────╯%RST%
+echo.
+echo  %CYAN%  ╭──────────────────────────────────────────────────────────────╮%RST%
+echo  %CYAN%  │%RST%  %WHITE%%BOLD%TARGET%RST%    !BUILD_LABEL!
+echo  %CYAN%  │%RST%  %GREY%Commande%RST%  %DIM%npm run !BUILD_CMD!%RST%
+echo  %CYAN%  ╰──────────────────────────────────────────────────────────────╯%RST%
+echo.
+echo  %GREEN%  ● LIVE%RST%  La compilation electron-builder va demarrer.
+echo  %GREY%          Pour arreter : %WHITE%Ctrl+C%RST%
+echo.
+echo  %CYAN%  ───────────────────────── BUILD CONSOLE ───────────────────────%RST%
+echo.
+
+call npm run !BUILD_CMD!
+set "EXIT_CODE=!errorlevel!"
+
+echo.
+echo  %CYAN%  ────────────────────────────────────────────────────────────────%RST%
+if not "!EXIT_CODE!"=="0" (
+    call :fatal "Le build s'est arrete avec le code !EXIT_CODE!." "Consultez les logs ci-dessus."
+) else (
+    call :ok "Build termine avec succes."
+    if exist "release\" call :info "Artefacts disponibles dans le dossier : release"
+    if exist "dist_electron\" call :info "Artefacts disponibles dans le dossier : dist_electron"
+    echo.
+    pause
+)
+goto :menu
+
+:: ============================================================
+:: CREDITS
+:: ============================================================
+
+:credits
+cls
+call :banner
+echo.
+echo  %PURPLE%  ╭──────────────────────────── CREDITS ─────────────────────────╮%RST%
+echo.
+echo     %WHITE%%BOLD%  LEANNA OS%RST%  %DIM%v%VERSION%%RST%
+echo     %GREY%  Autonomous AI Workspace%RST%
+echo.
+echo     %CYAN%  Launcher%RST%        %WHITE%v%LAUNCHER_VERSION%%RST%
+echo     %CYAN%  Runtime%RST%         %WHITE%Node.js  ·  Electron  ·  Vite%RST%
+echo     %CYAN%  Process Mgr%RST%     %WHITE%PM2%RST%
+echo     %CYAN%  Build System%RST%    %WHITE%electron-builder  ·  esbuild%RST%
+echo.
+echo  %PURPLE%  ────────────────────────────────────────────────────────────────%RST%
+echo     %GREY%  Concu et developpe par l'equipe Leanna.%RST%
+echo     %GREY%  (c) 2026 Leanna OS. Tous droits reserves.%RST%
+echo.
+echo  %PURPLE%  ╰──────────────────────────────────────────────────────────────╯%RST%
 echo.
 pause
 goto :menu
