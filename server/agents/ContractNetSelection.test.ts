@@ -172,6 +172,43 @@ describe("ContractNetNegotiator — mode sélection", () => {
     assert.ok(outcome.durationMs >= 50);
   });
 
+  it("déduplique les bids du même rôle (garde le meilleur skillMatch)", async () => {
+    const task = makeTask();
+    const promise = negotiator.negotiate(task, "architect", { award: false });
+    negotiator.submitBid(task.taskId, { role: "coder", skillMatch: 0.5, confidence: 0.9, loadPenalty: 0 });
+    negotiator.submitBid(task.taskId, { role: "coder", skillMatch: 0.9, confidence: 0.5, loadPenalty: 0 });
+    negotiator.submitBid(task.taskId, { role: "coder", skillMatch: 0.1, confidence: 1.0, loadPenalty: 0 }); // pire → ignoré
+    const outcome = await promise;
+
+    assert.equal(outcome.bids.filter((b) => b.role === "coder").length, 1);
+    assert.equal(outcome.winner, "coder");
+    assert.equal(outcome.bids[0].skillMatch, 0.9);
+  });
+
+  it("une contrainte vide rend tous les bids éligibles", async () => {
+    const task = makeTask({ requiredCapabilities: [] });
+    const promise = negotiator.negotiate(task, "architect", { award: false });
+    negotiator.submitBid(task.taskId, { role: "writer", skillMatch: 1, confidence: 0.5, loadPenalty: 0 });
+    const outcome = await promise;
+
+    assert.equal(outcome.winner, "writer");
+    assert.equal(outcome.awarded, false);
+  });
+
+  it("skillMatchFor retourne 1 pour une contrainte vide (tout le monde couvre)", () => {
+    assert.equal(negotiator.skillMatchFor([], []), 1);
+    assert.equal(negotiator.skillMatchFor(["verify_full"], []), 1);
+  });
+
+  it("hasNoOnlineBidders exclut l'initiateur des bidders attendus", () => {
+    // Seul 'architect' est en ligne. Si c'est lui l'initiateur, aucun bidder
+    // réel ne peut répondre → true (inutile d'ouvrir une enchère).
+    negotiator.setExpectedBiddersProvider(() => ["architect"] as AgentRole[]);
+    assert.equal(negotiator.hasNoOnlineBidders("architect"), true);
+    // Un autre initiateur laisse 'architect' comme bidder valide → false.
+    assert.equal(negotiator.hasNoOnlineBidders("orchestrator"), false);
+  });
+
   it("tient des métriques d'enchères et de replis", async () => {
     const t1 = makeTask({ taskId: "m1" });
     const p1 = negotiator.negotiate(t1, "architect", { award: false });

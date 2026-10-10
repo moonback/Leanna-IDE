@@ -293,6 +293,21 @@ export class ContractNetNegotiator {
       log.debug(`Bid ignoré : enchère ${taskId.slice(0, 8)} fermée ou inconnue`);
       return false;
     }
+
+    // Dédup par rôle : un même rôle peut re-soumettre (retry, re-broadcast).
+    // On conserve le bid au skillMatch le plus élevé pour éviter les doublons
+    // dans `ranked`/`bids`, des statistiques gonflées, et surtout qu'un second
+    // bid inéligible (skillMatch 0) ne masque un premier bid éligible.
+    const existingIdx = call.bids.findIndex((b) => b.role === bid.role);
+    if (existingIdx !== -1) {
+      if (bid.skillMatch > call.bids[existingIdx].skillMatch) {
+        call.bids[existingIdx] = bid;
+      }
+      call.responded.add(bid.role);
+      call.notify?.();
+      return true;
+    }
+
     call.bids.push(bid);
     call.responded.add(bid.role);
     log.debug(
@@ -326,10 +341,13 @@ export class ContractNetNegotiator {
    * il est alors inutile de lancer une enchère (personne n'enchérirait et l'on
    * attendrait la fenêtre complète pour rien).
    */
-  hasNoOnlineBidders(): boolean {
+  hasNoOnlineBidders(from: AgentRole = this.initiator): boolean {
     if (!this.expectedBiddersProvider) return false;
     try {
-      return this.expectedBiddersProvider().length === 0;
+      // On exclut l'initiateur : le bus ne lui diffuse pas l'appel d'offres, il
+      // ne pourrait donc pas enchérir. Sans ce filtre, un `negotiate(task, X)`
+      // où `X` est le seul agent en ligne attendrait stérilement toute la fenêtre.
+      return this.expectedBiddersProvider().filter((role) => role !== from).length === 0;
     } catch {
       return false;
     }
@@ -446,6 +464,9 @@ export class ContractNetNegotiator {
     if (!best) return { winner: null, preferredKept: false };
 
     if (task.preferredRole && best.role !== task.preferredRole) {
+      // `eligible` ne contient QUE des bids éligibles, et `submitBid` déduplique
+      // par rôle : impossible de retomber ici sur un bid `skillMatch: 0` du rôle
+      // préféré qui aurait doublé un bid éligible.
       const preferred = eligible.find((b) => b.role === task.preferredRole);
       const margin = task.switchMargin ?? getContractNetConfig().switchMargin;
       // Epsilon : évite qu'un écart de 0.1 « flottant » (0.10000000000000009) casse la marge.
@@ -553,9 +574,14 @@ export class ContractNetNegotiator {
     });
   }
 
-  /** Part des capacités requises couvertes par l'agent (0..1). */
+  /**
+   * Part des capacités requises couvertes par l'agent (0..1).
+   * Aucune capacité requise = contrainte vide → tout le monde couvre
+   * trivialement la tâche (retour 1). Sinon tous les bids seraient inéligibles
+   * (skillMatch 0) et l'enchère n'aurait jamais de gagnant.
+   */
   private computeSkillMatch(capabilities: string[], required: string[]): number {
-    if (required.length === 0) return 0;
+    if (required.length === 0) return 1;
     const owned = new Set(capabilities);
     const covered = required.filter((cap) => owned.has(cap)).length;
     return covered / required.length;
