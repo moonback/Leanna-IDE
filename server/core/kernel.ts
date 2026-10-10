@@ -92,6 +92,13 @@ export interface CoreKernelOptions {
    * Par défaut, `.Leanna/core/ledger/actions.jsonl`.
    */
   ledgerFile?: string;
+  /**
+   * Surcharge du répertoire du store de missions durables (tests) — permet
+   * d'isoler les snapshots de cycle de vie entre exécutions. Sans isolation,
+   * le Supervisor relit (correctement) un snapshot terminal d'une exécution
+   * précédente et court-circuite la mission. Par défaut, `.Leanna/core/missions`.
+   */
+  missionStoreDir?: string;
 }
 
 /** Lit l'activation de l'idempotence depuis l'environnement. */
@@ -110,7 +117,7 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
   const guard = new LedgerGuard(ledger);
   const checkpoints = new CheckpointManager();
   const evidence = new EvidenceEngine();
-  const missionStore = new DurableMissionStore();
+  const missionStore = new DurableMissionStore(options.missionStoreDir);
   const supervisor = new LeannaSupervisor({ missionStore, checkpoints, evidence });
 
   const enable = options.enableIdempotency ?? idempotencyEnabledFromEnv(env);

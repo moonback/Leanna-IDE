@@ -18,9 +18,9 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
   - Watchdog **pause-aware** : le temps en pause ne compte plus dans le timeout.
   - `writeJsonAtomic` : `fsync` ajouté ; `readJson` journalise un JSON corrompu.
   - Routes : `approve` lié au `missionId`, `409` vs `404` pour pause/resume, `durationMs` réellement calculé, `priority` validée.
-  - **Reste du Sprint 2 (gros chantier, non fait) :** rechargement d'état + try/finally + timeout runner dans le `LeannaSupervisor` (point 5), branchement du noyau `core/` sur les missions.
-- ⏳ **Sprint 3 à venir** (unification Supervisor, skill 10, Planner 12).
-- Vérifs : typecheck propre sur les fichiers touchés ; 66 tests mission + core au vert.
+- 🔄 **Sprint 3 (partie 1) : `LeannaSupervisor` durci** — rechargement d'état depuis snapshot, `try/finally` autour de rollback/commit/evidence, timeout runner (`AbortSignal`), et usage de `PAUSED`/`WAITING_APPROVAL` via hooks. Nouveau `kernel.missionStoreDir` pour isoler les snapshots en test.
+- ⏳ **Sprint 3 (partie 2) à venir** : faire passer l'Executor par le Supervisor (couture `MissionRunner`, preuve réelle via `EvidenceEngine`), compléter le skill `mission` (point 10), plafonner le Planner (point 12).
+- Vérifs : typecheck propre sur les fichiers touchés ; **88 tests mission + core au vert** (dont 6 nouveaux sur le Supervisor durci).
 
 ## 🔴 Critiques (à corriger en premier)
 
@@ -62,12 +62,12 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
 - Dans les 527 fichiers fournis, aucun appel à `runSupervisedAgenticMission` hors tests. `DurableMissionStore.listResumable` n'est jamais lu.
 - Deux machines d'états parallèles coexistent (`GoalStatus` côté Executor, 13 états côté `core`), alors que `LeannaSupervisor` se présente comme « autorité unique ».
 - La persistance réelle dépend de Supabase, qui est un no-op silencieux sans variables d'env. Dans ce cas, **aucune reprise après crash**, alors que le store local `.Leanna/` est toujours disponible.
-- Le Supervisor lui-même a des trous :
-  - il crée toujours une machine neuve et ne recharge jamais l'état sauvegardé ;
-  - pas de try/finally : si `rollback`, `commit` ou `evidence.record` lève une exception, la mission reste coincée en `RECOVERING`, `VERIFYING` ou `COMMITTING` ;
-  - pas de timeout runner ;
-  - il n'utilise jamais `PAUSED` ni `WAITING_APPROVAL` ;
-  - sans `plannedFiles`, le rollback ne fait rien.
+- Le Supervisor lui-même avait des trous — ✅ **durcis (Sprint 3, partie 1) :**
+  - ✅ **Rechargement d'état** : `runMission` relit le snapshot persisté (`loadOrCreate`) et court-circuite si la mission est déjà terminale ; `ensureReady` ramène une machine reprise à `READY` par transitions légales.
+  - ✅ **try/finally** : `evidence.record`/`commit`/`rollback` encapsulés ; toute exception bascule proprement en `FAILED` (via `safeAdvance`, toujours persisté) au lieu de rester coincé en `VERIFYING`/`COMMITTING`/`RECOVERING`.
+  - ✅ **Timeout runner** : `runnerTimeoutMs` borne chaque tentative ; un dépassement déclenche un `AbortSignal` transmis au runner et compte comme tentative échouée.
+  - ✅ **`PAUSED` / `WAITING_APPROVAL`** : hooks optionnels (`needsApproval`/`awaitApproval`, `shouldPause`/`awaitResume`) matérialisent ces états (rétrocompatibles).
+  - **Reste :** sans `plannedFiles`, le rollback ne couvre toujours rien (limite du checkpoint) ; l'Executor des missions ne passe toujours PAS par le Supervisor (couture `MissionRunner`, Sprint 3 partie 2).
 
 ## 🟠 Majeurs
 

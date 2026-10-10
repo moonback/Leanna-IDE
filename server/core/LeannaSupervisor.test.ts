@@ -154,3 +154,162 @@ test("mission state is persisted durably and ends terminal", async () => {
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ─── Sprint 3 : durcissement du Supervisor ──────────────────────────────────
+
+test("reloads a persisted mission instead of recreating a fresh one", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const store = new DurableMissionStore(path.join(dir, "missions"));
+
+  // Première exécution : la mission réussit et devient COMPLETED (terminal).
+  const sup1 = new LeannaSupervisor({
+    maxAttempts: 2,
+    missionStore: store,
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+  const okRunner: MissionRunner = async () => ({
+    success: true,
+    evidence: { testsExecuted: [{ name: "unit", passed: true }] },
+  });
+  await sup1.runMission({ missionId: "m-reload", goal: "do", runner: okRunner });
+
+  // Seconde exécution : un nouveau Supervisor relit l'état terminal persisté et
+  // NE relance PAS le runner.
+  const sup2 = new LeannaSupervisor({
+    maxAttempts: 2,
+    missionStore: store,
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+  let called = false;
+  const spyRunner: MissionRunner = async () => {
+    called = true;
+    return { success: true, evidence: { testsExecuted: [{ name: "unit", passed: true }] } };
+  };
+  const result = await sup2.runMission({ missionId: "m-reload", goal: "do", runner: spyRunner });
+
+  assert.equal(result.finalState, "COMPLETED");
+  assert.equal(result.attempts, 0, "no new attempt on an already-terminal mission");
+  assert.equal(called, false, "runner must not run for a completed mission");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("an evidence failure never leaves the machine stuck in a transient state", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const store = new DurableMissionStore(path.join(dir, "missions"));
+  // Evidence engine qui lève systématiquement.
+  const throwingEvidence = {
+    record() {
+      throw new Error("evidence engine exploded");
+    },
+  } as unknown as EvidenceEngine;
+
+  const sup = new LeannaSupervisor({
+    maxAttempts: 2,
+    missionStore: store,
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: throwingEvidence,
+  });
+
+  const runner: MissionRunner = async () => ({ success: true });
+  const result = await sup.runMission({ missionId: "m-stuck", goal: "verify", runner });
+
+  // Au lieu de rester en VERIFYING, la mission bascule proprement en FAILED…
+  assert.equal(result.finalState, "FAILED");
+  // …et l'état FAILED est bien persisté (reprise cohérente).
+  const reloaded = store.load("m-stuck");
+  assert.equal(reloaded?.current, "FAILED");
+  assert.equal(reloaded?.isTerminal(), true);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a runner that exceeds the timeout counts as a failed attempt", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 1,
+    runnerTimeoutMs: 30,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+
+  let aborted = false;
+  const slowRunner: MissionRunner = ({ signal }) =>
+    new Promise((resolve) => {
+      signal?.addEventListener("abort", () => { aborted = true; });
+      // Ne se résout jamais à temps : le timeout doit gagner.
+      setTimeout(() => resolve({ success: true }), 5000).unref?.();
+    });
+
+  const result = await sup.runMission({ missionId: "m-timeout", goal: "slow", runner: slowRunner });
+
+  assert.equal(result.finalState, "ESCALATED", "timeout → failed attempt → escalate at maxAttempts");
+  assert.equal(aborted, true, "the runner received the abort signal on timeout");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("WAITING_APPROVAL: a refused approval escalates without running", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 2,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+
+  let ran = false;
+  const runner: MissionRunner = async () => { ran = true; return { success: true }; };
+  const result = await sup.runMission({
+    missionId: "m-approval",
+    goal: "sensitive",
+    runner,
+    hooks: {
+      needsApproval: () => true,
+      awaitApproval: async () => false, // refusée
+    },
+  });
+
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(ran, false, "runner never executed without approval");
+  const states = new DurableMissionStore(path.join(dir, "missions")).load("m-approval")?.snapshot().history.map((h) => h.to);
+  assert.ok(states?.includes("WAITING_APPROVAL"), "went through WAITING_APPROVAL");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("PAUSED: shouldPause suspends then awaitResume lets the mission complete", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 2,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+
+  let resumed = false;
+  let pauseAsked = false;
+  const runner: MissionRunner = async () => ({
+    success: true,
+    evidence: { testsExecuted: [{ name: "unit", passed: true }] },
+  });
+  const result = await sup.runMission({
+    missionId: "m-pause",
+    goal: "pausable",
+    runner,
+    hooks: {
+      shouldPause: () => { const first = !pauseAsked; pauseAsked = true; return first; },
+      awaitResume: async () => { resumed = true; },
+    },
+  });
+
+  assert.equal(result.finalState, "COMPLETED");
+  assert.equal(resumed, true, "awaitResume was awaited");
+  const states = new DurableMissionStore(path.join(dir, "missions")).load("m-pause")?.snapshot().history.map((h) => h.to);
+  assert.ok(states?.includes("PAUSED"), "went through PAUSED");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
