@@ -11,6 +11,7 @@ function md5(content: string): string {
 import {
   getProjectRoot,
   normalizeProjectPath,
+  resolveReadPath,
   resolveWritePath,
   checkWorkspace,
   EXCLUDED_DIRS,
@@ -217,7 +218,10 @@ export async function handleReadProjectFile(args: any) {
   }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
-  const normalized = normalizeProjectPath(requestedPath);
+  // Bug B — resolveReadPath retombe sur le projet réel (SELF_ROOT) si la cible
+  // n'est pas (encore) matérialisée dans l'image sandbox, évitant un faux
+  // « Fichier introuvable » sur un fichier qui existe bien côté projet.
+  const normalized = resolveReadPath(requestedPath);
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
   const stats = await fs.promises.stat(normalized);
@@ -296,7 +300,10 @@ export async function handleReadFileOutline(args: any) {
   }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
-  const normalized = normalizeProjectPath(requestedPath);
+  // Bug B — resolveReadPath retombe sur le projet réel (SELF_ROOT) si la cible
+  // n'est pas (encore) matérialisée dans l'image sandbox, évitant un faux
+  // « Fichier introuvable » sur un fichier qui existe bien côté projet.
+  const normalized = resolveReadPath(requestedPath);
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
   const stats = await fs.promises.stat(normalized);
@@ -324,8 +331,16 @@ export async function handleSearchInFiles(args: any) {
   const query = String(args.query || "").trim();
   if (!query) return { error: "Le terme de recherche est requis." };
   const searchPath = String(args.path || ".").trim();
-  const normalized = normalizeProjectPath(searchPath);
+  // Repli sandbox→projet pour la racine de recherche (Bug B), cohérent avec les
+  // handlers de lecture single-file.
+  const normalized = resolveReadPath(searchPath);
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
+  // Garde ENOENT : si la racine de recherche n'existe pas, renvoyer une erreur
+  // propre plutôt que de laisser walkDirectory lever « ENOENT: scandir » (crash
+  // observé en production quand l'agent cible un chemin inexistant).
+  if (!fs.existsSync(normalized)) {
+    return { error: `Chemin de recherche introuvable : ${searchPath}` };
+  }
   const extensions = args.extensions ? String(args.extensions).split(",").map((e: string) => e.trim().replace(/^\./, "")) : null;
   const caseSensitive = args.caseSensitive === true;
   const isRegex = args.regex === true;
@@ -435,7 +450,10 @@ export async function handleAnalyzeProjectFile(args: any, toolContext: any) {
   }
   const requestedPath = String(args.path || "").trim();
   if (!requestedPath) return { error: "Le chemin de fichier est requis." };
-  const normalized = normalizeProjectPath(requestedPath);
+  // Bug B — resolveReadPath retombe sur le projet réel (SELF_ROOT) si la cible
+  // n'est pas (encore) matérialisée dans l'image sandbox, évitant un faux
+  // « Fichier introuvable » sur un fichier qui existe bien côté projet.
+  const normalized = resolveReadPath(requestedPath);
   if (!normalized) return { error: "Chemin invalide ou en dehors du workspace." };
   if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
   const stats = await fs.promises.stat(normalized);

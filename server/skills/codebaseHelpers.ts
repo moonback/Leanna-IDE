@@ -75,6 +75,42 @@ export function normalizeProjectPath(target: string): string | null {
 }
 
 /**
+ * Résout un chemin de LECTURE avec repli sur le projet réel (SELF_ROOT).
+ *
+ * Quand le sandbox est actif, `normalizeProjectPath` résout sous
+ * `.Leanna/sandbox`. Mais l'image sandbox peut ne pas (encore) contenir un
+ * fichier donné (copie incrémentale, exclusions, état transitoire). Dans ce cas
+ * la lecture échouait en « Fichier introuvable » alors que le fichier existe
+ * dans le projet source. Ce helper tente d'abord la cible sandbox ; si elle
+ * n'existe pas physiquement ET que le sandbox est actif, il retombe sur le même
+ * chemin relatif sous SELF_ROOT (lecture seule, aucune écriture).
+ *
+ * Les mêmes garde-fous que `normalizeProjectPath` s'appliquent (pas de chemin
+ * absolu, pas d'évasion hors racine) : le repli réutilise `normalizeSelfPath`
+ * qui valide le confinement sous SELF_ROOT.
+ *
+ * Retourne le chemin absolu à lire, ou null si invalide / aucun workspace.
+ */
+export function resolveReadPath(target: string): string | null {
+  const primary = normalizeProjectPath(target);
+  if (primary === null) return null;
+
+  // Si la cible existe là où elle a été résolue, rien à faire.
+  if (fs.existsSync(primary)) return primary;
+
+  // Repli uniquement si le sandbox est actif (sinon `primary` pointe déjà sur
+  // SELF_ROOT et il n'y a pas d'autre racine à tenter).
+  if (!isSandboxActive()) return primary;
+
+  const fallback = normalizeSelfPath(target.trim());
+  if (fallback && fs.existsSync(fallback)) return fallback;
+
+  // Ni sandbox ni projet source : on renvoie la cible primaire pour que
+  // l'appelant émette le « Fichier introuvable » habituel.
+  return primary;
+}
+
+/**
  * Adaptateur de compatibilité : toute écriture est autorisée et résolue par
  * assertSandboxReady(), sans fallback vers SELF_ROOT.
  */

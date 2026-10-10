@@ -520,6 +520,7 @@ export class AgentBrain {
     // Réindexer les étapes régénérées pour éviter toute collision d'id avec les
     // étapes déjà complétées, et les faire dépendre du dernier travail préservé.
     const completedIds = completedStages.map((s) => s.id);
+    const completedIdSet = new Set(completedIds);
     const reindexed: BrainStage[] = regenerated.map((s, i) => {
       const newId = `replan${replanIndex}-${i + 1}-${s.agentRole}`;
       return { ...s, id: newId, status: "pending" as const, result: undefined };
@@ -529,9 +530,20 @@ export class AgentBrain {
     regenerated.forEach((s, i) => idMap.set(s.id, reindexed[i].id));
     for (const s of reindexed) {
       s.dependsOn = (s.dependsOn ?? [])
-        .map((d) => idMap.get(d))
-        .filter((d): d is string => Boolean(d));
+        .map((d) => {
+          // #7 : une dépendance vers une étape DÉJÀ COMPLÉTÉE doit être conservée
+          // telle quelle. L'ancien code ne mappait que via idMap (sous-plan
+          // régénéré) puis filtrait `Boolean(d)`, ce qui supprimait silencieusement
+          // ces liens et cassait l'ordre topologique attendu du DAG.
+          if (idMap.has(d)) return idMap.get(d)!;
+          if (completedIdSet.has(d)) return d;
+          return undefined;
+        })
+        // #8 : refuse l'auto-dépendance (un stage se référençant lui-même ferait
+        // rejeter tout le plan par le BrainPlanValidator).
+        .filter((d): d is string => Boolean(d) && d !== s.id);
       // La première étape du sous-plan reprend après le travail déjà validé
+      // (fallback appliqué seulement si AUCUNE dépendance exploitable n'a été posée).
       if (s.dependsOn.length === 0 && completedIds.length > 0) {
         s.dependsOn = [completedIds[completedIds.length - 1]];
       }

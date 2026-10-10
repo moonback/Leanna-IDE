@@ -155,6 +155,16 @@ export class ContractNetNegotiator {
   ): Promise<NegotiationOutcome> {
     const shortId = task.taskId.slice(0, 8);
     const t0 = Date.now();
+
+    // Guard (#2) : une enchère déjà ouverte sur ce taskId rendrait le second
+    // appel destructeur — `openCalls.set(taskId, [])` écraserait la liste de bids
+    // du premier. On refuse explicitement les taskId concurrents en doublon.
+    if (this.openCalls.has(task.taskId)) {
+      throw new Error(
+        `Négociation déjà ouverte pour la tâche ${shortId} — utilisez un taskId unique.`
+      );
+    }
+
     log.info(
       `🔔 Négociation ouverte "${task.title}" (${shortId}) par [${from}] — ` +
         `capacités requises: [${task.requiredCapabilities.join(", ") || "—"}], ` +
@@ -162,76 +172,83 @@ export class ContractNetNegotiator {
     );
     this.openCalls.set(task.taskId, []);
 
-    await this.announce(task, from);
-    await this.wait(this.biddingWindowMs);
+    try {
+      await this.announce(task, from);
+      await this.wait(this.biddingWindowMs);
 
-    const liveBidCount = this.openCalls.get(task.taskId)?.length ?? 0;
+      const liveBidCount = this.openCalls.get(task.taskId)?.length ?? 0;
 
-    // Repli déterministe : si aucun agent vivant n'a enchéri pendant la fenêtre,
-    // faire concourir les rôles enregistrés (bids dérivés de leurs capacités).
-    // L'enchère est encore ouverte ici, donc `autoBidFor` → `submitBid` est accepté.
-    // On n'écrase jamais des bids vivants : le repli ne se déclenche QUE sur une
-    // enchère restée vide.
-    let usedFallback = false;
-    if (liveBidCount === 0 && this.fallbackBidders) {
-      const roles = this.fallbackBidders().filter((role) => role !== from);
-      if (roles.length > 0) {
-        usedFallback = true;
-        log.info(
-          `🤖 Aucun ench\u00e9risseur vivant pour "${task.title}" (${shortId}) — ` +
-            `repli automatique sur ${roles.length} r\u00f4le(s) enregistr\u00e9(s) : [${roles.join(", ")}]`
-        );
-        this.autoBidFor(roles, task);
-      } else {
-        log.debug(`Repli configuré mais aucun rôle candidat (hors initiateur) pour ${shortId}`);
+      // Repli déterministe : si aucun agent vivant n'a enchéri pendant la fenêtre,
+      // faire concourir les rôles enregistrés (bids dérivés de leurs capacités).
+      // L'enchère est encore ouverte ici, donc `autoBidFor` → `submitBid` est accepté.
+      // On n'écrase jamais des bids vivants : le repli ne se déclenche QUE sur une
+      // enchère restée vide.
+      let usedFallback = false;
+      if (liveBidCount === 0 && this.fallbackBidders) {
+        const roles = this.fallbackBidders().filter((role) => role !== from);
+        if (roles.length > 0) {
+          usedFallback = true;
+          log.info(
+            `🤖 Aucun ench\u00e9risseur vivant pour "${task.title}" (${shortId}) — ` +
+              `repli automatique sur ${roles.length} r\u00f4le(s) enregistr\u00e9(s) : [${roles.join(", ")}]`
+          );
+          this.autoBidFor(roles, task);
+        } else {
+          log.debug(`Repli configuré mais aucun rôle candidat (hors initiateur) pour ${shortId}`);
+        }
+      } else if (liveBidCount > 0) {
+        log.info(`🙋 ${liveBidCount} offre(s) vivante(s) reçue(s) pour "${task.title}" (${shortId}) — pas de repli`);
       }
-    } else if (liveBidCount > 0) {
-      log.info(`🙋 ${liveBidCount} offre(s) vivante(s) reçue(s) pour "${task.title}" (${shortId}) — pas de repli`);
-    }
 
-    const rawBids = this.openCalls.get(task.taskId) ?? [];
-    this.openCalls.delete(task.taskId);
+      const rawBids = this.openCalls.get(task.taskId) ?? [];
 
-    const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
+      const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
 
-    // Classement complet (DEBUG) pour vérifier POURQUOI un rôle gagne/perd.
-    if (scored.length > 0) {
-      const ranking = scored
-        .map(
-          (b, i) =>
-            `${i + 1}. ${b.role} score=${b.score.toFixed(3)} ` +
-            `(skill=${b.skillMatch.toFixed(2)} conf=${b.confidence.toFixed(2)} load=${b.loadPenalty.toFixed(2)}` +
-            `${b.eligible ? "" : " INÉLIGIBLE"})`
-        )
-        .join(" | ");
-      log.debug(`📊 Classement ${shortId} [${usedFallback ? "repli" : "vivant"}] : ${ranking}`);
-    }
+      // Classement complet (DEBUG) pour vérifier POURQUOI un rôle gagne/perd.
+      if (scored.length > 0) {
+        const ranking = scored
+          .map(
+            (b, i) =>
+              `${i + 1}. ${b.role} score=${b.score.toFixed(3)} ` +
+              `(skill=${b.skillMatch.toFixed(2)} conf=${b.confidence.toFixed(2)} load=${b.loadPenalty.toFixed(2)}` +
+              `${b.eligible ? "" : " INÉLIGIBLE"})`
+          )
+          .join(" | ");
+        log.debug(`📊 Classement ${shortId} [${usedFallback ? "repli" : "vivant"}] : ${ranking}`);
+      }
 
-    const best = scored.find((b) => b.eligible) ?? null;
+      const best = scored.find((b) => b.eligible) ?? null;
 
-    if (!best) {
-      log.warn(
-        `🪧 Aucune offre éligible pour la tâche "${task.title}" (${shortId}) — ` +
-          `${rawBids.length} bid(s) reçu(s), tous disqualifiés (${Date.now() - t0}ms)`
+      if (!best) {
+        log.warn(
+          `🪧 Aucune offre éligible pour la tâche "${task.title}" (${shortId}) — ` +
+            `${rawBids.length} bid(s) reçu(s), tous disqualifiés (${Date.now() - t0}ms)`
+        );
+        return { taskId: task.taskId, winner: null, winningScore: null, bids: scored, awarded: false };
+      }
+
+      const awarded = await this.award(task, best.role, from);
+
+      log.info(
+        `🏆 Marché attribué à [${best.role}] pour "${task.title}" ` +
+          `(score ${best.score.toFixed(3)}, ${scored.length} bid(s), ` +
+          `source=${usedFallback ? "repli" : "vivant"}, award=${awarded ? "ok" : "ÉCHEC"}, ${Date.now() - t0}ms)`
       );
-      return { taskId: task.taskId, winner: null, winningScore: null, bids: scored, awarded: false };
+
+      return {
+        taskId: task.taskId,
+        winner: best.role,
+        winningScore: best.score,
+        bids: scored,
+        awarded,
+      };
+    } finally {
+      // Cleanup TOUJOURS (#1) : une exception dans announce/wait/scoring laissait
+      // auparavant l'entrée `openCalls` en place (fuite mémoire + blocage du guard
+      // ci-dessus sur une future enchère au même taskId). `rawBids` est déjà extrait
+      // avant tout usage, donc déplacer le delete ici est sans effet de bord.
+      this.openCalls.delete(task.taskId);
     }
-
-    const awarded = await this.award(task, best.role, from);
-
-    log.info(
-      `🏆 Marché attribué à [${best.role}] pour "${task.title}" ` +
-        `(score ${best.score.toFixed(3)}, ${scored.length} bid(s), ` +
-        `source=${usedFallback ? "repli" : "vivant"}, award=${awarded ? "ok" : "ÉCHEC"}, ${Date.now() - t0}ms)`
-    );
-
-    return {
-      taskId: task.taskId,
-      winner: best.role,
-      winningScore: best.score,
-      bids: scored,
-      awarded,
-    };
   }
 
   /**
@@ -318,6 +335,17 @@ export class ContractNetNegotiator {
     winner: AgentRole,
     from: AgentRole
   ): Promise<boolean> {
+    // Garde-fou (#3) : un agent ne peut pas remporter sa propre enchère
+    // (auto-attribution biaisée). En pratique l'initiateur n'est pas abonné à son
+    // propre broadcast et le repli filtre déjà `role !== from`, mais on protège
+    // explicitement le contrat contre un futur chemin d'émission.
+    if (winner === from) {
+      log.error(
+        `Auto-attribution refusée : [${from}] ne peut pas remporter sa propre enchère (${task.taskId.slice(0, 8)}).`
+      );
+      return false;
+    }
+
     const message: AgentMessage = {
       id: randomUUID(),
       type: "task_request",

@@ -12,12 +12,13 @@
  * exist (STATIC_AGENT_ROLES, DynamicAgentRegistry, AgentOrchestrator). The gap
  * the roadmap names is the *composition intelligence*. This composer is a
  * deterministic selector/orderer over the existing roles — it never invents a
- * role (every chosen role is validated via `hasAgent`) and never calls a model.
+ * role (every chosen role is validated against `listAgentRoles()`, the single
+ * source of truth aggregating static + dynamic roles) and never calls a model.
  * Teardown only unregisters roles the composition itself created dynamically;
  * static roles are shared and left intact.
  */
 
-import { listAgentRoles, hasAgent } from "./roles.js";
+import { listAgentRoles } from "./roles.js";
 import { dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
 import type { AgentRole } from "./types.js";
 
@@ -143,13 +144,16 @@ export class SwarmComposer {
   /** Pure planning: select + order the team without any registration. */
   plan(input: SwarmComposeInput): TeamComposition {
     const text = `${input.objective.title} ${input.objective.description ?? ""}`;
-    const maxMembers = input.maxMembers ?? 6;
+    const maxMembers = Math.max(1, input.maxMembers ?? 6);
+    // Source unique de vérité (#4) : listAgentRoles() agrège déjà les rôles
+    // statiques + dynamiques. L'ancien `|| hasAgent(role)` était un doublon strict
+    // qui laissait croire à deux sources de vérité distinctes.
     const available = new Set(listAgentRoles());
 
     // Selected role → rationale (first reason wins).
     const selected = new Map<AgentRole, string>();
     const want = (role: AgentRole, why: string) => {
-      if (!selected.has(role) && (available.has(role) || hasAgent(role))) selected.set(role, why);
+      if (!selected.has(role) && available.has(role)) selected.set(role, why);
     };
 
     // 1) Always start from understanding and end with verification/review — the
@@ -170,8 +174,10 @@ export class SwarmComposer {
 
     // 4) If some build/change work is implied but no builder picked yet, add coder.
     const hasBuilder = [...selected.keys()].some((r) => ROLE_STAGE[r] === "build");
-    const impliesChange = /ajout|add|implement|créer|creer|build|écris|ecris|develop|feature|corrige|fix|refactor|optimi/i.test(text)
-      || (input.plannedSkills ?? []).some((s) => /write|edit|replace|create|patch/i.test(s));
+    // Frontières de mots (#6) : sans \b, /add/ matchait "address" et /optimi/
+    // "imperfect"-like, recrutant un coder sur des objectifs purement documentaires.
+    const impliesChange = /\b(ajout|add|implement|créer|creer|build|écris|ecris|develop|feature|corrige|corrig|fix|refactor|optimi)/i.test(text)
+      || (input.plannedSkills ?? []).some((s) => /\b(write|edit|replace|create|patch)/i.test(s));
     if (!hasBuilder && impliesChange) want("coder", "implémentation nécessaire");
 
     // 5) If the team changes code, ensure it is verified and reviewed.
@@ -200,21 +206,38 @@ export class SwarmComposer {
   }
 
   /**
-   * Cap the team while preserving a coherent pipeline: keep the first builder,
-   * a verifier and a reviewer if present, then fill by stage order.
+   * Cap the team while preserving a coherent pipeline: keep one builder, one
+   * verifier and one reviewer if present, then fill by stage order. If `max` is
+   * smaller than the number of essentials present, essentials take priority and
+   * a warning is emitted — the cap is never breached, but the drop is explicit
+   * and bounded (never an arbitrary mix).
    */
   private capTeam(members: SwarmMember[], max: number): SwarmMember[] {
     if (members.length <= max) return members;
     const essential = new Set<SwarmStage>(["build", "verify", "review"]);
     const kept: SwarmMember[] = [];
-    // First pass: essentials in stage order.
-    for (const m of members) {
-      if (essential.has(m.stage) && !kept.find((k) => k.stage === m.stage)) kept.push(m);
+    // First pass (#5): essentials in canonical stage order (one per essential
+    // stage). Iterating STAGE_ORDER (not `members`) guarantees deterministic
+    // ordering regardless of selection order.
+    for (const stage of STAGE_ORDER) {
+      if (!essential.has(stage)) continue;
+      const m = members.find((x) => x.stage === stage);
+      if (m) kept.push(m);
     }
     // Second pass: fill remaining slots by stage order.
     for (const m of members) {
       if (kept.length >= max) break;
       if (!kept.includes(m)) kept.push(m);
+    }
+    // Traceability (#5): if `max` is below the essential count, slice(0, max)
+    // below will drop essentials. Make that explicit instead of silent.
+    if (kept.length > max) {
+      const dropped = kept.slice(max).map((m) => m.role);
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[SwarmComposer] maxMembers=${max} inférieur au nombre d'essentiels présents ; ` +
+          `rôles retirés malgré leur étage critique : ${dropped.join(", ")}`
+      );
     }
     return kept
       .slice(0, max)

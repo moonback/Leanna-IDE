@@ -189,6 +189,7 @@ export class AgenticRuntime implements IAgentRuntime {
       taskId,
       agent,
       tools,
+      goalText: [task.goal, task.instructions].filter(Boolean).join(" "),
       observations: [],
       verifications: [],
       recoveries: [],
@@ -228,6 +229,10 @@ export class AgenticRuntime implements IAgentRuntime {
     // Nombre de fois où l'on a refusé une clôture « sans écriture » pour relancer
     // l'agent vers l'action. Borné pour éviter une relance stérile indéfinie.
     let actionNudges = 0;
+    // Relances « sans contexte » (l'agent conclut sans avoir rien lu). Bornées
+    // séparément : elles ne doivent pas consommer les relances d'action, mais ne
+    // doivent pas non plus boucler indéfiniment si l'agent n'explore jamais.
+    let discoveryNudges = 0;
     while (stepIdx < plan.steps.length) {
       if (this.budgetExhausted(session)) {
         log.warn(`[${taskId.slice(0, 8)}] ⛔ Budget épuisé — arrêt de la boucle`);
@@ -274,11 +279,36 @@ export class AgenticRuntime implements IAgentRuntime {
           observation.isFinal &&
           observation.toolOutcomes.length === 0 &&
           session.filesModified.size === 0 &&
-          this.planExpectedWrites(plan) &&
+          this.expectsWrites(session, plan) &&
           session.usage.writeCalls < session.budget.maxWrite &&
           actionNudges < AgenticRuntime.MAX_ACTION_NUDGES &&
           !this.budgetExhausted(session)
         ) {
+          // Distingue DEUX enlisements différents :
+          //  (a) l'agent n'a encore RIEN lu de concluant (filesRead === 0) : il
+          //      ne peut pas écrire sans contexte. On le renvoie EXPLORER, et on
+          //      ne consomme PAS de relance d'action (sinon on épuise les 2
+          //      nudges avant même d'avoir le fichier — bug observé : relances
+          //      1/2 et 2/2 brûlées en iter 2-3, le bon fichier lu seulement en
+          //      iter 4, plus aucune garde ensuite).
+          //  (b) l'agent a du contexte mais conclut sans écrire : on le pousse à
+          //      AGIR et on décompte une relance (garde-fou borné).
+          const hasContext = session.usage.filesRead > 0;
+          if (!hasContext && discoveryNudges < AgenticRuntime.MAX_DISCOVERY_NUDGES) {
+            discoveryNudges += 1;
+            session.phase = "discovery";
+            session.pendingInstruction =
+              "Tu n'as pas encore lu le fichier cible. Localise-le d'abord " +
+              "(list_project_files / search_in_files) puis lis-le (read_project_file) " +
+              "AVANT de conclure. Ne termine pas sans avoir pris connaissance du contenu.";
+            step.status = "running";
+            log.info(
+              `[${session.taskId.slice(0, 8)}] ⚠️ Clôture refusée (sans contexte ${discoveryNudges}/${AgenticRuntime.MAX_DISCOVERY_NUDGES}, hors quota d'action) : ` +
+                `aucune lecture concluante — relance en phase discovery.`
+            );
+            continue;
+          }
+
           actionNudges += 1;
           session.phase = "write";
           session.pendingInstruction =
@@ -329,13 +359,28 @@ export class AgenticRuntime implements IAgentRuntime {
     const { agent, tools } = session;
 
     const toolNames = tools.map((t) => t.name).join(", ") || "(aucun)";
+
+    // ── GROUNDING : résout les chemins réels évoqués par l'objectif AVANT de
+    // planifier. Sans ça, le LLM devine des chemins (ex. « EmptyEditorState »
+    // → chemin inexistant), échoue à les lire, puis conclut sans écrire. En
+    // injectant les fichiers réellement présents, le plan cible les bons
+    // chemins et déclare les bons outils d'écriture. Best-effort, lecture seule,
+    // ne consomme pas le budget d'exploration de la boucle.
+    const groundedFiles = await this.groundCandidateFiles(task);
+
     const planPrompt = [
       `OBJECTIF UTILISATEUR : ${task.goal}`,
       task.instructions ? `INSTRUCTIONS : ${task.instructions}` : "",
       task.files?.length ? `FICHIERS DE CONTEXTE : ${task.files.join(", ")}` : "",
+      groundedFiles.length
+        ? `FICHIERS CANDIDATS (résolus automatiquement dans le projet — utilise ces chemins EXACTS, ne les devine pas) :\n${groundedFiles.map((f) => `  - ${f}`).join("\n")}`
+        : "",
       `OUTILS QUE TU POURRAS UTILISER : ${toolNames}`,
       "",
       "Analyse l'intention puis produis un plan d'action minimal et vérifiable.",
+      "Si l'objectif implique de MODIFIER du code, le plan DOIT inclure au moins",
+      "une étape dont les suggestedTools contiennent un outil d'écriture",
+      "(write_project_file / modify_project_file / patch_project_file).",
       "Réponds UNIQUEMENT avec un JSON strict de la forme :",
       JSON.stringify(
         {
@@ -388,6 +433,88 @@ export class AgenticRuntime implements IAgentRuntime {
     );
     this.events?.emit({ type: "workflow:started", workflowId: session.taskId, name: plan.intent });
     return plan;
+  }
+
+  /**
+   * GROUNDING du planificateur : à partir de l'objectif (+ fichiers de contexte
+   * fournis), résout les CHEMINS RÉELS présents dans le projet, pour que le plan
+   * cible des chemins exacts au lieu d'en inventer.
+   *
+   * Stratégie best-effort, lecture seule, 100 % tolérante aux erreurs :
+   *   1. fichiers de contexte explicitement fournis dans la tâche (confiance max) ;
+   *   2. identifiants « CamelCase » et noms de fichiers extraits de l'objectif,
+   *      résolus via `knowledge_search_entities` (champ `file`) puis, en repli,
+   *      via un `list_project_files` récursif filtré par nom de base.
+   *
+   * N'appelle PAS `invokeTool` (donc ne consomme aucun quota d'exploration) :
+   * les appels passent directement par le registre. Toute exception est avalée.
+   */
+  private async groundCandidateFiles(task: AgentTask): Promise<string[]> {
+    const found = new Set<string>();
+    const MAX_FILES = 8;
+
+    // 1. Fichiers de contexte fournis par l'appelant.
+    for (const f of task.files ?? []) {
+      if (typeof f === "string" && f.trim()) found.add(f.trim());
+    }
+
+    const text = [task.goal, task.instructions].filter(Boolean).join(" ");
+
+    // 2. Jetons candidats : noms de fichiers explicites (foo.tsx) + identifiants
+    //    CamelCase (EmptyEditorState) de longueur ≥ 4.
+    const tokens = new Set<string>();
+    for (const m of text.matchAll(/\b([\w.-]+\.[a-z0-9]{1,5})\b/gi)) tokens.add(m[1]);
+    for (const m of text.matchAll(/\b([A-Z][a-zA-Z0-9]{3,})\b/g)) tokens.add(m[1]);
+
+    const callRegistry = async (name: string, args: Record<string, unknown>): Promise<any> => {
+      try {
+        return await this.registry.call(name, args, { agentId: task.role });
+      } catch {
+        return undefined;
+      }
+    };
+
+    for (const token of tokens) {
+      if (found.size >= MAX_FILES) break;
+
+      // 2a. Entités de code (classes/fonctions/composants) → leur fichier.
+      const ent = await callRegistry("knowledge_search_entities", { query: token });
+      const entities = (ent && typeof ent === "object" && Array.isArray((ent as any).entities))
+        ? (ent as any).entities as Array<{ file?: unknown }>
+        : [];
+      for (const e of entities) {
+        if (typeof e.file === "string" && e.file.trim()) found.add(e.file.trim());
+        if (found.size >= MAX_FILES) break;
+      }
+    }
+
+    // 3. Repli : si rien n'a matché via le graphe, chercher les noms de fichiers
+    //    explicites par nom de base dans l'arborescence.
+    if (found.size === 0) {
+      const listing = await callRegistry("list_project_files", { path: ".", recursive: true });
+      const files: string[] =
+        listing && typeof listing === "object" && Array.isArray((listing as any).files)
+          ? ((listing as any).files as unknown[]).filter((f): f is string => typeof f === "string")
+          : [];
+      for (const token of tokens) {
+        const base = token.toLowerCase();
+        for (const f of files) {
+          if (f.toLowerCase().includes(base)) {
+            found.add(f);
+            if (found.size >= MAX_FILES) break;
+          }
+        }
+        if (found.size >= MAX_FILES) break;
+      }
+    }
+
+    const result = [...found].slice(0, MAX_FILES);
+    if (result.length > 0) {
+      log.debug(
+        `[${task.id?.slice(0, 8) ?? "?"}] 📎 Grounding : ${result.length} fichier(s) candidat(s) injecté(s) dans le plan : ${result.join(", ")}`
+      );
+    }
+    return result;
   }
 
   // ─── execute : ACT + OBSERVE RESULT (boucle d'outils interne) ───────────────
@@ -539,6 +666,14 @@ export class AgenticRuntime implements IAgentRuntime {
       // sinon une écriture refusée serait comptabilisée à tort (faux positif).
       const appError = toolResultError(result);
       if (appError) {
+        // Bug A — Une LECTURE qui échoue applicativement (ex. "Fichier
+        // introuvable." quand la cible n'est pas encore matérialisée dans le
+        // sandbox) ne doit PAS consommer le quota d'exploration : sinon l'agent
+        // s'auto-affame (budget read épuisé par des lectures ratées) et ne peut
+        // plus relire une fois la cible disponible. On rembourse le compteur
+        // facturé en amont par countCall(). Les écritures/vérifications ratées
+        // restent comptées (une tentative d'action consomme son quota réservé).
+        if (kind === "read") this.refundCall(session, kind);
         return {
           invocation: { name, parameters },
           success: false,
@@ -587,6 +722,11 @@ export class AgenticRuntime implements IAgentRuntime {
         durationMs,
       };
     } catch (err) {
+      // Bug A (symétrie exception) : une LECTURE qui échoue en LEVANT une
+      // exception (ex. search_in_files → ENOENT scandir) ne doit pas davantage
+      // grever le quota d'exploration qu'une lecture échouée applicativement.
+      // Même remboursement que la branche appError pour ne pas auto-affamer.
+      if (kind === "read") this.refundCall(session, kind);
       return {
         invocation: { name, parameters },
         success: false,
@@ -604,6 +744,21 @@ export class AgenticRuntime implements IAgentRuntime {
     else if (kind === "write") u.writeCalls += 1;
     else if (kind === "verify") u.verifyCalls += 1;
     else u.otherCalls += 1;
+  }
+
+  /**
+   * Rembourse un appel facturé par countCall() lorsque l'outil a échoué
+   * applicativement et qu'il ne doit pas grever le quota de sa phase (ex. une
+   * lecture « Fichier introuvable »). Symétrique strict de countCall(), borné à
+   * zéro pour ne jamais produire de compteur négatif.
+   */
+  private refundCall(session: RunSession, kind: ToolKind): void {
+    const u = session.usage;
+    u.toolCalls = Math.max(0, u.toolCalls - 1);
+    if (kind === "read") u.readCalls = Math.max(0, u.readCalls - 1);
+    else if (kind === "write") u.writeCalls = Math.max(0, u.writeCalls - 1);
+    else if (kind === "verify") u.verifyCalls = Math.max(0, u.verifyCalls - 1);
+    else u.otherCalls = Math.max(0, u.otherCalls - 1);
   }
 
   /** Premier fichier écrit dans l'observation qui n'est pas vérifié dans le WorkspaceState. */
@@ -1001,6 +1156,14 @@ export class AgenticRuntime implements IAgentRuntime {
   private static readonly MAX_ACTION_NUDGES = 2;
 
   /**
+   * Nombre maximum de relances « explore avant de conclure » quand l'agent
+   * tente de terminer sans avoir rien lu. Séparé de MAX_ACTION_NUDGES pour ne
+   * pas épuiser les relances d'action avant d'avoir le moindre contexte, mais
+   * borné pour ne pas boucler si l'agent n'explore jamais.
+   */
+  private static readonly MAX_DISCOVERY_NUDGES = 2;
+
+  /**
    * Fait avancer la phase courante selon la consommation du budget.
    * discovery → write dès qu'un CONTEXTE MINIMAL est acquis (assez de lectures
    * ET au moins un fichier réellement lu), à défaut à saturation du quota, ou
@@ -1028,14 +1191,41 @@ export class AgenticRuntime implements IAgentRuntime {
 
   /**
    * Le plan comportait-il au moins une étape dont les outils suggérés sont des
-   * outils d'écriture ? C'est le signal qu'une MODIFICATION était attendue.
-   * Permet de distinguer une tâche d'implémentation (qui DOIT écrire) d'une
-   * tâche d'analyse/lecture (où « 0 fichier » est un résultat légitime).
+   * outils d'écriture ? Signal FAIBLE : il dépend entièrement de ce que le LLM
+   * a bien voulu déclarer dans `suggestedTools`.
    */
   private planExpectedWrites(plan: Plan): boolean {
     return plan.steps.some((s) =>
       (s.suggestedTools ?? []).some((t) => WRITE_TOOLS.has(t))
     );
+  }
+
+  /**
+   * Mots-clés d'objectif impliquant une MODIFICATION (frontière de mot en tête
+   * pour éviter les faux positifs ; radicaux volontairement ouverts à droite
+   * pour couvrir les conjugaisons : implémente/implémenter, corrige/corriger…).
+   */
+  private static readonly CHANGE_INTENT_RE =
+    /\b(ajout|add|implement|implément|créer|creer|crée|cree|écri|ecri|develop|développ|feature|corrig|fix|répar|repar|refactor|optimi|amélior|amelior|modif|remplac|replace|renomm|rename|supprim|delete|design|style|redesign|refont|refond)/i;
+
+  /**
+   * Une MODIFICATION était-elle attendue pour cette mission ? Combine deux
+   * signaux pour ne pas dépendre du seul plan LLM (bug observé : plan à 1 étape
+   * sans outil d'écriture → mission d'implémentation déclarée `success` sans
+   * aucune écriture) :
+   *   1. le plan déclare explicitement un outil d'écriture (signal fort si
+   *      présent), OU
+   *   2. l'agent DISPOSE réellement d'outils d'écriture ET l'objectif exprime
+   *      une intention de changement.
+   *
+   * Reste faux pour les tâches d'analyse pure (agent sans outil d'écriture, ou
+   * objectif purement exploratoire) : « 0 fichier » y est un résultat légitime.
+   */
+  private expectsWrites(session: RunSession, plan: Plan): boolean {
+    if (this.planExpectedWrites(plan)) return true;
+    const agentCanWrite = session.tools.some((t) => WRITE_TOOLS.has(t.name));
+    if (!agentCanWrite) return false;
+    return AgenticRuntime.CHANGE_INTENT_RE.test(session.goalText);
   }
 
   private assessOutcome(session: RunSession, plan: Plan): import("./types.js").AgentOutcome {
@@ -1052,7 +1242,7 @@ export class AgenticRuntime implements IAgentRuntime {
     // écrire le moindre fichier, ce n'est PAS un demi-succès : on renvoie
     // `no_change` (→ success:false), ce qui déclenche la récupération/
     // replanification au lieu de laisser croire à une réussite partielle.
-    if (!wroteSomething && this.planExpectedWrites(plan)) return "no_change";
+    if (!wroteSomething && this.expectsWrites(session, plan)) return "no_change";
 
     // La VÉRIFICATION hashée est l'arbitre, pas le simple fait d'avoir écrit.
     // On consulte le WorkspaceState : chaque fichier modifié doit être "verified"
@@ -1076,6 +1266,51 @@ export class AgenticRuntime implements IAgentRuntime {
     return "success";
   }
 
+  /**
+   * Construit un message de diagnostic lisible pour un run non réussi, à partir
+   * des sources déjà présentes dans la session : le rapport de complétion hashé
+   * du WorkspaceState (cause la plus précise), puis les issues de vérification,
+   * enfin un repli générique par outcome. Garantit un `error` jamais vide quand
+   * la mission échoue, sans inventer de cause.
+   */
+  private diagnoseFailure(
+    session: RunSession,
+    outcome: import("./types.js").AgentOutcome
+  ): string | undefined {
+    // 1. Rapport de complétion : pourquoi les écritures ne sont pas « verified ».
+    if (session.filesModified.size > 0) {
+      const report = session.workspace.completionReport(session.filesModified);
+      if (!report.passed && report.errors.length > 0) {
+        return report.errors.slice(0, 5).join(" ; ");
+      }
+    }
+
+    // 2. Dernières issues de vérification observées.
+    const issues = session.verifications.flatMap((v) => v.issues).filter(Boolean);
+    if (issues.length > 0) {
+      return [...new Set(issues)].slice(0, 5).join(" ; ");
+    }
+
+    // 3. Fichiers explicitement bloqués par la politique de réparation.
+    if (session.blockedFiles.size > 0) {
+      return `Progression bloquée sur : ${[...session.blockedFiles].join(", ")}`;
+    }
+
+    // 4. Repli par outcome (jamais vide pour un échec).
+    switch (outcome) {
+      case "no_change":
+        return "Aucune modification produite alors qu'une écriture était attendue.";
+      case "blocked":
+        return "Mission bloquée : budget épuisé avant une vérification concluante.";
+      case "failed":
+        return "La mission a échoué sans diagnostic détaillé.";
+      case "partial":
+        return "Mission partiellement aboutie (certaines actions ont échoué).";
+      default:
+        return undefined;
+    }
+  }
+
   private async finish(
     task: AgentTask,
     session: RunSession,
@@ -1086,6 +1321,15 @@ export class AgenticRuntime implements IAgentRuntime {
     const final = error ? emptyFinal(error) : await this.finalize(task);
     session.usage.elapsedMs = Date.now() - session.startedAt;
     const success = successOverride ?? (outcome === "success" || outcome === "partial");
+
+    // Bug C — Diagnostic non vide pour un échec issu de la terminaison NORMALE
+    // de la boucle. Historiquement `finish` n'était appelé avec un `error`
+    // explicite que pour un échec de planification ou un fail-fast ; un outcome
+    // `failed`/`blocked` dérivé de la vérification hashée laissait `error`
+    // undefined → ProgressNotifier affichait « échouée: » (message vide). On
+    // agrège ici la vraie cause (issues de vérification, fichiers bloqués) pour
+    // la rendre exploitable côté UI/logs, SANS court-circuiter `finalize()`.
+    const resolvedError = error ?? (success ? undefined : this.diagnoseFailure(session, outcome));
 
     const result: AgentResult = {
       taskId: session.taskId,
@@ -1103,7 +1347,7 @@ export class AgenticRuntime implements IAgentRuntime {
       final,
       budgetUsage: session.usage,
       durationMs: session.usage.elapsedMs,
-      error,
+      error: resolvedError,
     };
 
     this.events?.emit({ type: "workflow:completed", workflowId: session.taskId, success });
@@ -1170,6 +1414,7 @@ export class AgenticRuntime implements IAgentRuntime {
       taskId: task.id ?? "test-task",
       agent,
       tools,
+      goalText: [task.goal, task.instructions].filter(Boolean).join(" "),
       observations: [],
       verifications: [],
       recoveries: [],
@@ -1200,6 +1445,8 @@ interface RunSession {
   taskId: string;
   agent: AgentDefinition;
   tools: ToolDeclaration[];
+  /** Objectif en langage naturel (goal + instructions) — sert au signal d'écriture. */
+  goalText: string;
   observations: Observation[];
   verifications: Verification[];
   recoveries: Recovery[];
