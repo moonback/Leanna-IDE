@@ -27,6 +27,7 @@ import { Supervisor } from '../autonomy/index.js';
 import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
+import { agentEventStream } from '../agents/AgentEventStream.js';
 import {
   ToolCallTracker, getToolDeliveryMode, getAckAfterMs,
   raceWithAbort, raceWithDeadline, abortableSleep, ToolCancelledError,
@@ -1468,10 +1469,44 @@ export function attachLiveWebSocket(
         try { session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: message }] }] }); } catch (e) { console.error('[Supervisor] Injection échouée:', e); }
       });
 
+      // ── Visibilité des issues de tâches déléguées pour l'assistant ──
+      // Quand une tâche agent atteint un état terminal (annulée, terminée,
+      // échouée), on injecte une note système DANS la session Gemini pour que
+      // l'assistant en soit informé sans avoir à poller `agent_status`.
+      // Essentiel pour l'annulation déclenchée par l'utilisateur depuis l'UI :
+      // sinon le modèle continue de croire que la tâche tourne encore.
+      const TERMINAL_TASK_EVENTS = new Set(['task_cancelled', 'task_completed', 'task_failed']);
+      const unsubscribeAgentEvents = agentEventStream.subscribe((event) => {
+        try {
+          if (event.type !== 'agent_event') return;
+          if (!TERMINAL_TASK_EVENTS.has(event.event)) return;
+          // Ignorer les messages internes du bus inter-agents (title "[bus] …").
+          if (typeof event.title === 'string' && event.title.startsWith('[bus]')) return;
+
+          const durationTxt = event.durationMs ? ` (après ${(event.durationMs / 1000).toFixed(1)}s)` : '';
+          let notice: string;
+          if (event.event === 'task_cancelled') {
+            notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) a été ANNULÉE par l'utilisateur${durationTxt}. `
+              + `Ne poursuis pas cette tâche et ne poll pas agent_status pour cet id. Prends-en acte auprès de l'utilisateur et propose la suite.`;
+          } else if (event.event === 'task_completed') {
+            notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) est TERMINÉE${durationTxt}.`
+              + (event.summary ? ` Résumé : ${event.summary}` : '');
+          } else {
+            notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) a ÉCHOUÉ${durationTxt}.`
+              + (event.detail ? ` Cause : ${event.detail}` : '');
+          }
+
+          session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: notice }] }] });
+        } catch (e) {
+          console.error('[AgentEvents→Live] Injection échouée:', e);
+        }
+      });
+
       clientWs.on('close', () => {
         toolTracker.close('client_disconnected');
         console.log('Client disconnected');
         activeGeminiSessions.delete(session);
+        unsubscribeAgentEvents();
         flushAssistantBuffer();
         if (conversationId) {
           endConversation(conversationId).catch(e => console.error('[History] Erreur fin conversation:', e));

@@ -14,7 +14,7 @@ const log = createLogger("AgentProgress");
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ProgressEvent = "started" | "progress" | "completed" | "failed";
+export type ProgressEvent = "started" | "progress" | "completed" | "failed" | "cancelled";
 
 /** Callback de notification de progression */
 export type ProgressCallback = (task: AgentTask, event: ProgressEvent) => void;
@@ -25,7 +25,7 @@ export type EventBroadcaster = (event: AgentEvent) => void;
 /** Événement agent envoyé au frontend pour la visibilité */
 export interface AgentEvent {
   type: "agent_event";
-  event: "task_started" | "task_progress" | "task_completed" | "task_failed" | "orchestration_started" | "orchestration_completed";
+  event: "task_started" | "task_progress" | "task_completed" | "task_failed" | "task_cancelled" | "orchestration_started" | "orchestration_completed" | "orchestration_cancelled";
   taskId: string;
   role: AgentRole;
   title: string;
@@ -74,6 +74,9 @@ export class ProgressNotifier {
       case "failed":
         log.error(`❌ ${agentName} — "${task.title}" échouée: ${task.result?.error ?? ""}`);
         break;
+      case "cancelled":
+        log.info(`🛑 ${agentName} — "${task.title}" annulée par l'utilisateur`);
+        break;
       case "progress":
         log.debug(`⏳ ${agentName} — "${task.title}" en cours`);
         break;
@@ -89,7 +92,7 @@ export class ProgressNotifier {
     }
 
     // Persistance Supabase (best-effort, non bloquant)
-    if (event === "started" || event === "completed" || event === "failed") {
+    if (event === "started" || event === "completed" || event === "failed" || event === "cancelled") {
       agentPersistence.updateTaskStatus(
         task.id,
         task.status,
@@ -119,6 +122,8 @@ export class ProgressNotifier {
             ? task.result?.summary
             : event === "failed"
             ? task.result?.error
+            : event === "cancelled"
+            ? (task.result?.summary ?? `Tâche "${task.title}" annulée par l'utilisateur`)
             : undefined,
           summary: task.result?.summary,
           durationMs: task.result?.durationMs,

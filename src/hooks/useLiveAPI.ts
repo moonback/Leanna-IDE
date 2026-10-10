@@ -489,6 +489,7 @@ export function useLiveAPI() {
       const emoji = msg.event === 'task_started' ? '🤖'
         : msg.event === 'task_completed' ? '✅'
         : msg.event === 'task_failed' ? '❌'
+        : msg.event === 'task_cancelled' ? '🛑'
         : '⏳';
       const duration = msg.durationMs ? ` (${(msg.durationMs / 1000).toFixed(1)}s)` : '';
       addLog(`${emoji} Agent ${msg.agentName}: ${msg.detail || msg.title}${duration}`,

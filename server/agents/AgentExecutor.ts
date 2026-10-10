@@ -547,7 +547,7 @@ export class AgentExecutor implements AgentTaskRunner {
         log.info(`[task:${taskShortId}] 🛑 [${agent.name}] Annulée après ${(durationMs / 1000).toFixed(1)}s`);
         telemetryService.endTaskSpan(task.id, false);
         clearTelemetryContext();
-        this.notifier.notify(task, "failed");
+        this.notifier.notify(task, "cancelled");
         return;
       }
 

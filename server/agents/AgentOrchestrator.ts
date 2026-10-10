@@ -626,19 +626,40 @@ export class AgentOrchestrator {
 
     if (task.status === "pending") {
       task.status = "cancelled";
-      agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      task.completedAt = new Date().toISOString();
+      task.result = {
+        success: false,
+        outcome: "failed",
+        summary: `Tâche "${task.title}" annulée par l'utilisateur avant son démarrage`,
+        error: "cancelled_by_user",
+        durationMs: 0,
+      };
+      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
       log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
+      // Émettre un événement terminal pour que l'UI ET l'assistant soient informés.
+      this.notifier.notify(task, "cancelled");
       return true;
     }
 
     if (task.status === "running") {
       const signaled = this.executor.cancel(taskId);
       if (signaled) {
+        // Le statut terminal ("cancelled") + l'événement seront émis par
+        // AgentExecutor au prochain point de contrôle (via CancellationError).
         log.info(`🛑 Tâche ${taskId.slice(0, 8)} (running) — signal d'annulation envoyé`);
       } else {
         log.warn(`⚠️ Tâche ${taskId.slice(0, 8)} marquée running mais aucune exécution active — annulation logique`);
         task.status = "cancelled";
-        agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+        task.completedAt = new Date().toISOString();
+        task.result = {
+          success: false,
+          outcome: "failed",
+          summary: `Tâche "${task.title}" annulée par l'utilisateur`,
+          error: "cancelled_by_user",
+          durationMs: 0,
+        };
+        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+        this.notifier.notify(task, "cancelled");
       }
       return true;
     }
