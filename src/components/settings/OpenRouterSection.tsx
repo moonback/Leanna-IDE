@@ -9,24 +9,111 @@ import type { AIProvider } from '../../context/UserProfileContext.js';
 // Source : openrouter.ai/api/v1/models — vérifié le 03/08/2026
 
 export const OPENROUTER_MODELS = [
-  // ── Coding agents ─────────────────────────────────────────────────────────
-  { id: 'openai/gpt-6-luna',                               name: 'GPT-6-Luna',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
-  { id: 'openai/gpt-5.6-luna',                               name: 'GPT-5.6',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
-  { id: 'z-ai/glm-5.3-flash',                                name: 'GLM 5.3 Flash',         provider: 'ZAI',         free: false, desc: 'Multimodal, efficace pour le code et les tâches agentiques, 1M ctx' },
-  { id: 'deepseek/deepseek-v4-flash-0731',                   name: 'DeepSeek V4 Flash',     provider: 'DeepSeek',    free: false, desc: 'MoE 284B sparce, adapté code et raisonnement, GA release, 1.3M ctx' },
-  { id: 'minimax/minimax-m3',                                name: 'MiniMax M3',            provider: 'MiniMax',     free: false, desc: 'Multimodal, MSA sparse attention, rapide et économique, 1M ctx' },
-  // { id: 'moonshotai/kimi-k3',                                name: 'Kimi K3',               provider: 'MoonshotIA',  free: false, desc: '118B-A8B coding agent — meilleur score code de Poolside, 262K ctx' },
-  { id: 'nvidia/nemotron-3-ultra-550b-a55b:free',            name: 'Nemotron 3 Ultra',       provider: 'NVIDIA',    free: true, desc: 'MoE 550B-A55B, 1M contexte, raisonnement & orchestration' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free',            name: 'Nemotron 3 Super',       provider: 'NVIDIA',    free: true, desc: 'MoE 120B-A12B, 262K contexte, efficacité maximale' },
-  { id: 'nvidia/nemotron-3-nano-30b-a3b:free',               name: 'Nemotron 3 Nano 30B',    provider: 'NVIDIA',    free: true, desc: 'MoE 30B-A3B, 256K contexte, très léger' },
-  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',name: 'Nemotron 3 Nano Omni',   provider: 'NVIDIA',    free: true, desc: 'Multimodal 30B-A3B avec raisonnement, 256K contexte' },
-  { id: 'nvidia/nemotron-nano-12b-v2-vl:free',               name: 'Nemotron Nano 12B VL',   provider: 'NVIDIA',    free: true, desc: '12B vision-language, compréhension vidéo & raisonnement, 128K' },
-  { id: 'nvidia/nemotron-nano-9b-v2:free',                   name: 'Nemotron Nano 9B',       provider: 'NVIDIA',    free: true, desc: '9B unifié LLM+raisonnement, 128K contexte' },
-  { id: 'nvidia/nemotron-3.5-content-safety:free',           name: 'Nemotron 3.5 Safety',    provider: 'NVIDIA',    free: true, desc: '4B guardrail multimodal, modération de contenu, 128K' },
- // ── OpenAI open-weight ─────────────────────────────────────────────────────
-  { id: 'openai/gpt-oss-20b:free',                           name: 'GPT-OSS 20B',            provider: 'OpenAI',    free: true, desc: '21B Apache 2.0, MoE, polyvalent, 131K contexte' },
-  // ── Inclusion AI ───────────────────────────────────────────────────────────
-  { id: 'inclusionai/ling-3.0-flash:free',                   name: 'Ling 3.0 Flash',         provider: 'InclusionAI', free: true, desc: 'MoE 124B-A5B, rapide et multilingue, 262K contexte' },
+  // ── Coding agents & modèles généralistes ────────────────────────────────
+  {
+    id: 'openai/gpt-6-luna-decisions',
+    name: 'GPT-6 Luna Decisions',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Modèle multimodal de décision et de classification, jusqu’à 1,05M tokens. Retourne des décisions structurées et des probabilités ; ce n’est pas un modèle de génération de code classique.'
+  },
+  {
+    id: 'openai/gpt-5.6-luna',
+    name: 'GPT-5.6 Luna',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Modèle rapide et économique pour le chat, la classification et les tâches agentiques légères. Raisonnement, appels d’outils et contexte de 1,05M tokens.'
+  },
+  {
+    id: 'z-ai/glm-5.3-flash',
+    name: 'GLM 5.3 Flash',
+    provider: 'Z.ai',
+    free: false,
+    desc: 'Modèle multimodal texte, image et vidéo, optimisé pour le code et les agents autonomes sur des tâches longues. Architecture à attention sparse et linéaire, contexte de 1,31M tokens.'
+  },
+  {
+    id: 'deepseek/deepseek-v4.1-flash',
+    name: 'DeepSeek V4.1 Flash',
+    provider: 'DeepSeek',
+    free: false,
+    desc: 'MoE de 552B paramètres, avec 8B actifs en entrée et 16B en sortie. Compréhension des images, programmation, terminal, computer-use et tâches agentiques longues. Contexte de 1,05M tokens.'
+  },
+  {
+    id: 'minimax/minimax-m3',
+    name: 'MiniMax M3',
+    provider: 'MiniMax',
+    free: false,
+    desc: 'Modèle multimodal texte, image et vidéo, fondé sur la Sparse Attention MSA. Contexte de 1,05M tokens, adapté au code et aux workflows longs. Vérifier la prise en charge des outils selon le fournisseur.'
+  },
+
+  // ── NVIDIA Nemotron : raisonnement et orchestration ─────────────────────
+  {
+    id: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    name: 'Nemotron 3 Ultra',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'MoE de 550B paramètres, dont 55B actifs. Raisonnement multiétape, planification, recherche approfondie et orchestration d’agents. Contexte annoncé jusqu’à 1M tokens selon la variante.'
+  },
+  {
+    id: 'nvidia/nemotron-3-super-120b-a12b:free',
+    name: 'Nemotron 3 Super',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'MoE de 120B paramètres, dont 12B actifs. Optimisé pour les systèmes multi-agents, le raisonnement complexe et la planification sur de longs contextes.'
+  },
+  {
+    id: 'nvidia/nemotron-3-nano-30b-a3b:free',
+    name: 'Nemotron 3 Nano 30B',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'MoE ouvert de 30B paramètres, dont 3B actifs. Modèle compact pour les agents spécialisés, le raisonnement et les tâches à faible coût d’inférence.'
+  },
+  {
+    id: 'nvidia/nemotron-3-nano-omni-30b-a3b:free',
+    name: 'Nemotron 3 Nano Omni',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle multimodal ouvert 30B-A3B acceptant texte, images, vidéo et audio. Adapté à la perception multimodale et au raisonnement dans les architectures agentiques.'
+  },
+  {
+    id: 'nvidia/nemotron-nano-12b-v2-vl:free',
+    name: 'Nemotron Nano 12B VL',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle vision-langage pour analyser des images et des documents visuels. Vérifier les capacités vidéo et la fenêtre de contexte de l’endpoint choisi.'
+  },
+  {
+    id: 'nvidia/nemotron-nano-9b-v2:free',
+    name: 'Nemotron Nano 9B',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle compact de raisonnement pour les tâches générales et les agents légers. Vérifier la référence exacte, le contexte et les capacités de raisonnement exposées par OpenRouter.'
+  },
+  {
+    id: 'nvidia/nemotron-3.5-content-safety:free',
+    name: 'Nemotron 3.5 Content Safety',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle de sécurité multimodal de 4B paramètres. Classe les prompts et réponses comme sûrs ou dangereux, identifie les catégories de risque et aide à construire des garde-fous IA. Contexte jusqu’à 128K.'
+  },
+
+  // ── Modèles à poids ouverts ─────────────────────────────────────────────
+  {
+    id: 'openai/gpt-oss-20b:free',
+    name: 'GPT-OSS 20B',
+    provider: 'OpenAI',
+    free: true,
+    desc: 'Modèle à poids ouverts de 21B paramètres, dont 3,6B actifs, sous licence Apache 2.0. Raisonnement configurable, appels d’outils et sorties structurées. Contexte de 131K tokens.'
+  },
+
+  // ── InclusionAI ─────────────────────────────────────────────────────────
+  {
+    id: 'inclusionai/ling-3.0-flash:free',
+    name: 'Ling 3.0 Flash',
+    provider: 'InclusionAI',
+    free: true,
+    desc: 'MoE de 124B paramètres avec environ 5,1B actifs par token. Conçu pour une inférence agentique efficace, avec un bon compromis entre latence, consommation de tokens et coût. Contexte de 262K tokens.'
+  }
 ];
 
 // ─── Modèles de génération d'images disponibles via OpenRouter ────────────────

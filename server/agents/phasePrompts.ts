@@ -32,8 +32,10 @@ import type { AgentPhase } from "../runtime/agentic/types.js";
 const PHASE_GUIDANCE: Record<AgentPhase, string[]> = {
   discovery: [
     "PHASE ACTUELLE — DÉCOUVERTE :",
-    "- Objectif : rassembler le CONTEXTE MINIMAL nécessaire pour agir (lire les",
-    "  fichiers concernés, repérer les points d'entrée). Pas d'écriture ici.",
+    "- Objectif : rassembler le CONTEXTE MINIMAL nécessaire pour agir. Pas d'écriture ici.",
+    "- RÈGLE DE CHEMIN : ne lis/vérifie QUE des chemins EXACTS apparus dans un résultat",
+    "  d'outil (list_project_files, search_in_files, knowledge_*). Ne déduis jamais un chemin.",
+    "- Après « Fichier introuvable » : reprends un chemin proposé ou cherche le nom de fichier.",
     "- Ne sur-explore pas : dès que tu sais quoi modifier, PASSE À L'ÉCRITURE.",
   ],
   plan: [
@@ -46,6 +48,7 @@ const PHASE_GUIDANCE: Record<AgentPhase, string[]> = {
     "PHASE ACTUELLE — ACTION (ÉCRITURE) :",
     "- Objectif : appliquer la modification la plus CHIRURGICALE qui atteint le",
     "  but. Un write ciblé, pas une réécriture de fichier entier.",
+    "- N'écris que sur un chemin déjà apparu dans un résultat d'outil (jamais deviné).",
     "- Après chaque écriture réussie, tu passeras en VÉRIFICATION : prépare-toi",
     "  à prouver que le changement est correct (verify_file / typecheck / tests).",
   ],
@@ -53,6 +56,7 @@ const PHASE_GUIDANCE: Record<AgentPhase, string[]> = {
     "PHASE ACTUELLE — VÉRIFICATION :",
     "- Objectif : prouver INDÉPENDAMMENT que le travail est correct (verify_file,",
     "  verify_typecheck, run_tests). Ne te fie pas à ta propre certitude.",
+    "- Ne vérifie que des fichiers réellement écrits ou lus : un chemin inexistant ne prouve rien.",
     "- Si la vérification passe : termine par la réponse finale + statut structuré.",
     "- Si elle échoue : décris l'écart précis — tu passeras en RÉCUPÉRATION.",
   ],
@@ -60,6 +64,7 @@ const PHASE_GUIDANCE: Record<AgentPhase, string[]> = {
     "PHASE ACTUELLE — RÉCUPÉRATION :",
     "- Objectif : corriger la CAUSE de l'échec de vérification, pas le symptôme.",
     "- Ne répète pas à l'identique un patch déjà tenté : change d'approche.",
+    "- « Fichier introuvable » = chemin deviné : reprends un chemin proposé ou le listing.",
     "- Si le problème est externe/préexistant (dépendance manquante, build cassé",
     "  en amont), déclare-le honnêtement via le statut structuré `blocked`.",
   ],

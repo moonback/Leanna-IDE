@@ -510,7 +510,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
     const result = [...found].slice(0, MAX_FILES);
     if (result.length > 0) {
-      log.debug(
+      log.info(
         `[${task.id?.slice(0, 8) ?? "?"}] 📎 Grounding : ${result.length} fichier(s) candidat(s) injecté(s) dans le plan : ${result.join(", ")}`
       );
     }
@@ -610,7 +610,11 @@ export class AgenticRuntime implements IAgentRuntime {
         : calls
             .map((c, i) => {
               const o = toolOutcomes[i];
-              const verdict = o?.success === false ? `✗(${(o.error ?? "").slice(0, 60)})` : "✓";
+              // Aplatit le message sur une ligne avant de tronquer : certaines
+              // erreurs (suggestions de chemins) sont multi-lignes et casseraient
+              // la lisibilité du résumé d'itération.
+              const flat = (o?.error ?? "").replace(/\s+/g, " ").trim();
+              const verdict = o?.success === false ? `✗(${flat.slice(0, 60)})` : "✓";
               return `${classifyTool(c.name)}:${c.name}${verdict}`;
             })
             .join(", ");
@@ -674,10 +678,20 @@ export class AgenticRuntime implements IAgentRuntime {
         // facturé en amont par countCall(). Les écritures/vérifications ratées
         // restent comptées (une tentative d'action consomme son quota réservé).
         if (kind === "read") this.refundCall(session, kind);
+        // Chemin deviné → on rend l'échec ACTIONNABLE en proposant les vrais
+        // chemins candidats de l'inventaire (sinon l'agent continue de deviner).
+        // UNIQUEMENT pour les lectures : suggérer un chemin sur un write/delete
+        // qui échoue encouragerait l'agent à RÉESSAYER une écriture destructrice
+        // sur un vrai chemin (ex. delete_project_file). Les écritures ratées ne
+        // reçoivent donc pas de suggestion.
+        const suggestion =
+          kind === "read"
+            ? await this.suggestPathAlternatives(session, parameters, appError)
+            : undefined;
         return {
           invocation: { name, parameters },
           success: false,
-          error: appError,
+          error: suggestion ? `${appError}${suggestion}` : appError,
           result: clampResult(result),
           durationMs,
         };
@@ -706,7 +720,14 @@ export class AgenticRuntime implements IAgentRuntime {
       // Comptabilité des fichiers lus distincts + mise en cache.
       if (kind === "read") {
         const path = extractPath(parameters);
-        if (path && !session.readFilesSeen.has(path)) {
+        // Relecture de VÉRIFICATION : relire un fichier DÉJÀ MODIFIÉ dans ce run
+        // n'est pas de la découverte — c'est confirmer son propre travail. On ne
+        // facture pas ce type de lecture au quota d'exploration : sinon, avec un
+        // budget read serré, l'agent qui a tout dépensé en découverte ne peut
+        // plus relire après écriture pour se vérifier (impasse observée).
+        if (path && session.filesModified.has(path)) {
+          this.refundCall(session, kind);
+        } else if (path && !session.readFilesSeen.has(path)) {
           session.readFilesSeen.add(path);
           session.usage.filesRead = session.readFilesSeen.size;
         }
@@ -727,10 +748,16 @@ export class AgenticRuntime implements IAgentRuntime {
       // grever le quota d'exploration qu'une lecture échouée applicativement.
       // Même remboursement que la branche appError pour ne pas auto-affamer.
       if (kind === "read") this.refundCall(session, kind);
+      const message = (err as Error).message;
+      // Suggestion de chemins réservée aux lectures (cf. branche appError).
+      const suggestion =
+        kind === "read"
+          ? await this.suggestPathAlternatives(session, parameters, message)
+          : undefined;
       return {
         invocation: { name, parameters },
         success: false,
-        error: (err as Error).message,
+        error: suggestion ? `${message}${suggestion}` : message,
         durationMs: Date.now() - start,
       };
     }
@@ -759,6 +786,65 @@ export class AgenticRuntime implements IAgentRuntime {
     else if (kind === "write") u.writeCalls = Math.max(0, u.writeCalls - 1);
     else if (kind === "verify") u.verifyCalls = Math.max(0, u.verifyCalls - 1);
     else u.otherCalls = Math.max(0, u.otherCalls - 1);
+  }
+
+  /**
+   * Sur une erreur « fichier introuvable », propose les chemins RÉELS les plus
+   * proches issus de l'inventaire du projet (match par nom de fichier, puis par
+   * radical). L'inventaire est chargé une seule fois par run, directement via le
+   * registre : aucun quota d'exploration consommé. Best-effort, ne lève jamais.
+   * Retourne un suffixe à ajouter au message d'erreur, ou undefined.
+   */
+  private async suggestPathAlternatives(
+    session: RunSession,
+    parameters: Record<string, unknown>,
+    error: string
+  ): Promise<string | undefined> {
+    if (!/introuvable|not found|ENOENT/i.test(error)) return undefined;
+    const requested = extractPath(parameters);
+    if (!requested) return undefined;
+
+    if (!session.fileInventory) {
+      try {
+        const listing = (await this.registry.call(
+          "list_project_files",
+          { path: ".", recursive: true },
+          { agentId: session.agent.role }
+        )) as { files?: unknown } | undefined;
+        session.fileInventory = Array.isArray(listing?.files)
+          ? listing!.files
+              .filter((f): f is string => typeof f === "string")
+              .map((f) => f.replace(/\\/g, "/"))
+              // Exclut les copies internes (sandbox, VCS, deps) : sinon chaque
+              // fichier réapparaît sous `.Leanna/sandbox/...`, polluant les
+              // suggestions avec des chemins non éditables par l'agent.
+              .filter((f) => !/(^|\/)(\.Leanna|node_modules|\.git)(\/|$)/.test(f))
+          : [];
+      } catch {
+        session.fileInventory = [];
+      }
+    }
+    const inventory = session.fileInventory;
+    if (inventory.length === 0) return undefined;
+
+    const base = (requested.replace(/\\/g, "/").split("/").pop() ?? requested).toLowerCase();
+    const stem = base.replace(/\.[a-z0-9]+$/i, "");
+    const byName = (f: string) => (f.split("/").pop() ?? f).toLowerCase();
+
+    let candidates = inventory.filter((f) => byName(f) === base);
+    if (candidates.length === 0 && stem.length >= 4) {
+      candidates = inventory.filter((f) => byName(f).includes(stem));
+    }
+    candidates = candidates.sort((a, b) => a.length - b.length).slice(0, 5);
+
+    if (candidates.length === 0) {
+      return `\n  → Aucun fichier nommé "${base}" dans le projet. Vérifie le nom exact ou cherche-le avec search_in_files.`;
+    }
+    return (
+      `\n  → Chemins réels candidats :\n` +
+      candidates.map((c) => `     - ${c}`).join("\n") +
+      `\n  → Réessaie sur UN de ces chemins EXACTS (ne devine pas).`
+    );
   }
 
   /** Premier fichier écrit dans l'observation qui n'est pas vérifié dans le WorkspaceState. */
@@ -808,11 +894,18 @@ export class AgenticRuntime implements IAgentRuntime {
         checks.push(`écriture ${path} (verify_file indisponible pour cet agent)`);
         continue;
       }
+      // Invariant WorkspaceState : le fichier doit être relu AVANT la
+      // vérification. On relit d'abord, PUIS on lance verify_file : ainsi le
+      // `contentHash` du workspace et le `hashAfter` du record proviennent du
+      // même état de fichier. (Auparavant le reread se faisait APRÈS verify_file,
+      // introduisant une 3ᵉ lecture disque distincte : si le watcher sandbox
+      // resynchronisait le fichier entre les deux lectures, les hash divergeaient
+      // → `recordVerification` concluait `stale` et une écriture pourtant correcte
+      // et vérifiée était rejetée. Bug observé en production.)
+      await session.workspace.reread(path, "read").catch(() => undefined);
       const res = await this.invokeTool(session, "verify_file", { path });
       const record = extractVerificationRecord(res.result);
       if (record) {
-        // Le fichier doit être relu avant recordVerification (invariant WorkspaceState).
-        await session.workspace.reread(path, "read").catch(() => undefined);
         try {
           session.workspace.recordVerification(path, record);
         } catch (e) {
@@ -1447,6 +1540,8 @@ interface RunSession {
   tools: ToolDeclaration[];
   /** Objectif en langage naturel (goal + instructions) — sert au signal d'écriture. */
   goalText: string;
+  /** Inventaire des fichiers du projet, chargé à la demande (suggestions de chemins). */
+  fileInventory?: string[];
   observations: Observation[];
   verifications: Verification[];
   recoveries: Recovery[];
