@@ -130,6 +130,12 @@ export interface MissionState {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  /**
+   * Configuration de la mission, persistée pour qu'une reprise après crash
+   * restaure fidèlement dryRun, timeout, maxRetries, etc. (sans ça, une reprise
+   * repart aux valeurs par défaut et une mission dry-run s'exécute pour de vrai).
+   */
+  config?: MissionConfig;
 }
 
 /** Contexte dynamique de la mission */

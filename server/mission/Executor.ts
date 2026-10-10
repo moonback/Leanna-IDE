@@ -10,7 +10,6 @@ import type {  PlannedAction,  ReflectionResult,
   MissionPlan,
   MissionState,
   Goal,
-  GoalStatus,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
@@ -88,6 +87,13 @@ export class Executor {
   /** Missions complétées (historique, max 50) */
   private completedMissions: Mission[] = [];
   private static readonly MAX_COMPLETED = 50;
+
+  /**
+   * IDs des missions déjà finalisées. Garde-fou d'idempotence pour
+   * `finalizeMission` (annulation/timeout + fin naturelle ne doivent pas
+   * finaliser deux fois la même mission).
+   */
+  private finalizedMissions: Set<string> = new Set();
 
   /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
   private readonly missionRuns = new Map<string, Promise<void>>();
@@ -347,10 +353,28 @@ export class Executor {
     });
     this.emit("mission_started", { missionId: mission.id, title: params.title });
 
+    this.launchMission(mission, params.availableSkills);
+    return mission;
+  }
+
+  /**
+   * Lance (ou relance) l'exécution d'une mission déjà enregistrée dans
+   * `activeMissions`, avec TOUTE l'infrastructure d'exécution :
+   *   - promesse observable enregistrée dans `missionRuns` (pour waitForMission) ;
+   *   - watchdog de timeout global ;
+   *   - nettoyage télémétrie en cas d'échec.
+   *
+   * Correctif audit (point 3) : factorisation commune à `startMission` et
+   * `confirmResume`. Avant, une reprise appelait directement `executeMission`
+   * sans watchdog, sans trace télémétrie, sans entrée `missionRuns` — donc
+   * `waitForMission` rendait la main immédiatement et une mission reprise
+   * n'avait ni timeout ni budget.
+   */
+  private launchMission(mission: Mission, availableSkills: string[]): void {
     // Lancer l'exécution en arrière-plan, tout en conservant une promesse
     // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
     // que déclarer une mission réussie juste après sa création.
-    const run = this.executeMission(mission, params.availableSkills).catch((err) => {
+    const run = this.executeMission(mission, availableSkills).catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
       telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
@@ -359,12 +383,14 @@ export class Executor {
     void run.finally(() => this.missionRuns.delete(mission.id));
 
     // Watchdog : arrêt forcé si la mission dépasse le timeout global configuré.
-    const timeoutMs = missionConfig.missionTimeoutMs;
+    const timeoutMs = mission.getConfig().missionTimeoutMs;
     if (timeoutMs > 0) {
       const watchdog = setTimeout(() => {
         if (!mission.isCompleted() && this.activeMissions.has(mission.id)) {
           console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms). Arrêt.`);
-          mission.completeActiveGoal({ success: false, summary: "Timeout global de mission." });
+          // Correctif audit (point 4) : fermer la racine + tous les objectifs
+          // non terminaux, pas seulement le sommet de la pile.
+          mission.cancel("Timeout global de mission.");
           this.finalizeMission(mission);
           telemetryService.endMissionTrace(mission.id, false);
           telemetryService.clearMissionBudget(mission.id);
@@ -375,8 +401,6 @@ export class Executor {
       if (typeof watchdog.unref === "function") watchdog.unref();
       void run.finally(() => clearTimeout(watchdog));
     }
-
-    return mission;
   }
 
   /**
@@ -485,10 +509,12 @@ export class Executor {
     const mission = this.activeMissions.get(missionId);
     if (!mission) return false;
 
-    mission.completeActiveGoal({
-      success: false,
-      summary: "Mission annulée par l'utilisateur.",
-    });
+    // Correctif audit (point 4) : annuler la RACINE et tous les objectifs non
+    // terminaux (pas seulement le sommet de la pile via completeActiveGoal).
+    // La mission passe en "cancelled" ; sans ça elle restait "in_progress" et
+    // la boucle executeMission la re-finalisait (doublon + mission_completed
+    // émis après mission_cancelled).
+    mission.cancel("Mission annulée par l'utilisateur.");
 
     this.finalizeMission(mission);
     
@@ -614,33 +640,54 @@ export class Executor {
     if (!mission.isCompleted()) {
       const allGoals = Object.values(mission.getState().goals);
       const subGoals = allGoals.filter((g) => g.parentId !== null);
-      const isTerminal = (s: GoalStatus) =>
-        s === "completed" || s === "failed" || s === "cancelled";
-      const allTerminal = subGoals.every((g) => isTerminal(g.status));
-      const allCompleted = subGoals.length > 0 && subGoals.every((g) => g.status === "completed");
-      const anyCriticalFailed = subGoals.some(
-        (g) => (g.status === "failed" || g.status === "blocked") && g.priority === "critical"
+      const allCompleted =
+        subGoals.length > 0 && subGoals.every((g) => g.status === "completed");
+
+      // ── Correctif audit (point 2) : plus de « faux succès » ────────────────
+      // Une mission n'est RÉUSSIE que si TOUS ses sous-objectifs sont
+      // "completed". Un seul objectif échoué, bloqué ou annulé (même non
+      // critique) rend la mission non réussie — sinon les stats, playbooks et le
+      // profil projet apprenaient de faux succès.
+      const failedOrBlocked = subGoals.filter(
+        (g) => g.status === "failed" || g.status === "blocked"
       );
-      // Succès si tout est complété, ou si tout est terminal sans échec critique.
-      const success = allCompleted || (allTerminal && !anyCriticalFailed);
+      const success = allCompleted;
+
+      let summary: string;
+      if (success) {
+        summary = `Mission "${mission.getState().title}" complétée avec succès.`;
+      } else if (failedOrBlocked.length > 0 && failedOrBlocked.length < subGoals.length) {
+        // Succès partiel : certains objectifs ont abouti, d'autres non.
+        summary =
+          `Mission "${mission.getState().title}" partiellement réussie — ` +
+          `${subGoals.length - failedOrBlocked.length}/${subGoals.length} objectif(s) atteint(s).`;
+      } else {
+        summary = `Mission "${mission.getState().title}" terminée avec des objectifs échoués.`;
+      }
 
       mission.completeActiveGoal({
         success,
-        summary: success
-          ? `Mission "${mission.getState().title}" complétée avec succès.`
-          : `Mission terminée avec des objectifs échoués.`,
+        summary,
         lessonsLearned: this.extractLessons(mission),
       });
     }
 
+    // Si la mission a déjà été finalisée entre-temps (annulation/timeout via
+    // cancelMission/watchdog), ne pas la finaliser ni émettre une 2e fois.
+    // Correctif audit (point 4) : évite le doublon et l'émission de
+    // mission_completed après mission_cancelled.
+    if (this.finalizedMissions.has(mission.id)) {
+      return;
+    }
+
     this.finalizeMission(mission);
-    
+
     // End trace with success status
     const success = mission.status === "completed";
     telemetryService.endMissionTrace(mission.id, success);
     telemetryService.clearMissionBudget(mission.id);
     clearTelemetryContext();
-    
+
     console.log(`[Executor] ✓ Mission terminée: ${mission.status}`);
     this.emit("mission_completed", {
       missionId: mission.id,
@@ -798,12 +845,59 @@ export class Executor {
         continue;
       }
 
-      // Aucune replanification : avancer le curseur au-delà de l'action courante.
-      // (Une action retentée reste "pending" et sera re-sélectionnée ; une action
-      // terminée est de toute façon ignorée par le filtre de statut ci-dessus.)
-      if (result.decision !== "retry") {
-        cursor++;
+      // ── Retry (correctif audit, point 1) ────────────────────────────────────
+      // `recordActionResult` a posé l'action en "failed". Pour la rejouer, il
+      // faut explicitement la remettre en "pending" ET consommer une tentative
+      // de l'objectif. `retryAction` renvoie false quand `maxAttempts` est
+      // atteint : on bascule alors en replanification (dernier recours avant
+      // escalade) au lieu de boucler indéfiniment sur une action morte.
+      if (!actionSucceeded && result.decision === "retry") {
+        const canRetry = mission.retryAction(action.id);
+        if (canRetry) {
+          const g = mission.getGoal(goalId);
+          console.log(
+            `[Executor]    🔁 Nouvelle tentative de "${action.skillName}" ` +
+            `(tentative ${g?.attempts}/${g?.maxAttempts}).`
+          );
+          this.emit("action_retry", {
+            missionId: mission.id,
+            goalId,
+            actionId: action.id,
+            skill: action.skillName,
+            attempt: g?.attempts ?? 0,
+            maxAttempts: g?.maxAttempts ?? 0,
+          });
+          // L'action est de nouveau "pending" : ne pas avancer le curseur, elle
+          // sera re-sélectionnée au prochain tour de boucle.
+          continue;
+        }
+
+        // Budget de tentatives épuisé → replanifier une dernière fois.
+        console.log(
+          `[Executor]    ⛔ Tentatives épuisées pour "${action.skillName}" → replanification.`
+        );
+        this.emit("action_max_attempts", {
+          missionId: mission.id,
+          goalId,
+          actionId: action.id,
+          skill: action.skillName,
+          maxAttempts: mission.getGoal(goalId)?.maxAttempts ?? 0,
+        });
+        const replanned = await this.planner.replan(
+          mission,
+          goalId,
+          action,
+          result.failure ?? "Tentatives épuisées",
+          availableSkills
+        );
+        mission.setPlanForGoal(goalId, replanned);
+        cursor = 0;
+        continue;
       }
+
+      // Aucune replanification / retry : avancer le curseur au-delà de l'action
+      // courante (continue / action terminée).
+      cursor++;
     }
 
     // Ne valider l'objectif qu'une fois toutes les actions traitées.
@@ -1022,8 +1116,17 @@ export class Executor {
           await this.executeGoalDirectly(mission, goalId, availableSkills);
           remaining.delete(goalId);
 
-          if (goal.status === "failed" && goal.priority === "critical") {
-            console.log(`[Executor] ❌ Objectif critique échoué: "${goal.title}". Arrêt de la mission.`);
+          // Correctif audit (point 9) : un objectif critique BLOQUÉ (escaladé)
+          // doit arrêter la mission au même titre qu'un échec — c'est cohérent
+          // avec le calcul de succès final qui compte "blocked" comme non réussi.
+          if (
+            (goal.status === "failed" || goal.status === "blocked") &&
+            goal.priority === "critical"
+          ) {
+            console.log(
+              `[Executor] ❌ Objectif critique ${goal.status === "blocked" ? "bloqué" : "échoué"}: ` +
+              `"${goal.title}". Arrêt de la mission.`
+            );
             criticalFailure = true;
           }
         })
@@ -1745,7 +1848,19 @@ JSON:`;
     return lessons;
   }
 
+  /**
+   * Finalise une mission (une seule fois).
+   *
+   * Correctif audit (point 4) : rendu IDEMPOTENT. L'annulation/timeout et la fin
+   * naturelle de `executeMission` pouvaient tous deux appeler cette méthode pour
+   * la même mission → doublon dans `completedMissions`, double apprentissage et
+   * `mission_completed` émis après `mission_cancelled`. Le garde `finalized`
+   * garantit qu'une mission n'est finalisée qu'une fois.
+   */
   private finalizeMission(mission: Mission): void {
+    if (this.finalizedMissions.has(mission.id)) return;
+    this.finalizedMissions.add(mission.id);
+
     this.activeMissions.delete(mission.id);
     this.completedMissions.push(mission);
     if (this.completedMissions.length > Executor.MAX_COMPLETED) {
@@ -2050,16 +2165,30 @@ JSON:`;
     // Garde-fou : si déjà active (double-clic), ne pas relancer deux fois.
     if (this.activeMissions.has(missionId)) return true;
 
+    // Correctif audit (point 3) : `fromJSON` restaure la config persistée
+    // (dryRun, timeout, maxRetries…). Une mission dry-run reprise reste donc en
+    // dry-run au lieu de retomber silencieusement à `false`.
     const mission = Mission.fromJSON(pending.state);
+    // Autoriser une nouvelle finalisation si la mission avait été finalisée
+    // dans une session précédente (le garde est en mémoire, pas persisté).
+    this.finalizedMissions.delete(mission.id);
     this.activeMissions.set(mission.id, mission);
 
-    console.log(`[Executor] ♻️ Reprise de la mission "${pending.title}" (${missionId}).`);
+    const dryRun = mission.getConfig().dryRun;
+    console.log(
+      `[Executor] ♻️ Reprise de la mission "${pending.title}" (${missionId})` +
+      `${dryRun ? " [DRY-RUN]" : ""}.`
+    );
+
+    // Rétablir l'infrastructure d'observabilité comme pour un démarrage normal.
+    telemetryService.startMissionTrace(mission.id, pending.title);
+    setTelemetryContext({ missionId: mission.id });
+
     this.emit("mission_resumed", { missionId: mission.id, title: pending.title });
 
-    this.executeMission(mission, this.resumeAvailableSkills).catch((err) => {
-      console.error(`[Executor] Reprise mission ${mission.id} échouée:`, err);
-      this.emit("mission_failed", { missionId: mission.id, error: String(err) });
-    });
+    // Correctif audit (point 3) : passer par launchMission → la reprise obtient
+    // watchdog, trace télémétrie et entrée missionRuns (waitForMission fonctionne).
+    this.launchMission(mission, this.resumeAvailableSkills);
     return true;
   }
 

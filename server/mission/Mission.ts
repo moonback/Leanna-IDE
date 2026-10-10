@@ -84,6 +84,8 @@ export class Mission {
       },
       createdAt: now,
       updatedAt: now,
+      // Persister la config pour une reprise fidèle (dryRun, timeout, retries…).
+      config: this.config,
     };
   }
 
@@ -127,7 +129,11 @@ export class Mission {
   }
 
   isCompleted(): boolean {
-    return this.state.status === "completed" || this.state.status === "failed";
+    return (
+      this.state.status === "completed" ||
+      this.state.status === "failed" ||
+      this.state.status === "cancelled"
+    );
   }
 
   // ─── Goal Stack Management ────────────────────────────────────────────────
@@ -332,6 +338,80 @@ export class Mission {
   }
 
   /**
+   * Remet une action échouée en file d'attente pour une nouvelle tentative,
+   * en respectant le budget de tentatives de l'objectif qui la porte.
+   *
+   * Retourne `true` si l'action a effectivement été re-mise en `pending`
+   * (tentative restante), `false` si le quota `maxAttempts` est épuisé — dans
+   * ce cas l'appelant doit basculer en replan/escalate plutôt que de boucler.
+   *
+   * Correctif audit (point 1) : sans ça, une action `failed` restait `failed`,
+   * la boucle de l'Executor (qui ne sélectionne que `pending`) la sautait, et
+   * `goal.attempts` n'était jamais incrémenté — donc `maxAttempts` et l'escalade
+   * ne se déclenchaient jamais.
+   */
+  retryAction(actionId: string): boolean {
+    const action = this.findAction(actionId);
+    if (!action) throw new Error(`Action ${actionId} not found`);
+
+    const goal = this.findGoalOfAction(actionId);
+    if (!goal) throw new Error(`Goal owning action ${actionId} not found`);
+
+    // Budget épuisé : ne pas relancer. L'objectif a atteint sa limite.
+    if (goal.attempts >= goal.maxAttempts) {
+      return false;
+    }
+
+    goal.attempts++;
+    // Remettre l'action en file : status pending + résultat/réflexion vidés.
+    action.status = "pending";
+    action.result = undefined;
+    action.reflection = undefined;
+
+    this.state.metrics.retriedActions++;
+    this.state.updatedAt = new Date().toISOString();
+    return true;
+  }
+
+  /**
+   * Annule la mission : l'objectif racine et tous les objectifs/actions encore
+   * non terminaux passent en `cancelled`. Idempotent — ne touche pas aux
+   * objectifs déjà terminés (completed/failed) ni à une mission déjà terminale.
+   *
+   * Correctif audit (point 4) : `completeActiveGoal` ne fermait que le sommet de
+   * la pile (un sous-objectif), laissant la racine `in_progress`, ce qui
+   * provoquait une double finalisation et un statut final incohérent.
+   */
+  cancel(summary = "Mission annulée."): void {
+    if (this.isCompleted() || this.state.status === "cancelled") return;
+
+    const now = new Date().toISOString();
+    const isTerminal = (s: GoalStatus) =>
+      s === "completed" || s === "failed" || s === "cancelled";
+
+    for (const goal of Object.values(this.state.goals)) {
+      if (!isTerminal(goal.status)) {
+        goal.status = "cancelled";
+        goal.completedAt = now;
+        if (!goal.result) {
+          goal.result = { success: false, summary };
+        }
+      }
+      for (const action of goal.plannedActions) {
+        if (action.status === "pending" || action.status === "in_progress") {
+          action.status = "cancelled";
+        }
+      }
+    }
+
+    this.state.status = "cancelled";
+    this.state.completedAt = now;
+    this.state.goalStack = [];
+    this.state.activeGoalId = null;
+    this.state.updatedAt = now;
+  }
+
+  /**
    * Associe une réflexion à une action.
    */
   recordReflection(reflection: ReflectionResult): void {
@@ -384,6 +464,15 @@ export class Mission {
     return structuredClone(this.state);
   }
 
+  /**
+   * Reconstruit une Mission depuis un état persisté.
+   *
+   * Priorité de la config :
+   *   1. `config` passé explicitement (override ponctuel) ;
+   *   2. `data.config` persisté dans l'état (dryRun, timeout, retries d'origine) ;
+   *   3. valeurs par défaut.
+   * Sans (2), une mission reprise perdait son dryRun et s'exécutait réellement.
+   */
   static fromJSON(data: MissionState, config?: Partial<MissionConfig>): Mission {
     const mission = Object.create(Mission.prototype) as Mission;
     const sanitized = structuredClone(data);
@@ -413,7 +502,13 @@ export class Mission {
     }
 
     mission.state = sanitized;
-    mission.config = { ...DEFAULT_MISSION_CONFIG, ...config };
+    mission.config = {
+      ...DEFAULT_MISSION_CONFIG,
+      ...(sanitized.config ?? {}),
+      ...config,
+    };
+    // Re-synchroniser la config persistée avec la config effective retenue.
+    mission.state.config = mission.config;
     return mission;
   }
 
@@ -477,6 +572,14 @@ export class Mission {
     for (const goal of Object.values(this.state.goals)) {
       const action = goal.plannedActions.find((a) => a.id === actionId);
       if (action) return action;
+    }
+    return undefined;
+  }
+
+  /** Retrouve l'objectif qui porte une action donnée. */
+  private findGoalOfAction(actionId: string): Goal | undefined {
+    for (const goal of Object.values(this.state.goals)) {
+      if (goal.plannedActions.some((a) => a.id === actionId)) return goal;
     }
     return undefined;
   }
