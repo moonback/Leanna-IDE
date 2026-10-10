@@ -43,3 +43,88 @@ test('Executor exposes a completion promise for autonomous callers', async () =>
   assert.ok(learning, 'terminal missions should produce reviewable learning proposals');
   assert.deepEqual(learning.improvementsApplied, [], 'mission finalization must not auto-apply learning proposals');
 });
+
+// ─── Sprint 3 : skill mission complété + plafonnement du Planner ─────────────
+
+test('Executor caps sub-goals at maxSubGoals when the LLM over-decomposes', async () => {
+  const events: string[] = [];
+  // Config avec un plafond bas pour rendre le test rapide et déterministe.
+  const executor = new Executor({ maxSubGoals: 3 });
+  executor.setSkillHandler(async () => null);
+  executor.setEventEmitter((event, data) => {
+    if (event === 'plan_truncated') events.push(`${data.proposed}->${data.kept}`);
+  });
+
+  // LLM qui renvoie 8 sous-objectifs (> maxSubGoals=3).
+  const over = Array.from({ length: 8 }, (_, i) => ({
+    title: `Étape ${i + 1}`,
+    description: `desc ${i + 1}`,
+    successCriteria: ['ok'],
+    priority: 'medium',
+    dependsOn: [],
+  }));
+  executor.setLLMDecompose(async () => JSON.stringify(over));
+
+  const mission = await executor.startMission({
+    title: 'Grosse mission',
+    description: 'Une mission que le LLM sur-découpe.',
+    availableSkills: [],
+  });
+  await executor.waitForMission(mission.id);
+
+  // La troncature a bien été signalée…
+  assert.deepEqual(events, ['8->3']);
+  // …et seuls 3 sous-objectifs (hors racine) existent.
+  const subGoals = Object.values(mission.getState().goals).filter((g) => g.parentId !== null);
+  assert.equal(subGoals.length, 3, 'les sous-objectifs sont plafonnés à maxSubGoals');
+});
+
+test('Executor.addGoal attaches a sub-goal to an active mission (and rejects unknown ones)', async () => {
+  const executor = new Executor();
+  // skillHandler lent pour garder la mission active le temps d'ajouter un goal.
+  executor.setSkillHandler(() => new Promise((r) => setTimeout(() => r(null), 50)));
+  // Pas de décomposition LLM → une seule racine, exécution directe.
+  const mission = await executor.startMission({
+    title: 'Mission vivante',
+    description: 'Rester active pour accepter un ajout de sous-objectif.',
+    availableSkills: [],
+  });
+
+  const res = executor.addGoal(mission.id, {
+    title: 'Nouvelle étape',
+    description: 'Ajoutée à chaud',
+  });
+  assert.equal(res.ok, true);
+  if (res.ok) {
+    const goal = mission.getGoal(res.goalId);
+    assert.ok(goal, 'le sous-objectif ajouté est présent');
+    assert.equal(goal!.title, 'Nouvelle étape');
+  }
+
+  // Mission inconnue → échec typé, pas d'exception.
+  const bad = executor.addGoal('does-not-exist', { title: 'x', description: 'y' });
+  assert.equal(bad.ok, false);
+
+  await executor.waitForMission(mission.id);
+});
+
+test('Executor pause/resume toggles the paused state of an active mission', async () => {
+  const executor = new Executor();
+  executor.setSkillHandler(() => new Promise((r) => setTimeout(() => r(null), 50)));
+  const mission = await executor.startMission({
+    title: 'Pausable',
+    description: 'Vérifier pause puis reprise.',
+    availableSkills: [],
+  });
+
+  assert.equal(executor.pauseMission(mission.id), true);
+  assert.equal(executor.isPaused(mission.id), true);
+  // Re-pause interdite tant qu'elle est déjà en pause.
+  assert.equal(executor.pauseMission(mission.id), false);
+  assert.equal(executor.resumeMission(mission.id), true);
+  assert.equal(executor.isPaused(mission.id), false);
+  // Reprendre une mission non en pause échoue.
+  assert.equal(executor.resumeMission(mission.id), false);
+
+  await executor.waitForMission(mission.id);
+});

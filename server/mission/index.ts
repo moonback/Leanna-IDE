@@ -51,7 +51,7 @@ export type {
   SkillScore,
   Confidence,
 } from "./types.js";
-export { DEFAULT_MISSION_CONFIG, createMissionSchema, addGoalSchema } from "./types.js";
+export { DEFAULT_MISSION_CONFIG } from "./types.js";
 
 // Mission Simulator (P0) — aperçu bout-en-bout d'une mission en dry-run (SIMULER)
 export {

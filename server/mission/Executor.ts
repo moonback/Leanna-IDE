@@ -639,6 +639,58 @@ export class Executor {
   }
 
   /**
+   * Ajoute un sous-objectif à une mission ACTIVE (audit, point 10 :
+   * `mission_add_goal` était déclaré sans handler). Le sous-objectif est
+   * rattaché à `parentId` (ou à l'objectif racine par défaut) et sera pris en
+   * compte par l'ordonnancement par vagues au tour suivant.
+   *
+   * Retourne un résultat typé plutôt que de lever, pour que le skill/route
+   * puisse répondre proprement (mission inconnue, limites atteintes, etc.).
+   */
+  addGoal(
+    missionId: string,
+    params: {
+      title: string;
+      description: string;
+      successCriteria?: string[];
+      priority?: "low" | "medium" | "high" | "critical";
+      parentId?: string;
+    }
+  ): { ok: true; goalId: string } | { ok: false; error: string } {
+    const mission = this.activeMissions.get(missionId);
+    if (!mission) {
+      return { ok: false, error: `Mission ${missionId} introuvable ou non active.` };
+    }
+    if (mission.isCompleted()) {
+      return { ok: false, error: `Mission ${missionId} déjà terminée.` };
+    }
+
+    const parentId = params.parentId ?? mission.rootGoal.id;
+    if (!mission.getGoal(parentId)) {
+      return { ok: false, error: `Objectif parent ${parentId} introuvable dans la mission.` };
+    }
+
+    try {
+      const goalId = mission.addSubGoal({
+        parentId,
+        title: params.title,
+        description: params.description,
+        successCriteria:
+          params.successCriteria && params.successCriteria.length > 0
+            ? params.successCriteria
+            : [`Le sous-objectif "${params.title}" est atteint.`],
+        priority: params.priority,
+      });
+      void this.persist(mission);
+      this.emit("goal_added", { missionId, goalId, title: params.title, parentId });
+      return { ok: true, goalId };
+    } catch (err) {
+      // addSubGoal lève sur dépassement de maxSubGoals / maxDepth.
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+
+  /**
    * Supprime définitivement une mission.
    * - Si elle est active, elle est d'abord annulée.
    * - Elle est retirée de l'historique en mémoire, de la file de reprise ET du
@@ -1856,7 +1908,25 @@ JSON:`;
     // 1re passe : créer tous les objectifs et mémoriser le mapping titre → id.
     const titleToId = new Map<string, string>();
 
-    for (const plan of plans) {
+    // Plafonnement par `maxSubGoals` (audit, point 12). Sans ça, un LLM qui
+    // renvoie plus de 10 sous-objectifs faisait lever `addSubGoal` au 11e et
+    // plantait tout `startMission`. On tronque proprement et on le signale.
+    const maxSubGoals = mission.getConfig().maxSubGoals;
+    let effectivePlans = plans;
+    if (plans.length > maxSubGoals) {
+      console.warn(
+        `[Executor] ⚠️ ${plans.length} sous-objectifs proposés > maxSubGoals (${maxSubGoals}). ` +
+        `Troncature aux ${maxSubGoals} premiers.`
+      );
+      this.emit("plan_truncated", {
+        missionId: mission.id,
+        proposed: plans.length,
+        kept: maxSubGoals,
+      });
+      effectivePlans = plans.slice(0, maxSubGoals);
+    }
+
+    for (const plan of effectivePlans) {
       const id = mission.addSubGoal({
         parentId,
         title: plan.title,
@@ -1865,13 +1935,25 @@ JSON:`;
         priority: plan.priority as import("./types.js").GoalPriority,
       });
       ids.push(id);
-      titleToId.set(plan.title.trim().toLowerCase(), id);
+      // Dépendances par titre : conserver la PREMIÈRE occurrence d'un titre.
+      // Avant, un titre dupliqué écrasait le mapping — les `dependsOn` pointaient
+      // alors tous vers le dernier homonyme. On garde le premier et on avertit.
+      const key = plan.title.trim().toLowerCase();
+      if (titleToId.has(key)) {
+        console.warn(
+          `[Executor] ⚠️ Titre de sous-objectif en double: "${plan.title}". ` +
+          `Les dépendances par titre résoudront vers la 1re occurrence.`
+        );
+      } else {
+        titleToId.set(key, id);
+      }
     }
 
     // 2e passe : résoudre les dépendances (exprimées par titre) en IDs de goals.
     // Les dépendances non résolues (titre inconnu) sont signalées explicitement
-    // au lieu d'être silencieusement supprimées.
-    plans.forEach((plan, index) => {
+    // au lieu d'être silencieusement supprimées. On itère sur les plans
+    // RÉELLEMENT créés (effectivePlans) pour rester aligné avec `ids`.
+    effectivePlans.forEach((plan, index) => {
       const deps = plan.dependsOn ?? [];
       if (deps.length === 0) return;
       const goal = mission.getGoal(ids[index]);

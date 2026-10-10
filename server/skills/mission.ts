@@ -189,6 +189,51 @@ export const missionSkill: Skill = {
       },
     },
     {
+      name: "mission_pause",
+      description:
+        "⏸️ Met une mission en cours en PAUSE. L'exécution s'arrête au prochain point de contrôle (entre deux actions/vagues) et reste suspendue jusqu'à `mission_resume` ou `mission_cancel`.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission à mettre en pause." },
+        },
+        required: ["missionId"],
+      },
+    },
+    {
+      name: "mission_resume",
+      description:
+        "▶️ Reprend une mission précédemment mise en pause avec `mission_pause`. L'exécution redémarre là où elle s'était arrêtée.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission à reprendre." },
+        },
+        required: ["missionId"],
+      },
+    },
+    {
+      name: "mission_add_goal",
+      description:
+        "➕ Ajoute un sous-objectif à une mission ACTIVE. Utile pour enrichir une mission en cours avec une nouvelle étape sans la recréer. Le sous-objectif est rattaché à l'objectif racine (ou à `parentId` si fourni) et sera planifié/exécuté selon ses dépendances.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          missionId: { type: "STRING", description: "ID de la mission active." },
+          title: { type: "STRING", description: "Titre court du sous-objectif." },
+          description: { type: "STRING", description: "Description détaillée de ce que ce sous-objectif doit accomplir." },
+          successCriteria: {
+            type: "ARRAY",
+            description: "Critères de succès vérifiables du sous-objectif.",
+            items: { type: "STRING" },
+          },
+          priority: { type: "STRING", description: "Priorité: low, medium, high, critical", enum: ["low", "medium", "high", "critical"] },
+          parentId: { type: "STRING", description: "ID de l'objectif parent (défaut: objectif racine de la mission)." },
+        },
+        required: ["missionId", "title", "description"],
+      },
+    },
+    {
       name: "mission_dryrun_report",
       description:
         "Retourne le rapport de simulation (dry-run global) : la liste des effets de bord qui AURAIENT eu lieu " +
@@ -245,6 +290,20 @@ export const missionSkill: Skill = {
     mission_list: z.object({}),
     mission_cancel: z.object({
       missionId: z.string().min(1),
+    }),
+    mission_pause: z.object({
+      missionId: z.string().min(1),
+    }),
+    mission_resume: z.object({
+      missionId: z.string().min(1),
+    }),
+    mission_add_goal: z.object({
+      missionId: z.string().min(1),
+      title: z.string().min(1).trim(),
+      description: z.string().min(1).trim(),
+      successCriteria: z.array(z.string().min(1)).optional(),
+      priority: z.enum(["low", "medium", "high", "critical"]).optional(),
+      parentId: z.string().min(1).optional(),
     }),
     mission_dryrun_report: z.object({}),
     mission_reflect: z.object({
@@ -453,6 +512,55 @@ export const missionSkill: Skill = {
           message: success
             ? `Mission ${missionId} annulée.`
             : `Mission ${missionId} non trouvée ou déjà terminée.`,
+        };
+      }
+
+      case "mission_pause": {
+        const { missionId } = validateArgs(missionSkill.inputSchemas!["mission_pause"], args);
+        const success = executor.pauseMission(missionId);
+        return {
+          success,
+          missionId,
+          status: success ? "paused" : undefined,
+          message: success
+            ? `Mission ${missionId} mise en pause. Elle s'arrêtera au prochain point de contrôle. Utilise mission_resume pour reprendre.`
+            : `Mission ${missionId} introuvable, non active, ou déjà en pause.`,
+        };
+      }
+
+      case "mission_resume": {
+        const { missionId } = validateArgs(missionSkill.inputSchemas!["mission_resume"], args);
+        const success = executor.resumeMission(missionId);
+        return {
+          success,
+          missionId,
+          status: success ? "in_progress" : undefined,
+          message: success
+            ? `Mission ${missionId} reprise.`
+            : `Mission ${missionId} introuvable ou non en pause.`,
+        };
+      }
+
+      case "mission_add_goal": {
+        const { missionId, title, description, successCriteria, priority, parentId } = validateArgs(
+          missionSkill.inputSchemas!["mission_add_goal"],
+          args
+        );
+        const result = executor.addGoal(missionId, {
+          title,
+          description,
+          successCriteria,
+          priority,
+          parentId,
+        });
+        if (!result.ok) {
+          return { error: result.error };
+        }
+        return {
+          ok: true,
+          missionId,
+          goalId: result.goalId,
+          message: `Sous-objectif "${title}" ajouté à la mission ${missionId}.`,
         };
       }
 
