@@ -268,9 +268,9 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | # | Fonctionnalité / optimisation | S'appuie sur | Prio | Effort | Statut |
 |---|---|---|---|---|---|
 | 5 | **Composition de swarm pilotée par le Brain** : brancher `SwarmComposer.compose()` sur le plan réel pour instancier/dissoudre l'équipe par mission | `SwarmComposer`, `AgentBrain` | P1 | L | 📋 |
-| 6 | **Contract-net en production** : utiliser `ContractNetNegotiator` pour attribuer dynamiquement les tâches aux agents les mieux notés, au lieu d'un routage statique | `ContractNetNegotiator`, `AgentMessageBus` | P1 | L | 🟡 moteur prêt, câblage orchestrateur à faire |
+| 6 | ✅ ~~**Contract-net en production** : utiliser `ContractNetNegotiator` pour attribuer dynamiquement les tâches aux agents les mieux notés, au lieu d'un routage statique~~ | `ContractNetNegotiator`, `AgentMessageBus` | P1 | L | ✅ `AgentOrchestrator.resolveRole` (modes `LEANNA_CONTRACT_NET=off\|shadow\|on`) câblé sur `AgentBrain` (étapes + auto-correction), `orchestrate()` (rôle optionnel) et `agent_negotiate` ; repli statique, clôture anticipée des enchères |
 | 7 | **Dashboard du bus de messages** : exposer `MessageBusMonitor` (health, alertes, flux, métriques agrégées) dans l'UI avec le rendu ASCII en live | `MessageBusMonitor` | P2 | M | 📋 |
-| 8 | **Scoring par-rôle du contract-net** : remplacer le proxy `successRate` global par une fiabilité par rôle issue de `StrategyMemory` | `ContractNetNegotiator.estimateConfidence`, `StrategyMemory` | P2 | M | 📋 |
+| 8 | ✅ ~~**Scoring par-rôle du contract-net** : remplacer le proxy `successRate` global par une fiabilité par rôle issue de `StrategyMemory`~~ | `ContractNetNegotiator.confidenceFor`, `StrategyMemory` | P2 | M | ✅ `RoleReliability` (clés `agent_role:<rôle>`, lissage de Laplace, neutre sous `CONTRACT_NET_MIN_EVIDENCE`) |
 
 ### Catégorie C — Autonomie proactive
 

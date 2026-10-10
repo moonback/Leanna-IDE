@@ -76,7 +76,7 @@ handler : il doit lire `context.signal`.
 | `generate_codebase_markdown` | ✅ coopératif | Check à chaque fichier de la boucle de détail + skip de l'analyse réseau ; `status:"cancelled"`. |
 | `browser_research` | ✅ coopératif | Arrêt entre deux sources ; renvoie `partial`/`cancelled` avec les sources déjà lues. |
 | `knowledge_reindex` | ✅ coopératif | `scanAll({ signal })` ; check par fichier → `ScanCancelledError` → `status:"cancelled"`. |
-| `mission_create`, `agent_delegate`, `agent_orchestrate`, `agent_negotiate` | ⚠️ non branché | Mécanisme applicatif propre (`agent_cancel`), non relié à `signal`. |
+| `mission_create`, `agent_delegate`, `agent_orchestrate`, `agent_negotiate` | ⚠️ non branché | Mécanisme applicatif propre (`agent_cancel`), non relié à `signal`. Les tâches attribuées par enchère (`agent_negotiate`, rôle omis dans `agent_orchestrate`, étapes du Brain) sont suivies par l'orchestrateur et donc annulables par `agent_cancel` / `agent_cancel_orchestration`. |
 | `knowledge_build_context`, `knowledge_impact_analyze` | ⚠️ non branché | Appels quasi instantanés ; `raceWithAbort` suffit. |
 | `browser_summarize_page`, `create_rich_document` | ⚠️ non branché | Étape unique / généralement rapide. |
 

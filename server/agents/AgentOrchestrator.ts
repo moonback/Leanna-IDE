@@ -401,6 +401,15 @@ export class AgentOrchestrator {
     request: RoleResolutionRequest,
     options: { force?: boolean } = {}
   ): Promise<RoleAssignment> {
+    const assignment = await this.computeAssignment(request, options);
+    if (assignment.mode !== "off") this.publishAssignment(request, assignment);
+    return assignment;
+  }
+
+  private async computeAssignment(
+    request: RoleResolutionRequest,
+    options: { force?: boolean }
+  ): Promise<RoleAssignment> {
     const mode: ContractNetMode = options.force ? "on" : getContractNetConfig().mode;
     const preferred = request.preferredRole;
     const staticRole = preferred ?? DEFAULT_FALLBACK_ROLE;
@@ -500,6 +509,31 @@ export class AgentOrchestrator {
       reserved: true,
       ...common,
     };
+  }
+
+  /**
+   * Publie la décision d'attribution (enchère, repli, shadow) sur le flux
+   * d'événements pour le dashboard. Jamais bloquant.
+   */
+  private publishAssignment(request: RoleResolutionRequest, assignment: RoleAssignment): void {
+    try {
+      agentEventStream.publish({
+        type: "agent_event",
+        event: "task_progress",
+        taskId: assignment.auctionId ?? randomUUID(),
+        role: assignment.role,
+        title: `[Contract-Net] ${request.title.slice(0, 80)} → ${assignment.role}`,
+        status: "running",
+        agentName: getAgentDefinition(assignment.role)?.name ?? assignment.role,
+        detail:
+          `contract-net:${assignment.via}:${assignment.role}:${request.preferredRole ?? "-"}` +
+          `${assignment.shadowWinner ? `:shadow=${assignment.shadowWinner}` : ""}` +
+          `${assignment.reason ? ` (${assignment.reason})` : ""}`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      /* l'observabilité ne doit jamais faire échouer l'attribution */
+    }
   }
 
   /** Libère une place réservée par `resolveRole` (idempotent, jamais négatif). */
@@ -906,15 +940,37 @@ export class AgentOrchestrator {
    * Retourne l'état de santé complet de la flotte d'agents autonomes.
    */
   getFleetStatus() {
+    const contractNet = this.getContractNetStatus();
     if (!this.registry.isReady) {
       return {
         initialized: false,
         message: "Le registre d'agents n'est pas encore initialisé (setSkillHandler() pas encore appelé)",
+        contractNet,
       };
     }
     return {
       initialized: true,
       ...this.registry.getFleetStatus(),
+      contractNet,
+    };
+  }
+
+  /**
+   * État du contract-net : mode, réglages effectifs, métriques d'enchères et
+   * notes par rôle (fiabilité récente utilisée dans les bids).
+   */
+  getContractNetStatus(): {
+    mode: ContractNetMode;
+    config: ReturnType<typeof getContractNetConfig>;
+    stats: ReturnType<ContractNetNegotiator["getStats"]>;
+    roleRatings: ReturnType<RoleReliability["listRatings"]>;
+  } {
+    const config = getContractNetConfig();
+    return {
+      mode: config.mode,
+      config,
+      stats: this.negotiator.getStats(),
+      roleRatings: this.reliability.listRatings(),
     };
   }
 

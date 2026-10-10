@@ -278,6 +278,37 @@ test("agent_orchestrate — succès avec mock orchestrate", async (t) => {
   assert.equal(result.tasks[1].role, "test");
 });
 
+test("agent_orchestrate — le rôle d'une tâche est optionnel (attribution par enchère)", async (t) => {
+  const decl = agentsSkill.declarations.find((d) => d.name === "agent_orchestrate");
+  const taskItems = (decl!.parameters.properties as any).tasks.items;
+  assert.ok(!taskItems.required.includes("role"), "role ne doit plus être requis");
+  assert.ok(taskItems.properties.requiredCapabilities, "requiredCapabilities doit être déclaré");
+
+  let received: any;
+  t.mock.method(agentOrchestrator, "orchestrate", async (params: any) => {
+    received = params;
+    return {
+      id: "orch-auto",
+      title: params.title,
+      description: params.description,
+      status: "running",
+      createdAt: new Date().toISOString(),
+      tasks: [{ id: "t1", role: "unassigned", title: "Vérifier", status: "pending" }],
+      dependencies: {},
+    };
+  });
+
+  const result = await agentsSkill.handleToolCall("agent_orchestrate", {
+    title: "Plan auto",
+    description: "Sans rôle",
+    tasks: [{ title: "Vérifier", description: "Lancer les tests", requiredCapabilities: ["verify_full"] }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(received.tasks[0].role, undefined);
+  assert.deepEqual(received.tasks[0].requiredCapabilities, ["verify_full"]);
+});
+
 test("agent_negotiate — déclaration et schéma présents", () => {
   const decl = agentsSkill.declarations.find((d) => d.name === "agent_negotiate");
   assert.ok(decl, "agent_negotiate doit être déclaré");

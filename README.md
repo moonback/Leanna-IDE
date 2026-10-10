@@ -902,13 +902,17 @@ L'équipe est plafonnée (défaut 6 membres) tout en préservant la colonne vert
 `ContractNetNegotiator` implémente le protocole contract-net :
 
 ```text
-negotiate(task)
+negotiate(task, from?, { award })
    │
    ├─ announce()        broadcast « call_for_proposals » (initiateur neutre)
-   ├─ wait(500 ms)      fenêtre d'enchères (biddingWindowMs)
-   ├─ submitBid()       les agents soumettent leurs offres
+   ├─ submitBid() /     les agents soumettent leur offre, ou un refus explicite
+   │  declineBid()      (aucune capacité requise)
+   ├─ collect()         clôture ANTICIPÉE dès que tous les agents en ligne ont
+   │                    répondu ; la fenêtre (CONTRACT_NET_BIDDING_WINDOW_MS,
+   │                    défaut 500 ms) n'est plus qu'un plafond
    ├─ scoreBids()       scoring pondéré
-   └─ award()           task_request ciblé au gagnant éligible
+   ├─ pickWinner()      le rôle préféré garde la tâche si l'écart de score ≤ marge
+   └─ award()           task_request ciblé au gagnant (omis en mode sélection)
 ```
 
 Le scoring combine trois critères clampés dans [0, 1] :
@@ -916,7 +920,7 @@ Le scoring combine trois critères clampés dans [0, 1] :
 | Critère | Poids (`DEFAULT_WEIGHTS`) | Source |
 |---|:---:|---|
 | `skillMatch` | **0.60** | part des capacités requises couvertes par l'agent |
-| `confidence` | **0.25** | fiabilité estimée depuis le bus (`successRate`, neutre 0.5 sans données) |
+| `confidence` | **0.25** | fiabilité RÉCENTE propre au rôle (`RoleReliability`, via `StrategyMemory` ; neutre 0.5 sous `CONTRACT_NET_MIN_EVIDENCE` tâches) |
 | `loadPenalty` | **−0.15** | charge normalisée (`activeMessages × 0.25`, plafonné) |
 
 ```text
@@ -926,6 +930,36 @@ score = 0.60·skillMatch + 0.25·confidence − 0.15·loadPenalty
 Un bid n'est **éligible** que si `skillMatch > 0`. L'initiateur par défaut est un
 pseudo-rôle neutre `orchestrator` : aucun agent n'y est abonné, donc tous (y
 compris `architect`) reçoivent l'appel d'offres sans biais d'émetteur.
+
+#### Attribution dynamique en production
+
+L'enchère fonctionne en **mode sélection** : elle choisit l'agent, puis la tâche
+est exécutée par `AgentOrchestrator.delegateTask()` sur le moteur actif. Statut,
+annulation, budget et résultat restent donc suivis de bout en bout, et l'issue de
+chaque tâche alimente la note du rôle qui l'a exécutée.
+
+| Point d'entrée | Comportement |
+|---|---|
+| `AgentBrain` (étapes + auto-correction) | `agentRole` = rôle **préféré** : il garde la tâche sauf s'il est battu de plus de `CONTRACT_NET_SWITCH_MARGIN` (0.10). Le rôle attribué est reporté dans `stage.assignedRole` / `assignedVia` |
+| `agent_orchestrate` / `orchestrate()` | `role` **optionnel** : s'il est omis, l'agent est attribué au lancement de la tâche (charges, notes et résultats de dépendances à jour) |
+| `agent_negotiate` / `negotiateTask()` | enchère explicite, active même en mode `off` |
+| `agent_delegate` | rôle explicite, routage statique inchangé |
+
+`AgentOrchestrator.resolveRole()` retient le meilleur candidat classé **ayant une
+place libre** (tâches en cours + réservations < `maxConcurrency`). Sans agent en
+ligne, sans offre éligible ou en cas d'erreur, il se replie sur le rôle préféré
+(sinon `planner`), ce qui est journalisé et compté.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `LEANNA_CONTRACT_NET` | `on` | `off` : routage statique · `shadow` : enchère observée, rôle statique conservé · `on` : le gagnant exécute |
+| `CONTRACT_NET_BIDDING_WINDOW_MS` | `500` | plafond de la fenêtre d'enchères (20–5000) |
+| `CONTRACT_NET_SWITCH_MARGIN` | `0.10` | écart de score en deçà duquel le rôle préféré est conservé |
+| `CONTRACT_NET_MIN_EVIDENCE` | `3` | tâches minimales avant qu'une note par rôle soit jugée fiable |
+
+L'état (mode, métriques d'enchères, replis, notes par rôle) est exposé par
+`getFleetStatus().contractNet`, par les outils `agent_fleet_status` et
+`agent_stats`, et les décisions sont publiées sur le flux d'événements agents.
 
 ### Délégation structurée — DelegationManager
 

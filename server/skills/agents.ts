@@ -779,7 +779,7 @@ export const agentsSkill: Skill = {
       }
 
       case "agent_stats": {
-        const stats = agentOrchestrator.getStats();
+        const stats = { ...agentOrchestrator.getStats(), contractNet: agentOrchestrator.getContractNetStatus?.() };
         console.log(`[AgentsSkill]   Total: ${stats.totalTasks} | Running: ${stats.byStatus.running} | Done: ${stats.byStatus.completed}`);
         return stats;
       }
@@ -824,6 +824,7 @@ export const agentsSkill: Skill = {
             initialized: false,
             message: "Flotte non initialisée — elle démarre à la première délégation.",
             hint: "Lance agent_delegate ou agent_collaborate pour démarrer.",
+            contractNet: fleet?.contractNet,
           };
         }
         console.log(`[AgentsSkill]   Flotte: ${fleet.onlineAgents}/${fleet.totalAgents} en ligne`);
@@ -838,6 +839,7 @@ export const agentsSkill: Skill = {
           },
           agents: fleet.agents,
           busMetrics: fleet.busMetrics,
+          contractNet: fleet.contractNet,
           recommendation:
             fleet.overloadedAgents > 0
               ? `⚠️ ${fleet.overloadedAgents} agent(s) surchargé(s) — attends avant de déléguer davantage.`
