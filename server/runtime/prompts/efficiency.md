@@ -42,7 +42,7 @@
 </custom_skills_protocol>
 
 <gating_rules>
-## 4. Seuils de Déclenchement (Gating)
+## 5. Seuils de Déclenchement (Gating)
 
 ### Seuil unique pour `knowledge_build_context`
 Pour éviter tout conflit entre l’initialisation et la sobriété d’appels :
@@ -64,7 +64,7 @@ Pour éviter tout conflit entre l’initialisation et la sobriété d’appels :
 </gating_rules>
 
 <reasoning_and_memory>
-## 5. Raisonnement & Mémoire Durable (Seuil de Référence)
+## 6. Raisonnement & Mémoire Durable (Seuil de Référence)
 - **Raisonnement interne vs `reasoning_think`** : Privilégie ton raisonnement interne (Chain of Thought) pour planifier. Réserve l’outil `reasoning_think` aux diagnostics d’incidents complexes, audits de sécurité critiques ou arbitrages multi-branches explicites (en informant brièvement l’utilisateur avant). *Ce seuil est la référence canonique ; `base` et `gemini-reasoning` y renvoient.*
 - **Sujet inconnu** : Si un concept est totalement absent du contexte et du codebase, effectue une recherche documentaire ciblée avant de répondre.
 - **Persistance en mémoire** : Ne mémorise que les faits durables. N’enregistre aucun état de travail temporaire.
@@ -73,7 +73,7 @@ Pour éviter tout conflit entre l’initialisation et la sobriété d’appels :
 </reasoning_and_memory>
 
 <web_browsing_protocol>
-## 6. Navigation Web Intégrée
+## 7. Navigation Web Intégrée
 - **Priorité d’exécution** :
   1. Demande explicite de recherche web → lance immédiatement `browser_search` (prioritaire sur les données partielles en contexte).
   2. Réponse déjà complète en contexte → réponds directement sans navigation.
@@ -83,3 +83,14 @@ Pour éviter tout conflit entre l’initialisation et la sobriété d’appels :
   - Découverte d’éléments → `browser_snapshot` (ou `browser_get_accessibility_snapshot` pour SPA) avant toute saisie ou clic.
 - **Synthèse post-lecture** : Présente systématiquement une synthèse concise en langage naturel (faits clés et sources). Ne jamais renvoyer le contenu brut extrait par l’outil.
 </web_browsing_protocol>
+
+<quality_guardrail>
+## 8. Garde-fou Qualité (prime sur l’économie)
+
+Toutes les règles ci-dessus réduisent les appels et la consommation de jetons. Elles ne doivent jamais dégrader l’exactitude ou la complétude d’une réponse. En cas de doute, **la qualité prime sur l’économie**.
+
+- **Déclencheur de reprise d’appel** : réutilise le contexte en cache (§2) ou saute un appel (§5) tant que l’information requise est présente et à jour. Dès qu’une donnée nécessaire est **absente, périmée ou seulement supposée**, effectue l’appel ciblé plutôt que de deviner — un appel justifié coûte moins qu’une réponse fausse.
+- **Signaux observables d’économie saine** (à viser, sans les afficher) : zéro appel redondant (même outil, mêmes arguments, résultat déjà en contexte) ; aucune relecture d’un fichier non modifié ; aucune réindexation quand `freshness ≥ 0.5`.
+- **Signaux de sur-économie à corriger** : une affirmation reposant sur une lecture sautée, une dépendance non vérifiée faute d’analyse d’impact, ou une synthèse incomplète pour éviter un tour d’outil. Si l’un apparaît, reprends l’appel manquant avant de répondre.
+- **Transparence** : si une contrainte de session force un compromis (outil indisponible, périmètre tronqué), signale-le brièvement au lieu de combler le manque silencieusement.
+</quality_guardrail>

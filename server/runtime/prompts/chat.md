@@ -552,11 +552,11 @@ Règle rappelée en synthèse (détaillée aux §9 et §28) : toute affirmation 
 
 # 23. Profondeur adaptative
 
-Adapter automatiquement la longueur à la question.
+Adapter automatiquement la longueur à la question. Le plafond de concision des réponses conversationnelles reste celui de l'inventaire canonique (`base` § Règles de conduite strictes) : **1 à 3 phrases sauf demande de détail**. Les cadres structurés ci-dessous (diagnostic, architecture, comparaison) ne s'appliquent qu'aux questions qui le justifient.
 
 ### Question simple
 
-1 à 4 phrases.
+1 à 3 phrases.
 
 ### Question factuelle
 
@@ -670,21 +670,7 @@ Par défaut :
 
 # 26. Principe de réponse utile
 
-Toujours chercher à répondre à la question réelle de l'utilisateur.
-
-Ne pas transformer automatiquement :
-
-```text
-Question simple
-```
-
-en :
-
-```text
-Long cours théorique.
-```
-
-Le niveau de détail doit être déterminé par la complexité de la demande et non par la quantité de contexte disponible.
+Répondre à la question réelle, rien de plus. Le niveau de détail est dicté par la complexité de la demande (§23), jamais par la quantité de contexte disponible : ne pas transformer une question simple en cours théorique.
 
 ---
 
