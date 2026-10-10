@@ -708,7 +708,7 @@ function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, o
       <div
         className="flex flex-col transition-[border-color,box-shadow] duration-200 rounded-xl overflow-hidden"
         style={{
-          backgroundColor: 'var(--bg-input)',
+          // backgroundColor: 'var(--bg-input)',
           border: `1px solid ${isFocused ? 'var(--accent-primary)' : 'var(--border-base)'}`,
           boxShadow: isFocused
             ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent), 0 0 20px var(--accent-glow), inset 0 1px 2px rgba(0,0,0,0.15)'
@@ -716,18 +716,6 @@ function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, o
         }}
       >
 
-        {/* Bandeau de connexion — remplace le placeholder "impasse" par une action */}
-        {!connected && onConnect && (
-          <button
-            type="button"
-            onClick={onConnect}
-            className="flex items-center gap-2 px-3 py-2 border-b text-sm font-medium transition-colors hover:bg-[var(--accent-subtle)]"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
-          >
-            <Power size={14} />
-            <span>Se connecter à l'assistant pour commencer</span>
-          </button>
-        )}
 
         {/* Textarea row */}
         <div className="flex items-end gap-2 px-3 py-2">
@@ -792,21 +780,21 @@ function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, o
 
         {/* Bottom info bar */}
         <div
-          className="flex items-center justify-between px-3 py-1.5 border-t"
+          className="flex items-center justify-between gap-2 px-3 py-1.5 border-t overflow-hidden"
           style={{ borderColor: 'var(--border-base)', backgroundColor: 'color-mix(in srgb, var(--bg-input) 40%, transparent)' }}
         >
           <span
             id="chat-input-hints"
-            className="text-xs tracking-wide"
+            className="text-xs tracking-wide min-w-0 flex-1 truncate whitespace-nowrap"
             style={{ color: 'var(--text-dimmed)' }}
           >
-            <kbd className="font-mono">Enter</kbd> envoyer &nbsp;·&nbsp;
-            <kbd className="font-mono">⇧Enter</kbd> saut de ligne &nbsp;·&nbsp;
-            <kbd className="font-mono">@</kbd> fichier &nbsp;·&nbsp;
+            <kbd className="font-mono">Enter</kbd> envoyer <span className="opacity-60">·</span>{' '}
+            <kbd className="font-mono">⇧Enter</kbd> saut de ligne <span className="opacity-60">·</span>{' '}
+            <kbd className="font-mono">@</kbd> fichier <span className="opacity-60">·</span>{' '}
             <kbd className="font-mono">/</kbd> commande
           </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Char counter */}
             {input.length > 0 && (
               <span

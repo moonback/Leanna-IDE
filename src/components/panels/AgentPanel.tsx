@@ -801,6 +801,7 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
   // ── Sélection multiple pour suppression groupée ──
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   // Purge les ids sélectionnés qui n'existent plus (tâches supprimées/nettoyées).
   useEffect(() => {
@@ -843,8 +844,6 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
     setSelectMode(false);
     setSelected(new Set());
   };
-
-  const [deleting, setDeleting] = useState(false);
 
   const deleteSelected = async () => {
     const ids = [...selected];
