@@ -70,13 +70,21 @@ test("auto-expires after its TTL so a crashed holder cannot deadlock others", as
 test("renew extends the TTL while held", async () => {
   const mgr = new DistributedLockManager();
   const key = uniqueKey("renew");
-  const handle = await mgr.tryAcquire(key, 40);
+  // Marges volontairement larges : setTimeout ne garantit qu'un délai MINIMUM,
+  // donc des TTL trop serrés (ex: 40ms) rendaient ce test instable — un
+  // `sleep` qui déborde faisait expirer le verrou AVANT le renew, et le renew
+  // échouait légitimement. On garde l'intention (renew prolonge au-delà du TTL
+  // d'origine) avec des durées qui absorbent le jitter de l'ordonnanceur.
+  const originalTtl = 200;
+  const handle = await mgr.tryAcquire(key, originalTtl);
   assert.ok(handle);
-  await sleep(25);
-  const renewed = await handle!.renew(60);
+  await sleep(80);
+  const renewed = await handle!.renew(400);
   assert.equal(renewed, true, "renew succeeds while held");
-  await sleep(25); // would have expired at 40ms without renewal
-  const blocked = await mgr.tryAcquire(key, 40);
+  // Attendre au-delà du TTL d'origine (200ms depuis l'acquisition) : sans le
+  // renew, le verrou aurait expiré ici.
+  await sleep(160); // total ~240ms > 200ms d'origine
+  const blocked = await mgr.tryAcquire(key, originalTtl);
   assert.equal(blocked, null, "renewed lock is still held past the original TTL");
   await handle!.release();
 });
