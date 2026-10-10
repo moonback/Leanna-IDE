@@ -996,8 +996,20 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
         border: `1px solid ${selected ? 'var(--accent-primary)' : isRunning ? `${meta.color}30` : isPending ? `${meta.color}20` : 'var(--border-base)'}`,
         opacity: task.status === 'cancelled' ? 0.6 : 1,
       }}>
-      <button className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
-        onClick={selectMode ? onSelectToggle : onToggle}>
+      {/* Rangée cliquable : un <div role="button"> et non un <button>, car elle
+          contient elle-même un bouton (Annuler) — imbriquer deux <button> est
+          invalide en HTML et casse l'accessibilité + le clic. */}
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
+        onClick={selectMode ? onSelectToggle : onToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            (selectMode ? onSelectToggle : onToggle)();
+          }
+        }}>
         {/* Case à cocher en mode sélection */}
         {selectMode && (
           <span className="flex-shrink-0 flex items-center justify-center" style={{ color: selected ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}>
@@ -1075,7 +1087,7 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
             <ChevronRight size={10} style={{ color: 'var(--text-dimmed)' }} />
           </motion.div>
         )}
-      </button>
+      </div>
 
       {/* Barre de progression pour les tâches en cours */}
       {isRunning && progressPct > 0 && (

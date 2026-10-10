@@ -39,7 +39,26 @@ export interface AgentTask {
   metadata?: Record<string, unknown>;
   /** Surcharge du budget par défaut pour cette tâche précise. */
   budget?: Partial<AgentBudget>;
+  /**
+   * Callback de progression de phase. Le runtime l'appelle à chaque transition
+   * de phase (plan → act → verify → finalize) pour que l'appelant puisse
+   * refléter l'avancement réel côté UI (ex: 2/5, 3/5, 4/5) au lieu de rester
+   * figé sur « Planification ».
+   */
+  onProgress?: (phase: RuntimePhase) => void;
+  /**
+   * Signal d'annulation coopératif. Quand il est déclenché (abort), le runtime
+   * interrompt la planification/boucle au prochain point de contrôle et ne
+   * lance plus de nouvel appel LLM.
+   */
+  signal?: AbortSignal;
 }
+
+/**
+ * Phases rapportées à l'appelant via `onProgress`. Distinctes des `AgentPhase`
+ * internes (budget) : ce sont les jalons visibles de l'exécution.
+ */
+export type RuntimePhase = "planning" | "acting" | "verifying" | "finalizing";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Budget — les gardes-fous de la boucle

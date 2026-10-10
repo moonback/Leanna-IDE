@@ -225,18 +225,39 @@ export class AgenticRuntime implements IAgentRuntime {
         `${tools.length} outil(s) réellement disponible(s) sur ${agent.capabilities.length} déclaré(s)`
     );
 
+    // Annulation précoce : si le signal est déjà déclenché, inutile de planifier.
+    if (task.signal?.aborted) {
+      return this.finish(task, session, "blocked", "Tâche annulée avant la planification.");
+    }
+
     let plan: Plan;
     try {
       // ── UNDERSTAND + PLAN ──
-      plan = await this.plan(task);
+      task.onProgress?.("planning");
+      // La planification est un unique appel LLM : on le borne par un mur
+      // temporel dur (dérivé du budget), sinon un provider lent/suspendu peut
+      // bloquer la tâche indéfiniment sur « Planification ».
+      plan = await this.withPlanningGuard(session, task.signal, () => this.plan(task));
       session.lastPlan = plan;
     } catch (err) {
-      return this.finish(task, session, "failed", `Échec de la planification: ${(err as Error).message}`);
+      const aborted = task.signal?.aborted || (err as Error).name === "AbortError";
+      return this.finish(
+        task,
+        session,
+        aborted ? "blocked" : "failed",
+        aborted ? "Tâche annulée pendant la planification." : `Échec de la planification: ${(err as Error).message}`,
+      );
     }
 
     // ── Boucle ACT → OBSERVE → VERIFY → (NEXT | RECOVER) ──
+    task.onProgress?.("acting");
     let stepIdx = 0;
+    let verifyingAnnounced = false;
     while (stepIdx < plan.steps.length) {
+      if (task.signal?.aborted) {
+        log.warn(`[${taskId.slice(0, 8)}] 🛑 Annulation demandée — arrêt de la boucle`);
+        return this.finish(task, session, "blocked", "Tâche annulée par l'utilisateur.");
+      }
       if (this.budgetExhausted(session)) {
         log.warn(`[${taskId.slice(0, 8)}] ⛔ Budget épuisé — arrêt de la boucle`);
         break;
@@ -267,6 +288,10 @@ export class AgenticRuntime implements IAgentRuntime {
 
       // ── VERIFY ──
       step.status = "verifying";
+      if (!verifyingAnnounced) {
+        task.onProgress?.("verifying");
+        verifyingAnnounced = true;
+      }
       const verification = await this.verify(step, observation);
       session.verifications.push(verification);
 
@@ -295,9 +320,55 @@ export class AgenticRuntime implements IAgentRuntime {
     }
 
     // ── COMPLETE ──
+    task.onProgress?.("finalizing");
     const outcome = this.assessOutcome(session, plan);
     const success = outcome === "success" || outcome === "partial";
     return this.finish(task, session, outcome, undefined, success);
+  }
+
+  /**
+   * Borne la phase de planification par un mur temporel dur et par le signal
+   * d'annulation. Sans cela, `plan()` (un unique appel LLM sans timeout propre)
+   * peut suspendre la tâche indéfiniment — la cause racine du blocage sur
+   * « 1/5 Planification ». La fenêtre est dérivée du budget : au plus la moitié
+   * du temps d'exécution, plafonnée à 90s, avec un plancher de 30s.
+   */
+  private async withPlanningGuard<T>(
+    session: RunSession,
+    signal: AbortSignal | undefined,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const windowMs = Math.min(90_000, Math.max(30_000, Math.floor(session.budget.maxExecutionTimeMs / 2)));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+
+    const guard = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Planification interrompue après ${Math.round(windowMs / 1000)}s (timeout).`)),
+        windowMs,
+      );
+      if (signal) {
+        if (signal.aborted) {
+          const e = new Error("Planification annulée.");
+          e.name = "AbortError";
+          reject(e);
+          return;
+        }
+        onAbort = () => {
+          const e = new Error("Planification annulée.");
+          e.name = "AbortError";
+          reject(e);
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    });
+
+    try {
+      return await Promise.race([fn(), guard]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (signal && onAbort) signal.removeEventListener("abort", onAbort);
+    }
   }
 
   // ─── plan : UNDERSTAND + PLAN ───────────────────────────────────────────────

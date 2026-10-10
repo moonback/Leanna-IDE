@@ -13,7 +13,7 @@
  */
 
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
-import type { AgentResult, AgentTask as AgenticTask, AgentBudget } from "../runtime/agentic/types.js";
+import type { AgentResult, AgentTask as AgenticTask, AgentBudget, RuntimePhase } from "../runtime/agentic/types.js";
 import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
@@ -21,6 +21,19 @@ import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentRuntimeExecutor");
+
+/**
+ * Traduction des jalons de phase du runtime en progression affichée (x/5).
+ * L'étape 1/5 « Planification » est émise avant l'appel à `run()`, et 5/5
+ * « Terminé » après ; ce tableau couvre les transitions intermédiaires pour que
+ * l'UI reflète l'avancement réel au lieu de rester bloquée sur 1/5.
+ */
+const RUNTIME_PHASE_PROGRESS: Record<RuntimePhase, { current: number; total: number; label: string } | undefined> = {
+  planning: { current: 1, total: 5, label: "Planification" },
+  acting: { current: 2, total: 5, label: "Exécution" },
+  verifying: { current: 3, total: 5, label: "Vérification" },
+  finalizing: { current: 4, total: 5, label: "Finalisation" },
+};
 
 /**
  * Exécuteur de tâches basé sur le runtime agentique.
@@ -85,7 +98,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
     const agent = getAgentDefinitionOrThrow(task.role);
     const startTime = Date.now();
 
-    this.active.set(task.id, new AbortController());
+    const controller = new AbortController();
+    this.active.set(task.id, controller);
     this.increment(task.role);
     task.status = "running";
     task.startedAt = new Date().toISOString();
@@ -106,6 +120,15 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
           title: task.title,
         },
         budget: this.defaultBudget,
+        // Propage l'annulation jusqu'au runtime : un clic « Annuler » interrompt
+        // désormais réellement la planification/boucle, au lieu d'être ignoré.
+        signal: controller.signal,
+        // Reflète l'avancement RÉEL de phase vers l'UI. Sans cela, la tâche
+        // restait figée sur « 1/5 Planification » jusqu'à la toute fin.
+        onProgress: (phase) => {
+          const step = RUNTIME_PHASE_PROGRESS[phase];
+          if (step) this.notifier.notify(task, "progress", step);
+        },
       };
 
       const result = await this.agentic.run(agenticTask);
@@ -122,17 +145,24 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
           `${(result.durationMs / 1000).toFixed(1)}s`
       );
     } catch (err) {
-      task.status = "failed";
+      // Si l'annulation a été demandée, c'est un arrêt volontaire, pas un échec.
+      const cancelled = controller.signal.aborted;
+      task.status = cancelled ? "cancelled" : "failed";
       task.completedAt = new Date().toISOString();
       task.result = {
         success: false,
-        outcome: "failed",
-        summary: `Échec de l'agent ${agent.name}`,
-        error: (err as Error).message,
+        outcome: cancelled ? "blocked" : "failed",
+        summary: cancelled ? `Tâche "${task.title}" annulée` : `Échec de l'agent ${agent.name}`,
+        error: cancelled ? undefined : (err as Error).message,
         durationMs: Date.now() - startTime,
       };
-      log.error(`[task:${shortId}] ❌ [${agent.name}] ${(err as Error).message}`);
-      this.notifier.notify(task, "failed");
+      if (cancelled) {
+        log.info(`[task:${shortId}] 🛑 [${agent.name}] annulée par l'utilisateur`);
+        this.notifier.notify(task, "cancelled");
+      } else {
+        log.error(`[task:${shortId}] ❌ [${agent.name}] ${(err as Error).message}`);
+        this.notifier.notify(task, "failed");
+      }
     } finally {
       this.active.delete(task.id);
       this.decrement(task.role);
