@@ -22,6 +22,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { ToolRegistry } from "../ToolRegistry.js";
 import type { EventBus } from "../EventBus.js";
 import type { ToolDeclaration } from "../types.js";
@@ -139,8 +140,10 @@ export class AgenticRuntime implements IAgentRuntime {
   private readonly defaultBudget: AgentBudget;
   private readonly model: GenerateTextFn;
 
-  // État par exécution (reconstruit à chaque run pour rester réentrant).
-  private session: RunSession | null = null;
+  // Concurrence sécurisée : chaque tâche dispose de son propre stockage asynchrone (AsyncLocalStorage).
+  // Permet l'exécution parallèle sans écrasement mutuel des sessions.
+  private readonly sessionStorage = new AsyncLocalStorage<RunSession>();
+  private testSession: RunSession | null = null;
 
   constructor(deps: AgenticRuntimeDeps) {
     this.registry = deps.registry;
@@ -207,12 +210,12 @@ export class AgenticRuntime implements IAgentRuntime {
       blockedFiles: new Set<string>(),
       lastPatchByFile: new Map<string, string>(),
     };
-    this.session = session;
 
-    log.info(
-      `[${taskId.slice(0, 8)}] ▶ ${agent.name} — objectif: "${truncate(task.goal, 120)}" | ` +
-        `${tools.length} outil(s) réellement disponible(s) sur ${agent.capabilities.length} déclaré(s)`
-    );
+    return this.sessionStorage.run(session, async () => {
+      log.info(
+        `[${taskId.slice(0, 8)}] ▶ ${agent.name} — objectif: "${truncate(task.goal, 120)}" | ` +
+          `${tools.length} outil(s) réellement disponible(s) sur ${agent.capabilities.length} déclaré(s)`
+      );
 
     let plan: Plan;
     try {
@@ -316,6 +319,7 @@ export class AgenticRuntime implements IAgentRuntime {
     // pas un succès et ne doit pas être présenté comme tel à l'interface.
     const success = outcome === "success";
     return this.finish(task, session, outcome, undefined, success);
+    });
   }
 
   // ─── plan : UNDERSTAND + PLAN ───────────────────────────────────────────────
@@ -1096,7 +1100,7 @@ export class AgenticRuntime implements IAgentRuntime {
         `${session.usage.toolCalls} appel(s) outil | ${session.usage.iterations} itération(s) | ` +
         `${(result.durationMs / 1000).toFixed(1)}s`
     );
-    this.session = null;
+    if (this.testSession === session) this.testSession = null;
     return result;
   }
 
@@ -1128,10 +1132,11 @@ export class AgenticRuntime implements IAgentRuntime {
   }
 
   private requireSession(): RunSession {
-    if (!this.session) {
+    const session = this.sessionStorage.getStore() ?? this.testSession;
+    if (!session) {
       throw new Error("AgenticRuntime: aucune session active. Appelez run() (les phases ne sont pas réentrantes hors run).");
     }
-    return this.session;
+    return session;
   }
 
   /**
@@ -1170,7 +1175,7 @@ export class AgenticRuntime implements IAgentRuntime {
       blockedFiles: new Set(),
       lastPatchByFile: new Map(),
     };
-    this.session = session;
+    this.testSession = session;
     return session;
   }
 }

@@ -413,3 +413,36 @@ describe("buildObservationHistory — historique borné", () => {
     assert.ok(tiny.length <= 200);
   });
 });
+
+describe("AgenticRuntime — réentrance et concurrence", () => {
+  it("deux tâches exécutées en parallèle sur la même instance ne s'écrasent pas", async () => {
+    registerTestAgent("parallel_agent", ["read_project_file", "modify_project_file", "verify_file"]);
+    const fs: FakeFs = {
+      content: new Map([["a.ts", "1"], ["b.ts", "2"]]),
+      verifyOk: () => true,
+    };
+    const registry = makeRegistry(fs);
+    const rt = new AgenticRuntime({
+      registry,
+      model: async (opts) => {
+        if (/produis un plan/i.test(opts.prompt)) {
+          return { text: JSON.stringify({ intent: "Plan", steps: [{ description: "Action" }] }), provider: "gemini", model: "test" };
+        }
+        if (/synth[eè]se finale/i.test(opts.prompt)) {
+          return { text: JSON.stringify({ summary: "OK", deliverables: [] }), provider: "gemini", model: "test" };
+        }
+        return { text: "Terminé.", provider: "openrouter", model: "test" };
+      },
+    });
+
+    const [resA, resB] = await Promise.all([
+      rt.run({ role: "parallel_agent", goal: "Tâche A", id: "task-A" }),
+      rt.run({ role: "parallel_agent", goal: "Tâche B", id: "task-B" }),
+    ]);
+
+    assert.equal(resA.taskId, "task-A");
+    assert.equal(resB.taskId, "task-B");
+    assert.ok(resA.durationMs >= 0);
+    assert.ok(resB.durationMs >= 0);
+  });
+});
