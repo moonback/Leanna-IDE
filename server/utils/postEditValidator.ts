@@ -16,7 +16,7 @@ const subscribers = new Set<NotifyFn>();
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let validationRunning = false;
-let lastResult: { valid: boolean; errors?: string; timestamp: number } | null = null;
+let lastResult: (ValidationResult & { timestamp: number }) | null = null;
 
 const DEBOUNCE_MS = 2500; // 2.5 secondes sans écriture → validation
 
@@ -47,10 +47,25 @@ export function scheduleValidation(enabled = true, validationSupervisor = superv
   }, DEBOUNCE_MS);
 }
 
+/** Résultat enrichi d'une validation : build + directive corrective du Superviseur. */
+export interface ValidationResult {
+  valid: boolean;
+  errors?: string;
+  /** True si le Superviseur juge qu'une correction est nécessaire. */
+  needsCorrection?: boolean;
+  /**
+   * Directive corrective structurée produite par le Superviseur
+   * (anti-boucle / pivot / escalade). Toujours fournie en cas d'échec de build,
+   * que l'injecteur de session soit câblé ou non — ainsi la boucle agentique
+   * peut la consommer même hors session Gemini Live.
+   */
+  directive?: string;
+}
+
 /**
  * Force une validation immédiate (utile pour le bouton UI).
  */
-export async function runValidation(validationSupervisor = supervisor): Promise<{ valid: boolean; errors?: string }> {
+export async function runValidation(validationSupervisor = supervisor): Promise<ValidationResult> {
   if (validationRunning) {
     return lastResult || { valid: true };
   }
@@ -60,12 +75,20 @@ export async function runValidation(validationSupervisor = supervisor): Promise<
 
   try {
     const result = await validateBuild();
-    lastResult = { ...result, timestamp: Date.now() };
 
     const evaluation = await validationSupervisor.evaluateBuildResult(result);
+    // L'injection vers une session Gemini Live reste best-effort (no-op si aucun
+    // injecteur n'est câblé — cas du runtime agentique pur).
     if (evaluation.needsCorrection && evaluation.directive) {
       validationSupervisor.injectDirective(evaluation.directive);
     }
+
+    const enriched: ValidationResult = {
+      ...result,
+      needsCorrection: evaluation.needsCorrection,
+      directive: evaluation.directive,
+    };
+    lastResult = { ...enriched, timestamp: Date.now() };
 
     notifyAll({
       type: 'build-status',
@@ -80,9 +103,9 @@ export async function runValidation(validationSupervisor = supervisor): Promise<
       console.warn('[PostEdit] ✗ Build échoué:', result.errors?.slice(0, 200));
     }
 
-    return result;
+    return enriched;
   } catch (e: any) {
-    const result = { valid: false, errors: e.message };
+    const result: ValidationResult = { valid: false, errors: e.message };
     lastResult = { ...result, timestamp: Date.now() };
     notifyAll({ type: 'build-status', status: 'fail', errors: e.message });
     return result;

@@ -20,6 +20,7 @@
  */
 import { randomUUID } from "crypto";
 import type { AgentRole } from "./types.js";
+import { STATIC_AGENT_ROLES } from "./types.js";
 import type { AgentMessage, TaskRequestPayload } from "./AgentCommunication.js";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
 import { getAgentDefinition } from "./roles.js";
@@ -71,6 +72,13 @@ export interface Bid {
 export interface ScoredBid extends Bid {
   score: number;
   eligible: boolean;
+  /**
+   * Spécificité (0..1) : part des capacités de l'agent effectivement dédiées
+   * aux capacités requises = couvertes_requises / total_capacités_agent.
+   * Un spécialiste focalisé (ratio élevé) l'emporte sur un généraliste (ratio
+   * faible) à score égal — c'est le premier critère de départage.
+   */
+  specificity: number;
 }
 
 /** Résultat d'une négociation. */
@@ -166,7 +174,9 @@ export class ContractNetNegotiator {
     const rawBids = this.openCalls.get(task.taskId) ?? [];
     this.openCalls.delete(task.taskId);
 
-    const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
+    const scored = this.scoreBids(rawBids, task.requiredCapabilities).sort((a, b) =>
+      this.compareBids(a, b)
+    );
     const best = scored.find((b) => b.eligible) ?? null;
 
     // ── Trace : CLÔTURE + classement complet des offres ──
@@ -185,22 +195,37 @@ export class ContractNetNegotiator {
     }
 
     const runnerUp = scored.filter((b) => b.eligible && b.role !== best.role)[0];
-    const margin = runnerUp ? (best.score - runnerUp.score).toFixed(3) : "n/a (candidat unique)";
+    const scoreMargin = runnerUp ? best.score - runnerUp.score : null;
+    // Écart de score négligeable → le départage s'est joué sur skillMatch puis
+    // sur l'ordre de rôle stable (critère déterministe). On l'explicite.
+    const tieOnScore = runnerUp !== undefined && scoreMargin !== null && scoreMargin < 1e-9;
+    const tieOnSkill = tieOnScore && Math.abs(best.skillMatch - runnerUp!.skillMatch) < 1e-9;
+    const marginLabel =
+      scoreMargin === null
+        ? "n/a (candidat unique)"
+        : !tieOnScore
+          ? scoreMargin.toFixed(3)
+          : tieOnSkill
+            ? `égalité score+skill → départagé par ordre de rôle stable ` +
+              `([${best.role}] prioritaire sur [${runnerUp!.role}])`
+            : `égalité de score → départagé par skillMatch ` +
+              `(${best.skillMatch.toFixed(2)} vs ${runnerUp!.skillMatch.toFixed(2)})`;
 
     log.info(
       `🏆 [contract-net] GAGNANT ${shortId} → [${best.role}] pour "${task.title}"\n` +
         `   ├─ score gagnant : ${best.score.toFixed(3)} ` +
-        `(skill=${best.skillMatch.toFixed(2)}, conf=${best.confidence.toFixed(2)}, load=${best.loadPenalty.toFixed(2)})\n` +
+        `(skill=${best.skillMatch.toFixed(2)}, conf=${best.confidence.toFixed(2)}, load=${best.loadPenalty.toFixed(2)}, ` +
+        `spéc=${best.specificity.toFixed(2)})\n` +
         `   ├─ dauphin       : ${runnerUp ? `[${runnerUp.role}] ${runnerUp.score.toFixed(3)}` : "aucun"}\n` +
-        `   ├─ marge         : ${margin}\n` +
+        `   ├─ départage     : ${marginLabel}\n` +
         `   └─ offres totales: ${scored.length} (${scored.filter((b) => b.eligible).length} éligible(s))`
     );
 
     const awarded = await this.award(task, best.role, from);
 
     log.info(
-      `${awarded ? "✅" : "⚠️"} [contract-net] Attribution ${awarded ? "PUBLIÉE" : "ÉCHOUÉE"} ${shortId} → [${best.role}] ` +
-        `(task_request ${awarded ? "émis sur le bus" : "non émis"})`
+      `${awarded ? "✅" : "⚠️"} [contract-net] Enchère ${shortId} CLÔTURÉE → gagnant [${best.role}] ` +
+        `(task_request ${awarded ? "émis — l'agent exécute en arrière-plan" : "NON émis"})`
     );
 
     return {
@@ -222,7 +247,8 @@ export class ContractNetNegotiator {
         const medal = b.eligible ? (rank === 1 ? "🥇" : `#${rank}`) : "⛔";
         return (
           `   ${branch} ${medal} [${b.role}] score=${b.score.toFixed(3)} ` +
-          `(skill=${b.skillMatch.toFixed(2)}, conf=${b.confidence.toFixed(2)}, load=${b.loadPenalty.toFixed(2)}) ` +
+          `(skill=${b.skillMatch.toFixed(2)}, conf=${b.confidence.toFixed(2)}, load=${b.loadPenalty.toFixed(2)}, ` +
+          `spéc=${b.specificity.toFixed(2)}) ` +
           `${b.eligible ? "éligible" : "DISQUALIFIÉ (skillMatch=0)"}`
         );
       })
@@ -350,25 +376,37 @@ export class ContractNetNegotiator {
       },
     };
 
-    try {
-      await this.bus.publish(message);
-      log.info(
-        `📤 [contract-net] task_request ${message.id.slice(0, 8)} publié ${task.taskId.slice(0, 8)} ` +
-          `[${from}] → [${winner}] (mode autonome, priorité ${task.priority ?? "medium"})`
-      );
-      return true;
-    } catch (err) {
+    // IMPORTANT — publication FIRE-AND-FORGET.
+    // `bus.publish()` livre le message de façon synchrone au handler du gagnant
+    // (handleTaskRequest → boucle autonome), qui est `await`-é tout au long de
+    // l'exécution. Si on l'attendait ici, `negotiate()` ne rendrait la main
+    // qu'après la fin complète du travail de l'agent (plusieurs minutes), et le
+    // log d'attribution ne sortirait qu'À LA FIN — donnant l'impression trompeuse
+    // qu'un gagnant est désigné APRÈS l'exploitation de l'agent.
+    // On loggue donc l'émission AVANT la livraison, et on ne bloque pas dessus :
+    // l'enchère se clôt immédiatement, l'agent gagnant exécute en arrière-plan
+    // (même sémantique que les délégations ciblées).
+    log.info(
+      `📤 [contract-net] task_request ${message.id.slice(0, 8)} émis ${task.taskId.slice(0, 8)} ` +
+        `[${from}] → [${winner}] (mode autonome, priorité ${task.priority ?? "medium"}) — exécution en arrière-plan`
+    );
+
+    void this.bus.publish(message).catch((err) => {
       log.error(
-        `❌ [contract-net] Échec publication task_request ${task.taskId.slice(0, 8)} vers [${winner}]: ${(err as Error).message}`
+        `❌ [contract-net] Échec livraison task_request ${task.taskId.slice(0, 8)} vers [${winner}]: ${(err as Error).message}`
       );
-      return false;
-    }
+    });
+
+    // L'attribution (= émission du task_request) a réussi du point de vue de
+    // l'enchère ; le succès/échec de l'EXÉCUTION du gagnant est un évènement
+    // distinct, tracé par AutonomousLoop / AgentRuntimeExecutor.
+    return true;
   }
 
   // ─── Scoring ───────────────────────────────────────────────────────────────
 
   /** Score tous les bids. Un bid avec skillMatch === 0 est inéligible. */
-  private scoreBids(bids: Bid[]): ScoredBid[] {
+  private scoreBids(bids: Bid[], requiredCapabilities: readonly string[]): ScoredBid[] {
     return bids.map((bid) => {
       const clampedSkill = clamp01(bid.skillMatch);
       const clampedConf = clamp01(bid.confidence);
@@ -386,6 +424,7 @@ export class ContractNetNegotiator {
         loadPenalty: clampedLoad,
         score,
         eligible: clampedSkill > 0,
+        specificity: this.computeSpecificity(bid.role, requiredCapabilities),
       };
     });
   }
@@ -396,6 +435,58 @@ export class ContractNetNegotiator {
     const owned = new Set(capabilities);
     const covered = required.filter((cap) => owned.has(cap)).length;
     return covered / required.length;
+  }
+
+  /**
+   * Spécificité d'un agent pour les capacités requises :
+   * couvertes_requises / total_capacités_agent (0..1).
+   *
+   * Mesure à quel point l'agent est FOCALISÉ sur ce que la tâche demande, par
+   * opposition à un généraliste qui couvre les mêmes capacités « noyées » parmi
+   * beaucoup d'autres. Sert de premier critère de départage à score égal.
+   */
+  private computeSpecificity(role: AgentRole, required: readonly string[]): number {
+    const definition = getAgentDefinition(role);
+    if (!definition || definition.capabilities.length === 0 || required.length === 0) return 0;
+    const owned = new Set(definition.capabilities);
+    const coveredRequired = required.filter((cap) => owned.has(cap)).length;
+    return coveredRequired / definition.capabilities.length;
+  }
+
+  /**
+   * Ordre de priorité stable des rôles STATIQUES (dernier recours de départage).
+   * Garantit un gagnant DÉTERMINISTE même quand score ET spécificité sont égaux,
+   * en éliminant la dépendance à l'ordre d'arrivée des bids / au tri instable.
+   * Les rôles dynamiques (hors liste) sont départagés alphabétiquement après.
+   */
+  private roleOrder(role: AgentRole): number {
+    const idx = STATIC_AGENT_ROLES.indexOf(role as (typeof STATIC_AGENT_ROLES)[number]);
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+  }
+
+  /**
+   * Comparateur de départage total et déterministe entre deux offres scorées :
+   *   1. score composite décroissant (critère principal) ;
+   *   2. skillMatch décroissant (couverture brute des capacités requises) ;
+   *   3. ordre de priorité de rôle stable (STATIC_AGENT_ROLES) ;
+   *   4. ordre alphabétique du rôle (filet de sécurité pour rôles dynamiques).
+   *
+   * NOTE sur la spécificité : `couvertes_requises / total_capacités` récompense
+   * mécaniquement l'agent au plus PETIT jeu de capacités, ce qui peut router une
+   * tâche d'ACTION (écriture/vérif) vers un agent qui n'a pas les outils pour
+   * l'exécuter (ex. researcher sans write_project_file battant tester). On ne
+   * l'utilise donc PAS pour départager : elle reste purement diagnostique dans
+   * la trace. À skillMatch égal, l'ordre de rôle stable (coder < refactor <
+   * debugger < reviewer < tester < … < researcher) tranche de façon prévisible.
+   * Un epsilon absorbe le bruit flottant sur les critères continus.
+   */
+  private compareBids(a: ScoredBid, b: ScoredBid): number {
+    const EPS = 1e-9;
+    if (Math.abs(a.score - b.score) > EPS) return b.score - a.score;
+    if (Math.abs(a.skillMatch - b.skillMatch) > EPS) return b.skillMatch - a.skillMatch;
+    const orderDelta = this.roleOrder(a.role) - this.roleOrder(b.role);
+    if (orderDelta !== 0) return orderDelta;
+    return String(a.role).localeCompare(String(b.role));
   }
 
   /**
