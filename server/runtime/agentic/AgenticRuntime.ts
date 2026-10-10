@@ -115,6 +115,17 @@ function classifyTool(name: string): ToolKind {
 }
 
 /**
+ * Un agent est « producteur d'artefact » s'il dispose d'au moins un outil
+ * d'écriture. Pour ces agents, une réponse purement narrative (0 tool_call,
+ * 0 écriture) n'est PAS une complétion valide : la tâche attend un artefact.
+ * Les agents purement analytiques (researcher, planner, summarizer…) n'ont
+ * aucun outil d'écriture et conservent le droit de conclure en texte.
+ */
+function agentCanWrite(tools: readonly ToolDeclaration[]): boolean {
+  return tools.some((t) => WRITE_TOOLS.has(t.name));
+}
+
+/**
  * Signature du générateur de texte. En production c'est `generateText`
  * (Gemini/OpenRouter). Un modèle DÉTERMINISTE peut être injecté pour tester la
  * chaîne agentique complète sans réseau ni clés API (voir mission-harness).
@@ -430,11 +441,35 @@ export class AgenticRuntime implements IAgentRuntime {
       }
     }
 
+    // ── Garde anti « narration sans action » ──
+    // Un agent producteur d'artefact qui répond en pur texte SANS avoir encore
+    // rien écrit ni exécuté le moindre outil dans ce run n'a pas « terminé » :
+    // il a esquivé l'action. On refuse ce faux final, on injecte une consigne
+    // impérative d'écriture, et on laisse la boucle le relancer (budget large).
+    const nothingDoneYet =
+      session.filesModified.size === 0 && session.toolsExecuted.length === 0;
+    const prematureNarration =
+      calls.length === 0 && nothingDoneYet && agentCanWrite(tools);
+
+    if (prematureNarration) {
+      session.pendingInstruction =
+        "Tu as répondu par du texte sans appeler aucun outil, alors qu'AUCUN " +
+        "artefact n'a encore été produit. Ne décris pas ce que tu ferais : FAIS-LE. " +
+        "Émets maintenant un tool_calls JSON d'écriture " +
+        "(write_project_file / modify_project_file / patch_project_file), " +
+        "puis vérifie avec verify_file. Une réponse finale sans écriture est un ÉCHEC.";
+      log.warn(
+        `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — réponse narrative sans action ` +
+          `(itération ${iteration}) → relance forcée vers l'écriture`
+      );
+    }
+
     const observation: Observation = {
       iteration,
       reasoning: text,
       toolOutcomes,
-      isFinal: calls.length === 0,
+      // Narration prématurée : NON finale → la boucle poursuit et re-sollicite.
+      isFinal: calls.length === 0 && !prematureNarration,
     };
     session.observations.push(observation);
     return observation;
@@ -606,9 +641,25 @@ export class AgenticRuntime implements IAgentRuntime {
       }
     }
 
-    // 3. Réponse finale sans action : acceptée seulement si rien n'a été écrit.
-    if (observation.isFinal && observation.toolOutcomes.length === 0) {
-      checks.push("réponse finale sans action");
+    // 3. Réponse sans action.
+    //    - Agent NON producteur d'artefact (analytique) OU travail déjà produit
+    //      en amont → une conclusion textuelle est légitime.
+    //    - Agent producteur d'artefact n'ayant encore RIEN fait → la narration
+    //      prématurée est un échec d'étape : on force la récupération (nudge
+    //      d'écriture) au lieu de valider une tâche qui ne modifie rien.
+    if (observation.toolOutcomes.length === 0) {
+      const nothingDoneYet =
+        session.filesModified.size === 0 && session.toolsExecuted.length === 0;
+      const prematureNarration = nothingDoneYet && agentCanWrite(session.tools);
+
+      if (prematureNarration) {
+        issues.push(
+          "Réponse narrative sans aucune action : l'agent doit produire un artefact " +
+            "(écriture de fichier) avant de conclure."
+        );
+      } else if (observation.isFinal) {
+        checks.push("réponse finale sans action");
+      }
     }
 
     const passed = issues.length === 0;

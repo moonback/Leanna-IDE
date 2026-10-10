@@ -124,25 +124,41 @@ export class DelegationDispatcher {
     const taskId = randomUUID();
     const requiredCapabilities = inferRequiredCapabilities(open.reason, open.instructions);
 
+    // Description ORIENTÉE ACTION, avec consigne d'écriture explicite.
     const description = [
-      `Sous-tâche déléguée (par appel d'offres) depuis [${parentTask.role}]`,
+      `## Sous-tâche à produire (mise aux enchères)`,
       ``,
-      `Raison : ${open.reason}`,
+      `**Origine** : agent [${parentTask.role}]`,
+      `**Raison** : ${open.reason}`,
       ``,
-      `Contexte de la tâche parent :`,
+      `### Contexte de la tâche parent`,
       `- Titre : ${parentTask.title}`,
       `- Description : ${parentTask.description.slice(0, 300)}`,
+      ...(parentTask.result?.summary
+        ? [`- Résultat parent : ${parentTask.result.summary}`]
+        : []),
+      ...(parentTask.result?.filesModified?.length
+        ? [`- Fichiers touchés par le parent : ${parentTask.result.filesModified.join(", ")}`]
+        : []),
+      ``,
+      `### Contrat d'exécution`,
+      `- Tu DOIS produire un artefact concret (fichier créé ou modifié) avant de conclure.`,
+      `- Utilise write_project_file / modify_project_file / patch_project_file.`,
+      `- Vérifie l'écriture avec verify_file.`,
+      `- Un rapport textuel SANS écriture est considéré comme un ÉCHEC de la tâche.`,
+      ...(open.instructions ? [``, `### Instructions supplémentaires`, open.instructions] : []),
     ].join("\n");
 
     log.info(
-      `📣 [${parentTask.role}] Mise aux enchères : "${open.reason.slice(0, 60)}" ` +
-        `(capacités déduites: ${requiredCapabilities.join(", ")})`
+      `📣 [contract-net] [${parentTask.role}] Délégation OUVERTE mise aux enchères ${taskId.slice(0, 8)} : ` +
+        `"${open.reason.slice(0, 60)}" — capacités déduites: ${requiredCapabilities.join(", ")} ` +
+        `(parent: ${parentTask.id.slice(0, 8)})`
     );
 
     try {
       const outcome = await this.negotiator.negotiate({
         taskId,
-        title: `[Enchère] ${open.reason.slice(0, 80)}`,
+        title: open.reason.slice(0, 120), // plus de préfixe [Enchère] (pollution du goal LLM)
         description,
         requiredCapabilities,
         files: [
@@ -151,23 +167,41 @@ export class DelegationDispatcher {
         ].filter((v, i, arr) => arr.indexOf(v) === i),
         instructions: open.instructions,
         priority: open.priority,
+        // ── Contexte propagé à l'agent gagnant ──
+        successCriteria: [
+          "Artefact concret produit (fichier écrit ou modifié)",
+          "Vérification post-écriture réussie (verify_file)",
+        ],
+        context: { parentTaskId: parentTask.id, parentRole: parentTask.role },
+        previousResults: parentTask.result
+          ? [
+              {
+                summary: parentTask.result.summary,
+                filesModified: parentTask.result.filesModified,
+                success: parentTask.result.success,
+              },
+            ]
+          : undefined,
       });
 
       if (!outcome.winner) {
         log.warn(
-          `[${parentTask.role}] Enchère "${open.reason.slice(0, 40)}" sans gagnant — aucune offre éligible`
+          `🪧 [contract-net] [${parentTask.role}] Enchère ${taskId.slice(0, 8)} "${open.reason.slice(0, 40)}" ` +
+            `SANS gagnant — aucune offre éligible, délégation abandonnée`
         );
         return null;
       }
 
       log.info(
-        `🏆 [${parentTask.role}] Enchère remportée par [${outcome.winner}] ` +
-          `(task: ${taskId.slice(0, 8)})`
+        `🏆 [contract-net] [${parentTask.role}] Enchère ${taskId.slice(0, 8)} REMPORTÉE par [${outcome.winner}] ` +
+          `(score ${outcome.winningScore?.toFixed(3) ?? "?"}, ${outcome.bids.length} offre(s)) ` +
+          `→ ${outcome.awarded ? "sous-tâche dispatchée" : "attribution non publiée"}`
       );
       return outcome.awarded ? taskId : null;
     } catch (err) {
       log.error(
-        `[${parentTask.role}] Échec négociation "${open.reason.slice(0, 40)}": ${(err as Error).message}`
+        `❌ [contract-net] [${parentTask.role}] Échec négociation ${taskId.slice(0, 8)} ` +
+          `"${open.reason.slice(0, 40)}": ${(err as Error).message}`
       );
       return null;
     }

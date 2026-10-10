@@ -41,6 +41,16 @@ export interface NegotiationTask {
   files?: string[];
   instructions?: string;
   priority?: "low" | "medium" | "high" | "critical";
+  /** Critères de succès vérifiables — passés à l'agent gagnant. */
+  successCriteria?: string[];
+  /** Contexte additionnel (métadonnées libres, parentId, etc.). */
+  context?: Record<string, unknown>;
+  /** Résumé des étapes précédentes (chaînage). */
+  previousResults?: Array<{
+    summary: string;
+    filesModified?: string[];
+    success: boolean;
+  }>;
 }
 
 /** Offre soumise par un agent candidat. */
@@ -134,7 +144,21 @@ export class ContractNetNegotiator {
     task: NegotiationTask,
     from: AgentRole = this.initiator
   ): Promise<NegotiationOutcome> {
+    const shortId = task.taskId.slice(0, 8);
+    const negotiationStart = Date.now();
     this.openCalls.set(task.taskId, []);
+
+    // ── Trace : OUVERTURE de la négociation ──
+    log.info(
+      `🔔 [contract-net] Négociation OUVERTE ${shortId} — "${task.title}"\n` +
+        `   ├─ initiateur       : [${from}]\n` +
+        `   ├─ capacités req.   : ${task.requiredCapabilities.join(", ") || "—"}\n` +
+        `   ├─ fenêtre d'enchère: ${this.biddingWindowMs}ms\n` +
+        `   ├─ priorité         : ${task.priority ?? "medium"}\n` +
+        `   ├─ fichiers         : ${task.files?.join(", ") || "—"}\n` +
+        `   ├─ critères succès  : ${task.successCriteria?.join(" | ") || "—"}\n` +
+        `   └─ pondérations     : skill=${this.weights.skill}, conf=${this.weights.confidence}, load=${this.weights.load}`
+    );
 
     await this.announce(task, from);
     await this.wait(this.biddingWindowMs);
@@ -145,19 +169,38 @@ export class ContractNetNegotiator {
     const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
     const best = scored.find((b) => b.eligible) ?? null;
 
+    // ── Trace : CLÔTURE + classement complet des offres ──
+    const windowMs = Date.now() - negotiationStart;
+    log.info(
+      `📊 [contract-net] Enchère CLÔTURÉE ${shortId} — ${rawBids.length} offre(s) reçue(s) en ${windowMs}ms\n` +
+        this.formatLeaderboard(scored)
+    );
+
     if (!best) {
       log.warn(
-        `🪧 Aucune offre éligible pour la tâche "${task.title}" (${task.taskId.slice(0, 8)}) — ` +
-          `${rawBids.length} bid(s) reçu(s), tous disqualifiés`
+        `🪧 [contract-net] AUCUN gagnant ${shortId} — "${task.title}" — ` +
+          `${rawBids.length} bid(s) reçu(s), tous disqualifiés (skillMatch=0 ou aucune offre)`
       );
       return { taskId: task.taskId, winner: null, winningScore: null, bids: scored, awarded: false };
     }
 
+    const runnerUp = scored.filter((b) => b.eligible && b.role !== best.role)[0];
+    const margin = runnerUp ? (best.score - runnerUp.score).toFixed(3) : "n/a (candidat unique)";
+
+    log.info(
+      `🏆 [contract-net] GAGNANT ${shortId} → [${best.role}] pour "${task.title}"\n` +
+        `   ├─ score gagnant : ${best.score.toFixed(3)} ` +
+        `(skill=${best.skillMatch.toFixed(2)}, conf=${best.confidence.toFixed(2)}, load=${best.loadPenalty.toFixed(2)})\n` +
+        `   ├─ dauphin       : ${runnerUp ? `[${runnerUp.role}] ${runnerUp.score.toFixed(3)}` : "aucun"}\n` +
+        `   ├─ marge         : ${margin}\n` +
+        `   └─ offres totales: ${scored.length} (${scored.filter((b) => b.eligible).length} éligible(s))`
+    );
+
     const awarded = await this.award(task, best.role, from);
 
     log.info(
-      `🏆 Marché attribué à [${best.role}] pour "${task.title}" ` +
-        `(score ${best.score.toFixed(3)}, ${scored.length} bid(s))`
+      `${awarded ? "✅" : "⚠️"} [contract-net] Attribution ${awarded ? "PUBLIÉE" : "ÉCHOUÉE"} ${shortId} → [${best.role}] ` +
+        `(task_request ${awarded ? "émis sur le bus" : "non émis"})`
     );
 
     return {
@@ -169,6 +212,23 @@ export class ContractNetNegotiator {
     };
   }
 
+  /** Rend le classement complet des offres (gagnant → perdants) pour la trace. */
+  private formatLeaderboard(scored: readonly ScoredBid[]): string {
+    if (scored.length === 0) return "   └─ (aucune offre)";
+    return scored
+      .map((b, i) => {
+        const rank = i + 1;
+        const branch = rank === scored.length ? "└─" : "├─";
+        const medal = b.eligible ? (rank === 1 ? "🥇" : `#${rank}`) : "⛔";
+        return (
+          `   ${branch} ${medal} [${b.role}] score=${b.score.toFixed(3)} ` +
+          `(skill=${b.skillMatch.toFixed(2)}, conf=${b.confidence.toFixed(2)}, load=${b.loadPenalty.toFixed(2)}) ` +
+          `${b.eligible ? "éligible" : "DISQUALIFIÉ (skillMatch=0)"}`
+        );
+      })
+      .join("\n");
+  }
+
   /**
    * Enregistre un bid pour une enchère ouverte. Appelé par les agents candidats
    * (ou par `collectBid` via le bus). Ignoré si l'enchère est fermée.
@@ -176,13 +236,17 @@ export class ContractNetNegotiator {
   submitBid(taskId: string, bid: Bid): boolean {
     const bids = this.openCalls.get(taskId);
     if (!bids) {
-      log.debug(`Bid ignoré : enchère ${taskId.slice(0, 8)} fermée ou inconnue`);
+      log.warn(
+        `📭 [contract-net] Bid REJETÉ de [${bid.role}] pour ${taskId.slice(0, 8)} — ` +
+          `enchère fermée ou inconnue (arrivé hors fenêtre ?)`
+      );
       return false;
     }
     bids.push(bid);
-    log.debug(
-      `📨 Bid reçu de [${bid.role}] pour ${taskId.slice(0, 8)} ` +
-        `(skill ${bid.skillMatch.toFixed(2)}, conf ${bid.confidence.toFixed(2)}, load ${bid.loadPenalty.toFixed(2)})`
+    log.info(
+      `📨 [contract-net] Bid #${bids.length} reçu de [${bid.role}] pour ${taskId.slice(0, 8)} — ` +
+        `skill=${bid.skillMatch.toFixed(2)}, conf=${bid.confidence.toFixed(2)}, load=${bid.loadPenalty.toFixed(2)}` +
+        `${bid.skillMatch <= 0 ? " ⛔ (sera disqualifié)" : ""}`
     );
     return true;
   }
@@ -242,8 +306,8 @@ export class ContractNetNegotiator {
       priority: task.priority ?? "medium",
     });
     log.info(
-      `📣 Appel d'offres diffusé par [${from}] : "${task.title}" ` +
-        `(capacités requises: ${task.requiredCapabilities.join(", ") || "—"})`
+      `📣 [contract-net] Appel d'offres DIFFUSÉ ${task.taskId.slice(0, 8)} par [${from}] : "${task.title}" ` +
+        `— capacités requises: ${task.requiredCapabilities.join(", ") || "—"} — en attente des bids...`
     );
   }
 
@@ -267,15 +331,36 @@ export class ContractNetNegotiator {
         description: task.description,
         files: task.files ?? [],
         instructions: task.instructions,
+        context: {
+          successCriteria: task.successCriteria,
+          previousResults: task.previousResults,
+          ...(task.context ?? {}),
+        },
       } satisfies TaskRequestPayload,
-      metadata: { negotiated: true, awardedTo: winner },
+      metadata: {
+        negotiated: true,
+        awardedTo: winner,
+        // ── CORRECTIF CRITIQUE ──
+        // Sans ce flag, l'agent gagnant exécute en one-shot (executor.execute)
+        // au lieu de la boucle autonome (retry/verify/no-progress guard), d'où
+        // les tâches "qui ne modifient rien".
+        autonomous: true,
+        // Traçabilité : initiateur de la négociation (broadcast neutre).
+        negotiationInitiator: from,
+      },
     };
 
     try {
       await this.bus.publish(message);
+      log.info(
+        `📤 [contract-net] task_request ${message.id.slice(0, 8)} publié ${task.taskId.slice(0, 8)} ` +
+          `[${from}] → [${winner}] (mode autonome, priorité ${task.priority ?? "medium"})`
+      );
       return true;
     } catch (err) {
-      log.error(`Échec publication task_request vers [${winner}]: ${(err as Error).message}`);
+      log.error(
+        `❌ [contract-net] Échec publication task_request ${task.taskId.slice(0, 8)} vers [${winner}]: ${(err as Error).message}`
+      );
       return false;
     }
   }

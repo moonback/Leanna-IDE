@@ -17,7 +17,7 @@ import { AgentMessageBus } from "./AgentMessageBus.js";
 import { AutonomousAgent } from "./AutonomousAgent.js";
 import type { AgentTask } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
-import type { AgentMessage, TaskRequestPayload } from "./AgentCommunication.js";
+import type { AgentMessage } from "./AgentCommunication.js";
 
 const stubRunner: AgentTaskRunner = {
   async execute(task: AgentTask): Promise<void> {
@@ -134,12 +134,12 @@ describe("DelegationDispatcher — négociation des délégations ouvertes", () 
     ];
     for (const a of agents) a.start();
 
-    // Capturer le task_request attribué au gagnant.
+    // Capturer le task_request attribué au gagnant. L'attribution est marquée
+    // par metadata.negotiated (le titre ne porte plus de préfixe [Enchère]).
     let awardedRole: string | null = null;
     for (const role of ["tester", "writer", "researcher"]) {
       bus.subscribe(role, "task_request", async (msg: AgentMessage) => {
-        const payload = msg.payload as TaskRequestPayload;
-        if (payload.title.startsWith("[Enchère]")) awardedRole = msg.to as string;
+        if (msg.metadata?.negotiated === true) awardedRole = msg.to as string;
       });
     }
 

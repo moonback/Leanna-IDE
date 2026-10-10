@@ -321,7 +321,10 @@ export class AutonomousAgent {
     // N'enchérit pas si l'agent ne couvre aucune des capacités requises :
     // un bid inéligible n'apporte rien et pollue l'enchère.
     if (skillMatch <= 0) {
-      log.debug(`🙅 [${this.agentName}] N'enchérit pas sur ${taskId.slice(0, 8)} (skillMatch 0)`);
+      log.info(
+        `🙅 [contract-net] [${this.agentName}] N'ENCHÉRIT PAS sur ${taskId.slice(0, 8)} — ` +
+          `skillMatch=0 (capacités requises: ${requiredCapabilities.join(", ") || "—"} non couvertes)`
+      );
       return;
     }
 
@@ -340,8 +343,9 @@ export class AutonomousAgent {
 
     if (submitted) {
       log.info(
-        `🙋 [${this.agentName}] Bid soumis pour ${taskId.slice(0, 8)} ` +
-          `(skill ${skillMatch.toFixed(2)}, load ${liveLoad.toFixed(2)})`
+        `🙋 [contract-net] [${this.agentName}] Bid SOUMIS pour ${taskId.slice(0, 8)} ` +
+          `(skill=${skillMatch.toFixed(2)}, conf=${confidence.toFixed(2)}, load=${liveLoad.toFixed(2)} ` +
+          `[${this.runningTasks.size} en cours + ${this.taskQueue.length} en file])`
       );
     }
   }
@@ -351,8 +355,11 @@ export class AutonomousAgent {
     const payload = message.payload as TaskRequestPayload;
     const isAutonomous = (message.metadata?.autonomous === true);
 
+    const viaNegotiation = message.metadata?.negotiated === true;
     log.info(
-      `📋 [${this.agentName}] Reçu task_request de [${message.from}]: "${payload.title}"${isAutonomous ? " [mode autonome]" : ""}`
+      `📋 [${this.agentName}] Reçu task_request ${payload.taskId.slice(0, 8)} de [${message.from}]: ` +
+        `"${payload.title}"${isAutonomous ? " [mode autonome]" : ""}` +
+        `${viaNegotiation ? " [via contract-net 🏆]" : ""}`
     );
 
     const agentDef = getAgentDefinitionOrThrow(this.role);
@@ -367,9 +374,17 @@ export class AutonomousAgent {
       context: {
         files: payload.files ?? [],
         instructions: payload.instructions,
+        // Propagation explicite des critères de succès (agentic runtime &
+        // evidence evaluator s'appuient dessus pour juger la complétion).
+        successCriteria: Array.isArray(
+          (payload.context as Record<string, unknown> | undefined)?.successCriteria
+        )
+          ? ((payload.context as Record<string, unknown>).successCriteria as string[])
+          : undefined,
         metadata: {
           delegatedBy: message.from,
           autonomous: isAutonomous,
+          negotiation: message.metadata?.negotiated === true,
           ...((payload.context as Record<string, unknown>) ?? {}),
         },
       },

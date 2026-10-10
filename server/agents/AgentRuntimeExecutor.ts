@@ -145,6 +145,12 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
   private buildGoal(task: AgentTask): string {
     const parts = [task.title];
     if (task.description && task.description !== task.title) parts.push(task.description);
+    // Critères de succès vérifiables (transmis par délégation/négociation) :
+    // ils indiquent explicitement au modèle que la tâche attend un artefact.
+    const criteria = task.context.successCriteria;
+    if (criteria?.length) {
+      parts.push(`\nCRITÈRES DE SUCCÈS (à satisfaire) :\n${criteria.map((c) => `- ${c}`).join("\n")}`);
+    }
     // Injecter les résultats de dépendances (chaînage d'orchestration).
     const prev = task.context.previousResults;
     if (prev?.length) {
