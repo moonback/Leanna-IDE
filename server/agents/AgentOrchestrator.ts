@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getAgentDefinition, getAgentDefinitionOrThrow } from "./roles.js";
+import { getAgentDefinition, getAgentDefinitionOrThrow, listAgentRoles } from "./roles.js";
 import type {
   AgentRole,
   AgentTask,
@@ -9,13 +9,15 @@ import type {
 } from "./types.js";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
-import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
+import { TaskScheduler, UNASSIGNED_ROLE, type TaskRunner } from "./TaskScheduler.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
 import { COLLABORATION_PATTERNS } from "./AgentCommunication.js";
-import { contractNetNegotiator } from "./ContractNetNegotiator.js";
+import { contractNetNegotiator, type ContractNetNegotiator } from "./ContractNetNegotiator.js";
+import { getContractNetConfig, type ContractNetMode } from "./contractNetConfig.js";
+import { roleReliability, type RoleReliability } from "./RoleReliability.js";
 import { inferRequiredCapabilities } from "./capabilityInference.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
@@ -36,6 +38,74 @@ export { COLLABORATION_PATTERNS, DELEGATION_MATRIX, delegationPolicy } from "./A
 export type { DelegationPolicy, DelegationTaskContext } from "./AgentCommunication.js";
 
 const log = createLogger("Orchestrator");
+
+/**
+ * Rôle de repli quand une tâche n'a ni rôle préféré ni gagnant d'enchère.
+ * `planner` est un choix sûr : généraliste (analyse, plans, documents) sans
+ * l'étendue d'écriture/exécution d'un rôle d'ingénierie.
+ */
+export const DEFAULT_FALLBACK_ROLE: AgentRole = "planner";
+
+/** Indices pour déduire les capacités requises d'une tâche mise aux enchères. */
+export interface NegotiationHints {
+  /** Outils prévus pour la tâche (ex. `stage.tools` du Brain). */
+  tools?: string[];
+  /** Capacités requises explicites (prioritaires sur la déduction heuristique). */
+  requiredCapabilities?: string[];
+}
+
+export interface RoleResolutionRequest extends NegotiationHints {
+  title: string;
+  description: string;
+  instructions?: string;
+  files?: string[];
+  priority?: TaskPriority;
+  /** Rôle statique choisi en amont (ex. Brain) : repli, et favori via la marge. */
+  preferredRole?: AgentRole;
+}
+
+/** Décision d'attribution d'une tâche à un rôle. */
+export interface RoleAssignment {
+  role: AgentRole;
+  /**
+   * contract-net : gagnant de l'enchère utilisé ;
+   * static : rôle imposé par l'appelant (mode off) ;
+   * shadow : enchère observée, rôle statique conservé ;
+   * fallback : aucune offre exploitable, repli sur le rôle statique/par défaut.
+   */
+  via: "contract-net" | "static" | "shadow" | "fallback";
+  mode: ContractNetMode;
+  preferredRole?: AgentRole;
+  /** Identifiant de l'enchère (absent si aucune enchère n'a eu lieu). */
+  auctionId?: string;
+  winningScore?: number | null;
+  /** Gagnant de l'enchère en mode shadow (non appliqué). */
+  shadowWinner?: AgentRole | null;
+  requiredCapabilities: string[];
+  bids: Array<{
+    role: AgentRole;
+    score: number;
+    skillMatch: number;
+    confidence: number;
+    loadPenalty: number;
+    eligible: boolean;
+  }>;
+  durationMs?: number;
+  reason?: string;
+  /**
+   * True si une place a été RÉSERVÉE sur le rôle (anti-course entre résolutions
+   * parallèles). L'appelant doit appeler `releaseRoleReservation(role)` une fois
+   * la tâche démarrée — `delegateTask` le fait automatiquement.
+   */
+  reserved?: boolean;
+}
+
+/** Dépendances injectables (tests). */
+export interface AgentOrchestratorDeps {
+  negotiator?: ContractNetNegotiator;
+  reliability?: RoleReliability;
+  registry?: AgentRegistry;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AgentOrchestrator — Façade allégée (délègue l'exécution aux composants)
@@ -64,6 +134,22 @@ export class AgentOrchestrator {
 
   // Registry des agents autonomes (partagé via singleton)
   private registry: AgentRegistry = agentRegistry;
+
+  // Contract-net : négociateur, notes par rôle et réservations de capacité
+  private negotiator: ContractNetNegotiator;
+  private reliability: RoleReliability;
+  /** Places réservées par rôle entre la résolution d'une enchère et le démarrage de la tâche. */
+  private reservations = new Map<string, number>();
+
+  constructor(deps: AgentOrchestratorDeps = {}) {
+    this.negotiator = deps.negotiator ?? contractNetNegotiator;
+    this.reliability = deps.reliability ?? roleReliability;
+    if (deps.registry) this.registry = deps.registry;
+    // Chaque tâche d'orchestration terminée alimente la note de son rôle.
+    this.scheduler.setOnTaskSettled((task) => this.recordRoleOutcome(task));
+    // Les tâches d'orchestration sans rôle sont attribuées par enchère au lancement.
+    this.scheduler.setRoleResolver((task) => this.assignOrchestratedTask(task));
+  }
 
   // ─── Configuration ────────────────────────────────────────────────────────
 
@@ -183,20 +269,61 @@ export class AgentOrchestrator {
   /**
    * Délègue une tâche à un agent spécialisé.
    * Retourne immédiatement avec l'ID de la tâche (exécution async).
+   *
+   * Attribution du rôle :
+   *  - `role` seul (comportement historique) : routage STATIQUE, inchangé ;
+   *  - `negotiate` : le rôle est choisi par appel d'offres contract-net (voir
+   *    `resolveRole`). `preferredRole` (ou à défaut `role`) sert de repli et de
+   *    favori via la marge de préférence ;
+   *  - `assignment` : décision déjà prise par `resolveRole` (pas de seconde enchère).
    */
   async delegateTask(params: {
-    role: AgentRole;
+    role?: AgentRole;
+    preferredRole?: AgentRole;
+    negotiate?: boolean | NegotiationHints;
+    assignment?: RoleAssignment;
     title: string;
     description: string;
     files?: string[];
     instructions?: string;
     priority?: TaskPriority;
     timeoutMs?: number;
+    /** Métadonnées additionnelles fusionnées dans `task.context.metadata`. */
+    metadata?: Record<string, unknown>;
   }): Promise<AgentTask> {
-    const agent = getAgentDefinitionOrThrow(params.role);
-    const currentRunning = this.executor.getRunningCount(params.role);
+    let assignment = params.assignment;
+    if (!assignment && params.negotiate) {
+      const hints: NegotiationHints = typeof params.negotiate === "object" ? params.negotiate : {};
+      assignment = await this.resolveRole({
+        title: params.title,
+        description: params.description,
+        instructions: params.instructions,
+        files: params.files,
+        priority: params.priority,
+        tools: hints.tools,
+        requiredCapabilities: hints.requiredCapabilities,
+        preferredRole: params.preferredRole ?? params.role,
+      });
+    }
 
-    log.info(`📋 Délégation → ${agent.name}: "${params.title}" (priorité: ${params.priority ?? "medium"})`);
+    const role = assignment?.role ?? params.role;
+    if (!role) {
+      throw new Error("delegateTask: 'role' requis (ou 'negotiate' pour une attribution par appel d'offres).");
+    }
+
+    // La réservation a rempli son office : le rôle démarre (ou échoue) juste après.
+    if (assignment?.reserved) {
+      this.releaseRoleReservation(role);
+      assignment = { ...assignment, reserved: false };
+    }
+
+    const agent = getAgentDefinitionOrThrow(role);
+    const currentRunning = this.executor.getRunningCount(role);
+
+    log.info(
+      `📋 Délégation → ${agent.name}: "${params.title}" (priorité: ${params.priority ?? "medium"}` +
+        `${assignment ? `, via ${assignment.via}` : ""})`
+    );
 
     if (currentRunning >= agent.maxConcurrency) {
       log.warn(`⚠️ Rejet — ${agent.name} à capacité maximale (${agent.maxConcurrency})`);
@@ -205,9 +332,22 @@ export class AgentOrchestrator {
       );
     }
 
+    const metadata: Record<string, unknown> = { ...(params.metadata ?? {}) };
+    if (assignment) {
+      metadata.assignment = {
+        via: assignment.via,
+        mode: assignment.mode,
+        role: assignment.role,
+        preferredRole: assignment.preferredRole,
+        winningScore: assignment.winningScore ?? null,
+        auctionId: assignment.auctionId,
+        reason: assignment.reason,
+      };
+    }
+
     const task: AgentTask = {
       id: randomUUID(),
-      role: params.role,
+      role,
       title: params.title,
       description: params.description,
       priority: params.priority ?? "medium",
@@ -215,6 +355,7 @@ export class AgentOrchestrator {
       context: {
         files: params.files ?? [],
         instructions: params.instructions,
+        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
       },
       createdAt: new Date().toISOString(),
       timeoutMs: params.timeoutMs ?? agent.defaultTimeoutMs,
@@ -226,27 +367,250 @@ export class AgentOrchestrator {
     // Persister immédiatement (statut pending)
     agentPersistence.saveTask(task).catch(() => {});
 
-    // Lancer l'exécution en arrière-plan
-    this.executor.execute(task).catch((err) => {
-      log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
-    });
+    // Lancer l'exécution en arrière-plan ; l'issue alimente la note du rôle.
+    this.executor
+      .execute(task)
+      .then(() => this.recordRoleOutcome(task))
+      .catch((err) => {
+        log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
+        this.recordRoleOutcome(task, false);
+      });
 
     return task;
+  }
+
+  // ─── Attribution dynamique du rôle (contract-net) ──────────────────────────
+
+  /**
+   * Choisit le rôle qui exécutera une tâche.
+   *
+   * Modes (`LEANNA_CONTRACT_NET`, forcé à `on` avec `force`) :
+   *  - `off`    : routage statique pur (rôle préféré, sinon rôle par défaut) ;
+   *  - `shadow` : une enchère est lancée et son gagnant journalisé, mais le rôle
+   *               statique est conservé ;
+   *  - `on`     : le meilleur candidat classé AYANT UNE PLACE LIBRE est retenu.
+   *
+   * Repli (jamais d'exception) : sans agent en ligne, sans offre éligible, sans
+   * candidat disponible ou en cas d'erreur → rôle préféré (sinon rôle par
+   * défaut), journalisé et compté dans les métriques du négociateur.
+   *
+   * En mode `on`, une place est RÉSERVÉE sur le rôle retenu (`reserved: true`)
+   * pour que des résolutions parallèles ne visent pas toutes le même rôle plein.
+   */
+  async resolveRole(
+    request: RoleResolutionRequest,
+    options: { force?: boolean } = {}
+  ): Promise<RoleAssignment> {
+    const mode: ContractNetMode = options.force ? "on" : getContractNetConfig().mode;
+    const preferred = request.preferredRole;
+    const staticRole = preferred ?? DEFAULT_FALLBACK_ROLE;
+    const requiredCapabilities = mode === "off" ? [] : this.deriveCapabilities(request);
+
+    const staticAssignment = (
+      via: RoleAssignment["via"],
+      extra: Partial<RoleAssignment> = {}
+    ): RoleAssignment => ({
+      role: staticRole,
+      via,
+      mode,
+      preferredRole: preferred,
+      requiredCapabilities,
+      bids: [],
+      ...extra,
+    });
+
+    if (mode === "off") {
+      return staticAssignment(preferred ? "static" : "fallback", { reason: "contract-net désactivé" });
+    }
+
+    const fallback = (reason: string, extra: Partial<RoleAssignment> = {}): RoleAssignment => {
+      if (mode === "on") this.negotiator.recordFallback();
+      log.warn(`↩️ Repli sur [${staticRole}] pour "${request.title.slice(0, 60)}" — ${reason}`);
+      return staticAssignment(mode === "shadow" ? "shadow" : "fallback", { reason, ...extra });
+    };
+
+    // Aucun agent en ligne : inutile d'attendre une enchère que personne ne peut honorer.
+    if (this.negotiator.hasNoOnlineBidders()) {
+      return fallback("aucun agent autonome en ligne");
+    }
+
+    const auctionId = randomUUID();
+    let outcome: Awaited<ReturnType<ContractNetNegotiator["negotiate"]>>;
+    try {
+      outcome = await this.negotiator.negotiate(
+        {
+          taskId: auctionId,
+          title: request.title,
+          description: request.description,
+          requiredCapabilities,
+          files: request.files ?? [],
+          instructions: request.instructions,
+          priority: request.priority ?? "medium",
+          preferredRole: preferred,
+        },
+        undefined,
+        { award: false }
+      );
+    } catch (err) {
+      return fallback(`enchère en erreur: ${(err as Error).message}`, { auctionId });
+    }
+
+    const bids = outcome.bids.map((b) => ({
+      role: b.role,
+      score: b.score,
+      skillMatch: b.skillMatch,
+      confidence: b.confidence,
+      loadPenalty: b.loadPenalty,
+      eligible: b.eligible,
+    }));
+    const common = { auctionId, requiredCapabilities, bids, durationMs: outcome.durationMs };
+
+    if (mode === "shadow") {
+      log.info(
+        `🕶️ [shadow] "${request.title.slice(0, 60)}" → enchère: [${outcome.winner ?? "aucun"}], ` +
+          `statique conservé: [${staticRole}]${outcome.winner && outcome.winner !== staticRole ? " (divergence)" : ""}`
+      );
+      return staticAssignment("shadow", {
+        ...common,
+        shadowWinner: outcome.winner,
+        winningScore: outcome.winningScore,
+        reason: "mode shadow",
+      });
+    }
+
+    const candidate = outcome.ranked.find((b) => this.hasRoleCapacity(b.role));
+    if (!candidate) {
+      return fallback(
+        outcome.winner ? "aucun candidat éligible avec une place libre" : "aucune offre éligible",
+        common
+      );
+    }
+
+    this.reservations.set(candidate.role, (this.reservations.get(candidate.role) ?? 0) + 1);
+    log.info(
+      `🎯 "${request.title.slice(0, 60)}" → [${candidate.role}] par enchère ` +
+        `(score ${candidate.score.toFixed(3)}${preferred && preferred !== candidate.role ? `, préféré: ${preferred}` : ""})`
+    );
+    return {
+      role: candidate.role,
+      via: "contract-net",
+      mode,
+      preferredRole: preferred,
+      winningScore: candidate.score,
+      reserved: true,
+      ...common,
+    };
+  }
+
+  /** Libère une place réservée par `resolveRole` (idempotent, jamais négatif). */
+  releaseRoleReservation(role: AgentRole): void {
+    const current = this.reservations.get(role) ?? 0;
+    if (current <= 1) this.reservations.delete(role);
+    else this.reservations.set(role, current - 1);
+  }
+
+  /** Le rôle existe et a une place libre (tâches en cours + réservations < maxConcurrency). */
+  private hasRoleCapacity(role: AgentRole): boolean {
+    const definition = getAgentDefinition(role);
+    if (!definition) return false;
+    const used = this.executor.getRunningCount(role) + (this.reservations.get(role) ?? 0);
+    return used < definition.maxConcurrency;
+  }
+
+  /**
+   * Capacités requises d'une enchère : explicites si fournies, sinon déduites du
+   * texte (heuristique) et complétées par les outils prévus, filtrés sur les
+   * capacités réellement déclarées par au moins un agent.
+   */
+  private deriveCapabilities(request: RoleResolutionRequest): string[] {
+    if (request.requiredCapabilities && request.requiredCapabilities.length > 0) {
+      return [...new Set(request.requiredCapabilities)];
+    }
+    const inferred = inferRequiredCapabilities(`${request.title} ${request.description}`, request.instructions);
+    const tools = request.tools ?? [];
+    if (tools.length === 0) return inferred;
+
+    const known = new Set<string>();
+    for (const role of listAgentRoles()) {
+      for (const capability of getAgentDefinition(role)?.capabilities ?? []) known.add(capability);
+    }
+    const usableTools = tools.filter((tool) => known.has(tool));
+    return [...new Set([...inferred, ...usableTools])];
+  }
+
+  /**
+   * Attribue un rôle à une tâche d'orchestration créée sans `role` (appelé par le
+   * `TaskScheduler` juste avant le lancement). Retourne la fonction de libération
+   * de la réservation de place, que le scheduler appelle une fois la tâche démarrée.
+   */
+  private async assignOrchestratedTask(task: AgentTask): Promise<(() => void) | void> {
+    const metadata = (task.context.metadata ??= {}) as Record<string, unknown>;
+    const requiredCapabilities = Array.isArray(metadata.requiredCapabilities)
+      ? (metadata.requiredCapabilities as unknown[]).filter((c): c is string => typeof c === "string")
+      : undefined;
+
+    const assignment = await this.resolveRole({
+      title: task.title,
+      description: task.description,
+      instructions: task.context.instructions,
+      files: task.context.files,
+      priority: task.priority,
+      requiredCapabilities,
+    });
+
+    const agent = getAgentDefinitionOrThrow(assignment.role);
+    task.role = assignment.role;
+    task.timeoutMs = agent.defaultTimeoutMs;
+    metadata.assignment = {
+      via: assignment.via,
+      mode: assignment.mode,
+      role: assignment.role,
+      winningScore: assignment.winningScore ?? null,
+      auctionId: assignment.auctionId,
+      reason: assignment.reason,
+    };
+    agentPersistence.saveTask(task).catch(() => {});
+
+    return assignment.reserved ? () => this.releaseRoleReservation(assignment.role) : undefined;
+  }
+
+  /**
+   * Alimente la note du rôle avec l'issue d'une tâche terminée (statique ou
+   * négociée : toutes comptent, pour que les notes reflètent la réalité).
+   * Les annulations ne sont pas imputées au rôle.
+   */
+  private recordRoleOutcome(task: AgentTask, forcedSuccess?: boolean): void {
+    if (!task.role || task.role === "unassigned") return;
+    let success: boolean;
+    if (forcedSuccess !== undefined) {
+      success = forcedSuccess;
+    } else if (task.status === "completed") {
+      success = true;
+    } else if (task.status === "failed" || task.status === "incomplete") {
+      success = false;
+    } else {
+      return;
+    }
+    const durationMs =
+      task.result?.durationMs ??
+      (task.startedAt ? Math.max(0, Date.now() - Date.parse(task.startedAt)) : 0);
+    this.reliability.record(task.role, success, durationMs);
   }
 
   // ─── Délégation par négociation (contract-net) ─────────────────────────────
 
   /**
    * Met une sous-tâche aux enchères (contract-net) au lieu de choisir l'agent
-   * à l'avance : diffuse un appel d'offres, la flotte enchérit automatiquement,
-   * et le meilleur-match (compétences + charge) remporte la tâche et reçoit un
-   * `task_request`.
+   * à l'avance : la flotte enchérit automatiquement, et le meilleur candidat
+   * (compétences + fiabilité + charge) ayant une place libre remporte la tâche.
    *
-   * Déclenchement DÉTERMINISTE : contrairement au bloc `## DÉLÉGATION` sans
-   * cible (dépendant du phrasé du LLM), cet appel force toujours la négociation.
+   * L'enchère ne fait que SÉLECTIONNER l'agent ; la tâche est ensuite exécutée
+   * par `delegateTask()` sur le moteur actif. Elle est donc suivie de bout en
+   * bout (`agent_status`, annulation, budget, résultat) — contrairement à
+   * l'ancien chemin « task_request sur le bus » dont le résultat était perdu.
    *
-   * Les capacités requises sont fournies explicitement, ou déduites par
-   * heuristique depuis le titre/la description si omises.
+   * Appel EXPLICITE : l'enchère a lieu même si `LEANNA_CONTRACT_NET=off`.
+   * Les capacités requises sont fournies, ou déduites du titre/de la description.
    */
   async negotiateTask(params: {
     title: string;
@@ -262,7 +626,6 @@ export class AgentOrchestrator {
     awarded: boolean;
     bids: Array<{ role: AgentRole; score: number; skillMatch: number; eligible: boolean }>;
   }> {
-    const taskId = randomUUID();
     const requiredCapabilities =
       params.requiredCapabilities && params.requiredCapabilities.length > 0
         ? params.requiredCapabilities
@@ -272,64 +635,64 @@ export class AgentOrchestrator {
       `📣 Mise aux enchères "${params.title}" — capacités requises: ${requiredCapabilities.join(", ")}`
     );
 
-    // Enregistre la tâche négociée dans le registre AVANT d'attendre l'issue,
-    // avec le même UUID que celui mis aux enchères. Sans cela, `agent_status`
-    // (et `getTask`) ne trouvent jamais la tâche : elle n'existait que dans le
-    // négociateur/bus le temps de la fenêtre d'enchères, d'où l'erreur
-    // "Aucune tâche ou orchestration trouvée avec l'ID …".
-    const negotiatedTask: AgentTask = {
-      id: taskId,
-      role: "unassigned",
-      title: params.title,
-      description: params.description,
-      priority: params.priority ?? "medium",
-      status: "pending",
-      context: {
-        files: params.files ?? [],
+    const assignment = await this.resolveRole(
+      {
+        title: params.title,
+        description: params.description,
         instructions: params.instructions,
-        metadata: { negotiated: true, requiredCapabilities },
+        files: params.files,
+        priority: params.priority,
+        requiredCapabilities,
       },
-      createdAt: new Date().toISOString(),
-    };
-    this.tasks.set(negotiatedTask.id, negotiatedTask);
-    agentPersistence.saveTask(negotiatedTask).catch(() => {});
+      { force: true }
+    );
 
-    const outcome = await contractNetNegotiator.negotiate({
-      taskId,
+    const bids = assignment.bids.map((b) => ({
+      role: b.role,
+      score: b.score,
+      skillMatch: b.skillMatch,
+      eligible: b.eligible,
+    }));
+
+    if (assignment.via !== "contract-net") {
+      // Aucun gagnant utilisable : on garde une trace consultable via agent_status.
+      const taskId = assignment.auctionId ?? randomUUID();
+      const unassigned: AgentTask = {
+        id: taskId,
+        role: "unassigned",
+        title: params.title,
+        description: params.description,
+        priority: params.priority ?? "medium",
+        status: "incomplete",
+        context: {
+          files: params.files ?? [],
+          instructions: params.instructions,
+          metadata: { negotiated: true, requiredCapabilities, reason: assignment.reason },
+        },
+        createdAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+      };
+      this.tasks.set(unassigned.id, unassigned);
+      agentPersistence.saveTask(unassigned).catch(() => {});
+      return { taskId, winner: null, winningScore: null, awarded: false, bids };
+    }
+
+    const task = await this.delegateTask({
+      assignment,
       title: params.title,
       description: params.description,
-      requiredCapabilities,
-      files: params.files ?? [],
+      files: params.files,
       instructions: params.instructions,
-      priority: params.priority ?? "medium",
+      priority: params.priority,
+      metadata: { negotiated: true, requiredCapabilities },
     });
 
-    // Reflète l'issue de la négociation sur la tâche enregistrée. L'exécution
-    // du gagnant est fire-and-forget via le bus ; le statut "running" indique
-    // qu'un agent a été attribué, "incomplete" qu'aucune offre éligible n'a été
-    // reçue, et "failed" si la publication du task_request a échoué.
-    if (!outcome.awarded || !outcome.winner) {
-      negotiatedTask.status = "incomplete";
-      negotiatedTask.completedAt = new Date().toISOString();
-    } else {
-      negotiatedTask.role = outcome.winner;
-      negotiatedTask.status = "running";
-      negotiatedTask.startedAt = new Date().toISOString();
-    }
-    this.tasks.set(negotiatedTask.id, negotiatedTask);
-    agentPersistence.saveTask(negotiatedTask).catch(() => {});
-
     return {
-      taskId: outcome.taskId,
-      winner: outcome.winner,
-      winningScore: outcome.winningScore,
-      awarded: outcome.awarded,
-      bids: outcome.bids.map((b) => ({
-        role: b.role,
-        score: b.score,
-        skillMatch: b.skillMatch,
-        eligible: b.eligible,
-      })),
+      taskId: task.id,
+      winner: assignment.role,
+      winningScore: assignment.winningScore ?? null,
+      awarded: true,
+      bids,
     };
   }
 
@@ -345,7 +708,14 @@ export class AgentOrchestrator {
     tasks: Array<{
       /** ID stable optionnel — permet d'être référencé dans dependsOn d'autres tâches */
       id?: string;
-      role: AgentRole;
+      /**
+       * Rôle de l'agent. OPTIONNEL : s'il est omis, l'agent est choisi par appel
+       * d'offres (contract-net) juste avant le lancement de la tâche, parmi les
+       * agents en ligne, selon compétences, fiabilité et charge.
+       */
+      role?: AgentRole;
+      /** Capacités requises pour l'enchère (rôle omis). Sinon déduites du texte. */
+      requiredCapabilities?: string[];
       title: string;
       description: string;
       files?: string[];
@@ -365,7 +735,7 @@ export class AgentOrchestrator {
   }): Promise<OrchestrationPlan> {
     const orchestrationId = randomUUID();
 
-    log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${[...new Set(params.tasks.map(t => t.role))].join(", ")}`);
+    log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${[...new Set(params.tasks.map(t => t.role ?? "auto (enchère)"))].join(", ")}`);
 
     const agentTasks: AgentTask[] = [];
     const dependencies: Record<string, string[]> = {};
@@ -416,13 +786,14 @@ export class AgentOrchestrator {
     // Seconde passe : créer les tâches et résoudre toutes les dépendances.
     for (let i = 0; i < params.tasks.length; i++) {
       const taskDef = params.tasks[i];
-      const agent = getAgentDefinitionOrThrow(taskDef.role);
+      // Rôle explicite : validé immédiatement. Rôle omis : attribué par enchère au lancement.
+      const agent = taskDef.role ? getAgentDefinitionOrThrow(taskDef.role) : undefined;
       const taskId = taskIds[i];
 
       const task: AgentTask = {
         id: taskId,
         orchestrationId,
-        role: taskDef.role,
+        role: taskDef.role ?? UNASSIGNED_ROLE,
         title: taskDef.title,
         description: taskDef.description,
         priority: taskDef.priority ?? "medium",
@@ -430,9 +801,12 @@ export class AgentOrchestrator {
         context: {
           files: taskDef.files ?? [],
           instructions: taskDef.instructions,
+          ...(taskDef.role
+            ? {}
+            : { metadata: { autoAssign: true, requiredCapabilities: taskDef.requiredCapabilities } }),
         },
         createdAt: new Date().toISOString(),
-        timeoutMs: agent.defaultTimeoutMs,
+        timeoutMs: agent?.defaultTimeoutMs,
       };
 
       agentTasks.push(task);

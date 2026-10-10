@@ -113,7 +113,8 @@ function makeOrchestrator(writeForTask: (params: { role: string; title: string; 
     delegated,
     canRunTool: true,
     async runTool() { return null; },
-    async delegateTask(params: { role: string; title: string; files?: string[] }) {
+    async delegateTask(input: { role?: string; preferredRole?: string; title: string; files?: string[] }) {
+      const params = { role: (input.role ?? input.preferredRole)!, title: input.title, files: input.files };
       const index = counter++;
       const id = `task-${index}-${params.role}`;
       delegated.push({ role: params.role, title: params.title });

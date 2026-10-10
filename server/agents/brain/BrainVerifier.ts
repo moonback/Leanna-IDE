@@ -35,7 +35,9 @@ export class BrainVerifier {
     _understanding: GoalUnderstanding,
     filesModified: string[]
   ): Promise<StageVerification> {
-    log.info(`🔍 Vérification de l'étape ${stage.id} (Agent: ${stage.agentRole})`);
+    // Rôle effectif : l'agent réellement attribué (contract-net), sinon le rôle planifié.
+    const role = stage.assignedRole ?? stage.agentRole;
+    log.info(`🔍 Vérification de l'étape ${stage.id} (Agent: ${role})`);
 
     const issues: VerificationIssue[] = [];
     let syntaxCheckOk = true;
@@ -67,16 +69,16 @@ export class BrainVerifier {
     }
 
     // 2. Vérification spécifique par rôle
-    if (stage.agentRole === "coder" || stage.agentRole === "refactor" || stage.agentRole === "debugger") {
+    if (role === "coder" || role === "refactor" || role === "debugger") {
       if (filesModified.length === 0 && stage.result?.filesModified?.length === 0) {
         issues.push({
           severity: "warning",
-          message: `L'agent ${stage.agentRole} s'est achevé sans modifier de fichier.`,
+          message: `L'agent ${role} s'est achevé sans modifier de fichier.`,
         });
       }
     }
 
-    if (stage.agentRole === "vision") {
+    if (role === "vision") {
       // Pour l'agent vision, vérifier que le responsive ou le layout a bien été inspecté
       const output = stage.result?.details ?? stage.result?.summary ?? "";
       if (/invalide|erreur visuelle|débordement|overflow|cassé/i.test(output)) {
@@ -101,12 +103,12 @@ export class BrainVerifier {
     const passed = !hasErrors;
 
     const summary = passed
-      ? `✅ Étape ${stage.id} (${stage.agentRole}) vérifiée avec succès.`
-      : `❌ Vérification échouée pour l'étape ${stage.id} (${stage.agentRole}) : ${issues.filter((i) => i.severity === "error").map((i) => i.message).join("; ")}`;
+      ? `✅ Étape ${stage.id} (${role}) vérifiée avec succès.`
+      : `❌ Vérification échouée pour l'étape ${stage.id} (${role}) : ${issues.filter((i) => i.severity === "error").map((i) => i.message).join("; ")}`;
 
     return {
       stageId: stage.id,
-      role: stage.agentRole,
+      role: role,
       passed,
       syntaxCheckOk,
       testsOk,

@@ -51,6 +51,9 @@ export class AgentRegistry {
   ) {
     this.bus = bus;
     this.negotiator = negotiator;
+    // Clôture anticipée des enchères : le négociateur sait quels agents sont en
+    // ligne et attend leurs réponses (bid ou refus) plutôt que la fenêtre entière.
+    this.negotiator.setExpectedBiddersProvider(() => this.onlineRoles());
     this.notifier = new ProgressNotifier();
     this.executor = new AgentExecutor(this.notifier);
     this.runner = this.executor;
@@ -59,6 +62,15 @@ export class AgentRegistry {
   /** Retourne le ProgressNotifier partagé (pour brancher un runtime agentique). */
   getNotifier(): ProgressNotifier {
     return this.notifier;
+  }
+
+  /** Rôles des agents autonomes actuellement en ligne (abonnés au bus). */
+  onlineRoles(): AgentRole[] {
+    const roles: AgentRole[] = [];
+    for (const [role, agent] of this.agents) {
+      if (agent.getStats().isOnline) roles.push(role);
+    }
+    return roles;
   }
 
   /** Nombre de tâches actives (en cours + en file) sur toute la flotte. */

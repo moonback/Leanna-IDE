@@ -108,7 +108,13 @@ export type {
   NegotiationOutcome,
   ScoringWeights,
   NegotiatorOptions,
+  NegotiateOptions,
+  NegotiatorStats,
 } from "./ContractNetNegotiator.js";
+export { getContractNetConfig } from "./contractNetConfig.js";
+export type { ContractNetConfig, ContractNetMode } from "./contractNetConfig.js";
+export { RoleReliability, roleReliability } from "./RoleReliability.js";
+export type { RoleRating } from "./RoleReliability.js";
 
 // Surveillance et traçage du MessageBus
 export { MessageBusMonitor, messageBusMonitor } from "./MessageBusMonitor.js";

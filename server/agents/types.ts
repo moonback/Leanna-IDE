@@ -410,7 +410,13 @@ export const orchestrateSchema = z.object({
      * Si absent, un UUID est généré automatiquement.
      */
     id: z.string().min(1).optional(),
-    role: agentRoleSchema,
+    /**
+     * Rôle de l'agent. OPTIONNEL : s'il est omis, l'agent est attribué par appel
+     * d'offres (contract-net) au lancement de la tâche.
+     */
+    role: agentRoleSchema.optional(),
+    /** Capacités requises pour l'appel d'offres (rôle omis) ; sinon déduites du texte. */
+    requiredCapabilities: z.array(z.string().min(1)).optional(),
     title: z.string().min(1).trim(),
     description: z.string().min(1).trim(),
     files: z.array(z.string()).optional().default([]),

@@ -51,7 +51,16 @@ export interface BrainStage {
   id: string;
   title: string;
   description: string;
+  /** Rôle PLANIFIÉ (préféré) : repli et favori de l'appel d'offres contract-net. */
   agentRole: AgentRole;
+  /**
+   * Rôle réellement attribué à l'exécution (gagnant de l'enchère). Absent tant
+   * que l'étape n'a pas été attribuée ; égal à `agentRole` si le rôle planifié
+   * a conservé la tâche ou en cas de repli.
+   */
+  assignedRole?: AgentRole;
+  /** Mode d'attribution retenu : contract-net, static, shadow ou fallback. */
+  assignedVia?: "contract-net" | "static" | "shadow" | "fallback";
   agentReason: string;
   skills: string[];
   tools: string[];

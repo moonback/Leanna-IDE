@@ -241,14 +241,18 @@ export class AgentBrain {
     let stageTaskResult: any = null;
 
     try {
+      // Attribution dynamique (contract-net) : `agentRole` est le rôle préféré du
+      // planificateur ; un autre rôle ne le remplace que s'il le bat nettement.
       const delegatedTask: AgentTask = await this.orchestrator.delegateTask({
-        role: stage.agentRole,
+        preferredRole: stage.agentRole,
+        negotiate: { tools: stage.tools },
         title: stage.title,
         description: `${stage.description}\n\nOutils autorisés : ${stage.tools.join(", ")}`,
         files: stage.files,
         instructions: stage.instructions,
         priority: stage.priority,
       });
+      this.recordAssignment(stage, delegatedTask);
 
       stageTaskResult = await this.awaitTaskCompletion(delegatedTask.id);
       stage.result = stageTaskResult;
@@ -306,7 +310,10 @@ export class AgentBrain {
 
       try {
         const fixTask = await this.orchestrator.delegateTask({
-          role: correction.targetRole,
+          preferredRole: correction.targetRole,
+          // Un correctif doit pouvoir écrire : on exige des capacités d'écriture en
+          // plus de celles de l'étape, pour ne pas confier un fix à un rôle en lecture seule.
+          negotiate: { tools: ["modify_project_file", "write_project_file", ...stage.tools] },
           title: `[Auto-Correction] Fix pour ${stage.title}`,
           description: correction.correctiveInstructions,
           files: correction.filesToFix,
@@ -356,10 +363,10 @@ export class AgentBrain {
       type: "agent_event",
       event: verification.passed ? "task_completed" : "task_failed",
       taskId: stage.id,
-      role: stage.agentRole,
+      role: stage.assignedRole ?? stage.agentRole,
       title: `[Brain Stage] ${stage.title}`,
       status: verification.passed ? "completed" : "failed",
-      agentName: stage.agentRole,
+      agentName: stage.assignedRole ?? stage.agentRole,
       detail: verification.summary,
       timestamp: new Date().toISOString(),
     });
@@ -478,6 +485,35 @@ export class AgentBrain {
   }
 
   /**
+   * Reporte sur l'étape le rôle réellement attribué par l'orchestrateur, pour que
+   * la vérification (BrainVerifier) et les événements reflètent l'agent qui a
+   * travaillé. Publie un événement quand l'enchère a changé de rôle.
+   */
+  private recordAssignment(stage: BrainStage, delegatedTask: AgentTask): void {
+    const assignment = (delegatedTask.context.metadata as Record<string, any> | undefined)?.assignment as
+      | { via?: BrainStage["assignedVia"]; winningScore?: number | null }
+      | undefined;
+    const planned = stage.agentRole;
+    stage.assignedRole = delegatedTask.role;
+    stage.assignedVia = assignment?.via ?? "static";
+
+    if (delegatedTask.role === planned) return;
+
+    log.info(`🔀 Étape "${stage.title}" : rôle planifié [${planned}] → attribué à [${delegatedTask.role}] (contract-net)`);
+    agentEventStream.publish({
+      type: "agent_event",
+      event: "task_progress",
+      taskId: stage.id,
+      role: delegatedTask.role,
+      title: `[Brain Stage] ${stage.title} → ${delegatedTask.role}`,
+      status: "running",
+      agentName: delegatedTask.role,
+      detail: `Attribué par appel d'offres à ${delegatedTask.role} (planifié: ${planned}, score ${assignment?.winningScore?.toFixed?.(3) ?? "n/a"})`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
    * Attente active de terminaison d'une tâche déléguée
    */
   private async awaitTaskCompletion(taskId: string, maxWaitMs = 180_000): Promise<any> {
@@ -496,6 +532,20 @@ export class AgentBrain {
 
       if (task.status === "failed") {
         return task.result ?? { success: false, outcome: "failed" as const, summary: "Tâche échouée", durationMs: 0, error: "Tâche échouée" };
+      }
+
+      // États terminaux non réussis : on rend la main immédiatement au lieu
+      // d'attendre le délai maximal (180 s) d'une tâche qui ne changera plus.
+      if (task.status === "incomplete" || task.status === "cancelled") {
+        return (
+          task.result ?? {
+            success: false,
+            outcome: "failed" as const,
+            summary: task.status === "cancelled" ? "Tâche annulée" : "Tâche incomplète",
+            durationMs: 0,
+            error: task.status === "cancelled" ? "Tâche annulée" : "Tâche incomplète",
+          }
+        );
       }
 
       await new Promise((resolve) => setTimeout(resolve, checkInterval));

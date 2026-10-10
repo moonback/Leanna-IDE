@@ -315,20 +315,30 @@ export class AutonomousAgent {
       ? (data.requiredCapabilities as unknown[]).filter((c): c is string => typeof c === "string")
       : [];
 
-    const agentDef = getAgentDefinitionOrThrow(this.role);
-    const skillMatch = this.negotiator.skillMatchFor(agentDef.capabilities, requiredCapabilities);
+    let skillMatch: number;
+    try {
+      const agentDef = getAgentDefinitionOrThrow(this.role);
+      skillMatch = this.negotiator.skillMatchFor(agentDef.capabilities, requiredCapabilities);
+    } catch (err) {
+      // Définition introuvable : on décline pour ne pas retarder la clôture de l'enchère.
+      log.warn(`[${this.role}] Bid impossible sur ${taskId.slice(0, 8)}: ${(err as Error).message}`);
+      this.negotiator.declineBid(taskId, this.role);
+      return;
+    }
 
     // N'enchérit pas si l'agent ne couvre aucune des capacités requises :
-    // un bid inéligible n'apporte rien et pollue l'enchère.
+    // un bid inéligible n'apporte rien et pollue l'enchère. Le refus explicite
+    // permet à l'enchère de se fermer dès que tout le monde a répondu.
     if (skillMatch <= 0) {
       log.debug(`🙅 [${this.agentName}] N'enchérit pas sur ${taskId.slice(0, 8)} (skillMatch 0)`);
+      this.negotiator.declineBid(taskId, this.role);
       return;
     }
 
     // Charge live : 1 tâche active/en file ≈ 0.25 de pénalité, plafonnée à 1.
     const liveLoad = Math.min(1, (this.runningTasks.size + this.taskQueue.length) * 0.25);
-    // Confiance neutre tant qu'aucune métrique de fiabilité par-rôle n'existe.
-    const confidence = 0.5;
+    // Confiance = fiabilité récente propre à ce rôle (neutre sous le seuil de preuve).
+    const confidence = this.negotiator.confidenceFor(this.role);
 
     const submitted = this.negotiator.submitBid(taskId, {
       role: this.role,

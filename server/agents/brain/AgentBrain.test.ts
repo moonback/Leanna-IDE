@@ -341,12 +341,30 @@ class MockOrchestrator {
   private tasks = new Map<string, any>();
   public delegated: Array<{ role: string; title: string }> = [];
   private counter = 0;
+  public negotiations: Array<{ preferredRole?: string; negotiate: unknown }> = [];
 
   constructor(
-    private resultFor: (params: { role: string; title: string; index: number }) => MockTaskResult
+    private resultFor: (params: { role: string; title: string; index: number }) => MockTaskResult,
+    /** Simule le contract-net : choisit le rôle réellement attribué (défaut : le rôle préféré). */
+    private assign?: (preferredRole: string, title: string) => string
   ) {}
 
-  async delegateTask(params: { role: string; title: string; description?: string; files?: string[]; instructions?: string; priority?: string }) {
+  async delegateTask(input: {
+    role?: string;
+    preferredRole?: string;
+    negotiate?: unknown;
+    title: string;
+    description?: string;
+    files?: string[];
+    instructions?: string;
+    priority?: string;
+  }) {
+    const preferred = (input.role ?? input.preferredRole)!;
+    const params = {
+      role: input.negotiate && this.assign ? this.assign(preferred, input.title) : preferred,
+      title: input.title,
+    };
+    if (input.negotiate) this.negotiations.push({ preferredRole: input.preferredRole, negotiate: input.negotiate });
     const index = this.counter++;
     const id = `task-${index}-${params.role}`;
     this.delegated.push({ role: params.role, title: params.title });
@@ -354,6 +372,12 @@ class MockOrchestrator {
     const task = {
       id,
       role: params.role,
+      context: {
+        files: [] as string[],
+        metadata: input.negotiate
+          ? { assignment: { via: params.role === preferred ? "fallback" : "contract-net", winningScore: 0.7 } }
+          : undefined,
+      },
       title: params.title,
       status: r.success ? "completed" : "failed",
       result: {
@@ -471,7 +495,7 @@ describe("AgentBrain.executeGoal (scheduler DAG)", () => {
     const origDelegate = orch2.delegateTask.bind(orch2);
     let delegateSeq = 0;
     (orch2 as any).delegateTask = async (params: any) => {
-      const startedKey = `${params.role}#${delegateSeq++}`;
+      const startedKey = `${params.role ?? params.preferredRole}#${delegateSeq++}`;
       windows[startedKey] = { start: Date.now() - t0, end: 0 };
       await sleepMs(40);
       windows[startedKey].end = Date.now() - t0;
@@ -645,5 +669,82 @@ describe("AgentBrain.executeGoal (intégration bout-en-bout)", () => {
     // Le run se termine (pas de boucle infinie) avec un succès global après régénération
     assert.equal(typeof result.success, "boolean");
     assert.ok(result.totalDurationMs >= 0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Attribution dynamique (contract-net) des étapes et des corrections
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("AgentBrain × contract-net (attribution dynamique)", () => {
+  it("délègue chaque étape avec le rôle planifié comme rôle PRÉFÉRÉ et les outils de l'étape", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const stage = { ...makeStage("coder", "s1"), status: "pending" as const, tools: ["read_project_file", "verify_full"] };
+    const plan = makePlanFrom([stage]);
+    const orch = new MockOrchestrator(() => ({ success: true, filesModified: ["src/a.ts"] }));
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    await brain.executeGoal(makeInput("Préférence", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 }));
+
+    assert.equal(orch.negotiations.length >= 1, true, "la délégation doit passer par la négociation");
+    assert.equal(orch.negotiations[0].preferredRole, "coder");
+    assert.deepEqual((orch.negotiations[0].negotiate as { tools: string[] }).tools, ["read_project_file", "verify_full"]);
+  });
+
+  it("reporte le rôle gagnant sur l'étape (assignedRole) et vérifie avec cet agent", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([{ ...makeStage("coder", "s1"), status: "pending" as const }]);
+    // L'enchère désigne tester à la place de coder.
+    const orch = new MockOrchestrator(() => ({ success: true, filesModified: ["src/a.ts"] }), (preferred) =>
+      preferred === "coder" ? "tester" : preferred
+    );
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    const result = await brain.executeGoal(makeInput("Attribution", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 0 }));
+
+    const stage = result.stages[0].stage;
+    assert.equal(stage.agentRole, "coder", "le rôle planifié est conservé");
+    assert.equal(stage.assignedRole, "tester", "le rôle attribué est celui du gagnant");
+    assert.equal(stage.assignedVia, "contract-net");
+    assert.equal(orch.delegated[0].role, "tester");
+    assert.equal(result.verifications[0].role, "tester", "la vérification reflète l'agent qui a travaillé");
+  });
+
+  it("délègue aussi la correction autonome par négociation, avec des capacités d'écriture", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([{ ...makeStage("coder", "s1"), status: "pending" as const }]);
+    const orch = new MockOrchestrator(({ title }) =>
+      title.includes("Auto-Correction") ? { success: true, filesModified: ["src/fix.ts"] } : { success: false, error: "échec initial" }
+    );
+    const brain = makeBrainWithPlan(orch, understanding, plan);
+
+    await brain.executeGoal(makeInput("Correction", { mode: "auto", maxCorrectionAttempts: 1, maxReplans: 0 }));
+
+    const fix = orch.negotiations.find((n) => (n.negotiate as { tools: string[] }).tools.includes("modify_project_file"));
+    assert.ok(fix, "la correction doit négocier avec des capacités d'écriture");
+    assert.equal(fix!.preferredRole, "coder");
+  });
+
+  it("rend la main immédiatement sur une tâche incomplete au lieu d'attendre le délai maximal", async () => {
+    const orch = {
+      getTask: () => ({ id: "t", status: "incomplete", result: undefined }),
+    };
+    const brain = new AgentBrain(orch as any);
+    const startedAt = Date.now();
+
+    const result = await (brain as any).awaitTaskCompletion("t", 5_000);
+
+    assert.equal(result.success, false);
+    assert.ok(Date.now() - startedAt < 1_000, "pas d'attente du délai maximal");
+  });
+
+  it("rend la main immédiatement sur une tâche annulée", async () => {
+    const orch = { getTask: () => ({ id: "t", status: "cancelled" }) };
+    const brain = new AgentBrain(orch as any);
+
+    const result = await (brain as any).awaitTaskCompletion("t", 5_000);
+
+    assert.equal(result.success, false);
+    assert.match(result.summary, /annul/i);
   });
 });

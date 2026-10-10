@@ -23,6 +23,8 @@ import type { AgentRole } from "./types.js";
 import type { AgentMessage, TaskRequestPayload } from "./AgentCommunication.js";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
 import { getAgentDefinition } from "./roles.js";
+import { getContractNetConfig } from "./contractNetConfig.js";
+import { roleReliability, type RoleReliability } from "./RoleReliability.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ContractNetNegotiator");
@@ -41,6 +43,23 @@ export interface NegotiationTask {
   files?: string[];
   instructions?: string;
   priority?: "low" | "medium" | "high" | "critical";
+  /**
+   * Rôle préféré (ex. `agentRole` choisi par le Brain). Il garde la tâche si son
+   * bid éligible est à moins de `switchMargin` du meilleur score.
+   */
+  preferredRole?: AgentRole;
+  /** Marge de préférence (défaut : `CONTRACT_NET_SWITCH_MARGIN`, 0.10). */
+  switchMargin?: number;
+}
+
+/** Options d'une négociation. */
+export interface NegotiateOptions {
+  /**
+   * `true` (défaut) : publie un `task_request` ciblé vers le gagnant.
+   * `false` (mode SÉLECTION) : l'enchère choisit seulement l'agent ; l'appelant
+   * exécute la tâche lui-même (suivi de statut, annulation, budget conservés).
+   */
+  award?: boolean;
 }
 
 /** Offre soumise par un agent candidat. */
@@ -73,6 +92,42 @@ export interface NegotiationOutcome {
   bids: ScoredBid[];
   /** True si un task_request a été publié vers le gagnant. */
   awarded: boolean;
+  /**
+   * Candidats éligibles, gagnant en tête puis par score décroissant. Permet à
+   * l'appelant de passer au candidat suivant (ex. gagnant sans capacité libre).
+   */
+  ranked: ScoredBid[];
+  /** True si le rôle préféré a conservé la tâche grâce à la marge de préférence. */
+  preferredKept: boolean;
+  /** True si l'enchère s'est fermée avant la fin de la fenêtre (tous ont répondu). */
+  closedEarly: boolean;
+  /** Durée réelle de l'enchère (annonce → attribution), en ms. */
+  durationMs: number;
+}
+
+/** Métriques cumulées du négociateur (observabilité). */
+export interface NegotiatorStats {
+  auctions: number;
+  withWinner: number;
+  noWinner: number;
+  closedEarly: number;
+  preferredKept: number;
+  /** Enchères où le gagnant diffère du rôle préféré. */
+  switched: number;
+  /** Replis sur le rôle statique signalés par l'appelant (`recordFallback`). */
+  fallbacks: number;
+  totalDurationMs: number;
+  avgDurationMs: number;
+  winsByRole: Record<string, number>;
+}
+
+/** État interne d'une enchère ouverte. */
+interface OpenCall {
+  bids: Bid[];
+  /** Rôles ayant répondu (bid ou refus) — sert à la clôture anticipée. */
+  responded: Set<AgentRole>;
+  /** Réveille `negotiate` quand une réponse arrive (clôture anticipée). */
+  notify?: () => void;
 }
 
 /** Pondérations du score. */
@@ -89,6 +144,8 @@ export interface NegotiatorOptions {
   weights?: Partial<ScoringWeights>;
   /** Initiateur par défaut des appels d'offres. */
   initiator?: AgentRole;
+  /** Source de la fiabilité par rôle (défaut : singleton adossé à StrategyMemory). */
+  reliability?: RoleReliability;
 }
 
 const DEFAULT_WEIGHTS: ScoringWeights = { skill: 0.6, confidence: 0.25, load: 0.15 };
@@ -109,63 +166,120 @@ export const NEGOTIATION_INITIATOR = "orchestrator" as AgentRole;
 
 export class ContractNetNegotiator {
   private readonly bus: AgentMessageBus;
-  private readonly biddingWindowMs: number;
+  /** Fenêtre imposée (tests/options). Sinon lue paresseusement depuis l'environnement. */
+  private readonly windowOverrideMs: number | undefined;
   private readonly weights: ScoringWeights;
   private readonly initiator: AgentRole;
+  private readonly reliability: RoleReliability;
 
-  /** Enchères ouvertes : taskId → bids reçus. */
-  private openCalls: Map<string, Bid[]> = new Map();
+  /** Enchères ouvertes : taskId → état (bids + rôles ayant répondu). */
+  private openCalls: Map<string, OpenCall> = new Map();
+
+  /** Fournit les rôles en ligne attendus à une enchère (clôture anticipée). */
+  private expectedBiddersProvider: (() => AgentRole[]) | null = null;
+
+  private stats: Omit<NegotiatorStats, "avgDurationMs"> = emptyStats();
 
   constructor(bus: AgentMessageBus = agentMessageBus, options: NegotiatorOptions = {}) {
     this.bus = bus;
-    this.biddingWindowMs = options.biddingWindowMs ?? 500;
+    this.windowOverrideMs = options.biddingWindowMs;
     this.weights = { ...DEFAULT_WEIGHTS, ...options.weights };
     this.initiator = options.initiator ?? NEGOTIATION_INITIATOR;
+    this.reliability = options.reliability ?? roleReliability;
+  }
+
+  /** Plafond de la fenêtre d'enchères (ms) : option explicite, sinon `CONTRACT_NET_BIDDING_WINDOW_MS`. */
+  private get biddingWindowMs(): number {
+    return this.windowOverrideMs ?? getContractNetConfig().biddingWindowMs;
   }
 
   // ─── API publique ──────────────────────────────────────────────────────────
 
   /**
+   * Déclare la source des rôles en ligne attendus à chaque enchère. Activée par
+   * `AgentRegistry`, elle permet la CLÔTURE ANTICIPÉE : dès que chaque rôle
+   * attendu a répondu (bid ou refus), l'enchère se ferme sans attendre la
+   * fenêtre, qui ne sert plus que de plafond.
+   */
+  setExpectedBiddersProvider(provider: (() => AgentRole[]) | null): void {
+    this.expectedBiddersProvider = provider;
+  }
+
+  /**
    * Lance une négociation complète : annonce → collecte des bids → attribution.
-   * Retourne l'issue (gagnant, bids scorés). Publie un `task_request` ciblé si
-   * un gagnant éligible est trouvé.
+   * Retourne l'issue (gagnant, bids scorés). Par défaut publie un `task_request`
+   * ciblé vers le gagnant ; avec `{ award: false }` (mode SÉLECTION) elle choisit
+   * seulement l'agent et laisse l'appelant exécuter la tâche.
    */
   async negotiate(
     task: NegotiationTask,
-    from: AgentRole = this.initiator
+    from: AgentRole = this.initiator,
+    options: NegotiateOptions = {}
   ): Promise<NegotiationOutcome> {
-    this.openCalls.set(task.taskId, []);
+    const startedAt = Date.now();
+    const shouldAward = options.award !== false;
 
-    await this.announce(task, from);
-    await this.wait(this.biddingWindowMs);
+    // L'enchère est ouverte de façon SYNCHRONE : un submitBid() émis juste après
+    // l'appel (sans await) est ainsi toujours pris en compte.
+    const call: OpenCall = { bids: [], responded: new Set() };
+    this.openCalls.set(task.taskId, call);
 
-    const rawBids = this.openCalls.get(task.taskId) ?? [];
-    this.openCalls.delete(task.taskId);
+    let closedEarly = false;
+    let rawBids: Bid[];
+    try {
+      await this.announce(task, from);
+      closedEarly = await this.collect(call, from);
+    } finally {
+      rawBids = call.bids;
+      this.openCalls.delete(task.taskId);
+    }
 
     const scored = this.scoreBids(rawBids).sort((a, b) => b.score - a.score);
-    const best = scored.find((b) => b.eligible) ?? null;
+    const eligible = scored.filter((b) => b.eligible);
+    const { winner, preferredKept } = this.pickWinner(eligible, task);
 
-    if (!best) {
+    if (!winner) {
       log.warn(
         `🪧 Aucune offre éligible pour la tâche "${task.title}" (${task.taskId.slice(0, 8)}) — ` +
           `${rawBids.length} bid(s) reçu(s), tous disqualifiés`
       );
-      return { taskId: task.taskId, winner: null, winningScore: null, bids: scored, awarded: false };
+      const durationMs = Date.now() - startedAt;
+      this.recordAuction({ winner: null, task, closedEarly, preferredKept: false, durationMs });
+      return {
+        taskId: task.taskId,
+        winner: null,
+        winningScore: null,
+        bids: scored,
+        awarded: false,
+        ranked: [],
+        preferredKept: false,
+        closedEarly,
+        durationMs,
+      };
     }
 
-    const awarded = await this.award(task, best.role, from);
+    // Gagnant en tête, puis les autres éligibles par score décroissant.
+    const ranked = [winner, ...eligible.filter((b) => b !== winner)];
+    const awarded = shouldAward ? await this.award(task, winner.role, from) : false;
+    const durationMs = Date.now() - startedAt;
+    this.recordAuction({ winner: winner.role, task, closedEarly, preferredKept, durationMs });
 
     log.info(
-      `🏆 Marché attribué à [${best.role}] pour "${task.title}" ` +
-        `(score ${best.score.toFixed(3)}, ${scored.length} bid(s))`
+      `🏆 Marché ${shouldAward ? "attribué" : "sélectionné"} : [${winner.role}] pour "${task.title}" ` +
+        `(score ${winner.score.toFixed(3)}, ${scored.length} bid(s), ${durationMs}ms` +
+        `${closedEarly ? ", clôture anticipée" : ""}${preferredKept ? ", rôle préféré conservé" : ""})`
     );
 
     return {
       taskId: task.taskId,
-      winner: best.role,
-      winningScore: best.score,
+      winner: winner.role,
+      winningScore: winner.score,
       bids: scored,
       awarded,
+      ranked,
+      preferredKept,
+      closedEarly,
+      durationMs,
     };
   }
 
@@ -174,22 +288,70 @@ export class ContractNetNegotiator {
    * (ou par `collectBid` via le bus). Ignoré si l'enchère est fermée.
    */
   submitBid(taskId: string, bid: Bid): boolean {
-    const bids = this.openCalls.get(taskId);
-    if (!bids) {
+    const call = this.openCalls.get(taskId);
+    if (!call) {
       log.debug(`Bid ignoré : enchère ${taskId.slice(0, 8)} fermée ou inconnue`);
       return false;
     }
-    bids.push(bid);
+    call.bids.push(bid);
+    call.responded.add(bid.role);
     log.debug(
       `📨 Bid reçu de [${bid.role}] pour ${taskId.slice(0, 8)} ` +
         `(skill ${bid.skillMatch.toFixed(2)}, conf ${bid.confidence.toFixed(2)}, load ${bid.loadPenalty.toFixed(2)})`
     );
+    call.notify?.();
+    return true;
+  }
+
+  /**
+   * Refus explicite d'un agent qui ne peut / ne veut pas enchérir (ex. aucune
+   * capacité requise). Ne crée pas de bid, mais compte comme réponse pour la
+   * clôture anticipée. Ignoré si l'enchère est fermée.
+   */
+  declineBid(taskId: string, role: AgentRole): boolean {
+    const call = this.openCalls.get(taskId);
+    if (!call) return false;
+    call.responded.add(role);
+    call.notify?.();
     return true;
   }
 
   /** Indique si une enchère est actuellement ouverte pour ce taskId. */
   hasOpenCall(taskId: string): boolean {
     return this.openCalls.has(taskId);
+  }
+
+  /**
+   * True si un fournisseur de rôles est branché ET qu'aucun agent n'est en ligne :
+   * il est alors inutile de lancer une enchère (personne n'enchérirait et l'on
+   * attendrait la fenêtre complète pour rien).
+   */
+  hasNoOnlineBidders(): boolean {
+    if (!this.expectedBiddersProvider) return false;
+    try {
+      return this.expectedBiddersProvider().length === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Signale qu'un appelant a dû se replier sur le rôle statique (métriques). */
+  recordFallback(): void {
+    this.stats.fallbacks++;
+  }
+
+  /** Métriques cumulées depuis le démarrage (ou le dernier `resetStats`). */
+  getStats(): NegotiatorStats {
+    const { auctions, totalDurationMs } = this.stats;
+    return {
+      ...this.stats,
+      winsByRole: { ...this.stats.winsByRole },
+      avgDurationMs: auctions > 0 ? totalDurationMs / auctions : 0,
+    };
+  }
+
+  resetStats(): void {
+    this.stats = emptyStats();
   }
 
   /**
@@ -228,6 +390,92 @@ export class ContractNetNegotiator {
   }
 
   // ─── Étapes internes ─────────────────────────────────────────────────────
+
+  /**
+   * Attend les réponses de l'enchère. Retourne `true` si elle s'est fermée AVANT
+   * la fin de la fenêtre parce que tous les rôles attendus ont répondu.
+   *
+   * Sans fournisseur de rôles attendus (ou liste vide), on garde le comportement
+   * historique : attente de la fenêtre complète.
+   */
+  private async collect(call: OpenCall, from: AgentRole): Promise<boolean> {
+    const allResponded = (): boolean => {
+      const expected = this.expectedRoles(from);
+      return expected.length > 0 && expected.every((role) => call.responded.has(role));
+    };
+
+    // `broadcast` attend les handlers des agents : leurs bids sont souvent déjà là.
+    if (allResponded()) return true;
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (early: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        call.notify = undefined;
+        resolve(early);
+      };
+      const timer = setTimeout(() => finish(false), this.biddingWindowMs);
+      call.notify = () => {
+        if (allResponded()) finish(true);
+      };
+    });
+  }
+
+  /** Rôles en ligne attendus (hors initiateur, que le bus exclut du broadcast). */
+  private expectedRoles(from: AgentRole): AgentRole[] {
+    if (!this.expectedBiddersProvider) return [];
+    try {
+      return this.expectedBiddersProvider().filter((role) => role !== from);
+    } catch (err) {
+      log.warn(`Fournisseur de rôles attendus en erreur: ${(err as Error).message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Choisit le gagnant parmi les bids éligibles (triés par score décroissant).
+   * Le rôle préféré garde la tâche si son écart au meilleur score est <= marge.
+   */
+  private pickWinner(
+    eligible: ScoredBid[],
+    task: NegotiationTask
+  ): { winner: ScoredBid | null; preferredKept: boolean } {
+    const best = eligible[0] ?? null;
+    if (!best) return { winner: null, preferredKept: false };
+
+    if (task.preferredRole && best.role !== task.preferredRole) {
+      const preferred = eligible.find((b) => b.role === task.preferredRole);
+      const margin = task.switchMargin ?? getContractNetConfig().switchMargin;
+      // Epsilon : évite qu'un écart de 0.1 « flottant » (0.10000000000000009) casse la marge.
+      if (preferred && best.score - preferred.score <= margin + 1e-9) {
+        return { winner: preferred, preferredKept: true };
+      }
+    }
+    return { winner: best, preferredKept: false };
+  }
+
+  private recordAuction(info: {
+    winner: AgentRole | null;
+    task: NegotiationTask;
+    closedEarly: boolean;
+    preferredKept: boolean;
+    durationMs: number;
+  }): void {
+    const s = this.stats;
+    s.auctions++;
+    s.totalDurationMs += info.durationMs;
+    if (info.closedEarly) s.closedEarly++;
+    if (!info.winner) {
+      s.noWinner++;
+      return;
+    }
+    s.withWinner++;
+    s.winsByRole[info.winner] = (s.winsByRole[info.winner] ?? 0) + 1;
+    if (info.preferredKept) s.preferredKept++;
+    if (info.task.preferredRole && info.winner !== info.task.preferredRole) s.switched++;
+  }
 
   /** Diffuse l'appel d'offres sur le bus (broadcast non bloquant). */
   private async announce(task: NegotiationTask, from: AgentRole): Promise<void> {
@@ -314,16 +562,16 @@ export class ContractNetNegotiator {
   }
 
   /**
-   * Estime la fiabilité d'un rôle à partir du taux de succès observé sur le bus.
-   * Valeur neutre (0.5) en l'absence de données — pas de dépendance fantôme.
+   * Confiance d'un rôle (0..1) : taux de succès RÉCENT propre à ce rôle, tiré de
+   * `StrategyMemory` via `RoleReliability`. Neutre (0.5) sous le seuil de preuve.
+   * Utilisée par `buildAutoBid` et par `AutonomousAgent.autoBidOnCall`.
    */
+  confidenceFor(role: AgentRole): number {
+    return clamp01(this.reliability.getConfidence(role));
+  }
+
   private estimateConfidence(role: AgentRole): number {
-    const metrics = this.bus.getMetrics();
-    const sent = metrics.byAgentRole[role];
-    if (!sent || metrics.totalMessages === 0) return 0.5;
-    // successRate est global au bus ; on l'utilise comme proxy de fiabilité
-    // tant qu'aucune métrique par-rôle n'est disponible.
-    return clamp01(metrics.successRate);
+    return this.confidenceFor(role);
   }
 
   /** Estime la charge normalisée d'un rôle à partir de getAgentLoad(). */
@@ -335,9 +583,20 @@ export class ContractNetNegotiator {
     return clamp01(entry.activeMessages * 0.25);
   }
 
-  private wait(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+}
+
+function emptyStats(): Omit<NegotiatorStats, "avgDurationMs"> {
+  return {
+    auctions: 0,
+    withWinner: 0,
+    noWinner: 0,
+    closedEarly: 0,
+    preferredKept: 0,
+    switched: 0,
+    fallbacks: 0,
+    totalDurationMs: 0,
+    winsByRole: {},
+  };
 }
 
 function clamp01(value: number): number {

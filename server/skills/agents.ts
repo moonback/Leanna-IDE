@@ -196,6 +196,7 @@ export const agentsSkill: Skill = {
         "RÈGLE CRITIQUE : si une tâche B doit attendre la fin de A, tu DOIS mettre l'id de A dans dependsOn de B. " +
         "Sans dependsOn, toutes les tâches démarrent simultanément. " +
         "Exemple séquentiel : reviewer → coder → tester nécessite que coder.dependsOn=[\"task-review\"] et tester.dependsOn=[\"task-impl\"]. " +
+        "Le champ 'role' de chaque tâche est OPTIONNEL : s'il est omis, l'agent le mieux noté est attribué automatiquement par appel d'offres (contract-net) au moment où la tâche démarre. " +
         "Retourne un orchestrationId pour suivre avec agent_status.",
       parameters: {
         type: "OBJECT",
@@ -208,7 +209,8 @@ export const agentsSkill: Skill = {
               type: "OBJECT",
               properties: {
                 id:           { type: "STRING", description: "Identifiant stable de la tâche, utilisé dans dependsOn des autres tâches. Utilise des slugs courts et lisibles (ex: 'task-review', 'task-impl', 'task-qa'). OBLIGATOIRE si d'autres tâches en dépendent." },
-                role:         { type: "STRING", description: "Rôle : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer ou planner." },
+                role:         { type: "STRING", description: "Rôle (OPTIONNEL) : coder, refactor, debugger, reviewer, tester, security, architect, writer, formatter, researcher, proofreader, translator, summarizer ou planner. LAISSE VIDE si tu ne sais pas quel agent convient : l'agent le mieux noté (compétences, fiabilité, charge) est alors attribué automatiquement par appel d'offres au lancement de la tâche." },
+                requiredCapabilities: { type: "ARRAY", items: { type: "STRING" }, description: "Capacités/outils requis pour l'appel d'offres (utile seulement si 'role' est omis). Ex: run_project_command, verify_full. Sinon déduites du titre et de la description." },
                 title:        { type: "STRING", description: "Titre de la sous-tâche" },
                 description:  { type: "STRING", description: "Description détaillée" },
                 files:        { type: "ARRAY", items: { type: "STRING" }, description: "Fichiers pertinents" },
@@ -216,7 +218,7 @@ export const agentsSkill: Skill = {
                 priority:     { type: "STRING", description: "Priorité" },
                 dependsOn:    { type: "ARRAY", items: { type: "STRING" }, description: "IDs (champ id) des tâches prérequises du même plan. La tâche ne démarre que lorsque toutes les tâches listées ici ont le statut 'completed'. Laisse vide pour un démarrage immédiat en parallèle." },
               },
-              required: ["role", "title", "description"],
+              required: ["title", "description"],
             },
             description: "Liste des tâches. L'ordre d'exécution est contrôlé exclusivement par dependsOn — pas par l'ordre dans ce tableau.",
           },
@@ -591,7 +593,8 @@ export const agentsSkill: Skill = {
           title: v.title!, description: v.description!,
           tasks: v.tasks!.map((t) => ({
             id: t.id,
-            role: t.role as AgentRole, title: t.title!, description: t.description!,
+            role: t.role as AgentRole | undefined, requiredCapabilities: t.requiredCapabilities,
+            title: t.title!, description: t.description!,
             files: t.files, instructions: t.instructions,
             priority: t.priority, dependsOn: t.dependsOn,
           })),

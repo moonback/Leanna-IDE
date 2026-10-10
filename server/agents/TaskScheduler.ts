@@ -4,13 +4,16 @@
  * Responsabilité unique : exécuter un plan d'orchestration en respectant
  * les dépendances entre tâches et la parallélisation.
  */
-import type { OrchestrationPlan, TaskResult } from "./types.js";
+import type { AgentTask, OrchestrationPlan, TaskResult } from "./types.js";
 import { getAgentDefinition } from "./roles.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 
 const log = createLogger("TaskScheduler");
+
+/** Rôle provisoire d'une tâche d'orchestration dont l'agent sera choisi par enchère. */
+export const UNASSIGNED_ROLE = "unassigned";
 
 /**
  * Moteur d'exécution d'une tâche. Implémenté par `AgentExecutor` (legacy) et
@@ -25,9 +28,34 @@ export class TaskScheduler {
     private notifier?: ProgressNotifier
   ) {}
 
+  /** Callback appelé quand une tâche d'orchestration a fini de s'exécuter (quel que soit son statut). */
+  private onTaskSettled?: (task: AgentTask) => void;
+
   /** Remplace le moteur d'exécution (bascule vers le runtime agentique). */
   setRunner(runner: TaskRunner): void {
     this.executor = runner;
+  }
+
+  /**
+   * Résolveur de rôle (contract-net) pour les tâches sans rôle (`unassigned`).
+   * Appelé JUSTE AVANT le lancement de la tâche : charges et notes sont alors
+   * fraîches et les résultats des dépendances déjà injectés. Il fixe `task.role`
+   * et peut retourner une fonction de libération de réservation, appelée dès que
+   * l'exécution a démarré.
+   */
+  private roleResolver?: (task: AgentTask) => Promise<(() => void) | void>;
+
+  setRoleResolver(resolver: ((task: AgentTask) => Promise<(() => void) | void>) | undefined): void {
+    this.roleResolver = resolver;
+  }
+
+  /**
+   * Enregistre un observateur de fin de tâche (ex. mise à jour des notes par
+   * rôle du contract-net). Une erreur de l'observateur n'interrompt jamais
+   * l'orchestration.
+   */
+  setOnTaskSettled(callback: ((task: AgentTask) => void) | undefined): void {
+    this.onTaskSettled = callback;
   }
 
   /**
@@ -91,6 +119,38 @@ export class TaskScheduler {
       // Lancer les tâches prêtes en parallèle
       const executions = ready.map(async (task) => {
         const taskShortId = task.id.slice(0, 8);
+
+        // Attribution dynamique du rôle (contract-net) pour les tâches sans rôle.
+        let releaseReservation: (() => void) | void = undefined;
+        if (task.role === UNASSIGNED_ROLE) {
+          // Injection des dépendances AVANT l'enchère : la description reste celle de la tâche,
+          // mais le résolveur peut s'appuyer sur `task.context.previousResults`.
+          const earlyDeps = plan.dependencies[task.id] ?? [];
+          const early = earlyDeps
+            .map((depId) => plan.tasks.find((t) => t.id === depId)?.result)
+            .filter(Boolean) as TaskResult[];
+          if (early.length > 0) task.context.previousResults = early;
+
+          try {
+            if (!this.roleResolver) throw new Error("aucun résolveur de rôle configuré");
+            releaseReservation = await this.roleResolver(task);
+          } catch (err) {
+            log.error(`[${orchShortId}] [task:${taskShortId}] Attribution du rôle impossible: ${(err as Error).message}`);
+            task.status = "failed";
+            task.completedAt = new Date().toISOString();
+            task.result = {
+              success: false,
+              outcome: "failed",
+              summary: "Aucun agent n'a pu être attribué à la tâche",
+              error: (err as Error).message,
+              durationMs: 0,
+            };
+            failed.add(task.id);
+            this.notifier?.notify(task, "failed");
+            return;
+          }
+        }
+
         const agentName = getAgentDefinition(task.role)?.name ?? task.role;
         // Injecter les résultats des dépendances dans le contexte
         const deps = plan.dependencies[task.id] ?? [];
@@ -105,8 +165,20 @@ export class TaskScheduler {
 
         log.info(`[${orchShortId}] [task:${taskShortId}] ➤ [${agentName}] Lancement: "${task.title}" | Dépendances satisfaites: ${deps.length > 0 ? deps.map(d => d.slice(0, 8)).join(", ") : "aucune"}`);
         const taskStart = Date.now();
-        await this.executor.execute(task);
+        const execution = this.executor.execute(task);
+        // `execute` a pris sa place de façon synchrone : la réservation n'est plus utile.
+        try {
+          releaseReservation?.();
+        } catch {
+          /* best-effort */
+        }
+        await execution;
         const taskMs = Date.now() - taskStart;
+        try {
+          this.onTaskSettled?.(task);
+        } catch (err) {
+          log.warn(`[${orchShortId}] onTaskSettled en erreur: ${(err as Error).message}`);
+        }
 
         if (task.status === "completed") {
           completed.add(task.id);
