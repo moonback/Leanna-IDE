@@ -225,6 +225,11 @@ export class AgenticRuntime implements IAgentRuntime {
 
     // ── Boucle ACT → OBSERVE → VERIFY → (NEXT | RECOVER) ──
     let stepIdx = 0;
+    // CR-3 : compteur de stall — itérations consécutives sans aucun appel d'outil.
+    // Un agent qui répond « terminé » sans avoir rien fait doit être détecté.
+    let stallCount = 0;
+    const MAX_STALL_ITERATIONS = 3;
+
     while (stepIdx < plan.steps.length) {
       if (this.budgetExhausted(session)) {
         log.warn(`[${taskId.slice(0, 8)}] ⛔ Budget épuisé — arrêt de la boucle`);
@@ -242,6 +247,7 @@ export class AgenticRuntime implements IAgentRuntime {
       try {
         observation = await this.execute(task, step);
       } catch (err) {
+        stallCount = 0; // une exception est une activité, pas un stall
         const recovery = await this.recover({
           phase: "act",
           message: (err as Error).message,
@@ -252,6 +258,26 @@ export class AgenticRuntime implements IAgentRuntime {
         if (advance === "abort") break;
         if (advance === "next") stepIdx++;
         continue;
+      }
+
+      // CR-3 : détection de stall — l'itération n'a invoqué aucun outil.
+      // On distingue deux cas légitimes de zéro outil :
+      //   1. La tâche est vraiment terminée (verification.passed + isFinal)
+      //   2. L'agent a émis une réponse finale APRÈS avoir écrit des fichiers
+      // Dans tous les autres cas, c'est une itération sans progression.
+      if (observation.toolOutcomes.length === 0) {
+        stallCount++;
+        if (stallCount >= MAX_STALL_ITERATIONS) {
+          log.warn(
+            `[${taskId.slice(0, 8)}] 🚫 Stall détecté : ${stallCount} itérations consécutives ` +
+            `sans appel d'outil — interruption de la boucle.`
+          );
+          step.status = "failed";
+          break;
+        }
+        log.debug(`[${taskId.slice(0, 8)}] ⚠️ Itération sans outil (stall ${stallCount}/${MAX_STALL_ITERATIONS})`);
+      } else {
+        stallCount = 0; // toute activité réelle réinitialise le compteur
       }
 
       // ── VERIFY ──
@@ -285,7 +311,10 @@ export class AgenticRuntime implements IAgentRuntime {
 
     // ── COMPLETE ──
     const outcome = this.assessOutcome(session, plan);
-    const success = outcome === "success" || outcome === "partial";
+    // CR-1 : seul "success" qualifie de réussite effective.
+    // "partial" signifie que des étapes ou des outils ont échoué — ce n'est
+    // pas un succès et ne doit pas être présenté comme tel à l'interface.
+    const success = outcome === "success";
     return this.finish(task, session, outcome, undefined, success);
   }
 
@@ -759,8 +788,12 @@ export class AgenticRuntime implements IAgentRuntime {
       .filter(Boolean)
       .join("\n\n");
 
+    // CR-2 : le résumé par défaut reflète l'outcome réel, pas un message générique
+    // trompeur. Il ne sera utilisé que si le LLM ne renvoie pas un JSON valide.
+    const outcome = this.assessOutcome(session, session.lastPlan ?? { intent: task.goal, steps: [], successCriteria: [], rationale: "" });
+    const defaultSummary = this.buildDefaultSummary(outcome, session);
     let final: FinalResult = {
-      summary: "Tâche traitée.",
+      summary: defaultSummary,
       details: "",
       deliverables: [...session.filesModified],
       suggestions: [],
@@ -962,6 +995,17 @@ export class AgenticRuntime implements IAgentRuntime {
     // Aucune écriture ni aucun outil exécuté : rien n'a bougé.
     if (!wroteSomething && session.toolsExecuted.length === 0) return "no_change";
 
+    // CR-4 : Des outils ont été exécutés mais aucun fichier n'a été modifié.
+    // Si l'agent avait accès à des outils d'écriture ET que le plan comportait
+    // des étapes en échec, c'est un échec de progression (pas un simple no_change).
+    if (!wroteSomething && session.toolsExecuted.length > 0) {
+      const hasWriteCapability = session.tools.some((t) => WRITE_TOOLS.has(t.name));
+      const missionRequiredWrite = anyFailedStep || anyToolError;
+      if (hasWriteCapability && missionRequiredWrite) return "failed";
+      // Aucun outil d'écriture disponible ou mission purement exploratoire sans échec.
+      return anyFailedStep || anyToolError ? "partial" : "no_change";
+    }
+
     // La VÉRIFICATION hashée est l'arbitre, pas le simple fait d'avoir écrit.
     // On consulte le WorkspaceState : chaque fichier modifié doit être "verified"
     // avec un hash courant concordant, sinon la mission n'est pas un succès.
@@ -982,6 +1026,37 @@ export class AgenticRuntime implements IAgentRuntime {
     if (anyFailedStep && !wroteSomething) return "failed";
     if (anyFailedStep || anyToolError) return "partial";
     return "success";
+  }
+
+  /**
+   * CR-2 : Summary contextuel par défaut selon l'outcome réel.
+   * Utilisé uniquement si le LLM ne renvoie pas un JSON valide dans finalize().
+   * Ne masque jamais un échec derrière un message générique de succès.
+   */
+  private buildDefaultSummary(outcome: import("./types.js").AgentOutcome, session: RunSession): string {
+    const modifiedCount = session.filesModified.size;
+    const toolCount = session.toolsExecuted.length;
+    const iterCount = session.usage.iterations;
+
+    switch (outcome) {
+      case "success":
+        return `Mission accomplie — ${modifiedCount} fichier(s) modifié(s) et vérifié(s).`;
+      case "partial":
+        return `Mission partiellement exécutée — ${modifiedCount} fichier(s) modifié(s), mais des étapes ou vérifications ont échoué.`;
+      case "blocked":
+        return `Mission bloquée — des fichiers ont été modifiés mais la vérification n'a pas abouti dans le budget alloué.`;
+      case "no_change":
+        return `Aucune modification effectuée${toolCount > 0 ? ` malgré ${toolCount} appel(s) d'outils` : ""}.`;
+      case "failed":
+      default: {
+        const reason = session.blockedFiles.size > 0
+          ? `blocage sur ${[...session.blockedFiles].join(", ")}`
+          : modifiedCount === 0 && toolCount > 0
+            ? `${toolCount} appel(s) exécuté(s) en ${iterCount} itération(s) sans modification persistée`
+            : `échec après ${iterCount} itération(s)`;
+        return `Mission échouée — ${reason}.`;
+      }
+    }
   }
 
   private async finish(

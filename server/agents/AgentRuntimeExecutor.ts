@@ -110,6 +110,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
 
       const result = await this.agentic.run(agenticTask);
       task.result = this.toTaskResult(result);
+      // CR-5 : utiliser le flag success calculé par AgenticRuntime (qui ne marque
+      // plus "partial" comme succès), pas une dérivation locale de l'outcome.
       task.status = result.success ? "completed" : "failed";
       task.completedAt = new Date().toISOString();
 

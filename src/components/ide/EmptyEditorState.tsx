@@ -234,8 +234,10 @@ function GlobalStyles() {
       .ee-card-hero {
         border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
         background-image:
-          radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--primary) 16%, transparent) 0%, transparent 55%),
-          linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent) 0%, transparent 70%);
+          radial-gradient(140% 160% at 0% 0%, color-mix(in srgb, var(--primary) 20%, transparent) 0%, transparent 60%),
+          linear-gradient(145deg, color-mix(in srgb, var(--primary) 10%, transparent) 0%, transparent 70%);
+        box-shadow: 0 10px 30px -10px color-mix(in srgb, var(--primary) 15%, transparent),
+                    0 1px 1px color-mix(in srgb, #fff 10%, transparent);
       }
       .ee-card-hero:hover:not(:disabled) {
         border-color: color-mix(in srgb, var(--primary) 55%, transparent);
@@ -350,8 +352,6 @@ function GlobalStyles() {
       @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
         .ee-glass { background-color: var(--surface); }
       }
-
-      /* Prénom mis en valeur par un dégradé de texte */
       .ee-name-accent {
         background-image: linear-gradient(100deg,
           var(--primary) 0%,
