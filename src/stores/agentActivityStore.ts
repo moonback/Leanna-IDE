@@ -406,6 +406,110 @@ export function clearCompletedTasks() {
   notify();
 }
 
+/**
+ * Retire une liste de tâches de l'affichage local uniquement (pas d'appel serveur).
+ * À utiliser quand la purge serveur est gérée séparément.
+ */
+function removeAgentTasksLocal(ids: string[]) {
+  if (ids.length === 0) return;
+  const toRemove = new Set(ids);
+  const before = agentTasks.length;
+  agentTasks = agentTasks.filter(t => !toRemove.has(t.id));
+  if (agentTasks.length !== before) notify();
+}
+
+/**
+ * Supprime définitivement une liste de tâches par leur id :
+ *  1. retire immédiatement les tâches de l'affichage local (optimiste) ;
+ *  2. demande au serveur de les purger de la mémoire ET de la persistance.
+ *
+ * La suppression côté serveur annule au besoin les tâches encore actives.
+ * Best-effort : si l'appel réseau échoue, l'UI reste nettoyée (les tâches
+ * actives réapparaîtront à la prochaine resynchronisation si elles tournent
+ * toujours — c'est le comportement attendu).
+ *
+ * @returns le nombre de tâches supprimées côté serveur (0 si réseau en échec).
+ */
+export async function removeAgentTasks(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+
+  removeAgentTasksLocal(ids);
+
+  try {
+    const res = await fetch('/api/agents/tasks/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskIds: ids }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json().catch(() => null);
+    return typeof data?.deleted === 'number' ? data.deleted : ids.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Marque une tâche comme en cours d'annulation dans le store (optimiste),
+ * utile pour un retour visuel immédiat avant la confirmation serveur.
+ */
+function markTaskCancelling(taskId: string) {
+  agentTasks = agentTasks.map(t =>
+    t.id === taskId
+      ? { ...t, detail: 'Annulation demandée…', steps: t.steps.includes('Annulation demandée…') ? t.steps : [...t.steps, 'Annulation demandée…'] }
+      : t,
+  );
+  notify();
+}
+
+/**
+ * Applique le statut final d'annulation à une tâche du store.
+ */
+function markTaskCancelled(taskId: string) {
+  agentTasks = agentTasks.map(t =>
+    t.id === taskId
+      ? { ...t, status: 'cancelled' as const, detail: t.detail ?? 'Tâche annulée', durationMs: t.durationMs ?? (Date.now() - t.timestamp) }
+      : t,
+  );
+  notify();
+}
+
+/**
+ * Demande au serveur d'annuler une tâche agent (pending ou running).
+ * Met à jour le store de façon optimiste puis confirme/annule selon la réponse.
+ *
+ * @returns `true` si le serveur confirme l'annulation, `false` sinon.
+ */
+export async function cancelAgentTask(taskId: string): Promise<boolean> {
+  const task = agentTasks.find(t => t.id === taskId);
+  // Rien à annuler si la tâche est déjà terminée.
+  if (task && task.status !== 'running' && task.status !== 'pending') return false;
+
+  markTaskCancelling(taskId);
+
+  try {
+    const res = await fetch(`/api/agents/tasks/${encodeURIComponent(taskId)}/cancel`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      // Rollback léger : retirer le marqueur d'annulation en échec.
+      agentTasks = agentTasks.map(t =>
+        t.id === taskId ? { ...t, detail: 'Échec de l’annulation' } : t,
+      );
+      notify();
+      return false;
+    }
+    markTaskCancelled(taskId);
+    return true;
+  } catch {
+    agentTasks = agentTasks.map(t =>
+      t.id === taskId ? { ...t, detail: 'Échec de l’annulation (réseau)' } : t,
+    );
+    notify();
+    return false;
+  }
+}
+
 export function subscribe(fn: Listener): () => void {
   listeners.push(fn);
   return () => {

@@ -13,6 +13,7 @@ import {
   activateSandbox,
   deactivateSandbox,
   getSandboxStatus,
+  isExcludedFromDiff,
 } from './sandbox.js';
 
 // Ensure SELF_ROOT is set before sandbox functions are exercised.
@@ -109,4 +110,29 @@ test('sandbox: initSandbox ne se copie pas récursivement dans le dossier destin
     // Nettoyage
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
+});
+
+// ── Régression : les données internes .Leanna/core ne sont jamais des modifications ──
+//
+// Les fichiers internes de Leanna (checkpoints, evidence, …) sous .Leanna/
+// ne sont pas du code projet. Ils ne doivent jamais apparaître dans la liste
+// des fichiers modifiés ni dans le diff du sandbox.
+test('sandbox: isExcludedFromDiff exclut .Leanna/core et les dossiers internes', () => {
+  // Exclus par préfixe de dossier.
+  assert.ok(isExcludedFromDiff('.Leanna/core/checkpoints/cp_123.json'));
+  assert.ok(isExcludedFromDiff('.Leanna/core/evidence/abc.json'));
+  assert.ok(isExcludedFromDiff('.Leanna/sandbox/server/x.ts'));
+  assert.ok(isExcludedFromDiff('node_modules/pkg/index.js'));
+  assert.ok(isExcludedFromDiff('.git/config'));
+  // Séparateurs Windows et préfixe "./" normalisés.
+  assert.ok(isExcludedFromDiff('.Leanna\\core\\checkpoints\\cp.json'));
+  assert.ok(isExcludedFromDiff('./.Leanna/core/evidence/x.json'));
+  // Exclus par nom de base (comportement historique conservé).
+  assert.ok(isExcludedFromDiff('docs/codebase.md'));
+
+  // NON exclus : fichiers projet normaux.
+  assert.ok(!isExcludedFromDiff('server/index.ts'));
+  assert.ok(!isExcludedFromDiff('src/components/App.tsx'));
+  // Un dossier qui commence par le même texte mais n'est pas le préfixe exact.
+  assert.ok(!isExcludedFromDiff('.Leannafoo/bar.ts'));
 });

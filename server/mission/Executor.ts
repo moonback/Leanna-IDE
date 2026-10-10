@@ -533,8 +533,9 @@ export class Executor {
   /**
    * Supprime définitivement une mission.
    * - Si elle est active, elle est d'abord annulée.
-   * - Elle est retirée de l'historique en mémoire et du store persistant.
-   * Retourne false si aucune mission (active ou complétée) ne correspond.
+   * - Elle est retirée de l'historique en mémoire, de la file de reprise ET du
+   *   store persistant — pour qu'elle ne réapparaisse pas au redémarrage.
+   * Retourne false uniquement si la mission est totalement inconnue.
    */
   deleteMission(missionId: string): boolean {
     const wasActive = this.activeMissions.has(missionId);
@@ -549,12 +550,21 @@ export class Executor {
 
     this.pausedMissions.delete(missionId);
 
-    // Nettoyage du store persistant (no-op si aucun store branché).
+    // Retirer de la file des missions interrompues en attente de décision.
+    // Sans ça, une mission « effacée » qui n'était présente QUE dans la file de
+    // reprise (cas typique après une réouverture) n'était jamais réellement
+    // supprimée : la méthode renvoyait false, le store persistant n'était pas
+    // purgé, et la mission revenait au prochain démarrage via resumePending().
+    const wasPendingResume = this.pendingResumes.delete(missionId);
+
+    // Nettoyage du store persistant TOUJOURS tenté (indépendamment de la
+    // présence en mémoire) : la source de la « résurrection » est la ligne
+    // persistée, qu'il faut effacer même si la mission n'est plus en mémoire.
     if (this.store) {
       void this.store.delete(missionId);
     }
 
-    const existed = wasActive || removedFromHistory;
+    const existed = wasActive || removedFromHistory || wasPendingResume;
     if (existed) {
       this.emit("mission_deleted", { missionId });
     }

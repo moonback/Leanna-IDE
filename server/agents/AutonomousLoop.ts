@@ -280,12 +280,24 @@ export class AutonomousLoop {
 
     // Validation build synchrone uniquement lorsque l’exécuteur n’a pas déjà
     // fourni une vérification complète, afin d’éviter le double travail.
+    let supervisorDirective: string | undefined;
     if (result.filesModified?.length && !evidencePassed) {
       try {
         const { runValidation } = await import("../utils/postEditValidator.js");
         const buildResult = await runValidation();
         if (!buildResult.valid && buildResult.errors) {
           verifyErrors.push(`build: ${buildResult.errors.slice(0, 500)}`);
+        }
+        // Récupère la directive corrective du Superviseur (anti-boucle / pivot /
+        // escalade). Dans le chemin runtime agentique, aucun injecteur de session
+        // n'est câblé : on relaie donc la directive via l'observation pour qu'elle
+        // guide explicitement la prochaine tentative.
+        if (buildResult.needsCorrection && buildResult.directive) {
+          supervisorDirective = buildResult.directive;
+          log.info(
+            `[${task.role}] 🧭 Directive du Superviseur capturée pour la prochaine tentative ` +
+              `(${buildResult.directive.length} car.)`
+          );
         }
       } catch {
         // non bloquant si la validation échoue à se lancer
@@ -313,6 +325,7 @@ export class AutonomousLoop {
       confidenceScore,
       resultLength: details.length,
       resultSummary: result.summary,
+      supervisorDirective,
     };
   }
 
@@ -505,6 +518,16 @@ export class AutonomousLoop {
       );
     }
 
+    // Directive corrective du Superviseur : guidage structuré (anti-boucle,
+    // pivot, escalade) prioritaire sur la simple relecture des erreurs brutes.
+    if (obs.supervisorDirective) {
+      correctionParts.push(
+        ``,
+        `**🧭 Directive du Superviseur (PRIORITAIRE) :**`,
+        obs.supervisorDirective.trim()
+      );
+    }
+
     if (obs.hasRetrySignal) {
       // Extraire le contenu du bloc ## RETRY pour guider l'itération suivante
       const retryMatch = prevResult.details?.match(
@@ -597,4 +620,10 @@ interface ObservationReport {
   confidenceScore: number;
   resultLength: number;
   resultSummary: string;
+  /**
+   * Directive corrective produite par le Superviseur après un échec de build
+   * global (anti-boucle / pivot / escalade). Injectée dans le prompt de la
+   * prochaine tentative afin que la correction soit guidée, pas aveugle.
+   */
+  supervisorDirective?: string;
 }

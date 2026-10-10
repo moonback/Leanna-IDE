@@ -115,6 +115,17 @@ function classifyTool(name: string): ToolKind {
 }
 
 /**
+ * Un agent est « producteur d'artefact » s'il dispose d'au moins un outil
+ * d'écriture. Pour ces agents, une réponse purement narrative (0 tool_call,
+ * 0 écriture) n'est PAS une complétion valide : la tâche attend un artefact.
+ * Les agents purement analytiques (researcher, planner, summarizer…) n'ont
+ * aucun outil d'écriture et conservent le droit de conclure en texte.
+ */
+function agentCanWrite(tools: readonly ToolDeclaration[]): boolean {
+  return tools.some((t) => WRITE_TOOLS.has(t.name));
+}
+
+/**
  * Signature du générateur de texte. En production c'est `generateText`
  * (Gemini/OpenRouter). Un modèle DÉTERMINISTE peut être injecté pour tester la
  * chaîne agentique complète sans réseau ni clés API (voir mission-harness).
@@ -214,18 +225,39 @@ export class AgenticRuntime implements IAgentRuntime {
         `${tools.length} outil(s) réellement disponible(s) sur ${agent.capabilities.length} déclaré(s)`
     );
 
+    // Annulation précoce : si le signal est déjà déclenché, inutile de planifier.
+    if (task.signal?.aborted) {
+      return this.finish(task, session, "blocked", "Tâche annulée avant la planification.");
+    }
+
     let plan: Plan;
     try {
       // ── UNDERSTAND + PLAN ──
-      plan = await this.plan(task);
+      task.onProgress?.("planning");
+      // La planification est un unique appel LLM : on le borne par un mur
+      // temporel dur (dérivé du budget), sinon un provider lent/suspendu peut
+      // bloquer la tâche indéfiniment sur « Planification ».
+      plan = await this.withPlanningGuard(session, task.signal, () => this.plan(task));
       session.lastPlan = plan;
     } catch (err) {
-      return this.finish(task, session, "failed", `Échec de la planification: ${(err as Error).message}`);
+      const aborted = task.signal?.aborted || (err as Error).name === "AbortError";
+      return this.finish(
+        task,
+        session,
+        aborted ? "blocked" : "failed",
+        aborted ? "Tâche annulée pendant la planification." : `Échec de la planification: ${(err as Error).message}`,
+      );
     }
 
     // ── Boucle ACT → OBSERVE → VERIFY → (NEXT | RECOVER) ──
+    task.onProgress?.("acting");
     let stepIdx = 0;
+    let verifyingAnnounced = false;
     while (stepIdx < plan.steps.length) {
+      if (task.signal?.aborted) {
+        log.warn(`[${taskId.slice(0, 8)}] 🛑 Annulation demandée — arrêt de la boucle`);
+        return this.finish(task, session, "blocked", "Tâche annulée par l'utilisateur.");
+      }
       if (this.budgetExhausted(session)) {
         log.warn(`[${taskId.slice(0, 8)}] ⛔ Budget épuisé — arrêt de la boucle`);
         break;
@@ -256,6 +288,10 @@ export class AgenticRuntime implements IAgentRuntime {
 
       // ── VERIFY ──
       step.status = "verifying";
+      if (!verifyingAnnounced) {
+        task.onProgress?.("verifying");
+        verifyingAnnounced = true;
+      }
       const verification = await this.verify(step, observation);
       session.verifications.push(verification);
 
@@ -284,9 +320,55 @@ export class AgenticRuntime implements IAgentRuntime {
     }
 
     // ── COMPLETE ──
+    task.onProgress?.("finalizing");
     const outcome = this.assessOutcome(session, plan);
     const success = outcome === "success" || outcome === "partial";
     return this.finish(task, session, outcome, undefined, success);
+  }
+
+  /**
+   * Borne la phase de planification par un mur temporel dur et par le signal
+   * d'annulation. Sans cela, `plan()` (un unique appel LLM sans timeout propre)
+   * peut suspendre la tâche indéfiniment — la cause racine du blocage sur
+   * « 1/5 Planification ». La fenêtre est dérivée du budget : au plus la moitié
+   * du temps d'exécution, plafonnée à 90s, avec un plancher de 30s.
+   */
+  private async withPlanningGuard<T>(
+    session: RunSession,
+    signal: AbortSignal | undefined,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const windowMs = Math.min(90_000, Math.max(30_000, Math.floor(session.budget.maxExecutionTimeMs / 2)));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+
+    const guard = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Planification interrompue après ${Math.round(windowMs / 1000)}s (timeout).`)),
+        windowMs,
+      );
+      if (signal) {
+        if (signal.aborted) {
+          const e = new Error("Planification annulée.");
+          e.name = "AbortError";
+          reject(e);
+          return;
+        }
+        onAbort = () => {
+          const e = new Error("Planification annulée.");
+          e.name = "AbortError";
+          reject(e);
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    });
+
+    try {
+      return await Promise.race([fn(), guard]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (signal && onAbort) signal.removeEventListener("abort", onAbort);
+    }
   }
 
   // ─── plan : UNDERSTAND + PLAN ───────────────────────────────────────────────
@@ -430,11 +512,35 @@ export class AgenticRuntime implements IAgentRuntime {
       }
     }
 
+    // ── Garde anti « narration sans action » ──
+    // Un agent producteur d'artefact qui répond en pur texte SANS avoir encore
+    // rien écrit ni exécuté le moindre outil dans ce run n'a pas « terminé » :
+    // il a esquivé l'action. On refuse ce faux final, on injecte une consigne
+    // impérative d'écriture, et on laisse la boucle le relancer (budget large).
+    const nothingDoneYet =
+      session.filesModified.size === 0 && session.toolsExecuted.length === 0;
+    const prematureNarration =
+      calls.length === 0 && nothingDoneYet && agentCanWrite(tools);
+
+    if (prematureNarration) {
+      session.pendingInstruction =
+        "Tu as répondu par du texte sans appeler aucun outil, alors qu'AUCUN " +
+        "artefact n'a encore été produit. Ne décris pas ce que tu ferais : FAIS-LE. " +
+        "Émets maintenant un tool_calls JSON d'écriture " +
+        "(write_project_file / modify_project_file / patch_project_file), " +
+        "puis vérifie avec verify_file. Une réponse finale sans écriture est un ÉCHEC.";
+      log.warn(
+        `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — réponse narrative sans action ` +
+          `(itération ${iteration}) → relance forcée vers l'écriture`
+      );
+    }
+
     const observation: Observation = {
       iteration,
       reasoning: text,
       toolOutcomes,
-      isFinal: calls.length === 0,
+      // Narration prématurée : NON finale → la boucle poursuit et re-sollicite.
+      isFinal: calls.length === 0 && !prematureNarration,
     };
     session.observations.push(observation);
     return observation;
@@ -606,9 +712,25 @@ export class AgenticRuntime implements IAgentRuntime {
       }
     }
 
-    // 3. Réponse finale sans action : acceptée seulement si rien n'a été écrit.
-    if (observation.isFinal && observation.toolOutcomes.length === 0) {
-      checks.push("réponse finale sans action");
+    // 3. Réponse sans action.
+    //    - Agent NON producteur d'artefact (analytique) OU travail déjà produit
+    //      en amont → une conclusion textuelle est légitime.
+    //    - Agent producteur d'artefact n'ayant encore RIEN fait → la narration
+    //      prématurée est un échec d'étape : on force la récupération (nudge
+    //      d'écriture) au lieu de valider une tâche qui ne modifie rien.
+    if (observation.toolOutcomes.length === 0) {
+      const nothingDoneYet =
+        session.filesModified.size === 0 && session.toolsExecuted.length === 0;
+      const prematureNarration = nothingDoneYet && agentCanWrite(session.tools);
+
+      if (prematureNarration) {
+        issues.push(
+          "Réponse narrative sans aucune action : l'agent doit produire un artefact " +
+            "(écriture de fichier) avant de conclure."
+        );
+      } else if (observation.isFinal) {
+        checks.push("réponse finale sans action");
+      }
     }
 
     const passed = issues.length === 0;

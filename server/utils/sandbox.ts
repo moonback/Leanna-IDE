@@ -64,11 +64,38 @@ const DIFF_EXCLUDED_BASENAMES = new Set<string>([
 ]);
 
 /**
+ * Dossiers (préfixes de chemin relatif) exclus du comparateur de modifications.
+ * Les données internes de Leanna (`.Leanna/core` : checkpoints, evidence, …)
+ * ne sont jamais du code projet : elles ne doivent apparaître ni dans la liste
+ * des fichiers modifiés ni dans le diff, quel que soit le chemin par lequel
+ * elles arriveraient dans le set de suivi.
+ */
+const DIFF_EXCLUDED_DIR_PREFIXES: readonly string[] = [
+  ".Leanna",
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "release",
+];
+
+/**
  * Indique si un chemin sandbox doit être ignoré par le comparateur de
  * modifications (liste des fichiers modifiés + diff).
+ *
+ * Exclusion par nom de base (ex. `codebase.md`) OU par préfixe de dossier
+ * (ex. tout ce qui est sous `.Leanna/`, donc `.Leanna/core/...`).
  */
 export function isExcludedFromDiff(relativePath: string): boolean {
-  return DIFF_EXCLUDED_BASENAMES.has(path.basename(relativePath));
+  if (DIFF_EXCLUDED_BASENAMES.has(path.basename(relativePath))) {
+    return true;
+  }
+  // Normaliser les séparateurs pour comparer des préfixes de dossier de façon
+  // fiable sous Windows comme sous POSIX.
+  const normalized = relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
+  return DIFF_EXCLUDED_DIR_PREFIXES.some(
+    prefix => normalized === prefix || normalized.startsWith(prefix + "/"),
+  );
 }
 
 // ── State ────────────────────────────────────────────────────────────────────

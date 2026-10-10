@@ -252,6 +252,8 @@ export interface TaskContext {
   instructions?: string;
   /** Résultats d'agents précédents (pour le chaînage) */
   previousResults?: TaskResult[];
+  /** Critères de succès vérifiables (transmis par délégation/négociation). */
+  successCriteria?: string[];
   /** Métadonnées libres */
   metadata?: Record<string, unknown>;
 }

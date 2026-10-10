@@ -10,7 +10,7 @@ import { useEffect, useCallback, useRef } from 'react';
 
 interface AgentEvent {
   type: 'agent_event';
-  event: 'task_started' | 'task_progress' | 'task_completed' | 'task_failed';
+  event: 'task_started' | 'task_progress' | 'task_completed' | 'task_failed' | 'task_cancelled';
   taskId: string;
   role: string;
   title: string;
@@ -40,6 +40,7 @@ const EMOJI_BY_EVENT: Record<string, string> = {
   task_started: '🚀',
   task_completed: '✅',
   task_failed: '❌',
+  task_cancelled: '🛑',
   task_progress: '⏳',
 };
 

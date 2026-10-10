@@ -626,25 +626,74 @@ export class AgentOrchestrator {
 
     if (task.status === "pending") {
       task.status = "cancelled";
-      agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+      task.completedAt = new Date().toISOString();
+      task.result = {
+        success: false,
+        outcome: "failed",
+        summary: `Tâche "${task.title}" annulée par l'utilisateur avant son démarrage`,
+        error: "cancelled_by_user",
+        durationMs: 0,
+      };
+      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
       log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
+      // Émettre un événement terminal pour que l'UI ET l'assistant soient informés.
+      this.notifier.notify(task, "cancelled");
       return true;
     }
 
     if (task.status === "running") {
       const signaled = this.executor.cancel(taskId);
       if (signaled) {
+        // Le statut terminal ("cancelled") + l'événement seront émis par
+        // AgentExecutor au prochain point de contrôle (via CancellationError).
         log.info(`🛑 Tâche ${taskId.slice(0, 8)} (running) — signal d'annulation envoyé`);
       } else {
         log.warn(`⚠️ Tâche ${taskId.slice(0, 8)} marquée running mais aucune exécution active — annulation logique`);
         task.status = "cancelled";
-        agentPersistence.updateTaskStatus(taskId, "cancelled").catch(() => {});
+        task.completedAt = new Date().toISOString();
+        task.result = {
+          success: false,
+          outcome: "failed",
+          summary: `Tâche "${task.title}" annulée par l'utilisateur`,
+          error: "cancelled_by_user",
+          durationMs: 0,
+        };
+        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+        this.notifier.notify(task, "cancelled");
       }
       return true;
     }
 
     // Déjà terminée (completed/failed/incomplete/cancelled) — rien à annuler.
     return false;
+  }
+
+  /**
+   * Supprime définitivement des tâches : les retire de la mémoire ET de la
+   * persistance. Une tâche encore active (`pending`/`running`) est d'abord
+   * annulée pour ne pas laisser une exécution orpheline en arrière-plan.
+   *
+   * @returns le nombre de tâches effectivement retirées de la mémoire.
+   */
+  async deleteTasks(taskIds: string[]): Promise<number> {
+    if (taskIds.length === 0) return 0;
+
+    let removed = 0;
+    for (const id of taskIds) {
+      const task = this.tasks.get(id);
+      if (!task) continue;
+      // Annuler proprement si la tâche tourne encore avant de la jeter.
+      if (task.status === "pending" || task.status === "running") {
+        this.cancelTask(id);
+      }
+      if (this.tasks.delete(id)) removed++;
+    }
+
+    // Purge persistante (best-effort, non bloquant pour l'appelant).
+    agentPersistence.deleteTasks(taskIds).catch(() => {});
+
+    log.info(`🗑️ ${removed} tâche(s) supprimée(s) définitivement`);
+    return removed;
   }
 
   /**

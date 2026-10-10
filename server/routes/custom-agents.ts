@@ -11,20 +11,42 @@ import { SELF_ROOT } from "../utils/selfRoot.js";
 import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry.js";
 import { agentRegistry } from "../agents/AgentRegistry.js";
 import { getAgentDefinition } from "../agents/roles.js";
+import { AgentSecurityError, ALLOWED_CAPABILITIES } from "../security/agentDefinitionSchema.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("CustomAgentsAPI");
 
 // ── Schémas de validation ────────────────────────────────────────────────────
 
-/** Schéma d'un agent personnalisé à créer */
+/**
+ * Schéma d'un agent personnalisé à créer.
+ *
+ * ALIGNÉ sur le schéma d'enregistrement (`agentDefinitionSchema`) : le rôle doit
+ * être en snake_case strict et chaque capability doit appartenir à la liste
+ * blanche. Sans cet alignement, un agent pouvait être SAUVEGARDÉ puis échouer
+ * silencieusement au chargement (ex: rôle "roadmap-analyst" avec tiret, ou
+ * capability inventée "create_rich_document"). On rejette donc tôt, avec un
+ * message clair, plutôt que tard et en silence.
+ */
+const capabilityDraftSchema = z
+  .string()
+  .refine((cap) => ALLOWED_CAPABILITIES.has(cap), {
+    message: `Capability non autorisée. Valeurs permises : ${[...ALLOWED_CAPABILITIES].join(", ")}`,
+  });
+
 const AgentDraftSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
-  role: z.string().min(1, "Le rôle est requis").regex(/^[a-zA-Z0-9_-]+$/, "Le rôle ne peut contenir que des lettres, chiffres, tirets et underscores"),
+  role: z
+    .string()
+    .min(1, "Le rôle est requis")
+    .regex(
+      /^[a-z][a-z0-9_]*$/,
+      "Le rôle doit être en snake_case (minuscules, chiffres, underscores — pas de tiret ni de majuscule)",
+    ),
   description: z.string().optional(),
   systemPrompt: z.string().optional(),
-  capabilities: z.array(z.string()).optional(),
-  tools: z.array(z.string()).optional(),
+  capabilities: z.array(capabilityDraftSchema).optional(),
+  tools: z.array(capabilityDraftSchema).optional(),
   maxConcurrency: z.number().int().min(1).max(10).optional(),
   defaultTimeoutMs: z.number().int().min(1000).max(600_000).optional(),
   triggerKeywords: z.array(z.string()).optional(),
@@ -159,47 +181,64 @@ export function initCustomAgents(): void {
     const agents = readAgents();
     let registeredCount = 0;
     
+    let skippedCount = 0;
+
     for (const agent of agents) {
       if (!agent?.name || !agent?.role) continue;
-      
+
       // Vérifier que le rôle n'existe pas déjà dans les statiques
       if (getAgentDefinition(agent.role)) {
         log.warn(`⚠️ Agent personnalisé "${agent.role}" ignoré : rôle statique existant`);
         continue;
       }
-      
+
       // Vérifier que l'agent n'est pas déjà enregistré
       if (dynamicAgentRegistry.hasAgent(agent.role)) {
         continue;
       }
-      
-      // Enregistrer dans le registre dynamique
-      dynamicAgentRegistry.registerAgent({
-        role: agent.role,
-        name: agent.name,
-        description: agent.description || '',
-        systemPrompt: agent.systemPrompt || '',
-        capabilities: agent.capabilities || agent.tools || [],
-        maxConcurrency: agent.maxConcurrency ?? 2,
-        defaultTimeoutMs: agent.defaultTimeoutMs ?? 60_000,
-        version: "1.0.0",
-        tags: agent.triggerKeywords || [],
-        isActive: true,
-        author: "agent-builder",
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-      });
-      
-      // Démarrer l'agent si le AgentRegistry est initialisé
-      if (agentRegistry.isReady) {
-        agentRegistry.registerAndStartDynamicAgent(agent.role);
+
+      // Isolation par agent : une définition invalide ne doit PAS empêcher le
+      // chargement des autres. On capture l'erreur de validation ici, on
+      // journalise la raison exacte (les détails Zod), puis on continue.
+      try {
+        dynamicAgentRegistry.registerAgent({
+          role: agent.role,
+          name: agent.name,
+          description: agent.description || '',
+          systemPrompt: agent.systemPrompt || '',
+          capabilities: agent.capabilities || agent.tools || [],
+          maxConcurrency: agent.maxConcurrency ?? 2,
+          defaultTimeoutMs: agent.defaultTimeoutMs ?? 60_000,
+          version: "1.0.0",
+          tags: agent.triggerKeywords || [],
+          isActive: true,
+          author: "agent-builder",
+          createdAt: agent.createdAt,
+          updatedAt: agent.updatedAt,
+        });
+
+        // Démarrer l'agent si le AgentRegistry est initialisé
+        if (agentRegistry.isReady) {
+          agentRegistry.registerAndStartDynamicAgent(agent.role);
+        }
+
+        registeredCount++;
+      } catch (err) {
+        skippedCount++;
+        // Expose la cause précise (ex: rôle non snake_case, capability non
+        // autorisée) au lieu d'un simple « 2 erreur(s) » opaque.
+        const detail = err instanceof AgentSecurityError && err.details?.length
+          ? ` — ${err.details.join(" ; ")}`
+          : `: ${(err as Error).message}`;
+        log.warn(`⚠️ Agent personnalisé "${agent.role}" ignoré (définition invalide)${detail}`);
       }
-      
-      registeredCount++;
     }
-    
+
     if (registeredCount > 0) {
       log.info(`✅ ${registeredCount} agent(s) personnalisé(s) chargé(s) et enregistré(s)`);
+    }
+    if (skippedCount > 0) {
+      log.warn(`⚠️ ${skippedCount} agent(s) personnalisé(s) ignoré(s) pour cause de définition invalide`);
     }
   } catch (err: any) {
     log.error(`⚠️ Erreur lors du chargement des agents personnalisés: ${err.message}`);

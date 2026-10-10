@@ -2673,3 +2673,35 @@ button {
   -webkit-backdrop-filter: none;
   box-shadow: none;
 }
+
+
+/* Status bar visual refinement */
+.status-bar-enhanced {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--border-base) 60%, transparent), 0 -6px 18px color-mix(in srgb, var(--bg-primary) 35%, transparent);
+}
+
+.status-bar-enhanced :where(button, [role="button"]) {
+  min-height: 24px;
+  border-radius: 6px;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.status-bar-enhanced :where(button, [role="button"]):hover {
+  background: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
+}
+
+.status-bar-enhanced :where(button, [role="button"]):focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-bar-enhanced :where(button, [role="button"]) {
+    transition: none;
+  }
+}
