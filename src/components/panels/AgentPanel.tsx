@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, Bot, FileText,
@@ -8,6 +8,7 @@ import {
   Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
   Palette, TrendingUp, BookOpen, Accessibility, Gauge,
+  Ban, Power, Hourglass, ListChecks,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { IconButton } from '../ui/IconButton.js';
@@ -16,7 +17,7 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import type { AgentRole } from '../../context/UserProfileContext.js';
 import {
   getToolActivities, getAgentTasks, subscribe,
-  clearCompletedTools, clearCompletedTasks,
+  clearCompletedTools, clearCompletedTasks, cancelAgentTask,
   type ToolActivityEntry, type AgentTaskEntry,
 } from '../../stores/agentActivityStore.js';
 
@@ -111,6 +112,7 @@ function StatusBadge({ status }: { status: string }) {
     running:   { color: 'var(--accent-secondary)', bg: 'var(--color-info-subtle)', label: 'En cours', icon: <Loader2 size={9} className="animate-spin" /> },
     completed: { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
     failed:    { color: 'var(--color-error)', bg: 'var(--color-error-subtle)', label: 'Erreur', icon: <XCircle size={9} /> },
+    cancelled: { color: 'var(--text-muted)', bg: 'rgba(113,113,122,0.12)', label: 'Annulée', icon: <Ban size={9} /> },
     done:      { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
   };
   const c = config[status] ?? config.pending;
@@ -245,8 +247,18 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
   // Subscribe to the global store — re-renders on every change
   const toolActivities = useSyncExternalStore(subscribe, getToolActivities);
   const delegatedTasks = useSyncExternalStore(subscribe, getAgentTasks);
-  const { profile } = useProfile();
+  const { profile, setField, save } = useProfile();
   const { connected, getLatencyStats, lastLatencyMs, lastProbeReport } = useLiveAPIContext();
+
+  // Active/désactive un agent directement depuis le panneau (persisté comme dans Paramètres → Agents).
+  const toggleRole = useCallback((role: AgentRole) => {
+    const current = profile.agents.allowedRoles;
+    const updated = current.includes(role)
+      ? current.filter(r => r !== role)
+      : [...current, role];
+    setField('agents', { ...profile.agents, allowedRoles: updated });
+    save();
+  }, [profile.agents, setField, save]);
 
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [tab, setTab] = useState<'roster' | 'live' | 'delegated'>('roster');
@@ -345,7 +357,12 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar" style={scrollAreaStyle}>
         {tab === 'roster' ? (
-          <RosterTab allowedRoles={profile.agents.allowedRoles} activeRoles={activeRoles} />
+          <RosterTab
+            allowedRoles={profile.agents.allowedRoles}
+            activeRoles={activeRoles}
+            agentsEnabled={profile.agents.enabled}
+            onToggleRole={toggleRole}
+          />
         ) : tab === 'live' ? (
           <LiveTab groupedActivities={groupedActivities} expanded={expandedTask} onToggle={id => setExpandedTask(prev => prev === id ? null : id)} />
         ) : (
@@ -492,24 +509,55 @@ function TabBtn({ active, onClick, count, children }: { active: boolean; onClick
 
 // ── Roster Tab: Available agents and their status ────────────────────────
 
-function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; activeRoles: Set<string> }) {
+function RosterTab({ allowedRoles, activeRoles, agentsEnabled, onToggleRole }: {
+  allowedRoles: AgentRole[];
+  activeRoles: Set<string>;
+  agentsEnabled: boolean;
+  onToggleRole: (role: AgentRole) => void;
+}) {
+  const enabledCount = AGENT_ROSTER.filter(a => allowedRoles.includes(a.id)).length;
+
   return (
     <div className="space-y-1.5">
+      {/* Bandeau d'avertissement si le système multi-agents est globalement coupé */}
+      {!agentsEnabled && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg mb-1"
+          style={{ backgroundColor: 'var(--color-warning-subtle)', border: '1px solid var(--border-warning-subtle, var(--border-base))' }}>
+          <Power size={13} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Le système multi-agents est <span className="font-semibold">désactivé</span>. Activez-le dans
+            <span className="font-semibold" style={{ color: 'var(--text-muted)' }}> Paramètres → Agents</span> pour que la délégation fonctionne.
+          </p>
+        </div>
+      )}
+
+      {/* Résumé */}
+      <div className="flex items-center justify-between px-1 pb-1">
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="font-bold" style={{ color: 'var(--text-muted)' }}>{enabledCount}</span>/{AGENT_ROSTER.length} agents actifs
+        </span>
+        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Cliquez pour activer/désactiver</span>
+      </div>
+
       {AGENT_ROSTER.map(agent => {
         const isAllowed = allowedRoles.includes(agent.id);
         const isActive = activeRoles.has(agent.id);
         const Icon = agent.icon;
 
         return (
-          <motion.div
+          <motion.button
+            type="button"
             key={agent.id}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors"
+            onClick={() => onToggleRole(agent.id)}
+            title={isAllowed ? `Désactiver « ${agent.label} »` : `Activer « ${agent.label} »`}
+            aria-pressed={isAllowed}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-left cursor-pointer hover:bg-[var(--bg-hover)]"
             style={{
               backgroundColor: isActive ? `${agent.color}10` : 'var(--bg-input)',
               border: `1px solid ${isActive ? `${agent.color}40` : isAllowed ? 'var(--border-base)' : 'transparent'}`,
-              opacity: isAllowed ? 1 : 0.45,
+              opacity: isAllowed ? 1 : 0.5,
             }}
           >
             {/* Icon */}
@@ -542,27 +590,34 @@ function RosterTab({ allowedRoles, activeRoles }: { allowedRoles: AgentRole[]; a
               </p>
             </div>
 
-            {/* Status */}
-            <div className="flex-shrink-0">
-              {isAllowed ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
-                  style={{ backgroundColor: 'var(--color-success-subtle)', color: 'var(--color-success)' }}>
-                  <CheckCircle2 size={9} /> Disponible
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
-                  style={{ backgroundColor: 'rgba(113,113,122,0.1)', color: 'var(--text-dimmed)' }}>
-                  <XCircle size={9} /> Désactivé
-                </span>
-              )}
+            {/* Toggle switch visuel */}
+            <div className="flex-shrink-0 flex items-center gap-2">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold"
+                style={isAllowed
+                  ? { backgroundColor: 'var(--color-success-subtle)', color: 'var(--color-success)' }
+                  : { backgroundColor: 'rgba(113,113,122,0.1)', color: 'var(--text-dimmed)' }}>
+                {isAllowed ? <><CheckCircle2 size={9} /> Activé</> : <><XCircle size={9} /> Désactivé</>}
+              </span>
+              <span
+                className="relative inline-flex items-center flex-shrink-0 rounded-full transition-colors"
+                style={{
+                  width: 30, height: 17,
+                  backgroundColor: isAllowed ? agent.color : 'var(--border-base)',
+                }}
+              >
+                <span
+                  className="absolute rounded-full bg-white transition-all"
+                  style={{ width: 13, height: 13, top: 2, left: isAllowed ? 15 : 2 }}
+                />
+              </span>
             </div>
-          </motion.div>
+          </motion.button>
         );
       })}
 
       {/* Footer hint */}
       <p className="text-center text-xs pt-3 pb-1" style={{ color: 'var(--text-dimmed)' }}>
-        Gérez les agents dans <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Paramètres → Agents</span>
+        Réglages avancés dans <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Paramètres → Agents</span>
       </p>
     </div>
   );
@@ -733,6 +788,11 @@ function RunningElapsed({ startTime }: { startTime: number }) {
 
 // ── Delegated Tab: Multi-role agent tasks ────────────────────────────────
 
+// Ordre d'affichage : en cours d'abord, puis la file d'attente, puis les terminées.
+const TASK_STATUS_ORDER: Record<AgentTaskEntry['status'], number> = {
+  running: 0, pending: 1, failed: 2, completed: 3, cancelled: 4,
+};
+
 function DelegatedTab({ tasks, expanded, onToggle }: {
   tasks: AgentTaskEntry[];
   expanded: string | null;
@@ -742,25 +802,83 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
     return <EmptyState message="Aucun agent déclenché" sub="Les agents multi-rôles s'activent quand Leanna délègue une tâche complexe (test, docs, refactor, security, review, architect)" />;
   }
 
+  const running = tasks.filter(t => t.status === 'running');
+  const pending = tasks.filter(t => t.status === 'pending');
+
+  // Tri stable : en cours → en attente → terminées, en gardant l'ordre d'arrivée au sein d'un même statut.
+  const sorted = [...tasks].sort((a, b) => {
+    const d = TASK_STATUS_ORDER[a.status] - TASK_STATUS_ORDER[b.status];
+    return d !== 0 ? d : a.timestamp - b.timestamp;
+  });
+
   return (
-    <AnimatePresence initial={false}>
-      {tasks.map(task => (
-        <DelegatedTaskCard key={task.id} task={task}
-          expanded={expanded === task.id}
-          onToggle={() => onToggle(task.id)} />
-      ))}
-    </AnimatePresence>
+    <div className="space-y-1.5">
+      {/* Résumé en cours / à venir */}
+      {(running.length > 0 || pending.length > 0) && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+          style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
+          {running.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent-secondary)' }}>
+              <Loader2 size={10} className="animate-spin" /> {running.length} en cours
+            </span>
+          )}
+          {running.length > 0 && pending.length > 0 && <span className="text-xs opacity-40">•</span>}
+          {pending.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <Hourglass size={10} /> {pending.length} à venir
+            </span>
+          )}
+        </div>
+      )}
+
+      <AnimatePresence initial={false}>
+        {sorted.map(task => {
+          // Position dans la file d'attente pour les tâches en attente.
+          const queuePosition = task.status === 'pending'
+            ? pending.findIndex(p => p.id === task.id) + 1
+            : 0;
+          return (
+            <DelegatedTaskCard key={task.id} task={task}
+              queuePosition={queuePosition}
+              queueTotal={pending.length}
+              expanded={expanded === task.id}
+              onToggle={() => onToggle(task.id)} />
+          );
+        })}
+      </AnimatePresence>
+    </div>
   );
 }
 
-function DelegatedTaskCard({ task, expanded, onToggle }: {
+function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle }: {
   task: AgentTaskEntry;
+  queuePosition: number;
+  queueTotal: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const meta = getRoleMeta(task.role);
   const Icon = meta.icon;
   const isRunning = task.status === 'running';
+  const isPending = task.status === 'pending';
+  const canCancel = isRunning || isPending;
+  const [cancelling, setCancelling] = useState(false);
+
+  // Progression explicite si le serveur l'a fournie, sinon dérivée des étapes.
+  const progressPct = task.progress && task.progress.total > 0
+    ? Math.min(100, (task.progress.current / task.progress.total) * 100)
+    : 0;
+
+  const handleCancel = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canCancel || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelAgentTask(task.id);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <motion.div
@@ -771,20 +889,22 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
       className="rounded-lg overflow-hidden"
       style={{
         backgroundColor: isRunning ? `${meta.color}08` : 'var(--bg-input)',
-        border: `1px solid ${isRunning ? `${meta.color}30` : 'var(--border-base)'}`,
+        border: `1px solid ${isRunning ? `${meta.color}30` : isPending ? `${meta.color}20` : 'var(--border-base)'}`,
+        opacity: task.status === 'cancelled' ? 0.6 : 1,
       }}>
       <button className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}>
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${meta.color}18` }}>
           {isRunning ? <Loader2 size={13} className="animate-spin" style={{ color: meta.color }} /> :
+            isPending ? <Hourglass size={13} style={{ color: meta.color }} /> :
             <Icon size={13} style={{ color: meta.color }} />}
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-primary)' }}>
             {task.title}
           </span>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-xs font-medium" style={{ color: meta.color }}>{task.agentName}</span>
             <span className="text-xs opacity-50">•</span>
             <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{timeLabel(task.timestamp)}</span>
@@ -797,7 +917,28 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
             {task.steps.length > 0 && (
               <>
                 <span className="text-xs opacity-50">•</span>
-                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{task.steps.length} étape{task.steps.length > 1 ? 's' : ''}</span>
+                <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                  <ListChecks size={9} /> {task.steps.length} étape{task.steps.length > 1 ? 's' : ''}
+                </span>
+              </>
+            )}
+            {/* Position dans la file d'attente pour les tâches à venir */}
+            {isPending && queuePosition > 0 && (
+              <>
+                <span className="text-xs opacity-50">•</span>
+                <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md"
+                  style={{ backgroundColor: 'var(--bg-active, rgba(113,113,122,0.12))', color: 'var(--text-muted)' }}>
+                  <Hourglass size={8} /> {queuePosition}/{queueTotal} en file
+                </span>
+              </>
+            )}
+            {/* Progression chiffrée si disponible */}
+            {isRunning && task.progress && task.progress.total > 0 && (
+              <>
+                <span className="text-xs opacity-50">•</span>
+                <span className="text-xs font-mono" style={{ color: meta.color }}>
+                  {task.progress.current}/{task.progress.total} {task.progress.label}
+                </span>
               </>
             )}
           </div>
@@ -805,11 +946,39 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {isRunning && <RunningElapsed startTime={task.timestamp} />}
           <StatusBadge status={task.status} />
+          {/* Bouton d'annulation pour les tâches en cours ou en attente */}
+          {canCancel && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              title={isPending ? 'Retirer de la file' : 'Annuler la tâche en cours'}
+              aria-label="Annuler la tâche"
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--color-error-subtle)] disabled:opacity-50"
+              style={{ color: 'var(--color-error)' }}
+            >
+              {cancelling ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />}
+            </button>
+          )}
         </div>
         <motion.div animate={{ rotate: expanded ? 90 : 0 }} className="flex-shrink-0">
           <ChevronRight size={10} style={{ color: 'var(--text-dimmed)' }} />
         </motion.div>
       </button>
+
+      {/* Barre de progression pour les tâches en cours */}
+      {isRunning && progressPct > 0 && (
+        <div className="px-2.5 pb-1.5">
+          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
+            <motion.div
+              className="h-full rounded-full"
+              style={{ backgroundColor: meta.color }}
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPct}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {expanded && (
@@ -854,7 +1023,11 @@ function DelegatedTaskCard({ task, expanded, onToggle }: {
                 <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>
                   {isRunning
                     ? 'Exécution en cours… Les étapes apparaîtront au fur et à mesure.'
-                    : 'Aucun détail disponible.'}
+                    : isPending
+                      ? 'En attente de démarrage… Cette tâche est dans la file d’exécution.'
+                      : task.status === 'cancelled'
+                        ? 'Tâche annulée par l’utilisateur.'
+                        : 'Aucun détail disponible.'}
                 </p>
               )}
             </div>

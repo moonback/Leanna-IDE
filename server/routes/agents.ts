@@ -96,6 +96,26 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     }
   });
 
+  // POST /api/agents/tasks/:taskId/cancel — Annule une tâche agent (pending ou running)
+  router.post('/tasks/:taskId/cancel', (req: Request, res: Response) => {
+    const taskId = String(req.params.taskId || '').trim();
+    if (!taskId) {
+      return res.status(400).json({ error: "Paramètre 'taskId' requis." });
+    }
+    try {
+      const cancelled = agentOrchestrator.cancelTask(taskId);
+      if (!cancelled) {
+        return res.status(404).json({
+          success: false,
+          error: "Tâche introuvable ou déjà terminée.",
+        });
+      }
+      return res.json({ success: true, message: `Tâche "${taskId}" annulée.` });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // GET /api/agents/roles
   router.get('/roles', async (_req: Request, res: Response) => {
     try {

@@ -406,6 +406,67 @@ export function clearCompletedTasks() {
   notify();
 }
 
+/**
+ * Marque une tâche comme en cours d'annulation dans le store (optimiste),
+ * utile pour un retour visuel immédiat avant la confirmation serveur.
+ */
+function markTaskCancelling(taskId: string) {
+  agentTasks = agentTasks.map(t =>
+    t.id === taskId
+      ? { ...t, detail: 'Annulation demandée…', steps: t.steps.includes('Annulation demandée…') ? t.steps : [...t.steps, 'Annulation demandée…'] }
+      : t,
+  );
+  notify();
+}
+
+/**
+ * Applique le statut final d'annulation à une tâche du store.
+ */
+function markTaskCancelled(taskId: string) {
+  agentTasks = agentTasks.map(t =>
+    t.id === taskId
+      ? { ...t, status: 'cancelled' as const, detail: t.detail ?? 'Tâche annulée', durationMs: t.durationMs ?? (Date.now() - t.timestamp) }
+      : t,
+  );
+  notify();
+}
+
+/**
+ * Demande au serveur d'annuler une tâche agent (pending ou running).
+ * Met à jour le store de façon optimiste puis confirme/annule selon la réponse.
+ *
+ * @returns `true` si le serveur confirme l'annulation, `false` sinon.
+ */
+export async function cancelAgentTask(taskId: string): Promise<boolean> {
+  const task = agentTasks.find(t => t.id === taskId);
+  // Rien à annuler si la tâche est déjà terminée.
+  if (task && task.status !== 'running' && task.status !== 'pending') return false;
+
+  markTaskCancelling(taskId);
+
+  try {
+    const res = await fetch(`/api/agents/tasks/${encodeURIComponent(taskId)}/cancel`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      // Rollback léger : retirer le marqueur d'annulation en échec.
+      agentTasks = agentTasks.map(t =>
+        t.id === taskId ? { ...t, detail: 'Échec de l’annulation' } : t,
+      );
+      notify();
+      return false;
+    }
+    markTaskCancelled(taskId);
+    return true;
+  } catch {
+    agentTasks = agentTasks.map(t =>
+      t.id === taskId ? { ...t, detail: 'Échec de l’annulation (réseau)' } : t,
+    );
+    notify();
+    return false;
+  }
+}
+
 export function subscribe(fn: Listener): () => void {
   listeners.push(fn);
   return () => {
