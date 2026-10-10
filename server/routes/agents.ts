@@ -116,6 +116,21 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     }
   });
 
+  // POST /api/agents/tasks/delete — Supprime définitivement des tâches (purge mémoire + persistance)
+  router.post('/tasks/delete', async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+    const ids: unknown = body.taskIds;
+    if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string') || ids.length === 0) {
+      return res.status(400).json({ error: "Champ 'taskIds' (string[]) non vide requis." });
+    }
+    try {
+      const deleted = await agentOrchestrator.deleteTasks(ids as string[]);
+      return res.json({ success: true, deleted, requested: ids.length });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // GET /api/agents/roles
   router.get('/roles', async (_req: Request, res: Response) => {
     try {

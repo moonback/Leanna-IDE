@@ -669,6 +669,34 @@ export class AgentOrchestrator {
   }
 
   /**
+   * Supprime définitivement des tâches : les retire de la mémoire ET de la
+   * persistance. Une tâche encore active (`pending`/`running`) est d'abord
+   * annulée pour ne pas laisser une exécution orpheline en arrière-plan.
+   *
+   * @returns le nombre de tâches effectivement retirées de la mémoire.
+   */
+  async deleteTasks(taskIds: string[]): Promise<number> {
+    if (taskIds.length === 0) return 0;
+
+    let removed = 0;
+    for (const id of taskIds) {
+      const task = this.tasks.get(id);
+      if (!task) continue;
+      // Annuler proprement si la tâche tourne encore avant de la jeter.
+      if (task.status === "pending" || task.status === "running") {
+        this.cancelTask(id);
+      }
+      if (this.tasks.delete(id)) removed++;
+    }
+
+    // Purge persistante (best-effort, non bloquant pour l'appelant).
+    agentPersistence.deleteTasks(taskIds).catch(() => {});
+
+    log.info(`🗑️ ${removed} tâche(s) supprimée(s) définitivement`);
+    return removed;
+  }
+
+  /**
    * Annule une orchestration entière : signale toutes ses tâches `pending` et
    * `running`. Les tâches déjà terminées ne sont pas affectées.
    *

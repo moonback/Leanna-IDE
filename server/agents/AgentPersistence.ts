@@ -194,6 +194,33 @@ export class AgentPersistence {
     this.scheduleUpdate(taskId, update);
   }
 
+  /**
+   * Supprime définitivement une ou plusieurs tâches de la base.
+   * No-op si la persistance n'est pas disponible (mode mémoire).
+   *
+   * @returns le nombre d'ids demandés (best-effort — Supabase ne renvoie pas
+   *          toujours le compte réel de lignes supprimées).
+   */
+  async deleteTasks(taskIds: string[]): Promise<number> {
+    if (!this.client || taskIds.length === 0) return 0;
+    try {
+      const { error } = await this.client
+        .from("agent_tasks")
+        .delete()
+        .in("id", taskIds);
+
+      if (error) {
+        log.error(`deleteTasks: ${error.message}`);
+        return 0;
+      }
+      log.debug(`${taskIds.length} tâche(s) supprimée(s) de la persistance`);
+      return taskIds.length;
+    } catch (err) {
+      log.error(`deleteTasks exception: ${(err as Error).message}`);
+      return 0;
+    }
+  }
+
   /** Charge toutes les tâches non terminées (recovery au redémarrage) */
   async loadPendingTasks(): Promise<AgentTask[]> {
     if (!this.client) return [];

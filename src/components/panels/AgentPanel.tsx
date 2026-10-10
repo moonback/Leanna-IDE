@@ -8,7 +8,7 @@ import {
   Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
   Palette, TrendingUp, BookOpen, Accessibility, Gauge,
-  Ban, Power, Hourglass, ListChecks,
+  Ban, Power, Hourglass, ListChecks, CheckSquare, Square, X,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { IconButton } from '../ui/IconButton.js';
@@ -17,7 +17,7 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import type { AgentRole } from '../../context/UserProfileContext.js';
 import {
   getToolActivities, getAgentTasks, subscribe,
-  clearCompletedTools, clearCompletedTasks, cancelAgentTask,
+  clearCompletedTools, clearCompletedTasks, cancelAgentTask, removeAgentTasks,
   type ToolActivityEntry, type AgentTaskEntry,
 } from '../../stores/agentActivityStore.js';
 
@@ -798,6 +798,20 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
   expanded: string | null;
   onToggle: (id: string) => void;
 }) {
+  // ── Sélection multiple pour suppression groupée ──
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Purge les ids sélectionnés qui n'existent plus (tâches supprimées/nettoyées).
+  useEffect(() => {
+    setSelected(prev => {
+      if (prev.size === 0) return prev;
+      const alive = new Set(tasks.map(t => t.id));
+      const next = new Set([...prev].filter(id => alive.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tasks]);
+
   if (tasks.length === 0) {
     return <EmptyState message="Aucun agent déclenché" sub="Les agents multi-rôles s'activent quand Leanna délègue une tâche complexe (test, docs, refactor, security, review, architect)" />;
   }
@@ -811,25 +825,110 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
     return d !== 0 ? d : a.timestamp - b.timestamp;
   });
 
+  const allSelected = selected.size > 0 && selected.size === tasks.length;
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected(prev => (prev.size === tasks.length ? new Set() : new Set(tasks.map(t => t.id))));
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteSelected = async () => {
+    const ids = [...selected];
+    if (ids.length === 0 || deleting) return;
+    setDeleting(true);
+    try {
+      // La suppression serveur annule au besoin les tâches encore actives,
+      // puis les purge de la mémoire et de la persistance.
+      await removeAgentTasks(ids);
+      exitSelectMode();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-1.5">
-      {/* Résumé en cours / à venir */}
-      {(running.length > 0 || pending.length > 0) && (
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-          style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
-          {running.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent-secondary)' }}>
-              <Loader2 size={10} className="animate-spin" /> {running.length} en cours
+      {/* Barre de sélection / actions groupées */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+        style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)' }}>
+        {!selectMode ? (
+          <>
+            {(running.length > 0 || pending.length > 0) ? (
+              <>
+                {running.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent-secondary)' }}>
+                    <Loader2 size={10} className="animate-spin" /> {running.length} en cours
+                  </span>
+                )}
+                {running.length > 0 && pending.length > 0 && <span className="text-xs opacity-40">•</span>}
+                {pending.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                    <Hourglass size={10} /> {pending.length} à venir
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{tasks.length} tâche{tasks.length > 1 ? 's' : ''}</span>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={() => setSelectMode(true)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition-colors hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-muted)' }}
+              title="Sélectionner plusieurs tâches à supprimer"
+            >
+              <CheckSquare size={11} /> Sélectionner
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={toggleSelectAll}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition-colors hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {allSelected ? <CheckSquare size={11} style={{ color: 'var(--accent-primary)' }} /> : <Square size={11} />}
+              {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+            </button>
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+              {selected.size} sélectionnée{selected.size > 1 ? 's' : ''}
             </span>
-          )}
-          {running.length > 0 && pending.length > 0 && <span className="text-xs opacity-40">•</span>}
-          {pending.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-              <Hourglass size={10} /> {pending.length} à venir
-            </span>
-          )}
-        </div>
-      )}
+            <div className="flex-1" />
+            <button
+              onClick={deleteSelected}
+              disabled={selected.size === 0 || deleting}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-40 hover:bg-[var(--color-error-subtle)]"
+              style={{ color: 'var(--color-error)' }}
+              title="Supprimer définitivement les tâches sélectionnées"
+            >
+              {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />} Supprimer
+            </button>
+            <button
+              onClick={exitSelectMode}
+              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-muted)' }}
+              title="Quitter la sélection"
+              aria-label="Quitter la sélection"
+            >
+              <X size={13} />
+            </button>
+          </>
+        )}
+      </div>
 
       <AnimatePresence initial={false}>
         {sorted.map(task => {
@@ -841,6 +940,9 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
             <DelegatedTaskCard key={task.id} task={task}
               queuePosition={queuePosition}
               queueTotal={pending.length}
+              selectMode={selectMode}
+              selected={selected.has(task.id)}
+              onSelectToggle={() => toggleSelected(task.id)}
               expanded={expanded === task.id}
               onToggle={() => onToggle(task.id)} />
           );
@@ -850,10 +952,13 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
   );
 }
 
-function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle }: {
+function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, selected, onSelectToggle, expanded, onToggle }: {
   task: AgentTaskEntry;
   queuePosition: number;
   queueTotal: number;
+  selectMode: boolean;
+  selected: boolean;
+  onSelectToggle: () => void;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -888,12 +993,18 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle
       transition={{ duration: 0.15 }}
       className="rounded-lg overflow-hidden"
       style={{
-        backgroundColor: isRunning ? `${meta.color}08` : 'var(--bg-input)',
-        border: `1px solid ${isRunning ? `${meta.color}30` : isPending ? `${meta.color}20` : 'var(--border-base)'}`,
+        backgroundColor: selected ? 'var(--accent-subtle)' : isRunning ? `${meta.color}08` : 'var(--bg-input)',
+        border: `1px solid ${selected ? 'var(--accent-primary)' : isRunning ? `${meta.color}30` : isPending ? `${meta.color}20` : 'var(--border-base)'}`,
         opacity: task.status === 'cancelled' ? 0.6 : 1,
       }}>
       <button className="w-full flex items-center gap-2 px-2.5 py-2.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
-        onClick={onToggle}>
+        onClick={selectMode ? onSelectToggle : onToggle}>
+        {/* Case à cocher en mode sélection */}
+        {selectMode && (
+          <span className="flex-shrink-0 flex items-center justify-center" style={{ color: selected ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}>
+            {selected ? <CheckSquare size={16} /> : <Square size={16} />}
+          </span>
+        )}
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${meta.color}18` }}>
           {isRunning ? <Loader2 size={13} className="animate-spin" style={{ color: meta.color }} /> :
@@ -946,8 +1057,8 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {isRunning && <RunningElapsed startTime={task.timestamp} />}
           <StatusBadge status={task.status} />
-          {/* Bouton d'annulation pour les tâches en cours ou en attente */}
-          {canCancel && (
+          {/* Bouton d'annulation pour les tâches en cours ou en attente (masqué en mode sélection) */}
+          {!selectMode && canCancel && (
             <button
               onClick={handleCancel}
               disabled={cancelling}
@@ -960,9 +1071,11 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle
             </button>
           )}
         </div>
-        <motion.div animate={{ rotate: expanded ? 90 : 0 }} className="flex-shrink-0">
-          <ChevronRight size={10} style={{ color: 'var(--text-dimmed)' }} />
-        </motion.div>
+        {!selectMode && (
+          <motion.div animate={{ rotate: expanded ? 90 : 0 }} className="flex-shrink-0">
+            <ChevronRight size={10} style={{ color: 'var(--text-dimmed)' }} />
+          </motion.div>
+        )}
       </button>
 
       {/* Barre de progression pour les tâches en cours */}
@@ -981,7 +1094,7 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, expanded, onToggle
       )}
 
       <AnimatePresence>
-        {expanded && (
+        {expanded && !selectMode && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="px-3 py-2.5 space-y-2"
