@@ -472,6 +472,25 @@ export class AgenticRuntime implements IAgentRuntime {
       const result = await this.registry.call(name, parameters, { agentId: session.agent.role });
       const durationMs = Date.now() - start;
 
+      // ── Échec LOGIQUE sans exception. ──
+      // Les handlers d'outils du projet (ex: codebaseWriter) ne LÈVENT PAS sur
+      // échec : ils retournent `{ error }` (ou `{ status: "error" }`). Sans ce
+      // contrôle, une écriture ratée (searchText introuvable, fichier absent,
+      // chemin hors workspace…) serait prise pour un succès et le fichier marqué
+      // modifié à tort. On la traite donc comme un échec d'appel : l'agent voit
+      // la vraie erreur et peut relire puis réessayer DANS le même run, et le
+      // fichier n'est jamais compté comme modifié.
+      const toolError = extractToolError(result);
+      if (toolError) {
+        return {
+          invocation: { name, parameters },
+          success: false,
+          error: toolError,
+          result: clampResult(result),
+          durationMs,
+        };
+      }
+
       // ── Écriture CONFIRMÉE : enregistrée immédiatement (transactionnel). ──
       // La preuve d'écriture est capturée dès le retour du handler, AVANT tout
       // contrôle de budget ultérieur. Une limite atteinte plus tard n'annule
@@ -1144,10 +1163,38 @@ function cacheKey(name: string, parameters: Record<string, unknown>): string {
 
 /** Extrait un chemin de fichier des paramètres d'un appel d'outil. */
 function extractPath(parameters: Record<string, unknown>): string | undefined {
-  if (typeof parameters.path === "string") return parameters.path;
-  if (typeof parameters.file === "string") return parameters.file;
-  if (typeof parameters.filePath === "string") return parameters.filePath;
+  for (const key of ["path", "file", "filePath", "targetPath", "filename", "fileName"]) {
+    const value = parameters[key];
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
   return undefined;
+}
+
+/**
+ * Détecte la forme d'échec CONVENTIONNELLE d'un handler d'outil : les handlers
+ * du projet ne lèvent pas sur échec logique, ils retournent `{ error }` ou
+ * `{ status: "error" | "failed" }`. Retourne le message d'erreur si le résultat
+ * est un échec, sinon `null` (succès).
+ */
+function extractToolError(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null;
+  const obj = result as Record<string, unknown>;
+  if (typeof obj.error === "string" && obj.error.trim() !== "") return obj.error;
+  if (typeof obj.status === "string") {
+    const status = obj.status.toLowerCase();
+    if (status === "error" || status === "failed" || status === "failure") {
+      const detail =
+        typeof obj.message === "string" ? obj.message :
+        typeof obj.error === "string" ? obj.error : `status=${obj.status}`;
+      return detail;
+    }
+  }
+  // Échec explicite via booléen (ex: { success: false, message }).
+  if (obj.success === false) {
+    return typeof obj.message === "string" ? obj.message
+      : typeof obj.error === "string" ? obj.error : "Échec de l'outil (success:false).";
+  }
+  return null;
 }
 
 /** Normalise un chemin (slashes, préfixe ./) pour servir de clé stable. */

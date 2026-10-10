@@ -69,6 +69,24 @@ function makeRegistry(fs: FakeFs): ToolRegistry {
     },
     permissions: ["write"],
   });
+  // Écriture qui ÉCHOUE logiquement sans lever (contrat `{ error }` du projet).
+  // `write_project_file` est une capability réelle (ALLOWED_CAPABILITIES) ; on la
+  // fait échouer pour simuler un handler qui retourne { error } au lieu de lever.
+  registry.register({
+    declaration: { name: "write_project_file", description: "écrit en échouant", parameters: { path: "string" } },
+    handler: async () => ({ error: "searchText introuvable dans le fichier." }),
+    permissions: ["write"],
+  });
+  // Écriture dont le chemin arrive sous une clé alternative (targetPath).
+  // `patch_project_file` est une capability réelle.
+  registry.register({
+    declaration: { name: "patch_project_file", description: "modifie via targetPath", parameters: { targetPath: "string" } },
+    handler: async (args) => {
+      fs.content.set(String(args.targetPath), "written-via-altkey");
+      return { status: "success" };
+    },
+    permissions: ["write"],
+  });
   registry.register({
     declaration: { name: "verify_file", description: "vérifie", parameters: { path: "string" } },
     handler: async (args) => {
@@ -241,6 +259,82 @@ describe("Phase 4 — vérification hashée + réparation bornée", () => {
     const recovery = await rt.recover({ phase: "verify", message: "fail", file: "d.ts" });
     assert.equal(recovery.strategy, "abort");
     assert.match(recovery.reason, /récupération/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Échec d'écriture SANS exception (handler renvoyant { error }) — anti faux succès
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("invokeTool — un handler qui renvoie { error } est un ÉCHEC, pas une écriture", () => {
+  beforeEach(() => {
+    registerTestAgent("test_writer_err", [
+      "read_project_file",
+      "write_project_file",
+      "patch_project_file",
+      "modify_project_file",
+      "verify_file",
+    ]);
+  });
+
+  it("ne compte PAS le fichier comme modifié quand l'écriture renvoie { error }", async () => {
+    const fs: FakeFs = { content: new Map([["x.ts", "orig"]]), verifyOk: () => true };
+    const rt = makeRuntime(fs);
+    const session = rt._seedSessionForTest({ role: "test_writer_err", goal: "fix", id: "e1" });
+
+    // @ts-expect-error accès test à invokeTool (privé)
+    const outcome = await rt.invokeTool(session, "write_project_file", { path: "x.ts" });
+
+    assert.equal(outcome.success, false, "l'écriture ratée doit être un échec d'appel");
+    assert.match(outcome.error ?? "", /searchText introuvable/);
+    assert.equal(session.filesModified.size, 0, "aucun fichier ne doit être compté comme modifié");
+    assert.equal(fs.content.get("x.ts"), "orig", "le fichier reste inchangé");
+  });
+
+  it("un échec { error } mène à outcome=failed (jamais partial trompeur)", async () => {
+    const fs: FakeFs = { content: new Map([["x.ts", "orig"]]), verifyOk: () => true };
+    const rt = makeRuntime(fs);
+    const session = rt._seedSessionForTest({ role: "test_writer_err", goal: "fix", id: "e2" });
+    // Simule une étape échouée + un appel d'outil en erreur, sans aucune écriture.
+    // @ts-expect-error accès test
+    await rt.invokeTool(session, "write_project_file", { path: "x.ts" });
+    session.observations.push({
+      iteration: 1,
+      reasoning: "tentative",
+      toolOutcomes: [{ invocation: { name: "write_project_file", parameters: { path: "x.ts" } }, success: false, error: "x", durationMs: 1 }],
+      isFinal: false,
+    });
+    session.toolsExecuted.push("write_project_file");
+    const plan = { intent: "fix", steps: [{ id: "s1", description: "fix", status: "failed" as const }], successCriteria: [], rationale: "" };
+
+    // @ts-expect-error accès test à assessOutcome (privé)
+    const outcome = rt.assessOutcome(session, plan);
+    assert.equal(outcome, "failed", "une écriture ratée non résolue est un échec franc, pas un faux partial");
+  });
+
+  it("compte bien l'écriture quand le chemin est sous une clé alternative (targetPath)", async () => {
+    const fs: FakeFs = { content: new Map(), verifyOk: () => true };
+    const rt = makeRuntime(fs);
+    const session = rt._seedSessionForTest({ role: "test_writer_err", goal: "fix", id: "e3" });
+
+    // @ts-expect-error accès test
+    const outcome = await rt.invokeTool(session, "patch_project_file", { targetPath: "y.ts" });
+
+    assert.equal(outcome.success, true);
+    assert.ok(session.filesModified.has("y.ts"), "le chemin sous targetPath doit être tracé");
+    assert.equal(fs.content.get("y.ts"), "written-via-altkey");
+  });
+
+  it("une écriture réussie classique reste comptée (non-régression)", async () => {
+    const fs: FakeFs = { content: new Map([["z.ts", "a"]]), verifyOk: () => true };
+    const rt = makeRuntime(fs);
+    const session = rt._seedSessionForTest({ role: "test_writer_err", goal: "fix", id: "e4" });
+
+    // @ts-expect-error accès test
+    const outcome = await rt.invokeTool(session, "modify_project_file", { path: "z.ts", content: "b" });
+
+    assert.equal(outcome.success, true);
+    assert.ok(session.filesModified.has("z.ts"));
   });
 });
 
