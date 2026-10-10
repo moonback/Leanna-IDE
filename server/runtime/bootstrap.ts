@@ -13,7 +13,7 @@
  */
 
 import { AgentRuntime } from "./AgentRuntime.js";
-import { createAgentRuntime, type AgenticRuntime, type AgentBudget } from "./agentic/index.js";
+import { createAgentRuntime, agentBudgetFromEnv, type AgenticRuntime, type AgentBudget } from "./agentic/index.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
 import { PromptRegistry } from "./PromptRegistry.js";
 import { PermissionPolicy } from "./PermissionPolicy.js";
@@ -241,7 +241,11 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
 
   // Runtime agentique : réutilise le ToolRegistry/EventBus déjà configurés,
   // de sorte que les agents reçoivent réellement leurs outils déclarés.
-  const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+  // Budget agentique : défaut < surcharge `.env` (LEANNA_AGENT_MAX_*) < config
+  // explicite passée en code (prioritaire pour tests/appelants).
+  const agentic = createAgentRuntime(runtime, {
+    budget: { ...agentBudgetFromEnv(), ...config.agenticBudget },
+  });
 
   // Brancher le pont Runtime-plugin → boucle agentique. Les 8 plugins
   // d'ingénierie (coder, debugger, …) exécutent alors leurs tâches
@@ -343,7 +347,10 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
     console.error("[Bootstrap] Erreur lors du démarrage:", err);
   });
 
-  const agentic = createAgentRuntime(runtime, { budget: config.agenticBudget });
+  // Budget agentique : défaut < surcharge `.env` (LEANNA_AGENT_MAX_*) < config explicite.
+  const agentic = createAgentRuntime(runtime, {
+    budget: { ...agentBudgetFromEnv(), ...config.agenticBudget },
+  });
 
   // Brancher le pont Runtime-plugin → boucle agentique (voir version async).
   setAgenticRuntimeProvider(agentic);

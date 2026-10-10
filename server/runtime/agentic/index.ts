@@ -26,6 +26,8 @@ export {
 } from "./ToolPromptBuilder.js";
 export {
   DEFAULT_AGENT_BUDGET,
+  agentBudgetFromEnv,
+  normalizeBudget,
   type AgentBudget,
   type AgentTask,
   type AgentResult,

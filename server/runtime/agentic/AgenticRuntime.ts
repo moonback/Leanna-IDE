@@ -225,6 +225,9 @@ export class AgenticRuntime implements IAgentRuntime {
 
     // ── Boucle ACT → OBSERVE → VERIFY → (NEXT | RECOVER) ──
     let stepIdx = 0;
+    // Nombre de fois où l'on a refusé une clôture « sans écriture » pour relancer
+    // l'agent vers l'action. Borné pour éviter une relance stérile indéfinie.
+    let actionNudges = 0;
     while (stepIdx < plan.steps.length) {
       if (this.budgetExhausted(session)) {
         log.warn(`[${taskId.slice(0, 8)}] ⛔ Budget épuisé — arrêt de la boucle`);
@@ -260,6 +263,36 @@ export class AgenticRuntime implements IAgentRuntime {
       session.verifications.push(verification);
 
       if (verification.passed) {
+        // ── Garde anti-enlisement : « conclut en texte sans jamais écrire » ──
+        // Si le modèle rend une réponse finale (aucun tool_call) alors qu'une
+        // écriture était ATTENDUE (le plan suggère un outil d'écriture), qu'AUCUN
+        // fichier n'a encore été écrit, et qu'il reste du budget d'écriture, on
+        // REFUSE cette clôture prématurée : on force la phase write et on injecte
+        // une consigne impérative d'action. Sans ça, l'agent s'arrête en
+        // discovery après avoir seulement lu (bug observé en production).
+        if (
+          observation.isFinal &&
+          observation.toolOutcomes.length === 0 &&
+          session.filesModified.size === 0 &&
+          this.planExpectedWrites(plan) &&
+          session.usage.writeCalls < session.budget.maxWrite &&
+          actionNudges < AgenticRuntime.MAX_ACTION_NUDGES &&
+          !this.budgetExhausted(session)
+        ) {
+          actionNudges += 1;
+          session.phase = "write";
+          session.pendingInstruction =
+            "Tu as suffisamment exploré mais tu n'as RIEN écrit. N'explique pas, AGIS : " +
+            "applique la modification maintenant avec write_project_file / modify_project_file / " +
+            "patch_project_file, puis vérifie avec verify_file. Ne termine pas sans avoir écrit.";
+          step.status = "running";
+          log.info(
+            `[${session.taskId.slice(0, 8)}] ⚠️ Clôture refusée (relance ${actionNudges}/${AgenticRuntime.MAX_ACTION_NUDGES}) : ` +
+              `réponse finale sans écriture alors qu'une modification est attendue — relance en phase write.`
+          );
+          continue; // reste sur la même étape, l'agent doit agir
+        }
+
         step.status = "done";
         stepIdx++;
         // Si le modèle a produit une réponse finale, on peut clore tôt.
@@ -437,6 +470,32 @@ export class AgenticRuntime implements IAgentRuntime {
       isFinal: calls.length === 0,
     };
     session.observations.push(observation);
+
+    // ── Diagnostic d'itération : pourquoi l'agent (n')écrit(-il pas) ? ──
+    // Trace, à chaque tour : phase courante, outils émis (ou « réponse finale
+    // sans action » = le modèle a conclu en texte sans tool_call), consommation
+    // read/write/verify, et un extrait du raisonnement. Permet de distinguer
+    // « n'a jamais tenté d'écrire » de « a tenté mais a été bloqué ».
+    const u = session.usage;
+    const callSummary =
+      calls.length === 0
+        ? "AUCUN tool_call → réponse finale (texte)"
+        : calls
+            .map((c, i) => {
+              const o = toolOutcomes[i];
+              const verdict = o?.success === false ? `✗(${(o.error ?? "").slice(0, 60)})` : "✓";
+              return `${classifyTool(c.name)}:${c.name}${verdict}`;
+            })
+            .join(", ");
+    log.info(
+      `[${session.taskId.slice(0, 8)}] 🔎 iter ${iteration} | phase=${session.phase} | ` +
+        `budget read ${u.readCalls}/${session.budget.maxRead} write ${u.writeCalls}/${session.budget.maxWrite} ` +
+        `verify ${u.verifyCalls}/${session.budget.maxVerify} | actions: ${callSummary}`
+    );
+    if (text.length > 0) {
+      log.debug(`[${session.taskId.slice(0, 8)}] 💭 iter ${iteration} raisonnement: ${truncate(text, 300)}`);
+    }
+
     return observation;
   }
 
@@ -471,6 +530,23 @@ export class AgenticRuntime implements IAgentRuntime {
     try {
       const result = await this.registry.call(name, parameters, { agentId: session.agent.role });
       const durationMs = Date.now() - start;
+
+      // ── Échec APPLICATIF : le handler a RÉSOLU (pas throw) mais signale une
+      // erreur via `{ error }` ou `{ status: "failed" }` (ex. refus sandbox,
+      // searchText introuvable, fichier protégé). Le ToolRegistry métré ces
+      // retours comme `success:true`, mais pour la boucle agentique ce sont des
+      // ÉCHECS d'outil. On NE compte PAS un fichier « modifié » dans ce cas :
+      // sinon une écriture refusée serait comptabilisée à tort (faux positif).
+      const appError = toolResultError(result);
+      if (appError) {
+        return {
+          invocation: { name, parameters },
+          success: false,
+          error: appError,
+          result: clampResult(result),
+          durationMs,
+        };
+      }
 
       // ── Écriture CONFIRMÉE : enregistrée immédiatement (transactionnel). ──
       // La preuve d'écriture est capturée dès le retour du handler, AVANT tout
@@ -918,21 +994,48 @@ export class AgenticRuntime implements IAgentRuntime {
     }
   }
 
+  /** Nombre de lectures jugé suffisant pour disposer d'un contexte minimal. */
+  private static readonly DISCOVERY_ENOUGH_READS = 3;
+
+  /** Nombre maximum de relances « agis au lieu de conclure » par mission. */
+  private static readonly MAX_ACTION_NUDGES = 2;
+
   /**
    * Fait avancer la phase courante selon la consommation du budget.
-   * discovery → write dès que le quota de découverte est atteint (ou qu'une
-   * écriture a déjà eu lieu). En recovery, la phase est pilotée par recover().
+   * discovery → write dès qu'un CONTEXTE MINIMAL est acquis (assez de lectures
+   * ET au moins un fichier réellement lu), à défaut à saturation du quota, ou
+   * dès qu'une écriture a eu lieu. En recovery, la phase est pilotée par recover().
+   *
+   * Historiquement, la bascule n'avait lieu qu'à saturation (readCalls >= maxRead).
+   * Conséquence observée : l'agent restait en `discovery`, enchaînait des lectures
+   * puis concluait en texte sans jamais écrire. On bascule donc plus tôt pour
+   * pousser vers l'action dès que le contexte est raisonnablement établi.
    */
   private advancePhase(session: RunSession): void {
     if (session.phase === "recovery" || session.phase === "verify") return;
+    if (session.phase !== "discovery") return;
     const { budget, usage } = session;
-    if (session.phase === "discovery" && (usage.readCalls >= budget.maxRead || usage.writeCalls > 0)) {
+    const enoughContext =
+      usage.readCalls >= AgenticRuntime.DISCOVERY_ENOUGH_READS && usage.filesRead >= 1;
+    if (usage.readCalls >= budget.maxRead || usage.writeCalls > 0 || enoughContext) {
       session.phase = "write";
     }
   }
 
   private allRemainingTrivial(plan: Plan, fromIdx: number): boolean {
     return plan.steps.slice(fromIdx).every((s) => s.status === "done" || s.status === "skipped");
+  }
+
+  /**
+   * Le plan comportait-il au moins une étape dont les outils suggérés sont des
+   * outils d'écriture ? C'est le signal qu'une MODIFICATION était attendue.
+   * Permet de distinguer une tâche d'implémentation (qui DOIT écrire) d'une
+   * tâche d'analyse/lecture (où « 0 fichier » est un résultat légitime).
+   */
+  private planExpectedWrites(plan: Plan): boolean {
+    return plan.steps.some((s) =>
+      (s.suggestedTools ?? []).some((t) => WRITE_TOOLS.has(t))
+    );
   }
 
   private assessOutcome(session: RunSession, plan: Plan): import("./types.js").AgentOutcome {
@@ -942,6 +1045,14 @@ export class AgenticRuntime implements IAgentRuntime {
 
     // Aucune écriture ni aucun outil exécuté : rien n'a bougé.
     if (!wroteSomething && session.toolsExecuted.length === 0) return "no_change";
+
+    // Tâche d'IMPLÉMENTATION sans aucune écriture : échec honnête, pas « partiel ».
+    // Si le plan attendait une écriture (un outil d'écriture figurait dans les
+    // outils suggérés d'au moins une étape) mais que l'agent a terminé sans
+    // écrire le moindre fichier, ce n'est PAS un demi-succès : on renvoie
+    // `no_change` (→ success:false), ce qui déclenche la récupération/
+    // replanification au lieu de laisser croire à une réussite partielle.
+    if (!wroteSomething && this.planExpectedWrites(plan)) return "no_change";
 
     // La VÉRIFICATION hashée est l'arbitre, pas le simple fait d'avoir écrit.
     // On consulte le WorkspaceState : chaque fichier modifié doit être "verified"
@@ -1153,6 +1264,25 @@ function extractPath(parameters: Record<string, unknown>): string | undefined {
 /** Normalise un chemin (slashes, préfixe ./) pour servir de clé stable. */
 function normPath(filePath: string): string {
   return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/**
+ * Détecte un échec APPLICATIF dans le résultat d'un outil : les handlers de skill
+ * signalent une erreur en RÉSOLVANT avec `{ error: "..." }` ou
+ * `{ status: "failed" }` plutôt qu'en levant une exception (ces retours sont
+ * métrés `success:true` par le ToolRegistry). Retourne le message d'erreur si
+ * c'en est un, sinon `undefined`. Utilisé pour ne pas comptabiliser une écriture
+ * qui a en réalité échoué (refus sandbox, searchText introuvable, fichier
+ * protégé…).
+ */
+function toolResultError(result: unknown): string | undefined {
+  if (!result || typeof result !== "object") return undefined;
+  const r = result as { error?: unknown; status?: unknown; ok?: unknown };
+  if (typeof r.error === "string" && r.error.trim().length > 0) return r.error;
+  if (r.status === "failed" || r.status === "error") {
+    return typeof r.error === "string" ? r.error : `statut d'outil "${String(r.status)}"`;
+  }
+  return undefined;
 }
 
 /** Type guard : le résultat de verify_file contient-il un VerificationRecord ? */

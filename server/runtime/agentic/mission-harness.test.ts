@@ -221,4 +221,54 @@ describe("Mission Harness — chaîne agentique de bout en bout (fake LLM)", () 
     assert.equal(write.allowed, false, "write refusé au-delà du quota");
     assert.equal(verify.allowed, true, "verify TOUJOURS disponible (réserve étanche)");
   });
+
+  it("E. NO_WRITE : plan attend une écriture mais l'agent clôt sans écrire → no_change (échec honnête)", async () => {
+    // Le plan (PLAN_JSON) suggère modify_project_file : une écriture est ATTENDUE.
+    // Le modèle se contente de lire puis conclut en texte, sans jamais écrire.
+    const fs: FakeFs = { content: new Map([["src/example.ts", "const value: string = 123;"]]), isFixed: () => true };
+    const { registry, writes } = makeRegistry(fs);
+    const model = scriptedModel([
+      toolCall("read_project_file", { path: "src/example.ts" }),
+      "J'ai analysé le fichier. Voici ce qu'il faudrait faire…", // réponse finale SANS écriture
+    ]);
+    const runtime = new AgenticRuntime({ registry, events: new EventBus(), model });
+
+    const result = await runtime.run({ role: "harness_fixer", goal: "Implémente le correctif dans src/example.ts", id: "mE" });
+
+    assert.equal(result.filesModified.length, 0, "aucun fichier écrit");
+    assert.equal(writes.length, 0, "aucune écriture réelle");
+    assert.equal(result.outcome, "no_change", "une implémentation sans écriture n'est PAS un succès partiel");
+    assert.equal(result.success, false, "no_change ⇒ success:false (plus de faux positif 'partial')");
+  });
+
+  it("F. WRITE_REFUSED : un handler qui retourne { error } ne compte pas comme fichier modifié", async () => {
+    const fs: FakeFs = { content: new Map([["src/example.ts", "x"]]), isFixed: () => true };
+    const registry = new ToolRegistry({ permissionPolicy: new PermissionPolicy({ mode: "off" }) });
+    registry.register({
+      declaration: { name: "read_project_file", description: "lit", parameters: { path: "string" } },
+      handler: async (a) => ({ content: fs.content.get(String(a.path)) ?? "", status: "success" }),
+      permissions: ["read"],
+    });
+    // L'écriture est REFUSÉE : le handler résout avec { error } (ex. refus sandbox).
+    registry.register({
+      declaration: { name: "modify_project_file", description: "modifie", parameters: { path: "string", content: "string" } },
+      handler: async () => ({ error: "Sandbox indisponible ou chemin modifié — écriture refusée." }),
+      permissions: ["write"],
+    });
+    const model = scriptedModel([
+      toolCall("modify_project_file", { path: "src/example.ts", content: "nouveau" }),
+      "Terminé.",
+    ]);
+    const runtime = new AgenticRuntime({ registry, events: new EventBus(), model });
+
+    const result = await runtime.run({ role: "harness_fixer", goal: "Implémente dans src/example.ts", id: "mF" });
+
+    assert.equal(result.filesModified.length, 0, "une écriture refusée ne doit PAS compter comme fichier modifié");
+    assert.equal(result.success, false, "l'échec d'écriture ne doit pas être un succès");
+    // L'erreur applicative doit apparaître comme un échec d'outil observable.
+    assert.ok(
+      result.observations.some((o) => o.toolOutcomes.some((t) => !t.success && /refusée/.test(t.error ?? ""))),
+      "le refus doit remonter comme un toolOutcome en échec"
+    );
+  });
 });

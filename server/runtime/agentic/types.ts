@@ -115,6 +115,52 @@ export function normalizeBudget(budget: AgentBudget): AgentBudget {
   return { ...budget, maxToolCalls: total };
 }
 
+/**
+ * Lit un entier positif depuis l'environnement, avec repli silencieux si absent
+ * ou invalide (0, négatif, NaN). Permet de régler les quotas sans recompiler.
+ */
+function envPositiveInt(env: NodeJS.ProcessEnv, key: string): number | undefined {
+  const raw = env[key];
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+}
+
+/**
+ * Construit un budget surchargé par les variables d'environnement
+ * `LEANNA_AGENT_*`. Chaque quota absent du `.env` conserve sa valeur par défaut
+ * (`DEFAULT_AGENT_BUDGET`). `maxToolCalls` est toujours recalculé comme la somme
+ * des phases (invariant), donc jamais à régler à la main.
+ *
+ * Variables reconnues :
+ *   LEANNA_AGENT_MAX_READ         quota d'exploration (lecture)
+ *   LEANNA_AGENT_MAX_PLAN         quota de (re)planification
+ *   LEANNA_AGENT_MAX_WRITE        quota d'écriture (réservé)
+ *   LEANNA_AGENT_MAX_VERIFY       quota de vérification (réservé)
+ *   LEANNA_AGENT_MAX_RECOVERY     quota de récupération (réservé)
+ *   LEANNA_AGENT_MAX_ITERATIONS   nombre maximum d'itérations de la boucle
+ *   LEANNA_AGENT_MAX_FILES_READ   nombre maximum de fichiers lus distincts
+ *   LEANNA_AGENT_MAX_EXEC_MS      mur temporel en millisecondes
+ */
+export function agentBudgetFromEnv(env: NodeJS.ProcessEnv = process.env): Partial<AgentBudget> {
+  const overrides: Partial<AgentBudget> = {};
+  const map: Array<[keyof AgentBudget, string]> = [
+    ["maxRead", "LEANNA_AGENT_MAX_READ"],
+    ["maxPlan", "LEANNA_AGENT_MAX_PLAN"],
+    ["maxWrite", "LEANNA_AGENT_MAX_WRITE"],
+    ["maxVerify", "LEANNA_AGENT_MAX_VERIFY"],
+    ["maxRecovery", "LEANNA_AGENT_MAX_RECOVERY"],
+    ["maxIterations", "LEANNA_AGENT_MAX_ITERATIONS"],
+    ["maxFilesRead", "LEANNA_AGENT_MAX_FILES_READ"],
+    ["maxExecutionTimeMs", "LEANNA_AGENT_MAX_EXEC_MS"],
+  ];
+  for (const [field, key] of map) {
+    const value = envPositiveInt(env, key);
+    if (value !== undefined) overrides[field] = value;
+  }
+  return overrides;
+}
+
 /** Réserve d'appels garantie aux actions critiques (write + verify + recovery). */
 export function criticalReserve(budget: AgentBudget): number {
   return budget.maxWrite + budget.maxVerify + budget.maxRecovery;
