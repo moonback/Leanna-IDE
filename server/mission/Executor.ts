@@ -2000,6 +2000,21 @@ JSON:`;
       )
     );
 
+    // ── Objectif à livrable sans écriture = ÉCHEC factuel ───────────────────
+    // Observé en prod : un objectif « produire un rapport » était validé sur de
+    // simples lectures (verify_file/list/search) alors qu'aucun fichier n'était
+    // produit. Si l'objectif attend un artefact concret et qu'AUCUNE écriture
+    // n'a réussi, on ajoute un contrôle factuel échoué : la preuve ne peut pas
+    // établir le succès sans livrable.
+    if (this.goalExpectsArtifact(goal) && filesModified.length === 0) {
+      runtimeChecks.push({
+        name: "artefact-produit",
+        passed: false,
+        details:
+          "L'objectif attend un livrable concret (fichier/document) mais aucune écriture n'a abouti.",
+      });
+    }
+
     const toolsExecuted = executed.map((a) => a.skillName);
 
     const input: EvidenceInput = {

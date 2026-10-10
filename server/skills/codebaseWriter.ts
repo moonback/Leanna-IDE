@@ -183,6 +183,35 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
 
   if (!requestedPath) return { error: "Le chemin de fichier est requis. Exemple: modify_project_file({ path: 'src/file.ts', searchText: 'texte exact', replaceText: 'nouveau texte' })" };
 
+  // ── Auto-création quand le fichier cible n'existe pas ────────────────────
+  // Observé en prod : l'IA tentait `modify_project_file` sur un fichier
+  // INEXISTANT (ex. docs/README-audit.md) pour y écrire un livrable → « Fichier
+  // introuvable », livrable perdu, boucle de replanification. Quand le fichier
+  // n'existe pas et que l'intention est clairement de CRÉER du contenu
+  // (replaceText fourni, pas de searchText de remplacement ciblé), on délègue à
+  // write_project_file. Les marqueurs/placeholders éventuels sont retirés du
+  // contenu puisqu'il n'y a aucun bloc existant à délimiter.
+  {
+    const probe = resolveSandboxWriteTarget(requestedPath);
+    if (probe && !fs.existsSync(probe.sandboxPath)) {
+      const wantsCreate = replaceText.trim().length > 0 && !searchText;
+      if (wantsCreate) {
+        log.info(`[modify_project_file] Fichier inexistant "${requestedPath}" → création via write_project_file.`);
+        let content = replaceText;
+        // Retirer les marqueurs de bloc s'ils encadrent tout le contenu (pas de
+        // bloc existant à préserver sur un nouveau fichier).
+        if (startMarker) content = content.split(startMarker).join("");
+        if (endMarker) content = content.split(endMarker).join("");
+        return await handleWriteProjectFile({ path: requestedPath, content: content.trim() + "\n" }, toolContext);
+      }
+      // Intention ambiguë : message actionnable orientant vers la création.
+      return {
+        error: `Fichier introuvable: "${requestedPath}".`,
+        action: `Ce fichier n'existe pas encore. Pour le CRÉER, utilise write_project_file({ path: "${requestedPath}", content: "..." }). modify_project_file ne s'applique qu'à un fichier existant.`,
+      };
+    }
+  }
+
   // Mode startMarker/endMarker : le backend construit searchText depuis le fichier
   if (!searchText && startMarker && endMarker) {
     const target = resolveSandboxWriteTarget(requestedPath);
@@ -205,7 +234,12 @@ export async function handleModifyProjectFile(args: any, toolContext: any) {
   if (!target) return { error: "Chemin invalide ou en dehors du workspace." };
   const normalized = target.sandboxPath;
   if (isWriteForbidden(target.logicalPath)) return { error: `Écriture interdite sur ce fichier protégé: ${requestedPath}` };
-  if (!fs.existsSync(normalized)) return { error: "Fichier introuvable." };
+  if (!fs.existsSync(normalized)) {
+    return {
+      error: `Fichier introuvable: "${requestedPath}".`,
+      action: `Pour créer ce fichier, utilise write_project_file({ path: "${requestedPath}", content: "..." }).`,
+    };
+  }
 
   const raw = await fs.promises.readFile(normalized, "utf-8");
   const isCrlf = raw.includes("\r\n");

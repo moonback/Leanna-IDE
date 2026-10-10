@@ -261,3 +261,27 @@ test('default mode (no supervisor) keeps running missions directly', async () =>
 
   fs.rmSync(fs.mkdtempSync(path.join(os.tmpdir(), 'noop-')), { recursive: true, force: true });
 });
+
+// ─── Preuve : objectif à livrable sans écriture = échec ──────────────────────
+
+test('evidence verification fails an artifact-expecting goal when nothing was written', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-art-'));
+  const executor = new Executor();
+  // Un skill de lecture qui réussit factuellement mais ne produit AUCUN fichier.
+  executor.setSkillHandler(async () => ({ ok: true }));
+  executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+
+  // Titre/description réclamant explicitement un livrable (rapport/document).
+  const mission = await executor.startMission({
+    title: 'Produire le rapport d’audit',
+    description: 'Rédiger et écrire un rapport Markdown documentant les résultats.',
+    availableSkills: ['read_project_file'],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  // Aucun fichier produit alors qu'un livrable est attendu → mission non réussie.
+  assert.notEqual(done.status, 'completed', 'un objectif à livrable sans écriture ne doit pas réussir');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
