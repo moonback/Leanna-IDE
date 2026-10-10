@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Planner } from "./Planner.js";
 import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
-import { MissionStore } from "./MissionStore.js";
+import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
@@ -66,8 +66,8 @@ export class Executor {
   /** Schémas des outils (name → { description, parameters }) pour la génération d'arguments. */
   private toolSchemas: Map<string, ToolSchema> = new Map();
 
-  /** Store de persistance (optionnel). */
-  private store: MissionStore | null = null;
+  /** Store de persistance (optionnel) : local, Supabase, ou composite. */
+  private store: MissionStatePort | null = null;
 
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
@@ -95,6 +95,32 @@ export class Executor {
    */
   private finalizedMissions: Set<string> = new Set();
 
+  /**
+   * Contrôleurs d'annulation par mission. Le signal associé est transmis au
+   * `skillHandler` à chaque action ; `cancelMission` et le watchdog de timeout
+   * l'abandonnent pour interrompre un skill en cours. (Audit, point 4.)
+   */
+  private abortControllers: Map<string, AbortController> = new Map();
+
+  /** Retourne (en le créant au besoin) le contrôleur d'annulation d'une mission. */
+  private getAbortController(missionId: string): AbortController {
+    let controller = this.abortControllers.get(missionId);
+    if (!controller) {
+      controller = new AbortController();
+      this.abortControllers.set(missionId, controller);
+    }
+    return controller;
+  }
+
+  /** Abandonne le signal d'une mission (interrompt le skill en cours) et nettoie. */
+  private abortMission(missionId: string, reason: string): void {
+    const controller = this.abortControllers.get(missionId);
+    if (controller && !controller.signal.aborted) {
+      try { controller.abort(new Error(reason)); } catch { /* best-effort */ }
+    }
+    this.abortControllers.delete(missionId);
+  }
+
   /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
   private readonly missionRuns = new Map<string, Promise<void>>();
   /** Candidate lessons/proposals; never auto-applied by mission finalization. */
@@ -110,6 +136,12 @@ export class Executor {
 
   /** Intervalle de sondage de l'état de pause (ms). */
   private static readonly PAUSE_POLL_MS = 500;
+
+  /**
+   * Intervalle de sondage du watchdog de timeout global (ms). Le temps n'est
+   * compté que lorsque la mission tourne réellement (pas en pause).
+   */
+  private static readonly WATCHDOG_POLL_MS = 1000;
 
   /**
    * Missions interrompues (crash/redémarrage) rechargées depuis le store mais
@@ -223,9 +255,9 @@ export class Executor {
   }
 
   /**
-   * Injecte le store de persistance des missions (Supabase).
+   * Injecte le store de persistance des missions (local, Supabase ou composite).
    */
-  setStore(store: MissionStore): void {
+  setStore(store: MissionStatePort): void {
     this.store = store;
   }
 
@@ -257,6 +289,24 @@ export class Executor {
   /** Liste les IDs d'actions en attente d'approbation. */
   listPendingApprovals(): string[] {
     return Array.from(this.pendingApprovals.keys());
+  }
+
+  /**
+   * Vérifie qu'une action appartient bien à une mission donnée.
+   *
+   * Correctif audit (point 8) : la route `approve` indexait l'approbation
+   * uniquement par `actionId`, en ignorant le `:id` de mission de l'URL —
+   * n'importe quel `actionId` était donc approuvable via n'importe quelle
+   * mission. Ce contrôle permet à la route de refuser une approbation croisée.
+   */
+  actionBelongsToMission(missionId: string, actionId: string): boolean {
+    const mission =
+      this.activeMissions.get(missionId) ??
+      this.completedMissions.find((m) => m.id === missionId);
+    if (!mission) return false;
+    return Object.values(mission.getState().goals).some((g) =>
+      g.plannedActions.some((a) => a.id === actionId)
+    );
   }
 
   /** Accès au curseur d'autonomie (pour lire/modifier le mode à chaud). */
@@ -383,23 +433,52 @@ export class Executor {
     void run.finally(() => this.missionRuns.delete(mission.id));
 
     // Watchdog : arrêt forcé si la mission dépasse le timeout global configuré.
+    //
+    // Correctif audit (point 6) : le temps passé EN PAUSE ne compte PAS. Avant,
+    // un unique setTimeout(timeoutMs) tuait une mission même pausée (le timer
+    // tournait pendant la pause). On remplace par un sondage qui n'accumule le
+    // temps que lorsque la mission tourne réellement : la pause étend d'autant
+    // l'échéance.
     const timeoutMs = mission.getConfig().missionTimeoutMs;
     if (timeoutMs > 0) {
-      const watchdog = setTimeout(() => {
-        if (!mission.isCompleted() && this.activeMissions.has(mission.id)) {
-          console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms). Arrêt.`);
+      let activeElapsedMs = 0;
+      let lastTick = Date.now();
+      const poll = Math.min(Executor.WATCHDOG_POLL_MS, timeoutMs);
+
+      const watchdog = setInterval(() => {
+        const now = Date.now();
+        const delta = now - lastTick;
+        lastTick = now;
+
+        // Mission terminée ou disparue : plus rien à surveiller.
+        if (mission.isCompleted() || !this.activeMissions.has(mission.id)) {
+          clearInterval(watchdog);
+          return;
+        }
+
+        // En pause : on ne consomme pas de budget de temps (l'échéance recule).
+        if (this.pausedMissions.has(mission.id)) {
+          return;
+        }
+
+        activeElapsedMs += delta;
+        if (activeElapsedMs >= timeoutMs) {
+          clearInterval(watchdog);
+          console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms de temps actif). Arrêt.`);
           // Correctif audit (point 4) : fermer la racine + tous les objectifs
           // non terminaux, pas seulement le sommet de la pile.
           mission.cancel("Timeout global de mission.");
+          // Interrompre un skill en cours (AbortSignal).
+          this.abortMission(mission.id, "Timeout global de mission.");
           this.finalizeMission(mission);
           telemetryService.endMissionTrace(mission.id, false);
           telemetryService.clearMissionBudget(mission.id);
           this.emit("mission_timeout", { missionId: mission.id });
         }
-      }, timeoutMs);
+      }, poll);
       // Ne pas garder le process Node en vie uniquement pour ce timer.
       if (typeof watchdog.unref === "function") watchdog.unref();
-      void run.finally(() => clearTimeout(watchdog));
+      void run.finally(() => clearInterval(watchdog));
     }
   }
 
@@ -515,6 +594,9 @@ export class Executor {
     // la boucle executeMission la re-finalisait (doublon + mission_completed
     // émis après mission_cancelled).
     mission.cancel("Mission annulée par l'utilisateur.");
+
+    // Interrompre un skill éventuellement en cours (AbortSignal).
+    this.abortMission(missionId, "Mission annulée par l'utilisateur.");
 
     this.finalizeMission(mission);
     
@@ -754,6 +836,12 @@ export class Executor {
       if (mission.isCompleted() || !this.activeMissions.has(mission.id)) break;
 
       const result = await this.executeAction(mission, goalId, action, availableSkills);
+
+      // Persistance APRÈS CHAQUE ACTION (audit, point 7). Avant, l'état n'était
+      // sauvegardé qu'au démarrage, après chaque vague et à la fin — donc un
+      // crash en milieu d'objectif perdait toutes les actions de la vague en
+      // cours. Best-effort, non bloquant.
+      await this.persist(mission);
 
       // Une action RÉUSSIE est terminale : la réflexion ne peut pas la "défaire".
       // On ignore donc retry/replan/escalate/abort quand l'action a réussi
@@ -1299,7 +1387,8 @@ export class Executor {
 
     try {
       const dryRun = mission.getConfig().dryRun;
-      result = await this.skillHandler!(action.skillName, action.args, { dryRun });
+      const signal = this.getAbortController(mission.id).signal;
+      result = await this.skillHandler!(action.skillName, action.args, { dryRun, signal });
       const failure = Executor.detectSkillFailure(result);
       success = failure === null;
       if (!success) {
@@ -1315,8 +1404,8 @@ export class Executor {
 
     const durationMs = Date.now() - startTime;
 
-    // Enregistrer le résultat
-    mission.recordActionResult(action.id, result, success);
+    // Enregistrer le résultat (avec sa durée, exposée ensuite par l'API).
+    mission.recordActionResult(action.id, result, success, durationMs);
     this.scorer.recordUsage(action.skillName, success, durationMs);
     // Persistance durable de la fiabilité du skill (GAP-1) : alimente la mémoire
     // de stratégie lue par les missions futures. Best-effort, jamais bloquant.
@@ -1861,6 +1950,9 @@ JSON:`;
     if (this.finalizedMissions.has(mission.id)) return;
     this.finalizedMissions.add(mission.id);
 
+    // Libérer le contrôleur d'annulation (plus de skill à interrompre).
+    this.abortControllers.delete(mission.id);
+
     this.activeMissions.delete(mission.id);
     this.completedMissions.push(mission);
     if (this.completedMissions.length > Executor.MAX_COMPLETED) {
@@ -2239,6 +2331,12 @@ function problemSignature(title: string, errors: string[]): string {
 export interface SkillHandlerOptions {
   /** Exécuter en simulation (dry-run), sans effet de bord. */
   dryRun?: boolean;
+  /**
+   * Signal d'annulation : passe à `aborted` quand la mission est annulée ou
+   * atteint son timeout global. Un skill qui le respecte peut interrompre une
+   * opération longue (fetch, shell…) au lieu de la mener à terme. (Audit, point 4.)
+   */
+  signal?: AbortSignal;
 }
 
 /** Handler pour exécuter un skill */

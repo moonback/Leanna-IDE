@@ -92,6 +92,8 @@ export interface PlannedAction {
   result?: unknown;
   /** Réflexion post-exécution */
   reflection?: ReflectionResult;
+  /** Durée d'exécution de l'action en millisecondes (renseignée après exécution). */
+  durationMs?: number;
 }
 
 /** Résultat d'un objectif complété */

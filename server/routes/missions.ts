@@ -33,6 +33,14 @@ export function createMissionsRouter(
     if (typeof description !== "string" || !description.trim()) {
       return res.status(400).json({ error: "Champ 'description' (string) requis." });
     }
+    // Valider la priorité côté route (point mineur de l'audit) : rejeter une
+    // valeur inconnue plutôt que de la propager silencieusement.
+    const ALLOWED_PRIORITIES = ["low", "medium", "high", "critical"];
+    if (priority !== undefined && !ALLOWED_PRIORITIES.includes(priority)) {
+      return res.status(400).json({
+        error: "Champ 'priority' invalide (low | medium | high | critical).",
+      });
+    }
     try {
       // Réutilise exactement le chemin du skill (validation, skills disponibles, executor).
       const result = await handleToolCall("mission_create", {
@@ -142,7 +150,7 @@ export function createMissionsRouter(
           status: a.status,
           confidence: a.reflection?.confidence,
           decision: a.reflection?.decision,
-          durationMs: undefined,
+          durationMs: a.durationMs,
         })),
       }));
 
@@ -226,12 +234,28 @@ export function createMissionsRouter(
     const executor = requireExecutor(res);
     if (!executor) return;
 
+    const missionId = req.params.id;
     const { actionId, approved } = req.body ?? {};
     if (typeof actionId !== "string" || !actionId.trim()) {
       return res.status(400).json({ error: "Champ 'actionId' (string) requis." });
     }
     if (typeof approved !== "boolean") {
       return res.status(400).json({ error: "Champ 'approved' (boolean) requis." });
+    }
+
+    // Correctif audit (point 8) : l'action doit appartenir à la mission :id de
+    // l'URL. Sans ce contrôle, un actionId pouvait être approuvé via n'importe
+    // quelle mission (approbation croisée). On n'applique le contrôle que si
+    // l'Executor expose la vérification (compat).
+    if (
+      typeof executor.actionBelongsToMission === "function" &&
+      !executor.actionBelongsToMission(missionId, actionId)
+    ) {
+      return res.status(404).json({
+        error: "Cette action n'appartient pas à la mission indiquée (ou mission introuvable).",
+        missionId,
+        actionId,
+      });
     }
 
     const resolved = executor.resolveApproval(actionId, approved);
@@ -250,12 +274,17 @@ export function createMissionsRouter(
     if (!executor) return;
 
     const missionId = req.params.id;
+    // Mission inconnue/non active → 404 ; conflit d'état (déjà en pause) → 409.
+    const active = typeof executor.getMission === "function" ? executor.getMission(missionId) : undefined;
+    if (!active) {
+      return res.status(404).json({ error: "Mission introuvable ou non active.", missionId });
+    }
+    if (typeof executor.isPaused === "function" && executor.isPaused(missionId)) {
+      return res.status(409).json({ error: "Mission déjà en pause.", missionId });
+    }
     const ok = executor.pauseMission?.(missionId) ?? false;
     if (!ok) {
-      return res.status(404).json({
-        error: "Mission introuvable, déjà en pause, ou non active.",
-        missionId,
-      });
+      return res.status(409).json({ error: "Impossible de mettre la mission en pause.", missionId });
     }
     return res.json({ ok: true, missionId, status: "paused" });
   });
@@ -266,12 +295,17 @@ export function createMissionsRouter(
     if (!executor) return;
 
     const missionId = req.params.id;
+    // Mission inconnue/non active → 404 ; non en pause → 409 (conflit d'état).
+    const active = typeof executor.getMission === "function" ? executor.getMission(missionId) : undefined;
+    if (!active) {
+      return res.status(404).json({ error: "Mission introuvable ou non active.", missionId });
+    }
+    if (typeof executor.isPaused === "function" && !executor.isPaused(missionId)) {
+      return res.status(409).json({ error: "Mission non en pause.", missionId });
+    }
     const ok = executor.resumeMission?.(missionId) ?? false;
     if (!ok) {
-      return res.status(404).json({
-        error: "Mission introuvable ou non en pause.",
-        missionId,
-      });
+      return res.status(409).json({ error: "Impossible de reprendre la mission.", missionId });
     }
     return res.json({ ok: true, missionId, status: "in_progress" });
   });

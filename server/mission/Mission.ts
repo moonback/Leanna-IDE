@@ -314,7 +314,7 @@ export class Mission {
   /**
    * Enregistre le résultat d'une action.
    */
-  recordActionResult(actionId: string, result: unknown, success: boolean): void {
+  recordActionResult(actionId: string, result: unknown, success: boolean, durationMs?: number): void {
     const action = this.findAction(actionId);
     if (!action) throw new Error(`Action ${actionId} not found`);
 
@@ -324,6 +324,9 @@ export class Mission {
 
     action.status = success ? "completed" : "failed";
     action.result = result;
+    if (typeof durationMs === "number" && Number.isFinite(durationMs)) {
+      action.durationMs = durationMs;
+    }
 
     if (success) {
       this.state.metrics.successfulActions++;

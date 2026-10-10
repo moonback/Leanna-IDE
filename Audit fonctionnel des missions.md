@@ -8,29 +8,46 @@ Audit statique du code (rien n'a été exécuté) : `mission/` (Mission, Executo
 
 L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approbation humaine). Mais plusieurs mécanismes annoncés ne fonctionnent pas réellement, et le noyau de fiabilité (`core/`) n'est pas utilisé par les missions.
 
+## État d'avancement
+
+- ✅ **Sprint 1 terminé** (points 1, 2, 3, 4, 9) — logique corrigée dans `Mission.ts`, `types.ts`, `Executor.ts`.
+- ✅ **Sprint 2 largement traité** (fiabilité) :
+  - Store local `.Leanna` par défaut (`LocalMissionStore` + `CompositeMissionStore`) → reprise après crash sans Supabase.
+  - Persistance **après chaque action** (plus seulement par vague).
+  - `AbortSignal` propagé au `skillHandler` et déclenché sur annulation/timeout (skill en cours interrompu).
+  - Watchdog **pause-aware** : le temps en pause ne compte plus dans le timeout.
+  - `writeJsonAtomic` : `fsync` ajouté ; `readJson` journalise un JSON corrompu.
+  - Routes : `approve` lié au `missionId`, `409` vs `404` pour pause/resume, `durationMs` réellement calculé, `priority` validée.
+  - **Reste du Sprint 2 (gros chantier, non fait) :** rechargement d'état + try/finally + timeout runner dans le `LeannaSupervisor` (point 5), branchement du noyau `core/` sur les missions.
+- ⏳ **Sprint 3 à venir** (unification Supervisor, skill 10, Planner 12).
+- Vérifs : typecheck propre sur les fichiers touchés ; 66 tests mission + core au vert.
+
 ## 🔴 Critiques (à corriger en premier)
 
-### 1. Le « retry » ne relance jamais rien
+### 1. ✅ CORRIGÉ — Le « retry » ne relance jamais rien
 
 - `Mission.recordActionResult` met l'action en `failed`, et rien ne la remet en `pending`. Seul `Mission.fromJSON` le fait, uniquement pour `in_progress`.
 - La boucle de `executeGoalDirectly` ne sélectionne que les actions `pending` : une action « à retenter » est silencieusement sautée.
 - `goal.attempts` n'est jamais incrémenté, donc `attemptCount` vaut toujours 1. La limite `maxAttempts` et l'escalade qui en dépend ne se déclenchent jamais.
 - **Correctif :** sur `retry`, si `attempts < maxAttempts`, faire `attempts++`, remettre l'action à `pending` et vider son résultat. Sinon, passer en `replan` ou `escalate`.
+- **Fait :** `Mission.retryAction()` (incrémente `attempts`, remet en `pending`, vide résultat/réflexion, renvoie `false` quand `maxAttempts` atteint) ; la branche `retry` de `executeGoalDirectly` l'appelle et bascule en `replan` quand le budget est épuisé.
 
-### 2. Fausses missions « réussies »
+### 2. ✅ CORRIGÉ — Fausses missions « réussies »
 
 - Dans `executeMission`, `success = allCompleted || (allTerminal && !anyCriticalFailed)`.
 - Une mission dont des sous-objectifs non critiques ont échoué est donc marquée `completed`.
 - Les stats, `MissionEvolution`, les playbooks et le profil projet apprennent alors de faux succès.
 - **Correctif :** succès uniquement si tout est `completed`. Sinon, ajouter un statut `partial` et ne pas alimenter l'apprentissage en succès.
+- **Fait :** `success = allCompleted` ; résumé « partiellement réussie » quand une partie seulement aboutit. L'apprentissage ne reçoit plus de faux succès.
 
-### 3. Une mission dry-run réactivée s'exécute pour de vrai
+### 3. ✅ CORRIGÉ — Une mission dry-run réactivée s'exécute pour de vrai
 
 - `confirmResume` appelle `Mission.fromJSON(pending.state)` sans config, donc `dryRun` retombe à `false`. Timeout, `maxRetries` et autres réglages repartent aux valeurs par défaut.
 - Les reprises n'ont pas non plus de watchdog, de trace télémétrie, de budget ni d'entrée dans `missionRuns` : `waitForMission` rend la main immédiatement.
 - **Correctif :** sauvegarder `config` dans `MissionState`, la passer à `fromJSON`, et factoriser un `launchMission()` commun à `startMission` et `confirmResume`.
+- **Fait :** `MissionConfig` persistée dans `MissionState` et restaurée par `fromJSON` ; `launchMission()` factorisé (watchdog + télémétrie + `missionRuns`) partagé par `startMission` et `confirmResume`.
 
-### 4. Annulation et timeout incorrects
+### 4. ✅ CORRIGÉ (hors AbortSignal) — Annulation et timeout incorrects
 
 - `cancelMission` et le watchdog utilisent `completeActiveGoal`, qui ferme le sommet de la pile (un sous-objectif), pas la racine.
 - Conséquences : le statut peut rester `in_progress` dans l'historique, et `executeMission` reprend ensuite et finalise une 2ᵉ fois (doublon dans `completedMissions`, `mission_completed` émis après `mission_cancelled`).
@@ -38,6 +55,7 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
 - Le statut `cancelled` n'est jamais posé alors que la route répond `"cancelled"`. Sans objectif actif, `completeActiveGoal` lève une exception (route en 500).
 - Un skill en cours n'est pas interrompu (pas d'`AbortSignal`).
 - **Correctif :** ajouter `Mission.cancel()` (racine + objectifs non terminaux → `cancelled`), rendre `finalizeMission` idempotent, et propager un `AbortSignal` au `skillHandler`.
+- **Fait :** `Mission.cancel()` ajouté (racine + objectifs/actions non terminaux → `cancelled`) ; `finalizeMission` idempotent via `finalizedMissions` ; `executeMission` ne ré-émet plus après annulation. **Reste :** propagation d'un `AbortSignal` au skill en cours (Sprint 2).
 
 ### 5. Le noyau `core/` n'est pas branché sur les missions
 
@@ -53,10 +71,10 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
 
 ## 🟠 Majeurs
 
-6. **Pause :** le watchdog de 30 min continue de tourner pendant la pause, donc une mission pausée peut être tuée. La pause n'est pas persistée et ne prend effet qu'entre deux actions.
-7. **Persistance :** sauvegarde au démarrage, après chaque vague et à la fin seulement, jamais après une action. À la reprise, les actions `in_progress` sont rejouées, ce qui est risqué pour les écritures, le shell et git, puisque l'idempotence du ledger est optionnelle (`LEANNA_IDEMPOTENCY`) et ne couvre pas ce chemin. L'historique (50 max) est en mémoire seulement et disparaît au redémarrage. Les `void persist()` en fin de mission peuvent s'écraser entre eux.
-8. **Route `approve` :** elle ignore `:id`, donc n'importe quel `actionId` est approuvable via n'importe quelle mission. `POST /missions/autonomy` peut passer en mode `auto` : à protéger (auth, rate-limit) ; non vérifiable ici. Le garde-fou `LEANNA_AUTO_ALLOW_DANGEROUS` est lui bien conçu.
-9. **Échec critique :** seul `failed` arrête la mission, pas `blocked` (escalade), alors que le calcul final compte `blocked` comme échec critique. Les dépendants d'un objectif bloqué attendent une vague de plus.
+6. ✅ **CORRIGÉ (watchdog) — Pause :** le watchdog ne compte plus le temps passé en pause (sondage qui n'accumule que le temps actif). **Reste :** la pause n'est toujours pas persistée et ne prend effet qu'entre deux actions.
+7. ✅ **CORRIGÉ en partie — Persistance :** sauvegarde désormais **après chaque action** (plus seulement par vague). Store local `.Leanna` par défaut → reprise possible sans Supabase. **Reste :** à la reprise, les actions `in_progress` sont encore rejouées (idempotence ledger optionnelle) ; l'historique (50 max) reste en mémoire.
+8. ✅ **CORRIGÉ (approve) — Route `approve` :** l'action doit désormais appartenir à la mission `:id` (plus d'approbation croisée). **Reste :** `POST /missions/autonomy` (passage en mode `auto`) à protéger par auth/rate-limit — non vérifiable depuis ce dump. Garde-fou `LEANNA_AUTO_ALLOW_DANGEROUS` bien conçu.
+9. ✅ **CORRIGÉ — Échec critique :** seul `failed` arrêtait la mission, pas `blocked`. **Fait :** un objectif critique `blocked` stoppe désormais la mission comme un `failed`, cohérent avec le calcul de succès final.
 10. **Skill `mission` :** `mission_pause`, `mission_resume` et `mission_add_goal` sont dans `toolPermissions` mais sans déclaration, schéma ni handler. L'IA ne peut donc ni pauser ni reprendre. Les schémas Zod de `types.ts` doublonnent ceux du skill.
 11. **Vérification des objectifs trop permissive :** sans critères, un seul succès suffit. Avec LLM, un verdict négatif non « bloquant » est converti en succès. La vérification repose sur le LLM plutôt que sur des faits, alors que l'`EvidenceEngine` fait exactement cela.
 12. **Planner (à vérifier) :** aucun plafonnement par `maxSubGoals` (10) trouvé. Si le LLM renvoie plus de 10 sous-objectifs, `addSubGoal` lève une exception et `startMission` échoue. Les `dependsOn` par titre écrasent les doublons de titres.
@@ -64,9 +82,9 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
 
 ## 🟡 Mineurs
 
-- **Routes :** utiliser 409 plutôt que 404 pour « déjà en pause » ou « non en pause » ; `durationMs: undefined` dans `serializeMission` ; `priority` non validée côté route.
-- **Machine d'états :** `ESCALATED` est terminal, donc aucune reprise humaine après escalade ; pas de transition vers `PAUSED` depuis `VERIFYING` ou `COMMITTING`.
-- **`writeJsonAtomic` :** pas de `fsync`, et le repli `copyFileSync` (EPERM Windows) n'est pas atomique. Un snapshot corrompu devient `null` sans aucun log.
+- ✅ **CORRIGÉ — Routes :** `409` (conflit d'état) vs `404` (introuvable) pour pause/resume ; `durationMs` réellement renseigné dans `serializeMission` (via `PlannedAction.durationMs`) ; `priority` validée côté route.
+- **Machine d'états :** `ESCALATED` est terminal, donc aucune reprise humaine après escalade ; pas de transition vers `PAUSED` depuis `VERIFYING` ou `COMMITTING`. *(non traité)*
+- ✅ **CORRIGÉ (fsync + log) — `writeJsonAtomic` :** `fsync` ajouté avant le rename ; un JSON corrompu est désormais journalisé dans `readJson`. **Reste :** le repli `copyFileSync` (EPERM Windows) n'est toujours pas atomique.
 - **Tests :** `Executor.test.ts` compte 2 tests pour 2 134 lignes. Rien sur retry, cancel, pause, reprise ou ordonnancement par dépendances. `Executor.ts` (2 134 lignes) et `Reflection.ts` (1 266) méritent d'être découpés.
 
 ## Plan proposé

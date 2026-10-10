@@ -325,10 +325,10 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {
       const missionModule = await import("./server/mission/index.js");
-      const { Executor, MissionStore, AutonomyPolicy } = missionModule;
+      const { Executor, MissionStore, LocalMissionStore, CompositeMissionStore, AutonomyPolicy } = missionModule;
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
-      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean }) =>
+      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal }) =>
         sm.handleToolCall(name, args, undefined, opts));
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
@@ -364,8 +364,14 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         .map((d: any) => d.name)
         .filter((name: string) => !name.startsWith("browser_") || MISSION_WEB_TOOL_ALLOWLIST.has(name));
 
-      // Persistance des missions (Supabase). No-op si non configuré.
-      const missionStore = new MissionStore();
+      // Persistance des missions : store LOCAL (.Leanna, toujours disponible,
+      // garantit la reprise après crash sans Supabase) + store Supabase quand
+      // il est configuré. Le composite diffuse les écritures aux deux et unifie
+      // les lectures de reprise. (Audit, points 5 & 7.)
+      const missionStore = new CompositeMissionStore(
+        new LocalMissionStore(),
+        new MissionStore(),
+      );
       executor.setStore(missionStore);
 
       // Curseur d'autonomie (suggest/ask/auto) + .leannaignore.

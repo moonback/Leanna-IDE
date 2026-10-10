@@ -29,6 +29,11 @@ export { Mission } from "./Mission.js";
 export { Planner, type SubGoalPlan, type DecomposeFunction } from "./Planner.js";
 export { Executor, type SkillHandlerFn, type ExecutorEventEmitter, type LLMTextFn, type ToolSchema } from "./Executor.js";
 export { MissionStore } from "./MissionStore.js";
+export {
+  LocalMissionStore,
+  CompositeMissionStore,
+  type MissionStatePort,
+} from "./LocalMissionStore.js";
 export { AutonomyPolicy, type AutonomyMode, type AutonomyDecision, type AutonomyVerdict } from "./AutonomyPolicy.js";
 export { ReflectionEngine, reflectionEngine, type ReflectionInput, type ReflectFunction, type ReflectionMode, type LoopDetectionResult, type ConfidenceAnalysis, type ReflectionLesson, type ReflectionSummary } from "./Reflection.js";
 export { SkillScorer, type ScoringContext, type SkillCategory } from "./SkillScorer.js";

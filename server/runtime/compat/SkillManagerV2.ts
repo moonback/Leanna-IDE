@@ -94,7 +94,7 @@ export class SkillManagerV2 {
     name: string,
     args: any,
     context?: any,
-    options?: { dryRun?: boolean }
+    options?: { dryRun?: boolean; signal?: AbortSignal }
   ): Promise<any> {
     // Normalisation du nom (compatibilité Gemini qui préfixe)
     let normalizedName = name;
@@ -126,15 +126,23 @@ export class SkillManagerV2 {
           const dryRunActive = options?.dryRun ?? this.registry.getDryRun().isEnabled();
           const def = this.registry.getDefinition(normalizedName);
           if (dryRunActive && def && this.registry.getDryRun().hasSideEffect(def.permissions)) {
-            return this.registry.call(normalizedName, args ?? {}, { context, dryRun: true });
+            return this.registry.call(normalizedName, args ?? {}, { context, dryRun: true, signal: options?.signal });
           }
-          return skill.handleToolCall(normalizedName, args, context);
+          // Propager le signal d'annulation au handler legacy via le contexte,
+          // pour qu'il puisse interrompre une opération longue.
+          const mergedContext =
+            options?.signal !== undefined ? { ...(context ?? {}), signal: options.signal } : context;
+          return skill.handleToolCall(normalizedName, args, mergedContext);
         }
       }
     }
 
     // Sinon, utiliser le ToolRegistry normal
-    return this.registry.call(normalizedName, args ?? {}, { context, dryRun: options?.dryRun });
+    return this.registry.call(normalizedName, args ?? {}, {
+      context,
+      dryRun: options?.dryRun,
+      signal: options?.signal,
+    });
   }
 
   /**
