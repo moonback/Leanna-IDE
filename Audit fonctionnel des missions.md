@@ -20,8 +20,9 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
   - Routes : `approve` lié au `missionId`, `409` vs `404` pour pause/resume, `durationMs` réellement calculé, `priority` validée.
 - ✅ **Sprint 3 (partie 1) : `LeannaSupervisor` durci** — rechargement d'état depuis snapshot, `try/finally` autour de rollback/commit/evidence, timeout runner (`AbortSignal`), `PAUSED`/`WAITING_APPROVAL` via hooks. Nouveau `kernel.missionStoreDir` pour isoler les snapshots en test.
 - ✅ **Sprint 3 (partie 1 bis) : skill `mission` complété (point 10) + Planner plafonné (point 12)** — `mission_pause`/`mission_resume`/`mission_add_goal` opérationnels, schémas Zod dupliqués supprimés, `maxSubGoals` respecté, `dependsOn` par titre déterministe.
-- ⏳ **Sprint 3 (partie 2) à venir** : faire passer l'Executor par le Supervisor (couture `MissionRunner`, preuve réelle via `EvidenceEngine` au lieu du verdict LLM — point 11), unifiant les deux machines d'états.
-- Vérifs : typecheck propre sur les fichiers touchés ; **91 tests mission + core au vert**.
+- ✅ **Sprint 3 (partie 2) : vérification par PREUVE (point 11)** — l'`Executor` juge les objectifs sur des faits (`EvidenceEngine`) plutôt que sur le verdict LLM, derrière le flag `LEANNA_MISSION_EVIDENCE` (réversible).
+- ✅ **Unification (point 5) : couture Executor → Supervisor** — en mode supervisé (`LEANNA_MISSION_SUPERVISED`), `startMission` exécute DANS la boucle du `LeannaSupervisor` : l'Executor est le `MissionRunner`, le Supervisor possède l'état durable (`MissionLifecycleState`), snapshots/rollback, scellement de preuve et récupération. Les deux machines d'états sont réconciliées (`buildMissionOutcome` mappe `GoalStatus` → `RunnerOutcome`). Réversible : sans le flag, exécution directe inchangée.
+- Vérifs : typecheck propre sur les fichiers touchés ; **95 tests mission + core au vert**.
 
 ## 🔴 Critiques (à corriger en premier)
 
@@ -68,7 +69,8 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
   - ✅ **try/finally** : `evidence.record`/`commit`/`rollback` encapsulés ; toute exception bascule proprement en `FAILED` (via `safeAdvance`, toujours persisté) au lieu de rester coincé en `VERIFYING`/`COMMITTING`/`RECOVERING`.
   - ✅ **Timeout runner** : `runnerTimeoutMs` borne chaque tentative ; un dépassement déclenche un `AbortSignal` transmis au runner et compte comme tentative échouée.
   - ✅ **`PAUSED` / `WAITING_APPROVAL`** : hooks optionnels (`needsApproval`/`awaitApproval`, `shouldPause`/`awaitResume`) matérialisent ces états (rétrocompatibles).
-  - **Reste :** sans `plannedFiles`, le rollback ne couvre toujours rien (limite du checkpoint) ; l'Executor des missions ne passe toujours PAS par le Supervisor (couture `MissionRunner`, Sprint 3 partie 2).
+  - ✅ **Couture Executor → Supervisor** : via `LEANNA_MISSION_SUPERVISED`, l'exécution transite DANS la boucle du Supervisor (`Executor.runSupervised` + `buildMissionOutcome` mappe `GoalStatus` → `RunnerOutcome`). Le Supervisor est l'autorité unique du cycle de vie ; les deux machines d'états sont réconciliées.
+  - **Reste :** sans `plannedFiles`, le rollback ne couvre toujours rien (limite du checkpoint) ; en supervisé, une mission fait une passe de la boucle d'objectifs par exécution (retries fins au niveau action), une reprise multi-tentatives Supervisor demanderait de réinitialiser l'état de mission entre tentatives.
 
 ## 🟠 Majeurs
 
@@ -77,7 +79,7 @@ L'idée est solide (goal stack, vagues parallèles, anti-boucle, dry-run, approb
 8. ✅ **CORRIGÉ (approve) — Route `approve` :** l'action doit désormais appartenir à la mission `:id` (plus d'approbation croisée). **Reste :** `POST /missions/autonomy` (passage en mode `auto`) à protéger par auth/rate-limit — non vérifiable depuis ce dump. Garde-fou `LEANNA_AUTO_ALLOW_DANGEROUS` bien conçu.
 9. ✅ **CORRIGÉ — Échec critique :** seul `failed` arrêtait la mission, pas `blocked`. **Fait :** un objectif critique `blocked` stoppe désormais la mission comme un `failed`, cohérent avec le calcul de succès final.
 10. ✅ **CORRIGÉ — Skill `mission` :** `mission_pause`, `mission_resume` et `mission_add_goal` ont désormais déclaration + schéma Zod + handler. `mission_add_goal` s'appuie sur un nouveau `Executor.addGoal()` (ajout à chaud d'un sous-objectif à une mission active). Les schémas Zod dupliqués de `types.ts` (`createMissionSchema`, `addGoalSchema`) ont été supprimés : le skill est la source de vérité unique.
-11. **Vérification des objectifs trop permissive :** sans critères, un seul succès suffit. Avec LLM, un verdict négatif non « bloquant » est converti en succès. La vérification repose sur le LLM plutôt que sur des faits, alors que l'`EvidenceEngine` fait exactement cela.
+11. ✅ **CORRIGÉ (derrière flag) — Vérification des objectifs :** l'`Executor` peut désormais vérifier un objectif par PREUVE factuelle via l'`EvidenceEngine` (`setEvidenceEngine`, activable par `LEANNA_MISSION_EVIDENCE`). Chaque action devient un `runtimeCheck` dont le verdict dérive de `detectSkillFailure` (faits, pas narration) ; un seul check échoué interdit le succès. Le LLM/heuristique ne sert plus que de repli quand aucun fait n'est exploitable. **Reste :** l'Executor ne transite toujours pas DANS la boucle du Supervisor (couture `MissionRunner` complète) — c'est la dernière étape d'unification des deux machines d'états.
 12. ✅ **CORRIGÉ — Planner / `createSubGoals` :** plafonnement par `maxSubGoals` ajouté (troncature + événement `plan_truncated`) → plus de crash de `startMission` quand le LLM sur-découpe. Les `dependsOn` par titre conservent désormais la **première** occurrence d'un titre dupliqué (avec avertissement) au lieu d'écraser le mapping.
 13. **Simulator (à vérifier) :** il lit un rapport dry-run global (`DryRunController`) sans reset visible ; des simulations ou missions concurrentes peuvent se polluer.
 

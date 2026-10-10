@@ -128,3 +128,136 @@ test('Executor pause/resume toggles the paused state of an active mission', asyn
 
   await executor.waitForMission(mission.id);
 });
+
+// ─── Sprint 3 (partie 2) : vérification d'objectif par PREUVE ────────────────
+
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { EvidenceEngine } from '../core/EvidenceEngine.js';
+
+test('evidence-based verification fails a goal when a skill reports a factual failure', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-ev-'));
+  const verified: Array<{ passed: boolean }> = [];
+
+  const executor = new Executor();
+  // Un skill de vérification qui signale factuellement un échec (status: failed)
+  // SANS clé `error` — exactement le cas que detectSkillFailure doit attraper.
+  executor.setSkillHandler(async (name: string) => {
+    if (name === 'verify_typecheck') return { status: 'failed', message: 'TS2322' };
+    return null;
+  });
+  executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+  executor.setEventEmitter((event, data) => {
+    if (event === 'goal_verified') verified.push({ passed: data.passed as boolean });
+  });
+
+  // Pas de LLM : une seule racine, plan via le scorer heuristique.
+  // On force un plan contenant verify_typecheck en l'exposant comme skill dispo.
+  const mission = await executor.startMission({
+    title: 'Vérifier la compilation',
+    description: 'Lancer verify_typecheck et confirmer la compilation.',
+    availableSkills: ['verify_typecheck'],
+  });
+  await executor.waitForMission(mission.id);
+
+  // La mission ne doit PAS être marquée réussie : la preuve (status failed) prime.
+  assert.equal(mission.status !== 'completed', true, 'un check factuel échoué interdit le succès');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('evidence-based verification passes a goal when all factual checks pass', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-ev-'));
+  const executor = new Executor();
+  executor.setSkillHandler(async () => ({ ok: true, status: 'success' }));
+  executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+
+  const mission = await executor.startMission({
+    title: 'Action réussie',
+    description: 'Exécuter une action qui réussit factuellement.',
+    availableSkills: ['verify_typecheck'],
+  });
+  await executor.waitForMission(mission.id);
+
+  const completed = await executor.waitForMission(mission.id);
+  assert.ok(completed);
+  assert.equal(completed.status, 'completed', 'tous les checks factuels passent → succès');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ─── Unification : couture Executor → Supervisor ─────────────────────────────
+
+import { LeannaSupervisor } from '../core/LeannaSupervisor.js';
+import { DurableMissionStore } from '../core/DurableMissionStore.js';
+import { CheckpointManager } from '../core/CheckpointManager.js';
+
+function supervisorInDir(dir: string): LeannaSupervisor {
+  const memGateway = (() => {
+    const store = new Map<string, string>();
+    return {
+      exists: (p: string) => store.has(p),
+      read: (p: string) => { const v = store.get(p); if (v === undefined) throw new Error(`missing ${p}`); return v; },
+      write: (p: string, c: string) => void store.set(p, c),
+      remove: (p: string) => void store.delete(p),
+    };
+  })();
+  return new LeannaSupervisor({
+    maxAttempts: 1,
+    missionStore: new DurableMissionStore(path.join(dir, 'missions')),
+    checkpoints: new CheckpointManager({ gateway: memGateway, dirOverride: path.join(dir, 'cp') }),
+    evidence: new EvidenceEngine(path.join(dir, 'ev')),
+  });
+}
+
+test('supervised mode governs a successful mission through the lifecycle to COMPLETED', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-sup-'));
+  const events: Array<{ state: string; passed: unknown }> = [];
+
+  const executor = new Executor();
+  executor.setSkillHandler(async () => ({ ok: true }));
+  const supervisor = supervisorInDir(dir);
+  executor.setSupervisor(supervisor, true);
+  executor.setEventEmitter((event, data) => {
+    if (event === 'mission_supervised') events.push({ state: data.lifecycleState as string, passed: data.evidencePassed });
+  });
+
+  const mission = await executor.startMission({
+    title: 'Mission supervisée',
+    description: 'Exécuter sous gouvernance du Supervisor.',
+    availableSkills: [],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  assert.equal(done.status, 'completed', 'la mission Executor aboutit');
+  // Le cycle de vie durable a atteint COMPLETED et la preuve a été scellée.
+  assert.equal(events.length, 1);
+  assert.equal(events[0].state, 'COMPLETED');
+
+  // Le snapshot durable du Supervisor reflète l'état terminal.
+  const reloaded = new DurableMissionStore(path.join(dir, 'missions')).load(mission.id);
+  assert.equal(reloaded?.current, 'COMPLETED');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('default mode (no supervisor) keeps running missions directly', async () => {
+  const executor = new Executor();
+  executor.setSkillHandler(async () => null);
+  let supervisedSeen = false;
+  executor.setEventEmitter((event) => { if (event === 'mission_supervised') supervisedSeen = true; });
+
+  const mission = await executor.startMission({
+    title: 'Mission directe',
+    description: 'Aucun Supervisor branché : exécution directe.',
+    availableSkills: [],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  assert.equal(supervisedSeen, false, 'pas de gouvernance Supervisor sur le chemin par défaut');
+
+  fs.rmSync(fs.mkdtempSync(path.join(os.tmpdir(), 'noop-')), { recursive: true, force: true });
+});

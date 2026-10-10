@@ -5,6 +5,8 @@ import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
 import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
+import type { EvidenceEngine, EvidenceInput, CheckResult } from "../core/EvidenceEngine.js";
+import type { LeannaSupervisor, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
@@ -68,6 +70,37 @@ export class Executor {
 
   /** Store de persistance (optionnel) : local, Supabase, ou composite. */
   private store: MissionStatePort | null = null;
+
+  /**
+   * Moteur de preuve optionnel (audit, point 11). Quand branché ET activé, la
+   * vérification d'objectif s'appuie sur une PREUVE factuelle (checks dérivés
+   * des résultats de skills) plutôt que sur le seul verdict LLM — « la preuve
+   * prime sur la narration ». Rétrocompatible : absent → vérification LLM/
+   * heuristique d'origine.
+   */
+  private evidence: EvidenceEngine | null = null;
+
+  /**
+   * Active la vérification par preuve. Par défaut lu depuis
+   * `LEANNA_MISSION_EVIDENCE` (true/1), surchargé par `setEvidenceEngine`.
+   */
+  private evidenceVerification = false;
+
+  /**
+   * Autorité de gouvernance optionnelle (audit, point 5 / unification). Quand
+   * branchée ET activée, l'exécution d'une mission transite DANS la boucle du
+   * `LeannaSupervisor` : l'Executor devient le `MissionRunner`, le Supervisor
+   * possède l'état durable (`MissionLifecycleState`), les snapshots/rollbacks,
+   * la preuve et les décisions de récupération. Rétrocompatible : absent →
+   * exécution directe (chemin par défaut inchangé).
+   */
+  private supervisor: LeannaSupervisor | null = null;
+
+  /**
+   * Active le mode supervisé. Par défaut lu depuis `LEANNA_MISSION_SUPERVISED`
+   * (true/1), surchargé par `setSupervisor`.
+   */
+  private supervisedMode = false;
 
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
@@ -202,6 +235,12 @@ export class Executor {
     this.planner = new Planner(this.scorer);
     this.reflection = new ReflectionEngine();
     this.planEstimator = new PlanEstimator(this.scorer);
+    // Vérification par preuve activable par défaut via l'environnement.
+    const raw = (process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase().trim();
+    this.evidenceVerification = raw === "true" || raw === "1";
+    // Mode supervisé (couture Supervisor) activable par défaut via l'environnement.
+    const sup = (process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase().trim();
+    this.supervisedMode = sup === "true" || sup === "1";
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
@@ -259,6 +298,35 @@ export class Executor {
    */
   setStore(store: MissionStatePort): void {
     this.store = store;
+  }
+
+  /**
+   * Branche le moteur de preuve et active la vérification par preuve (audit,
+   * point 11). `enabled` par défaut `true` : fournir un moteur signifie qu'on
+   * veut l'utiliser. Passer `false` branche le moteur sans l'activer.
+   */
+  setEvidenceEngine(engine: EvidenceEngine, enabled = true): void {
+    this.evidence = engine;
+    this.evidenceVerification = enabled;
+  }
+
+  /** Active/désactive la vérification par preuve à chaud (si un moteur est branché). */
+  setEvidenceVerification(enabled: boolean): void {
+    this.evidenceVerification = enabled;
+  }
+
+  /**
+   * Branche l'autorité de gouvernance (`LeannaSupervisor`) et active le mode
+   * supervisé (audit, point 5 / unification). `enabled` par défaut `true`.
+   */
+  setSupervisor(supervisor: LeannaSupervisor, enabled = true): void {
+    this.supervisor = supervisor;
+    this.supervisedMode = enabled;
+  }
+
+  /** Active/désactive le mode supervisé à chaud (si un Supervisor est branché). */
+  setSupervisedMode(enabled: boolean): void {
+    this.supervisedMode = enabled;
   }
 
   /**
@@ -424,7 +492,16 @@ export class Executor {
     // Lancer l'exécution en arrière-plan, tout en conservant une promesse
     // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
     // que déclarer une mission réussie juste après sa création.
-    const run = this.executeMission(mission, availableSkills).catch((err) => {
+    //
+    // Unification (audit, point 5) : en mode supervisé, l'exécution transite
+    // DANS la boucle du Supervisor (état durable, snapshots, preuve, récupération).
+    // Sinon, exécution directe (chemin par défaut inchangé).
+    const body =
+      this.supervisor && this.supervisedMode
+        ? this.runSupervised(mission, availableSkills)
+        : this.executeMission(mission, availableSkills);
+
+    const run = body.catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
       telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
@@ -480,6 +557,127 @@ export class Executor {
       if (typeof watchdog.unref === "function") watchdog.unref();
       void run.finally(() => clearInterval(watchdog));
     }
+  }
+
+  /**
+   * Exécute une mission SOUS GOUVERNANCE du `LeannaSupervisor` (unification,
+   * audit §5 / point 11).
+   *
+   * L'Executor devient le `MissionRunner` : à chaque tentative gouvernée, il
+   * exécute la boucle d'objectifs (`executeMission`) puis remonte un
+   * `RunnerOutcome` dont le succès et la PREUVE dérivent de l'état FACTUEL des
+   * objectifs (pas de la narration). Le Supervisor possède alors l'état durable
+   * (`MissionLifecycleState`), les snapshots/rollbacks, le scellement de preuve
+   * et la décision de récupération — fusionnant les deux machines d'états
+   * (`GoalStatus` de l'Executor ↔ cycle de vie du core).
+   *
+   * Les fichiers planifiés (ciblés par le plan) sont transmis au Supervisor pour
+   * un rollback fidèle entre tentatives.
+   */
+  private async runSupervised(mission: Mission, availableSkills: string[]): Promise<void> {
+    const supervisor = this.supervisor!;
+
+    // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
+    const plannedFiles = this.collectPlannedFiles(mission);
+
+    const runner = async (): Promise<RunnerOutcome> => {
+      // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
+      // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
+      await this.executeMission(mission, availableSkills);
+      return this.buildMissionOutcome(mission);
+    };
+
+    const result = await supervisor.runMission({
+      missionId: mission.id,
+      goal: mission.getState().title,
+      runner,
+      plannedFiles,
+    });
+
+    this.emit("mission_supervised", {
+      missionId: mission.id,
+      lifecycleState: result.finalState,
+      attempts: result.attempts,
+      evidencePassed: result.evidence?.passed,
+    });
+  }
+
+  /**
+   * Agrège l'état FACTUEL des objectifs d'une mission en `RunnerOutcome` pour le
+   * Supervisor : succès ssi tous les sous-objectifs sont `completed` ; preuve
+   * dérivée des actions (checks par skill via `detectSkillFailure`, fichiers
+   * écrits, outils exécutés) ; décision de récupération suggérée en cas d'échec.
+   */
+  private buildMissionOutcome(mission: Mission): RunnerOutcome {
+    const goals = Object.values(mission.getState().goals);
+    const subGoals = goals.filter((g) => g.parentId !== null);
+    const scope = subGoals.length > 0 ? subGoals : goals;
+
+    const allCompleted =
+      scope.length > 0 && scope.every((g) => g.status === "completed");
+    const anyBlocked = scope.some((g) => g.status === "blocked");
+    const anyFailed = scope.some((g) => g.status === "failed");
+
+    // Preuve factuelle agrégée sur toutes les actions exécutées de la mission.
+    const executed = goals.flatMap((g) => g.plannedActions).filter(
+      (a) => a.status === "completed" || a.status === "failed"
+    );
+    const runtimeChecks: CheckResult[] = executed.map((a) => {
+      const failure = Executor.detectSkillFailure(a.result);
+      return {
+        name: a.skillName,
+        passed: a.status === "completed" && failure === null,
+        details: failure ?? undefined,
+      };
+    });
+    const filesModified = Array.from(
+      new Set(
+        executed
+          .filter(
+            (a) =>
+              a.status === "completed" &&
+              Executor.WRITE_TOOLS.includes(a.skillName) &&
+              typeof (a.args as Record<string, unknown>)?.path === "string"
+          )
+          .map((a) => String((a.args as Record<string, unknown>).path))
+      )
+    );
+    const toolsExecuted = executed.map((a) => a.skillName);
+
+    // Décision de récupération suggérée (sinon le Supervisor décide seul) :
+    //   - un objectif bloqué (escaladé) → escalate ;
+    //   - un échec « simple » → replan (changer de stratégie au tour suivant).
+    let suggestedRecovery: RecoveryDecision | undefined;
+    if (!allCompleted) {
+      if (anyBlocked) suggestedRecovery = "escalate";
+      else if (anyFailed) suggestedRecovery = "replan";
+    }
+
+    return {
+      success: allCompleted,
+      touchedFiles: filesModified,
+      evidence: { filesModified, toolsExecuted, runtimeChecks },
+      suggestedRecovery,
+      error: allCompleted ? undefined : "Objectifs non tous atteints.",
+    };
+  }
+
+  /**
+   * Liste des fichiers ciblés par le plan courant (args `path`/`file` des
+   * actions planifiées), pour le snapshot/rollback du Supervisor.
+   */
+  private collectPlannedFiles(mission: Mission): string[] {
+    const files = new Set<string>();
+    for (const goal of Object.values(mission.getState().goals)) {
+      for (const action of goal.plannedActions) {
+        const args = action.args as Record<string, unknown> | undefined;
+        for (const key of ["path", "file", "filePath"]) {
+          const v = args?.[key];
+          if (typeof v === "string" && v.trim()) files.add(v);
+        }
+      }
+    }
+    return Array.from(files);
   }
 
   /**
@@ -1657,7 +1855,7 @@ JSON:`;
    * successCriteria, à partir des actions exécutées et de leurs résultats.
    * Utilise le LLM si disponible, sinon une heuristique conservatrice.
    */
-  private async verifyGoalCriteria(_mission: Mission, goal: Goal): Promise<{
+  private async verifyGoalCriteria(mission: Mission, goal: Goal): Promise<{
     passed: boolean;
     reasoning: string;
   }> {
@@ -1667,6 +1865,17 @@ JSON:`;
     const anySuccess = executed.some((a) => a.status === "completed");
     const allSuccess =
       executed.length > 0 && executed.every((a) => a.status === "completed");
+
+    // ── Vérification par PREUVE (audit, point 11) ───────────────────────────
+    // Quand le moteur de preuve est branché et activé, on juge l'objectif sur
+    // des FAITS (checks dérivés des résultats de skills, fichiers écrits) plutôt
+    // que sur une narration LLM. La preuve prime : un seul check factuel échoué
+    // interdit le succès. On ne retombe sur le LLM/heuristique QUE lorsqu'aucun
+    // fait exploitable n'existe (objectif purement analytique sans check).
+    if (this.evidence && this.evidenceVerification) {
+      const verdict = this.verifyByEvidence(mission, goal, executed);
+      if (verdict) return verdict;
+    }
 
     // Sans critères explicites, on retombe sur le succès des actions.
     if (!goal.successCriteria || goal.successCriteria.length === 0) {
@@ -1743,6 +1952,84 @@ JSON:`;
         reasoning: "Vérification LLM indisponible ; repli sur le succès de toutes les actions.",
       };
     }
+  }
+
+  /**
+   * Vérifie un objectif à partir d'une PREUVE factuelle (audit, point 11).
+   *
+   * Construit un `EvidenceInput` depuis les actions exécutées :
+   *   - chaque action devient un `runtimeCheck` dont `passed` dérive de
+   *     `detectSkillFailure` (le même détecteur factuel utilisé à l'exécution),
+   *     et non de la narration ;
+   *   - les fichiers écrits (outils d'écriture) alimentent `filesModified` ;
+   *   - les outils exécutés sont tracés.
+   * Le bundle est scellé par l'`EvidenceEngine`, qui calcule un verdict
+   * déterministe (`passed`) et une confiance bornée.
+   *
+   * Retourne `null` quand aucun fait exploitable n'existe (aucune action
+   * terminée) : l'appelant retombe alors sur la vérification LLM/heuristique.
+   */
+  private verifyByEvidence(
+    mission: Mission,
+    goal: Goal,
+    executed: PlannedAction[]
+  ): { passed: boolean; reasoning: string } | null {
+    if (!this.evidence) return null;
+    if (executed.length === 0) return null;
+
+    const runtimeChecks: CheckResult[] = executed.map((a) => {
+      const failure = Executor.detectSkillFailure(a.result);
+      return {
+        name: `${a.skillName}`,
+        passed: a.status === "completed" && failure === null,
+        details: failure ?? undefined,
+      };
+    });
+
+    // Fichiers réellement visés par une écriture réussie (preuve d'artefact).
+    const filesModified = Array.from(
+      new Set(
+        executed
+          .filter(
+            (a) =>
+              a.status === "completed" &&
+              Executor.WRITE_TOOLS.includes(a.skillName) &&
+              typeof (a.args as Record<string, unknown>)?.path === "string"
+          )
+          .map((a) => String((a.args as Record<string, unknown>).path))
+      )
+    );
+
+    const toolsExecuted = executed.map((a) => a.skillName);
+
+    const input: EvidenceInput = {
+      missionId: mission.id,
+      goal: goal.title,
+      filesModified,
+      toolsExecuted,
+      runtimeChecks,
+    };
+
+    const bundle = this.evidence.record(input);
+
+    this.emit("goal_evidence", {
+      missionId: mission.id,
+      goalId: goal.id,
+      passed: bundle.passed,
+      confidence: bundle.confidence,
+      checks: runtimeChecks.length,
+      failedChecks: runtimeChecks.filter((c) => !c.passed).length,
+    });
+
+    const failed = runtimeChecks.filter((c) => !c.passed);
+    const reasoning = bundle.passed
+      ? `Preuve: ${runtimeChecks.length} contrôle(s) factuel(s) passé(s) (confiance ${(bundle.confidence * 100).toFixed(0)}%).`
+      : `Preuve: ${failed.length}/${runtimeChecks.length} contrôle(s) en échec — ${failed
+          .map((c) => `${c.name}${c.details ? ` (${c.details})` : ""}`)
+          .slice(0, 3)
+          .join("; ")}.`;
+
+    return { passed: bundle.passed, reasoning };
   }
 
   private summarizeResult(result: unknown): string {

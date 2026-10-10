@@ -374,6 +374,39 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       );
       executor.setStore(missionStore);
 
+      // Vérification d'objectif par PREUVE réelle (audit, point 11), activable
+      // via LEANNA_MISSION_EVIDENCE. On branche le moteur de preuve local
+      // (.Leanna/core/evidence) ; l'activation effective suit le flag d'env lu
+      // par l'Executor (réversible : sans le flag, on garde la vérif LLM).
+      try {
+        const { EvidenceEngine } = await import("./server/core/EvidenceEngine.js");
+        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase();
+        const evidenceEnabled = evidenceFlag === "true" || evidenceFlag === "1";
+        executor.setEvidenceEngine(new EvidenceEngine(), evidenceEnabled);
+        if (evidenceEnabled) {
+          console.log(`[Bootstrap] ✓ Vérification d'objectif par preuve activée (EvidenceEngine).`);
+        }
+      } catch (err) {
+        console.warn(`[Bootstrap] ⚠️ EvidenceEngine non branché: ${(err as Error).message}`);
+      }
+
+      // Unification (audit, point 5) : brancher le LeannaSupervisor comme
+      // autorité de gouvernance, activable par LEANNA_MISSION_SUPERVISED. En mode
+      // supervisé, l'exécution transite dans la boucle du Supervisor (état durable,
+      // snapshots/rollback, preuve). Réversible : sans le flag, exécution directe.
+      try {
+        const { LeannaSupervisor } = await import("./server/core/LeannaSupervisor.js");
+        const supervisedFlag = String(process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase();
+        const supervisedEnabled = supervisedFlag === "true" || supervisedFlag === "1";
+        // Timeout runner optionnel aligné sur le timeout global de mission.
+        executor.setSupervisor(new LeannaSupervisor(), supervisedEnabled);
+        if (supervisedEnabled) {
+          console.log(`[Bootstrap] ✓ Mode supervisé activé (LeannaSupervisor gouverne le cycle de mission).`);
+        }
+      } catch (err) {
+        console.warn(`[Bootstrap] ⚠️ LeannaSupervisor non branché: ${(err as Error).message}`);
+      }
+
       // Curseur d'autonomie (suggest/ask/auto) + .leannaignore.
       // Défaut = "auto" : Leanna agit seule. Les actions DANGEREUSES (dangerous)
       // restent toutefois humaines-par-défaut même en auto (voir AutonomyPolicy),
