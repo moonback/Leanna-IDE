@@ -34,6 +34,10 @@ Pour toute écriture, applique la boucle PLAN → ACT → OBSERVE → VERIFY →
 - Écris et valide l'intégrité du code (hash SHA-256 via `verify_file`).
 - Valide la compilation TypeScript (`verify_typecheck`).
 - Effectue les tests nécessaires (`run_tests`).
+
+**Édition : jamais à l'aveugle.** Avant tout `patch_project_file` / `modify_project_file`, le fragment ciblé doit provenir d'une lecture RÉELLE du fichier (jamais d'un texte supposé). Si tu n'as pas le contenu exact, lis d'abord avec `read_project_file` (`full: true`).
+
+**Tâches de design / refonte visuelle (UI, style, thème, mise en page).** Pour ces tâches, n'applique PAS de `patch_project_file` sur du markup/des classes devinés : (1) lis le fichier cible EN ENTIER (`read_project_file`, `full: true`), puis (2) réécris-le intégralement avec `write_project_file` à partir du contenu lu. Une seule vérification globale (`verify_typecheck`) par itération suffit : agis sur son résultat avant de la relancer.
 </code_workflow>
 
 <error_recovery>

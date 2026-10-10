@@ -144,19 +144,19 @@ describe("resolveAgentTools — donne à l'agent ses outils réels", () => {
   });
 });
 
-describe("Budget absolu 8/3/9/6/4 — source de vérité (scénario 10)", () => {
-  it("expose les cinq quotas absolus et un total dérivé de 30", () => {
+describe("Budget absolu 10/3/9/6/4 — source de vérité (scénario 10)", () => {
+  it("expose les cinq quotas absolus et un total dérivé de 32", () => {
     const b = DEFAULT_AGENT_BUDGET;
-    assert.equal(b.maxRead, 8);
+    assert.equal(b.maxRead, 10);
     assert.equal(b.maxPlan, 3);
     assert.equal(b.maxWrite, 9);
     assert.equal(b.maxVerify, 6);
     assert.equal(b.maxRecovery, 4);
-    assert.equal(b.maxToolCalls, 30);
+    assert.equal(b.maxToolCalls, 32);
   });
   it("normalizeBudget recalcule le total comme somme des phases", () => {
     const b = normalizeBudget({ ...DEFAULT_AGENT_BUDGET, maxToolCalls: 999, maxWrite: 10 });
-    assert.equal(b.maxToolCalls, 8 + 3 + 10 + 6 + 4);
+    assert.equal(b.maxToolCalls, 10 + 3 + 10 + 6 + 4);
   });
   it("criticalReserve = write + verify + recovery", () => {
     assert.equal(criticalReserve(DEFAULT_AGENT_BUDGET), 9 + 6 + 4);
@@ -300,10 +300,10 @@ describe("Réserves de budget étanches (scénarios 6, 7)", () => {
 describe("buildBudgetSection — quotas absolus + réserves", () => {
   it("affiche la phase et les réserves étanches", () => {
     const usage = emptyBudgetUsage();
-    usage.readCalls = 8;
+    usage.readCalls = 10;
     const section = buildBudgetSection(DEFAULT_AGENT_BUDGET, usage, "discovery");
     assert.match(section, /DISCOVERY/);
-    assert.match(section, /exploration: 8\/8/);
+    assert.match(section, /exploration: 10\/10/);
     assert.match(section, /écriture \(réservé\): 0\/9/);
     assert.match(section, /vérification \(réservé\): 0\/6/);
     assert.match(section, /RÈGLE D'ARRÊT/);

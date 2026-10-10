@@ -60,8 +60,12 @@ export type AgentPhase = "discovery" | "plan" | "write" | "verify" | "recovery";
  * être consommées par l'exploration : c'est ce qui garantit qu'après la
  * découverte, l'agent a toujours de quoi écrire ET vérifier.
  *
- * Répartition par défaut (total 30) :
- *   discovery 8 · plan 3 · write 9 · verify 6 · recovery 4
+ * Répartition par défaut (total 32) :
+ *   discovery 10 · plan 3 · write 9 · verify 6 · recovery 4
+ *
+ * Note : `list_project_files` (navigation d'arborescence) n'est PAS facturé à
+ * `maxRead` — seules les lectures de CONTENU le sont. Le quota de 10 cible donc
+ * de vraies lectures utiles, pas la navigation.
  *
  * Les éventuelles fractions (affichage, heuristiques) sont DÉRIVÉES de ces
  * absolus, jamais l'inverse.
@@ -94,16 +98,16 @@ export interface AgentBudget {
 
 /**
  * Budget par défaut. Les cinq quotas de phase sont la SOURCE DE VÉRITÉ ;
- * `maxToolCalls` en est la somme (30).
+ * `maxToolCalls` en est la somme (32).
  */
 export const DEFAULT_AGENT_BUDGET: AgentBudget = {
   maxIterations: 20,
-  maxRead: 8,
+  maxRead: 10,
   maxPlan: 3,
   maxWrite: 9,
   maxVerify: 6,
   maxRecovery: 4,
-  maxToolCalls: 8 + 3 + 9 + 6 + 4, // = 30 (dérivé de la somme des phases)
+  maxToolCalls: 10 + 3 + 9 + 6 + 4, // = 32 (dérivé de la somme des phases)
   maxFilesRead: 20,
   maxExecutionTimeMs: 5 * 60_000, // 5 minutes
   maxCost: Infinity,

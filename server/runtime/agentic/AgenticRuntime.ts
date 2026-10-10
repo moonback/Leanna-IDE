@@ -103,6 +103,17 @@ const CACHEABLE_TOOLS = new Set([
   "analyze_project_file",
 ]);
 
+/**
+ * Lectures « structurelles » GRATUITES : elles cartographient l'arborescence
+ * (pas le CONTENU d'un fichier) et ne doivent pas grever le quota d'exploration.
+ * Lister les fichiers du projet est bon marché, souvent répété (une fois par
+ * sous-dossier) et nécessaire pour localiser la cible AVANT toute lecture utile.
+ * Les compter revenait à affamer le budget read avec de la navigation (4×
+ * list_project_files = 4 lectures « perdues »). Ils restent mis en cache (dédup)
+ * et exécutés, mais ni comptés ni gatés par `maxRead`.
+ */
+const FREE_READ_TOOLS = new Set(["list_project_files"]);
+
 const MAX_HISTORY_CHARS = 60_000;
 const MAX_RESULT_CHARS = 4_000;
 
@@ -332,6 +343,38 @@ export class AgenticRuntime implements IAgentRuntime {
 
       // ── FAILURE → RECOVER ──
       step.status = "failed";
+
+      // ── Garde anti-« vérifier dans le vide ». ──
+      // Cas observé : une MODIFICATION est attendue, l'agent n'a RIEN écrit, mais
+      // il a quand même émis des tool_calls (lectures, puis verify_file/
+      // verify_typecheck qui échouent). Le step passe « failed » → recovery, et
+      // l'agent s'enlise à re-vérifier un fichier jamais écrit, brûlant le quota
+      // verify. Tant qu'il reste du budget d'écriture et des relances d'action,
+      // on NE part PAS en recovery : on le renvoie ÉCRIRE (le vrai travail
+      // manquant), au lieu de « réparer » une vérification sans objet.
+      if (
+        session.filesModified.size === 0 &&
+        this.expectsWrites(session, plan) &&
+        session.usage.writeCalls < session.budget.maxWrite &&
+        actionNudges < AgenticRuntime.MAX_ACTION_NUDGES &&
+        !this.budgetExhausted(session)
+      ) {
+        actionNudges += 1;
+        session.phase = "write";
+        session.pendingInstruction =
+          "Tu n'as encore écrit AUCUN fichier alors qu'une modification est attendue. " +
+          "Ne vérifie rien (il n'y a rien à vérifier) : APPLIQUE d'abord la modification " +
+          "avec write_project_file / modify_project_file / patch_project_file sur le fichier " +
+          "cible déjà lu, PUIS vérifie avec verify_file. N'émets pas verify_typecheck tant " +
+          "que tu n'as rien écrit.";
+        step.status = "running";
+        log.info(
+          `[${session.taskId.slice(0, 8)}] ⚠️ Recovery court-circuitée (relance ${actionNudges}/${AgenticRuntime.MAX_ACTION_NUDGES}) : ` +
+            `vérification en échec sans aucune écriture — relance en phase write.`
+        );
+        continue; // reste sur la même étape, l'agent doit écrire
+      }
+
       // Identifie le premier fichier écrit non vérifié pour piloter la réparation.
       const failedFile = this.firstUnverifiedWrite(session, observation);
       const recovery = await this.recover({
@@ -381,6 +424,12 @@ export class AgenticRuntime implements IAgentRuntime {
       "Si l'objectif implique de MODIFIER du code, le plan DOIT inclure au moins",
       "une étape dont les suggestedTools contiennent un outil d'écriture",
       "(write_project_file / modify_project_file / patch_project_file).",
+      this.isDesignTask(session)
+        ? "TÂCHE DE DESIGN : le plan DOIT prévoir (a) une étape qui LIT le fichier " +
+          "cible en entier (read_project_file, full:true), puis (b) une étape qui le " +
+          "RÉÉCRIT intégralement via write_project_file. N'utilise pas patch/modify " +
+          "sur du texte supposé."
+        : "",
       "Réponds UNIQUEMENT avec un JSON strict de la forme :",
       JSON.stringify(
         {
@@ -451,12 +500,23 @@ export class AgenticRuntime implements IAgentRuntime {
    */
   private async groundCandidateFiles(task: AgentTask): Promise<string[]> {
     const found = new Set<string>();
-    const MAX_FILES = 8;
+    const MAX_FILES = 5;
+
+    // Rejette les chemins NON ÉDITABLES / générés : artefacts de sortie
+    // (graphify-out, dist, build, coverage), copies sandbox/VCS, dépendances,
+    // et rapports Markdown générés. Sans ce filtre, `knowledge_search_entities`
+    // peut renvoyer p.ex. `graphify-out/…/GRAPH_REPORT.md` comme « fichier » de
+    // l'entité, gaspillant le quota de lecture sur du bruit (bug observé).
+    const isNoise = (f: string): boolean =>
+      /(^|\/)(\.Leanna|node_modules|\.git|dist|build|coverage|graphify-out|\.project-knowledge)(\/|$)/i.test(
+        f.replace(/\\/g, "/")
+      ) || /GRAPH_REPORT\.md$/i.test(f);
+    const addCandidate = (f: unknown): void => {
+      if (typeof f === "string" && f.trim() && !isNoise(f.trim())) found.add(f.trim());
+    };
 
     // 1. Fichiers de contexte fournis par l'appelant.
-    for (const f of task.files ?? []) {
-      if (typeof f === "string" && f.trim()) found.add(f.trim());
-    }
+    for (const f of task.files ?? []) addCandidate(f);
 
     const text = [task.goal, task.instructions].filter(Boolean).join(" ");
 
@@ -483,7 +543,7 @@ export class AgenticRuntime implements IAgentRuntime {
         ? (ent as any).entities as Array<{ file?: unknown }>
         : [];
       for (const e of entities) {
-        if (typeof e.file === "string" && e.file.trim()) found.add(e.file.trim());
+        addCandidate(e.file);
         if (found.size >= MAX_FILES) break;
       }
     }
@@ -500,7 +560,7 @@ export class AgenticRuntime implements IAgentRuntime {
         const base = token.toLowerCase();
         for (const f of files) {
           if (f.toLowerCase().includes(base)) {
-            found.add(f);
+            addCandidate(f);
             if (found.size >= MAX_FILES) break;
           }
         }
@@ -527,11 +587,16 @@ export class AgenticRuntime implements IAgentRuntime {
 
     const iteration = usage.iterations;
     const systemPrompt = this.buildSystemPrompt(agent, tools, session);
+    const designProtocol =
+      this.isDesignTask(session) && tools.some((t) => t.name === "write_project_file")
+        ? AgenticRuntime.DESIGN_WRITE_PROTOCOL
+        : "";
     const stepPrompt = [
       `OBJECTIF GLOBAL : ${task.goal}`,
       `ÉTAPE COURANTE : ${step.description}`,
       step.suggestedTools?.length ? `OUTILS SUGGÉRÉS : ${step.suggestedTools.join(", ")}` : "",
       step.verification ? `VÉRIFICATION ATTENDUE : ${step.verification}` : "",
+      designProtocol,
       session.pendingInstruction ? `CONSIGNE CORRECTIVE : ${session.pendingInstruction}` : "",
       buildObservationHistory(session.observations, MAX_HISTORY_CHARS),
       "",
@@ -549,14 +614,86 @@ export class AgenticRuntime implements IAgentRuntime {
     const calls = extractToolCalls(text);
     const toolOutcomes: ToolCallOutcome[] = [];
 
+    // Déduplication INTRA-itération : un même outil de lecture appelé plusieurs
+    // fois avec les MÊMES arguments dans le SEUL tour courant ne doit compter
+    // que pour un (4× list_project_files identiques → 1). On s'appuie sur la
+    // clé de cache ; le readCache (inter-itérations) gère déjà la dédup entre
+    // tours, mais pas les doublons émis dans un même bloc de tool_calls.
+    const seenReadKeys = new Set<string>();
+    // Verrou anti-doublon de vérification : au plus UN verify_typecheck (et un
+    // verify_full) exécuté par itération. Les relances successives dans un même
+    // tour ne font qu'épuiser le quota sans information nouvelle.
+    const verifyRunThisIteration = new Set<string>();
+
     for (const call of calls) {
       const kind = classifyTool(call.name);
+
+      // ── Dédup intra-itération des lectures identiques. ──
+      if (kind === "read") {
+        const key = cacheKey(call.name, call.parameters);
+        if (seenReadKeys.has(key)) {
+          toolOutcomes.push({
+            invocation: { name: call.name, parameters: call.parameters },
+            success: true,
+            result: session.readCache.get(key),
+            durationMs: 0,
+            cached: true,
+          });
+          continue;
+        }
+        seenReadKeys.add(key);
+      }
+
+      // ── Vérification GLOBALE avant toute écriture = inutile. ──
+      // verify_typecheck / verify_full exécutent `tsc` sur tout le projet. Les
+      // lancer alors qu'AUCUN fichier n'a été modifié (et qu'une écriture est
+      // attendue) ne teste que l'état préexistant : si le projet a déjà une
+      // erreur TS ailleurs, l'outil renvoie `failed`, ce qui envoie l'agent en
+      // recovery pour un échec qui ne le concerne pas (enlisement observé :
+      // verify 2/6 → 4/6 sans aucune écriture). On bloque et on redirige vers
+      // l'écriture tant que rien n'a été produit.
+      if (
+        (call.name === "verify_typecheck" || call.name === "verify_full") &&
+        session.filesModified.size === 0 &&
+        this.expectsWrites(session, this.session?.lastPlan ?? { intent: "", steps: [], successCriteria: [], rationale: "" })
+      ) {
+        toolOutcomes.push({
+          invocation: { name: call.name, parameters: call.parameters },
+          success: false,
+          error:
+            `${call.name} est prématuré : aucun fichier n'a encore été modifié. ` +
+            `Une vérification globale avant écriture ne teste que l'état préexistant du projet. ` +
+            `Applique d'abord la modification (write_project_file / modify_project_file / patch_project_file), ` +
+            `puis vérifie le fichier écrit avec verify_file.`,
+          durationMs: 0,
+        });
+        session.pendingInstruction =
+          "N'exécute pas de vérification globale (verify_typecheck) tant que tu n'as rien écrit. Écris d'abord.";
+        continue;
+      }
+
+      // ── Verrou anti-doublon : un seul typecheck/verify_full par itération. ──
+      if (call.name === "verify_typecheck" || call.name === "verify_full") {
+        if (verifyRunThisIteration.has(call.name)) {
+          toolOutcomes.push({
+            invocation: { name: call.name, parameters: call.parameters },
+            success: false,
+            error:
+              `${call.name} a déjà été exécuté dans cette itération. ` +
+              `Une seule vérification globale par tour : agis sur le résultat précédent ` +
+              `(corrige puis relance au tour suivant) au lieu de relancer immédiatement.`,
+            durationMs: 0,
+          });
+          continue;
+        }
+        verifyRunThisIteration.add(call.name);
+      }
 
       // Gate de budget SÉLECTIF par nature d'appel.
       // - read/other : bloqués dès que le budget non-critique est épuisé.
       // - write/verify : autorisés tant que le budget réservé aux actions
       //   critiques n'est pas dépassé (les corrections doivent pouvoir aboutir).
-      const gate = this.admitCall(session, kind);
+      const gate = this.admitCall(session, kind, call.name, call.parameters);
       if (!gate.allowed) {
         toolOutcomes.push({
           invocation: { name: call.name, parameters: call.parameters },
@@ -654,7 +791,10 @@ export class AgenticRuntime implements IAgentRuntime {
     }
 
     const start = Date.now();
-    this.countCall(session, kind);
+    // Les lectures structurelles gratuites (list_project_files) sont exécutées
+    // et tracées, mais NON facturées au quota d'exploration.
+    const billable = !FREE_READ_TOOLS.has(name);
+    if (billable) this.countCall(session, kind);
     session.toolsExecuted.push(name);
     this.events?.emit({ type: "tool:called", toolName: name, agentId: session.agent.role });
 
@@ -677,7 +817,7 @@ export class AgenticRuntime implements IAgentRuntime {
         // plus relire une fois la cible disponible. On rembourse le compteur
         // facturé en amont par countCall(). Les écritures/vérifications ratées
         // restent comptées (une tentative d'action consomme son quota réservé).
-        if (kind === "read") this.refundCall(session, kind);
+        if (kind === "read" && billable) this.refundCall(session, kind);
         // Chemin deviné → on rend l'échec ACTIONNABLE en proposant les vrais
         // chemins candidats de l'inventaire (sinon l'agent continue de deviner).
         // UNIQUEMENT pour les lectures : suggérer un chemin sur un write/delete
@@ -726,7 +866,7 @@ export class AgenticRuntime implements IAgentRuntime {
         // budget read serré, l'agent qui a tout dépensé en découverte ne peut
         // plus relire après écriture pour se vérifier (impasse observée).
         if (path && session.filesModified.has(path)) {
-          this.refundCall(session, kind);
+          if (billable) this.refundCall(session, kind);
         } else if (path && !session.readFilesSeen.has(path)) {
           session.readFilesSeen.add(path);
           session.usage.filesRead = session.readFilesSeen.size;
@@ -747,7 +887,7 @@ export class AgenticRuntime implements IAgentRuntime {
       // exception (ex. search_in_files → ENOENT scandir) ne doit pas davantage
       // grever le quota d'exploration qu'une lecture échouée applicativement.
       // Même remboursement que la branche appError pour ne pas auto-affamer.
-      if (kind === "read") this.refundCall(session, kind);
+      if (kind === "read" && billable) this.refundCall(session, kind);
       const message = (err as Error).message;
       // Suggestion de chemins réservée aux lectures (cf. branche appError).
       const suggestion =
@@ -1161,7 +1301,9 @@ export class AgenticRuntime implements IAgentRuntime {
    */
   private admitCall(
     session: RunSession,
-    kind: ToolKind
+    kind: ToolKind,
+    name?: string,
+    parameters?: Record<string, unknown>
   ): { allowed: boolean; reason: string; nudge?: string } {
     const { budget, usage } = session;
 
@@ -1172,6 +1314,17 @@ export class AgenticRuntime implements IAgentRuntime {
     }
     if (usage.cost >= budget.maxCost) {
       return { allowed: false, reason: "Budget de coût épuisé." };
+    }
+
+    // Un read déjà en cache (relecture identique inter-itérations) est resservi
+    // sans coût : il ne doit jamais être refusé pour quota épuisé.
+    if (name && parameters && CACHEABLE_TOOLS.has(name) && session.readCache.has(cacheKey(name, parameters))) {
+      return { allowed: true, reason: "" };
+    }
+
+    // Lectures structurelles gratuites (list_project_files) : jamais gatées.
+    if (name && FREE_READ_TOOLS.has(name)) {
+      return { allowed: true, reason: "" };
     }
 
     // Chaque nature d'appel est plafonnée par SON quota de phase absolu, jamais
@@ -1300,6 +1453,33 @@ export class AgenticRuntime implements IAgentRuntime {
    */
   private static readonly CHANGE_INTENT_RE =
     /\b(ajout|add|implement|implément|créer|creer|crée|cree|écri|ecri|develop|développ|feature|corrig|fix|répar|repar|refactor|optimi|amélior|amelior|modif|remplac|replace|renomm|rename|supprim|delete|design|style|redesign|refont|refond)/i;
+
+  /**
+   * Mots-clés d'objectif impliquant une refonte VISUELLE / de DESIGN. Pour ces
+   * tâches, un search/replace sur du texte SUPPOSÉ est fragile (l'agent devine
+   * le markup/classes existants et échoue en silence). On impose donc le
+   * protocole « lire le fichier EN ENTIER → réécrire via write_project_file ».
+   */
+  private static readonly DESIGN_INTENT_RE =
+    /\b(design|style|styl|redesign|refont|refond|refonte|ui|ux|th[eè]me|theme|mise en page|layout|maquette|visuel|apparence|look|charte|palette|couleur|color)/i;
+
+  /** La mission est-elle une tâche de design / refonte visuelle ? */
+  private isDesignTask(session: RunSession): boolean {
+    return AgenticRuntime.DESIGN_INTENT_RE.test(session.goalText);
+  }
+
+  /**
+   * Consigne impérative pour les tâches de design : interdit le patch/replace
+   * « à l'aveugle » sur du contenu supposé et impose lecture intégrale puis
+   * réécriture complète. Injectée dans le prompt d'étape et le prompt de plan.
+   */
+  private static readonly DESIGN_WRITE_PROTOCOL =
+    "TÂCHE DE DESIGN — PROTOCOLE OBLIGATOIRE : " +
+    "1) lis le fichier cible EN ENTIER avec read_project_file (full:true) pour connaître " +
+    "le contenu RÉEL (markup, classes, styles) ; " +
+    "2) réécris-le INTÉGRALEMENT avec write_project_file en repartant du contenu lu. " +
+    "N'utilise PAS patch_project_file / modify_project_file sur du texte supposé : " +
+    "un search/replace sur un fragment deviné échoue en silence sur du design.";
 
   /**
    * Une MODIFICATION était-elle attendue pour cette mission ? Combine deux

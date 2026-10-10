@@ -205,8 +205,8 @@ function GlobalStyles() {
       .ee-glass {
         position: relative;
         overflow: hidden;
-        background-color: color-mix(in srgb, var(--surface) 50%, transparent);
-        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+        background-color: color-mix(in srgb, var(--surface) 60%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
@@ -218,10 +218,14 @@ function GlobalStyles() {
         position: absolute; inset: 0; z-index: 0;
         border-radius: inherit;
         pointer-events: none;
-        background: linear-gradient(135deg, color-mix(in srgb, #fff 10%, transparent) 0%, transparent 40%);
+          color-mix(in srgb, #fff 15%, transparent) 0%, transparent 50%);
       }
       .ee-glass > * { position: relative; z-index: 1; }
-      .ee-glass:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+      .ee-glass:hover { 
+        border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+                    0 12px 32px color-mix(in srgb, #000 24%, transparent);
+      }
 
       /* Carte Leanna : accent primaire plus marqué */
       .ee-card-primary {
@@ -250,8 +254,8 @@ function GlobalStyles() {
       .ee-card {
         position: relative;
         overflow: hidden;
-        background-color: color-mix(in srgb, var(--surface) 50%, transparent);
-        border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+        background-color: color-mix(in srgb, var(--surface) 60%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
