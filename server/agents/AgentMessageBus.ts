@@ -238,7 +238,10 @@ export class AgentMessageBus extends EventEmitter {
     };
 
     this.addToHistory(message);
-    log.debug(`📢 [${from}] broadcast: "${eventType}"`);
+    // Pas de trace pour les annonces de présence (agent_online) : bruit au démarrage.
+    if (eventType !== "agent_online") {
+      log.debug(`📢 [${from}] broadcast: "${eventType}"`);
+    }
     await this.deliverToAll(message);
   }
 

@@ -266,9 +266,16 @@ export class AutonomousAgent {
   // ─── Gestion des messages entrants ────────────────────────────────────────
 
   private async handleMessage(message: AgentMessage): Promise<void> {
-    log.debug(
-      `📨 [${this.agentName}] Message reçu de [${message.from}] type="${message.type}"`
-    );
+    // Les broadcasts de présence (agent_online) sont émis par chaque agent au
+    // démarrage et reçus par tous les autres → O(N²) lignes de bruit. On ne
+    // trace que les messages actionnables (task/status/collaboration/appel d'offres).
+    const payloadMsg = (message.payload as { message?: string } | undefined)?.message;
+    const isPresenceNoise = message.type === "broadcast" && payloadMsg === "agent_online";
+    if (!isPresenceNoise) {
+      log.debug(
+        `📨 [${this.agentName}] Message reçu de [${message.from}] type="${message.type}"`
+      );
+    }
 
     switch (message.type) {
       case "task_request":
@@ -293,7 +300,10 @@ export class AutonomousAgent {
 
   private async handleBroadcast(message: AgentMessage): Promise<void> {
     const payload = message.payload as { message: string; data?: Record<string, unknown> };
-    log.debug(`📢 [${this.agentName}] Broadcast: "${payload.message}" de [${message.from}]`);
+    // On ne trace pas les broadcasts de présence (agent_online) : bruit O(N²).
+    if (payload.message !== "agent_online") {
+      log.debug(`📢 [${this.agentName}] Broadcast: "${payload.message}" de [${message.from}]`);
+    }
 
     // Répondre automatiquement aux appels d'offres contract-net.
     if (payload.message === "call_for_proposals") {
