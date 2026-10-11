@@ -26,12 +26,12 @@
 
 <sub>Leanna est une plateforme desktop local-first dédiée à l'exécution sécurisée et transparente d'agents IA autonomes. Conçue pour offrir un contrôle total, l'application orchestre des tâches complexes via un cycle strict : Comprendre, Planifier, Agir, Observer, Vérifier et Récupérer.
 
-Rien ne quitte votre machine sans action explicite. Chaque action à effet de bord traverse une chaîne de sécurité rigoureuse (idempotence, permissions, sandbox, dry-run, Safety Gate Jev), et surtout un **noyau transactionnel** qui snapshot, agit, vérifie par la preuve, puis commit ou rollback.</sub>
+Rien ne quitte votre machine sans action explicite. Chaque action à effet de bord traverse une chaîne de sécurité rigoureuse (idempotence, permissions, sandbox, dry-run, Safety Gate Jev, **approbation humaine interactive**), et surtout un **noyau transactionnel** qui snapshot, agit, vérifie par la preuve, puis commit ou rollback.</sub>
 
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-1260%20passing-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-~1193%20passing-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
@@ -110,7 +110,8 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 | 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
 | 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
 | 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
-| 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) |
+| 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
+| 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) |
 | 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
@@ -231,9 +232,10 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Connaissance** | Graphe de connaissances, AST (tree-sitter), call-graph, dépendances, impact, mémoire de stratégie | ✅ |
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
 | **Navigateur intégré** | 29 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
+| **Boucle humaine (HITL)** | Approbation interactive des actions à risque + contrôle de mission (pause/reprise/annulation), relais Telegram | ✅ |
 | **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram, MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
-| **Workflow builder visuel** | Constructeur de workflows dans l'interface | 🟡 |
-| **Marketplace** | Registre de compétences | 🟡 |
+| **Marketplace** | Registre de compétences (backend local + UI : recherche, publication avec analyse de sécurité, notes, installation) | ✅ |
+| **Workflow builder** | Éditeur de workflows par étapes dans l'interface (steps, actions, onError, retries, schedule) | 🟡 |
 
 La disponibilité effective d'un rôle ou d'un outil au runtime dépend de son
 enregistrement et de sa configuration d'exécution.
@@ -1470,14 +1472,47 @@ LEANNA_AGENT_SECRET=""
   inline de Monaco que par **hash SHA-256** exact
   (`sha256-HFhrXxEaMb8M1qOPJFyWyRxQ19x/oAt60ZKfwIqwr8g=`).
 
-### Approbation & checkpoints
+### Boucle humaine (approbation interactive)
 
-Les opérations sensibles passent par des mécanismes de confirmation
-(`confirmationBridge.ts`, `CriticalEditConfirm.tsx`, `usePendingApprovals.ts`). Une
-infrastructure de points de contrôle (`checkpoint.ts`, `CheckpointPanel.tsx`,
+Quand la politique d'autonomie rend un verdict `ask` sur une action à effet de
+bord, l'exécution de la mission est **réellement bloquée** jusqu'à une décision
+humaine — et l'UI est désormais câblée de bout en bout pour trancher.
+
+```text
+Action à effet de bord
+      │  (verdict politique = "ask")
+      ▼
+Executor.requestApproval()        bloque sur une Promise<boolean>
+      │   emit "approval_required"      (pendingApprovals: actionId → resolver)
+      ▼
+UI : PendingApprovalsCard / MissionPanel / pastille StatusBar
+      │   POST /api/missions/:id/approve { actionId, approved }
+      ▼
+Executor.resolveApproval()        débloque l'action (approuvée ou refusée)
+      │   ⌛ sans décision avant approvalTimeoutMs (défaut 5 min) → refus fail-closed
+      ▼
+Mission reprend (ou action refusée)
+```
+
+| Côté | Composant | Rôle |
+|---|---|---|
+| Backend | `server/mission/Executor.ts` | `requestApproval` (blocage + timeout fail-closed), `resolveApproval`, `actionBelongsToMission` (anti-approbation croisée) |
+| Routes | `server/routes/missions.ts` | `POST /missions/:id/approve\|pause\|resume\|cancel`, `DELETE /missions/:id`, `GET /missions/pending-approvals`, reprise après crash (`pending-resumes` / `resume-decision`) |
+| UI | `src/hooks/usePendingApprovals.ts` | Store partagé (`useSyncExternalStore`), `usePendingApprovalCount` (badges), balayage d'expiration aligné sur le fail-closed serveur |
+| UI | `src/views/AutonomyView.tsx` · `src/components/panels/MissionPanel.tsx` · `src/components/ide/StatusBar.tsx` | `PendingApprovalsCard` (approuver/refuser), `controlMission` (pause/reprise/annulation/suppression), pastille globale visible panneau fermé |
+| Canal externe | `server/telegram/TelegramService.ts` | File d'approbation Telegram (boutons inline Approuver/Refuser) |
+
+Le **centre de propositions** (`src/views/MissionControlView.tsx` → `InsightsCard`)
+liste les `AnticipationProposal` (`problem` / `opportunity` / `optimization` /
+`risk` / `automation`) et permet de **lancer une mission** depuis une proposition
+(`POST /api/missions`).
+
+### Checkpoints
+
+Une infrastructure de points de contrôle (`checkpoint.ts`, `CheckpointPanel.tsx`,
 `AutonomyPersistence.ts`) préserve l'état d'exécution — essentielle pour les tâches
 autonomes de longue durée qui ne doivent pas être traitées comme une opération
-indivisible. (Voir aussi les `CheckpointManager` du noyau P0.)
+indivisible. (Voir aussi le `CheckpointManager` du noyau P0.)
 
 ### Observabilité
 
@@ -1776,19 +1811,43 @@ src/components/github/ · src/views/GitHubView.tsx
 
 Un moteur de workflow (`server/runtime/WorkflowEngine.ts`, `routes/workflows.ts`,
 `skills/workflow.ts`) permet des séquences d'actions répétables (déclencheur →
-condition → action → vérification → résultat). Côté interface, un constructeur de
-workflow visuel existe (`src/components/workflows/VisualWorkflowBuilder.tsx`,
-`src/components/panels/WorkflowsPanel.tsx`). 🟡 *Le composant est présent ; le README
-ne qualifie pas sa nature exacte (canvas de nœuds vs formulaire) sans vérification
-visuelle.*
+condition → action → vérification → résultat). Côté interface,
+`src/components/workflows/VisualWorkflowBuilder.tsx` (+ `WorkflowsPanel.tsx`) est un
+**éditeur par étapes séquentielles** : liste d'étapes avec action, arguments JSON,
+`onError` (stop/skip/retry), `maxRetries`, planification et catalogue d'actions
+courantes. 🟡 *C'est un éditeur de formulaire/étapes, pas un canvas de nœuds
+drag-and-drop.*
 
 ### Fenêtres temps réel
 
+* **`/live`** — session vocale/outils principale avec **reconnexion automatique**
+  à backoff exponentiel borné (`src/hooks/useWebSocket.ts` : `RECONNECT_MAX=5`,
+  `min(2000·2^n, 30 s)`), reprise GoAway / `context_overflow` / `prompt_replace` en
+  conservant le `conversation_id`. ✅ *(le backoff auto couvre `/live` ; les sockets
+  `/notebook-live`, `/terminal`, `/sandbox-watch`, `/autonomy` ne passent pas encore
+  par ce hook — 🟡).*
 * **`/autonomy`** — WebSocket en lecture seule diffusant la timeline d'autonomie
   (`src/hooks/useAutonomyTimeline.ts`, `AutonomyView.tsx`). ✅
 * **`/orb-live`** — fenêtre Electron dédiée (`OrbLiveWindow` / `OrbLiveView.tsx`,
   IPC `electron/open-orb-window`) avec son propre `LiveAPIProvider`, isolée du layout
   global. ✅
+
+### Marketplace de compétences
+
+Un **marketplace local** (embarqué, non distant) permet de parcourir, publier et
+installer des compétences/agents.
+
+```text
+server/marketplace/MarketplaceRegistry.ts   catalogue + installs (persistance disque)
+server/routes/marketplace.ts                 API REST (test marketplace.test.ts)
+src/components/panels/MarketplacePanel.tsx    UI (home/catalogue/installés/publier/importer)
+src/stores/marketplaceStore.ts
+```
+
+Le registre expose `search`, `getFeatured`, `getInstalled`, `publish` (avec
+`runSecurityAnalysis` → `SecurityReport`), `ratePackage`, `markInstalled/Uninstalled`
+et `getStats`. Le catalogue repose sur un seed local (`buildSeedCatalog`) + une
+persistance fichier — il ne s'agit **pas** d'un registre communautaire distant.
 
 <br>
 

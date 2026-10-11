@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
+import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
 // @ts-ignore - Asset handled by bundler
 import logo from '../../assets/images/icon-sombre.png';
 
@@ -125,6 +126,7 @@ export function StartupProjectModal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forceSelection, setForceSelection] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const { error: toastError } = useToast();
   const shouldReduceMotion = useReducedMotion();
 
@@ -525,8 +527,9 @@ export function StartupProjectModal() {
     navigate('/ide');
   };
 
-  /** Quitte l'application Electron (fenêtre desktop uniquement). */
-  const handleQuit = () => {
+  /** Confirme et quitte l'application Electron (fenêtre desktop uniquement). */
+  const handleQuitConfirm = () => {
+    setShowQuitConfirm(false);
     const api = getElectronQuitAPI();
     if (api) api.quit();
     else window.close();
@@ -554,8 +557,8 @@ export function StartupProjectModal() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-hidden"
-        style={{ backgroundColor: 'rgba(4, 6, 10, 0.88)', backdropFilter: 'blur(20px)' }}
+        className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden"
+        style={{ zIndex: 'var(--z-modal)', backgroundColor: 'rgba(4, 6, 10, 0.88)', backdropFilter: 'blur(20px)' }}
         onClick={!forceSelection ? handleClose : undefined}
       >
         {/* Atmospheric glows */}
@@ -771,7 +774,7 @@ export function StartupProjectModal() {
                 {canQuit && (
                   <motion.button
                     type="button"
-                    onClick={handleQuit}
+                    onClick={() => setShowQuitConfirm(true)}
                     whileHover={shouldReduceMotion ? undefined : { opacity: 0.9 }}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
                     className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
@@ -783,19 +786,7 @@ export function StartupProjectModal() {
                     <Power className="w-4 h-4" />
                   </motion.button>
                 )}
-                {!forceSelection && (
-                  <motion.button
-                    type="button"
-                    onClick={handleClose}
-                    whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
-                    whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
-                    style={{ color: 'var(--text-muted)' }}
-                    title={currentPath ? 'Fermer' : 'Quitter'}
-                  >
-                    <X className="w-4 h-4" />
-                  </motion.button>
-                )}
+                
               </div>
             </div>
           </div>
@@ -1369,6 +1360,13 @@ export function StartupProjectModal() {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Confirmation avant de quitter l'application Electron */}
+      <QuitConfirmDialog
+        open={showQuitConfirm}
+        onClose={() => setShowQuitConfirm(false)}
+        onConfirm={handleQuitConfirm}
+      />
     </AnimatePresence>
   );
 }

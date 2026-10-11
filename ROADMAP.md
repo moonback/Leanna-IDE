@@ -2,7 +2,7 @@
 
 > **Dernière refonte : Octobre 2026** · Version courante : **1.7.0** · Licence BUSL 1.1
 >
-> Cette roadmap a été **re-auditée contre le code réel** après l'itération **Noyau P0** (`server/core/`) et l'extension des rôles d'agents (**20 rôles statiques**). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
+> Cette roadmap a été **re-auditée contre le code réel** (audit **2026-10-11**) après l'itération **Noyau P0** (`server/core/`), l'extension des rôles d'agents (**20 rôles statiques**) et le **câblage de la boucle humaine** (human-in-the-loop). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
 
 Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonomes et une mémoire long-terme réunis dans une seule application desktop. La vision reste : passer d'un « IDE qui délègue à des agents » à un **système d'exploitation cognitif qui comprend une intention, planifie un vrai graphe d'exécution parallèle, agit de façon autonome sous garde-fous transactionnels, et apprend de chaque mission**.
 
@@ -12,6 +12,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 
 | Version | Date | Changements majeurs |
 |---|---|---|
+| **1.7.0** | 2026-10-11 | **Boucle humaine (HITL) câblée bout-en-bout** : file d'approbation interactive côté UI (`AutonomyView` → `PendingApprovalsCard`, `usePendingApprovals`, `MissionPanel.resolveApproval`, pastille `StatusBar`) adossée au backend `Executor.requestApproval/resolveApproval` + routes REST `POST /missions/:id/approve|pause|resume|cancel`, `DELETE /missions/:id`. **Centre de propositions** `AnticipationProposal` dans `MissionControlView` (lancer une mission depuis une proposition). **Compression de contexte automatique** réellement déclenchée au seuil de tokens (`LiveSocketHandler.autoSummarizeContext`). **Contract-net en production** (`AgentOrchestrator` + `DelegationDispatcher` appellent `contractNetNegotiator.negotiate`). **Reconnexion WebSocket `/live`** avec backoff exponentiel borné (`useWebSocket`). **Marketplace** (backend local + UI) et **Workflow builder** (éditeur par étapes). **Correctif** : le rôle `planner` n'a plus `delete_project_file` (contradiction P1 soldée). |
 | **1.6.0** | 2026-10-09 | **Noyau P0 transactionnel** livré (`server/core/` : machine à états durable 13 états, `ExecutionLedger` idempotent, `CheckpointManager` snapshot/rollback, `EvidenceEngine`, `LeannaSupervisor`, `LedgerGuard`, `JevSafetyGate`, `kernel.createCoreKernel`). **20 rôles statiques** (ajout du groupe Web & Qualité : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`) = **20 plugins runtime**. Autonomie proactive (`AnticipationEngine`, `ComputerUseAgent`, `SmartSkills`). Nouvelle **Phase R7 — 20 fonctionnalités & optimisations**. |
 | **1.4.0** | 2026-10-04 | Sandbox d'exécution des skills tiers : `SkillWorker`, `agentDefinitionSchema` (Zod + HMAC-SHA256), `AgentLoader` hardened, `DynamicAgentRegistry.registerAgent()`, `McpBridge.sanitizePathArgs()`. 32 nouveaux tests. |
 | **1.3.0** | 2026-09-25 | Re-audit post-`AGENTIC_RUNTIME` et `AUTONOMY_IMPLEMENTATION`. 11 items migrés 📋/🟡 → ✅. KPI actualisés. |
@@ -24,6 +25,8 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 - **Agents** : ✅ 20 rôles statiques = 20 plugins runtime (7 rédaction one-shot + 8 ingénierie + 5 Web & Qualité agentiques), ✅ `SwarmComposer`, ✅ `ContractNetNegotiator`, ✅ `MessageBusMonitor`.
 - **Autonomie proactive** : ✅ `AnticipationEngine` (observe→détecte→propose + auto-launch borné), ✅ `ComputerUseAgent`, ✅ `SmartSkills` (quality_loop, validate_patch, read_until_understood, plan_code_change).
 - **Kill-switch temps-réel** : ✅ `AbortSignal` propagé jusqu'au `ToolRegistry.call` (soldé depuis la 1.4.0).
+- **Boucle humaine (HITL)** *(nouveau 1.7.0)* : ✅ file d'approbation **interactive** de bout en bout — l'UI approuve/refuse une action à effet de bord bloquée par le superviseur, et pilote la mission (pause/reprise/annulation/suppression). Le refus par défaut (fail-closed) reste garanti à l'expiration du délai.
+- **Compression de contexte auto** *(nouveau 1.7.0)* : ✅ déclenchée automatiquement au seuil de tokens dans la session live (plus seulement sur appel manuel).
 
 ---
 
@@ -72,6 +75,12 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | **Cross-mission learning** | `server/knowledge/StrategyMemory.ts` — store durable `.Leanna/strategy.json` (atomique, legacy `.Leanna-strategy.json` auto-migré), `getFailingSkills` (seuil 0.34, min 3). Consommé par `SkillScorer.seedFromReliability`, `Planner`, `AutonomousExecutive.recallOutcome`. Tests : `StrategyMemory.test.ts`. |
 | **Navigateur intégré** | `server/skills/browser.ts` — **29 outils** `browser_*`, multi-onglets/profils/extensions, `browser_capture` (vision multimodale), `browser_get_console`. Recherche serveur `webSearchProvider.ts` (Brave + DuckDuckGo, SSRF, lecture parallèle). Durcissement `electron/main.cjs`. |
 | **Kill-switch temps-réel** | `ToolCallOptions.signal` propagé jusqu'au `ToolRegistry.call`, course abort, `run_project_command` tue le sous-processus via `execFile({ signal })`. |
+| **Boucle humaine (HITL) interactive** *(nouveau)* | **Backend** : `server/mission/Executor.ts` — `requestApproval()` bloque l'action sur un verdict `ask` (`Promise<boolean>`, `pendingApprovals`, refus fail-closed à l'expiration `approvalTimeoutMs`), `resolveApproval()`, `actionBelongsToMission()` (anti-approbation croisée). **Routes** : `server/routes/missions.ts` — `POST /missions/:id/approve|pause|resume|cancel`, `DELETE /missions/:id`, `GET /missions/pending-approvals`. **UI** : `src/views/AutonomyView.tsx` (`PendingApprovalsCard`), `src/hooks/usePendingApprovals.ts` (store partagé `useSyncExternalStore`, `usePendingApprovalCount`), `src/components/panels/MissionPanel.tsx` (`resolveApproval`, `controlMission`), pastille globale `StatusBar.tsx`. Relais Telegram `TelegramService.pendingApprovals`. |
+| **Contrôle de mission (pause/reprise/annulation)** *(nouveau)* | `Executor.pauseMission/resumeMission/cancelMission/deleteMission` + routes REST dédiées + reprise après crash (`listPendingResumes` / `confirmResume` → `reactivate`/`delete`), jamais relancée d'office. UI : `MissionPanel.controlMission`. |
+| **Compression de contexte automatique** *(nouveau)* | `server/live/LiveSocketHandler.ts` — `autoSummarizeContext` déclenchée au seuil critique de tokens (`summarizeWithLLM`, cooldown 30 s, `MAX_AUTO_SUMMARIZES_PER_SESSION=6`, `MIN_MESSAGES_FOR_AUTO_SUMMARIZE=8`), ré-injection `[CONTEXTE COMPACTÉ (AUTO)]`. Chemin manuel séparé : `POST /api/tokens/summarize-context`. |
+| **Contract-net en production** *(câblé)* | `server/agents/ContractNetNegotiator.ts` (`negotiate`, singleton `contractNetNegotiator`) réellement invoqué hors tests : `AgentOrchestrator.ts` et `DelegationDispatcher.ts`. Tests : `ContractNetNegotiator.test.ts`, `DelegationNegotiation.test.ts`. |
+| **Marketplace (backend local + UI)** *(précisé)* | `server/marketplace/MarketplaceRegistry.ts` (`search`/`publish`+`runSecurityAnalysis`/`ratePackage`/`getFeatured`/`getInstalled`, persistance disque + `buildSeedCatalog`), route `server/routes/marketplace.ts` (test `marketplace.test.ts`). UI `src/components/panels/MarketplacePanel.tsx` + `marketplaceStore.ts`. **Marketplace local/embarqué** (seed + fichiers), pas de registre distant communautaire. |
+| **Reconnexion WebSocket `/live`** *(nouveau)* | `src/hooks/useWebSocket.ts` — backoff exponentiel borné (`RECONNECT_MAX=5`, `min(2000·2^n, 30 s)`), reprise GoAway/`context_overflow`/`prompt_replace` avec `conversation_id`. **Limité au socket `/live`.** |
 | **Tests & sécurité de base** | **1193+ tests** (`node --import tsx --test server/**/*.test.ts`), 118 tests d'intégration REST (22 fichiers), auth `timingSafeEqual`, rate limiting, écoute loopback, audit log NDJSON, `promptInjectionGuard` (3 vues EN+FR), `csp.ts` dev/prod. |
 
 ### 🟡 Scaffolding solide, mais pas encore câblé au réel
@@ -80,10 +89,12 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 |---|---|
 | **Observabilité (export réel)** | Traces OpenTelemetry créées et corrélées, mais **aucun exporter OTLP par défaut** ni Jaeger/Tempo local câblé. Les métriques exposées sont des endpoints **JSON** — pas d'exposition au format texte Prometheus. |
 | **Timeline de mission rejouable** | Événements `autonomy:*` diffusés sur `/autonomy` (`AutonomyTimeline.tsx`), mais **pas de replay** : pas de fixtures ni de stockage ordonné des décisions/outils/diffs. |
-| **File d'approbation humaine (UI)** | `Executor.resolveApproval` + `AutonomyPolicy` + file Telegram (`TelegramService.pendingApprovals`) existent côté backend, mais l'**UI de validation interactive** dans `AutonomyView` reste à câbler (vue encore « lecture seule »). |
+| **Reconnexion auto des autres sockets** | ✅ pour `/live` (`useWebSocket`), mais `/notebook-live`, `/terminal`, `/sandbox-watch` et `/autonomy` ne passent **pas** par ce hook et n'héritent donc pas du backoff. Gap : généraliser la reconnexion aux 4 autres sockets. |
+| **Cache de prompts (non sémantique)** | `server/utils/promptCache.ts` (`PromptCache`) existe, mais c'est un cache **exact par clé** (SHA-256 base/rôle), **non branché** dans `textGeneration.ts` et **sans test**. Pas de similarité par embedding → ce n'est pas encore un cache *sémantique*. |
+| **Rapport post-mission Markdown** | Les faits existent (`EvidenceEngine` → `EvidenceBundle`, coûts via `TelemetryService`), mais **aucun agrégateur** ne les assemble en un artefact Markdown unifié (fichiers + tests + coût + corrections). |
+| **Composition de swarm pilotée par le Brain** | `SwarmComposer.plan()/compose()` prêts et testés, mais atteints **uniquement** via l'outil LLM `agent_compose_swarm` (`server/skills/agents.ts`) ; le Brain ne compose/dissout **pas** d'équipe automatiquement, et `compose()` (teardown dynamique) n'est appelé nulle part en prod. |
 | **`AnticipationKind.automation`** | Déclaré dans l'union de types, mais **aucun chemin d'émission** dédié dans le sweep (les opérations récurrentes surfacent en `problem`/`optimization`). |
-| **Workflow builder visuel** | `VisualWorkflowBuilder.tsx` présent, mais nature exacte (canvas de nœuds vs formulaire) non confirmée. |
-| **Marketplace** | Module minimal (`MarketplaceRegistry.ts` + `types.ts`) — surface réduite, à confirmer comme feature livrée. |
+| **Workflow builder** | ✅ livré, mais c'est un **éditeur par étapes séquentielles** (`VisualWorkflowBuilder.tsx` : steps, action, args JSON, onError, retries, schedule) adossé à `server/routes/workflows.ts` (test `workflows.test.ts`) — **pas un canvas de nœuds** drag-and-drop. |
 
 ### 🔴 Absent ou très mince
 
@@ -102,7 +113,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 ## Vision refondée — les 5 paris
 
 1. **Un cerveau qui planifie vraiment.** ✅ **Atteint** — scheduler DAG parallèle, validation Zod, réplanification à chaud. Reste : estimation coût/risque/durée avancée, timeline rejouable, rapport post-mission unifié.
-2. **Une autonomie qui agit sous garde-fous.** ✅ **Atteint & durci** — dispatcher autonome + **Noyau P0 transactionnel** (snapshot/rollback/preuve) + **Safety Gate Jev**. Reste : UI d'approbation interactive.
+2. **Une autonomie qui agit sous garde-fous.** ✅ **Atteint, durci & supervisable** — dispatcher autonome + **Noyau P0 transactionnel** (snapshot/rollback/preuve) + **Safety Gate Jev** + **boucle humaine interactive** (approuver/refuser/pause/reprise/annuler depuis l'UI). Reste : confirmation UI du `ComputerUseAgent`.
 3. **Un moteur de modèles universel.** 🚧 **En cours** — failover Gemini↔OpenRouter solide. Manque Ollama local + routeur intelligent.
 4. **Une mémoire qui apprend.** ✅ **Atteint** — `StrategyMemory` influence la planification dès la première itération. Restent playbooks et profils par projet.
 5. **De l'inédit, mesurable.** 📋 **À construire** — harness d'évaluation, time-travel, simulation globale, voix comme interface principale.
@@ -135,9 +146,10 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 ## KPI de succès
 
-| Indicateur | Aujourd'hui (2026-10-09) | Cible R5/R7 |
+| Indicateur | Aujourd'hui (2026-10-11) | Cible R5/R7 |
 |---|---|---|
 | Taux de succès des missions autonomes | mécanique prouvée, **score métier non mesuré** | ≥ 85 % sur suite d'évaluation |
+| Boucle humaine (approbation interactive) | ✅ UI approuver/refuser/pause/reprise/annuler branchée au superviseur | 100 % des actions `ask` tranchées par l'humain (ou refus fail-closed) |
 | Reprise sûre après crash (idempotence) | ✅ `ExecutionLedger` (rejeu d'effet de bord bloqué) | 100 % des actions destructives non rejouées |
 | Rollback transactionnel de mission | ✅ `CheckpointManager` + `LeannaSupervisor` | 100 % des échecs restaurent l'état antérieur |
 | Jugement de risque pré-exécution | ✅ `JevSafetyGate` (audit/enforce) | ≥ 95 % de rappel sur actions destructives en `enforce` |
@@ -160,7 +172,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | ✅ ~~Jugement de risque pré-exécution~~ | P0 | L | ✅ `JevSafetyGate` + `jevGating` |
 | **Exporter OpenTelemetry réel** (OTLP → Jaeger/Tempo local en container) | P0 | S | 📋 |
 | **CI GitHub Actions bloquante** : lint + typecheck + test + build + `npm audit` | P0 | M | 📋 |
-| **Reconnexion WebSocket auto** (backoff) sur `/live`, `/notebook-live`, `/terminal`, `/sandbox-watch`, `/autonomy` | P0 | S | 📋 |
+| **Reconnexion WebSocket auto** (backoff) sur `/live`, `/notebook-live`, `/terminal`, `/sandbox-watch`, `/autonomy` | P0 | S | � ✅ `/live` (`useWebSocket`, backoff borné) ; 4 autres sockets à généraliser |
 | **Scan + redaction de secrets** dans logs, traces, prompts et avant tout commit/push agent | P0 | M | 📋 |
 | **Health check enrichi** `/api/health` : Supabase, Gemini, pgvector, Ollama, uptime, version | P1 | S | 📋 |
 
@@ -189,8 +201,8 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | ✅ ~~Gouvernance transactionnelle de mission~~ | P0 | XL | ✅ `LeannaSupervisor.runMission` (Noyau P0) |
 | ✅ ~~Snapshots de workspace avant mission~~ | P1 | M | ✅ `CheckpointManager.snapshot` (dans le cycle du superviseur) |
 | ✅ ~~Agents proactifs (détectent, proposent sans exécuter sans accord)~~ | P1 | L | ✅ `AnticipationEngine` (auto-launch borné + réflexions) |
-| **File d'approbation humaine (UI)** : bouton approuver/refuser dans `AutonomyView` (backend + relais Telegram prêts) | P0 | M | 🟡 backend prêt, UI à câbler |
-| **Vue Autonomie interactive** : passer de « lecture seule » à un centre de contrôle (approuver, pause, annuler) | P1 | M | 🟡 timeline connectée, actions absentes |
+| ✅ ~~File d'approbation humaine (UI)~~ : approuver/refuser dans `AutonomyView` | P0 | M | ✅ `PendingApprovalsCard` + `usePendingApprovals` + `POST /missions/:id/approve` (backend `Executor.requestApproval/resolveApproval`) |
+| ✅ ~~Vue Autonomie interactive~~ : centre de contrôle (approuver, pause, annuler) | P1 | M | ✅ `MissionPanel.controlMission` + routes `pause`/`resume`/`cancel`/`delete` ; propositions actionnables dans `MissionControlView` |
 | **Rotation du token API** et **audit des accès** exposés dans l'UI | P1 | M | 📋 |
 
 ---
@@ -203,8 +215,8 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | **Abstraction provider complète** : découpler les skills du client Gemini | P0 | L | 📋 |
 | **Fallback en cascade multi-niveaux** (Gemini → OpenRouter → Ollama local) | P0 | M | 🟡 2 niveaux sur 3 |
 | **Routeur de modèles intelligent** : choix auto par complexité, coût, latence, confidentialité | P1 | L | 📋 |
-| **Cache sémantique de prompts** : réponse réutilisée si prompt équivalent | P1 | M | 📋 |
-| **Compression de contexte automatique** en fin de fenêtre | P1 | L | 🟡 `POST /api/tokens/summarize-context` existe ; pas de trigger auto |
+| **Cache sémantique de prompts** : réponse réutilisée si prompt équivalent | P1 | M | � `promptCache.ts` = cache **exact** (non sémantique), non branché, sans test |
+| ✅ ~~Compression de contexte automatique~~ en fin de fenêtre | P1 | L | ✅ `LiveSocketHandler.autoSummarizeContext` (déclenchée au seuil de tokens) |
 
 ---
 
@@ -252,7 +264,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 ## Phase R7 — 20 fonctionnalités & optimisations (nouveau)
 
-**Thème** : vingt chantiers concrets qui capitalisent sur le socle livré en 1.6.0 — le **Noyau P0 transactionnel**, les **20 rôles**, l'**autonomie proactive** et le **RAG hybride**. Chaque item cite le composant existant sur lequel il s'appuie, pour rester buildable et honnête. Aucun n'est marqué ✅ : ce sont les prochains pas.
+**Thème** : vingt chantiers concrets qui capitalisent sur le socle livré en 1.6.0 — le **Noyau P0 transactionnel**, les **20 rôles**, l'**autonomie proactive** et le **RAG hybride**. Chaque item cite le composant existant sur lequel il s'appuie, pour rester buildable et honnête. **Mise à jour 1.7.0 : 3 items livrés (#6 contract-net, #9 centre de propositions, #15 compression auto).**
 
 ### Catégorie A — Noyau P0 & transactionnalité
 
@@ -268,7 +280,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | # | Fonctionnalité / optimisation | S'appuie sur | Prio | Effort | Statut |
 |---|---|---|---|---|---|
 | 5 | **Composition de swarm pilotée par le Brain** : brancher `SwarmComposer.compose()` sur le plan réel pour instancier/dissoudre l'équipe par mission | `SwarmComposer`, `AgentBrain` | P1 | L | 📋 |
-| 6 | **Contract-net en production** : utiliser `ContractNetNegotiator` pour attribuer dynamiquement les tâches aux agents les mieux notés, au lieu d'un routage statique | `ContractNetNegotiator`, `AgentMessageBus` | P1 | L | 🟡 moteur prêt, câblage orchestrateur à faire |
+| 6 | ✅ ~~**Contract-net en production**~~ : attribution dynamique des tâches aux agents les mieux notés | `ContractNetNegotiator`, `AgentMessageBus` | P1 | L | ✅ `contractNetNegotiator.negotiate` appelé par `AgentOrchestrator` + `DelegationDispatcher` |
 | 7 | **Dashboard du bus de messages** : exposer `MessageBusMonitor` (health, alertes, flux, métriques agrégées) dans l'UI avec le rendu ASCII en live | `MessageBusMonitor` | P2 | M | 📋 |
 | 8 | **Scoring par-rôle du contract-net** : remplacer le proxy `successRate` global par une fiabilité par rôle issue de `StrategyMemory` | `ContractNetNegotiator.estimateConfidence`, `StrategyMemory` | P2 | M | 📋 |
 
@@ -276,7 +288,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 | # | Fonctionnalité / optimisation | S'appuie sur | Prio | Effort | Statut |
 |---|---|---|---|---|---|
-| 9 | **Centre de propositions** : UI listant les `AnticipationProposal` (problem/opportunity/optimization/risk) avec accepter/ignorer/planifier | `AnticipationEngine.getProposals` | P1 | M | 📋 |
+| 9 | ✅ ~~**Centre de propositions**~~ : UI listant les `AnticipationProposal` (problem/opportunity/optimization/risk/automation) avec lancement de mission | `AnticipationEngine.getProposals` | P1 | M | ✅ `MissionControlView` → `InsightsCard` (lance une mission via `POST /api/missions`) + `PendingApprovalsCard` |
 | 10 | **Chemin d'émission `automation`** : implémenter la détection d'opérations manuelles répétées pour émettre réellement des propositions de kind `automation` | `AnticipationEngine` (union déjà déclarée) | P2 | M | 🟡 type déclaré, émission absente |
 | 11 | **Computer Use avec confirmation UI** : câbler le handler de confirmation `confirmAtOrAbove` à une modale, pour sortir du fail-closed systématique | `ComputerUseAgent` | P1 | M | 📋 |
 | 12 | **Smart Skills dans l'IDE** : exposer `quality_loop` / `validate_patch` / `plan_code_change` comme actions one-click dans l'éditeur | `SmartSkills` | P2 | M | 📋 |
@@ -287,7 +299,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 |---|---|---|---|---|---|
 | 13 | **Cache sémantique de prompts** : clé par embedding de prompt, réponse réutilisée si similarité ≥ seuil (économie tokens/latence) | `embeddingStore`, `TelemetryService` | P1 | M | 📋 |
 | 14 | **Préchauffage & réutilisation du cache de contexte agentique** : persister `session.readCache` entre missions proches d'un même workspace | `AgenticRuntime` (CACHEABLE_TOOLS) | P2 | M | 📋 |
-| 15 | **Compression de contexte auto en fin de fenêtre** : déclencher `summarize-context` automatiquement au seuil de tokens plutôt que sur appel manuel | `POST /api/tokens/summarize-context` | P1 | M | 🟡 endpoint prêt, trigger auto manquant |
+| 15 | ✅ ~~**Compression de contexte auto en fin de fenêtre**~~ : déclenchée automatiquement au seuil de tokens | `LiveSocketHandler.autoSummarizeContext` | P1 | M | ✅ seuil + cooldown 30 s + ré-injection `[CONTEXTE COMPACTÉ (AUTO)]` |
 | 16 | **Budget adaptatif par type de mission** : dériver `DEFAULT_AGENT_BUDGET` (8/3/9/6/4) de l'historique `StrategyMemory` au lieu de constantes fixes | `AgentBudget`, `StrategyMemory` | P2 | M | 📋 |
 
 ### Catégorie E — Connaissance, observabilité & qualité
@@ -299,7 +311,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | 19 | **Harness d'évaluation d'agents** : dossier `eval/`, tâches de référence, fixtures de réponses modèles, scoring reproductible, détection de régression en CI | `mission-harness.test.ts`, `AgentTaskRunnerContract` | P0 | XL | 📋 |
 | 20 | **Rapport post-mission Markdown unifié** : agréger `EvidenceBundle` + diffs + coût + durée + corrections en un artefact lisible, promu en source notebook | `EvidenceEngine`, `TelemetryService`, `DocumentStore` | P1 | M | 🟡 faits disponibles, agrégation à écrire |
 
-> Récapitulatif R7 : **20 items** · P0 ×3 · P1 ×9 · P2 ×8. Chacun transforme un composant **déjà présent** en valeur visible ou en gain de performance — pas de dépendance à une brique inexistante.
+> Récapitulatif R7 : **20 items** — ✅ 3 livrés (#6 contract-net, #9 centre de propositions, #15 compression auto) · 🟡 3 partiels (#10 `automation`, #18 embeddings incrémentaux, #20 rapport Markdown) · 📋 14 planifiés. Chacun transforme un composant **déjà présent** en valeur visible ou en gain de performance — pas de dépendance à une brique inexistante.
 
 ---
 
@@ -308,7 +320,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | Risque | Impact | Mitigation |
 |---|---|---|
 | Dépendance forte à Gemini (quotas, ruptures d'API) | Élevé | Routeur multi-provider + Ollama local (R3), abstraction provider (dette P0) |
-| Agent autonome causant une perte de données | Élevé | ✅ **Fortement mitigé** — Noyau P0 (snapshot/rollback, idempotence), Safety Gate Jev `enforce`, sandbox, permissions |
+| Agent autonome causant une perte de données | Élevé | ✅ **Fortement mitigé** — Noyau P0 (snapshot/rollback, idempotence), Safety Gate Jev `enforce`, sandbox, permissions, **boucle humaine interactive** (verdict `ask` → approbation UI, refus fail-closed à l'expiration) |
 | Rejeu d'une action destructive après crash | Élevé | ✅ **Mitigé** — `ExecutionLedger` bloque le rejeu d'un effet de bord de statut `unknown` |
 | Coûts modèles non maîtrisés | Moyen | Budgets appliqués par action **et** temps-réel ✅ ; cache sémantique + budget adaptatif (R7) |
 | Scaffolding pris pour du fini (fausse confiance) | Moyen | Cette roadmap distingue explicitement 🟡 de ✅ ; DoD strict |
@@ -331,12 +343,12 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | Traces OTel sans exporter | P1 | 📋 Ouvert | R0/R7 (observabilité réelle) |
 | Absence de migrations Supabase versionnées | P1 | 📋 Ouvert | R6 (portabilité) |
 | Serveur Express monoprocessus (blocages CPU longs) | P1 | 📋 Ouvert | R2/R3 (charge autonome + inférence locale) |
-| `planner` a `delete_project_file` dans ses capabilities | P1 | 🐛 Bug identifié | Cohérence du contrat de rôles |
+| ✅ ~~`planner` a `delete_project_file` dans ses capabilities~~ | P1 | ✅ **Soldé** (`roles.ts` : capability retirée du `plannerAgent` ; cohérence gardée par `roleCapabilities.test.ts`/`capabilityAudit.test.ts`) | — |
 | `AnticipationKind.automation` déclaré mais jamais émis | P2 | 🐛 Incohérence | R7 item #10 |
 
 ---
 
-*Cette roadmap est un document vivant, mais elle refuse le vaporware : une fonctionnalité marquée ✅ est prouvée par le code source (fichier + symbole) et couverte par un test. Un 🟡 est du scaffolding honnête, avec le gap précisément identifié. Tout le reste est planifié avec priorité, effort et critère de succès. Depuis la 1.4.0, le **Noyau P0 transactionnel** et le **Safety Gate Jev** font passer le pari « autonomie sous garde-fous » de « mécanique prouvée » à « transactionnel durable », et la Phase R7 trace vingt chantiers qui capitalisent sur ce socle.*
+*Cette roadmap est un document vivant, mais elle refuse le vaporware : une fonctionnalité marquée ✅ est prouvée par le code source (fichier + symbole) et couverte par un test. Un 🟡 est du scaffolding honnête, avec le gap précisément identifié. Tout le reste est planifié avec priorité, effort et critère de succès. Depuis la 1.4.0, le **Noyau P0 transactionnel** et le **Safety Gate Jev** ont fait passer le pari « autonomie sous garde-fous » de « mécanique prouvée » à « transactionnel durable » ; la **1.7.0** y ajoute la **boucle humaine interactive** (approbation + contrôle de mission depuis l'UI), la **compression de contexte automatique** et le **contract-net en production**, soldant 3 des 20 chantiers de la Phase R7.*
 
 ---
 
@@ -385,9 +397,19 @@ node --import tsx --test server/knowledge/StrategyMemory.test.ts
 node --import tsx --test server/security/agentDefinitionSchema.test.ts
 node --import tsx --test server/runtime/skillWorker.test.ts
 node --import tsx --test server/mcp/mcpBridgeSanitize.test.ts
+
+# Cohérence du contrat de rôles (planner sans delete_project_file)
+node --import tsx --test server/agents/roleCapabilities.test.ts
+node --import tsx --test server/agents/capabilityAudit.test.ts
+
+# Contract-net (négociation en production)
+node --import tsx --test server/agents/ContractNetNegotiator.test.ts
+node --import tsx --test server/agents/DelegationNegotiation.test.ts
 ```
 
 Un item ✅ **sans** test exécutable associé est un bug de cette roadmap — signalez-le.
+
+**Gaps de couverture identifiés (1.7.0, à combler) :** la boucle d'approbation HITL (`Executor.requestApproval → resolveApproval`) est livrée et vérifiée manuellement, mais **sans test d'intégration dédié** ciblant explicitement le cycle `ask → approve/reject → unblock` ; la suppression de `delete_project_file` chez le `planner` est garantie **indirectement** par l'audit de cohérence du registre (`capabilityAudit.test.ts`) plutôt que par une assertion littérale. Deux tests de garde à ajouter pour une clôture formelle.
 
 ---
 
