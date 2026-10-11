@@ -15,6 +15,7 @@ import {
   type ResumeConfirmationInfo,
 } from '../../hooks/useResumeConfirmations.js';
 import { skillLabel } from '../../utils/skillLabels.js';
+import { formatDuration } from '../../utils/timeFormat.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -183,11 +184,7 @@ function decisionBadge(decision: string) {
   );
 }
 
-function formatDuration(ms?: number): string {
-  if (!ms) return '';
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+
 
 /**
  * Fige les objectifs et actions restés « in_progress » lorsqu'une mission se

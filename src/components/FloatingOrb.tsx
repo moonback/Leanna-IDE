@@ -2,14 +2,14 @@ import { useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useOrbState } from '../hooks/useOrbState.js';
-// import { OrbCore } from './orb/OrbCore.js';
 
 /**
  * Floating draggable orb — visible across non-hub views.
  * Shows connection status + audio activity. Click to connect/disconnect.
  * Drag to reposition anywhere on screen.
  *
- * Visual rendering is delegated to OrbCore (shared with OrbHomeView).
+ * Compact self-contained sphere (48px) rendered with design tokens — no
+ * external OrbCore dependency.
  */
 export function FloatingOrb() {
   const orb = useOrbState();
@@ -60,7 +60,34 @@ export function FloatingOrb() {
         aria-label={`Leanna ${statusLabel}`}
         tabIndex={0}
       >
-        {/* <OrbCore orb={orb} size="sm" /> */}
+        {/* Orb body — compact sphere using design tokens */}
+        <motion.div
+          className="relative flex items-center justify-center rounded-full"
+          style={{
+            width: 48,
+            height: 48,
+            background:
+              'radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--accent-primary) 90%, white), var(--accent-primary) 56%, color-mix(in srgb, var(--accent-primary) 44%, black))',
+            boxShadow:
+              '0 0 20px color-mix(in srgb, var(--accent-primary) 40%, transparent), inset 0 1px 8px color-mix(in srgb, white 26%, transparent), inset 0 -4px 10px color-mix(in srgb, black 20%, transparent)',
+          }}
+          animate={isConnected || isConnecting ? { scale: [1, 1.06, 1] } : {}}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          aria-hidden
+        >
+          {/* Highlight reflection */}
+          <span
+            className="absolute rounded-full"
+            style={{
+              width: 18,
+              height: 18,
+              top: 8,
+              left: 11,
+              background: 'radial-gradient(circle, color-mix(in srgb, white 55%, transparent), transparent 70%)',
+            }}
+            aria-hidden
+          />
+        </motion.div>
 
         {/* Status dot */}
         <motion.div
@@ -73,7 +100,7 @@ export function FloatingOrb() {
               : isConnecting
               ? 'var(--color-warning)'
               : 'var(--text-muted)',
-            border: '2px solid rgba(15, 15, 20, 0.9)',
+            border: '2px solid var(--bg-base)',
           }}
           animate={isConnected || isConnecting ? { scale: [1, 1.3, 1] } : {}}
           transition={{ duration: 1.5, repeat: Infinity }}
@@ -83,9 +110,9 @@ export function FloatingOrb() {
         <div
           className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-mono font-bold uppercase tracking-wide select-none pointer-events-none"
           style={{
-            backgroundColor: profile.textProvider === 'openrouter' ? 'rgba(168, 85, 247, 0.9)' : 'rgba(34, 197, 94, 0.9)',
-            color: 'white',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            backgroundColor: profile.textProvider === 'openrouter' ? 'var(--accent-secondary)' : 'var(--color-success)',
+            color: 'var(--bg-base)',
+            boxShadow: 'var(--shadow-sm)',
           }}
         >
           {profile.textProvider === 'openrouter' ? (profile.openrouterModel?.split('/').pop() || 'OR') : 'Gemini'}

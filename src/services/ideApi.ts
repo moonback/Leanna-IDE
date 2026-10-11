@@ -387,3 +387,97 @@ export const missionApi = {
   },
 };
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Autonomy — suivi & contrôle du travail idle encadré (Phase 3)
+//
+// Mirrors the server shapes (BudgetSnapshot / AutonomyAuditEntry) and the
+// /api/autonomy router. Read-mostly, with two pause/resume controls for the
+// kill switch. Reuses getAuthHeaders() + fetchWithRetry like missionApi.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Rolling-hour budget snapshot for self-initiated idle work (server shape). */
+export interface IdleBudgetSnapshot {
+  windowMs: number;
+  actions: { used: number; max: number };
+  tokens: { used: number; max: number };
+  costUsd: { used: number; max: number };
+  perMission: { maxTokens: number; maxCostUsd: number };
+}
+
+export type IdleAuditPhase = 'considered' | 'skipped' | 'started' | 'completed' | 'error';
+
+/** One append-only audit entry describing a self-initiated action. */
+export interface IdleAuditEntry {
+  ts: string;
+  phase: IdleAuditPhase;
+  action: string;
+  message: string;
+  skills?: string[];
+  dryRun?: boolean;
+  outcome?: 'success' | 'blocked' | 'failed' | 'error';
+  tokens?: number;
+  costUsd?: number;
+  budget?: { actions?: string; tokens?: string; costUsd?: string };
+  runId?: string;
+  detail?: string;
+}
+
+export const autonomyApi = {
+  /** Rolling-hour idle budget. `null` when idle autonomy is not wired/enabled. */
+  async getIdleBudget(): Promise<IdleBudgetSnapshot | null> {
+    const response = await fetchWithRetry('/api/autonomy/idle-budget', { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return (data?.budget ?? null) as IdleBudgetSnapshot | null;
+  },
+
+  /**
+   * GLOBAL rolling-hour autonomy budget: real consumption across ALL autonomous
+   * activity (idle diagnostics + anticipation/executive missions), surfaced
+   * against the per-hour ceilings. Same shape as the idle budget.
+   */
+  async getAutonomyBudget(): Promise<IdleBudgetSnapshot | null> {
+    const response = await fetchWithRetry('/api/autonomy/autonomy-budget', { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return (data?.budget ?? null) as IdleBudgetSnapshot | null;
+  },
+
+  /** Readable audit trail of self-initiated idle work (oldest first). */
+  async getIdleAudit(limit = 100): Promise<IdleAuditEntry[]> {
+    const response = await fetchWithRetry(`/api/autonomy/idle-audit?limit=${encodeURIComponent(limit)}`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return Array.isArray(data?.entries) ? (data.entries as IdleAuditEntry[]) : [];
+  },
+
+  /** Kill-switch state of the idle loop. */
+  async getIdlePaused(): Promise<boolean> {
+    const response = await fetchWithRetry('/api/autonomy/idle-paused', { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return Boolean(data?.paused);
+  },
+
+  /** Kill switch — pause self-initiated idle work. Returns the new paused state. */
+  async pauseIdle(reason?: string): Promise<boolean> {
+    return setIdlePaused('pause', reason);
+  },
+
+  /** Resume self-initiated idle work after a pause. Returns the new paused state. */
+  async resumeIdle(reason?: string): Promise<boolean> {
+    return setIdlePaused('resume', reason);
+  },
+};
+
+async function setIdlePaused(op: 'pause' | 'resume', reason?: string): Promise<boolean> {
+  const response = await fetchWithRetry(`/api/autonomy/idle/${op}`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return Boolean(data?.paused);
+}

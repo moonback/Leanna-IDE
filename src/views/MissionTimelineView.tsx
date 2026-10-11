@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { missionApi } from '../services/ideApi.js';
+import { humanDuration, timeOf } from '../utils/timeFormat.js';
 
 // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
 
@@ -78,25 +79,6 @@ function statusTone(status: string, paused?: boolean): string {
     case 'in_progress': return 'var(--accent-primary)';
     default: return 'var(--color-info)';
   }
-}
-
-function timeOf(at?: string): string {
-  if (!at) return '';
-  try { return new Date(at).toISOString().slice(11, 19); } catch { return ''; }
-}
-
-/** Durée lisible entre deux timestamps ISO. */
-function humanDuration(startAt?: string, endAt?: string): string {
-  if (!startAt || !endAt) return '—';
-  try {
-    const ms = new Date(endAt).getTime() - new Date(startAt).getTime();
-    if (!Number.isFinite(ms) || ms < 0) return '—';
-    const s = Math.round(ms / 1000);
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    const rem = s % 60;
-    return rem ? `${m}m ${rem}s` : `${m}m`;
-  } catch { return '—'; }
 }
 
 export default function MissionTimelineView() {
@@ -383,7 +365,9 @@ export default function MissionTimelineView() {
                     const meta = EVENT_META[ev.type] ?? EVENT_META.action;
                     const Icon = meta.icon;
                     const active = selectedStep === ev.index;
-                    const clickable = !!ev.snapshot;
+                    // Every step is inspectable: even those without a rich
+                    // snapshot carry useful context (type, time, parent goal).
+                    const clickable = true;
                     // Time-travel visual: steps up to the cursor are "visited".
                     const visited = selectedStep !== null && i <= cursor;
                     return (
@@ -421,15 +405,20 @@ export default function MissionTimelineView() {
                           onMouseEnter={(e) => { if (!active && clickable) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
                           onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
                         >
-                          <span className="w-14 flex-shrink-0 text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>{timeOf(ev.at)}</span>
+                          <span className="w-14 flex-shrink-0 self-start pt-0.5 text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>{timeOf(ev.at)}</span>
                           <span
-                            className="flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium"
+                            className="flex-shrink-0 self-start rounded px-1.5 py-0.5 text-xs font-medium"
                             style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 12%, transparent)`, color: meta.color }}
                           >
                             {meta.label}
                           </span>
-                          <span className="truncate text-xs" style={{ color: 'var(--text-primary)' }}>{ev.label}</span>
-                          {clickable && <ChevronRight size={13} className="ml-auto flex-shrink-0" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />}
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate text-xs" style={{ color: 'var(--text-primary)' }}>{ev.label}</span>
+                            {ev.goalTitle && !ev.label.includes(ev.goalTitle) && (
+                              <span className="truncate text-xs" style={{ color: 'var(--text-dimmed)' }}>↳ {ev.goalTitle}</span>
+                            )}
+                          </span>
+                          <ChevronRight size={13} className="ml-auto flex-shrink-0 self-center" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
                         </button>
                       </li>
                     );
@@ -682,6 +671,15 @@ function StepDetail({ event, reduceMotion, position, total, onPrev, onNext, onCl
 }) {
   const s = event.snapshot ?? {};
   const meta = EVENT_META[event.type] ?? EVENT_META.action;
+  // Does this step carry any enriched detail beyond its label/goal/time? Used to
+  // show an explicit note instead of an empty-looking panel for skeleton steps
+  // (plan, analyze, success/end) that have no snapshot.
+  const hasRichDetail =
+    !!s.skillName || typeof s.confidence === 'number' || typeof s.score === 'number' ||
+    !!s.decision || !!s.rationale || !!s.reasoning || !!s.observation ||
+    !!s.failure || !!s.success ||
+    (!!s.args && Object.keys(s.args).length > 0) ||
+    (s.result !== undefined && s.result !== null);
 
   const Row = ({ label, children, copyText }: { label: string; children: React.ReactNode; copyText?: string }) => (
     <div className="mb-2.5">
@@ -719,7 +717,15 @@ function StepDetail({ event, reduceMotion, position, total, onPrev, onNext, onCl
 
       <h2 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{event.label}</h2>
 
+      {event.goalTitle && <Row label="Objectif">{event.goalTitle}</Row>}
+
       {s.skillName && <Row label="Outil"><code>{s.skillName}</code>{s.status ? <span className="ml-1" style={{ color: 'var(--text-muted)' }}>({s.status})</span> : null}</Row>}
+
+      {typeof s.score === 'number' && (
+        <Row label="Score de sélection">
+          <span className="tabular-nums" style={{ color: 'var(--text-primary)' }}>{s.score.toFixed(2)}</span>
+        </Row>
+      )}
 
       {typeof s.confidence === 'number' && (
         <Row label="Confiance">
@@ -753,6 +759,17 @@ function StepDetail({ event, reduceMotion, position, total, onPrev, onNext, onCl
             {typeof s.result === 'string' ? s.result : JSON.stringify(s.result, null, 2)}
           </pre>
         </Row>
+      )}
+
+      {/* Skeleton steps (plan / analyze / success / end) carry no snapshot — make
+          that explicit rather than leaving the panel looking broken. */}
+      {!hasRichDetail && (
+        <p className="rounded-md p-2.5 text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)' }}>
+          Étape de jalon ({meta.label}) — pas de détail d'exécution associé.
+          {event.type === 'plan' && ' Marque le début de la planification de la mission.'}
+          {event.type === 'goal_start' && ' Marque le début de l\u2019analyse de cet objectif.'}
+          {(event.type === 'success' || event.type === 'end') && ' Marque la fin de la mission.'}
+        </p>
       )}
 
       {/* Prev / next step navigation */}

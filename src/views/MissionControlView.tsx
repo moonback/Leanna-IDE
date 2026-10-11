@@ -8,6 +8,13 @@ import {
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
+import { useSafeguardsConfig } from '../hooks/useSafeguardsConfig.js';
+import { usePendingApprovalCount } from '../hooks/usePendingApprovals.js';
+import {
+  MissionsSummaryCard, CostSummaryCard, AutonomySummaryCard,
+  type MissionSummaryItem, type CostSummary,
+} from './missionControl/SummaryCards.js';
+import { scoreColor as scoreColorShared } from '../utils/scoreColor.js';
 
 // ─── Types mirrored from the server insights engines ─────────────────────────
 
@@ -45,25 +52,45 @@ const DIMENSION_LABELS: Record<HealthDimension, string> = {
   autonomy: 'Autonomie',
 };
 
-/** Score → semantic token. */
+/** Score → semantic token (paliers 85/70/50 avec info). */
 function scoreColor(n: number): string {
-  if (n >= 85) return 'var(--color-success)';
-  if (n >= 70) return 'var(--color-info)';
-  if (n >= 50) return 'var(--color-warning)';
-  return 'var(--color-error)';
+  return scoreColorShared(n, { good: 85, info: 70, warn: 50 });
 }
 
 export default function MissionControlView() {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const { state, proposals, connection } = useAutonomyTimeline({ enabled: true });
+  const { config: safeguards } = useSafeguardsConfig();
+  const pendingApprovals = usePendingApprovalCount();
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [briefing, setBriefing] = useState<BriefingReport | null>(null);
   const [briefingDismissed, setBriefingDismissed] = useState(false);
+  const [missions, setMissions] = useState<MissionSummaryItem[] | null>(null);
+  const [cost, setCost] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
+
+  /** Résumés légers (missions + coûts) — rafraîchis en direct, sans spinner global. */
+  const refreshSummaries = useCallback(async () => {
+    const [missionsRes, costRes] = await Promise.all([
+      fetch('/api/missions').then((r) => r.json()).catch(() => null),
+      fetch('/api/observability/dashboard?period=day').then((r) => r.json()).catch(() => null),
+    ]);
+    const rawMissions: Array<Record<string, unknown>> = Array.isArray(missionsRes?.missions) ? missionsRes.missions : [];
+    setMissions(rawMissions.map((m) => ({
+      id: String(m.id),
+      title: String(m.title ?? ''),
+      status: String(m.status ?? ''),
+      paused: m.paused === true,
+    })));
+    if (costRes?.success && costRes.dashboard?.overview) {
+      const o = costRes.dashboard.overview;
+      setCost({ totalCost: o.totalCost ?? 0, totalTokens: o.totalTokens ?? 0, totalCalls: o.totalCalls ?? 0 });
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -72,6 +99,7 @@ export default function MissionControlView() {
         fetch('/api/knowledge/doctor').then((r) => r.json()).catch(() => null),
         fetch('/api/knowledge/opportunities?limit=8').then((r) => r.json()).catch(() => null),
         fetch('/api/knowledge/daily-briefing').then((r) => r.json()).catch(() => null),
+        refreshSummaries(),
       ]);
       if (doctorRes?.report) setHealth(doctorRes.report as HealthReport);
       if (oppRes?.report?.opportunities) setOpportunities(oppRes.report.opportunities as Opportunity[]);
@@ -79,9 +107,22 @@ export default function MissionControlView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshSummaries]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // Rafraîchissement des coûts toutes les 15 s (aligné sur Observabilité).
+  useEffect(() => {
+    const id = setInterval(() => { void refreshSummaries(); }, 15_000);
+    return () => clearInterval(id);
+  }, [refreshSummaries]);
+
+  // Rafraîchissement live des missions quand un événement de mission est émis.
+  useEffect(() => {
+    const handler = () => { void refreshSummaries(); };
+    window.addEventListener('Leanna-mission-event', handler);
+    return () => window.removeEventListener('Leanna-mission-event', handler);
+  }, [refreshSummaries]);
 
   /** « Diagnostiquer » : matérialise les missions d'amélioration du Doctor. */
   const diagnose = useCallback(async () => {
@@ -103,7 +144,7 @@ export default function MissionControlView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Mission Control"
+        title="Tableau de bord"
         icon={LayoutDashboard}
         description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
         badge={connection === 'open' ? 'En direct' : 'Hors ligne'}
@@ -128,6 +169,18 @@ export default function MissionControlView() {
           {briefing && !briefingDismissed && (
             <DailyBriefingBanner briefing={briefing} reduceMotion={!!reduceMotion} onDismiss={() => setBriefingDismissed(true)} />
           )}
+
+          {/* Row 0 — Synthèse cliquable : missions · coûts · autonomie */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MissionsSummaryCard missions={missions} onOpen={() => navigate('/mission-timeline')} />
+            <CostSummaryCard cost={cost} onOpen={() => navigate('/observability')} />
+            <AutonomySummaryCard
+              level={safeguards.autonomyLevel ?? 'manual'}
+              pendingApprovals={pendingApprovals}
+              health={state?.health}
+              onOpen={() => navigate('/autonomy')}
+            />
+          </div>
 
           {/* Row 1 — Agent state + health global */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -177,11 +177,21 @@ export async function withGeminiRetry<T>(
   fn: (ai: GoogleGenAI) => Promise<T>,
   maxRetries?: number,
   /** Timeout global en ms (défaut: 120s). Protège contre les appels bloquants. */
-  timeoutMs: number = 120_000
+  timeoutMs: number = 120_000,
+  /**
+   * Signal d'annulation facultatif. Quand il se déclenche, la course est
+   * tranchée immédiatement et la boucle de retries s'arrête : on ne lance plus
+   * de nouvelle tentative après un abort. Le `fn` sous-jacent (l'appel SDK)
+   * doit lui-même recevoir le signal pour abandonner la requête en vol.
+   */
+  signal?: AbortSignal
 ): Promise<T> {
   const enabledCount = keyPool.filter((e) => !e.disabled).length;
   const retries = maxRetries ?? Math.max(enabledCount, 2);
   let lastError: any = null;
+
+  const abortError = () => new DOMException("Appel Gemini annulé.", "AbortError");
+  if (signal?.aborted) throw abortError();
 
   // (Audit §1) Timeout global pour éviter un blocage indéfini.
   // Le handle est conservé pour être nettoyé une fois la course terminée :
@@ -192,8 +202,20 @@ export async function withGeminiRetry<T>(
     timeoutHandle = setTimeout(() => reject(new Error(`withGeminiRetry timeout après ${timeoutMs}ms`)), timeoutMs);
   });
 
+  // Promesse qui rejette dès que le signal externe est déclenché, afin que la
+  // course rende la main immédiatement même si l'appel SDK tarde à propager
+  // l'annulation.
+  let onAbort: (() => void) | undefined;
+  const abortPromise = new Promise<never>((_, reject) => {
+    if (!signal) return;
+    onAbort = () => reject(abortError());
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+
   const execute = async (): Promise<T> => {
     for (let attempt = 0; attempt < retries; attempt++) {
+      if (signal?.aborted) throw abortError();
+
       const key = getNextGeminiKey();
       if (!key) {
         throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
@@ -205,6 +227,9 @@ export async function withGeminiRetry<T>(
         const result = await fn(ai);
         return result;
       } catch (error: any) {
+        // Une annulation ne doit jamais être retentée ni rotée.
+        if (signal?.aborted || error?.name === "AbortError") throw error;
+
         const status = error?.status || error?.httpStatus || error?.code;
 
         // BUGFIX : lastError n'était jamais assigné auparavant, donc l'erreur
@@ -233,9 +258,10 @@ export async function withGeminiRetry<T>(
   };
 
   try {
-    return await Promise.race([execute(), timeoutPromise]);
+    return await Promise.race([execute(), timeoutPromise, abortPromise]);
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
+    if (signal && onAbort) signal.removeEventListener("abort", onAbort);
   }
 }
 

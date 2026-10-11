@@ -1,5 +1,10 @@
 import { randomUUID } from "crypto";
 import type { AgentPriority } from "../runtime/types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("Autonomy:Tasks");
+/** Short id for readable logs. */
+const tsid = (id?: string): string => (id ? id.slice(0, 8) : "—");
 
 export type AutonomousTaskStatus =
   | "pending"
@@ -83,9 +88,27 @@ export class TaskManager {
     private readonly persistence?: TaskPersistence,
   ) {}
 
-  submit(input: Omit<AutonomousTask, "id" | "createdAt" | "status" | "attempts" | "maxRetries" | "timeoutMs">): AutonomousTask | undefined {
+  submit(
+    input: Omit<AutonomousTask, "id" | "createdAt" | "status" | "attempts" | "maxRetries" | "timeoutMs"> &
+      Partial<Pick<AutonomousTask, "timeoutMs" | "maxRetries">>,
+  ): AutonomousTask | undefined {
     this.pruneDedupe();
-    if (!this.accepting || this.queue.length >= this.config.maxQueueSize || this.dedupe.has(input.fingerprint) || this.isCircuitOpen(input.type)) return undefined;
+    if (!this.accepting) {
+      log.debug(`📥 Submit refused (${input.type}) — manager not accepting (stopped).`);
+      return undefined;
+    }
+    if (this.queue.length >= this.config.maxQueueSize) {
+      log.warn(`📥 Submit refused (${input.type}) — queue full (${this.queue.length}/${this.config.maxQueueSize}).`);
+      return undefined;
+    }
+    if (this.dedupe.has(input.fingerprint)) {
+      log.debug(`📥 Submit deduped (${input.type}) — fingerprint "${input.fingerprint}" within ${this.config.dedupeTtlMs}ms window.`);
+      return undefined;
+    }
+    if (this.isCircuitOpen(input.type)) {
+      log.warn(`📥 Submit refused (${input.type}) — circuit breaker OPEN (cooldown ${this.config.circuitBreakerCooldownMs}ms).`);
+      return undefined;
+    }
 
     const task: AutonomousTask = {
       ...input,
@@ -93,14 +116,17 @@ export class TaskManager {
       createdAt: Date.now(),
       status: "pending",
       attempts: 0,
-      maxRetries: this.config.maxRetries,
-      timeoutMs: this.config.timeoutMs,
+      // Honour per-task overrides when positive; otherwise fall back to config.
+      // Lets autonomy align a task's wall-time budget with its mission cap.
+      maxRetries: input.maxRetries && input.maxRetries > 0 ? input.maxRetries : this.config.maxRetries,
+      timeoutMs: input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.config.timeoutMs,
     };
 
     this.tasks.set(task.id, task);
     this.dedupe.set(task.fingerprint, Date.now() + this.config.dedupeTtlMs);
     this.queue.push(task.id);
     void this.persist(task, "save");
+    log.info(`📥 Task ${tsid(task.id)} queued [${task.type}/${task.priority}] "${task.title}" — ${this.queue.length} pending, ${this.running} running.`);
     this.pump();
     return task;
   }
@@ -124,7 +150,10 @@ export class TaskManager {
       void this.persist(task, "update");
       restored++;
     }
-    if (restored > 0) this.pump();
+    if (restored > 0) {
+      log.info(`♻️  Restored ${restored}/${tasks.length} persisted task(s) into the queue.`);
+      this.pump();
+    }
     return restored;
   }
 
@@ -140,10 +169,12 @@ export class TaskManager {
     this.accepting = false;
     for (const timer of this.retryTimers) clearTimeout(timer);
     this.retryTimers.clear();
-    for (const id of this.queue.splice(0)) {
+    const cancelled = this.queue.splice(0);
+    for (const id of cancelled) {
       const task = this.tasks.get(id);
       if (task) this.transition(task, "cancelled");
     }
+    log.info(`🛑 TaskManager stopped — ${cancelled.length} pending task(s) cancelled, ${this.running} still running.`);
   }
 
   private pump(): void {
@@ -165,30 +196,41 @@ export class TaskManager {
     this.running++;
     task.attempts++;
     this.transition(task, "running");
+    const startedAt = Date.now();
+    log.info(`⚙️  Task ${tsid(task.id)} running [${task.type}] attempt ${task.attempts}/${task.maxRetries} (timeout ${task.timeoutMs}ms).`);
 
     try {
       await withTimeout(this.execute(task), task.timeoutMs);
       this.transition(task, "completed");
       this.failures.delete(task.type);
+      log.info(`✅ Task ${tsid(task.id)} [${task.type}] completed in ${Date.now() - startedAt}ms.`);
     } catch (error) {
       task.error = error instanceof Error ? error.message : String(error);
       const failure = this.failures.get(task.type) ?? { count: 0 };
       failure.count++;
+      const breakerJustOpened = failure.count === this.config.circuitBreakerThreshold;
       if (failure.count >= this.config.circuitBreakerThreshold) failure.openedAt = Date.now();
       this.failures.set(task.type, failure);
+      log.warn(`❌ Task ${tsid(task.id)} [${task.type}] failed (attempt ${task.attempts}/${task.maxRetries}) after ${Date.now() - startedAt}ms: ${task.error}`);
+      if (breakerJustOpened) {
+        log.error(`🔌 Circuit breaker OPEN for task type "${task.type}" (${failure.count} consecutive failures) — cooldown ${this.config.circuitBreakerCooldownMs}ms.`);
+      }
 
       if (task.attempts < task.maxRetries && !this.isCircuitOpen(task.type) && this.accepting) {
         this.transition(task, "pending");
+        const delay = this.config.retryDelayMs * 2 ** (task.attempts - 1);
+        log.info(`🔁 Task ${tsid(task.id)} [${task.type}] scheduled for retry in ${delay}ms.`);
         const timer = setTimeout(() => {
           this.retryTimers.delete(timer);
           if (this.accepting) {
             this.queue.push(task.id);
             this.pump();
           }
-        }, this.config.retryDelayMs * 2 ** (task.attempts - 1));
+        }, delay);
         this.retryTimers.add(timer);
       } else {
         this.transition(task, "dead_letter");
+        log.error(`☠️  Task ${tsid(task.id)} [${task.type}] → dead-letter after ${task.attempts} attempt(s): ${task.error}`);
       }
     } finally {
       this.running--;
@@ -225,6 +267,7 @@ export class TaskManager {
     if (!failure?.openedAt) return false;
     if (Date.now() - failure.openedAt >= this.config.circuitBreakerCooldownMs) {
       this.failures.delete(type);
+      log.info(`🔌 Circuit breaker RESET for task type "${type}" — cooldown elapsed.`);
       return false;
     }
     return true;

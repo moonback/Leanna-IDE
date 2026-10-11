@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock, FileCog
+  Palette, Key, Database, Trash2, Shield, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock, FileCog
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -21,7 +21,7 @@ import {
   ModelSection,
   OpenRouterSection,
   SelfRootSection,
-  SafeguardsSection,
+  AutonomySection,
   CustomSkillsSection,
   KnowledgeHealthSection,
   SystemPromptSection,
@@ -63,7 +63,7 @@ const NAV_GROUPS = [
       { id: 'knowledge-settings', icon: Database, label: 'Knowledge System', keywords: 'graphe index ast arbre call-graph mémoire faits dépendances santé codebase réindexer fonctions' },
       { id: 'hierarchical-memory-settings', icon: Layers, label: 'Mémoire hiérarchique', keywords: 'mémoire hierarchique court moyen long terme session projet supabase' },
       { id: 'selfroot-settings', icon: Shield, label: 'Self-Root', keywords: 'workspace projet verrouillé périmètre branche' },
-      { id: 'safeguards-settings', icon: ShieldCheck, label: 'Garde-fous', keywords: 'checkpoint rollback validation build test protection critique' },
+      { id: 'autonomy-settings', icon: SlidersHorizontal, label: 'Autonomie', keywords: 'autonomie niveau manuel semi autonome garde-fous checkpoint rollback validation build test protection critique kill-switch budget idle travail audit approbations' },
       { id: 'audit-settings', icon: Database, label: 'Journal système', keywords: 'audit logs historique opérations traçabilité' },
       { id: 'env-settings', icon: FileCog, label: 'Variables .env', keywords: 'env environnement variables config configuration secrets clés api token port redis supabase gemini openrouter' },
     ],
@@ -77,7 +77,7 @@ const NAV_GROUPS = [
   },
 ];
 
-const SECURE_ITEMS = new Set(['selfroot-settings', 'safeguards-settings', 'env-settings']);
+const SECURE_ITEMS = new Set(['selfroot-settings', 'autonomy-settings', 'env-settings']);
 const LAST_SECTION_KEY = 'Leanna-settings-last-section';
 
 function getActiveLabel(id: string) {
@@ -494,7 +494,7 @@ export default function SettingsView() {
                 {activeSection === 'knowledge-settings' && <KnowledgeHealthSection />}
                 {activeSection === 'audit-settings' && <AuditSection />}
                 {activeSection === 'selfroot-settings' && <SelfRootSection />}
-                {activeSection === 'safeguards-settings' && <SafeguardsSection />}
+                {activeSection === 'autonomy-settings' && <AutonomySection />}
                 {activeSection === 'data-settings' && <DataSection />}
                 {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
                 {activeSection === 'hierarchical-memory-settings' && <HierarchicalMemorySection />}
@@ -527,7 +527,7 @@ function getSectionDescription(id: string): string {
     'knowledge-settings': 'Analysez et contrôlez la santé du Knowledge System et du graphe de dépendances.',
     'audit-settings': 'Consultez le journal des opérations système.',
     'selfroot-settings': 'Périmètre verrouillé — l\'IDE n\'opère que sur son propre repo.',
-    'safeguards-settings': 'Checkpoints, validation et protections pour l\'auto-modification.',
+    'autonomy-settings': 'Niveau d\'autonomie, garde-fous et travail autonome encadré — tous les réglages au même endroit.',
     'data-settings': 'Supprimez l\'historique des conversations et la mémoire.',
     'skills-doc-settings': 'Documentation interactive des skills et outils, auto-générée depuis leurs déclarations TypeScript.',
     'hierarchical-memory-settings': 'Orchestrez la mémoire à 3 niveaux : court-terme (session), moyen-terme (projet) et long-terme (Supabase).',

@@ -13,10 +13,11 @@
  */
 
 import { useCallback, useState } from 'react';
-import { SlidersHorizontal, ShieldCheck, Settings, Loader2, Play, XCircle, Clock } from 'lucide-react';
+import { SlidersHorizontal, ShieldCheck, Settings, Loader2, Play, XCircle, Clock, Bot } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { AutonomyTimeline } from '../components/AutonomyTimeline.js';
 import { AutonomyLevelSelector } from '../components/autonomy/AutonomyLevelSelector.js';
+import { IdleAutonomyPanel } from '../components/autonomy/IdleAutonomyPanel.js';
 import { useSafeguardsConfig } from '../hooks/useSafeguardsConfig.js';
 import { usePendingApprovals, clearPendingApproval, type PendingApprovalInfo } from '../hooks/usePendingApprovals.js';
 
@@ -100,7 +101,15 @@ export default function AutonomyView() {
             </div>
           </ControlCard>
 
-          {/* 4 — Statut du runtime + dernières actions */}
+          {/* 4 — Travail autonome encadré (budget, kill switch, audit) */}
+          <ControlCard icon={Bot} title="Travail autonome (lecture seule)">
+            <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Pendant les périodes calmes, Leanna lance des diagnostics en lecture seule, bornés par un budget horaire et traçables.
+            </p>
+            <IdleAutonomyPanel />
+          </ControlCard>
+
+          {/* 5 — Statut du runtime + dernières actions */}
           <div
             className="flex min-h-[22rem] flex-col overflow-hidden rounded-lg border shadow-sm"
             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}

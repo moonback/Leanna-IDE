@@ -49,12 +49,31 @@ export interface AutonomyTask {
   error?: string;
 }
 
+/**
+ * Raw proposal shape as persisted server-side (AnticipationEngine.getProposals()).
+ * It uses `id` (not `proposalId`) and carries `fingerprint`/`createdAt`. The live
+ * WebSocket *event* shape instead uses `proposalId`. We normalise both into the
+ * client `AnticipationProposal` so consumers always have a stable `proposalId`
+ * (used as a React key) — fixes the "unique key prop" warning.
+ */
+interface RawServerProposal {
+  id?: string;
+  proposalId?: string;
+  kind: AnticipationProposal['kind'];
+  importance: number;
+  priority: AnticipationProposal['priority'];
+  message: string;
+  affectedResources?: string[];
+  suggestedAction: string;
+  queuedAsTask?: boolean;
+}
+
 interface SnapshotMessage {
   type: 'autonomy_snapshot';
   timestamp: string;
   state: AutonomyState;
   tasks: AutonomyTask[];
-  proposals?: AnticipationProposal[];
+  proposals?: RawServerProposal[];
 }
 
 interface EventMessage {
@@ -64,7 +83,43 @@ interface EventMessage {
   payload: Record<string, unknown>;
 }
 
-type IncomingMessage = SnapshotMessage | EventMessage;
+/**
+ * Mission lifecycle event relayed onto the /autonomy channel by the server
+ * (mission_started, mission_completed, goal_started, action_completed, …). The
+ * server also pushes these on the /live socket, but that one only exists during
+ * a Gemini Live session; relaying them here lets the Mission Timeline refresh in
+ * real time regardless of any voice/chat session.
+ */
+interface MissionEventMessage {
+  type: 'mission_event';
+  event: string;
+  timestamp: string;
+  /** Flat payload: missionId/title/goalTitle/skill/etc. are spread at top level. */
+  [key: string]: unknown;
+}
+
+type IncomingMessage = SnapshotMessage | EventMessage | MissionEventMessage;
+
+/** Normalise a server/event proposal into the client shape with a stable id. */
+function normalizeProposal(raw: RawServerProposal): AnticipationProposal {
+  return {
+    proposalId: raw.proposalId ?? raw.id ?? `${raw.kind}:${raw.suggestedAction}`,
+    kind: raw.kind,
+    importance: raw.importance,
+    priority: raw.priority,
+    message: raw.message,
+    affectedResources: Array.isArray(raw.affectedResources) ? raw.affectedResources : [],
+    suggestedAction: raw.suggestedAction,
+    queuedAsTask: Boolean(raw.queuedAsTask),
+  };
+}
+
+/**
+ * Module-level guard so a mission_event received by several concurrent
+ * useAutonomyTimeline instances (AgentStatusBar, GlobalSidebar, MissionControl,
+ * …) is only re-dispatched to the DOM once. Keyed by event+timestamp+missionId.
+ */
+let lastMissionEventKey = '';
 
 export type AutonomyConnectionStatus = 'connecting' | 'open' | 'closed';
 
@@ -146,7 +201,21 @@ export function useAutonomyTimeline({
     if (data.type === 'autonomy_snapshot') {
       setState(data.state ?? null);
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
-      if (Array.isArray(data.proposals)) setProposals(data.proposals);
+      if (Array.isArray(data.proposals)) setProposals(data.proposals.map(normalizeProposal));
+      return;
+    }
+
+    // Mission lifecycle events relayed on /autonomy. Re-dispatch the same DOM
+    // CustomEvent that MissionTimelineView (and useAgentStatus / usePendingApprovals)
+    // already listen to, so the Mission Timeline refreshes live even without an
+    // active Gemini Live session. Mirrors useLiveAPI's dispatch for parity.
+    if (data.type === 'mission_event') {
+      const key = `${data.event}|${data.timestamp}|${String((data as Record<string, unknown>).missionId ?? '')}`;
+      if (key === lastMissionEventKey) return; // already dispatched by a sibling connection
+      lastMissionEventKey = key;
+      try {
+        window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: data }));
+      } catch { /* best-effort */ }
       return;
     }
 
@@ -171,7 +240,7 @@ export function useAutonomyTimeline({
       }
       // Live anticipation proposal → prepend (deduped by proposalId), bounded.
       if (data.event === 'autonomy:anticipation' && typeof data.payload?.proposalId === 'string') {
-        const proposal = data.payload as unknown as AnticipationProposal;
+        const proposal = normalizeProposal(data.payload as unknown as RawServerProposal);
         setProposals((prev) => {
           const next = [proposal, ...prev.filter((p) => p.proposalId !== proposal.proposalId)];
           return next.slice(0, 50);

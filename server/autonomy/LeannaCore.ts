@@ -1,10 +1,15 @@
 import { randomUUID } from "crypto";
 import type { AgentRuntime, EventBus } from "../runtime/index.js";
 import type { RuntimeEvent } from "../runtime/types.js";
+import { createLogger } from "../utils/logger.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
 import { AnticipationEngine, anticipationConfigFromEnv, type AnticipationEngineConfig, type AnticipationProposal } from "./AnticipationEngine.js";
 import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
+import { IdleWorker, type IdleMissionRunner } from "./IdleWorker.js";
+import { AutonomyBudget, autonomyBudgetConfigFromEnv } from "./AutonomyBudget.js";
+import type { AutonomyAuditEntry } from "./AutonomyAuditLog.js";
+import { telemetryService } from "../observability/TelemetryService.js";
 import {
   TaskManager,
   taskManagerConfigFromEnv,
@@ -41,7 +46,11 @@ export interface AutonomyTaskStore extends TaskPersistence {
   loadPendingTasks(): Promise<AutonomousTask[]>;
 }
 
-/** Autonomy event types forwarded to the real-time timeline. */
+/**
+ * Autonomy event types forwarded to the real-time timeline from the EventBus.
+ * These are the `autonomy:*` runtime events the coordinator subscribes to and
+ * re-broadcasts verbatim.
+ */
 export type AutonomyEventType =
   | "autonomy:heartbeat"
   | "autonomy:stateChanged"
@@ -51,13 +60,29 @@ export type AutonomyEventType =
   | "autonomy:anticipation";
 
 /**
+ * Executive cycle events emitted by AutonomousExecutive and forwarded verbatim
+ * by broadcastExecutive(). They travel the same broadcast channel but are NOT
+ * EventBus runtime events, so they are kept separate from AutonomyEventType.
+ */
+export type AutonomyExecutiveEventType =
+  | "autonomy.cycle.started"
+  | "autonomy.cycle.completed"
+  | "autonomy.cycle.escalated"
+  | "autonomy.decision.made"
+  | "autonomy.mission.created"
+  | "autonomy.memory.updated";
+
+/** Every event name a broadcast message can carry. */
+export type AutonomyBroadcastEventType = AutonomyEventType | AutonomyExecutiveEventType;
+
+/**
  * Envelope pushed to WebSocket clients for the autonomy timeline. It mirrors the
  * shape used by the existing agent/mission broadcasters (typed message + ISO
  * timestamp) so a single client can consume all real-time channels uniformly.
  */
 export interface AutonomyBroadcastMessage {
   type: "autonomy_event";
-  event: AutonomyEventType;
+  event: AutonomyBroadcastEventType;
   timestamp: string;
   payload: Record<string, unknown>;
 }
@@ -84,9 +109,26 @@ export interface LeannaCoreOptions {
     autoLaunch?: boolean;
     config?: Partial<AnticipationEngineConfig>;
   };
+  /**
+   * Phase 3 — bounded idle autonomy. During calm periods (heartbeat idle/sleep,
+   * no active tasks) Leanna runs a READ-ONLY diagnostic mission instead of a
+   * static message, bounded by a budget and a kill switch and written to an
+   * audit log. Disabled unless a `runMission` runner is supplied (and the env
+   * master flag is not turned off), so the default behaviour is unchanged.
+   */
+  idleWork?: {
+    /** Master enable. Defaults to LEANNA_AUTONOMY_IDLE_WORK !== "false". */
+    enabled?: boolean;
+    /** Constrained, read-only (dry-run) mission runner. Required to launch work. */
+    runMission?: IdleMissionRunner;
+  };
 }
 
 const MAX_RECENT_FAILURES = 20;
+
+const log = createLogger("Autonomy:Core");
+/** Short id for readable logs. */
+const coreSid = (id?: string): string => (id ? id.slice(0, 8) : "—");
 
 /**
  * Event-driven autonomy coordinator. It reuses the Runtime EventBus and keeps
@@ -99,6 +141,7 @@ export class LeannaCore {
   private readonly heartbeat: HeartbeatService;
   private readonly executive?: AutonomousExecutive;
   private readonly anticipation?: AnticipationEngine;
+  private readonly idleWorker?: IdleWorker;
   private readonly unsubscribers: Array<() => void> = [];
   private readonly persistence?: AutonomyTaskStore;
   private broadcaster?: AutonomyBroadcaster;
@@ -145,6 +188,20 @@ export class LeannaCore {
       this.anticipation = new AnticipationEngine(runtime, {
         config: { ...anticipationConfigFromEnv(), ...options.anticipation?.config },
         submitTask: autoLaunch ? (input) => this.taskManager.submit(input) : undefined,
+        // Suppress the static idle reflection when bounded idle autonomy will
+        // instead run a real read-only diagnostic this calm period.
+        idleWorkActive: () => Boolean(this.idleWorker) && !this.idleWorker!.isPaused(),
+      });
+    }
+    // Phase 3 — bounded idle autonomy. Off unless explicitly enabled AND a
+    // read-only mission runner is supplied; the env flag is a hard kill switch.
+    const idleEnabledByEnv = String(process.env.LEANNA_AUTONOMY_IDLE_WORK ?? "").toLowerCase() !== "false";
+    if (options.idleWork?.enabled !== false && idleEnabledByEnv && options.idleWork?.runMission) {
+      this.idleWorker = new IdleWorker(runtime, {
+        budget: new AutonomyBudget(autonomyBudgetConfigFromEnv()),
+        runMission: options.idleWork.runMission,
+        // Never run self-initiated work while real autonomy tasks are in flight.
+        isBusy: () => this.taskManager.list().some((task) => task.status === "running"),
       });
     }
   }
@@ -152,6 +209,11 @@ export class LeannaCore {
   start(): void {
     if (this.started) return;
     this.started = true;
+    log.info(
+      `🧠 Autonomy runtime starting — anticipation:${this.anticipation ? "on" : "off"}, ` +
+      `executive:${this.executive ? "on" : "off"}, idle-work:${this.idleWorker ? "on" : "off"}, ` +
+      `persistence:${this.persistence ? "on" : "off"}.`,
+    );
     this.setStatus("watching", "Autonomy runtime started.");
     this.unsubscribers.push(this.events.onAny((event) => this.handleEvent(event)));
     this.unsubscribers.push(this.events.on("autonomy:heartbeat", (event) => this.handleHeartbeat(event.state)));
@@ -161,6 +223,7 @@ export class LeannaCore {
     this.anticipation?.start();
     this.heartbeat.start();
     void this.resumePersistedTasks();
+    log.info("🧠 Autonomy runtime started — watching.");
   }
 
   /**
@@ -212,26 +275,34 @@ export class LeannaCore {
     if (!this.persistence) return;
     try {
       const pending = await this.persistence.loadPendingTasks();
-      if (pending.length === 0) return;
+      if (pending.length === 0) {
+        log.debug("♻️  Resume: no persisted autonomy tasks to restore.");
+        return;
+      }
+      log.info(`♻️  Resume: ${pending.length} persisted task(s) found; restoring…`);
       const restored = this.taskManager.restore(pending);
       if (restored > 0) {
         this.state.lastWakeAt = Date.now();
         this.heartbeat.wake("autonomy:resume");
         this.setStatus("watching", `Resumed ${restored} persisted autonomy task(s).`);
+        log.info(`♻️  Resume: ${restored}/${pending.length} task(s) re-enqueued (others deduped/circuit-blocked).`);
       }
-    } catch {
-      /* recovery is best-effort; the store logs its own errors */
+    } catch (error) {
+      log.warn(`♻️  Resume failed (best-effort): ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async stop(): Promise<void> {
     if (!this.started) return;
+    log.info("🧠 Autonomy runtime stopping — graceful shutdown requested.");
     this.setStatus("stopping", "Graceful shutdown requested.");
     this.heartbeat.stop();
     this.anticipation?.stop();
+    this.idleWorker?.pause("shutdown");
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     await this.taskManager.stop();
     this.started = false;
+    log.info("🧠 Autonomy runtime stopped.");
   }
 
   getState(): Readonly<LeannaRuntimeState> {
@@ -253,6 +324,64 @@ export class LeannaCore {
    */
   getProposals(): AnticipationProposal[] {
     return this.anticipation?.getProposals() ?? [];
+  }
+
+  // ─── Phase 3: bounded idle autonomy controls ────────────────────────────────
+
+  /**
+   * Kill switch — stop launching self-initiated read-only work (reversible).
+   * In-flight user/event missions are untouched; only the idle loop is halted.
+   */
+  pauseIdleWork(reason = "operator"): void {
+    this.idleWorker?.pause(reason);
+  }
+
+  /** Resume self-initiated idle work after a pause. */
+  resumeIdleWork(reason = "operator"): void {
+    this.idleWorker?.resume(reason);
+  }
+
+  /** True when idle autonomy is wired and currently paused. */
+  isIdleWorkPaused(): boolean {
+    return this.idleWorker?.isPaused() ?? false;
+  }
+
+  /** Readable audit trail of self-initiated work (most recent `limit` entries). */
+  getIdleAudit(limit = 100): AutonomyAuditEntry[] {
+    return this.idleWorker?.getAuditLog().read(limit) ?? [];
+  }
+
+  /** Current idle-autonomy budget snapshot (actions/tokens/cost per hour). */
+  getIdleBudget() {
+    return this.idleWorker?.getBudget().snapshot();
+  }
+
+  /**
+   * GLOBAL autonomy budget snapshot: real consumption across ALL autonomous
+   * activity (idle diagnostics + anticipation/executive missions) measured over
+   * the rolling hour, surfaced against the same per-hour ceilings as the idle
+   * budget. Same shape as `getIdleBudget()` so the UI can render it unchanged.
+   *
+   * Design note: the `used` values come from `TelemetryService` (which records
+   * every model call, regardless of what launched it), NOT from the idle
+   * `AutonomyBudget` — that budget deliberately counts only self-initiated idle
+   * work and must keep doing so (it is a safety ceiling for the idle loop). We
+   * only borrow its ceilings here for display. When idle work is not wired, the
+   * ceilings fall back to the env-configured defaults so the panel still shows
+   * real consumption against a sensible limit.
+   */
+  getAutonomyBudget() {
+    const usage = telemetryService.getRollingHourUsage();
+    // Ceilings: prefer the live idle budget's config; else the env defaults.
+    const ceilings = this.idleWorker?.getBudget().snapshot()
+      ?? new AutonomyBudget(autonomyBudgetConfigFromEnv()).snapshot();
+    return {
+      windowMs: usage.windowMs,
+      actions: { used: usage.missionCount, max: ceilings.actions.max },
+      tokens: { used: usage.totalTokens, max: ceilings.tokens.max },
+      costUsd: { used: usage.totalCost, max: ceilings.costUsd.max },
+      perMission: ceilings.perMission,
+    };
   }
 
   private get events(): EventBus {
@@ -283,19 +412,23 @@ export class LeannaCore {
     });
 
     if (task) {
+      log.info(`📥 Task ${coreSid(task.id)} created [${task.type}/${task.priority}] from ${event.type} — ${perception.reason}`);
       this.events.emit({
         type: "autonomy:taskCreated",
         taskId: task.id,
         taskType: task.type,
         sourceEventId: task.sourceEventId,
       });
+    } else {
+      // submit() returned undefined → deduped, queue full, or circuit open.
+      log.debug(`📥 Task not queued for ${event.type} (${perception.reason}) — deduped, queue full, or circuit open.`);
     }
   }
 
   private broadcastExecutive(event: { type: string; traceId: string; cycleId: string; timestamp: number; [key: string]: unknown }): void {
     if (!this.broadcaster) return;
     try {
-      this.broadcaster({ type: "autonomy_event", event: event.type as AutonomyEventType, timestamp: new Date(event.timestamp).toISOString(), payload: event });
+      this.broadcaster({ type: "autonomy_event", event: event.type as AutonomyBroadcastEventType, timestamp: new Date(event.timestamp).toISOString(), payload: event });
     } catch { /* observability is best-effort */ }
   }
 
@@ -313,21 +446,36 @@ export class LeannaCore {
       this.state.recentFailures = [task.error ?? task.title, ...this.state.recentFailures].slice(0, MAX_RECENT_FAILURES);
       this.state.health = "degraded";
       this.setStatus("error", `Task ${task.id} reached the dead-letter queue.`);
+      log.error(`☠️  Task ${coreSid(task.id)} [${task.type}] reached dead-letter after ${task.attempts} attempt(s): ${task.error ?? "unknown error"}`);
     } else if (task.status === "completed" && this.started) {
       this.setStatus("watching", "Autonomy task completed.");
+      log.info(`✅ Task ${coreSid(task.id)} [${task.type}] completed.`);
+    } else {
+      log.debug(`🔄 Task ${coreSid(task.id)} [${task.type}] ${previous} → ${task.status}`);
     }
   }
 
   private handleHeartbeat(state: "active" | "idle" | "sleep"): void {
     if (!this.started || this.getState().activeTasks > 0) return;
     this.setStatus(state === "active" ? "watching" : state === "idle" ? "idle" : "sleeping", `Heartbeat entered ${state}.`);
+    // Phase 3: calm period → run a bounded, read-only diagnostic instead of a
+    // static message. The worker self-gates on kill switch, budget and busy
+    // state; errors are swallowed so idle work never destabilises the loop.
+    if (this.idleWorker && state !== "active") {
+      void this.idleWorker.onHeartbeat(state).catch(() => { /* idle work is best-effort */ });
+    }
   }
 
   private healthCheck(): { attentionRequired: boolean; reason: string } {
     const stats = this.runtime.getStats();
     const degraded = !this.runtime.isRunning || stats.tasks.failed > 0 || this.state.recentFailures.length > 0;
+    const previous = this.state.health;
     this.state.health = degraded ? "degraded" : "healthy";
     const reason = degraded ? "Runtime has failed tasks or is stopped." : "Runtime healthy.";
+    if (previous !== this.state.health) {
+      const emoji = degraded ? "❤️‍🩹" : "💚";
+      log[degraded ? "warn" : "info"](`${emoji} Health ${previous} → ${this.state.health} — ${reason}`);
+    }
     this.events.emit({ type: "autonomy:health", status: this.state.health, reason });
     return { attentionRequired: degraded, reason };
   }
@@ -336,6 +484,8 @@ export class LeannaCore {
     const from = this.state.status;
     if (from === to) return;
     this.state.status = to;
+    const level = to === "error" ? "warn" : "debug";
+    log[level](`🧭 Runtime ${from} → ${to}${reason ? ` — ${reason}` : ""}`);
     this.events.emit({ type: "autonomy:stateChanged", from, to, reason });
   }
 

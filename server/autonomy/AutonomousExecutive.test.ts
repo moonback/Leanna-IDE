@@ -92,3 +92,92 @@ test("execute records a per-fingerprint failure tally consumed by later decision
   const recorded = [...runtime.store.keys()].some((k) => k.startsWith("autonomy:fingerprint:"));
   assert.equal(recorded, true, "a fingerprint tally must be persisted after a blocked mission");
 });
+
+// ── Phase 2: goal persistence ────────────────────────────────────────────────
+
+/** Memory fake supporting set/get/search/delete, like the real project store. */
+function persistentRuntime() {
+  const store = new Map<string, unknown>();
+  return {
+    events: new EventBus(),
+    memory: {
+      get: (_level: string, key: string) => store.get(key),
+      set: async (_level: string, key: string, value: unknown) => { store.set(key, value); },
+      delete: (_level: string, key: string) => store.delete(key),
+      search: (_level: string, query: { prefix?: string; limit?: number }) =>
+        [...store.entries()]
+          .filter(([k]) => !query.prefix || k.startsWith(query.prefix))
+          .slice(0, query.limit ?? 20)
+          .map(([key, value]) => ({ key, value, level: "project", createdAt: 0, updatedAt: 0 })),
+    },
+    store,
+  };
+}
+
+test("goals are mirrored to project memory under autonomy:goal:<id>", () => {
+  const runtime = persistentRuntime();
+  const executive = new AutonomousExecutive(runtime as never);
+  executive.decide({ type: "task:failed", taskId: "x", error: "boom" });
+
+  const goalKeys = [...runtime.store.keys()].filter((k) => k.startsWith("autonomy:goal:"));
+  assert.equal(goalKeys.length, 1, "a created goal must be persisted");
+});
+
+test("completed/cancelled goals are removed from the durable store", async () => {
+  const runtime = persistentRuntime();
+  const executive = new AutonomousExecutive(runtime as never, { executeMission: async () => ({ success: true }) });
+  await executive.execute({ id: "t", type: "maintenance", title: "f", priority: "high", sourceEventId: "t", fingerprint: "t", createdAt: Date.now(), status: "pending", attempts: 0, maxRetries: 1, timeoutMs: 100, metadata: { event: { type: "task:failed", taskId: "t", error: "boom" } } } as never);
+
+  // The goal transitioned PENDING → ACTIVE → COMPLETED; the terminal state must
+  // have purged it from the store even though it stays in the in-memory list.
+  const goalKeys = [...runtime.store.keys()].filter((k) => k.startsWith("autonomy:goal:"));
+  assert.equal(goalKeys.length, 0, "a completed goal must be purged from durable storage");
+});
+
+test("a fresh executive restores non-terminal goals from the store", () => {
+  const runtime = persistentRuntime();
+  // Seed a persisted, still-active goal as a prior process would have left it.
+  runtime.store.set("autonomy:goal:g-1", {
+    id: "g-1", description: "resume me", source: "EVENT", priority: "high", status: "ACTIVE",
+    constraints: [], riskLevel: "high", successCriteria: [], createdAt: 1, updatedAt: 1,
+  });
+
+  const executive = new AutonomousExecutive(runtime as never);
+  const restored = executive.goals.get("g-1");
+
+  assert.ok(restored, "a non-terminal goal must be rehydrated at construction");
+  assert.equal(restored!.description, "resume me");
+  assert.equal(executive.goals.list().length, 1);
+});
+
+// ── Regression: a mission that outlives its task timeout must not pin the slot ──
+
+test("a timed-out mission releases the concurrency budget for the next cycle", async () => {
+  const runtime = memoryRuntime();
+  let starts = 0;
+  const executive = new AutonomousExecutive(runtime as never, {
+    maxConcurrentCycles: 1,
+    // First hand-off never settles (simulates a mission that outlives the task
+    // timeout, exactly as TaskManager.withTimeout would abandon it); the second
+    // resolves promptly. Before the fix, activeCycles stayed pinned at 1/1 and
+    // every subsequent cycle was rejected with "concurrency budget exhausted".
+    executeMission: () => {
+      starts++;
+      return starts === 1 ? new Promise(() => {}) : Promise.resolve({ success: true });
+    },
+  });
+  const task = (id: string) => ({
+    id, type: "maintenance" as const, title: "stuck", priority: "high" as const,
+    sourceEventId: id, fingerprint: id, createdAt: Date.now(), status: "pending" as const,
+    attempts: 0, maxRetries: 1, timeoutMs: 60, // 60ms task budget → ~54ms cycle budget
+    metadata: { event: { type: "task:failed" as const, taskId: id, error: "boom" } },
+  });
+
+  // The first cycle must reject (cycle timeout) rather than hang forever.
+  await assert.rejects(executive.execute(task("one")), /wall-clock budget/);
+  // The stuck goal is parked as BLOCKED, not left stranded in ACTIVE.
+  assert.equal(executive.goals.list().find((g) => g.description.includes("runtime task"))?.status, "BLOCKED");
+  // Crucially, the slot is free again: a fresh cycle runs to completion.
+  await executive.execute(task("two"));
+  assert.equal(executive.goals.list().filter((g) => g.status === "COMPLETED").length, 1);
+});

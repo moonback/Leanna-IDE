@@ -27,7 +27,12 @@
 
 import { randomUUID } from "crypto";
 import type { AgentRuntime, RuntimeEvent } from "../runtime/index.js";
+import { createLogger } from "../utils/logger.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
+import { opportunityEngine, type OpportunityEngine } from "../knowledge/OpportunityEngine.js";
+import { projectDoctor, type ProjectDoctor } from "../knowledge/ProjectDoctor.js";
+import { predictionEngine, type PredictionEngine } from "../knowledge/PredictionEngine.js";
+import { dailyBriefing, type DailyBriefing } from "../knowledge/DailyBriefing.js";
 import type { AutonomousTask } from "./TaskManager.js";
 import { strategyMemory, type StrategyMemory } from "../knowledge/StrategyMemory.js";
 import { learningEngine, type LearningEngine } from "../knowledge/LearningEngine.js";
@@ -126,11 +131,26 @@ export interface AnticipationEngineOptions {
   strategyMemory?: StrategyMemory;
   /** Pattern/lesson signal source. Defaults to the shared singleton. */
   learningEngine?: LearningEngine;
+  /** Proactive opportunity hunter. Defaults to the shared singleton. */
+  opportunityEngine?: OpportunityEngine;
+  /** Project-health diagnostician. Defaults to the shared singleton. */
+  projectDoctor?: ProjectDoctor;
+  /** Pre-flight mission risk predictor. Defaults to the shared singleton. */
+  predictionEngine?: PredictionEngine;
+  /** Morning digest composer. Defaults to the shared singleton. */
+  dailyBriefing?: DailyBriefing;
   /**
    * Optional seam to turn high-importance proposals into mission tasks. When
    * omitted, the engine only emits proposals (observe-and-suggest mode).
    */
   submitTask?: AnticipationTaskSubmitter;
+  /**
+   * Phase 3 seam: returns true when bounded idle autonomy is active (and not
+   * paused). When it does, the static "I'm idle" reflection is suppressed —
+   * Leanna is about to run a real read-only diagnostic instead of merely
+   * saying she's available, avoiding a duplicate signal.
+   */
+  idleWorkActive?: () => boolean;
 }
 
 const PRIORITY_FROM_IMPORTANCE = (importance: number): AnticipationPriority =>
@@ -138,6 +158,8 @@ const PRIORITY_FROM_IMPORTANCE = (importance: number): AnticipationPriority =>
 
 const PRIORITY_TO_TASK = (priority: AnticipationPriority): AutonomousTask["priority"] =>
   priority === "critical" ? "critical" : priority === "high" ? "high" : priority === "medium" ? "medium" : "low";
+
+const log = createLogger("Autonomy:Anticipation");
 
 /**
  * Observe → detect → evaluate → propose. Mirrors the PerceptionEngine/Executive
@@ -147,8 +169,13 @@ export class AnticipationEngine {
   private readonly perception = new PerceptionEngine();
   private readonly strategy: StrategyMemory;
   private readonly learning: LearningEngine;
+  private readonly opportunities: OpportunityEngine;
+  private readonly doctor: ProjectDoctor;
+  private readonly prediction: PredictionEngine;
+  private readonly briefing: DailyBriefing;
   private readonly config: AnticipationEngineConfig;
   private readonly submitTask?: AnticipationTaskSubmitter;
+  private readonly idleWorkActive?: () => boolean;
 
   private readonly unsubscribers: Array<() => void> = [];
   private readonly dedupe = new Map<string, number>();
@@ -157,12 +184,19 @@ export class AnticipationEngine {
   private ticksSinceSweep = 0;
   /** Consecutive idle/sleep heartbeat ticks, for background reflection. */
   private idleTicks = 0;
+  /** Day bucket (UTC) of the last daily briefing emitted; prevents duplicates. */
+  private lastBriefingDay = -1;
 
   constructor(private readonly runtime: AgentRuntime, options: AnticipationEngineOptions = {}) {
     this.config = options.config ?? anticipationConfigFromEnv();
     this.strategy = options.strategyMemory ?? strategyMemory;
     this.learning = options.learningEngine ?? learningEngine;
+    this.opportunities = options.opportunityEngine ?? opportunityEngine;
+    this.doctor = options.projectDoctor ?? projectDoctor;
+    this.prediction = options.predictionEngine ?? predictionEngine;
+    this.briefing = options.dailyBriefing ?? dailyBriefing;
     this.submitTask = options.submitTask;
+    this.idleWorkActive = options.idleWorkActive;
   }
 
   start(): void {
@@ -175,12 +209,14 @@ export class AnticipationEngine {
     this.unsubscribers.push(
       this.runtime.events.on("autonomy:heartbeat", (event) => this.onHeartbeat(event.state)),
     );
+    log.info(`👁️  Anticipation started — sweep every ${this.config.sweepEveryTicks} tick(s), min importance ${this.config.minImportance}, auto-launch ≥ ${this.config.autoLaunchThreshold}, auto-launch:${this.submitTask ? "on" : "off"}.`);
   }
 
   stop(): void {
     if (!this.started) return;
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     this.started = false;
+    log.info("👁️  Anticipation stopped.");
   }
 
   /** Most recent proposals (newest first), for the UI / state snapshot. */
@@ -250,6 +286,11 @@ export class AnticipationEngine {
       this.idleTicks++;
     }
 
+    // Daily briefing: at most once per UTC day, independent of the sweep cadence.
+    // Driven by the shared heartbeat tick (no extra timer); the day bucket makes
+    // it idempotent across restarts within the same day once restored.
+    this.maybeEmitDailyBriefing();
+
     this.ticksSinceSweep++;
     const dueForSweep = this.ticksSinceSweep >= this.config.sweepEveryTicks;
     const dueForReflection =
@@ -261,12 +302,18 @@ export class AnticipationEngine {
     if (!dueForSweep && !dueForReflection) return;
 
     this.ticksSinceSweep = 0;
+    log.debug(`👁️  Sweep starting (state: ${state}, trigger: ${dueForSweep ? "schedule" : "reflection"}).`);
     const emitted = this.sweep();
+    log.info(`👁️  Sweep done — ${emitted.length} proposal(s) emitted.`);
 
     // "Vivant" : si rien de plus pressant n'a émergé pendant une période calme,
     // Leanna remarque tout de même qu'elle est disponible et réfléchit au projet.
     // Faible importance → surfacé seulement, jamais transformé en mission.
-    if (dueForReflection && emitted.length === 0) {
+    //
+    // Phase 3: when bounded idle autonomy is active it will run a real read-only
+    // diagnostic during this calm period, so we suppress the static reflection
+    // to avoid a duplicate "I'm available" signal.
+    if (dueForReflection && emitted.length === 0 && !this.idleWorkActive?.()) {
       this.reflect(state);
     }
   }
@@ -292,6 +339,56 @@ export class AnticipationEngine {
       suggestedAction: "Proposer une revue légère ou une amélioration du projet.",
       affectedResources: [],
       fingerprint: `reflect:${bucket}`,
+    });
+  }
+
+  // ─── Daily briefing (scheduled proactivity) ─────────────────────────────────
+
+  /**
+   * Emit the "Daily AI Briefing" at most once per UTC day. Composes the already-
+   * built knowledge engines via DailyBriefing (ProjectDoctor + OpportunityEngine
+   * + ProjectProfile) and surfaces it as a `schedule`-flavoured proposal. When a
+   * task submitter is wired, it is auto-launched as a SCHEDULE-sourced mission so
+   * Leanna can pre-stage the recommended missions behind the usual pipeline.
+   */
+  private maybeEmitDailyBriefing(): void {
+    const day = Math.floor(Date.now() / 86_400_000);
+    if (day === this.lastBriefingDay) return;
+    this.lastBriefingDay = day;
+    try {
+      log.info("☀️ Daily briefing due — composing the morning digest…");
+      this.emitDailyBriefing(day);
+    } catch (error) {
+      log.warn(`☀️ Daily briefing failed (best-effort): ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /** Force-emit a briefing now (tests / on-demand "brief me"). */
+  briefNow(): AnticipationProposal | undefined {
+    return this.emitDailyBriefing(Math.floor(Date.now() / 86_400_000));
+  }
+
+  private emitDailyBriefing(day: number): AnticipationProposal | undefined {
+    const report = this.briefing.generate({ maxMissions: 5 });
+    const total = report.counts.critical + report.counts.pending + report.counts.improvement;
+    // Importance tracks how loaded the briefing is; a critical finding makes it
+    // high enough to notify, an empty project stays a quiet FYI.
+    const importance = report.counts.critical > 0
+      ? 0.8
+      : report.counts.pending > 0
+        ? 0.6
+        : Math.max(this.config.minImportance, 0.45);
+    const headline = report.recommendedMissions[0]?.title ?? "Revue légère du projet.";
+    return this.propose({
+      kind: "opportunity",
+      importance,
+      message: `☀️ Briefing du jour — ${report.counts.critical} critique(s), ${report.counts.pending} en attente, ${report.counts.improvement} amélioration(s)${total === 0 ? " (rien d'urgent)" : ""}.`,
+      suggestedAction: headline,
+      affectedResources: report.recommendedMissions.map((m) => m.title),
+      // One briefing proposal per UTC day; the day bucket is the dedupe key.
+      fingerprint: `schedule:daily-briefing:${day}`,
+      scheduled: true,
+      briefingSummary: report.summary,
     });
   }
 
@@ -380,6 +477,72 @@ export class AnticipationEngine {
       /* stats read is best-effort */
     }
 
+    // 4) Opportunity hunter: the OpportunityEngine ranks useful work (automation,
+    // optimization, prevention, reliability, health) by payoff. We surface the
+    // top few; health opportunities are left to the Doctor detector below.
+    try {
+      const report = this.opportunities.scan({ limit: 5, includeHealth: false });
+      for (const opp of report.opportunities.slice(0, 3)) {
+        // Map 0..100 value → 0..1 importance, floored so it clears minImportance
+        // but kept below autoLaunch unless the payoff is genuinely high.
+        const importance = Math.min(0.84, Math.max(this.config.minImportance, opp.value / 100));
+        const kind: AnticipationKind = opp.kind === "automation" ? "automation" : opp.kind === "optimization" ? "optimization" : "opportunity";
+        push(this.propose({
+          kind,
+          importance,
+          message: opp.message,
+          suggestedAction: opp.suggestedAction,
+          affectedResources: opp.affectedResources,
+          fingerprint: `sweep:opportunity:${opp.signature}`,
+        }));
+      }
+    } catch {
+      /* opportunity scan is best-effort */
+    }
+
+    // 5) Project health: the ProjectDoctor's critical/high issues become risk/
+    // problem proposals so a degrading project surfaces even without a runtime event.
+    try {
+      const health = this.doctor.diagnose();
+      for (const issue of health.issues) {
+        if (issue.severity === "low" || issue.severity === "medium") continue;
+        const importance = issue.severity === "critical" ? 0.9 : 0.7;
+        push(this.propose({
+          kind: issue.severity === "critical" ? "risk" : "problem",
+          importance,
+          message: `[santé:${issue.dimension}] ${issue.message}`,
+          suggestedAction: issue.suggestedAction,
+          affectedResources: issue.affectedResources,
+          fingerprint: `sweep:health:${issue.dimension}:${issue.message.slice(0, 40)}`,
+        }));
+      }
+
+      // 6) Pre-flight risk: predict the success of the Doctor's top improvement
+      // mission. A low predicted success probability is itself a risk worth
+      // flagging before Leanna (or the user) launches it blindly.
+      const topMission = health.improvementMissions[0];
+      if (topMission) {
+        const prediction = this.prediction.predict({
+          objective: { title: topMission.title, description: topMission.description },
+          plannedSkills: [],
+        });
+        if (prediction.riskLevel === "high" || prediction.riskLevel === "critical") {
+          push(this.propose({
+            kind: "risk",
+            importance: prediction.riskLevel === "critical" ? 0.8 : 0.6,
+            message: `Mission d'amélioration « ${topMission.title} » : succès estimé ${prediction.successPercent}% (risque ${prediction.riskLevel}).`,
+            suggestedAction: prediction.recommendedStrategy.length
+              ? `Adapter le plan avant de lancer : ${prediction.recommendedStrategy.slice(0, 4).join(" → ")}.`
+              : topMission.title,
+            affectedResources: topMission.affectedResources,
+            fingerprint: `sweep:prediction:${topMission.dimension}:${prediction.riskLevel}`,
+          }));
+        }
+      }
+    } catch {
+      /* doctor / prediction read is best-effort (graph may be empty) */
+    }
+
     return emitted;
   }
 
@@ -397,6 +560,10 @@ export class AnticipationEngine {
     suggestedAction: string;
     affectedResources: string[];
     fingerprint: string;
+    /** Marks a scheduled proposal (e.g. the daily briefing) → SCHEDULE goal. */
+    scheduled?: boolean;
+    /** Optional Markdown digest carried through to the launched mission. */
+    briefingSummary?: string;
   }): AnticipationProposal | undefined {
     const importance = Math.max(0, Math.min(1, input.importance));
     if (importance < this.config.minImportance) return undefined;
@@ -433,10 +600,21 @@ export class AnticipationEngine {
             suggestedAction: proposal.suggestedAction,
             affectedResources: proposal.affectedResources,
             importance: proposal.importance,
+            // When set, the executive treats this as a scheduled goal (source
+            // SCHEDULE) rather than a learned anticipation (source LEARNED).
+            scheduled: input.scheduled ?? false,
+            briefingSummary: input.briefingSummary,
           },
         },
       });
       proposal.queuedAsTask = Boolean(task);
+      if (proposal.queuedAsTask) {
+        log.info(`💡→🚀 Proposal auto-launched as mission [${proposal.kind}/${proposal.priority}, importance ${proposal.importance.toFixed(2)}]: "${proposal.suggestedAction}"`);
+      } else {
+        log.warn(`💡 Proposal eligible for auto-launch but TaskManager refused it [${proposal.kind}]: "${proposal.suggestedAction}"`);
+      }
+    } else {
+      log.info(`💡 Proposal surfaced [${proposal.kind}/${proposal.priority}, importance ${proposal.importance.toFixed(2)}]: "${proposal.message}"`);
     }
 
     this.record(proposal);

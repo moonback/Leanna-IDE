@@ -198,6 +198,13 @@ export class Executor {
     "analyze_project_file", "search_in_files", "get_workspace_info",
     "knowledge_semantic_search", "knowledge_search_entities",
     "knowledge_build_context", "knowledge_impact_analyze",
+    // Outils informationnels/réseau sans effet de bord : les enchaîner reste de
+    // l'exploration. Sans eux, une boucle « lire → chercher → métriques → web →
+    // lire » voyait son streak d'exploration remis à zéro par chaque appel hors
+    // liste, et l'anti-boucle ne s'armait jamais (mission qui tourne jusqu'au
+    // timeout global). Observé en prod sur agent_bus_metrics / browser_web_search.
+    "browser_web_search", "agent_bus_metrics", "knowledge_opportunities",
+    "knowledge_predict", "knowledge_daily_briefing", "knowledge_project_doctor",
   ]);
 
   /**
@@ -210,20 +217,62 @@ export class Executor {
   ];
 
   /**
+   * Budgets de temps (ms) pour la génération d'arguments par le LLM.
+   *
+   * Un timeout fixe de 20 s était trop court pour les outils d'ÉCRITURE : en
+   * mode « artefact forcé », l'arg-gen doit produire un livrable complet
+   * (contenu réel, pas un squelette), ce qui dépasse souvent 20 s et faisait
+   * échouer les trois tentatives à l'identique (`LLM arg-gen timeout`). On
+   * distingue donc deux budgets, tous deux pilotables par l'environnement, et
+   * on les élargit à chaque nouvelle tentative (backoff) plutôt que de rejouer
+   * exactement le même appel voué au même timeout.
+   */
+  private static readonly ARG_GEN_TIMEOUT_MS = Executor.positiveEnvInt(
+    process.env.LEANNA_ARG_GEN_TIMEOUT_MS, 45_000
+  );
+  private static readonly ARG_GEN_TIMEOUT_WRITE_MS = Executor.positiveEnvInt(
+    process.env.LEANNA_ARG_GEN_TIMEOUT_WRITE_MS, 75_000
+  );
+  /** Multiplicateur de budget appliqué à chaque tentative d'arg-gen (backoff). */
+  private static readonly ARG_GEN_RETRY_BACKOFF = 1.5;
+
+  /** Lit un entier positif depuis l'environnement, défaut sûr sinon. */
+  private static positiveEnvInt(value: string | undefined, fallback: number): number {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  }
+
+  /**
    * Nombre d'actions d'exploration consécutives (sans aucune écriture réussie)
    * au-delà duquel on force une replanification orientée « produire un artefact ».
    */
   private static readonly EXPLORATION_LOOP_THRESHOLD = 4;
 
   /**
+   * Plafond CUMULÉ d'actions improductives (réussies mais sans écriture) sur un
+   * même objectif. Contrairement au streak consécutif, ce compteur ne se remet
+   * jamais à zéro tant qu'aucun artefact n'est produit : il attrape les boucles
+   * « diluées » où des outils read-only variés s'alternent (lire → chercher →
+   * métriques → web → lire…) sans jamais faire progresser l'objectif. Au-delà,
+   * on force un artefact si possible, sinon on CLÔT proprement l'objectif au
+   * lieu de laisser la mission tourner jusqu'au timeout global.
+   */
+  private static readonly UNPRODUCTIVE_ACTIONS_CAP = Executor.positiveEnvInt(
+    process.env.LEANNA_UNPRODUCTIVE_ACTIONS_CAP, 8
+  );
+
+  /**
    * Suivi anti-boucle par objectif. `explorationStreak` compte les actions
    * d'exploration enchaînées sans écriture ; `producedArtifact` passe à true dès
-   * qu'un outil d'écriture réussit ; `forcedArtifact` évite de forcer deux fois.
+   * qu'un outil d'écriture réussit ; `forcedArtifact` évite de forcer deux fois ;
+   * `unproductiveActions` compte, de façon cumulée, toute action réussie sans
+   * écriture (jamais remis à zéro sans artefact) pour borner les boucles diluées.
    */
   private loopGuards: Map<string, {
     explorationStreak: number;
     producedArtifact: boolean;
     forcedArtifact: boolean;
+    unproductiveActions: number;
   }> = new Map();
 
   /** Estimateur coût / durée / risque avant exécution. */
@@ -417,15 +466,31 @@ export class Executor {
     budget?: { maxTokens?: number; maxCostUsd?: number };
     /** Exécuter la mission entière en simulation, sans effet de bord. */
     dryRun?: boolean;
+    /**
+     * La mission attend-elle un livrable écrit pour réussir ? `false` pour une
+     * mission d'analyse/investigation (diagnostic autonome) : le succès se juge
+     * sur l'analyse/escalade, pas sur un fichier produit. `undefined` = héritage
+     * heuristique par mot-clé.
+     */
+    expectsArtifact?: boolean;
+    /**
+     * Plafonds spécifiques à CETTE mission (bornent le temps mural et la taille
+     * du plan), par-dessus la config globale. Utilisé par le travail autonome
+     * idle pour garder un diagnostic en lecture seule court et borné.
+     */
+    configOverrides?: Partial<Pick<MissionConfig, "missionTimeoutMs" | "maxSubGoals" | "maxConcurrentGoals">>;
   }): Promise<Mission> {
     if (!this.skillHandler) {
       throw new Error("SkillHandler not configured. Call setSkillHandler first.");
     }
 
-    // Config spécifique à la mission : le dry-run peut être activé par mission.
+    // Config spécifique à la mission : le dry-run peut être activé par mission,
+    // et les plafonds (temps/plan) peuvent être resserrés par l'appelant.
     const missionConfig: MissionConfig = {
       ...this.config,
       dryRun: params.dryRun ?? this.config.dryRun,
+      ...(params.expectsArtifact !== undefined ? { expectsArtifact: params.expectsArtifact } : {}),
+      ...(params.configOverrides ?? {}),
     };
 
     const mission = new Mission(
@@ -1066,7 +1131,7 @@ export class Executor {
 
     // Suivi anti-boucle d'exploration pour cet objectif (réinitialisé à chaque
     // entrée dans la méthode : une reprise repart d'un compteur propre).
-    this.loopGuards.set(goalId, { explorationStreak: 0, producedArtifact: false, forcedArtifact: false });
+    this.loopGuards.set(goalId, { explorationStreak: 0, producedArtifact: false, forcedArtifact: false, unproductiveActions: 0 });
 
     while (iterations++ < maxIterations) {
       if (mission.isCompleted()) break;
@@ -1110,10 +1175,17 @@ export class Executor {
       if (actionSucceeded && isWrite) {
         guard.producedArtifact = true;
         guard.explorationStreak = 0;
+        guard.unproductiveActions = 0;
       } else if (isExploration) {
         guard.explorationStreak++;
+        guard.unproductiveActions++;
       } else if (actionSucceeded) {
+        // Progrès non-exploratoire : on casse le streak CONSÉCUTIF, mais une
+        // action réussie sans écriture reste improductive au sens « livrable »,
+        // d'où l'incrément du compteur cumulé (qui, lui, ne se réinitialise que
+        // sur une écriture réussie).
         guard.explorationStreak = 0;
+        guard.unproductiveActions++;
       }
 
       // Si l'objectif enchaîne les lectures sans jamais produire d'artefact, on
@@ -1144,6 +1216,71 @@ export class Executor {
           continue;
         }
         // Si aucun outil d'écriture n'est disponible, on ne boucle pas davantage.
+      }
+
+      // ── Plafond CUMULÉ d'actions improductives (anti-boucle diluée) ─────────
+      // Filet de sécurité pour les boucles que le streak consécutif ci-dessus ne
+      // rattrape pas : des outils read-only variés qui s'alternent sans jamais
+      // produire d'artefact ni satisfaire les critères. Au plafond, on tente une
+      // dernière fois de forcer un artefact ; si c'est impossible (aucun outil
+      // d'écriture, ou objectif purement analytique), on CLÔT l'objectif ici
+      // plutôt que de laisser la mission consommer tout son budget jusqu'au
+      // watchdog de timeout global.
+      if (
+        !guard.producedArtifact &&
+        guard.unproductiveActions >= Executor.UNPRODUCTIVE_ACTIONS_CAP
+      ) {
+        // Dernière tentative d'artefact si l'objectif en attend un et qu'on ne
+        // l'a pas déjà forcée.
+        if (goalWantsArtifact && !guard.forcedArtifact) {
+          guard.forcedArtifact = true;
+          const forced = await this.planForcedArtifact(mission, goalId, availableSkills);
+          if (forced.length > 0) {
+            console.log(
+              `[Executor]    🧭 Plafond d'actions improductives atteint (${guard.unproductiveActions}) ` +
+              `→ replanification contrainte « produire un artefact » pour "${goal.title}".`
+            );
+            mission.setPlanForGoal(goalId, forced);
+            cursor = 0;
+            continue;
+          }
+        }
+
+        // Pas d'artefact possible : terminer proprement l'objectif. Une suite
+        // d'explorations réussies constitue un résultat partiel exploitable ;
+        // on le marque réussi SI au moins une action a réussi et que l'objectif
+        // n'attend pas de livrable concret, sinon on l'escalade comme bloqué.
+        const liveGoal = mission.getGoal(goalId);
+        const anySuccess = (liveGoal?.plannedActions ?? []).some((a) => a.status === "completed");
+        console.log(
+          `[Executor]    🛑 Boucle improductive stoppée pour "${goal.title}" ` +
+          `(${guard.unproductiveActions} actions sans livrable). Clôture de l'objectif.`
+        );
+        this.emit("goal_unproductive_capped", {
+          missionId: mission.id,
+          goalId,
+          unproductiveActions: guard.unproductiveActions,
+          skill: action.skillName,
+        });
+        if (anySuccess && !goalWantsArtifact) {
+          mission.completeGoal(goalId, {
+            success: true,
+            summary:
+              `Objectif clôturé après ${guard.unproductiveActions} actions d'analyse réussies ` +
+              `sans livrable requis (plafond anti-boucle).`,
+          });
+        } else {
+          mission.blockGoal(
+            goalId,
+            `Boucle improductive : ${guard.unproductiveActions} actions sans produire le livrable attendu.`
+          );
+          this.emit("goal_escalated", {
+            missionId: mission.id,
+            goalId,
+            reason: "Plafond d'actions improductives atteint sans livrable.",
+          });
+        }
+        return;
       }
 
       // Décider de la suite selon la réflexion (uniquement en cas d'échec).
@@ -1840,12 +1977,33 @@ INSTRUCTIONS:
 
 JSON:`;
 
-    const raw = await this.withTimeout(this.llmArgGen(prompt), 20_000, "arg-gen");
+    const timeoutMs = this.argGenTimeoutMs(action.skillName, goal.attempts);
+    const raw = await this.withLLMTimeout(
+      (signal) => this.llmArgGen!(prompt, signal), timeoutMs, "arg-gen"
+    );
     const args = this.parseJsonObject(raw);
     console.log(
       `[Executor]    🧩 Arguments générés pour ${action.skillName}: ${JSON.stringify(args).slice(0, 200)}`
     );
     return args;
+  }
+
+  /**
+   * Budget de temps (ms) pour l'arg-gen d'un outil, à une tentative donnée.
+   *
+   * - Base plus large pour les WRITE_TOOLS (ils génèrent un livrable complet).
+   * - Backoff : chaque tentative supplémentaire élargit le budget (×1.5 par
+   *   tentative au-delà de la première), pour qu'un retry ne rejoue pas le même
+   *   timeout de 20 s voué au même échec, comme observé en production.
+   * - Plafonné à 3 minutes pour rester borné.
+   */
+  private argGenTimeoutMs(skillName: string, attempts = 1): number {
+    const base = Executor.WRITE_TOOLS.includes(skillName)
+      ? Executor.ARG_GEN_TIMEOUT_WRITE_MS
+      : Executor.ARG_GEN_TIMEOUT_MS;
+    const extraAttempts = Math.max(0, (attempts ?? 1) - 1);
+    const scaled = base * Math.pow(Executor.ARG_GEN_RETRY_BACKOFF, extraAttempts);
+    return Math.min(Math.round(scaled), 180_000);
   }
 
   // ─── Validation par critères de succès ──────────────────────────────────────
@@ -1924,7 +2082,9 @@ INSTRUCTIONS:
 JSON:`;
 
     try {
-      const raw = await this.withTimeout(this.llmVerify(prompt), 20_000, "verify");
+      const raw = await this.withLLMTimeout(
+        (signal) => this.llmVerify!(prompt, signal), 20_000, "verify"
+      );
       const parsed = this.parseJsonObject(raw);
       const passed = parsed.passed === true;
       const blocking = parsed.blocking === true;
@@ -2006,7 +2166,19 @@ JSON:`;
     // produit. Si l'objectif attend un artefact concret et qu'AUCUNE écriture
     // n'a réussi, on ajoute un contrôle factuel échoué : la preuve ne peut pas
     // établir le succès sans livrable.
-    if (this.goalExpectsArtifact(goal) && filesModified.length === 0) {
+    //
+    // EXCEPTIONS au contrôle « artefact-produit » :
+    //  1) dry-run : les écritures sont SIMULÉES, jamais confirmées — exiger un
+    //     fichier réellement écrit serait contradictoire (mission read-only).
+    //  2) expectsArtifact === false : mission d'ANALYSE/investigation (diagnostic
+    //     autonome). Le livrable est l'analyse/l'escalade, pas un fichier. Sinon,
+    //     ces missions (ex. « analyser les échecs récurrents ») échouaient
+    //     systématiquement sur ce contrôle alors qu'elles ne doivent rien écrire.
+    // Si `expectsArtifact === true`, on force le contrôle même sans mot-clé.
+    const cfg = mission.getConfig();
+    const isDryRun = cfg.dryRun === true;
+    const expectsArtifact = cfg.expectsArtifact ?? this.goalExpectsArtifact(goal);
+    if (!isDryRun && expectsArtifact && filesModified.length === 0) {
       runtimeChecks.push({
         name: "artefact-produit",
         passed: false,
@@ -2187,13 +2359,35 @@ JSON:`;
     return parsed as Record<string, unknown>;
   }
 
-  private async withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  /**
+   * Exécute un appel LLM avec un timeout qui l'ANNULE RÉELLEMENT.
+   *
+   * L'ancien `withTimeout` faisait un `Promise.race` passif : au timeout il
+   * rejetait, mais l'appel LLM continuait en arrière-plan (ressource + coût
+   * gaspillés), et un retro immédiat empilait un nouvel appel — c'est ce qui
+   * produisait trois `LLM arg-gen timeout (20000ms)` de suite en production.
+   *
+   * Ici, un `AbortController` est fourni à l'appel via `signal`. Au timeout, on
+   * `abort()` : l'implémentation câblée (`generateText({ signal })`) abandonne
+   * la requête Gemini/OpenRouter en vol. La promesse rejette toujours à `ms`
+   * avec le même message `LLM ${label} timeout (${ms}ms)` pour préserver la
+   * sémantique attendue par la boucle de réflexion (retry/replan).
+   */
+  private async withLLMTimeout<T>(
+    call: (signal: AbortSignal) => Promise<T>,
+    ms: number,
+    label: string
+  ): Promise<T> {
+    const controller = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error(`LLM ${label} timeout (${ms}ms)`)), ms);
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`LLM ${label} timeout (${ms}ms)`));
+      }, ms);
     });
     try {
-      return await Promise.race([promise, timeout]);
+      return await Promise.race([call(controller.signal), timeout]);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -2733,8 +2927,17 @@ export type SkillHandlerFn = (
 /** Émetteur d'événements pour le frontend */
 export type ExecutorEventEmitter = (event: string, data: Record<string, unknown>) => void;
 
-/** Fonction LLM générique: prompt → texte. */
-export type LLMTextFn = (prompt: string) => Promise<string>;
+/**
+ * Fonction LLM générique: prompt → texte.
+ *
+ * `signal` est facultatif et rétro-compatible : les implémentations qui
+ * l'ignorent restent valides. Quand il est fourni et déclenché (ex. timeout
+ * d'arg-gen), l'implémentation doit abandonner RÉELLEMENT l'appel sous-jacent
+ * (voir le câblage `llmText` → `generateText({ signal })` dans server.ts), au
+ * lieu de laisser l'appel courir en arrière-plan comme le faisait l'ancien
+ * `Promise.race` purement passif.
+ */
+export type LLMTextFn = (prompt: string, signal?: AbortSignal) => Promise<string>;
 
 /** Schéma d'un outil, utilisé pour générer les arguments. */
 export interface ToolSchema {

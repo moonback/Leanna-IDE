@@ -225,6 +225,16 @@ export interface MissionConfig {
   dryRun: boolean;
   /** Durée maximale d'une mission avant arrêt (ms). 0 = illimité. */
   missionTimeoutMs: number;
+  /**
+   * La mission attend-elle un livrable concret (fichier écrit) pour réussir ?
+   *   - `undefined` (défaut) : détection heuristique par mot-clé de l'objectif
+   *     (comportement historique).
+   *   - `false` : mission d'ANALYSE/investigation (ex. diagnostic autonome). Le
+   *     livrable est l'analyse/l'escalade, pas un fichier — le contrôle factuel
+   *     « artefact-produit » est désactivé pour cette mission.
+   *   - `true` : impose un livrable écrit même si l'heuristique ne le détecte pas.
+   */
+  expectsArtifact?: boolean;
 }
 
 // ─── Schemas Zod ──────────────────────────────────────────────────────────────

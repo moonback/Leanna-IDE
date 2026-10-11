@@ -266,6 +266,7 @@ import { graphifySkill } from "./server/skills/graphify.js";
 import { hierarchicalMemorySkill } from "./server/skills/hierarchicalMemory.js";
 import { telegramSkill } from "./server/skills/telegram.js";
 import { telegramService } from "./server/telegram/TelegramService.js";
+import { telemetryService } from "./server/observability/TelemetryService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 import { LeannaCore } from "./server/autonomy/LeannaCore.js";
@@ -333,8 +334,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
       // génération d'arguments et validation des critères de succès.
-      const llmText = async (prompt: string): Promise<string> => {
-        const { text } = await generateText({ prompt, temperature: 0.3 });
+      const llmText = async (prompt: string, signal?: AbortSignal): Promise<string> => {
+        const { text } = await generateText({ prompt, temperature: 0.3, signal });
         return text;
       };
       executor.setLLMDecompose(llmText);
@@ -478,6 +479,23 @@ void eventBridge.start();
 // Durable task store enabling checkpoint/resume of autonomy tasks after a crash.
 // Degrades silently to in-memory only when Supabase is not configured.
 const autonomyPersistence = new AutonomyPersistence();
+
+// Bornes d'exécution des missions autonomes (réactives/anticipation). Elles sont
+// investigatives (analyse/récupération/escalade), pas des productions de fichier,
+// et doivent rester bornées en temps et en taille de plan pour ne pas monopoliser
+// le runtime en arrière-plan. Valeurs issues de l'environnement, repli sûr.
+const autonomyMissionCaps = (() => {
+  const pos = (v: string | undefined, fallback: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  };
+  return {
+    missionTimeoutMs: pos(process.env.LEANNA_AUTONOMY_MISSION_TIMEOUT_MS, 150_000), // 2,5 min
+    maxSubGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_SUBGOALS, 2),
+    maxConcurrentGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_CONCURRENT_GOALS, 1),
+  };
+})();
+
 const leannaCore = new LeannaCore(runtimeV2, {
   persistence: autonomyPersistence,
   executive: {
@@ -501,6 +519,13 @@ const leannaCore = new LeannaCore(runtimeV2, {
           .filter((name: string) => !name.startsWith("browser_") || name === "browser_web_search"),
         budget: goal.budget,
         dryRun: runtimeV2.tools.getDryRun().isEnabled(),
+        // Les missions autonomes sont INVESTIGATIVES : leur livrable est l'analyse
+        // + la récupération/escalade, pas un fichier écrit. Sans ce flag, le
+        // contrôle « artefact-produit » les faisait échouer systématiquement
+        // (ex. « analyser les échecs récurrents » bloquée faute d'écriture).
+        expectsArtifact: false,
+        // Bornes de temps/plan pour qu'une mission de fond ne tourne pas 3 min+.
+        configOverrides: autonomyMissionCaps,
       });
       const completed = await executor.waitForMission(mission.id);
       const success = completed?.status === "completed";
@@ -508,6 +533,46 @@ const leannaCore = new LeannaCore(runtimeV2, {
         success,
         escalate: !completed || completed.status === "blocked",
         summary: completed?.toContextSummary?.() ?? "Mission did not produce a terminal result.",
+      };
+    },
+  },
+  // Phase 3 — bounded idle autonomy. During calm periods LeannaCore asks this
+  // runner to perform a READ-ONLY diagnostic. The caller (IdleWorker) already
+  // constrained `availableSkills` to read-only tools; we additionally force
+  // dryRun:true so the mission can never mutate anything, and we report the
+  // real accounted usage so the per-hour budget stays honest.
+  idleWork: {
+    runMission: async ({ title, description, availableSkills, budget, caps }) => {
+      const executor = skillManager.missionExecutor;
+      if (!executor) {
+        return { success: false, escalate: true, summary: "Mission system is not initialized yet." };
+      }
+      const mission = await executor.startMission({
+        title: `Idle: ${title}`,
+        description,
+        priority: "low",
+        availableSkills,
+        budget,
+        dryRun: true, // read-only: side effects are simulated, never applied.
+        // Keep a background diagnostic short: tight wall-time + plan-size caps so
+        // an idle run can't balloon into a long, 25-step mission.
+        configOverrides: {
+          missionTimeoutMs: caps.timeoutMs,
+          maxSubGoals: caps.maxSubGoals,
+          maxConcurrentGoals: caps.maxConcurrentGoals,
+        },
+      });
+      const completed = await executor.waitForMission(mission.id);
+      // Prefer the real accounted usage from telemetry; fall back to the
+      // mission's estimated tokens when telemetry has no record.
+      const usage = telemetryService.checkBudget(mission.id);
+      const tokens = usage.tokensUsed || completed?.getMetrics?.().estimatedTokens || 0;
+      return {
+        success: completed?.status === "completed",
+        escalate: !completed || completed.status === "blocked",
+        summary: completed?.toContextSummary?.() ?? "Idle diagnostic did not produce a terminal result.",
+        tokens,
+        costUsd: usage.costUsd || 0,
       };
     },
   },
@@ -713,6 +778,10 @@ async function startServer() {
   const { createMetricsRouter } = await import("./server/runtime/routes/metrics.js");
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
   app.use("/api/v2/metrics", createMetricsRouter(runtimeV2, leannaCore));
+
+  // ─── Autonomie encadrée (Phase 3) : suivi & contrôle du travail idle ──────
+  const { createAutonomyRouter } = await import("./server/routes/autonomy.js");
+  app.use("/api/autonomy", createAutonomyRouter(leannaCore));
 
   // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
   const observabilityModule = await import("./server/routes/observability.js");
@@ -1056,6 +1125,16 @@ async function startServer() {
             try { client.send(payload); } catch { /* ignore */ }
           }
         }
+        // Relais sur le canal /autonomy (toujours connecté, indépendant d'une
+        // session Gemini Live). Sans ça, la Mission Timeline ne se rafraîchit en
+        // temps réel que lorsqu'une session Live est active — car son seul
+        // déclencheur côté client (CustomEvent "Leanna-mission-event") n'était
+        // émis que depuis le socket /live. On diffuse donc aussi ici.
+        for (const client of autonomyWss.clients) {
+          if (client.readyState === WebSocket.OPEN) {
+            try { client.send(payload); } catch { /* ignore */ }
+          }
+        }
 
         // ── Relais Telegram de la boucle d'approbation humaine ──────────────
         // Quand l'AutonomyPolicy (mode "ask") met une action en attente, on
@@ -1140,6 +1219,29 @@ async function startServer() {
         /* l'annonce vocale est best-effort et ne doit jamais casser la timeline */
       }
     }
+
+    // ── Push proactif Telegram (hors interface ouverte) ─────────────────────
+    // Seuil > 0,4 : les « réflexions » idle (importance 0,4) ne sont jamais envoyées.
+    try {
+      const p = message.payload as Record<string, unknown>;
+      const minImp = Number(process.env.LEANNA_TELEGRAM_MIN_IMPORTANCE ?? 0.6);
+      const esc = (s: unknown) => String(s ?? "").replace(/([_*`\[])/g, "\\$1");
+
+      if (message.event === "autonomy:anticipation" && Number(p?.importance) >= minImp) {
+        void telegramService.notify(
+          `💡 *Leanna a remarqué quelque chose*\n• ${esc(p.message)}\n• *Proposition :* ${esc(p.suggestedAction)}` +
+          (p.queuedAsTask ? "\n• _Mission lancée automatiquement._" : "")
+        ).catch(() => {});
+      } else if (message.event === "autonomy.cycle.escalated") {
+        void telegramService.notify(
+          `🚨 *Leanna a besoin de toi*\n• ${esc(p.status)}\n• Objectif : ${esc(p.goalId)}`
+        ).catch(() => {});
+      } else if (message.event === "autonomy.cycle.completed" && p?.status === "completed") {
+        void telegramService.notify(`✅ Mission autonome terminée (objectif ${esc(p.goalId)}).`).catch(() => {});
+      } else if (message.event === "autonomy:taskStateChanged" && p?.to === "dead_letter") {
+        void telegramService.notify(`❌ Tâche autonome en échec définitif : ${esc(p.taskType)}.\n${esc(p.error)}`).catch(() => {});
+      }
+    } catch { /* push best-effort */ }
   });
   console.log(`[Server] ✓ Autonomy broadcaster connecté au WebSocket dédié (/autonomy).`);
 
