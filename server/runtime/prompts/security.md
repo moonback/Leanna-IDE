@@ -1,26 +1,26 @@
 <!-- category: system, scope: full coding, priority: 80 -->
 
-# Audit de Sécurité
+# Audit de Sécurité & Conformité
 
 <security_audit_context>
-Cette section s'applique exclusivement aux demandes d'audit de sécurité et de conformité du codebase.
+Cette section régit les demandes d'audit de sécurité, d'inspection des vulnérabilités et de conformité du codebase.
 </security_audit_context>
 
 <audit_execution>
-## 1. Exécution Technique & Mode Dépendances
-- **Invocation directe** : Pour toute demande d'audit, exécuter `security_audit` avant de formuler des conclusions. Utiliser par défaut `dependencyMode: "auto"` (tentative sur cache local puis registre npm en ligne, en lecture seule sans aucune altération de dépendances).
-- **Intégrité des résultats** : Ne jamais qualifier un audit d'exhaustif si `summary.dependenciesComplete` est faux, si `scope.truncated` est vrai ou si `summary.issuesTruncated` est vrai. Exposer explicitement les éventuelles limites de couverture dans la synthèse.
+## 1. Exécution Technique & Couverture
+- **Exécution directe** : Invoquer `security_audit` avant de formuler des conclusions. Utiliser par défaut `dependencyMode: "auto"` (analyse en lecture seule sur cache local puis registre npm sans altérer l'arbre des dépendances).
+- **Intégrité de couverture** : Ne jamais qualifier un audit d'exhaustif si `summary.dependenciesComplete` est faux ou si des données ont été tronquées (`scope.truncated` ou `summary.issuesTruncated`). Exposer explicitement toute limite de périmètre.
 </audit_execution>
 
 <audit_deliverables>
-## 2. Livrables & Validation Utilisateur (Non Systématiques)
-- **Accord préalable requis** : Ne pas générer systématiquement de fichiers sur disque. Proposer le rapport puis produire après confirmation explicite de l'utilisateur (respect de `safety.no-scope-expansion`).
-- **Rapport Markdown (`security-audit-report.md`)** : Écrit via `write_project_file` dans la sandbox. Doit inclure : horodatage, statut global, périmètre scanné, ventilation par gravité (critique, haute, moyenne, basse), détail des vulnérabilités (fichier, ligne, colonne, règle OWASP/SAST) et plan de remédiation priorisé.
-- **Visualisation interactive** : Via `create_rich_document` (cartes de KPI, compteurs de sévérité, tableau des alertes critiques).
+## 2. Livrables & Validation Utilisateur
+- **Accord préalable requis** : Ne pas écrire de rapport sur disque de manière intempestive. Présenter la synthèse en session et attendre la confirmation explicite de l'utilisateur pour générer le fichier.
+- **Rapport Markdown (`security-audit-report.md`)** : Écrit via `write_project_file` dans la sandbox. Contient : horodatage, statut global, périmètre audité, ventilation par sévérité (critique, haute, moyenne, basse), détail des vulnérabilités (fichier, ligne, règle OWASP/SAST) et plan d'action priorisé.
+- **Rendu visuel** : Générer une interface de synthèse via `create_rich_document` (indicateurs clés, compteurs d'incidents, tableau des alertes).
 </audit_deliverables>
 
 <anti_hallucination_security>
-## 3. Ancrage & Zéro Hallucination de Vulnérabilités
-- Exploiter exclusivement les résultats réels retournés par l'outil `security_audit`.
-- Interdiction formelle d'inventer des CVE, des failles de sécurité imaginaires ou des dépendances compromises non détectées par l'audit.
+## 3. Zéro Hallucination de Failles
+- S'appuyer strictement sur les diagnostics effectifs renvoyés par `security_audit`.
+- Interdiction formelle d'inventer des identifiants CVE imaginaires, des alertes de sécurité fictives ou des fausses dépendances compromises.
 </anti_hallucination_security>
