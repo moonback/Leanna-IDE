@@ -1,6 +1,6 @@
 # Roadmap — Leanna AI Operating System
 
-> **Dernière refonte : Octobre 2026** · Version courante : **1.6.0** · Licence BUSL 1.1
+> **Dernière refonte : Octobre 2026** · Version courante : **1.7.0** · Licence BUSL 1.1
 >
 > Cette roadmap a été **re-auditée contre le code réel** après l'itération **Noyau P0** (`server/core/`) et l'extension des rôles d'agents (**20 rôles statiques**). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
 

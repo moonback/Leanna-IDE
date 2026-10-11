@@ -3,14 +3,15 @@ import { randomUUID } from "node:crypto";
 import { Planner } from "./Planner.js";
 import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
-import { MissionStore } from "./MissionStore.js";
+import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
+import type { EvidenceEngine, EvidenceInput, CheckResult } from "../core/EvidenceEngine.js";
+import type { LeannaSupervisor, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
   MissionState,
   Goal,
-  GoalStatus,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
@@ -67,8 +68,39 @@ export class Executor {
   /** Schémas des outils (name → { description, parameters }) pour la génération d'arguments. */
   private toolSchemas: Map<string, ToolSchema> = new Map();
 
-  /** Store de persistance (optionnel). */
-  private store: MissionStore | null = null;
+  /** Store de persistance (optionnel) : local, Supabase, ou composite. */
+  private store: MissionStatePort | null = null;
+
+  /**
+   * Moteur de preuve optionnel (audit, point 11). Quand branché ET activé, la
+   * vérification d'objectif s'appuie sur une PREUVE factuelle (checks dérivés
+   * des résultats de skills) plutôt que sur le seul verdict LLM — « la preuve
+   * prime sur la narration ». Rétrocompatible : absent → vérification LLM/
+   * heuristique d'origine.
+   */
+  private evidence: EvidenceEngine | null = null;
+
+  /**
+   * Active la vérification par preuve. Par défaut lu depuis
+   * `LEANNA_MISSION_EVIDENCE` (true/1), surchargé par `setEvidenceEngine`.
+   */
+  private evidenceVerification = false;
+
+  /**
+   * Autorité de gouvernance optionnelle (audit, point 5 / unification). Quand
+   * branchée ET activée, l'exécution d'une mission transite DANS la boucle du
+   * `LeannaSupervisor` : l'Executor devient le `MissionRunner`, le Supervisor
+   * possède l'état durable (`MissionLifecycleState`), les snapshots/rollbacks,
+   * la preuve et les décisions de récupération. Rétrocompatible : absent →
+   * exécution directe (chemin par défaut inchangé).
+   */
+  private supervisor: LeannaSupervisor | null = null;
+
+  /**
+   * Active le mode supervisé. Par défaut lu depuis `LEANNA_MISSION_SUPERVISED`
+   * (true/1), surchargé par `setSupervisor`.
+   */
+  private supervisedMode = false;
 
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
@@ -89,6 +121,39 @@ export class Executor {
   private completedMissions: Mission[] = [];
   private static readonly MAX_COMPLETED = 50;
 
+  /**
+   * IDs des missions déjà finalisées. Garde-fou d'idempotence pour
+   * `finalizeMission` (annulation/timeout + fin naturelle ne doivent pas
+   * finaliser deux fois la même mission).
+   */
+  private finalizedMissions: Set<string> = new Set();
+
+  /**
+   * Contrôleurs d'annulation par mission. Le signal associé est transmis au
+   * `skillHandler` à chaque action ; `cancelMission` et le watchdog de timeout
+   * l'abandonnent pour interrompre un skill en cours. (Audit, point 4.)
+   */
+  private abortControllers: Map<string, AbortController> = new Map();
+
+  /** Retourne (en le créant au besoin) le contrôleur d'annulation d'une mission. */
+  private getAbortController(missionId: string): AbortController {
+    let controller = this.abortControllers.get(missionId);
+    if (!controller) {
+      controller = new AbortController();
+      this.abortControllers.set(missionId, controller);
+    }
+    return controller;
+  }
+
+  /** Abandonne le signal d'une mission (interrompt le skill en cours) et nettoie. */
+  private abortMission(missionId: string, reason: string): void {
+    const controller = this.abortControllers.get(missionId);
+    if (controller && !controller.signal.aborted) {
+      try { controller.abort(new Error(reason)); } catch { /* best-effort */ }
+    }
+    this.abortControllers.delete(missionId);
+  }
+
   /** Promesses des missions lancées en arrière-plan, pour les appelants autonomes. */
   private readonly missionRuns = new Map<string, Promise<void>>();
   /** Candidate lessons/proposals; never auto-applied by mission finalization. */
@@ -104,6 +169,12 @@ export class Executor {
 
   /** Intervalle de sondage de l'état de pause (ms). */
   private static readonly PAUSE_POLL_MS = 500;
+
+  /**
+   * Intervalle de sondage du watchdog de timeout global (ms). Le temps n'est
+   * compté que lorsque la mission tourne réellement (pas en pause).
+   */
+  private static readonly WATCHDOG_POLL_MS = 1000;
 
   /**
    * Missions interrompues (crash/redémarrage) rechargées depuis le store mais
@@ -164,6 +235,12 @@ export class Executor {
     this.planner = new Planner(this.scorer);
     this.reflection = new ReflectionEngine();
     this.planEstimator = new PlanEstimator(this.scorer);
+    // Vérification par preuve activable par défaut via l'environnement.
+    const raw = (process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase().trim();
+    this.evidenceVerification = raw === "true" || raw === "1";
+    // Mode supervisé (couture Supervisor) activable par défaut via l'environnement.
+    const sup = (process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase().trim();
+    this.supervisedMode = sup === "true" || sup === "1";
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
@@ -217,10 +294,39 @@ export class Executor {
   }
 
   /**
-   * Injecte le store de persistance des missions (Supabase).
+   * Injecte le store de persistance des missions (local, Supabase ou composite).
    */
-  setStore(store: MissionStore): void {
+  setStore(store: MissionStatePort): void {
     this.store = store;
+  }
+
+  /**
+   * Branche le moteur de preuve et active la vérification par preuve (audit,
+   * point 11). `enabled` par défaut `true` : fournir un moteur signifie qu'on
+   * veut l'utiliser. Passer `false` branche le moteur sans l'activer.
+   */
+  setEvidenceEngine(engine: EvidenceEngine, enabled = true): void {
+    this.evidence = engine;
+    this.evidenceVerification = enabled;
+  }
+
+  /** Active/désactive la vérification par preuve à chaud (si un moteur est branché). */
+  setEvidenceVerification(enabled: boolean): void {
+    this.evidenceVerification = enabled;
+  }
+
+  /**
+   * Branche l'autorité de gouvernance (`LeannaSupervisor`) et active le mode
+   * supervisé (audit, point 5 / unification). `enabled` par défaut `true`.
+   */
+  setSupervisor(supervisor: LeannaSupervisor, enabled = true): void {
+    this.supervisor = supervisor;
+    this.supervisedMode = enabled;
+  }
+
+  /** Active/désactive le mode supervisé à chaud (si un Supervisor est branché). */
+  setSupervisedMode(enabled: boolean): void {
+    this.supervisedMode = enabled;
   }
 
   /**
@@ -251,6 +357,24 @@ export class Executor {
   /** Liste les IDs d'actions en attente d'approbation. */
   listPendingApprovals(): string[] {
     return Array.from(this.pendingApprovals.keys());
+  }
+
+  /**
+   * Vérifie qu'une action appartient bien à une mission donnée.
+   *
+   * Correctif audit (point 8) : la route `approve` indexait l'approbation
+   * uniquement par `actionId`, en ignorant le `:id` de mission de l'URL —
+   * n'importe quel `actionId` était donc approuvable via n'importe quelle
+   * mission. Ce contrôle permet à la route de refuser une approbation croisée.
+   */
+  actionBelongsToMission(missionId: string, actionId: string): boolean {
+    const mission =
+      this.activeMissions.get(missionId) ??
+      this.completedMissions.find((m) => m.id === missionId);
+    if (!mission) return false;
+    return Object.values(mission.getState().goals).some((g) =>
+      g.plannedActions.some((a) => a.id === actionId)
+    );
   }
 
   /** Accès au curseur d'autonomie (pour lire/modifier le mode à chaud). */
@@ -347,10 +471,37 @@ export class Executor {
     });
     this.emit("mission_started", { missionId: mission.id, title: params.title });
 
+    this.launchMission(mission, params.availableSkills);
+    return mission;
+  }
+
+  /**
+   * Lance (ou relance) l'exécution d'une mission déjà enregistrée dans
+   * `activeMissions`, avec TOUTE l'infrastructure d'exécution :
+   *   - promesse observable enregistrée dans `missionRuns` (pour waitForMission) ;
+   *   - watchdog de timeout global ;
+   *   - nettoyage télémétrie en cas d'échec.
+   *
+   * Correctif audit (point 3) : factorisation commune à `startMission` et
+   * `confirmResume`. Avant, une reprise appelait directement `executeMission`
+   * sans watchdog, sans trace télémétrie, sans entrée `missionRuns` — donc
+   * `waitForMission` rendait la main immédiatement et une mission reprise
+   * n'avait ni timeout ni budget.
+   */
+  private launchMission(mission: Mission, availableSkills: string[]): void {
     // Lancer l'exécution en arrière-plan, tout en conservant une promesse
     // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
     // que déclarer une mission réussie juste après sa création.
-    const run = this.executeMission(mission, params.availableSkills).catch((err) => {
+    //
+    // Unification (audit, point 5) : en mode supervisé, l'exécution transite
+    // DANS la boucle du Supervisor (état durable, snapshots, preuve, récupération).
+    // Sinon, exécution directe (chemin par défaut inchangé).
+    const body =
+      this.supervisor && this.supervisedMode
+        ? this.runSupervised(mission, availableSkills)
+        : this.executeMission(mission, availableSkills);
+
+    const run = body.catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
       telemetryService.endMissionTrace(mission.id, false);
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
@@ -359,24 +510,174 @@ export class Executor {
     void run.finally(() => this.missionRuns.delete(mission.id));
 
     // Watchdog : arrêt forcé si la mission dépasse le timeout global configuré.
-    const timeoutMs = missionConfig.missionTimeoutMs;
+    //
+    // Correctif audit (point 6) : le temps passé EN PAUSE ne compte PAS. Avant,
+    // un unique setTimeout(timeoutMs) tuait une mission même pausée (le timer
+    // tournait pendant la pause). On remplace par un sondage qui n'accumule le
+    // temps que lorsque la mission tourne réellement : la pause étend d'autant
+    // l'échéance.
+    const timeoutMs = mission.getConfig().missionTimeoutMs;
     if (timeoutMs > 0) {
-      const watchdog = setTimeout(() => {
-        if (!mission.isCompleted() && this.activeMissions.has(mission.id)) {
-          console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms). Arrêt.`);
-          mission.completeActiveGoal({ success: false, summary: "Timeout global de mission." });
+      let activeElapsedMs = 0;
+      let lastTick = Date.now();
+      const poll = Math.min(Executor.WATCHDOG_POLL_MS, timeoutMs);
+
+      const watchdog = setInterval(() => {
+        const now = Date.now();
+        const delta = now - lastTick;
+        lastTick = now;
+
+        // Mission terminée ou disparue : plus rien à surveiller.
+        if (mission.isCompleted() || !this.activeMissions.has(mission.id)) {
+          clearInterval(watchdog);
+          return;
+        }
+
+        // En pause : on ne consomme pas de budget de temps (l'échéance recule).
+        if (this.pausedMissions.has(mission.id)) {
+          return;
+        }
+
+        activeElapsedMs += delta;
+        if (activeElapsedMs >= timeoutMs) {
+          clearInterval(watchdog);
+          console.warn(`[Executor] ⏱️ Timeout global de mission atteint (${timeoutMs}ms de temps actif). Arrêt.`);
+          // Correctif audit (point 4) : fermer la racine + tous les objectifs
+          // non terminaux, pas seulement le sommet de la pile.
+          mission.cancel("Timeout global de mission.");
+          // Interrompre un skill en cours (AbortSignal).
+          this.abortMission(mission.id, "Timeout global de mission.");
           this.finalizeMission(mission);
           telemetryService.endMissionTrace(mission.id, false);
           telemetryService.clearMissionBudget(mission.id);
           this.emit("mission_timeout", { missionId: mission.id });
         }
-      }, timeoutMs);
+      }, poll);
       // Ne pas garder le process Node en vie uniquement pour ce timer.
       if (typeof watchdog.unref === "function") watchdog.unref();
-      void run.finally(() => clearTimeout(watchdog));
+      void run.finally(() => clearInterval(watchdog));
+    }
+  }
+
+  /**
+   * Exécute une mission SOUS GOUVERNANCE du `LeannaSupervisor` (unification,
+   * audit §5 / point 11).
+   *
+   * L'Executor devient le `MissionRunner` : à chaque tentative gouvernée, il
+   * exécute la boucle d'objectifs (`executeMission`) puis remonte un
+   * `RunnerOutcome` dont le succès et la PREUVE dérivent de l'état FACTUEL des
+   * objectifs (pas de la narration). Le Supervisor possède alors l'état durable
+   * (`MissionLifecycleState`), les snapshots/rollbacks, le scellement de preuve
+   * et la décision de récupération — fusionnant les deux machines d'états
+   * (`GoalStatus` de l'Executor ↔ cycle de vie du core).
+   *
+   * Les fichiers planifiés (ciblés par le plan) sont transmis au Supervisor pour
+   * un rollback fidèle entre tentatives.
+   */
+  private async runSupervised(mission: Mission, availableSkills: string[]): Promise<void> {
+    const supervisor = this.supervisor!;
+
+    // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
+    const plannedFiles = this.collectPlannedFiles(mission);
+
+    const runner = async (): Promise<RunnerOutcome> => {
+      // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
+      // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
+      await this.executeMission(mission, availableSkills);
+      return this.buildMissionOutcome(mission);
+    };
+
+    const result = await supervisor.runMission({
+      missionId: mission.id,
+      goal: mission.getState().title,
+      runner,
+      plannedFiles,
+    });
+
+    this.emit("mission_supervised", {
+      missionId: mission.id,
+      lifecycleState: result.finalState,
+      attempts: result.attempts,
+      evidencePassed: result.evidence?.passed,
+    });
+  }
+
+  /**
+   * Agrège l'état FACTUEL des objectifs d'une mission en `RunnerOutcome` pour le
+   * Supervisor : succès ssi tous les sous-objectifs sont `completed` ; preuve
+   * dérivée des actions (checks par skill via `detectSkillFailure`, fichiers
+   * écrits, outils exécutés) ; décision de récupération suggérée en cas d'échec.
+   */
+  private buildMissionOutcome(mission: Mission): RunnerOutcome {
+    const goals = Object.values(mission.getState().goals);
+    const subGoals = goals.filter((g) => g.parentId !== null);
+    const scope = subGoals.length > 0 ? subGoals : goals;
+
+    const allCompleted =
+      scope.length > 0 && scope.every((g) => g.status === "completed");
+    const anyBlocked = scope.some((g) => g.status === "blocked");
+    const anyFailed = scope.some((g) => g.status === "failed");
+
+    // Preuve factuelle agrégée sur toutes les actions exécutées de la mission.
+    const executed = goals.flatMap((g) => g.plannedActions).filter(
+      (a) => a.status === "completed" || a.status === "failed"
+    );
+    const runtimeChecks: CheckResult[] = executed.map((a) => {
+      const failure = Executor.detectSkillFailure(a.result);
+      return {
+        name: a.skillName,
+        passed: a.status === "completed" && failure === null,
+        details: failure ?? undefined,
+      };
+    });
+    const filesModified = Array.from(
+      new Set(
+        executed
+          .filter(
+            (a) =>
+              a.status === "completed" &&
+              Executor.WRITE_TOOLS.includes(a.skillName) &&
+              typeof (a.args as Record<string, unknown>)?.path === "string"
+          )
+          .map((a) => String((a.args as Record<string, unknown>).path))
+      )
+    );
+    const toolsExecuted = executed.map((a) => a.skillName);
+
+    // Décision de récupération suggérée (sinon le Supervisor décide seul) :
+    //   - un objectif bloqué (escaladé) → escalate ;
+    //   - un échec « simple » → replan (changer de stratégie au tour suivant).
+    let suggestedRecovery: RecoveryDecision | undefined;
+    if (!allCompleted) {
+      if (anyBlocked) suggestedRecovery = "escalate";
+      else if (anyFailed) suggestedRecovery = "replan";
     }
 
-    return mission;
+    return {
+      success: allCompleted,
+      touchedFiles: filesModified,
+      evidence: { filesModified, toolsExecuted, runtimeChecks },
+      suggestedRecovery,
+      error: allCompleted ? undefined : "Objectifs non tous atteints.",
+    };
+  }
+
+  /**
+   * Liste des fichiers ciblés par le plan courant (args `path`/`file` des
+   * actions planifiées), pour le snapshot/rollback du Supervisor.
+   */
+  private collectPlannedFiles(mission: Mission): string[] {
+    const files = new Set<string>();
+    for (const goal of Object.values(mission.getState().goals)) {
+      for (const action of goal.plannedActions) {
+        const args = action.args as Record<string, unknown> | undefined;
+        for (const key of ["path", "file", "filePath"]) {
+          const v = args?.[key];
+          if (typeof v === "string" && v.trim()) files.add(v);
+        }
+      }
+    }
+    return Array.from(files);
   }
 
   /**
@@ -485,10 +786,15 @@ export class Executor {
     const mission = this.activeMissions.get(missionId);
     if (!mission) return false;
 
-    mission.completeActiveGoal({
-      success: false,
-      summary: "Mission annulée par l'utilisateur.",
-    });
+    // Correctif audit (point 4) : annuler la RACINE et tous les objectifs non
+    // terminaux (pas seulement le sommet de la pile via completeActiveGoal).
+    // La mission passe en "cancelled" ; sans ça elle restait "in_progress" et
+    // la boucle executeMission la re-finalisait (doublon + mission_completed
+    // émis après mission_cancelled).
+    mission.cancel("Mission annulée par l'utilisateur.");
+
+    // Interrompre un skill éventuellement en cours (AbortSignal).
+    this.abortMission(missionId, "Mission annulée par l'utilisateur.");
 
     this.finalizeMission(mission);
     
@@ -528,6 +834,58 @@ export class Executor {
   /** Indique si une mission est actuellement en pause. */
   isPaused(missionId: string): boolean {
     return this.pausedMissions.has(missionId);
+  }
+
+  /**
+   * Ajoute un sous-objectif à une mission ACTIVE (audit, point 10 :
+   * `mission_add_goal` était déclaré sans handler). Le sous-objectif est
+   * rattaché à `parentId` (ou à l'objectif racine par défaut) et sera pris en
+   * compte par l'ordonnancement par vagues au tour suivant.
+   *
+   * Retourne un résultat typé plutôt que de lever, pour que le skill/route
+   * puisse répondre proprement (mission inconnue, limites atteintes, etc.).
+   */
+  addGoal(
+    missionId: string,
+    params: {
+      title: string;
+      description: string;
+      successCriteria?: string[];
+      priority?: "low" | "medium" | "high" | "critical";
+      parentId?: string;
+    }
+  ): { ok: true; goalId: string } | { ok: false; error: string } {
+    const mission = this.activeMissions.get(missionId);
+    if (!mission) {
+      return { ok: false, error: `Mission ${missionId} introuvable ou non active.` };
+    }
+    if (mission.isCompleted()) {
+      return { ok: false, error: `Mission ${missionId} déjà terminée.` };
+    }
+
+    const parentId = params.parentId ?? mission.rootGoal.id;
+    if (!mission.getGoal(parentId)) {
+      return { ok: false, error: `Objectif parent ${parentId} introuvable dans la mission.` };
+    }
+
+    try {
+      const goalId = mission.addSubGoal({
+        parentId,
+        title: params.title,
+        description: params.description,
+        successCriteria:
+          params.successCriteria && params.successCriteria.length > 0
+            ? params.successCriteria
+            : [`Le sous-objectif "${params.title}" est atteint.`],
+        priority: params.priority,
+      });
+      void this.persist(mission);
+      this.emit("goal_added", { missionId, goalId, title: params.title, parentId });
+      return { ok: true, goalId };
+    } catch (err) {
+      // addSubGoal lève sur dépassement de maxSubGoals / maxDepth.
+      return { ok: false, error: (err as Error).message };
+    }
   }
 
   /**
@@ -614,33 +972,54 @@ export class Executor {
     if (!mission.isCompleted()) {
       const allGoals = Object.values(mission.getState().goals);
       const subGoals = allGoals.filter((g) => g.parentId !== null);
-      const isTerminal = (s: GoalStatus) =>
-        s === "completed" || s === "failed" || s === "cancelled";
-      const allTerminal = subGoals.every((g) => isTerminal(g.status));
-      const allCompleted = subGoals.length > 0 && subGoals.every((g) => g.status === "completed");
-      const anyCriticalFailed = subGoals.some(
-        (g) => (g.status === "failed" || g.status === "blocked") && g.priority === "critical"
+      const allCompleted =
+        subGoals.length > 0 && subGoals.every((g) => g.status === "completed");
+
+      // ── Correctif audit (point 2) : plus de « faux succès » ────────────────
+      // Une mission n'est RÉUSSIE que si TOUS ses sous-objectifs sont
+      // "completed". Un seul objectif échoué, bloqué ou annulé (même non
+      // critique) rend la mission non réussie — sinon les stats, playbooks et le
+      // profil projet apprenaient de faux succès.
+      const failedOrBlocked = subGoals.filter(
+        (g) => g.status === "failed" || g.status === "blocked"
       );
-      // Succès si tout est complété, ou si tout est terminal sans échec critique.
-      const success = allCompleted || (allTerminal && !anyCriticalFailed);
+      const success = allCompleted;
+
+      let summary: string;
+      if (success) {
+        summary = `Mission "${mission.getState().title}" complétée avec succès.`;
+      } else if (failedOrBlocked.length > 0 && failedOrBlocked.length < subGoals.length) {
+        // Succès partiel : certains objectifs ont abouti, d'autres non.
+        summary =
+          `Mission "${mission.getState().title}" partiellement réussie — ` +
+          `${subGoals.length - failedOrBlocked.length}/${subGoals.length} objectif(s) atteint(s).`;
+      } else {
+        summary = `Mission "${mission.getState().title}" terminée avec des objectifs échoués.`;
+      }
 
       mission.completeActiveGoal({
         success,
-        summary: success
-          ? `Mission "${mission.getState().title}" complétée avec succès.`
-          : `Mission terminée avec des objectifs échoués.`,
+        summary,
         lessonsLearned: this.extractLessons(mission),
       });
     }
 
+    // Si la mission a déjà été finalisée entre-temps (annulation/timeout via
+    // cancelMission/watchdog), ne pas la finaliser ni émettre une 2e fois.
+    // Correctif audit (point 4) : évite le doublon et l'émission de
+    // mission_completed après mission_cancelled.
+    if (this.finalizedMissions.has(mission.id)) {
+      return;
+    }
+
     this.finalizeMission(mission);
-    
+
     // End trace with success status
     const success = mission.status === "completed";
     telemetryService.endMissionTrace(mission.id, success);
     telemetryService.clearMissionBudget(mission.id);
     clearTelemetryContext();
-    
+
     console.log(`[Executor] ✓ Mission terminée: ${mission.status}`);
     this.emit("mission_completed", {
       missionId: mission.id,
@@ -707,6 +1086,12 @@ export class Executor {
       if (mission.isCompleted() || !this.activeMissions.has(mission.id)) break;
 
       const result = await this.executeAction(mission, goalId, action, availableSkills);
+
+      // Persistance APRÈS CHAQUE ACTION (audit, point 7). Avant, l'état n'était
+      // sauvegardé qu'au démarrage, après chaque vague et à la fin — donc un
+      // crash en milieu d'objectif perdait toutes les actions de la vague en
+      // cours. Best-effort, non bloquant.
+      await this.persist(mission);
 
       // Une action RÉUSSIE est terminale : la réflexion ne peut pas la "défaire".
       // On ignore donc retry/replan/escalate/abort quand l'action a réussi
@@ -798,12 +1183,59 @@ export class Executor {
         continue;
       }
 
-      // Aucune replanification : avancer le curseur au-delà de l'action courante.
-      // (Une action retentée reste "pending" et sera re-sélectionnée ; une action
-      // terminée est de toute façon ignorée par le filtre de statut ci-dessus.)
-      if (result.decision !== "retry") {
-        cursor++;
+      // ── Retry (correctif audit, point 1) ────────────────────────────────────
+      // `recordActionResult` a posé l'action en "failed". Pour la rejouer, il
+      // faut explicitement la remettre en "pending" ET consommer une tentative
+      // de l'objectif. `retryAction` renvoie false quand `maxAttempts` est
+      // atteint : on bascule alors en replanification (dernier recours avant
+      // escalade) au lieu de boucler indéfiniment sur une action morte.
+      if (!actionSucceeded && result.decision === "retry") {
+        const canRetry = mission.retryAction(action.id);
+        if (canRetry) {
+          const g = mission.getGoal(goalId);
+          console.log(
+            `[Executor]    🔁 Nouvelle tentative de "${action.skillName}" ` +
+            `(tentative ${g?.attempts}/${g?.maxAttempts}).`
+          );
+          this.emit("action_retry", {
+            missionId: mission.id,
+            goalId,
+            actionId: action.id,
+            skill: action.skillName,
+            attempt: g?.attempts ?? 0,
+            maxAttempts: g?.maxAttempts ?? 0,
+          });
+          // L'action est de nouveau "pending" : ne pas avancer le curseur, elle
+          // sera re-sélectionnée au prochain tour de boucle.
+          continue;
+        }
+
+        // Budget de tentatives épuisé → replanifier une dernière fois.
+        console.log(
+          `[Executor]    ⛔ Tentatives épuisées pour "${action.skillName}" → replanification.`
+        );
+        this.emit("action_max_attempts", {
+          missionId: mission.id,
+          goalId,
+          actionId: action.id,
+          skill: action.skillName,
+          maxAttempts: mission.getGoal(goalId)?.maxAttempts ?? 0,
+        });
+        const replanned = await this.planner.replan(
+          mission,
+          goalId,
+          action,
+          result.failure ?? "Tentatives épuisées",
+          availableSkills
+        );
+        mission.setPlanForGoal(goalId, replanned);
+        cursor = 0;
+        continue;
       }
+
+      // Aucune replanification / retry : avancer le curseur au-delà de l'action
+      // courante (continue / action terminée).
+      cursor++;
     }
 
     // Ne valider l'objectif qu'une fois toutes les actions traitées.
@@ -1022,8 +1454,17 @@ export class Executor {
           await this.executeGoalDirectly(mission, goalId, availableSkills);
           remaining.delete(goalId);
 
-          if (goal.status === "failed" && goal.priority === "critical") {
-            console.log(`[Executor] ❌ Objectif critique échoué: "${goal.title}". Arrêt de la mission.`);
+          // Correctif audit (point 9) : un objectif critique BLOQUÉ (escaladé)
+          // doit arrêter la mission au même titre qu'un échec — c'est cohérent
+          // avec le calcul de succès final qui compte "blocked" comme non réussi.
+          if (
+            (goal.status === "failed" || goal.status === "blocked") &&
+            goal.priority === "critical"
+          ) {
+            console.log(
+              `[Executor] ❌ Objectif critique ${goal.status === "blocked" ? "bloqué" : "échoué"}: ` +
+              `"${goal.title}". Arrêt de la mission.`
+            );
             criticalFailure = true;
           }
         })
@@ -1196,7 +1637,8 @@ export class Executor {
 
     try {
       const dryRun = mission.getConfig().dryRun;
-      result = await this.skillHandler!(action.skillName, action.args, { dryRun });
+      const signal = this.getAbortController(mission.id).signal;
+      result = await this.skillHandler!(action.skillName, action.args, { dryRun, signal });
       const failure = Executor.detectSkillFailure(result);
       success = failure === null;
       if (!success) {
@@ -1212,8 +1654,8 @@ export class Executor {
 
     const durationMs = Date.now() - startTime;
 
-    // Enregistrer le résultat
-    mission.recordActionResult(action.id, result, success);
+    // Enregistrer le résultat (avec sa durée, exposée ensuite par l'API).
+    mission.recordActionResult(action.id, result, success, durationMs);
     this.scorer.recordUsage(action.skillName, success, durationMs);
     // Persistance durable de la fiabilité du skill (GAP-1) : alimente la mémoire
     // de stratégie lue par les missions futures. Best-effort, jamais bloquant.
@@ -1413,7 +1855,7 @@ JSON:`;
    * successCriteria, à partir des actions exécutées et de leurs résultats.
    * Utilise le LLM si disponible, sinon une heuristique conservatrice.
    */
-  private async verifyGoalCriteria(_mission: Mission, goal: Goal): Promise<{
+  private async verifyGoalCriteria(mission: Mission, goal: Goal): Promise<{
     passed: boolean;
     reasoning: string;
   }> {
@@ -1423,6 +1865,17 @@ JSON:`;
     const anySuccess = executed.some((a) => a.status === "completed");
     const allSuccess =
       executed.length > 0 && executed.every((a) => a.status === "completed");
+
+    // ── Vérification par PREUVE (audit, point 11) ───────────────────────────
+    // Quand le moteur de preuve est branché et activé, on juge l'objectif sur
+    // des FAITS (checks dérivés des résultats de skills, fichiers écrits) plutôt
+    // que sur une narration LLM. La preuve prime : un seul check factuel échoué
+    // interdit le succès. On ne retombe sur le LLM/heuristique QUE lorsqu'aucun
+    // fait exploitable n'existe (objectif purement analytique sans check).
+    if (this.evidence && this.evidenceVerification) {
+      const verdict = this.verifyByEvidence(mission, goal, executed);
+      if (verdict) return verdict;
+    }
 
     // Sans critères explicites, on retombe sur le succès des actions.
     if (!goal.successCriteria || goal.successCriteria.length === 0) {
@@ -1499,6 +1952,99 @@ JSON:`;
         reasoning: "Vérification LLM indisponible ; repli sur le succès de toutes les actions.",
       };
     }
+  }
+
+  /**
+   * Vérifie un objectif à partir d'une PREUVE factuelle (audit, point 11).
+   *
+   * Construit un `EvidenceInput` depuis les actions exécutées :
+   *   - chaque action devient un `runtimeCheck` dont `passed` dérive de
+   *     `detectSkillFailure` (le même détecteur factuel utilisé à l'exécution),
+   *     et non de la narration ;
+   *   - les fichiers écrits (outils d'écriture) alimentent `filesModified` ;
+   *   - les outils exécutés sont tracés.
+   * Le bundle est scellé par l'`EvidenceEngine`, qui calcule un verdict
+   * déterministe (`passed`) et une confiance bornée.
+   *
+   * Retourne `null` quand aucun fait exploitable n'existe (aucune action
+   * terminée) : l'appelant retombe alors sur la vérification LLM/heuristique.
+   */
+  private verifyByEvidence(
+    mission: Mission,
+    goal: Goal,
+    executed: PlannedAction[]
+  ): { passed: boolean; reasoning: string } | null {
+    if (!this.evidence) return null;
+    if (executed.length === 0) return null;
+
+    const runtimeChecks: CheckResult[] = executed.map((a) => {
+      const failure = Executor.detectSkillFailure(a.result);
+      return {
+        name: `${a.skillName}`,
+        passed: a.status === "completed" && failure === null,
+        details: failure ?? undefined,
+      };
+    });
+
+    // Fichiers réellement visés par une écriture réussie (preuve d'artefact).
+    const filesModified = Array.from(
+      new Set(
+        executed
+          .filter(
+            (a) =>
+              a.status === "completed" &&
+              Executor.WRITE_TOOLS.includes(a.skillName) &&
+              typeof (a.args as Record<string, unknown>)?.path === "string"
+          )
+          .map((a) => String((a.args as Record<string, unknown>).path))
+      )
+    );
+
+    // ── Objectif à livrable sans écriture = ÉCHEC factuel ───────────────────
+    // Observé en prod : un objectif « produire un rapport » était validé sur de
+    // simples lectures (verify_file/list/search) alors qu'aucun fichier n'était
+    // produit. Si l'objectif attend un artefact concret et qu'AUCUNE écriture
+    // n'a réussi, on ajoute un contrôle factuel échoué : la preuve ne peut pas
+    // établir le succès sans livrable.
+    if (this.goalExpectsArtifact(goal) && filesModified.length === 0) {
+      runtimeChecks.push({
+        name: "artefact-produit",
+        passed: false,
+        details:
+          "L'objectif attend un livrable concret (fichier/document) mais aucune écriture n'a abouti.",
+      });
+    }
+
+    const toolsExecuted = executed.map((a) => a.skillName);
+
+    const input: EvidenceInput = {
+      missionId: mission.id,
+      goal: goal.title,
+      filesModified,
+      toolsExecuted,
+      runtimeChecks,
+    };
+
+    const bundle = this.evidence.record(input);
+
+    this.emit("goal_evidence", {
+      missionId: mission.id,
+      goalId: goal.id,
+      passed: bundle.passed,
+      confidence: bundle.confidence,
+      checks: runtimeChecks.length,
+      failedChecks: runtimeChecks.filter((c) => !c.passed).length,
+    });
+
+    const failed = runtimeChecks.filter((c) => !c.passed);
+    const reasoning = bundle.passed
+      ? `Preuve: ${runtimeChecks.length} contrôle(s) factuel(s) passé(s) (confiance ${(bundle.confidence * 100).toFixed(0)}%).`
+      : `Preuve: ${failed.length}/${runtimeChecks.length} contrôle(s) en échec — ${failed
+          .map((c) => `${c.name}${c.details ? ` (${c.details})` : ""}`)
+          .slice(0, 3)
+          .join("; ")}.`;
+
+    return { passed: bundle.passed, reasoning };
   }
 
   private summarizeResult(result: unknown): string {
@@ -1664,7 +2210,25 @@ JSON:`;
     // 1re passe : créer tous les objectifs et mémoriser le mapping titre → id.
     const titleToId = new Map<string, string>();
 
-    for (const plan of plans) {
+    // Plafonnement par `maxSubGoals` (audit, point 12). Sans ça, un LLM qui
+    // renvoie plus de 10 sous-objectifs faisait lever `addSubGoal` au 11e et
+    // plantait tout `startMission`. On tronque proprement et on le signale.
+    const maxSubGoals = mission.getConfig().maxSubGoals;
+    let effectivePlans = plans;
+    if (plans.length > maxSubGoals) {
+      console.warn(
+        `[Executor] ⚠️ ${plans.length} sous-objectifs proposés > maxSubGoals (${maxSubGoals}). ` +
+        `Troncature aux ${maxSubGoals} premiers.`
+      );
+      this.emit("plan_truncated", {
+        missionId: mission.id,
+        proposed: plans.length,
+        kept: maxSubGoals,
+      });
+      effectivePlans = plans.slice(0, maxSubGoals);
+    }
+
+    for (const plan of effectivePlans) {
       const id = mission.addSubGoal({
         parentId,
         title: plan.title,
@@ -1673,13 +2237,25 @@ JSON:`;
         priority: plan.priority as import("./types.js").GoalPriority,
       });
       ids.push(id);
-      titleToId.set(plan.title.trim().toLowerCase(), id);
+      // Dépendances par titre : conserver la PREMIÈRE occurrence d'un titre.
+      // Avant, un titre dupliqué écrasait le mapping — les `dependsOn` pointaient
+      // alors tous vers le dernier homonyme. On garde le premier et on avertit.
+      const key = plan.title.trim().toLowerCase();
+      if (titleToId.has(key)) {
+        console.warn(
+          `[Executor] ⚠️ Titre de sous-objectif en double: "${plan.title}". ` +
+          `Les dépendances par titre résoudront vers la 1re occurrence.`
+        );
+      } else {
+        titleToId.set(key, id);
+      }
     }
 
     // 2e passe : résoudre les dépendances (exprimées par titre) en IDs de goals.
     // Les dépendances non résolues (titre inconnu) sont signalées explicitement
-    // au lieu d'être silencieusement supprimées.
-    plans.forEach((plan, index) => {
+    // au lieu d'être silencieusement supprimées. On itère sur les plans
+    // RÉELLEMENT créés (effectivePlans) pour rester aligné avec `ids`.
+    effectivePlans.forEach((plan, index) => {
       const deps = plan.dependsOn ?? [];
       if (deps.length === 0) return;
       const goal = mission.getGoal(ids[index]);
@@ -1745,7 +2321,22 @@ JSON:`;
     return lessons;
   }
 
+  /**
+   * Finalise une mission (une seule fois).
+   *
+   * Correctif audit (point 4) : rendu IDEMPOTENT. L'annulation/timeout et la fin
+   * naturelle de `executeMission` pouvaient tous deux appeler cette méthode pour
+   * la même mission → doublon dans `completedMissions`, double apprentissage et
+   * `mission_completed` émis après `mission_cancelled`. Le garde `finalized`
+   * garantit qu'une mission n'est finalisée qu'une fois.
+   */
   private finalizeMission(mission: Mission): void {
+    if (this.finalizedMissions.has(mission.id)) return;
+    this.finalizedMissions.add(mission.id);
+
+    // Libérer le contrôleur d'annulation (plus de skill à interrompre).
+    this.abortControllers.delete(mission.id);
+
     this.activeMissions.delete(mission.id);
     this.completedMissions.push(mission);
     if (this.completedMissions.length > Executor.MAX_COMPLETED) {
@@ -2050,16 +2641,30 @@ JSON:`;
     // Garde-fou : si déjà active (double-clic), ne pas relancer deux fois.
     if (this.activeMissions.has(missionId)) return true;
 
+    // Correctif audit (point 3) : `fromJSON` restaure la config persistée
+    // (dryRun, timeout, maxRetries…). Une mission dry-run reprise reste donc en
+    // dry-run au lieu de retomber silencieusement à `false`.
     const mission = Mission.fromJSON(pending.state);
+    // Autoriser une nouvelle finalisation si la mission avait été finalisée
+    // dans une session précédente (le garde est en mémoire, pas persisté).
+    this.finalizedMissions.delete(mission.id);
     this.activeMissions.set(mission.id, mission);
 
-    console.log(`[Executor] ♻️ Reprise de la mission "${pending.title}" (${missionId}).`);
+    const dryRun = mission.getConfig().dryRun;
+    console.log(
+      `[Executor] ♻️ Reprise de la mission "${pending.title}" (${missionId})` +
+      `${dryRun ? " [DRY-RUN]" : ""}.`
+    );
+
+    // Rétablir l'infrastructure d'observabilité comme pour un démarrage normal.
+    telemetryService.startMissionTrace(mission.id, pending.title);
+    setTelemetryContext({ missionId: mission.id });
+
     this.emit("mission_resumed", { missionId: mission.id, title: pending.title });
 
-    this.executeMission(mission, this.resumeAvailableSkills).catch((err) => {
-      console.error(`[Executor] Reprise mission ${mission.id} échouée:`, err);
-      this.emit("mission_failed", { missionId: mission.id, error: String(err) });
-    });
+    // Correctif audit (point 3) : passer par launchMission → la reprise obtient
+    // watchdog, trace télémétrie et entrée missionRuns (waitForMission fonctionne).
+    this.launchMission(mission, this.resumeAvailableSkills);
     return true;
   }
 
@@ -2110,6 +2715,12 @@ function problemSignature(title: string, errors: string[]): string {
 export interface SkillHandlerOptions {
   /** Exécuter en simulation (dry-run), sans effet de bord. */
   dryRun?: boolean;
+  /**
+   * Signal d'annulation : passe à `aborted` quand la mission est annulée ou
+   * atteint son timeout global. Un skill qui le respecte peut interrompre une
+   * opération longue (fetch, shell…) au lieu de la mener à terme. (Audit, point 4.)
+   */
+  signal?: AbortSignal;
 }
 
 /** Handler pour exécuter un skill */

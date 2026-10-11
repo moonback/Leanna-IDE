@@ -263,7 +263,37 @@ export class SkillScorer {
       }
     }
 
+    // ── Garde-fou « vérification de code hors contexte » ────────────────────
+    // Les contrôles qui compilent/testent le CODE du projet (verify_typecheck,
+    // verify_lint, verify_run_script…) n'ont de sens que pour un objectif qui
+    // touche réellement au code. Observé en prod : sur un objectif documentaire
+    // (« auditer le README »), ces outils étaient sélectionnés, échouaient sur
+    // des erreurs TS préexistantes, et faisaient boucler la mission en
+    // retry/replan. Si aucun signal « code » n'est présent, on neutralise leur
+    // pertinence pour qu'ils ne soient pas sélectionnés hors contexte.
+    if (Executor_CODE_CHECK_TOOLS.has(skillName) && !this.goalInvolvesCode(context)) {
+      score = 0;
+    }
+
     return Math.min(30, score);
+  }
+
+  /**
+   * Détecte si l'objectif porte réellement sur du CODE, via :
+   *   - le vocabulaire (code, compiler, typescript, test, bug, refactor, lint…) ;
+   *   - des fichiers pertinents à extension de code (.ts/.tsx/.js/.py/.go/.rs…).
+   * Un objectif purement documentaire/analytique (README, rapport, doc) → false.
+   */
+  private goalInvolvesCode(context: ScoringContext): boolean {
+    const text = `${context.goalTitle} ${context.goalDescription} ${context.successCriteria.join(" ")}`.toLowerCase();
+    const codeVocab =
+      /\b(code|coder|compil|typescript|\btsc\b|typecheck|type[-\s]?check|lint|eslint|test|tests|tester|unitaire|build|bug|debug|refactor|patch|fonction|classe|module|api|endpoint|import|dépendance|dependency|npm|script)\b/;
+    if (codeVocab.test(text)) return true;
+
+    const codeFile = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cc|cpp|h|hpp|cs|kt|swift|scala|sql)\b/i;
+    if (context.relevantFiles.some((f) => codeFile.test(f))) return true;
+
+    return false;
   }
 
   /**
@@ -437,6 +467,20 @@ export class SkillScorer {
     }
   }
 }
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+/**
+ * Outils qui compilent/testent/lintent le CODE du projet. Ils ne doivent pas
+ * être sélectionnés pour un objectif qui ne touche pas au code (sinon ils
+ * échouent sur des erreurs préexistantes et font boucler la mission).
+ */
+const Executor_CODE_CHECK_TOOLS: ReadonlySet<string> = new Set<string>([
+  "verify_typecheck",
+  "verify_lint",
+  "verify_run_script",
+  "run_tests",
+]);
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

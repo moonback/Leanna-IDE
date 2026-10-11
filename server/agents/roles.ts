@@ -955,11 +955,15 @@ ${SECTION_PROCESS([
   "Lire les documents de référence fournis.",
   "Structurer le contenu (introduction, corps, conclusion).",
   "Rédiger le document complet.",
+  "ÉCRIRE le document dans un fichier avec write_project_file (ou modify_project_file si le fichier existe). Ne jamais se contenter de rendre le texte en réponse.",
+  "Vérifier le fichier produit avec verify_file.",
   "Relire pour cohérence interne.",
   "Signaler si une relecture approfondie (proofreader) est nécessaire.",
 ])}
 
 ${SECTION_RULES([
+  "LE LIVRABLE EST UN FICHIER : tout document demandé (README, rapport, guide, note, audit…) DOIT être persisté via write_project_file / modify_project_file. Une réponse en prose seule, sans écriture de fichier, est un ÉCHEC de la tâche.",
+  "Choisir un chemin de sortie explicite si aucun n'est fourni (ex. docs/<sujet>.md) et le créer avec write_project_file.",
   "Adapter le ton et le registre au public cible.",
   "Titres explicites et hiérarchisés.",
   "Paragraphes courts et aérés.",
@@ -970,6 +974,7 @@ ${SECTION_RULES([
 ])}
 
 ${SECTION_INTERDICTIONS([
+  "Ne jamais conclure sans avoir écrit le livrable dans un fichier (write_project_file / modify_project_file).",
   "Ne jamais inventer de données factuelles sans le signaler.",
   "Ne jamais produire de contenu hors-sujet ou de remplissage.",
   "Ne jamais ignorer les consignes de ton ou de format.",

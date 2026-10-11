@@ -41,9 +41,25 @@ export function coreDir(...segments: string[]): string {
  * en cours d'écriture ne laisse jamais un fichier tronqué/corrompu.
  */
 export function writeJsonAtomic(filePath: string, data: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
   const tmp = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
+
+  // Écriture + flush DURABLE du contenu sur disque avant le rename. Sans fsync,
+  // le contenu peut rester en cache OS : un crash juste après le rename
+  // laisserait un fichier au bon nom mais au contenu vide/tronqué.
+  const fd = fs.openSync(tmp, "w");
+  try {
+    fs.writeFileSync(fd, JSON.stringify(data, null, 2), "utf8");
+    try {
+      fs.fsyncSync(fd);
+    } catch {
+      // fsync peut échouer sur certains systèmes de fichiers : best-effort.
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+
   try {
     fs.renameSync(tmp, filePath);
   } catch (err: any) {
@@ -65,13 +81,28 @@ export function writeJsonAtomic(filePath: string, data: unknown): void {
   }
 }
 
-/** Lit un fichier JSON. Retourne `fallback` si absent ou illisible. */
+/**
+ * Lit un fichier JSON. Retourne `fallback` si absent ou illisible.
+ *
+ * Un fichier présent mais au JSON invalide (snapshot corrompu par un crash en
+ * cours d'écriture) est désormais SIGNALÉ : avant, il retombait silencieusement
+ * sur `fallback` (souvent `null`), masquant une perte de données.
+ */
 export function readJson<T>(filePath: string, fallback: T): T {
+  let raw: string;
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    const raw = fs.readFileSync(filePath, "utf8");
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    console.warn(`[paths] ⚠️ Lecture impossible de ${filePath}: ${(err as Error).message}`);
+    return fallback;
+  }
+  try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[paths] ⚠️ JSON corrompu dans ${filePath} (${(err as Error).message}) — valeur de repli utilisée.`
+    );
     return fallback;
   }
 }

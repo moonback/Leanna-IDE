@@ -78,7 +78,7 @@ test("toRunnerOutcome carries evidence and files through", () => {
 
 test("governed mission COMPLETES when the agent proves success", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl") });
+  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
   const rt = fakeRuntime([
     result({ success: true, filesModified: ["a.ts"], verifications: [{ passed: true, checks: ["verify_file ok"], issues: [] }] }),
   ]);
@@ -93,7 +93,7 @@ test("governed mission COMPLETES when the agent proves success", async () => {
 
 test("governed mission ESCALATES when the agent's proof keeps failing, with rollback", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl") });
+  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
   const failing = result({
     success: false,
     outcome: "failed",
@@ -112,7 +112,7 @@ test("governed mission ESCALATES when the agent's proof keeps failing, with roll
 
 test("governed mission recovers on a later attempt (fail then succeed)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl") });
+  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
   const rt = fakeRuntime([
     result({ success: false, outcome: "failed", filesModified: ["a.ts"], verifications: [{ passed: false, checks: [], issues: ["oops"] }] }),
     result({ success: true, filesModified: ["a.ts"], verifications: [{ passed: true, checks: ["verify_file ok"], issues: [] }] }),
@@ -127,7 +127,7 @@ test("governed mission recovers on a later attempt (fail then succeed)", async (
 
 test("blocked outcome escalates immediately (no wasted retries)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl") });
+  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
   const rt = fakeRuntime([
     result({ success: false, outcome: "blocked", verifications: [{ passed: false, checks: [], issues: ["preexisting error"] }] }),
   ]);
@@ -141,7 +141,7 @@ test("blocked outcome escalates immediately (no wasted retries)", async () => {
 
 test("guard context is set during the mission and cleared afterwards", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl") });
+  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
 
   // Observe the guard context AT THE MOMENT the runtime runs (mid-mission) by
   // inspecting the deterministic idempotency key the guard would produce.

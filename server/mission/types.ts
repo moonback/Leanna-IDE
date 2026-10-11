@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types du système Mission — Couche décisionnelle autonome
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -92,6 +90,8 @@ export interface PlannedAction {
   result?: unknown;
   /** Réflexion post-exécution */
   reflection?: ReflectionResult;
+  /** Durée d'exécution de l'action en millisecondes (renseignée après exécution). */
+  durationMs?: number;
 }
 
 /** Résultat d'un objectif complété */
@@ -130,6 +130,12 @@ export interface MissionState {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  /**
+   * Configuration de la mission, persistée pour qu'une reprise après crash
+   * restaure fidèlement dryRun, timeout, maxRetries, etc. (sans ça, une reprise
+   * repart aux valeurs par défaut et une mission dry-run s'exécute pour de vrai).
+   */
+  config?: MissionConfig;
 }
 
 /** Contexte dynamique de la mission */
@@ -222,21 +228,12 @@ export interface MissionConfig {
 }
 
 // ─── Schemas Zod ──────────────────────────────────────────────────────────────
-
-export const createMissionSchema = z.object({
-  title: z.string().min(1).trim(),
-  description: z.string().min(1).trim(),
-  priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
-});
-
-export const addGoalSchema = z.object({
-  missionId: z.string().min(1),
-  parentId: z.string().nullable().optional().default(null),
-  title: z.string().min(1).trim(),
-  description: z.string().min(1).trim(),
-  successCriteria: z.array(z.string()).min(1),
-  priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
-});
+//
+// NB (audit, point 10) : les anciens schémas `createMissionSchema` et
+// `addGoalSchema` ont été RETIRÉS d'ici. Ils doublonnaient — et divergeaient de —
+// les schémas de validation canoniques portés par le skill `mission`
+// (`inputSchemas.mission_create`, `inputSchemas.mission_add_goal`). La source de
+// vérité unique est désormais le skill.
 
 export const DEFAULT_MISSION_CONFIG: MissionConfig = {
   maxSubGoals: 10,

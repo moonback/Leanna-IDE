@@ -325,10 +325,10 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
     // Initialiser le Mission System (doit être fait après que les outils soient enregistrés)
     try {
       const missionModule = await import("./server/mission/index.js");
-      const { Executor, MissionStore, AutonomyPolicy } = missionModule;
+      const { Executor, MissionStore, LocalMissionStore, CompositeMissionStore, AutonomyPolicy } = missionModule;
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
-      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean }) =>
+      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal }) =>
         sm.handleToolCall(name, args, undefined, opts));
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
@@ -364,9 +364,48 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         .map((d: any) => d.name)
         .filter((name: string) => !name.startsWith("browser_") || MISSION_WEB_TOOL_ALLOWLIST.has(name));
 
-      // Persistance des missions (Supabase). No-op si non configuré.
-      const missionStore = new MissionStore();
+      // Persistance des missions : store LOCAL (.Leanna, toujours disponible,
+      // garantit la reprise après crash sans Supabase) + store Supabase quand
+      // il est configuré. Le composite diffuse les écritures aux deux et unifie
+      // les lectures de reprise. (Audit, points 5 & 7.)
+      const missionStore = new CompositeMissionStore(
+        new LocalMissionStore(),
+        new MissionStore(),
+      );
       executor.setStore(missionStore);
+
+      // Vérification d'objectif par PREUVE réelle (audit, point 11), activable
+      // via LEANNA_MISSION_EVIDENCE. On branche le moteur de preuve local
+      // (.Leanna/core/evidence) ; l'activation effective suit le flag d'env lu
+      // par l'Executor (réversible : sans le flag, on garde la vérif LLM).
+      try {
+        const { EvidenceEngine } = await import("./server/core/EvidenceEngine.js");
+        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase();
+        const evidenceEnabled = evidenceFlag === "true" || evidenceFlag === "1";
+        executor.setEvidenceEngine(new EvidenceEngine(), evidenceEnabled);
+        if (evidenceEnabled) {
+          console.log(`[Bootstrap] ✓ Vérification d'objectif par preuve activée (EvidenceEngine).`);
+        }
+      } catch (err) {
+        console.warn(`[Bootstrap] ⚠️ EvidenceEngine non branché: ${(err as Error).message}`);
+      }
+
+      // Unification (audit, point 5) : brancher le LeannaSupervisor comme
+      // autorité de gouvernance, activable par LEANNA_MISSION_SUPERVISED. En mode
+      // supervisé, l'exécution transite dans la boucle du Supervisor (état durable,
+      // snapshots/rollback, preuve). Réversible : sans le flag, exécution directe.
+      try {
+        const { LeannaSupervisor } = await import("./server/core/LeannaSupervisor.js");
+        const supervisedFlag = String(process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase();
+        const supervisedEnabled = supervisedFlag === "true" || supervisedFlag === "1";
+        // Timeout runner optionnel aligné sur le timeout global de mission.
+        executor.setSupervisor(new LeannaSupervisor(), supervisedEnabled);
+        if (supervisedEnabled) {
+          console.log(`[Bootstrap] ✓ Mode supervisé activé (LeannaSupervisor gouverne le cycle de mission).`);
+        }
+      } catch (err) {
+        console.warn(`[Bootstrap] ⚠️ LeannaSupervisor non branché: ${(err as Error).message}`);
+      }
 
       // Curseur d'autonomie (suggest/ask/auto) + .leannaignore.
       // Défaut = "auto" : Leanna agit seule. Les actions DANGEREUSES (dangerous)
