@@ -1088,7 +1088,7 @@ export default function IdeView() {
         />
 
         {/* Global Progress Bar */}
-        {(fileSystem.loading || assistantWorking) && (
+        {/* {(fileSystem.loading || assistantWorking) && (
           <div
             className="ide-splash-progress absolute top-[35px] left-0 right-0 z-50"
             role="progressbar"
@@ -1108,7 +1108,7 @@ export default function IdeView() {
               <div className="ide-splash-progress__scan" />
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Main Editor + Panels Layout */}
                 <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
