@@ -35,6 +35,10 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
+<img src="https://img.shields.io/badge/skills%20intégrées-28%20skills-818CF8?style=for-the-badge" alt="28 Skills" />
+&nbsp;
+<img src="https://img.shields.io/badge/outils%20agent-228%20outils-38BDF8?style=for-the-badge" alt="228 Outils" />
+&nbsp;
 <img src="https://img.shields.io/badge/version-1.7.0-A78BFA?style=for-the-badge" alt="Version" />
 
 <br>
@@ -60,7 +64,8 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <a href="#-installation"><kbd>🚀 Installation</kbd></a>&nbsp;&nbsp;
 <a href="#-noyau-p0--le-noyau-transactionnel"><kbd>⚙️ Noyau P0</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-multi-agents"><kbd>🤖 Agents</kbd></a>&nbsp;&nbsp;
-<a href="#-autonomie-proactive"><kbd>🛰️ Autonomie</kbd></a>&nbsp;&nbsp;
+<a href="#-compilateur--architecture-des-prompts-système"><kbd>📜 Prompts Système</kbd></a>&nbsp;&nbsp;
+<a href="#-répertoire-complet-des-compétences--outils-28-skills--228-outils"><kbd>🧰 Skills & Outils (228)</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-de-sécurité"><kbd>🔐 Sécurité</kbd></a>
 
 <br><br>
