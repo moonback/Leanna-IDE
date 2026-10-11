@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, History, FileWarning, RotateCcw, Play, CheckCircle2, XCircle, Clock,
-  RefreshCw, Loader2, AlertCircle, X,
+  SlidersHorizontal, History, FileWarning, RotateCcw, Play,
+  CheckCircle2, XCircle, Clock, RefreshCw, Loader2, AlertCircle, X,
 } from 'lucide-react';
-import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+import { Section, Field, ToggleSwitch, SectionDivider } from './SettingsPrimitives.js';
 import { AutonomyLevelSelector } from '../autonomy/AutonomyLevelSelector.js';
+import { IdleAutonomyPanel } from '../autonomy/IdleAutonomyPanel.js';
 import { useSafeguardsConfig, type SafeguardsConfig } from '../../hooks/useSafeguardsConfig.js';
 
 interface Checkpoint {
@@ -14,7 +15,17 @@ interface Checkpoint {
   date: string;
 }
 
-export function SafeguardsSection() {
+/**
+ * AutonomySection — point UNIQUE pour tous les réglages d'autonomie.
+ *
+ * Regroupe ce qui était auparavant dispersé entre l'onglet « Garde-fous » et le
+ * Centre de contrôle Autonomie :
+ *   1. Niveau d'autonomie
+ *   2. Garde-fous d'auto-modification (toggles + fichiers critiques)
+ *   3. Validation manuelle + checkpoints/rollback
+ *   4. Travail autonome encadré (budget, kill-switch, journal d'audit)
+ */
+export function AutonomySection() {
   const { config, update } = useSafeguardsConfig();
   const saveConfig = (next: SafeguardsConfig) => { void update(next); };
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -81,12 +92,11 @@ export function SafeguardsSection() {
 
   return (
     <Section
-      icon={ShieldCheck}
-      title="Garde-fous auto-modification"
-      description="Protections actives quand l'IA modifie son propre code source"
-      badge="PHASE 2"
+      icon={SlidersHorizontal}
+      title="Autonomie"
+      description="Niveau d'autonomie, garde-fous et travail autonome encadré — tous les réglages au même endroit"
     >
-      {/* ─── Niveau d'autonomie ─── */}
+      {/* ─── 1. Niveau d'autonomie ─── */}
       <Field
         label="Niveau d'autonomie"
         hint="Détermine jusqu'où l'IA peut agir seule avant de demander votre aval."
@@ -97,7 +107,9 @@ export function SafeguardsSection() {
         />
       </Field>
 
-      {/* ─── Toggles ─── */}
+      <SectionDivider label="Garde-fous d'auto-modification" />
+
+      {/* ─── 2. Toggles garde-fous ─── */}
       <div className="flex flex-col gap-1">
         <ToggleSwitch
           value={config.autoCheckpoint}
@@ -284,6 +296,16 @@ export function SafeguardsSection() {
             </ul>
           )}
         </div>
+      </Field>
+
+      <SectionDivider label="Travail autonome encadré" />
+
+      {/* ─── 4. Idle work : budget, kill-switch, audit ─── */}
+      <Field
+        label="Travail autonome (lecture seule)"
+        hint="Pendant les périodes calmes, Leanna lance des diagnostics en lecture seule, bornés par un budget horaire et traçables."
+      >
+        <IdleAutonomyPanel />
       </Field>
     </Section>
   );

@@ -9,7 +9,7 @@ export { DataSection } from './DataSection.js';
 export { ModelSection } from './ModelSection.js';
 export { OpenRouterSection } from './OpenRouterSection.js';
 export { SelfRootSection } from './SelfRootSection.js';
-export { SafeguardsSection } from './SafeguardsSection.js';
+export { AutonomySection } from './AutonomySection.js';
 export { CustomSkillsSection } from './CustomSkillsSection.js';
 export { KnowledgeHealthSection } from './KnowledgeHealthSection.js';
 export { SystemPromptSection } from './SystemPromptSection.js';
