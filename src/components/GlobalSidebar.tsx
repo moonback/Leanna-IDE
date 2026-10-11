@@ -36,6 +36,8 @@ import { useConfirm } from './ui/ConfirmDialog.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
 import type { UnifiedSidebarProps } from './sidebar/types.js';
+// @ts-ignore - Asset handled by bundler
+import logoDark from '../../assets/images/icon-sombre.png';
 
 /* ------------------------------------------------------------------ */
 /* Types & données                                                     */
@@ -338,19 +340,32 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             onKeyDown={onNavKeyDown}
           >
             {/* Marque + bouton d'épinglage */}
-            <div className={`flex flex-shrink-0 items-center gap-2 px-3 ${collapsed ? 'justify-center' : ''}`} style={{ height: 56 }}>
+            <div
+              className={`relative flex flex-shrink-0 items-center gap-2.5 px-3 ${collapsed ? 'justify-center' : ''}`}
+              style={{
+                height: 60,
+                background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 7%, transparent) 0%, transparent 100%)',
+              }}
+            >
               <motion.span
                 aria-hidden
-                whileHover={reduceMotion ? undefined : { rotate: -6, scale: 1.06 }}
+                whileHover={reduceMotion ? undefined : { rotate: -8, scale: 1.08 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)' }}
+                className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl"
+                style={{
+                  boxShadow: '0 2px 10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.1)',
+                }}
               >
-                L
+                <img src={logoDark} alt="Leanna" className="h-full w-full object-contain" draggable={false} />
               </motion.span>
               <FadeSlide show={!collapsed} className="min-w-0 flex-1" reduceMotion={reduceMotion}>
-                <span className="block truncate text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                  Leanna{mode === 'ide' ? ' · IDE' : ''}
+                <span className="flex flex-col leading-tight">
+                  <span className="block truncate text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                    Leanna{mode === 'ide' ? ' · IDE' : ''}
+                  </span>
+                  <span className="block truncate text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+                    {mode === 'ide' ? 'Espace de travail' : 'Centre de pilotage'}
+                  </span>
                 </span>
               </FadeSlide>
               {!collapsed && (
@@ -692,8 +707,12 @@ function AgentPill({
       aria-label={`État de Leanna : ${agent.label}. Ouvrir Mission Control.`}
       whileHover={reduceMotion ? undefined : { x: 2 }}
       whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-      className={`group/pill mx-2 mb-2 flex flex-shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 ${collapsed ? 'justify-center' : ''} ${FOCUS_RING}`}
-      style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+      className={`group/pill mx-2 mb-2 mt-1 flex flex-shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:border-[var(--accent-primary)] ${collapsed ? 'justify-center' : ''} ${FOCUS_RING}`}
+      style={{
+        background: 'linear-gradient(180deg, var(--bg-panel) 0%, color-mix(in srgb, var(--bg-panel) 70%, var(--bg-secondary)) 100%)',
+        border: '1px solid var(--border-base)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
     >
       <span className="relative flex h-2.5 w-2.5 flex-shrink-0 items-center justify-center" aria-hidden>
         {agent.active && !reduceMotion && (
@@ -824,19 +843,29 @@ function IdeAssistantBlock({
   if (!connected) {
     // Un seul appel à l'action : connecter l'assistant.
     return (
-      <div className="mx-2 mb-2 flex-shrink-0">
+      <div className="mx-2 mb-3 mt-0.5 flex-shrink-0">
         <motion.button
           type="button"
           onClick={onConnect}
           title="Connecter l'assistant IA"
           aria-label="Connecter l'assistant IA"
-          whileHover={reduceMotion ? undefined : { scale: 1.02 }}
+          whileHover={reduceMotion ? undefined : { scale: 1.02, y: -1 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          className={`flex w-full items-center justify-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold ${FOCUS_RING}`}
-          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)', border: '1px solid var(--border-base)' }}
+          className={`group/cta relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-3 py-2.5 text-xs font-bold tracking-wide ${FOCUS_RING}`}
+          style={{
+            background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%)',
+            color: 'var(--bg-base)',
+            boxShadow: '0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2)',
+          }}
         >
-          <Bot size={14} />
-          {!collapsed && <span>Connecter l'IA</span>}
+          {!reduceMotion && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover/cta:translate-x-full"
+            />
+          )}
+          <Bot size={15} className="relative" />
+          {!collapsed && <span className="relative">Connecter l'IA</span>}
         </motion.button>
       </div>
     );
