@@ -174,9 +174,13 @@ const SENSITIVE_TOOL_ATTRIBUTION: Record<
   // Tests & vérification — pilotés par le testeur/débogueur.
   run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'], risk: 'exec' },
   verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'], risk: 'exec' },
-  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
+  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect'], risk: 'exec' },
   verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'], risk: 'exec' },
-  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger'], risk: 'exec' },
+  // `architect` est autorisé : le runtime le force à vérifier le livrable qu'il
+  // vient d'écrire (phase VERIFY). Sans cette autorisation, la relance forcée
+  // vers verify_file échouait sur une exception de permission → outcome=partial,
+  // 0 fichier (observé en prod sur l'agent Architecte Logiciel).
+  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect'], risk: 'exec' },
   // Exécution shell — attribuée au développeur (contexte d'exécution projet).
   run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'], risk: 'exec' },
   system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'], risk: 'exec' },

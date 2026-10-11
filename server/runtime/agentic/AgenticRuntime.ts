@@ -171,6 +171,17 @@ function agentCanWrite(tools: readonly ToolDeclaration[]): boolean {
 }
 
 /**
+ * Un agent peut-il invoquer un outil de vérification (verify_file, …) ?
+ * Tous les rôles n'ont pas cette capacité (ex. `architect` ne l'a pas par
+ * défaut) : la relance forcée vers l'écriture ne doit pas orienter l'agent
+ * vers un outil absent de sa boîte à outils, sinon il tente un appel qui sera
+ * refusé par la PermissionPolicy et gaspille son budget d'itérations.
+ */
+function agentCanVerify(tools: readonly ToolDeclaration[]): boolean {
+  return tools.some((t) => VERIFY_TOOL_SET.has(t.name));
+}
+
+/**
  * Signature du générateur de texte. En production c'est `generateText`
  * (Gemini/OpenRouter). Un modèle DÉTERMINISTE peut être injecté pour tester la
  * chaîne agentique complète sans réseau ni clés API (voir mission-harness).
@@ -605,12 +616,19 @@ export class AgenticRuntime implements IAgentRuntime {
 
     if (prematureNarration) {
       session.forcedWriteNudges = nudges + 1;
+      // N'oriente vers verify_file que si l'agent dispose réellement d'un outil
+      // de vérification. Sinon, l'instruction le pousserait vers un appel refusé
+      // par la PermissionPolicy (observé sur l'agent Architecte, sans verify_file).
+      const verifyHint = agentCanVerify(tools)
+        ? " puis vérifie le résultat avec verify_file."
+        : " Ne tente aucune vérification : conclus dès que le fichier est écrit.";
       session.pendingInstruction =
         "Tu as conclu sans produire de LIVRABLE : aucun fichier n'a été écrit. " +
         "Ne décris pas le document — ÉCRIS-LE maintenant via un tool_calls JSON " +
         "(write_project_file pour créer, ou modify_project_file si le fichier existe). " +
-        "Choisis un chemin de sortie explicite (ex. docs/<sujet>.md) si aucun n'est fourni, " +
-        "puis vérifie avec verify_file. Une réponse finale sans écriture de fichier est un ÉCHEC.";
+        "Choisis un chemin de sortie explicite (ex. docs/<sujet>.md) si aucun n'est fourni," +
+        verifyHint +
+        " Une réponse finale sans écriture de fichier est un ÉCHEC.";
       log.warn(
         `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — conclusion sans livrable écrit ` +
           `(itération ${iteration}, relance ${session.forcedWriteNudges}/${Executor_MAX_FORCED_WRITE_NUDGES}) → relance forcée vers l'écriture`
