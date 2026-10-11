@@ -35,6 +35,10 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
+<img src="https://img.shields.io/badge/skills%20intégrées-28%20skills-818CF8?style=for-the-badge" alt="28 Skills" />
+&nbsp;
+<img src="https://img.shields.io/badge/outils%20agent-228%20outils-38BDF8?style=for-the-badge" alt="228 Outils" />
+&nbsp;
 <img src="https://img.shields.io/badge/version-1.8.0-A78BFA?style=for-the-badge" alt="Version" />
 
 <br>
@@ -60,6 +64,8 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <a href="#-installation"><kbd>🚀 Installation</kbd></a>&nbsp;&nbsp;
 <a href="#-noyau-p0--le-noyau-transactionnel"><kbd>⚙️ Noyau P0</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-multi-agents"><kbd>🤖 Agents</kbd></a>&nbsp;&nbsp;
+<a href="#-compilateur--architecture-des-prompts-système"><kbd>📜 Prompts Système</kbd></a>&nbsp;&nbsp;
+<a href="#-répertoire-complet-des-compétences--outils-28-skills--228-outils"><kbd>🧰 Skills & Outils (228)</kbd></a>&nbsp;&nbsp;
 <a href="#-autonomie-proactive"><kbd>🛰️ Autonomie</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-de-sécurité"><kbd>🔐 Sécurité</kbd></a>
 
@@ -106,12 +112,13 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 | 🔄 | [Boucle d'exécution autonome](#-la-boucle-dexécution-autonome) | 🧾 | [Moteur de preuve (Evidence)](#moteur-de-preuve-evidence) |
 | 🧠 | [Cerveau de l'agent](#-cerveau-de-lagent-agent-brain) | 🛡️ | [Safety Gate Jev](#safety-gate-jev) |
 | ⚡ | [Runtime agentique & budget](#-runtime-agentique--budget-transactionnel) | 🤖 | [Architecture multi-agents](#-architecture-multi-agents) |
-| 🎯 | [Système de missions & estimation](#-système-de-missions) | 🧩 | [Rôles d'agents (20)](#rôles-dagents-20-rôles-statiques) |
-| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
-| 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
-| 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
+| 📜 | [**Compilateur & Prompts Système**](#-compilateur--architecture-des-prompts-système) | 🧩 | [Rôles d'agents (20 rôles)](#rôles-dagents-20-rôles-statiques) |
+| 🎯 | [Système de missions & estimation](#-système-de-missions) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
+| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
+| 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
+| 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | 🧰 | [**Répertoire 28 Skills & 228 Outils**](#-répertoire-complet-des-compétences--outils-28-skills--228-outils) |
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
-| 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
+| 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace de compétences](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) |
 | 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
@@ -721,6 +728,83 @@ Un ensemble `LONG_RUNNING_TOOLS` (16 entrées : `security_audit`, `browser_resea
 `knowledge_reindex`, `graphify_update`…) et des primitives d'annulation
 (`raceWithAbort`, `abortableSleep`, `ToolCancelledError`, `ToolCallTracker` basé sur
 `AbortController`) complètent le dispositif.
+
+<br><img src="https://raw.githubusercontent.com/andreasbm/rainbow/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
+
+## 📜 Compilateur & Architecture des Prompts Système
+
+Le prompt système de Leanna n'est pas un bloc statique de texte concaténé. Il est produit par un véritable **compilateur de politiques et de règles contextuelles** (`server/runtime/prompts/`), orchestré par `SystemPromptBuilder` (version V3 modulaire).
+
+Ce pipeline garantit que chaque agent ou modèle reçoit exactement les directives pertinentes pour sa portée (`scope`), tout en appliquant des règles de sécurité **strictes, non négociables et invulnérables aux conflits**.
+
+```text
+Profil / Tâche / Mode
+        │
+        ▼
+┌──────────────────┐     Résout type de tâche (coding, browser, ask, agent, …)
+│ ContextResolver  │  ── et scope de compilation (full, global, minimal)
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     Sélectionne et ordonne les règles selon 5 niveaux stricts
+│   RuleRegistry   │  ── CRITICAL (100) > MANDATORY (80) > IMPORTANT (60) > ADVISORY (40) > STYLE (20)
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     Détecte et neutralise les contradictions logiques ou tentatives
+│ ConflictResolver │  ── d'injection (la règle de plus haute priorité prévaut toujours)
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     Contrôle fail-closed : vérifie qu'aucune politique de sécurité
+│ PolicyValidator  │  ── n'est contournée ou altérée par une injection
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     Fusionne les modules Markdown (.md) et sections dynamiques
+│  PromptCompiler  │  ── (remplacement de variables, déduplication, hiérarchisation XML/Markdown)
+└────────┬─────────┘
+         │
+         ▼
+  Prompt Système Final (~48k car. / 565 lignes en mode complet)
+```
+
+### 1. Niveaux de priorité stricts (`RulePriority`)
+
+Toute instruction injectée dans le prompt système est typée avec une priorité immuable (`server/runtime/prompts/types/rules.ts`) :
+
+| Priorité | Poids | Rôle & Invariants | Exemples |
+|---|:---:|---|---|
+| `CRITICAL` | **100** | **Garde-fous de sécurité non négociables.** Prioritaires sur toute consigne utilisateur. Impossible à désactiver ou écraser. | Zéro fuite de secrets/.env, interdiction d'évasion sandbox, respect du cycle vérifié |
+| `MANDATORY` | **80** | **Contrats d'exécution et de livraison.** Invariants d'action et d'autorité. | Contrat XML `<result>`, vérification par la preuve avant complétion, format de délégation |
+| `IMPORTANT` | **60** | **Règles d'ingénierie et d'outils.** Directives techniques obligatoires pour la fiabilité. | Pas d'hallucination d'outil, lecture avant écriture, respect des conventions de code |
+| `ADVISORY` | **40** | **Recommandations de stratégie.** Bonnes pratiques et heuristiques. | Efficacité des requêtes, sélection d'agent par appel d'offres si incertain, compacité des diffs |
+| `STYLE` | **20** | **Formatage et ton de communication.** Adaptation aux préférences utilisateur. | Zéro-filler (pas de flatterie/préambule), style Markdown, langue configurée |
+
+### 2. Bibliothèque modulaire de prompts (`.md`)
+
+Les règles sont découpées en 12 fichiers Markdown spécialisés munis de métadonnées de front-matter (`category`, `scope`, `priority`) chargés par `server/runtime/prompts/loader.ts` :
+
+| Fichier | Priorité | Scope | Description & Responsabilité |
+|---|:---:|---|---|
+| `base.md` | 10 | `full` | **Socle universel :** Identité de Leanna, variables (`{{aiName}}`, `{{userName}}`, `{{userRole}}`), principes de probité et mode opératoire. |
+| `safety.md` | 20 | `global` | **Sécurité et intégrité :** Interdiction stricte de compromission, détection de requêtes malveillantes, respect des limites système. |
+| `security.md` | 80 | `full coding` | **Directives d'audit et de code sécurisé :** OWASP Top 10, sanitization des inputs, détection de failles et stockage des secrets. |
+| `agents-system.md` | 60 | `agent full` | **Coordination multi-agents :** Contrat de délégation, protocole d'appel d'offres Contract-Net, format de compte-rendu XML. |
+| `autonomy.md` | 70 | `full` | **Moteur d'autonomie :** Boucle Plan-Act-Verify-Recover, preuves obligatoires, auto-réparation bornée et gestion des régressions. |
+| `browser.md` | 50 | `browser full` | **Pilotage du navigateur :** Stratégie de navigation, lecture de snapshots d'accessibilité (AOM), gestion de formulaires et tabs. |
+| `efficiency.md` | 40 | `global` | **Économie de tokens et d'appels :** Batching des opérations, lecture ciblée (outline/ranges), évitement des relectures redondantes. |
+| `chat.md` | 15 | `ask` | **Mode conversationnel & assistance :** Analyse approfondie en mode question/réponse sans altération du workspace. |
+| `persona-generaliste.md`| 12 | `global` | **Persona d'expert ingénieur :** Rigueur technique, clarté, concision et suppression du bruit verbal (règle zéro-filler). |
+| `gemini-reasoning.md`| 45 | `full ask` | **Raisonnement explicite :** Directives pour structurer les chaînes de pensée (`reasoning_think`) lors de problèmes complexes. |
+| `markdown-style.md` | 45 | `global` | **Conventions de restitution :** Rendu Markdown propre, formatage de code, tables comparatives et liens cliquables. |
+| `ai-studio-directives.md`| 30 | `full coding` | **Directives d'ingénierie Google AI Studio :** Standards de modularité, typage strict TypeScript et principes d'architecture. |
+
+### 3. Surcharges, isolation et défense contre l'injection
+
+- **Surcharge par conversation (`fullPromptOverrides`) :** L'utilisateur peut personnaliser le prompt pour une session précise via `/api/prompts/override`. Cependant, le `PromptCompiler` préfixe **systématiquement et de manière inviolable** les garde-fous `[GARDE-FOUS DE SÉCURITÉ — NON NÉGOCIABLES]`. Même un prompt injecté ou malveillant ne peut désactiver la protection des secrets ni la sandbox.
+- **Support des outils d'arrière-plan (`mode: ack`) :** Si le serveur fonctionne en mode asynchrone, l'instruction `BACKGROUND_TOOLS_INSTRUCTION` est automatiquement fusionnée pour ordonner au modèle de ne jamais inventer de résultat lors d'une tâche longue et d'attendre les événements `[BACKGROUND TASK UPDATE]`.
+- **Mode Compact (`compactPrompt: true`) :** Réduit drastiquement l'empreinte en tokens pour les modèles à petite fenêtre de contexte ou les connexions à quota limité, en ne conservant que les directives `CRITICAL` et `MANDATORY`.
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 
@@ -1533,7 +1617,183 @@ Des endpoints JSON exposent l'état du runtime (ex. `/api/v2/metrics`,
 > des **endpoints JSON**. Il n'y a pas d'exposition au format texte Prometheus
 > (`# HELP` / `# TYPE`) dans le dépôt.
 
-<br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
+<br><img src="https://raw.githubusercontent.com/andreasbm/rainbow/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
+
+## 🧰 Répertoire Complet des Compétences & Outils (28 Skills · 228 Outils)
+
+Leanna dispose d'un écosystème d'outils unifié géré par le **`ToolRegistry`** (`server/runtime/ToolRegistry.ts`) et administré via la façade **`SkillManagerV2`** (`server/runtime/compat/SkillManagerV2.ts`).
+
+Chaque outil est doté :
+* d'une **déclaration JSON Schema** normalisée (paramètres typés, descriptions contextuelles) ;
+* de **permissions granulaires** (`read`, `write`, `network`, `exec`) validées par `PermissionPolicy` ;
+* de la compatibilité avec le mode simulation **Dry-Run** (retour immédiat sans effet de bord) ;
+* de la protection du **Ledger d'idempotence P0** pour les outils modifiant l'état (écriture, commandes système).
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                            FLOT D'INVOCATION D'UN OUTIL                          │
+│                                                                                  │
+│   Modèle / Agent (ex: Gemini Live, Coder, Orchestrator)                          │
+│        │                                                                         │
+│        ▼                                                                         │
+│   SkillManagerV2.handleToolCall(name, args, context)                             │
+│        │                                                                         │
+│        ├─ 1. Résolution de nom & normalisation (préfixes gemini / legacy)        │
+│        ├─ 2. Contrôle de permission (PermissionPolicy : read/write/network/exec) │
+│        ├─ 3. Vérification Sandbox (SandboxRoot & confinement de chemin)          │
+│        ├─ 4. Simulation Dry-Run (si activé → retourne le plan d'effet)           │
+│        ├─ 5. Safety Gate Jev (si en mode enforce → évaluation du risque)         │
+│        ├─ 6. Ledger d'idempotence (si outil mutating → journalise / bloque rejeu)│
+│        │                                                                         │
+│        ▼                                                                         │
+│   ToolRegistry.call(name, args, { signal }) ──▶ Handler du Skill spécialisé     │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Panorama des 28 Skills intégrées
+
+| # | Skill | Outils | Permissions | Rôle & Périmètre principal |
+|---|---|:---:|:---:|---|
+| 1 | **`codebase`** | **17** | `read`, `write` | Navigation, lecture chirurgicale (outline/ranges), édition, patchs et gestion du workspace |
+| 2 | **`smart`** | **4** | `read`, `write` | Boucles intelligentes intégrées : boucle de qualité, validation de patch, compréhension itérative |
+| 3 | **`automation`** | **30** | `read`, `write`, `exec` | Automatisation d'actions UI et headless, capture vidéo/snapshots, sessions, planification récurrente et workflows |
+| 4 | **`browser`** | **29** | `read`, `network` | Contrôle complet du navigateur intégré : navigation, lecture de page, AOM, recherche, console |
+| 5 | **`knowledge`** | **20** | `read`, `write` | Connaissance sémantique, analyse AST Tree-Sitter (call-graph), Doctor du projet, diagnostic d'impact |
+| 6 | **`graphify`** | **7** | `read`, `write` | Graphe de connaissances, god nodes, détection de communautés de code, chemins critiques |
+| 7 | **`document_knowledge`**| **10** | `read`, `write` | RAG documentaire vectoriel, mémoires de documents, synthèses et graphes relationnels |
+| 8 | **`documentLinker`** | **8** | `read`, `write` | Indexation de documents, recherche de similarités, liaisons conceptuelles et synthèse |
+| 9 | **`memory`** | **4** | `read`, `write` | Mémoire épisodique persistante du projet (`ProjectMemory`), faits architecturaux |
+| 10 | **`hierarchical_memory`**| **4** | `read`, `write` | Mémoire multi-niveaux (court / moyen / long terme) avec promotion automatique |
+| 11 | **`agents`** | **19** | `read`, `write`, `exec`| Coordination de la flotte : délégation, négociation Contract-Net, essaim Swarm, bus d'événements |
+| 12 | **`mission`** | **13** | `read`, `write` | Cycle de vie des missions : création, simulation, timeline, rewind, critique, dry-run |
+| 13 | **`reasoning`** | **4** | `read` | Réflexion explicite (chaînes de pensée), décomposition de problèmes et sélection de stratégies |
+| 14 | **`verify`** | **8** | `read`, `exec` | Contrôle qualité déterministe : typecheck TypeScript, linting, syntaxe, formatage, scripts |
+| 15 | **`security_audit`** | **1** | `read`, `exec` | Audit complet statique et dynamique de la sécurité, vulnérabilités et secrets |
+| 16 | **`github`** | **10** | `network`, `read`, `write` | Intégration GitHub API : issues, PRs, dépôts, notifications et recherche de code |
+| 17 | **`telegram`** | **9** | `network`, `write` | Bot Telegram : alertes proactives, push de rapports, envoi de captures et fichiers du workspace |
+| 18 | **`list`** | **6** | `read`, `write` | Gestion de listes structurées (tâches, todo, jalons) synchronisées avec Supabase |
+| 19 | **`system`** | **5** | `read`, `exec` | Exécution de commandes shell confinées, notifications bureau OS, métriques hôte |
+| 20 | **`project`** | **2** | `read`, `write` | Scaffolding de nouveaux projets et détection des frameworks supportés |
+| 21 | **`utilities`** | **2** | `network` | Utilitaires externes : flux d'actualités et recherche encyclopédique de sujets |
+| 22 | **`weather`** | **1** | `network` | Météo géolocalisée temps réel |
+| 23 | **`time`** | **1** | `read` | Horodatage et fuseau horaire du système |
+| 24 | **`history`** | **2** | `read` | Recherche d'historique de conversations passées et restauration de contexte |
+| 25 | **`aiStudioDirectives`**| **4** | `read` | Directives et standards d'ingénierie (comportement, architecture technique, ergonomie UI) |
+| 26 | **`guidelines`** | **6** | `read` | Standards de code, conventions d'équipe et règles de workflows |
+| 27 | **`richDocument`** | **1** | `read`, `write` | Génération de documents interactifs riches (rapports exécutifs, canvas visuels) |
+| 28 | **`imageGeneration`** | **1** | `network`, `write` | Synthèse d'images visuelles et maquettes via modèles d'imagerie générative |
+| **TOTAL** | **28 Skills** | **228 Outils** | — | **Couverture totale : bureau, code, web, IA, réseau et système** |
+
+---
+
+### 2. Catalogue Détaillé des Outils par Domaine
+
+#### 💻 Développement & Workspace (`codebase` · 17 outils & `smart` · 4 outils)
+* **Exploration & Lecture :**
+  * `list_project_files` : Exploration arborescente avec filtres d'extensions, mode récursif et métadonnées.
+  * `read_project_file` : Lecture chirurgicale avec pagination `startLine`/`endLine` pour éviter le débordement de contexte, ou lecture complète avec numérotation.
+  * `read_file_outline` : Extraction rapide des symboles, signatures de fonctions, classes et interfaces sans charger tout le fichier.
+  * `search_in_files` : Recherche textuelle rapide ou regex à travers tout le projet avec exclusion des dossiers build/node_modules.
+  * `analyze_project_file` : Analyse sémantique d'un fichier avec métriques de complexité et dépendances.
+  * `get_workspace_info` : Métadonnées du projet (chemins, package.json, TypeScript, Git).
+* **Édition & Écriture du Code :**
+  * `write_project_file` : Création ou remplacement intégral d'un fichier avec confinement dans le workspace.
+  * `modify_project_file` : Modification ciblée par remplacement de bloc de code.
+  * `apply_patch` / `patch_project_file` : Application de patches unifiés (diff unidiff) avec vérification pré-vol.
+  * `rename_project_file` : Déplacement ou renommage sécurisé de fichiers.
+  * `delete_project_file` / `delete_project_folder` : Suppression contrôlée avec confirmation.
+  * `create_project_directory` : Création de dossiers récursifs.
+* **Interface IDE & Documentation :**
+  * `open_ide` : Bascule l'UI sur la vue IDE de Leanna.
+  * `open_project_file` : Ouvre un fichier dans l'éditeur Monaco intégré et positionne le curseur à la ligne/colonne exacte.
+  * `generate_codebase_markdown` : Génère ou met à jour un `codebase.md` complet documentant toute l'architecture du projet.
+* **Smart Skills (Boucles autonomes intégrées) :**
+  * `quality_loop` : Boucle fermée `Edit → Lint → Typecheck → Fix` jusqu'à convergence ou épuisement du budget.
+  * `validate_patch` : Valide un patch sur une copie temporaire avant application réelle.
+  * `read_until_understood` : Lecture multi-fichiers itérative pour cartographier un contexte jusqu'à complétude.
+  * `plan_code_change` : Élabore un plan chirurgical de modification avec identification des impacts collatéraux.
+
+#### 🤖 Multi-Agents & Orchestration (`agents` · 19, `mission` · 13, `reasoning` · 4)
+* **Agents :**
+  * `agent_delegate` : Délégation directe d'une sous-tâche à un agent expert avec contrat d'entrée.
+  * `agent_negotiate` : Lancement d'un appel d'offres décentralisé **Contract-Net** entre agents spécialisés.
+  * `agent_orchestrate` : Orchestration d'un plan multi-étapes avec dépendances séquentielles ou parallèles.
+  * `agent_compose_swarm` : Composition dynamique d'une équipe sur-mesure (Swarm) en fonction des besoins de la tâche.
+  * `agent_status`, `agent_list_tasks`, `agent_list_roles`, `agent_create`, `agent_cancel`, `agent_cancel_orchestration` : Cycle de vie des tâches agents.
+  * `agent_stats`, `agent_fleet_status`, `agent_delegation_matrix`, `agent_bus_metrics` : Métriques temps réel et télémétrie de la flotte.
+  * `agent_message_history`, `assistant_logs`, `agent_brain` : Audit des échanges inter-agents et inspection de la mémoire de l'agent.
+* **Missions :**
+  * `mission_create` : Initialisation d'une mission orientée objectif avec budget et critères de succès.
+  * `mission_simulate` / `mission_dryrun_report` : Évaluation préalable et simulation des impacts avant exécution.
+  * `mission_timeline` / `mission_rewind` : Historique des états de mission et retour arrière transactionnel sur snapshot.
+  * `mission_status`, `mission_list`, `mission_pause`, `mission_resume`, `mission_cancel`, `mission_add_goal` : Contrôle de mission.
+  * `mission_self_critique` / `mission_reflect` : Évaluation critique réflexive des résultats obtenus par rapport à l'objectif.
+* **Raisonnement :**
+  * `reasoning_think` : Émission d'une chaîne de pensée structurée (analyse d'alternatives, risques, hypothèses).
+  * `agent_execute` : Exécution autonome d'un sous-objectif avec auto-évaluation.
+  * `reasoning_delegate_task` / `reasoning_list_strategies` : Sélection et évaluation des stratégies cognitives.
+
+#### 🧠 Connaissance, Graphe AST & Mémoires (`knowledge` · 20, `graphify` · 7, `docs` · 18, `memory` · 8)
+* **Analyse de Code & AST (`knowledge`) :**
+  * `knowledge_ast_callers`, `knowledge_ast_callees`, `knowledge_ast_call_chain` : Analyse du graphe d'appels TypeScript via AST Tree-Sitter pour cartographier qui appelle qui.
+  * `knowledge_ast_file_inspect` : Inspection structurelle approfondie des exports et imports d'un fichier source.
+  * `knowledge_project_doctor` : Bilan de santé global du projet (imports cassés, fichiers orphelins, cycles).
+  * `knowledge_impact_analyze` : Prédiction des impacts d'une modification sur le reste de la base de code.
+  * `knowledge_predict`, `knowledge_opportunities`, `knowledge_mission_evolution` : Anticipation proactive des besoins du projet.
+  * `knowledge_daily_briefing` : Résumé exécutif des dernières évolutions et de l'état du code.
+  * `knowledge_semantic_search`, `knowledge_search_entities`, `knowledge_build_context` : Recherche sémantique et vectorielle.
+* **Graphe de Connaissances (`graphify`) :**
+  * `graphify_query`, `graphify_path`, `graphify_explain`, `graphify_affected`, `graphify_god_nodes`, `graphify_read_report`, `graphify_update` : Requêtage du graphe de code global, détection de god nodes, plus courts chemins et calcul d'impact.
+* **Mémoires Structurées & Documents :**
+  * `memory_add`, `memory_search`, `memory_list`, `memory_delete` : Mémoire persistante du projet (`ProjectMemory`).
+  * `hierarchical_memory_store`, `hierarchical_memory_search`, `hierarchical_memory_promote`, `hierarchical_memory_stats` : Mémoire hiérarchique à 3 niveaux (Court, Moyen, Long terme).
+  * `document_list`, `document_search`, `document_find_similar`, `document_synthesize`, `doc_search`, `doc_memory_search`, etc. : RAG documentaire sur fichiers locaux ou PDF.
+
+#### 🌐 Navigation Web & Automatisation (`browser` · 29 outils & `automation` · 30 outils)
+* **Navigateur Intégré (`browser`) :**
+  * Navigation : `browser_navigate`, `browser_open`, `browser_search`, `browser_back`, `browser_forward`, `browser_reload`, `browser_close`, `browser_new_tab`.
+  * Interaction : `browser_click`, `browser_type`, `browser_fill_form`, `browser_select_option`, `browser_scroll`, `browser_wait_for`.
+  * Perception sémantique & AOM : `browser_get_accessibility_snapshot`, `browser_click_by_role`, `browser_type_by_label`, `browser_get_element_text`, `browser_get_element_attribute`, `browser_inspect`.
+  * Lecture & Synthèse : `browser_read_content`, `browser_get_links`, `browser_open_link`, `browser_summarize_page`, `browser_research`, `browser_web_search`.
+  * Débogage : `browser_capture` (screenshot), `browser_snapshot`, `browser_get_console` (logs JavaScript).
+* **Automatisation UI & Système (`automation`) :**
+  * Actions souris/clavier précises : `automation_click`, `automation_double_click`, `automation_right_click`, `automation_hover`, `automation_type`, `automation_press_keys`, `automation_scroll`.
+  * Gestion d'état & sessions : `automation_save_session`, `automation_restore_session`, `automation_list_sessions`, `automation_delete_session`.
+  * Capture visuelle : `automation_screenshot`, `automation_analyze_screenshot` (via modèle multimodal), `automation_download_file`.
+  * Tâches & Workflows : `automation_schedule_task`, `automation_list_scheduled_tasks`, `automation_cancel_scheduled_task`, `workflow_create`, `workflow_run`, `workflow_list`, `workflow_delete`, `workflow_toggle`.
+
+#### 🔍 Contrôle Qualité, Vérification & Sécurité (`verify` · 8 & `security_audit` · 1)
+* **Vérification déterministe (`verify`) :**
+  * `verify_typecheck` : Exécution du compilateur TypeScript (`tsc --noEmit`) pour valider l'intégrité des types.
+  * `verify_lint` : Validation ESLint pour détecter les infractions aux standards de code.
+  * `verify_syntax` : Validation syntaxique ultra-rapide des fichiers modifiés.
+  * `verify_format` : Vérification du formatage Prettier.
+  * `verify_security` : Détection statique des failles de sécurité courantes et des secrets en clair.
+  * `verify_file` : Relecture et calcul de hash SHA-256 du fichier pour prouver sa modification physique.
+  * `verify_run_script` : Exécution d'un script de test ou de validation défini dans `package.json`.
+  * `verify_full` : Batterie complète de vérification enchaînée (`syntax → format → lint → typecheck`).
+* **Audit de Sécurité (`security_audit`) :**
+  * `security_audit` : Audit approfondi analysant le code, les dépendances vulnérables (`npm audit`), les injections potentielles et l'exposition de données sensibles.
+
+#### 🔌 Écosystème Externe, Système & Médias (69 outils répartis)
+* **GitHub (`github` · 10) :** `get_github_user`, `get_github_repo`, `list_github_repos`, `list_github_issues`, `create_github_issue`, `list_github_pull_requests`, `search_github_repos`, `get_github_file_content`, `get_github_notifications`, `list_github_repo_files`.
+* **Telegram (`telegram` · 9) :** `telegram_notify`, `telegram_send_message`, `telegram_send_photo`, `telegram_send_document`, `telegram_send_from_workspace`, `telegram_broadcast`, `telegram_get_status`, `telegram_list_users`, `telegram_get_chat_info`.
+* **Système hôte (`system` · 5 & `project` · 2) :** `system_execute_command`, `run_project_command` (confiné au workspace avec timeout et kill-switch `AbortSignal`), `system_open`, `system_notify`, `system_info`, `project_scaffold`, `project_list_frameworks`.
+* **Listes Supabase (`list` · 6) :** `list_create`, `list_add_item`, `list_remove_item`, `list_delete`, `list_get`, `list_list_all`.
+* **Directives & Guidelines (`aiStudioDirectives` · 4 & `guidelines` · 6) :** Récupération dynamique des règles de comportement, des standards d'architecture et des styles de communication.
+* **Génération Multimédia & Utilitaires (7) :** `create_rich_document` (rendu interactif), `generate_image` (synthèse visuelle), `get_news`, `lookup_topic`, `get_weather`, `get_current_time`, `search_history`, `get_conversation_context`.
+
+### 3. Tiering dynamique & optimisation de tokens
+
+Pour ne pas surcharger la fenêtre de contexte du modèle avec 228 déclarations d'outils simultanées (représentant ~25k tokens rien que pour les schémas), Leanna applique un **mécanisme de tiering dynamique** (`server/live/LiveSocketHandler.ts`) :
+
+1. **Socle TIER 1 (`TIER1_CORE_TOOLS`) :** Enregistre en priorité les outils fondamentaux de lecture, écriture et navigation indispensables à toute interaction.
+2. **Filtrage par pertinence sémantique :** Analyse la requête initiale de l'utilisateur pour sélectionner dynamiquement le sous-ensemble d'outils pertinents dans chaque catégorie (`getRelevantToolDeclarations`).
+3. **Chargement d'outils à la demande (`request_tools`) :** Le modèle peut émettre dynamiquement un appel `request_tools({ category: "git" })` pour charger les outils d'une catégorie non présente au démarrage.
+4. **Outils MCP & Custom :** Forcés et toujours exposés si connectés, isolés par préfixes spécifiques.
+
+<br><img src="https://raw.githubusercontent.com/andreasbm/rainbow/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
+
 ## 🌐 Navigateur intégré
 
 Leanna embarque un **navigateur web intégré** (via `<webview>` Electron) utilisable
