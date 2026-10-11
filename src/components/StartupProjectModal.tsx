@@ -11,7 +11,7 @@ import {
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
 // @ts-ignore - Asset handled by bundler
-import logo from '../../assets/images/logo.png';
+import logo from '../../assets/images/icon-sombre.png';
 
 /** Clé sessionStorage pour le mode "sans projet" (réinitialisée à chaque fermeture du navigateur) */
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
@@ -494,7 +494,7 @@ export function StartupProjectModal() {
             <div className="flex items-center gap-3.5">
               <motion.div
                 whileHover={shouldReduceMotion ? undefined : { rotate: 10, scale: 1.06 }}
-                className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg"
+                className="relative w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg"
                 style={{
                   background:
                     'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 30%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 20%, transparent) 100%)',
@@ -502,7 +502,7 @@ export function StartupProjectModal() {
                   boxShadow: '0 8px 24px -4px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
                 }}
               >
-                <img src={logo} alt="Leanna" className="w-8 h-8 object-contain" draggable={false} />
+                <img src={logo} alt="Leanna" className="w-16 h-16 object-contain" draggable={false} />
               </motion.div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
