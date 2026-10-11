@@ -490,8 +490,8 @@ const autonomyMissionCaps = (() => {
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
   };
   return {
-    missionTimeoutMs: pos(process.env.LEANNA_AUTONOMY_MISSION_TIMEOUT_MS, 300_000), // 5 min
-    maxSubGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_SUBGOALS, 3),
+    missionTimeoutMs: pos(process.env.LEANNA_AUTONOMY_MISSION_TIMEOUT_MS, 150_000), // 2,5 min
+    maxSubGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_SUBGOALS, 2),
     maxConcurrentGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_CONCURRENT_GOALS, 1),
   };
 })();

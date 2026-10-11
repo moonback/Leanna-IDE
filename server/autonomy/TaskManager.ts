@@ -88,7 +88,10 @@ export class TaskManager {
     private readonly persistence?: TaskPersistence,
   ) {}
 
-  submit(input: Omit<AutonomousTask, "id" | "createdAt" | "status" | "attempts" | "maxRetries" | "timeoutMs">): AutonomousTask | undefined {
+  submit(
+    input: Omit<AutonomousTask, "id" | "createdAt" | "status" | "attempts" | "maxRetries" | "timeoutMs"> &
+      Partial<Pick<AutonomousTask, "timeoutMs" | "maxRetries">>,
+  ): AutonomousTask | undefined {
     this.pruneDedupe();
     if (!this.accepting) {
       log.debug(`📥 Submit refused (${input.type}) — manager not accepting (stopped).`);
@@ -113,8 +116,10 @@ export class TaskManager {
       createdAt: Date.now(),
       status: "pending",
       attempts: 0,
-      maxRetries: this.config.maxRetries,
-      timeoutMs: this.config.timeoutMs,
+      // Honour per-task overrides when positive; otherwise fall back to config.
+      // Lets autonomy align a task's wall-time budget with its mission cap.
+      maxRetries: input.maxRetries && input.maxRetries > 0 ? input.maxRetries : this.config.maxRetries,
+      timeoutMs: input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.config.timeoutMs,
     };
 
     this.tasks.set(task.id, task);
