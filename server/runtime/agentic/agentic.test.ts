@@ -294,6 +294,59 @@ describe("Réserves de budget étanches (scénarios 6, 7)", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Garde anti-narration : conclure sans écriture est refusé (livrable perdu)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Garde anti-narration — un agent producteur doit écrire un livrable", () => {
+  beforeEach(() => {
+    // Agent capable d'écrire (comme le Rédacteur) mais piloté par un modèle
+    // qui ne fait que « narrer » (aucun tool_call).
+    registerTestAgent("test_narrator", [
+      "read_project_file",
+      "modify_project_file",
+      "write_project_file",
+      "verify_file",
+    ]);
+  });
+
+  function narratingRuntime(fs: FakeFs): AgenticRuntime {
+    const registry = makeRegistry(fs);
+    // Modèle déterministe : répond toujours en prose, sans aucun tool_call.
+    const model = (async () => ({
+      text: "Voici le rapport : tout va bien. (aucune action)",
+      tokenUsage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    })) as unknown as ConstructorParameters<typeof AgenticRuntime>[0]["model"];
+    return new AgenticRuntime({ registry, model });
+  }
+
+  it("refuse la conclusion sans écriture même après des lectures, puis cesse après la borne", async () => {
+    const fs: FakeFs = { content: new Map([["README.md", "# Projet"]]), verifyOk: () => true };
+    const rt = narratingRuntime(fs);
+    const session = rt._seedSessionForTest({ role: "test_narrator", goal: "Auditer le README", id: "narr" });
+
+    // Simule des lectures déjà effectuées (comme l'agent Rédacteur en prod) :
+    // le garde NE doit PAS être désamorcé par la présence de tool calls passés.
+    session.toolsExecuted.push("read_project_file", "search_in_files");
+    assert.equal(session.filesModified.size, 0);
+
+    const step = { id: "s1", description: "produire le rapport", status: "running" as const };
+
+    // Les 3 premières conclusions sans écriture sont refusées (non finales) et
+    // injectent une consigne impérative d'écriture.
+    for (let i = 1; i <= 3; i++) {
+      const obs = await rt.execute({ role: "test_narrator", goal: "Auditer le README", id: "narr" }, step);
+      assert.equal(obs.isFinal, false, `relance ${i} : la conclusion sans livrable doit être refusée`);
+      assert.match(session.pendingInstruction ?? "", /ÉCRIS-LE|write_project_file/);
+    }
+
+    // Au-delà de la borne (MAX_FORCED_WRITE_NUDGES = 3), on laisse conclure pour
+    // ne pas boucler indéfiniment : la 4e conclusion est acceptée comme finale.
+    const finalObs = await rt.execute({ role: "test_narrator", goal: "Auditer le README", id: "narr" }, step);
+    assert.equal(finalObs.isFinal, true, "après la borne, la conclusion est acceptée (pas de boucle infinie)");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Helpers de prompt (inchangés fonctionnellement)
 // ═══════════════════════════════════════════════════════════════════════════
 

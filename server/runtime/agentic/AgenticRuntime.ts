@@ -106,6 +106,51 @@ const CACHEABLE_TOOLS = new Set([
 const MAX_HISTORY_CHARS = 60_000;
 const MAX_RESULT_CHARS = 4_000;
 
+/**
+ * Nombre maximum de relances forcées « produis le livrable » qu'un agent
+ * capable d'écrire peut recevoir avant qu'on le laisse conclure. Évite une
+ * boucle si le modèle refuse obstinément d'appeler un outil d'écriture.
+ */
+const Executor_MAX_FORCED_WRITE_NUDGES = 3;
+
+/**
+ * Détecte un échec métier dans le RÉSULTAT d'un outil (le handler n'a pas levé
+ * mais signale un échec). Reconnaît les conventions `{ error }`, `{ ok:false }`,
+ * `{ success:false }`, `{ status:"failed"|"error" }`, `exitCode != 0`,
+ * `statusCode >= 400`. Retourne un message lisible, ou `null` si succès.
+ * Aligné sur `Executor.detectSkillFailure` pour un comportement cohérent.
+ */
+function detectResultError(result: unknown): string | null {
+  if (result === null || result === undefined) return null;
+  if (typeof result !== "object") return null;
+  const r = result as Record<string, unknown>;
+
+  if ("error" in r && r.error) {
+    const base = typeof r.error === "string" ? r.error : "Erreur retournée par l'outil";
+    return typeof r.action === "string" ? `${base} — ${r.action}` : base;
+  }
+  if (r.ok === false || r.success === false) {
+    return (
+      (typeof r.message === "string" && r.message) ||
+      (typeof r.stderr === "string" && r.stderr) ||
+      "L'outil a signalé un échec (ok/success = false)."
+    );
+  }
+  if (typeof r.status === "string") {
+    const s = r.status.toLowerCase();
+    if (s === "failed" || s === "error" || s === "failure") {
+      return (typeof r.message === "string" && r.message) || `L'outil a renvoyé status="${r.status}".`;
+    }
+  }
+  if (typeof r.exitCode === "number" && r.exitCode !== 0) {
+    return `L'outil a terminé avec exitCode=${r.exitCode}.`;
+  }
+  if (typeof r.statusCode === "number" && r.statusCode >= 400) {
+    return `L'outil a renvoyé un statut HTTP ${r.statusCode}.`;
+  }
+  return null;
+}
+
 /** Classe un outil par nature, pour la comptabilité séparée et la règle d'arrêt. */
 function classifyTool(name: string): ToolKind {
   if (WRITE_TOOLS.has(name)) return "write";
@@ -323,6 +368,32 @@ export class AgenticRuntime implements IAgentRuntime {
     task.onProgress?.("finalizing");
     const outcome = this.assessOutcome(session, plan);
     const success = outcome === "success" || outcome === "partial";
+
+    // ── Récapitulatif diagnostique (audit) ─────────────────────────────────
+    // Rend explicite, en fin de run, pourquoi un agent producteur a pu finir
+    // sans livrable. Cas typique observé : des écritures ONT été tentées mais
+    // ont toutes échoué (soft errors) → filesModified vide → outcome=partial.
+    const writeAttempts = session.observations
+      .flatMap((o) => o.toolOutcomes)
+      .filter((t) => WRITE_TOOLS.has(t.invocation.name));
+    const failedWrites = writeAttempts.filter((t) => !t.success);
+    if (agentCanWrite(session.tools) && session.filesModified.size === 0) {
+      if (writeAttempts.length > 0) {
+        const reasons = Array.from(
+          new Set(failedWrites.map((t) => truncate(t.error ?? "raison inconnue", 120)))
+        ).slice(0, 3);
+        log.warn(
+          `[${session.taskId.slice(0, 8)}] ⚠️ Aucun livrable écrit malgré ${writeAttempts.length} tentative(s) d'écriture ` +
+            `(${failedWrites.length} en échec). Raisons: ${reasons.join(" | ") || "n/a"}`
+        );
+      } else {
+        log.warn(
+          `[${session.taskId.slice(0, 8)}] ⚠️ Aucun livrable écrit et AUCUNE tentative d'écriture ` +
+            `(l'agent n'a jamais appelé write_project_file/modify_project_file).`
+        );
+      }
+    }
+
     return this.finish(task, session, outcome, undefined, success);
   }
 
@@ -513,25 +584,36 @@ export class AgenticRuntime implements IAgentRuntime {
     }
 
     // ── Garde anti « narration sans action » ──
-    // Un agent producteur d'artefact qui répond en pur texte SANS avoir encore
-    // rien écrit ni exécuté le moindre outil dans ce run n'a pas « terminé » :
-    // il a esquivé l'action. On refuse ce faux final, on injecte une consigne
-    // impérative d'écriture, et on laisse la boucle le relancer (budget large).
-    const nothingDoneYet =
-      session.filesModified.size === 0 && session.toolsExecuted.length === 0;
+    // Un agent producteur d'artefact qui CONCLUT (aucun nouvel appel d'outil)
+    // sans avoir produit le MOINDRE livrable (aucune écriture confirmée) n'a pas
+    // « terminé » : il a rendu sa réponse en prose au lieu de persister un
+    // fichier. On refuse ce faux final et on le relance vers l'écriture.
+    //
+    // Correctif (observé en prod) : la condition précédente exigeait AUSSI
+    // `toolsExecuted.length === 0`, donc un agent qui avait lu/cherché (8 appels
+    // de lecture) mais jamais écrit passait entre les mailles → outcome=partial,
+    // 0 fichier, livrable perdu. On ne regarde plus que les ÉCRITURES réelles.
+    // Garde-fou : la relance est bornée (MAX_FORCED_WRITE_NUDGES) pour qu'un
+    // modèle qui refuse obstinément d'écrire ne boucle pas jusqu'au budget.
+    const noArtifactYet = session.filesModified.size === 0;
+    const nudges = session.forcedWriteNudges ?? 0;
     const prematureNarration =
-      calls.length === 0 && nothingDoneYet && agentCanWrite(tools);
+      calls.length === 0 &&
+      noArtifactYet &&
+      agentCanWrite(tools) &&
+      nudges < Executor_MAX_FORCED_WRITE_NUDGES;
 
     if (prematureNarration) {
+      session.forcedWriteNudges = nudges + 1;
       session.pendingInstruction =
-        "Tu as répondu par du texte sans appeler aucun outil, alors qu'AUCUN " +
-        "artefact n'a encore été produit. Ne décris pas ce que tu ferais : FAIS-LE. " +
-        "Émets maintenant un tool_calls JSON d'écriture " +
-        "(write_project_file / modify_project_file / patch_project_file), " +
-        "puis vérifie avec verify_file. Une réponse finale sans écriture est un ÉCHEC.";
+        "Tu as conclu sans produire de LIVRABLE : aucun fichier n'a été écrit. " +
+        "Ne décris pas le document — ÉCRIS-LE maintenant via un tool_calls JSON " +
+        "(write_project_file pour créer, ou modify_project_file si le fichier existe). " +
+        "Choisis un chemin de sortie explicite (ex. docs/<sujet>.md) si aucun n'est fourni, " +
+        "puis vérifie avec verify_file. Une réponse finale sans écriture de fichier est un ÉCHEC.";
       log.warn(
-        `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — réponse narrative sans action ` +
-          `(itération ${iteration}) → relance forcée vers l'écriture`
+        `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — conclusion sans livrable écrit ` +
+          `(itération ${iteration}, relance ${session.forcedWriteNudges}/${Executor_MAX_FORCED_WRITE_NUDGES}) → relance forcée vers l'écriture`
       );
     }
 
@@ -578,6 +660,27 @@ export class AgenticRuntime implements IAgentRuntime {
       const result = await this.registry.call(name, parameters, { agentId: session.agent.role });
       const durationMs = Date.now() - start;
 
+      // ── Détection d'échec « soft » AVANT toute comptabilité (audit) ────────
+      // Un handler peut RÉUSSIR l'appel (pas d'exception) tout en signalant un
+      // échec métier via { error } / { ok:false } / { status:"failed" }. C'est
+      // précisément le cas des écritures refusées (« Fichier introuvable »,
+      // sandbox non prêt, fichier critique bloqué). On DOIT le détecter avant
+      // d'ajouter le fichier à filesModified, sinon une écriture ratée est
+      // comptée comme un livrable et l'outcome devient trompeur.
+      const softError = detectResultError(result);
+      if (softError) {
+        log.warn(
+          `[${session.taskId.slice(0, 8)}]    ✗ ${name} (${kind}) a échoué: ${truncate(softError, 180)}`
+        );
+        return {
+          invocation: { name, parameters },
+          success: false,
+          error: softError,
+          result: clampResult(result),
+          durationMs,
+        };
+      }
+
       // ── Écriture CONFIRMÉE : enregistrée immédiatement (transactionnel). ──
       // La preuve d'écriture est capturée dès le retour du handler, AVANT tout
       // contrôle de budget ultérieur. Une limite atteinte plus tard n'annule
@@ -596,6 +699,9 @@ export class AgenticRuntime implements IAgentRuntime {
           // Mémorise le patch pour la détection de patch identique répété.
           session.lastPatchByFile.set(normPath(path), JSON.stringify(parameters));
         }
+        log.info(`[${session.taskId.slice(0, 8)}]    ✓ ${name} → ${extractPath(parameters) ?? "?"} (${durationMs}ms)`);
+      } else {
+        log.info(`[${session.taskId.slice(0, 8)}]    ✓ ${name} (${kind}, ${durationMs}ms)`);
       }
 
       // Comptabilité des fichiers lus distincts + mise en cache.
@@ -617,6 +723,9 @@ export class AgenticRuntime implements IAgentRuntime {
         durationMs,
       };
     } catch (err) {
+      log.warn(
+        `[${session.taskId.slice(0, 8)}]    ✗ ${name} (${kind}) exception: ${truncate((err as Error).message, 160)}`
+      );
       return {
         invocation: { name, parameters },
         success: false,
@@ -1221,6 +1330,8 @@ interface RunSession {
   startedAt: number;
   pendingInstruction?: string;
   replans: number;
+  /** Nombre de relances forcées « produis le livrable » déjà injectées (borné). */
+  forcedWriteNudges?: number;
   lastPlan?: Plan;
   /** Phase courante de la boucle (règle d'arrêt intelligente). */
   phase: AgentPhase;
