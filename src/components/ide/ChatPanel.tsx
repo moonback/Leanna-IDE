@@ -481,7 +481,7 @@ interface InputAreaProps {
   showChips?: boolean;
 }
 
-function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true }: InputAreaProps) {
+function InputArea({ connected, onConnect: _onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
