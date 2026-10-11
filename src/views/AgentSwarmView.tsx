@@ -127,7 +127,7 @@ export default function AgentSwarmView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Agent Swarm"
+        title="Essaim d'agents"
         icon={Network}
         description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
         badge="Composition"

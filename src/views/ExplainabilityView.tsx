@@ -95,7 +95,7 @@ export default function ExplainabilityView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Explainability — Pourquoi ?"
+        title="Explicabilité — Pourquoi ?"
         icon={HelpCircle}
         description="Les facteurs décisionnels derrière les choix de Leanna : probabilité, stratégie, historique, risques"
         badge="Décision"

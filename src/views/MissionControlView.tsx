@@ -103,7 +103,7 @@ export default function MissionControlView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Mission Control"
+        title="Tableau de bord"
         icon={LayoutDashboard}
         description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
         badge={connection === 'open' ? 'En direct' : 'Hors ligne'}

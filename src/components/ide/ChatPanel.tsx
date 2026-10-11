@@ -473,7 +473,6 @@ const SUGGESTION_CHIPS: { label: string; prompt: string; icon: typeof Send }[] =
 
 interface InputAreaProps {
   connected: boolean;
-  onConnect?: () => void;
   isBusy: boolean;
   onSend: (text: string) => void;
   onDocumentAnalyzed: (result: DocumentResult) => void;
@@ -481,7 +480,7 @@ interface InputAreaProps {
   showChips?: boolean;
 }
 
-function InputArea({ connected, onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true }: InputAreaProps) {
+function InputArea({ connected, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -1867,7 +1866,6 @@ export function ChatPanel({
             {showInput && (
               <InputArea
                 connected={connected}
-                onConnect={handleToggleConnect}
                 isBusy={isBusy}
                 onSend={handleSend}
                 onDocumentAnalyzed={handleDocumentAnalyzed}

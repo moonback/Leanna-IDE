@@ -59,43 +59,33 @@ interface ToolGroup { id: string; label: string; items: ToolItem[] }
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'pilotage', label: 'Pilotage',
+    id: 'piloter', label: 'Piloter',
     items: [
-      { id: 'mission-control', path: '/mission-control', label: 'Mission Control', icon: LayoutDashboard },
+      { id: 'mission-control', path: '/mission-control', label: 'Tableau de bord', icon: LayoutDashboard },
       { id: 'mission-timeline', path: '/mission-timeline', label: 'Missions', icon: Milestone },
       { id: 'mission-simulation', path: '/mission-simulation', label: 'Simulation', icon: FlaskConical },
-    ],
-  },
-  {
-    id: 'intelligence', label: 'Intelligence',
-    items: [
       { id: 'autonomy', path: '/autonomy', label: "Centre d'autonomie", icon: Gauge },
-      { id: 'agent-swarm', path: '/agent-swarm', label: 'Agent Swarm', icon: Network },
-      { id: 'explainability', path: '/explainability', label: 'Pourquoi ?', icon: HelpCircle },
     ],
   },
   {
-    id: 'travail', label: 'Travail',
+    id: 'comprendre', label: 'Comprendre',
     items: [
-      { id: 'ide', path: '/ide', label: 'IDE', icon: Code2 },
-      { id: 'automation', path: '/automation', label: 'Automatisations', icon: Zap },
-      { id: 'notebooks', path: '/notebooks', label: 'Notebooks', icon: NotebookPen },
-      { id: 'documents', path: '/documents', label: 'Documents', icon: FileText },
-      { id: 'github', path: '/github', label: 'GitHub', icon: Github },
-    ],
-  },
-  {
-    id: 'memoire', label: 'Mémoire',
-    items: [
+      { id: 'agent-swarm', path: '/agent-swarm', label: "Essaim d'agents", icon: Network },
+      { id: 'explainability', path: '/explainability', label: 'Explicabilité', icon: HelpCircle },
+      { id: 'observability', path: '/observability', label: 'Coûts & tokens', icon: BarChart2 },
       { id: 'memories', path: '/memories', label: 'Mémoires', icon: BrainCircuit },
       { id: 'history', path: '/history', label: 'Historique', icon: History },
       { id: 'lists', path: '/lists', label: 'Listes', icon: ListChecks },
     ],
   },
   {
-    id: 'observabilite', label: 'Observabilité',
+    id: 'produire', label: 'Produire',
     items: [
-      { id: 'observability', path: '/observability', label: 'Coûts & Tokens', icon: BarChart2 },
+      { id: 'ide', path: '/ide', label: 'IDE', icon: Code2 },
+      { id: 'automation', path: '/automation', label: 'Automatisations', icon: Zap },
+      { id: 'notebooks', path: '/notebooks', label: 'Notebooks', icon: NotebookPen },
+      { id: 'documents', path: '/documents', label: 'Documents', icon: FileText },
+      { id: 'github', path: '/github', label: 'GitHub', icon: Github },
     ],
   },
 ];
