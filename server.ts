@@ -334,8 +334,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
       // génération d'arguments et validation des critères de succès.
-      const llmText = async (prompt: string): Promise<string> => {
-        const { text } = await generateText({ prompt, temperature: 0.3 });
+      const llmText = async (prompt: string, signal?: AbortSignal): Promise<string> => {
+        const { text } = await generateText({ prompt, temperature: 0.3, signal });
         return text;
       };
       executor.setLLMDecompose(llmText);

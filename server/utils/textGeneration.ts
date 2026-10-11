@@ -96,6 +96,18 @@ export interface GenerateTextOptions {
    */
   untrustedPrompt?: boolean;
   untrustedSource?: string;
+  /**
+   * Signal d'annulation. Quand il est déclenché (ex. timeout côté appelant),
+   * l'appel LLM sous-jacent est RÉELLEMENT abandonné au lieu de continuer en
+   * arrière-plan : Gemini reçoit `abortSignal` dans sa config, OpenRouter le
+   * chaîne sur son AbortController, et la boucle de retries s'arrête net.
+   *
+   * NB : annuler est une opération CÔTÉ CLIENT. Elle libère le client
+   * immédiatement, mais le fournisseur peut déjà avoir engagé (et facturé) une
+   * partie du calcul. L'objectif ici est de ne plus bloquer l'appelant ni
+   * d'empiler des appels concurrents, pas de garantir l'absence de coût.
+   */
+  signal?: AbortSignal;
 }
 
 export interface GenerateTextResult {
@@ -204,6 +216,12 @@ export async function generateText(options: GenerateTextOptions): Promise<Genera
       recordProviderResult(provider, true, breakerThreshold);
       return result;
     } catch (error) {
+      // Une annulation volontaire (signal appelant) n'est pas une panne du
+      // provider : ne pas la compter dans le circuit breaker et ne PAS basculer
+      // sur l'autre provider. On la propage telle quelle à l'appelant.
+      if ((error as Error)?.name === 'AbortError' || options.signal?.aborted) {
+        throw error;
+      }
       recordProviderResult(provider, false, breakerThreshold);
       errors.push(`${provider}: ${(error as Error).message}`);
     }
@@ -458,20 +476,25 @@ async function generateWithGemini(options: GenerateTextOptions): Promise<Generat
       ? options.geminiParts
       : [{ text: options.systemPrompt ? `${options.systemPrompt}\n\n${options.prompt}` : options.prompt }];
 
+    // Court-circuit : si l'appelant a déjà annulé avant même l'envoi, inutile
+    // de consommer une clé ou un tour réseau.
+    if (options.signal?.aborted) {
+      throw new DOMException('Appel Gemini annulé avant envoi.', 'AbortError');
+    }
+
     // Timeout de 120s pour éviter que l'AgentExecutor se bloque indéfiniment
     // sur un appel Gemini suspendu (réseau lent, modèle surchargé).
     const GEMINI_TIMEOUT_MS = 120_000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Gemini timeout après ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS)
-    );
-
-    const response = await Promise.race([
-      withGeminiRetry((ai) =>
+    const response = await withGeminiRetry(
+      (ai) =>
         ai.models.generateContent({
           model,
           contents: [{ role: 'user', parts }],
           config: {
             temperature: resolveTemperature(options.temperature),
+            // Annulation réelle : le SDK abandonne l'attente de la requête dès
+            // que `signal` est déclenché (ex. timeout d'arg-gen de l'Executor).
+            ...(options.signal ? { abortSignal: options.signal } : {}),
             // maxOutputTokens est la clé "native" Gemini ; maxTokens est le nom
             // générique utilisé par les appelants (ex. chainOfThought.ts) qui
             // partagent le même code avec OpenRouter. Sans ce repli, un appel
@@ -487,10 +510,11 @@ async function generateWithGemini(options: GenerateTextOptions): Promise<Generat
               ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
               : {}),
           },
-        })
-      ),
-      timeoutPromise,
-    ]);
+        }),
+      undefined,
+      GEMINI_TIMEOUT_MS,
+      options.signal,
+    );
 
     const rawResponse = response as {
       text?: string;
@@ -594,6 +618,17 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
   // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
   const timeoutId = setTimeout(() => controller.abort(), 120_000);
 
+  // Annulation réelle : un signal externe (ex. timeout d'arg-gen) abandonne la
+  // requête fetch en cours au lieu de la laisser courir en arrière-plan.
+  let onExternalAbort: (() => void) | undefined;
+  if (options.signal) {
+    if (options.signal.aborted) controller.abort();
+    else {
+      onExternalAbort = () => controller.abort();
+      options.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
   try {
     const messages: any[] = [];
     if (options.systemPrompt) {
@@ -618,6 +653,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    if (options.signal && onExternalAbort) options.signal.removeEventListener('abort', onExternalAbort);
 
     if (!response.ok) {
       const errText = await response.text();
@@ -662,7 +698,21 @@ async function generateWithOpenRouter(options: GenerateTextOptions): Promise<Gen
     return { text, provider: 'openrouter', model, tokenUsage };
   } catch (e: any) {
     clearTimeout(timeoutId);
-    
+    if (options.signal && onExternalAbort) options.signal.removeEventListener('abort', onExternalAbort);
+
+    // Distinguer une annulation EXTERNE (signal appelant) d'un timeout interne :
+    // les deux se présentent comme AbortError sur le fetch. Si le signal externe
+    // est déclenché, remonter une AbortError explicite pour que les couches
+    // supérieures (generateText fallback) ne la confondent pas avec une panne
+    // provider à faire basculer en fallback.
+    if (options.signal?.aborted) {
+      const aborted = new DOMException('Appel OpenRouter annulé.', 'AbortError');
+      span.recordException(aborted as unknown as Error);
+      span.setStatus({ code: 2, message: aborted.message });
+      span.end();
+      throw aborted;
+    }
+
     span.recordException(e);
     span.setStatus({ code: 2, message: e.message }); // ERROR
     span.end();
