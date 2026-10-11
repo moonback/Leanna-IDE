@@ -113,12 +113,12 @@ interface IdlePlan {
  * Ordered by value — health first, then review, then the test/typecheck surface.
  */
 const IDLE_PLANS: IdlePlan[] = [
-  {
-    action: "idle:project-doctor",
-    title: "Diagnostic de santé du projet (lecture seule)",
-    description: "Analyser la santé du projet (architecture, sécurité, tests, dette) via les outils de diagnostic. Analyse en lecture seule UNIQUEMENT : ne produis aucun fichier, n'écris rien ; l'objectif est l'analyse elle-même, pas un livrable sur disque.",
-    prefer: ["knowledge_project_doctor", "knowledge_opportunities", "knowledge_build_context"],
-  },
+  // {
+  //   action: "idle:project-doctor",
+  //   title: "Diagnostic de santé du projet (lecture seule)",
+  //   description: "Analyser la santé du projet (architecture, sécurité, tests, dette) via les outils de diagnostic. Analyse en lecture seule UNIQUEMENT : ne produis aucun fichier, n'écris rien ; l'objectif est l'analyse elle-même, pas un livrable sur disque.",
+  //   prefer: ["knowledge_project_doctor", "knowledge_opportunities", "knowledge_build_context"],
+  // },
   {
     action: "idle:code-review",
     title: "Revue de code en lecture seule",
