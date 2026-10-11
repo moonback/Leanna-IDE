@@ -7,7 +7,7 @@
 <br>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/images/logo.png">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/images/icon-sombre.png">
   <source media="(prefers-color-scheme: light)" srcset="assets/images/logo.png">
   <img src="assets/images/logo.png" alt="Leanna" width="160">
 </picture>
