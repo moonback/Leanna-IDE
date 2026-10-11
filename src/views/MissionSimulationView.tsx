@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the MissionSimulator engine (mission_simulate) ──────
 
@@ -94,7 +95,7 @@ export default function MissionSimulationView() {
       });
       const data = await res.json();
       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
-      navigate('/mission-timeline');
+      navigate(ROUTES.missionTimeline);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -134,8 +135,7 @@ export default function MissionSimulationView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Simulation de mission"
-        icon={FlaskConical}
+        {...viewHeaderProps('mission-simulation')}
         description="Prévisualise ce que Leanna ferait — fichiers, commandes, agents, coût, risque — avant d'exécuter réellement"
         badge="Dry-run"
         actions={report ? (

@@ -13,7 +13,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  BarChart2, RefreshCw, DollarSign, Cpu, Zap,
+  RefreshCw, DollarSign, Cpu, Zap,
   Clock, TrendingUp, Shield, Info, Activity, Database,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
@@ -23,6 +23,7 @@ import { fmt, fmtCost, timeAgo } from '../components/observability/format.js';
 import { StatCard, BarRow } from '../components/observability/cards.js';
 import { RuntimeHealthPanel } from '../components/observability/RuntimeHealthPanel.js';
 import { BudgetPanel } from '../components/observability/BudgetPanel.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 // ─── Main View ───────────────────────────────────────────────────────────────
 
@@ -80,8 +81,7 @@ export default function ObservabilityView() {
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Observabilité"
-        icon={BarChart2}
+        {...viewHeaderProps('observability')}
         description="Coûts, tokens et traces OpenTelemetry en temps réel"
         badge="V1.1"
         actions={

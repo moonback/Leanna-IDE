@@ -1,0 +1,612 @@
+diff --git a/src/components/AgentStatusBar.tsx b/src/components/AgentStatusBar.tsx
+index 8a03016..3bb31c3 100644
+--- a/src/components/AgentStatusBar.tsx
++++ b/src/components/AgentStatusBar.tsx
+@@ -4,6 +4,7 @@ import {
+   Brain, Cog, ShieldCheck, Gauge, CircleDot, AlertTriangle, Clock, CheckCircle2,
+ } from 'lucide-react';
+ import { useAgentStatus, type AgentState } from '../hooks/useAgentStatus.js';
++import { ROUTES } from '../config/navigation.js';
+ 
+ /**
+  * AgentStatusBar — persistent global strip (task-ui.md §4). Shows WHAT Leanna is
+@@ -36,7 +37,7 @@ export function AgentStatusBar() {
+   return (
+     <button
+       type="button"
+-      onClick={() => navigate('/mission-control')}
++      onClick={() => navigate(ROUTES.missionControl)}
+       aria-label={`État de Leanna : ${status.label}. ${status.reason}. Ouvrir Mission Control.`}
+       className="group flex w-full items-center gap-2.5 border-b px-4 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] lg:px-6"
+       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+diff --git a/src/components/GlobalSidebar.tsx b/src/components/GlobalSidebar.tsx
+index 60883be..aebfee3 100644
+--- a/src/components/GlobalSidebar.tsx
++++ b/src/components/GlobalSidebar.tsx
+@@ -26,15 +26,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
+ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
+ import type { LucideIcon } from 'lucide-react';
+ import {
+-  LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
+-  Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
+-  BarChart2, Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
++  Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
+   Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio,
+ } from 'lucide-react';
+ import { useTheme } from '../context/ThemeContext.js';
+ import { useConfirm } from './ui/ConfirmDialog.js';
+ import { useAgentStatus } from '../hooks/useAgentStatus.js';
+ import { sidebarSections } from '../config/ideSidebarConfig.js';
++import { NAV_GROUPS, type NavItem } from '../config/navigation.js';
+ import type { UnifiedSidebarProps } from './sidebar/types.js';
+ // @ts-ignore - Asset handled by bundler
+ import logoDark from '../../assets/images/icon-sombre.png';
+@@ -43,9 +42,6 @@ import logoDark from '../../assets/images/icon-sombre.png';
+ /* Types & données                                                     */
+ /* ------------------------------------------------------------------ */
+ 
+-interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
+-interface NavGroup { id: string; label: string; items: NavItem[] }
+-
+ /** Outil IDE : bascule un panneau au lieu de naviguer. */
+ interface ToolItem {
+   id: string;
+@@ -57,49 +53,6 @@ interface ToolItem {
+ }
+ interface ToolGroup { id: string; label: string; items: ToolItem[] }
+ 
+-const NAV_GROUPS: NavGroup[] = [
+-  {
+-    id: 'pilotage', label: 'Pilotage',
+-    items: [
+-      { id: 'mission-control', path: '/mission-control', label: 'Mission Control', icon: LayoutDashboard },
+-      { id: 'mission-timeline', path: '/mission-timeline', label: 'Missions', icon: Milestone },
+-      { id: 'mission-simulation', path: '/mission-simulation', label: 'Simulation', icon: FlaskConical },
+-    ],
+-  },
+-  {
+-    id: 'intelligence', label: 'Intelligence',
+-    items: [
+-      { id: 'agent-swarm', path: '/agent-swarm', label: 'Agent Swarm', icon: Network },
+-      { id: 'explainability', path: '/explainability', label: 'Pourquoi ?', icon: HelpCircle },
+-      { id: 'autonomy', path: '/autonomy', label: 'Autonomie', icon: Gauge },
+-    ],
+-  },
+-  {
+-    id: 'travail', label: 'Travail',
+-    items: [
+-      { id: 'ide', path: '/ide', label: 'IDE', icon: Code2 },
+-      { id: 'automation', path: '/automation', label: 'Automatisations', icon: Zap },
+-      { id: 'notebooks', path: '/notebooks', label: 'Notebooks', icon: NotebookPen },
+-      { id: 'documents', path: '/documents', label: 'Documents', icon: FileText },
+-      { id: 'github', path: '/github', label: 'GitHub', icon: Github },
+-    ],
+-  },
+-  {
+-    id: 'memoire', label: 'Mémoire',
+-    items: [
+-      { id: 'memories', path: '/memories', label: 'Mémoires', icon: BrainCircuit },
+-      { id: 'history', path: '/history', label: 'Historique', icon: History },
+-      { id: 'lists', path: '/lists', label: 'Listes', icon: ListChecks },
+-    ],
+-  },
+-  {
+-    id: 'observabilite', label: 'Observabilité',
+-    items: [
+-      { id: 'observability', path: '/observability', label: 'Coûts & Tokens', icon: BarChart2 },
+-    ],
+-  },
+-];
+-
+ const COLLAPSE_KEY = 'leanna_global_sidebar_collapsed';
+ const GROUPS_KEY = 'leanna_global_sidebar_closed_groups';
+ const WIDTH_COLLAPSED = 56;
+diff --git a/src/config/ideSidebarConfig.ts b/src/config/ideSidebarConfig.ts
+index 3b6bfef..b53eb27 100644
+--- a/src/config/ideSidebarConfig.ts
++++ b/src/config/ideSidebarConfig.ts
+@@ -12,7 +12,7 @@
+  * 5. CI/CD & Aperçu    (sous-menu : Sandbox, Workflow, Prévisualisation)
+  * 6. Données           (sous-menu : Knowledge, Notebooks, Santé système, PM2)
+  * 7. Outils            (sous-menu : Agent Builder, Marketplace, Docs Skills, Caméra, Partage écran)
+- * (Agents en accès direct via AgentsSidebarButton ; IA via le flyout du statut agent)
++ * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar)
+  */
+ 
+ import {
+diff --git a/b/src/config/navigation.ts b/src/config/navigation.ts
+new file mode 100644
+index 0000000..ff23925
+--- /dev/null
++++ b/src/config/navigation.ts
+@@ -0,0 +1,95 @@
++/**
++ * navigation.ts — SOURCE UNIQUE de la navigation de Leanna.
++ *
++ * Avant : libellés, icônes et chemins étaient dupliqués entre la sidebar,
++ * les titres de page (ViewHeader), main.tsx et les `navigate('/…')` épars,
++ * et divergeaient (ex. sidebar « Listes » → page « Snippets », « Documents »
++ * → « Knowledge System », icône « Missions » identique à « Historique »).
++ *
++ * Maintenant : tout passe par ce fichier.
++ *  - `ROUTES`            chemins (à utiliser dans navigate() et <Route>)
++ *  - `NAV_ITEMS`         libellé + icône de chaque destination
++ *  - `NAV_GROUPS`        regroupement affiché dans la GlobalSidebar
++ *  - `viewHeaderProps()` titre + icône d'un <ViewHeader> (cohérents avec la sidebar)
++ *
++ * Déplacer une page (étape 3 : fusion des vues Pilotage) = modifier ici.
++ */
++import type { LucideIcon } from 'lucide-react';
++import {
++  LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
++  Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History,
++  Braces, BarChart2,
++} from 'lucide-react';
++
++export const ROUTES = {
++  home: '/',
++  ide: '/ide',
++  settings: '/settings',
++  missionControl: '/mission-control',
++  missionTimeline: '/mission-timeline',
++  missionSimulation: '/mission-simulation',
++  agentSwarm: '/agent-swarm',
++  explainability: '/explainability',
++  autonomy: '/autonomy',
++  automation: '/automation',
++  notebooks: '/notebooks',
++  documents: '/documents',
++  github: '/github',
++  memories: '/memories',
++  history: '/history',
++  lists: '/lists',
++  observability: '/observability',
++} as const;
++
++export type NavId =
++  | 'mission-control' | 'mission-timeline' | 'mission-simulation'
++  | 'agent-swarm' | 'explainability' | 'autonomy'
++  | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
++  | 'memories' | 'history' | 'lists'
++  | 'observability';
++
++export interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
++export interface NavGroup { id: string; label: string; items: NavItem[] }
++
++export const NAV_ITEMS: Record<NavId, NavItem> = {
++  'mission-control':    { id: 'mission-control',    path: ROUTES.missionControl,    label: 'Mission Control', icon: LayoutDashboard },
++  'mission-timeline':   { id: 'mission-timeline',   path: ROUTES.missionTimeline,   label: 'Missions',        icon: Milestone },
++  'mission-simulation': { id: 'mission-simulation', path: ROUTES.missionSimulation, label: 'Simulation',      icon: FlaskConical },
++  'agent-swarm':        { id: 'agent-swarm',        path: ROUTES.agentSwarm,        label: 'Agent Swarm',     icon: Network },
++  'explainability':     { id: 'explainability',     path: ROUTES.explainability,    label: 'Pourquoi ?',      icon: HelpCircle },
++  'autonomy':           { id: 'autonomy',           path: ROUTES.autonomy,          label: 'Autonomie',       icon: Gauge },
++  'ide':                { id: 'ide',                path: ROUTES.ide,               label: 'IDE',             icon: Code2 },
++  'automation':         { id: 'automation',         path: ROUTES.automation,        label: 'Automatisations', icon: Zap },
++  'notebooks':          { id: 'notebooks',          path: ROUTES.notebooks,         label: 'Notebooks',       icon: NotebookPen },
++  'documents':          { id: 'documents',          path: ROUTES.documents,         label: 'Documents',       icon: FileText },
++  'github':             { id: 'github',             path: ROUTES.github,            label: 'GitHub',          icon: Github },
++  'memories':           { id: 'memories',           path: ROUTES.memories,          label: 'Mémoire',         icon: BrainCircuit },
++  'history':            { id: 'history',            path: ROUTES.history,           label: 'Historique',      icon: History },
++  // La page est une bibliothèque de snippets de code (≠ « listes ») ; Braces évite
++  // la collision visuelle avec l'icône de l'IDE (Code2).
++  'lists':              { id: 'lists',              path: ROUTES.lists,             label: 'Snippets',        icon: Braces },
++  'observability':      { id: 'observability',      path: ROUTES.observability,     label: 'Observabilité',   icon: BarChart2 },
++};
++
++const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
++
++/**
++ * Regroupement par intention. « Pilotage » réunit les 6 vues qui lisent toutes
++ * /api/missions : préparation de leur fusion en une page à onglets (étape 3).
++ */
++export const NAV_GROUPS: NavGroup[] = [
++  { id: 'pilotage', label: 'Pilotage',
++    items: pick('mission-control', 'mission-timeline', 'mission-simulation', 'agent-swarm', 'autonomy', 'explainability') },
++  { id: 'travail', label: 'Travail',
++    items: pick('ide', 'notebooks', 'documents', 'github', 'automation') },
++  { id: 'memoire', label: 'Mémoire',
++    items: pick('memories', 'history', 'lists') },
++  { id: 'systeme', label: 'Système',
++    items: pick('observability') },
++];
++
++/** Titre + icône d'un <ViewHeader>, identiques au libellé de la sidebar. */
++export function viewHeaderProps(id: NavId): { title: string; icon: LucideIcon } {
++  const { label, icon } = NAV_ITEMS[id];
++  return { title: label, icon };
++}
+diff --git a/src/main.tsx b/src/main.tsx
+index faf8860..7e5ca91 100644
+--- a/src/main.tsx
++++ b/src/main.tsx
+@@ -23,6 +23,7 @@ import { useAgentEventStream } from './hooks/useAgentEventStream.js';
+ import { installIdeRemoteForwarder, installIdeRemoteReceiver } from './lib/ideRemoteBridge.js';
+ import { Loader2, X } from 'lucide-react';
+ import { GlobalSidebar } from './components/GlobalSidebar.js';
++import { ROUTES } from './config/navigation.js';
+ import { AgentStatusBar } from './components/AgentStatusBar.js';
+ const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
+ const SettingsView = lazy(() => import('./views/SettingsView.js'));
+@@ -467,7 +468,7 @@ function NavSidebar() {
+   const isIde = pathname === '/' || pathname === '/ide';
+   const isSettings = pathname === '/settings';
+ 
+-  // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
++  // Don't show on IDE (IdeView monte sa propre GlobalSidebar en variant='ide')
+   // Don't show on Settings (SettingsView has its own left nav)
+   if (isIde || isSettings) return null;
+   return <GlobalSidebar />;
+@@ -501,23 +502,25 @@ function AnimatedRoutes() {
+   return (
+     <AnimatePresence mode="wait">
+       <Routes location={location} key={location.pathname}>
+-        <Route path="/"              element={<Navigate to="/ide" replace />} />
+-        <Route path="/ide"           element={wrap(<IdeView />)} />
+-        <Route path="/memories"      element={wrap(<MemoriesView />)} />
+-        <Route path="/history"       element={wrap(<HistoryView />)} />
+-        <Route path="/settings"      element={wrap(<SettingsView />)} />
+-        <Route path="/lists"         element={wrap(<ListsView />)} />
+-        <Route path="/github"        element={wrap(<GitHubView />)} />
+-        <Route path="/automation"    element={wrap(<AutomationView />)} />
+-        <Route path="/documents"     element={wrap(<DocumentsView />)} />
+-        <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
+-        <Route path="/observability" element={wrap(<ObservabilityView />)} />
+-        <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
+-        <Route path="/mission-control" element={wrap(<MissionControlView />)} />
+-        <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
+-        <Route path="/mission-simulation" element={wrap(<MissionSimulationView />)} />
+-        <Route path="/agent-swarm"   element={wrap(<AgentSwarmView />)} />
+-        <Route path="/explainability" element={wrap(<ExplainabilityView />)} />
++        <Route path={ROUTES.home}    element={<Navigate to={ROUTES.ide} replace />} />
++        <Route path={ROUTES.ide}           element={wrap(<IdeView />)} />
++        <Route path={ROUTES.memories}      element={wrap(<MemoriesView />)} />
++        <Route path={ROUTES.history}       element={wrap(<HistoryView />)} />
++        <Route path={ROUTES.settings}      element={wrap(<SettingsView />)} />
++        <Route path={ROUTES.lists}         element={wrap(<ListsView />)} />
++        <Route path={ROUTES.github}        element={wrap(<GitHubView />)} />
++        <Route path={ROUTES.automation}    element={wrap(<AutomationView />)} />
++        <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
++        <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
++        <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
++        <Route path={ROUTES.autonomy}      element={wrap(<AutonomyView />)} />
++        <Route path={ROUTES.missionControl} element={wrap(<MissionControlView />)} />
++        <Route path={ROUTES.missionTimeline} element={wrap(<MissionTimelineView />)} />
++        <Route path={ROUTES.missionSimulation} element={wrap(<MissionSimulationView />)} />
++        <Route path={ROUTES.agentSwarm}   element={wrap(<AgentSwarmView />)} />
++        <Route path={ROUTES.explainability} element={wrap(<ExplainabilityView />)} />
++        {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}
++        <Route path="*" element={<Navigate to={ROUTES.ide} replace />} />
+       </Routes>
+     </AnimatePresence>
+   );
+diff --git a/src/views/AgentSwarmView.tsx b/src/views/AgentSwarmView.tsx
+index 3c8d4ad..27ec939 100644
+--- a/src/views/AgentSwarmView.tsx
++++ b/src/views/AgentSwarmView.tsx
+@@ -1,12 +1,13 @@
+ import { useCallback, useMemo, useRef, useState } from 'react';
+ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+ import {
+-  Users, Loader2, Network, AlertTriangle, Search, DraftingCompass, Code2,
++  Users, Loader2, AlertTriangle, Search, DraftingCompass, Code2,
+   FlaskConical, ShieldCheck, Eye, Gauge, FileText, ArrowDown, Lightbulb,
+   Copy, Check, RotateCcw, Sparkles, Play, LayoutList, GitBranch, History, X,
+ } from 'lucide-react';
+ import { useNavigate } from 'react-router-dom';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { ROUTES, viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types mirrored from the SwarmComposer (agent_compose_swarm) ─────────────
+ 
+@@ -86,7 +87,7 @@ export default function AgentSwarmView() {
+       });
+       const data = await res.json();
+       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
+-      navigate('/mission-timeline');
++      navigate(ROUTES.missionTimeline);
+     } catch (e) {
+       setError((e as Error).message);
+     } finally {
+@@ -127,8 +128,7 @@ export default function AgentSwarmView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Agent Swarm"
+-        icon={Network}
++        {...viewHeaderProps('agent-swarm')}
+         description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
+         badge="Composition"
+         actions={composition ? (
+diff --git a/src/views/AutomationView.tsx b/src/views/AutomationView.tsx
+index d98e138..d582ea7 100644
+--- a/src/views/AutomationView.tsx
++++ b/src/views/AutomationView.tsx
+@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
+ import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
+ import { useToast } from '../components/ui/Toast.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ interface ScheduledTask {
+   id: string;
+@@ -98,8 +99,7 @@ export default function AutomationView() {
+   return (
+     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        icon={Zap}
+-        title="Automatisations & Workflows"
++        {...viewHeaderProps('automation')}
+         badge="Low-Code"
+         description="Crée et surveille tes workflows visuels et tâches planifiées"
+         actions={
+diff --git a/src/views/AutonomyView.tsx b/src/views/AutonomyView.tsx
+index b91eb1f..416b19f 100644
+--- a/src/views/AutonomyView.tsx
++++ b/src/views/AutonomyView.tsx
+@@ -19,6 +19,7 @@ import { AutonomyTimeline } from '../components/AutonomyTimeline.js';
+ import { AutonomyLevelSelector } from '../components/autonomy/AutonomyLevelSelector.js';
+ import { useSafeguardsConfig } from '../hooks/useSafeguardsConfig.js';
+ import { usePendingApprovals, clearPendingApproval, type PendingApprovalInfo } from '../hooks/usePendingApprovals.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ const SAFEGUARD_LABELS: { key: 'autoCheckpoint' | 'postEditValidation' | 'criticalFileConfirm' | 'autoRestart'; label: string }[] = [
+   { key: 'autoCheckpoint', label: 'Checkpoint auto' },
+@@ -34,8 +35,7 @@ export default function AutonomyView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Centre de contrôle Autonomie"
+-        icon={SlidersHorizontal}
++        {...viewHeaderProps('autonomy')}
+         description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
+         badge="En direct"
+       />
+diff --git a/src/views/DocumentsView.tsx b/src/views/DocumentsView.tsx
+index a7cfcd6..6192a8f 100644
+--- a/src/views/DocumentsView.tsx
++++ b/src/views/DocumentsView.tsx
+@@ -20,6 +20,7 @@ import type { LucideIcon } from 'lucide-react';
+ import { useToast } from '../components/ui/Toast.js';
+ import { useConfirm } from '../components/ui/ConfirmDialog.js';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types ───────────────────────────────────────────────────────────────────
+ 
+@@ -176,8 +177,7 @@ export default function DocumentsView() {
+     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       {/* Header */}
+       <ViewHeader
+-        icon={FileText}
+-        title="Knowledge System"
++        {...viewHeaderProps('documents')}
+         badge="Documents"
+         description="Gérez vos documents, faits extraits et relations"
+       />
+diff --git a/src/views/ExplainabilityView.tsx b/src/views/ExplainabilityView.tsx
+index 5cd7f50..e0fa56b 100644
+--- a/src/views/ExplainabilityView.tsx
++++ b/src/views/ExplainabilityView.tsx
+@@ -5,6 +5,7 @@ import {
+   Copy, Check, RotateCcw, Gauge, ShieldAlert, ShieldCheck, ShieldOff,
+ } from 'lucide-react';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types mirrored from POST /api/knowledge/explain ─────────────────────────
+ 
+@@ -95,8 +96,7 @@ export default function ExplainabilityView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Explainability — Pourquoi ?"
+-        icon={HelpCircle}
++        {...viewHeaderProps('explainability')}
+         description="Les facteurs décisionnels derrière les choix de Leanna : probabilité, stratégie, historique, risques"
+         badge="Décision"
+         actions={data ? (
+diff --git a/src/views/HistoryView.tsx b/src/views/HistoryView.tsx
+index c872ee3..926ea48 100644
+--- a/src/views/HistoryView.tsx
++++ b/src/views/HistoryView.tsx
+@@ -4,6 +4,7 @@ import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu, ArrowRigh
+ import { useToast } from '../components/ui/Toast.js';
+ import { useConfirm } from '../components/ui/ConfirmDialog.js';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ interface Conversation {
+   id: string;
+@@ -118,8 +119,7 @@ export default function HistoryView() {
+     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
+       {/* Header */}
+       <ViewHeader
+-        icon={History}
+-        title="Historique"
++        {...viewHeaderProps('history')}
+         badge="Persistant"
+         description="Toutes vos conversations passées avec Leanna"
+         actions={
+diff --git a/src/views/ListsView.tsx b/src/views/ListsView.tsx
+index 8860824..d0f3560 100644
+--- a/src/views/ListsView.tsx
++++ b/src/views/ListsView.tsx
+@@ -4,6 +4,7 @@ import { Code, Plus, Trash2, RefreshCw, FileCode, X, Search, Layers3, Clock3, Co
+ import { useToast } from '../components/ui/Toast.js';
+ import { useConfirm } from '../components/ui/ConfirmDialog.js';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ interface SnippetSummary {
+   name: string;
+@@ -171,8 +172,7 @@ export default function ListsView() {
+   return (
+     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        icon={Code}
+-        title="Snippets"
++        {...viewHeaderProps('lists')}
+         badge="Bibliothèque"
+         description="Tes blocs de code réutilisables, centralisés dans Leanna"
+         actions={
+diff --git a/src/views/MemoriesView.tsx b/src/views/MemoriesView.tsx
+index 3392b70..894c5ab 100644
+--- a/src/views/MemoriesView.tsx
++++ b/src/views/MemoriesView.tsx
+@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
+ import { BrainCircuit, Search, Trash2, RefreshCw, Loader2, X, Check } from 'lucide-react';
+ import { useToast } from '../components/ui/Toast.js';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ interface Memory { id: string; content: string; created_at: string; }
+ 
+@@ -62,8 +63,7 @@ export default function MemoriesView() {
+     >
+       {/* Header */}
+       <ViewHeader
+-        icon={BrainCircuit}
+-        title="Mémoire"
++        {...viewHeaderProps('memories')}
+         badge="Mémoire active"
+         description="Les informations importantes retenues par Leanna"
+         actions={
+diff --git a/src/views/MissionControlView.tsx b/src/views/MissionControlView.tsx
+index 1ee7af5..69ef160 100644
+--- a/src/views/MissionControlView.tsx
++++ b/src/views/MissionControlView.tsx
+@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
+ import { motion, useReducedMotion } from 'motion/react';
+ import { useNavigate } from 'react-router-dom';
+ import {
+-  LayoutDashboard, Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
++  Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
+   Lightbulb, Wrench, ShieldAlert, Zap, Loader2, Stethoscope, Sun, X, CheckCircle2,
+   Play, Workflow,
+ } from 'lucide-react';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
+ import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
++import { ROUTES, viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types mirrored from the server insights engines ─────────────────────────
+ 
+@@ -103,8 +104,7 @@ export default function MissionControlView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Mission Control"
+-        icon={LayoutDashboard}
++        {...viewHeaderProps('mission-control')}
+         description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
+         badge={connection === 'open' ? 'En direct' : 'Hors ligne'}
+         actions={
+@@ -140,7 +140,7 @@ export default function MissionControlView() {
+ 
+           {/* Row 3 — Insights (anticipation) + Opportunities */}
+           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+-            <InsightsCard proposals={proposals} onLaunched={() => navigate('/mission-timeline')} />
++            <InsightsCard proposals={proposals} onLaunched={() => navigate(ROUTES.missionTimeline)} />
+             <OpportunitiesCard opportunities={opportunities} />
+           </div>
+ 
+@@ -151,7 +151,7 @@ export default function MissionControlView() {
+               diagnosing={diagnosing}
+               result={diagnoseResult}
+               onDiagnose={() => void diagnose()}
+-              onOpenTimeline={() => navigate('/mission-timeline')}
++              onOpenTimeline={() => navigate(ROUTES.missionTimeline)}
+             />
+           )}
+         </div>
+diff --git a/src/views/MissionSimulationView.tsx b/src/views/MissionSimulationView.tsx
+index b957ee6..9f7758d 100644
+--- a/src/views/MissionSimulationView.tsx
++++ b/src/views/MissionSimulationView.tsx
+@@ -7,6 +7,7 @@ import {
+ } from 'lucide-react';
+ import { useNavigate } from 'react-router-dom';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
++import { ROUTES, viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types mirrored from the MissionSimulator engine (mission_simulate) ──────
+ 
+@@ -94,7 +95,7 @@ export default function MissionSimulationView() {
+       });
+       const data = await res.json();
+       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
+-      navigate('/mission-timeline');
++      navigate(ROUTES.missionTimeline);
+     } catch (e) {
+       setError((e as Error).message);
+     } finally {
+@@ -134,8 +135,7 @@ export default function MissionSimulationView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Simulation de mission"
+-        icon={FlaskConical}
++        {...viewHeaderProps('mission-simulation')}
+         description="Prévisualise ce que Leanna ferait — fichiers, commandes, agents, coût, risque — avant d'exécuter réellement"
+         badge="Dry-run"
+         actions={report ? (
+diff --git a/src/views/MissionTimelineView.tsx b/src/views/MissionTimelineView.tsx
+index 9ca8c88..9b86451 100644
+--- a/src/views/MissionTimelineView.tsx
++++ b/src/views/MissionTimelineView.tsx
+@@ -1,13 +1,14 @@
+ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import { motion, useReducedMotion } from 'motion/react';
+ import {
+-  History, RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
++  RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
+   AlertTriangle, RotateCcw, CheckCircle2, CircleDot, Target, ShieldAlert,
+   Pause, Play, XCircle, Trash2, ChevronLeft, ChevronRight, SkipBack, SkipForward,
+   Copy, Check, Filter, Clock, Zap, Activity, X,
+ } from 'lucide-react';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
+ import { missionApi } from '../services/ideApi.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
+ 
+@@ -257,8 +258,7 @@ export default function MissionTimelineView() {
+   return (
+     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Mission Timeline"
+-        icon={History}
++        {...viewHeaderProps('mission-timeline')}
+         description="Parcours chronologique d'une mission — clique une étape ou utilise le scrubber pour « voyager » dans le temps"
+         badge="Time Travel"
+         actions={
+diff --git a/src/views/ObservabilityView.tsx b/src/views/ObservabilityView.tsx
+index 85099f1..710a9d8 100644
+--- a/src/views/ObservabilityView.tsx
++++ b/src/views/ObservabilityView.tsx
+@@ -13,7 +13,7 @@
+ 
+ import { useEffect, useState, useCallback, useRef } from 'react';
+ import {
+-  BarChart2, RefreshCw, DollarSign, Cpu, Zap,
++  RefreshCw, DollarSign, Cpu, Zap,
+   Clock, TrendingUp, Shield, Info, Activity, Database,
+ } from 'lucide-react';
+ import { ViewHeader } from '../components/ui/ViewHeader.js';
+@@ -23,6 +23,7 @@ import { fmt, fmtCost, timeAgo } from '../components/observability/format.js';
+ import { StatCard, BarRow } from '../components/observability/cards.js';
+ import { RuntimeHealthPanel } from '../components/observability/RuntimeHealthPanel.js';
+ import { BudgetPanel } from '../components/observability/BudgetPanel.js';
++import { viewHeaderProps } from '../config/navigation.js';
+ 
+ // ─── Main View ───────────────────────────────────────────────────────────────
+ 
+@@ -80,8 +81,7 @@ export default function ObservabilityView() {
+   return (
+     <div className="flex h-full flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+       <ViewHeader
+-        title="Observabilité"
+-        icon={BarChart2}
++        {...viewHeaderProps('observability')}
+         description="Coûts, tokens et traces OpenTelemetry en temps réel"
+         badge="V1.1"
+         actions={

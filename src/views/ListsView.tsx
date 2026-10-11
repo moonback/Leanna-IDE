@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Code, Plus, Trash2, RefreshCw, FileCode, X, Search, Layers3, Clock3, Copy, Check, Loader2 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, FileCode, X, Search, Layers3, Clock3, Copy, Check, Loader2 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 interface SnippetSummary {
   name: string;
@@ -171,8 +172,7 @@ export default function ListsView() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        icon={Code}
-        title="Snippets"
+        {...viewHeaderProps('lists')}
         badge="Bibliothèque"
         description="Tes blocs de code réutilisables, centralisés dans Leanna"
         actions={

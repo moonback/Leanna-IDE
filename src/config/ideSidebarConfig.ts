@@ -12,7 +12,7 @@
  * 5. CI/CD & Aperçu    (sous-menu : Sandbox, Workflow, Prévisualisation)
  * 6. Données           (sous-menu : Knowledge, Notebooks, Santé système, PM2)
  * 7. Outils            (sous-menu : Agent Builder, Marketplace, Docs Skills, Caméra, Partage écran)
- * (Agents en accès direct via AgentsSidebarButton ; IA via le flyout du statut agent)
+ * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar)
  */
 
 import {

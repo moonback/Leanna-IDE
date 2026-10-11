@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BrainCircuit, Search, Trash2, RefreshCw, Loader2, X, Check } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 interface Memory { id: string; content: string; created_at: string; }
 
@@ -62,8 +63,7 @@ export default function MemoriesView() {
     >
       {/* Header */}
       <ViewHeader
-        icon={BrainCircuit}
-        title="Mémoire"
+        {...viewHeaderProps('memories')}
         badge="Mémoire active"
         description="Les informations importantes retenues par Leanna"
         actions={

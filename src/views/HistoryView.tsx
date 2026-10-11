@@ -4,6 +4,7 @@ import { History, Search, Trash2, RefreshCw, MessageSquare, User, Cpu, ArrowRigh
 import { useToast } from '../components/ui/Toast.js';
 import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 interface Conversation {
   id: string;
@@ -118,8 +119,7 @@ export default function HistoryView() {
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
       {/* Header */}
       <ViewHeader
-        icon={History}
-        title="Historique"
+        {...viewHeaderProps('history')}
         badge="Persistant"
         description="Toutes vos conversations passées avec Leanna"
         actions={

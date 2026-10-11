@@ -19,6 +19,7 @@ import { AutonomyTimeline } from '../components/AutonomyTimeline.js';
 import { AutonomyLevelSelector } from '../components/autonomy/AutonomyLevelSelector.js';
 import { useSafeguardsConfig } from '../hooks/useSafeguardsConfig.js';
 import { usePendingApprovals, clearPendingApproval, type PendingApprovalInfo } from '../hooks/usePendingApprovals.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 const SAFEGUARD_LABELS: { key: 'autoCheckpoint' | 'postEditValidation' | 'criticalFileConfirm' | 'autoRestart'; label: string }[] = [
   { key: 'autoCheckpoint', label: 'Checkpoint auto' },
@@ -34,8 +35,7 @@ export default function AutonomyView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Centre de contrôle Autonomie"
-        icon={SlidersHorizontal}
+        {...viewHeaderProps('autonomy')}
         description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
         badge="En direct"
       />

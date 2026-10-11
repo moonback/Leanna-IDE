@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
-  History, RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
+  RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
   AlertTriangle, RotateCcw, CheckCircle2, CircleDot, Target, ShieldAlert,
   Pause, Play, XCircle, Trash2, ChevronLeft, ChevronRight, SkipBack, SkipForward,
   Copy, Check, Filter, Clock, Zap, Activity, X,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { missionApi } from '../services/ideApi.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
 
@@ -257,8 +258,7 @@ export default function MissionTimelineView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Mission Timeline"
-        icon={History}
+        {...viewHeaderProps('mission-timeline')}
         description="Parcours chronologique d'une mission — clique une étape ou utilise le scrubber pour « voyager » dans le temps"
         badge="Time Travel"
         actions={

@@ -22,6 +22,7 @@ import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { installIdeRemoteForwarder, installIdeRemoteReceiver } from './lib/ideRemoteBridge.js';
 import { Loader2, X } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
+import { ROUTES } from './config/navigation.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
@@ -466,7 +467,7 @@ function NavSidebar() {
   const isIde = pathname === '/' || pathname === '/ide';
   const isSettings = pathname === '/settings';
 
-  // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
+  // Don't show on IDE (IdeView monte sa propre GlobalSidebar en variant='ide')
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
   return <GlobalSidebar />;
@@ -500,23 +501,25 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/"              element={<Navigate to="/ide" replace />} />
-        <Route path="/ide"           element={wrap(<IdeView />)} />
-        <Route path="/memories"      element={wrap(<MemoriesView />)} />
-        <Route path="/history"       element={wrap(<HistoryView />)} />
-        <Route path="/settings"      element={wrap(<SettingsView />)} />
-        <Route path="/lists"         element={wrap(<ListsView />)} />
-        <Route path="/github"        element={wrap(<GitHubView />)} />
-        <Route path="/automation"    element={wrap(<AutomationView />)} />
-        <Route path="/documents"     element={wrap(<DocumentsView />)} />
-        <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
-        <Route path="/observability" element={wrap(<ObservabilityView />)} />
-        <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
-        <Route path="/mission-control" element={wrap(<MissionControlView />)} />
-        <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
-        <Route path="/mission-simulation" element={wrap(<MissionSimulationView />)} />
-        <Route path="/agent-swarm"   element={wrap(<AgentSwarmView />)} />
-        <Route path="/explainability" element={wrap(<ExplainabilityView />)} />
+        <Route path={ROUTES.home}    element={<Navigate to={ROUTES.ide} replace />} />
+        <Route path={ROUTES.ide}           element={wrap(<IdeView />)} />
+        <Route path={ROUTES.memories}      element={wrap(<MemoriesView />)} />
+        <Route path={ROUTES.history}       element={wrap(<HistoryView />)} />
+        <Route path={ROUTES.settings}      element={wrap(<SettingsView />)} />
+        <Route path={ROUTES.lists}         element={wrap(<ListsView />)} />
+        <Route path={ROUTES.github}        element={wrap(<GitHubView />)} />
+        <Route path={ROUTES.automation}    element={wrap(<AutomationView />)} />
+        <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
+        <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
+        <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
+        <Route path={ROUTES.autonomy}      element={wrap(<AutonomyView />)} />
+        <Route path={ROUTES.missionControl} element={wrap(<MissionControlView />)} />
+        <Route path={ROUTES.missionTimeline} element={wrap(<MissionTimelineView />)} />
+        <Route path={ROUTES.missionSimulation} element={wrap(<MissionSimulationView />)} />
+        <Route path={ROUTES.agentSwarm}   element={wrap(<AgentSwarmView />)} />
+        <Route path={ROUTES.explainability} element={wrap(<ExplainabilityView />)} />
+        {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}
+        <Route path="*" element={<Navigate to={ROUTES.ide} replace />} />
       </Routes>
     </AnimatePresence>
   );

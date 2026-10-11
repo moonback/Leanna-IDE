@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
+  Activity, HeartPulse, Sparkles, RefreshCw, AlertTriangle,
   Lightbulb, Wrench, ShieldAlert, Zap, Loader2, Stethoscope, Sun, X, CheckCircle2,
   Play, Workflow,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
+import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the server insights engines ─────────────────────────
 
@@ -103,8 +104,7 @@ export default function MissionControlView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Mission Control"
-        icon={LayoutDashboard}
+        {...viewHeaderProps('mission-control')}
         description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
         badge={connection === 'open' ? 'En direct' : 'Hors ligne'}
         actions={
@@ -140,7 +140,7 @@ export default function MissionControlView() {
 
           {/* Row 3 — Insights (anticipation) + Opportunities */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <InsightsCard proposals={proposals} onLaunched={() => navigate('/mission-timeline')} />
+            <InsightsCard proposals={proposals} onLaunched={() => navigate(ROUTES.missionTimeline)} />
             <OpportunitiesCard opportunities={opportunities} />
           </div>
 
@@ -151,7 +151,7 @@ export default function MissionControlView() {
               diagnosing={diagnosing}
               result={diagnoseResult}
               onDiagnose={() => void diagnose()}
-              onOpenTimeline={() => navigate('/mission-timeline')}
+              onOpenTimeline={() => navigate(ROUTES.missionTimeline)}
             />
           )}
         </div>

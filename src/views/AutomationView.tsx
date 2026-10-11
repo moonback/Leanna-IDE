@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useToast } from '../components/ui/Toast.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 interface ScheduledTask {
   id: string;
@@ -98,8 +99,7 @@ export default function AutomationView() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        icon={Zap}
-        title="Automatisations & Workflows"
+        {...viewHeaderProps('automation')}
         badge="Low-Code"
         description="Crée et surveille tes workflows visuels et tâches planifiées"
         actions={

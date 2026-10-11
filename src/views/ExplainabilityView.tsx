@@ -5,6 +5,7 @@ import {
   Copy, Check, RotateCcw, Gauge, ShieldAlert, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from POST /api/knowledge/explain ─────────────────────────
 
@@ -95,8 +96,7 @@ export default function ExplainabilityView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Explainability — Pourquoi ?"
-        icon={HelpCircle}
+        {...viewHeaderProps('explainability')}
         description="Les facteurs décisionnels derrière les choix de Leanna : probabilité, stratégie, historique, risques"
         badge="Décision"
         actions={data ? (

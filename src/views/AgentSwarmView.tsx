@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  Users, Loader2, Network, AlertTriangle, Search, DraftingCompass, Code2,
+  Users, Loader2, AlertTriangle, Search, DraftingCompass, Code2,
   FlaskConical, ShieldCheck, Eye, Gauge, FileText, ArrowDown, Lightbulb,
   Copy, Check, RotateCcw, Sparkles, Play, LayoutList, GitBranch, History, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the SwarmComposer (agent_compose_swarm) ─────────────
 
@@ -86,7 +87,7 @@ export default function AgentSwarmView() {
       });
       const data = await res.json();
       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
-      navigate('/mission-timeline');
+      navigate(ROUTES.missionTimeline);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -127,8 +128,7 @@ export default function AgentSwarmView() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       <ViewHeader
-        title="Agent Swarm"
-        icon={Network}
+        {...viewHeaderProps('agent-swarm')}
         description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
         badge="Composition"
         actions={composition ? (
