@@ -20,6 +20,7 @@ import {
   clearCompletedTools, clearCompletedTasks, cancelAgentTask, removeAgentTasks,
   type ToolActivityEntry, type AgentTaskEntry,
 } from '../../stores/agentActivityStore.js';
+import { formatDuration } from '../../utils/timeFormat.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Metadata
@@ -122,13 +123,6 @@ function StatusBadge({ status }: { status: string }) {
       {c.icon}{c.label}
     </span>
   );
-}
-
-function formatDuration(ms?: number): string {
-  if (!ms) return '';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
 function timeLabel(ts: number): string {

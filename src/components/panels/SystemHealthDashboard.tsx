@@ -4,6 +4,7 @@ import {
   RefreshCw, Clock, Loader2, Puzzle,
   Zap, X,
 } from 'lucide-react';
+import { scoreColor } from '../../utils/scoreColor.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,12 +50,6 @@ function formatUptime(hours: number): string {
   const h = Math.round(hours % 24);
   if (days > 0) return `${days}j ${h}h`;
   return `${h}h`;
-}
-
-function scoreColor(score: number): string {
-  if (score >= 80) return 'var(--color-success)';
-  if (score >= 50) return 'var(--color-warning)';
-  return 'var(--color-error)';
 }
 
 function memColor(pct: number): string {

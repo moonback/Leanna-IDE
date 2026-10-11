@@ -14,6 +14,7 @@ import {
   MissionsSummaryCard, CostSummaryCard, AutonomySummaryCard,
   type MissionSummaryItem, type CostSummary,
 } from './missionControl/SummaryCards.js';
+import { scoreColor as scoreColorShared } from '../utils/scoreColor.js';
 
 // ─── Types mirrored from the server insights engines ─────────────────────────
 
@@ -51,12 +52,9 @@ const DIMENSION_LABELS: Record<HealthDimension, string> = {
   autonomy: 'Autonomie',
 };
 
-/** Score → semantic token. */
+/** Score → semantic token (paliers 85/70/50 avec info). */
 function scoreColor(n: number): string {
-  if (n >= 85) return 'var(--color-success)';
-  if (n >= 70) return 'var(--color-info)';
-  if (n >= 50) return 'var(--color-warning)';
-  return 'var(--color-error)';
+  return scoreColorShared(n, { good: 85, info: 70, warn: 50 });
 }
 
 export default function MissionControlView() {

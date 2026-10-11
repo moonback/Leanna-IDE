@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import type { AuditStep, AuditReport } from '../../utils/audit.js';
+import { scoreColor } from '../../utils/scoreColor.js';
 
 interface AuditPanelProps {
   steps: AuditStep[];
@@ -73,11 +74,7 @@ function MemBar({ used, total }: { used: number; total: number }) {
   );
 }
 
-function scoreColor(score: number) {
-  if (score >= 80) return 'var(--color-success)';
-  if (score >= 50) return 'var(--color-warning)';
-  return 'var(--color-error)';
-}
+
 
 // ── Main component ─────────────────────────────────────────────────────────
 

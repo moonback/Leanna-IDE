@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { missionApi } from '../services/ideApi.js';
+import { humanDuration, timeOf } from '../utils/timeFormat.js';
 
 // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
 
@@ -78,25 +79,6 @@ function statusTone(status: string, paused?: boolean): string {
     case 'in_progress': return 'var(--accent-primary)';
     default: return 'var(--color-info)';
   }
-}
-
-function timeOf(at?: string): string {
-  if (!at) return '';
-  try { return new Date(at).toISOString().slice(11, 19); } catch { return ''; }
-}
-
-/** Durée lisible entre deux timestamps ISO. */
-function humanDuration(startAt?: string, endAt?: string): string {
-  if (!startAt || !endAt) return '—';
-  try {
-    const ms = new Date(endAt).getTime() - new Date(startAt).getTime();
-    if (!Number.isFinite(ms) || ms < 0) return '—';
-    const s = Math.round(ms / 1000);
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    const rem = s % 60;
-    return rem ? `${m}m ${rem}s` : `${m}m`;
-  } catch { return '—'; }
 }
 
 export default function MissionTimelineView() {
