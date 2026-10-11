@@ -1,4 +1,7 @@
 import type { EventBus } from "../runtime/EventBus.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("Autonomy:Heartbeat");
 
 export interface HeartbeatConfig {
   activeIntervalMs: number;
@@ -25,9 +28,23 @@ export class HeartbeatService {
 
   constructor(private readonly events: EventBus, private readonly check: () => { attentionRequired: boolean; reason: string }, private readonly config = heartbeatConfigFromEnv()) {}
 
-  start(): void { if (!this.running) { this.running = true; this.schedule(0); } }
-  stop(): void { this.running = false; if (this.timer) clearTimeout(this.timer); this.timer = undefined; }
-  wake(reason = "event received"): void { this.lastActivityAt = Date.now(); this.state = "active"; if (this.running) this.schedule(0, reason); }
+  start(): void {
+    if (!this.running) {
+      this.running = true;
+      log.info(`💓 Heartbeat started (active ${this.config.activeIntervalMs}ms / idle ${this.config.idleIntervalMs}ms / sleep ${this.config.sleepIntervalMs}ms, idle after ${this.config.idleAfterMs}ms).`);
+      this.schedule(0);
+    }
+  }
+  stop(): void {
+    if (this.running) log.info("💓 Heartbeat stopped.");
+    this.running = false; if (this.timer) clearTimeout(this.timer); this.timer = undefined;
+  }
+  wake(reason = "event received"): void {
+    this.lastActivityAt = Date.now();
+    if (this.state !== "active") log.debug(`💓 Woken (${this.state} → active) by: ${reason}`);
+    this.state = "active";
+    if (this.running) this.schedule(0, reason);
+  }
   getState(): "active" | "idle" | "sleep" { return this.state; }
 
   private schedule(delay: number, wakeReason?: string): void {
@@ -38,7 +55,11 @@ export class HeartbeatService {
     if (!this.running) return;
     const outcome = this.check();
     const elapsed = Date.now() - this.lastActivityAt;
+    const previous = this.state;
     this.state = outcome.attentionRequired || elapsed < this.config.idleAfterMs ? "active" : elapsed < this.config.idleAfterMs * 2 ? "idle" : "sleep";
+    if (previous !== this.state) {
+      log.debug(`💓 ${previous} → ${this.state} (idle for ${Math.round(elapsed / 1000)}s${outcome.attentionRequired ? ", attention required" : ""}).`);
+    }
     this.events.emit({ type: "autonomy:heartbeat", attentionRequired: outcome.attentionRequired, state: this.state, reason: wakeReason ?? outcome.reason });
     this.schedule(this.state === "active" ? this.config.activeIntervalMs : this.state === "idle" ? this.config.idleIntervalMs : this.config.sleepIntervalMs);
   }

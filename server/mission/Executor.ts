@@ -417,15 +417,31 @@ export class Executor {
     budget?: { maxTokens?: number; maxCostUsd?: number };
     /** Exécuter la mission entière en simulation, sans effet de bord. */
     dryRun?: boolean;
+    /**
+     * La mission attend-elle un livrable écrit pour réussir ? `false` pour une
+     * mission d'analyse/investigation (diagnostic autonome) : le succès se juge
+     * sur l'analyse/escalade, pas sur un fichier produit. `undefined` = héritage
+     * heuristique par mot-clé.
+     */
+    expectsArtifact?: boolean;
+    /**
+     * Plafonds spécifiques à CETTE mission (bornent le temps mural et la taille
+     * du plan), par-dessus la config globale. Utilisé par le travail autonome
+     * idle pour garder un diagnostic en lecture seule court et borné.
+     */
+    configOverrides?: Partial<Pick<MissionConfig, "missionTimeoutMs" | "maxSubGoals" | "maxConcurrentGoals">>;
   }): Promise<Mission> {
     if (!this.skillHandler) {
       throw new Error("SkillHandler not configured. Call setSkillHandler first.");
     }
 
-    // Config spécifique à la mission : le dry-run peut être activé par mission.
+    // Config spécifique à la mission : le dry-run peut être activé par mission,
+    // et les plafonds (temps/plan) peuvent être resserrés par l'appelant.
     const missionConfig: MissionConfig = {
       ...this.config,
       dryRun: params.dryRun ?? this.config.dryRun,
+      ...(params.expectsArtifact !== undefined ? { expectsArtifact: params.expectsArtifact } : {}),
+      ...(params.configOverrides ?? {}),
     };
 
     const mission = new Mission(
@@ -2006,7 +2022,19 @@ JSON:`;
     // produit. Si l'objectif attend un artefact concret et qu'AUCUNE écriture
     // n'a réussi, on ajoute un contrôle factuel échoué : la preuve ne peut pas
     // établir le succès sans livrable.
-    if (this.goalExpectsArtifact(goal) && filesModified.length === 0) {
+    //
+    // EXCEPTIONS au contrôle « artefact-produit » :
+    //  1) dry-run : les écritures sont SIMULÉES, jamais confirmées — exiger un
+    //     fichier réellement écrit serait contradictoire (mission read-only).
+    //  2) expectsArtifact === false : mission d'ANALYSE/investigation (diagnostic
+    //     autonome). Le livrable est l'analyse/l'escalade, pas un fichier. Sinon,
+    //     ces missions (ex. « analyser les échecs récurrents ») échouaient
+    //     systématiquement sur ce contrôle alors qu'elles ne doivent rien écrire.
+    // Si `expectsArtifact === true`, on force le contrôle même sans mot-clé.
+    const cfg = mission.getConfig();
+    const isDryRun = cfg.dryRun === true;
+    const expectsArtifact = cfg.expectsArtifact ?? this.goalExpectsArtifact(goal);
+    if (!isDryRun && expectsArtifact && filesModified.length === 0) {
       runtimeChecks.push({
         name: "artefact-produit",
         passed: false,

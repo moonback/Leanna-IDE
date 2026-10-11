@@ -27,6 +27,7 @@
 
 import { randomUUID } from "crypto";
 import type { AgentRuntime, RuntimeEvent } from "../runtime/index.js";
+import { createLogger } from "../utils/logger.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
 import { opportunityEngine, type OpportunityEngine } from "../knowledge/OpportunityEngine.js";
 import { projectDoctor, type ProjectDoctor } from "../knowledge/ProjectDoctor.js";
@@ -158,6 +159,8 @@ const PRIORITY_FROM_IMPORTANCE = (importance: number): AnticipationPriority =>
 const PRIORITY_TO_TASK = (priority: AnticipationPriority): AutonomousTask["priority"] =>
   priority === "critical" ? "critical" : priority === "high" ? "high" : priority === "medium" ? "medium" : "low";
 
+const log = createLogger("Autonomy:Anticipation");
+
 /**
  * Observe → detect → evaluate → propose. Mirrors the PerceptionEngine/Executive
  * style: constructor-injected deps, env-driven config, best-effort side effects.
@@ -206,12 +209,14 @@ export class AnticipationEngine {
     this.unsubscribers.push(
       this.runtime.events.on("autonomy:heartbeat", (event) => this.onHeartbeat(event.state)),
     );
+    log.info(`👁️  Anticipation started — sweep every ${this.config.sweepEveryTicks} tick(s), min importance ${this.config.minImportance}, auto-launch ≥ ${this.config.autoLaunchThreshold}, auto-launch:${this.submitTask ? "on" : "off"}.`);
   }
 
   stop(): void {
     if (!this.started) return;
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     this.started = false;
+    log.info("👁️  Anticipation stopped.");
   }
 
   /** Most recent proposals (newest first), for the UI / state snapshot. */
@@ -297,7 +302,9 @@ export class AnticipationEngine {
     if (!dueForSweep && !dueForReflection) return;
 
     this.ticksSinceSweep = 0;
+    log.debug(`👁️  Sweep starting (state: ${state}, trigger: ${dueForSweep ? "schedule" : "reflection"}).`);
     const emitted = this.sweep();
+    log.info(`👁️  Sweep done — ${emitted.length} proposal(s) emitted.`);
 
     // "Vivant" : si rien de plus pressant n'a émergé pendant une période calme,
     // Leanna remarque tout de même qu'elle est disponible et réfléchit au projet.
@@ -349,9 +356,10 @@ export class AnticipationEngine {
     if (day === this.lastBriefingDay) return;
     this.lastBriefingDay = day;
     try {
+      log.info("☀️ Daily briefing due — composing the morning digest…");
       this.emitDailyBriefing(day);
-    } catch {
-      /* briefing composition is best-effort */
+    } catch (error) {
+      log.warn(`☀️ Daily briefing failed (best-effort): ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -600,6 +608,13 @@ export class AnticipationEngine {
         },
       });
       proposal.queuedAsTask = Boolean(task);
+      if (proposal.queuedAsTask) {
+        log.info(`💡→🚀 Proposal auto-launched as mission [${proposal.kind}/${proposal.priority}, importance ${proposal.importance.toFixed(2)}]: "${proposal.suggestedAction}"`);
+      } else {
+        log.warn(`💡 Proposal eligible for auto-launch but TaskManager refused it [${proposal.kind}]: "${proposal.suggestedAction}"`);
+      }
+    } else {
+      log.info(`💡 Proposal surfaced [${proposal.kind}/${proposal.priority}, importance ${proposal.importance.toFixed(2)}]: "${proposal.message}"`);
     }
 
     this.record(proposal);

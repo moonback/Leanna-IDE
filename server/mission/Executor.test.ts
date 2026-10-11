@@ -285,3 +285,33 @@ test('evidence verification fails an artifact-expecting goal when nothing was wr
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ─── Preuve : mission investigative (expectsArtifact:false) réussit sans écriture ──
+// Régression : les missions autonomes (diagnostic/analyse) sont jugées sur
+// l'analyse, pas sur un fichier produit. Même quand le libellé contient des
+// mots « livrable » (rapport, document…), expectsArtifact:false désactive le
+// contrôle factuel « artefact-produit » qui, sinon, les bloque systématiquement.
+test('evidence verification does NOT require an artifact when expectsArtifact is false', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-noart-'));
+  const executor = new Executor();
+  // Skill de lecture : réussit factuellement, n'écrit aucun fichier.
+  executor.setSkillHandler(async () => ({ ok: true }));
+  executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+
+  const mission = await executor.startMission({
+    // Libellé truffé de mots-clés « livrable » qui, sans le flag, déclencheraient
+    // le contrôle artefact-produit (rapport / document / rédiger).
+    title: 'Analyser et documenter les échecs récurrents (rapport)',
+    description: 'Rédiger une synthèse des causes. Analyse en lecture seule.',
+    availableSkills: ['read_project_file'],
+    expectsArtifact: false,
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  // Le contrôle artefact-produit est désactivé → l'analyse réussie n'est pas
+  // bloquée faute d'écriture.
+  assert.notEqual(done.status, 'blocked', 'une mission investigative ne doit pas être bloquée faute de fichier');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});

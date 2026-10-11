@@ -1,0 +1,49 @@
+[
+  {
+    "id": "8594ff90-d8cd-458d-a023-be06b7ff0ba9",
+    "content": "Échec sur skill=\"verify_typecheck\" : TS2322 → Recommandation: Éviter de réessayer à l'identique. Tester d'abord l'hypothèse: \"L'erreur \"TS2322\" suggère un problème structurel. Changer d'approche.\"",
+    "category": "decision",
+    "tags": [
+      "error_pattern",
+      "reflection",
+      "lesson",
+      "verify_typecheck"
+    ],
+    "createdAt": "2026-10-11T13:26:23.439Z",
+    "updatedAt": "2026-10-11T13:26:23.439Z",
+    "confidence": 0.7,
+    "usageCount": 0
+  },
+  {
+    "id": "69ae8562-fe16-4b40-b469-2b60d3b21f0f",
+    "content": "Décision \"replan\" prise pour goal=\"Comprendre le besoin\" après 2 tentative(s) → Recommandation: L'erreur \"TS2322\" suggère un problème structurel. Changer d'approche.",
+    "category": "decision",
+    "tags": [
+      "decision",
+      "reflection",
+      "lesson",
+      "Comprendre le besoin",
+      "verify_typecheck"
+    ],
+    "createdAt": "2026-10-11T13:26:23.439Z",
+    "updatedAt": "2026-10-11T13:26:23.439Z",
+    "confidence": 0.6,
+    "usageCount": 0
+  },
+  {
+    "id": "ea73cb3b-f154-4c16-aa9d-88c9f3589786",
+    "content": "Décision \"escalate\" prise pour goal=\"Comprendre le besoin\" après 2 tentative(s) → Recommandation: Boucle détectée [same_failure]: Échec identique répété (3x) : ts2322. Escalade nécessaire.",
+    "category": "decision",
+    "tags": [
+      "decision",
+      "reflection",
+      "lesson",
+      "Comprendre le besoin",
+      "verify_typecheck"
+    ],
+    "createdAt": "2026-10-11T13:26:23.451Z",
+    "updatedAt": "2026-10-11T13:26:23.451Z",
+    "confidence": 0.6,
+    "usageCount": 0
+  }
+]

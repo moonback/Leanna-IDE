@@ -23,8 +23,11 @@
 import { randomUUID } from "crypto";
 import type { AgentRuntime } from "../runtime/index.js";
 import { buildToolInventory } from "../runtime/ToolInventory.js";
+import { createLogger } from "../utils/logger.js";
 import { AutonomyBudget } from "./AutonomyBudget.js";
 import { AutonomyAuditLog } from "./AutonomyAuditLog.js";
+
+const log = createLogger("Autonomy:IdleWork");
 
 /** Outcome of a self-initiated mission, reported by the executeMission seam. */
 export interface IdleMissionResult {
@@ -34,6 +37,16 @@ export interface IdleMissionResult {
   /** Real usage reported by the mission, when available (for the budget). */
   tokens?: number;
   costUsd?: number;
+}
+
+/** Hard caps keeping an idle diagnostic short and bounded. */
+export interface IdleMissionCaps {
+  /** Wall-clock timeout (ms) for the whole mission. */
+  timeoutMs: number;
+  /** Max sub-goals the planner may create. */
+  maxSubGoals: number;
+  /** Max sub-goals run concurrently in a wave. */
+  maxConcurrentGoals: number;
 }
 
 /** The hand-off into the existing mission pipeline, constrained to read-only. */
@@ -46,7 +59,19 @@ export type IdleMissionRunner = (request: {
   dryRun: true;
   /** Per-mission token/cost ceilings from the budget. */
   budget: { maxTokens: number; maxCostUsd: number };
+  /** Wall-time + plan-size caps so a background diagnostic stays short. */
+  caps: IdleMissionCaps;
 }) => Promise<IdleMissionResult>;
+
+const positiveInt = (value: number, fallback: number): number =>
+  Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+
+/** Reads idle-mission caps from the environment, failing closed to safe defaults. */
+export const idleMissionCapsFromEnv = (env: NodeJS.ProcessEnv = process.env): IdleMissionCaps => ({
+  timeoutMs: positiveInt(Number(env.LEANNA_AUTONOMY_IDLE_TIMEOUT_MS), 120_000),
+  maxSubGoals: positiveInt(Number(env.LEANNA_AUTONOMY_IDLE_MAX_SUBGOALS), 2),
+  maxConcurrentGoals: positiveInt(Number(env.LEANNA_AUTONOMY_IDLE_MAX_CONCURRENT_GOALS), 1),
+});
 
 /** A read-only diagnostic Leanna can run on her own. */
 interface IdlePlan {
@@ -66,19 +91,19 @@ const IDLE_PLANS: IdlePlan[] = [
   {
     action: "idle:project-doctor",
     title: "Diagnostic de santé du projet (lecture seule)",
-    description: "Analyser la santé du projet (architecture, sécurité, tests, dette) et résumer les problèmes prioritaires, sans aucune modification.",
+    description: "Analyser la santé du projet (architecture, sécurité, tests, dette) via les outils de diagnostic. Analyse en lecture seule UNIQUEMENT : ne produis aucun fichier, n'écris rien ; l'objectif est l'analyse elle-même, pas un livrable sur disque.",
     prefer: ["knowledge_project_doctor", "knowledge_opportunities", "knowledge_build_context"],
   },
   {
     action: "idle:code-review",
     title: "Revue de code en lecture seule",
-    description: "Parcourir le code et les dépendances pour repérer les risques et les améliorations possibles, en lecture seule, sans rien modifier.",
+    description: "Parcourir le code et les dépendances pour repérer les risques et les améliorations possibles. Analyse en lecture seule UNIQUEMENT : ne produis aucun fichier, n'écris rien ; l'objectif est l'analyse elle-même, pas un livrable sur disque.",
     prefer: ["codebase", "knowledge_semantic_search", "knowledge_build_context"],
   },
   {
     action: "idle:predict-review",
     title: "Revue des opportunités et prédiction de risque (lecture seule)",
-    description: "Lister les opportunités d'amélioration et estimer le risque de la mission prioritaire, en lecture seule.",
+    description: "Examiner les opportunités d'amélioration et estimer le risque de la mission prioritaire. Analyse en lecture seule UNIQUEMENT : ne produis aucun fichier, n'écris rien ; l'objectif est l'analyse elle-même, pas un livrable sur disque.",
     prefer: ["knowledge_opportunities", "knowledge_predict", "knowledge_daily_briefing"],
   },
 ];
@@ -92,6 +117,8 @@ export interface IdleWorkerOptions {
   isBusy?: () => boolean;
   /** Master enable from env; a false value keeps the worker fully dormant. */
   enabled?: boolean;
+  /** Wall-time + plan-size caps for each idle diagnostic. Defaults from env. */
+  caps?: IdleMissionCaps;
 }
 
 /** Deterministic, bounded idle worker. */
@@ -101,6 +128,7 @@ export class IdleWorker {
   private readonly runMission?: IdleMissionRunner;
   private readonly isBusy: () => boolean;
   private readonly enabled: boolean;
+  private readonly caps: IdleMissionCaps;
 
   /** Kill switch: when paused, no self-initiated work is launched. */
   private paused = false;
@@ -113,6 +141,7 @@ export class IdleWorker {
     this.budget = options.budget ?? new AutonomyBudget();
     this.audit = options.auditLog ?? new AutonomyAuditLog();
     this.runMission = options.runMission;
+    this.caps = options.caps ?? idleMissionCapsFromEnv();
     this.isBusy = options.isBusy ?? (() => false);
     this.enabled = options.enabled ?? true;
   }
@@ -121,6 +150,7 @@ export class IdleWorker {
   pause(reason = "kill switch"): void {
     if (this.paused) return;
     this.paused = true;
+    log.warn(`⏸️  Idle autonomy PAUSED — ${reason}.`);
     this.audit.append({ phase: "skipped", action: "idle:pause", message: `Idle autonomy paused — ${reason}.` });
   }
 
@@ -128,6 +158,7 @@ export class IdleWorker {
   resume(reason = "operator"): void {
     if (!this.paused) return;
     this.paused = false;
+    log.info(`▶️  Idle autonomy RESUMED — ${reason}.`);
     this.audit.append({ phase: "considered", action: "idle:resume", message: `Idle autonomy resumed — ${reason}.` });
   }
 
@@ -157,6 +188,7 @@ export class IdleWorker {
     const runId = randomUUID();
     const admit = this.budget.admit();
     if (!admit.allowed) {
+      log.debug(`💤 Idle run skipped — ${admit.reason}`);
       this.audit.append({ phase: "skipped", action: "idle:budget", message: admit.reason, runId, budget: this.budgetLine() });
       return false;
     }
@@ -164,10 +196,12 @@ export class IdleWorker {
     const allowlist = this.readOnlyAllowlist();
     const plan = this.selectPlan(allowlist);
     if (!plan) {
+      log.debug(`💤 Idle run skipped — no eligible read-only diagnostic (${allowlist.length} read-only tools available).`);
       this.audit.append({ phase: "skipped", action: "idle:no-plan", message: "No eligible read-only diagnostic for the current tool set.", runId });
       return false;
     }
 
+    log.debug(`💤 Calm period — considering read-only diagnostic « ${plan.title} » (budget ${this.budgetLine().actions} actions).`);
     this.audit.append({
       phase: "considered", action: plan.action, runId,
       message: `Calm period — considering read-only diagnostic « ${plan.title} ».`,
@@ -176,15 +210,18 @@ export class IdleWorker {
 
     // Without a runner wired we only observe/audit (observe-only mode).
     if (!this.runMission) {
+      log.debug("💤 Idle run skipped — no mission runner wired (observe-only mode).");
       this.audit.append({ phase: "skipped", action: plan.action, message: "No mission runner wired (observe-only mode).", runId });
       return false;
     }
 
     this.running = true;
     const perMission = this.budget.perMissionBudget();
+    const startedAt = Date.now();
+    log.info(`💤→🔬 Idle diagnostic launching (dry-run) « ${plan.title} » [${allowlist.length} read-only tools, timeout ${Math.round(this.caps.timeoutMs / 1000)}s, runId ${runId.slice(0, 8)}].`);
     this.audit.append({
       phase: "started", action: plan.action, runId, skills: allowlist.slice(0, 12), dryRun: true,
-      message: `Launching read-only (dry-run) mission « ${plan.title} ».`,
+      message: `Launching read-only (dry-run) mission « ${plan.title} » (timeout ${Math.round(this.caps.timeoutMs / 1000)}s, ≤${this.caps.maxSubGoals} sub-goals).`,
     });
 
     try {
@@ -194,10 +231,12 @@ export class IdleWorker {
         availableSkills: allowlist,
         dryRun: true,
         budget: perMission,
+        caps: this.caps,
       });
       // Account the real usage (defaults to one action with 0 tokens/cost).
       this.budget.record({ tokens: result.tokens, costUsd: result.costUsd });
       const outcome = result.success ? "success" : result.escalate ? "blocked" : "failed";
+      log.info(`🔬 Idle diagnostic ${outcome} in ${Date.now() - startedAt}ms « ${plan.title} » — ${result.tokens ?? 0} tokens, $${(result.costUsd ?? 0).toFixed(4)} (budget now ${this.budgetLine().actions} actions).`);
       this.audit.append({
         phase: "completed", action: plan.action, runId, outcome,
         tokens: result.tokens, costUsd: result.costUsd, dryRun: true,
@@ -208,9 +247,11 @@ export class IdleWorker {
     } catch (error) {
       // A thrown mission still consumed an action slot.
       this.budget.record({});
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`🔬 Idle diagnostic errored after ${Date.now() - startedAt}ms « ${plan.title} »: ${msg}`);
       this.audit.append({
         phase: "error", action: plan.action, runId, outcome: "error",
-        message: error instanceof Error ? error.message : String(error),
+        message: msg,
         budget: this.budgetLine(),
       });
       return true;

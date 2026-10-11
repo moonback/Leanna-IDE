@@ -479,6 +479,23 @@ void eventBridge.start();
 // Durable task store enabling checkpoint/resume of autonomy tasks after a crash.
 // Degrades silently to in-memory only when Supabase is not configured.
 const autonomyPersistence = new AutonomyPersistence();
+
+// Bornes d'exécution des missions autonomes (réactives/anticipation). Elles sont
+// investigatives (analyse/récupération/escalade), pas des productions de fichier,
+// et doivent rester bornées en temps et en taille de plan pour ne pas monopoliser
+// le runtime en arrière-plan. Valeurs issues de l'environnement, repli sûr.
+const autonomyMissionCaps = (() => {
+  const pos = (v: string | undefined, fallback: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  };
+  return {
+    missionTimeoutMs: pos(process.env.LEANNA_AUTONOMY_MISSION_TIMEOUT_MS, 300_000), // 5 min
+    maxSubGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_SUBGOALS, 3),
+    maxConcurrentGoals: pos(process.env.LEANNA_AUTONOMY_MISSION_MAX_CONCURRENT_GOALS, 1),
+  };
+})();
+
 const leannaCore = new LeannaCore(runtimeV2, {
   persistence: autonomyPersistence,
   executive: {
@@ -502,6 +519,13 @@ const leannaCore = new LeannaCore(runtimeV2, {
           .filter((name: string) => !name.startsWith("browser_") || name === "browser_web_search"),
         budget: goal.budget,
         dryRun: runtimeV2.tools.getDryRun().isEnabled(),
+        // Les missions autonomes sont INVESTIGATIVES : leur livrable est l'analyse
+        // + la récupération/escalade, pas un fichier écrit. Sans ce flag, le
+        // contrôle « artefact-produit » les faisait échouer systématiquement
+        // (ex. « analyser les échecs récurrents » bloquée faute d'écriture).
+        expectsArtifact: false,
+        // Bornes de temps/plan pour qu'une mission de fond ne tourne pas 3 min+.
+        configOverrides: autonomyMissionCaps,
       });
       const completed = await executor.waitForMission(mission.id);
       const success = completed?.status === "completed";
@@ -518,7 +542,7 @@ const leannaCore = new LeannaCore(runtimeV2, {
   // dryRun:true so the mission can never mutate anything, and we report the
   // real accounted usage so the per-hour budget stays honest.
   idleWork: {
-    runMission: async ({ title, description, availableSkills, budget }) => {
+    runMission: async ({ title, description, availableSkills, budget, caps }) => {
       const executor = skillManager.missionExecutor;
       if (!executor) {
         return { success: false, escalate: true, summary: "Mission system is not initialized yet." };
@@ -530,6 +554,13 @@ const leannaCore = new LeannaCore(runtimeV2, {
         availableSkills,
         budget,
         dryRun: true, // read-only: side effects are simulated, never applied.
+        // Keep a background diagnostic short: tight wall-time + plan-size caps so
+        // an idle run can't balloon into a long, 25-step mission.
+        configOverrides: {
+          missionTimeoutMs: caps.timeoutMs,
+          maxSubGoals: caps.maxSubGoals,
+          maxConcurrentGoals: caps.maxConcurrentGoals,
+        },
       });
       const completed = await executor.waitForMission(mission.id);
       // Prefer the real accounted usage from telemetry; fall back to the

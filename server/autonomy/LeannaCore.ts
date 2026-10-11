@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { AgentRuntime, EventBus } from "../runtime/index.js";
 import type { RuntimeEvent } from "../runtime/types.js";
+import { createLogger } from "../utils/logger.js";
 import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js";
 import { PerceptionEngine } from "./PerceptionEngine.js";
 import { AnticipationEngine, anticipationConfigFromEnv, type AnticipationEngineConfig, type AnticipationProposal } from "./AnticipationEngine.js";
@@ -124,6 +125,10 @@ export interface LeannaCoreOptions {
 
 const MAX_RECENT_FAILURES = 20;
 
+const log = createLogger("Autonomy:Core");
+/** Short id for readable logs. */
+const coreSid = (id?: string): string => (id ? id.slice(0, 8) : "—");
+
 /**
  * Event-driven autonomy coordinator. It reuses the Runtime EventBus and keeps
  * all tool/mission execution behind existing permission, dry-run and approval
@@ -203,6 +208,11 @@ export class LeannaCore {
   start(): void {
     if (this.started) return;
     this.started = true;
+    log.info(
+      `🧠 Autonomy runtime starting — anticipation:${this.anticipation ? "on" : "off"}, ` +
+      `executive:${this.executive ? "on" : "off"}, idle-work:${this.idleWorker ? "on" : "off"}, ` +
+      `persistence:${this.persistence ? "on" : "off"}.`,
+    );
     this.setStatus("watching", "Autonomy runtime started.");
     this.unsubscribers.push(this.events.onAny((event) => this.handleEvent(event)));
     this.unsubscribers.push(this.events.on("autonomy:heartbeat", (event) => this.handleHeartbeat(event.state)));
@@ -212,6 +222,7 @@ export class LeannaCore {
     this.anticipation?.start();
     this.heartbeat.start();
     void this.resumePersistedTasks();
+    log.info("🧠 Autonomy runtime started — watching.");
   }
 
   /**
@@ -263,20 +274,26 @@ export class LeannaCore {
     if (!this.persistence) return;
     try {
       const pending = await this.persistence.loadPendingTasks();
-      if (pending.length === 0) return;
+      if (pending.length === 0) {
+        log.debug("♻️  Resume: no persisted autonomy tasks to restore.");
+        return;
+      }
+      log.info(`♻️  Resume: ${pending.length} persisted task(s) found; restoring…`);
       const restored = this.taskManager.restore(pending);
       if (restored > 0) {
         this.state.lastWakeAt = Date.now();
         this.heartbeat.wake("autonomy:resume");
         this.setStatus("watching", `Resumed ${restored} persisted autonomy task(s).`);
+        log.info(`♻️  Resume: ${restored}/${pending.length} task(s) re-enqueued (others deduped/circuit-blocked).`);
       }
-    } catch {
-      /* recovery is best-effort; the store logs its own errors */
+    } catch (error) {
+      log.warn(`♻️  Resume failed (best-effort): ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async stop(): Promise<void> {
     if (!this.started) return;
+    log.info("🧠 Autonomy runtime stopping — graceful shutdown requested.");
     this.setStatus("stopping", "Graceful shutdown requested.");
     this.heartbeat.stop();
     this.anticipation?.stop();
@@ -284,6 +301,7 @@ export class LeannaCore {
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     await this.taskManager.stop();
     this.started = false;
+    log.info("🧠 Autonomy runtime stopped.");
   }
 
   getState(): Readonly<LeannaRuntimeState> {
@@ -365,12 +383,16 @@ export class LeannaCore {
     });
 
     if (task) {
+      log.info(`📥 Task ${coreSid(task.id)} created [${task.type}/${task.priority}] from ${event.type} — ${perception.reason}`);
       this.events.emit({
         type: "autonomy:taskCreated",
         taskId: task.id,
         taskType: task.type,
         sourceEventId: task.sourceEventId,
       });
+    } else {
+      // submit() returned undefined → deduped, queue full, or circuit open.
+      log.debug(`📥 Task not queued for ${event.type} (${perception.reason}) — deduped, queue full, or circuit open.`);
     }
   }
 
@@ -395,8 +417,12 @@ export class LeannaCore {
       this.state.recentFailures = [task.error ?? task.title, ...this.state.recentFailures].slice(0, MAX_RECENT_FAILURES);
       this.state.health = "degraded";
       this.setStatus("error", `Task ${task.id} reached the dead-letter queue.`);
+      log.error(`☠️  Task ${coreSid(task.id)} [${task.type}] reached dead-letter after ${task.attempts} attempt(s): ${task.error ?? "unknown error"}`);
     } else if (task.status === "completed" && this.started) {
       this.setStatus("watching", "Autonomy task completed.");
+      log.info(`✅ Task ${coreSid(task.id)} [${task.type}] completed.`);
+    } else {
+      log.debug(`🔄 Task ${coreSid(task.id)} [${task.type}] ${previous} → ${task.status}`);
     }
   }
 
@@ -414,8 +440,13 @@ export class LeannaCore {
   private healthCheck(): { attentionRequired: boolean; reason: string } {
     const stats = this.runtime.getStats();
     const degraded = !this.runtime.isRunning || stats.tasks.failed > 0 || this.state.recentFailures.length > 0;
+    const previous = this.state.health;
     this.state.health = degraded ? "degraded" : "healthy";
     const reason = degraded ? "Runtime has failed tasks or is stopped." : "Runtime healthy.";
+    if (previous !== this.state.health) {
+      const emoji = degraded ? "❤️‍🩹" : "💚";
+      log[degraded ? "warn" : "info"](`${emoji} Health ${previous} → ${this.state.health} — ${reason}`);
+    }
     this.events.emit({ type: "autonomy:health", status: this.state.health, reason });
     return { attentionRequired: degraded, reason };
   }
@@ -424,6 +455,8 @@ export class LeannaCore {
     const from = this.state.status;
     if (from === to) return;
     this.state.status = to;
+    const level = to === "error" ? "warn" : "debug";
+    log[level](`🧭 Runtime ${from} → ${to}${reason ? ` — ${reason}` : ""}`);
     this.events.emit({ type: "autonomy:stateChanged", from, to, reason });
   }
 

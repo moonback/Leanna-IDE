@@ -49,12 +49,31 @@ export interface AutonomyTask {
   error?: string;
 }
 
+/**
+ * Raw proposal shape as persisted server-side (AnticipationEngine.getProposals()).
+ * It uses `id` (not `proposalId`) and carries `fingerprint`/`createdAt`. The live
+ * WebSocket *event* shape instead uses `proposalId`. We normalise both into the
+ * client `AnticipationProposal` so consumers always have a stable `proposalId`
+ * (used as a React key) — fixes the "unique key prop" warning.
+ */
+interface RawServerProposal {
+  id?: string;
+  proposalId?: string;
+  kind: AnticipationProposal['kind'];
+  importance: number;
+  priority: AnticipationProposal['priority'];
+  message: string;
+  affectedResources?: string[];
+  suggestedAction: string;
+  queuedAsTask?: boolean;
+}
+
 interface SnapshotMessage {
   type: 'autonomy_snapshot';
   timestamp: string;
   state: AutonomyState;
   tasks: AutonomyTask[];
-  proposals?: AnticipationProposal[];
+  proposals?: RawServerProposal[];
 }
 
 interface EventMessage {
@@ -65,6 +84,20 @@ interface EventMessage {
 }
 
 type IncomingMessage = SnapshotMessage | EventMessage;
+
+/** Normalise a server/event proposal into the client shape with a stable id. */
+function normalizeProposal(raw: RawServerProposal): AnticipationProposal {
+  return {
+    proposalId: raw.proposalId ?? raw.id ?? `${raw.kind}:${raw.suggestedAction}`,
+    kind: raw.kind,
+    importance: raw.importance,
+    priority: raw.priority,
+    message: raw.message,
+    affectedResources: Array.isArray(raw.affectedResources) ? raw.affectedResources : [],
+    suggestedAction: raw.suggestedAction,
+    queuedAsTask: Boolean(raw.queuedAsTask),
+  };
+}
 
 export type AutonomyConnectionStatus = 'connecting' | 'open' | 'closed';
 
@@ -146,7 +179,7 @@ export function useAutonomyTimeline({
     if (data.type === 'autonomy_snapshot') {
       setState(data.state ?? null);
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
-      if (Array.isArray(data.proposals)) setProposals(data.proposals);
+      if (Array.isArray(data.proposals)) setProposals(data.proposals.map(normalizeProposal));
       return;
     }
 
@@ -171,7 +204,7 @@ export function useAutonomyTimeline({
       }
       // Live anticipation proposal → prepend (deduped by proposalId), bounded.
       if (data.event === 'autonomy:anticipation' && typeof data.payload?.proposalId === 'string') {
-        const proposal = data.payload as unknown as AnticipationProposal;
+        const proposal = normalizeProposal(data.payload as unknown as RawServerProposal);
         setProposals((prev) => {
           const next = [proposal, ...prev.filter((p) => p.proposalId !== proposal.proposalId)];
           return next.slice(0, 50);
