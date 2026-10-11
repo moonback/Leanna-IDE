@@ -31,7 +31,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-1242%20passing-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-1260%20passing-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
