@@ -18,6 +18,16 @@
  * It rides the existing heartbeat tick (no new timer) and launches through the
  * SAME executeMission seam as every other autonomy mission, so permissions,
  * dry-run and approval policy are unchanged.
+ *
+ * ── What this revision improves (behaviour preserved) ───────────────────────
+ *   • Less wasted work in calm periods: the budget pre-flight runs BEFORE the
+ *     tool inventory is built, and the read-only allowlist is cached with a
+ *     short TTL instead of being recomputed on every heartbeat.
+ *   • Stronger async handling: the worker enforces its OWN wall-clock deadline
+ *     around the mission (defence-in-depth if the runner ignores caps.timeoutMs)
+ *     and closes the admit()→running race so two idle missions can never overlap.
+ *   • Clearer rotation: the plan cursor only advances when a plan is actually
+ *     launched, so an eligible diagnostic is never silently skipped in the ring.
  */
 
 import { randomUUID } from "crypto";
@@ -72,6 +82,21 @@ export const idleMissionCapsFromEnv = (env: NodeJS.ProcessEnv = process.env): Id
   maxSubGoals: positiveInt(Number(env.LEANNA_AUTONOMY_IDLE_MAX_SUBGOALS), 2),
   maxConcurrentGoals: positiveInt(Number(env.LEANNA_AUTONOMY_IDLE_MAX_CONCURRENT_GOALS), 1),
 });
+
+/**
+ * How long the derived read-only allowlist is reused before being rebuilt from
+ * the ToolRegistry. The tool set is stable at runtime once bootstrapped, so a
+ * short TTL spares a full inventory walk on every calm heartbeat while still
+ * picking up any late MCP/custom registrations within a few seconds.
+ */
+const ALLOWLIST_TTL_MS = 30_000;
+
+/**
+ * Safety margin added to caps.timeoutMs for the worker's OWN deadline guard.
+ * The runner is expected to honour caps.timeoutMs; this outer guard only trips
+ * if it does not, so it is deliberately a little looser than the inner cap.
+ */
+const DEADLINE_GRACE_MS = 15_000;
 
 /** A read-only diagnostic Leanna can run on her own. */
 interface IdlePlan {
@@ -132,10 +157,13 @@ export class IdleWorker {
 
   /** Kill switch: when paused, no self-initiated work is launched. */
   private paused = false;
-  /** Guards against overlapping idle missions. */
+  /** Guards against overlapping idle missions (claimed before any await). */
   private running = false;
   /** Round-robin cursor over IDLE_PLANS. */
   private planCursor = 0;
+
+  /** Cached read-only allowlist + the moment it was derived (TTL-gated). */
+  private allowlistCache?: { skills: string[]; at: number };
 
   constructor(private readonly runtime: AgentRuntime, options: IdleWorkerOptions = {}) {
     this.budget = options.budget ?? new AutonomyBudget();
@@ -163,17 +191,29 @@ export class IdleWorker {
   }
 
   isPaused(): boolean { return this.paused; }
+  isRunning(): boolean { return this.running; }
   getAuditLog(): AutonomyAuditLog { return this.audit; }
   getBudget(): AutonomyBudget { return this.budget; }
+
+  /** Drop the cached allowlist so the next run rebuilds it from the registry. */
+  invalidateAllowlistCache(): void {
+    this.allowlistCache = undefined;
+  }
 
   /**
    * Entry point, called on each heartbeat. Only acts during genuinely calm
    * periods (idle/sleep, not busy). Returns true when a mission was launched.
+   *
+   * Fast rejections (disabled / paused / active / busy / already running) are
+   * checked first so a calm heartbeat does almost no work. The budget
+   * pre-flight is also consulted here, BEFORE the heavier allowlist/plan work,
+   * so a hour spent at the ceiling never rebuilds the tool inventory for nothing.
    */
   async onHeartbeat(state: "active" | "idle" | "sleep"): Promise<boolean> {
     if (!this.enabled || this.paused) return false;
     if (state === "active") return false;
     if (this.running || this.isBusy()) return false;
+    if (!this.budget.admit().allowed) return false;
     return this.runOnce();
   }
 
@@ -183,8 +223,19 @@ export class IdleWorker {
    */
   async runOnce(): Promise<boolean> {
     if (!this.enabled || this.paused) return false;
+    // Claim the single-flight slot synchronously, before any await, so a second
+    // heartbeat that fires during the admit/allowlist work cannot slip through.
     if (this.running) return false;
+    this.running = true;
+    try {
+      return await this.runOnceInner();
+    } finally {
+      this.running = false;
+    }
+  }
 
+  /** The actual run, executed while the single-flight slot is held. */
+  private async runOnceInner(): Promise<boolean> {
     const runId = randomUUID();
     const admit = this.budget.admit();
     if (!admit.allowed) {
@@ -215,7 +266,10 @@ export class IdleWorker {
       return false;
     }
 
-    this.running = true;
+    // Only now do we commit this slot of the rotation; a plan that could not be
+    // launched (budget/observe-only) never advances the ring.
+    this.commitPlanCursor(plan);
+
     const perMission = this.budget.perMissionBudget();
     const startedAt = Date.now();
     log.info(`💤→🔬 Idle diagnostic launching (dry-run) « ${plan.title} » [${allowlist.length} read-only tools, timeout ${Math.round(this.caps.timeoutMs / 1000)}s, runId ${runId.slice(0, 8)}].`);
@@ -225,14 +279,14 @@ export class IdleWorker {
     });
 
     try {
-      const result = await this.runMission({
+      const result = await this.runWithDeadline(this.runMission({
         title: plan.title,
         description: plan.description,
         availableSkills: allowlist,
         dryRun: true,
         budget: perMission,
         caps: this.caps,
-      });
+      }));
       // Account the real usage (defaults to one action with 0 tokens/cost).
       this.budget.record({ tokens: result.tokens, costUsd: result.costUsd });
       const outcome = result.success ? "success" : result.escalate ? "blocked" : "failed";
@@ -245,7 +299,7 @@ export class IdleWorker {
       });
       return true;
     } catch (error) {
-      // A thrown mission still consumed an action slot.
+      // A thrown or timed-out mission still consumed an action slot.
       this.budget.record({});
       const msg = error instanceof Error ? error.message : String(error);
       log.error(`🔬 Idle diagnostic errored after ${Date.now() - startedAt}ms « ${plan.title} »: ${msg}`);
@@ -255,9 +309,30 @@ export class IdleWorker {
         budget: this.budgetLine(),
       });
       return true;
-    } finally {
-      this.running = false;
     }
+  }
+
+  /**
+   * Defence-in-depth wall-clock guard. The runner is expected to honour
+   * caps.timeoutMs itself; this outer deadline (a little looser, by
+   * DEADLINE_GRACE_MS) only trips when it does not, so a misbehaving mission
+   * can never pin the single-flight slot indefinitely. The settled promise is
+   * ignored once the deadline wins — it stays dry-run and side-effect-free.
+   */
+  private runWithDeadline<T>(promise: Promise<T>): Promise<T> {
+    const deadlineMs = this.caps.timeoutMs + DEADLINE_GRACE_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Idle diagnostic exceeded worker deadline (${Math.round(deadlineMs / 1000)}s).`)),
+        deadlineMs,
+      );
+      // Do not keep the event loop alive just for this guard.
+      (timer as { unref?: () => void }).unref?.();
+    });
+    return Promise.race([promise, deadline]).finally(() => {
+      if (timer) clearTimeout(timer);
+    }) as Promise<T>;
   }
 
   /** Readable budget line for an audit entry (used/max per ceiling). */
@@ -275,33 +350,47 @@ export class IdleWorker {
    * authorization level is "read-only" (no write/exec/network/dangerous, and
    * not undeclared). Derived from the canonical ToolInventory classifier so the
    * definition of "read-only" matches the rest of the runtime.
+   *
+   * Cached for ALLOWLIST_TTL_MS: the tool set is stable once bootstrapped, so
+   * rebuilding the whole inventory on every calm heartbeat is wasted work.
    */
-  private readOnlyAllowlist(): string[] {
+  private readOnlyAllowlist(now = Date.now()): string[] {
+    const cached = this.allowlistCache;
+    if (cached && now - cached.at < ALLOWLIST_TTL_MS) return cached.skills;
     try {
       const inventory = buildToolInventory(this.runtime.tools);
-      return inventory.records
+      const skills = inventory.records
         .filter((record) => record.authorization === "read-only" && record.permissions.length > 0)
         .map((record) => record.name);
+      this.allowlistCache = { skills, at: now };
+      return skills;
     } catch {
-      return [];
+      // On failure, prefer a slightly stale allowlist over launching blind.
+      return cached?.skills ?? [];
     }
   }
 
   /**
    * Pick the next eligible plan (round-robin) whose preferred tools are present
    * in the read-only allowlist, so we never launch a diagnostic the current
-   * tool set cannot actually perform read-only.
+   * tool set cannot actually perform read-only. Pure lookup: the cursor is only
+   * advanced later, by commitPlanCursor, once the plan is actually launched.
    */
   private selectPlan(allowlist: string[]): IdlePlan | undefined {
     if (allowlist.length === 0) return undefined;
-    const has = (needle: string) => allowlist.some((name) => name === needle || name.includes(needle));
+    const allow = new Set(allowlist);
+    const has = (needle: string) =>
+      allow.has(needle) || allowlist.some((name) => name.includes(needle));
     for (let i = 0; i < IDLE_PLANS.length; i++) {
       const plan = IDLE_PLANS[(this.planCursor + i) % IDLE_PLANS.length];
-      if (plan.prefer.some(has)) {
-        this.planCursor = (this.planCursor + i + 1) % IDLE_PLANS.length;
-        return plan;
-      }
+      if (plan.prefer.some(has)) return plan;
     }
     return undefined;
+  }
+
+  /** Advance the round-robin cursor to just past the launched plan. */
+  private commitPlanCursor(plan: IdlePlan): void {
+    const index = IDLE_PLANS.indexOf(plan);
+    if (index >= 0) this.planCursor = (index + 1) % IDLE_PLANS.length;
   }
 }

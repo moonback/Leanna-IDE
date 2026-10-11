@@ -210,6 +210,32 @@ export class Executor {
   ];
 
   /**
+   * Budgets de temps (ms) pour la génération d'arguments par le LLM.
+   *
+   * Un timeout fixe de 20 s était trop court pour les outils d'ÉCRITURE : en
+   * mode « artefact forcé », l'arg-gen doit produire un livrable complet
+   * (contenu réel, pas un squelette), ce qui dépasse souvent 20 s et faisait
+   * échouer les trois tentatives à l'identique (`LLM arg-gen timeout`). On
+   * distingue donc deux budgets, tous deux pilotables par l'environnement, et
+   * on les élargit à chaque nouvelle tentative (backoff) plutôt que de rejouer
+   * exactement le même appel voué au même timeout.
+   */
+  private static readonly ARG_GEN_TIMEOUT_MS = Executor.positiveEnvInt(
+    process.env.LEANNA_ARG_GEN_TIMEOUT_MS, 45_000
+  );
+  private static readonly ARG_GEN_TIMEOUT_WRITE_MS = Executor.positiveEnvInt(
+    process.env.LEANNA_ARG_GEN_TIMEOUT_WRITE_MS, 75_000
+  );
+  /** Multiplicateur de budget appliqué à chaque tentative d'arg-gen (backoff). */
+  private static readonly ARG_GEN_RETRY_BACKOFF = 1.5;
+
+  /** Lit un entier positif depuis l'environnement, défaut sûr sinon. */
+  private static positiveEnvInt(value: string | undefined, fallback: number): number {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+  }
+
+  /**
    * Nombre d'actions d'exploration consécutives (sans aucune écriture réussie)
    * au-delà duquel on force une replanification orientée « produire un artefact ».
    */
@@ -1856,12 +1882,31 @@ INSTRUCTIONS:
 
 JSON:`;
 
-    const raw = await this.withTimeout(this.llmArgGen(prompt), 20_000, "arg-gen");
+    const timeoutMs = this.argGenTimeoutMs(action.skillName, goal.attempts);
+    const raw = await this.withTimeout(this.llmArgGen(prompt), timeoutMs, "arg-gen");
     const args = this.parseJsonObject(raw);
     console.log(
       `[Executor]    🧩 Arguments générés pour ${action.skillName}: ${JSON.stringify(args).slice(0, 200)}`
     );
     return args;
+  }
+
+  /**
+   * Budget de temps (ms) pour l'arg-gen d'un outil, à une tentative donnée.
+   *
+   * - Base plus large pour les WRITE_TOOLS (ils génèrent un livrable complet).
+   * - Backoff : chaque tentative supplémentaire élargit le budget (×1.5 par
+   *   tentative au-delà de la première), pour qu'un retry ne rejoue pas le même
+   *   timeout de 20 s voué au même échec, comme observé en production.
+   * - Plafonné à 3 minutes pour rester borné.
+   */
+  private argGenTimeoutMs(skillName: string, attempts = 1): number {
+    const base = Executor.WRITE_TOOLS.includes(skillName)
+      ? Executor.ARG_GEN_TIMEOUT_WRITE_MS
+      : Executor.ARG_GEN_TIMEOUT_MS;
+    const extraAttempts = Math.max(0, (attempts ?? 1) - 1);
+    const scaled = base * Math.pow(Executor.ARG_GEN_RETRY_BACKOFF, extraAttempts);
+    return Math.min(Math.round(scaled), 180_000);
   }
 
   // ─── Validation par critères de succès ──────────────────────────────────────
