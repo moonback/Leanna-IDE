@@ -69,9 +69,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'intelligence', label: 'Intelligence',
     items: [
+      { id: 'autonomy', path: '/autonomy', label: "Centre d'autonomie", icon: Gauge },
       { id: 'agent-swarm', path: '/agent-swarm', label: 'Agent Swarm', icon: Network },
       { id: 'explainability', path: '/explainability', label: 'Pourquoi ?', icon: HelpCircle },
-      { id: 'autonomy', path: '/autonomy', label: 'Autonomie', icon: Gauge },
     ],
   },
   {

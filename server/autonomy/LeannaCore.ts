@@ -5,6 +5,9 @@ import { HeartbeatService, heartbeatConfigFromEnv } from "./HeartbeatService.js"
 import { PerceptionEngine } from "./PerceptionEngine.js";
 import { AnticipationEngine, anticipationConfigFromEnv, type AnticipationEngineConfig, type AnticipationProposal } from "./AnticipationEngine.js";
 import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousExecutiveOptions } from "./AutonomousExecutive.js";
+import { IdleWorker, type IdleMissionRunner } from "./IdleWorker.js";
+import { AutonomyBudget, autonomyBudgetConfigFromEnv } from "./AutonomyBudget.js";
+import type { AutonomyAuditEntry } from "./AutonomyAuditLog.js";
 import {
   TaskManager,
   taskManagerConfigFromEnv,
@@ -104,6 +107,19 @@ export interface LeannaCoreOptions {
     autoLaunch?: boolean;
     config?: Partial<AnticipationEngineConfig>;
   };
+  /**
+   * Phase 3 — bounded idle autonomy. During calm periods (heartbeat idle/sleep,
+   * no active tasks) Leanna runs a READ-ONLY diagnostic mission instead of a
+   * static message, bounded by a budget and a kill switch and written to an
+   * audit log. Disabled unless a `runMission` runner is supplied (and the env
+   * master flag is not turned off), so the default behaviour is unchanged.
+   */
+  idleWork?: {
+    /** Master enable. Defaults to LEANNA_AUTONOMY_IDLE_WORK !== "false". */
+    enabled?: boolean;
+    /** Constrained, read-only (dry-run) mission runner. Required to launch work. */
+    runMission?: IdleMissionRunner;
+  };
 }
 
 const MAX_RECENT_FAILURES = 20;
@@ -119,6 +135,7 @@ export class LeannaCore {
   private readonly heartbeat: HeartbeatService;
   private readonly executive?: AutonomousExecutive;
   private readonly anticipation?: AnticipationEngine;
+  private readonly idleWorker?: IdleWorker;
   private readonly unsubscribers: Array<() => void> = [];
   private readonly persistence?: AutonomyTaskStore;
   private broadcaster?: AutonomyBroadcaster;
@@ -165,6 +182,20 @@ export class LeannaCore {
       this.anticipation = new AnticipationEngine(runtime, {
         config: { ...anticipationConfigFromEnv(), ...options.anticipation?.config },
         submitTask: autoLaunch ? (input) => this.taskManager.submit(input) : undefined,
+        // Suppress the static idle reflection when bounded idle autonomy will
+        // instead run a real read-only diagnostic this calm period.
+        idleWorkActive: () => Boolean(this.idleWorker) && !this.idleWorker!.isPaused(),
+      });
+    }
+    // Phase 3 — bounded idle autonomy. Off unless explicitly enabled AND a
+    // read-only mission runner is supplied; the env flag is a hard kill switch.
+    const idleEnabledByEnv = String(process.env.LEANNA_AUTONOMY_IDLE_WORK ?? "").toLowerCase() !== "false";
+    if (options.idleWork?.enabled !== false && idleEnabledByEnv && options.idleWork?.runMission) {
+      this.idleWorker = new IdleWorker(runtime, {
+        budget: new AutonomyBudget(autonomyBudgetConfigFromEnv()),
+        runMission: options.idleWork.runMission,
+        // Never run self-initiated work while real autonomy tasks are in flight.
+        isBusy: () => this.taskManager.list().some((task) => task.status === "running"),
       });
     }
   }
@@ -249,6 +280,7 @@ export class LeannaCore {
     this.setStatus("stopping", "Graceful shutdown requested.");
     this.heartbeat.stop();
     this.anticipation?.stop();
+    this.idleWorker?.pause("shutdown");
     this.unsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
     await this.taskManager.stop();
     this.started = false;
@@ -273,6 +305,36 @@ export class LeannaCore {
    */
   getProposals(): AnticipationProposal[] {
     return this.anticipation?.getProposals() ?? [];
+  }
+
+  // ─── Phase 3: bounded idle autonomy controls ────────────────────────────────
+
+  /**
+   * Kill switch — stop launching self-initiated read-only work (reversible).
+   * In-flight user/event missions are untouched; only the idle loop is halted.
+   */
+  pauseIdleWork(reason = "operator"): void {
+    this.idleWorker?.pause(reason);
+  }
+
+  /** Resume self-initiated idle work after a pause. */
+  resumeIdleWork(reason = "operator"): void {
+    this.idleWorker?.resume(reason);
+  }
+
+  /** True when idle autonomy is wired and currently paused. */
+  isIdleWorkPaused(): boolean {
+    return this.idleWorker?.isPaused() ?? false;
+  }
+
+  /** Readable audit trail of self-initiated work (most recent `limit` entries). */
+  getIdleAudit(limit = 100): AutonomyAuditEntry[] {
+    return this.idleWorker?.getAuditLog().read(limit) ?? [];
+  }
+
+  /** Current idle-autonomy budget snapshot (actions/tokens/cost per hour). */
+  getIdleBudget() {
+    return this.idleWorker?.getBudget().snapshot();
   }
 
   private get events(): EventBus {
@@ -341,6 +403,12 @@ export class LeannaCore {
   private handleHeartbeat(state: "active" | "idle" | "sleep"): void {
     if (!this.started || this.getState().activeTasks > 0) return;
     this.setStatus(state === "active" ? "watching" : state === "idle" ? "idle" : "sleeping", `Heartbeat entered ${state}.`);
+    // Phase 3: calm period → run a bounded, read-only diagnostic instead of a
+    // static message. The worker self-gates on kill switch, budget and busy
+    // state; errors are swallowed so idle work never destabilises the loop.
+    if (this.idleWorker && state !== "active") {
+      void this.idleWorker.onHeartbeat(state).catch(() => { /* idle work is best-effort */ });
+    }
   }
 
   private healthCheck(): { attentionRequired: boolean; reason: string } {

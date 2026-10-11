@@ -266,6 +266,7 @@ import { graphifySkill } from "./server/skills/graphify.js";
 import { hierarchicalMemorySkill } from "./server/skills/hierarchicalMemory.js";
 import { telegramSkill } from "./server/skills/telegram.js";
 import { telegramService } from "./server/telegram/TelegramService.js";
+import { telemetryService } from "./server/observability/TelemetryService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 import { LeannaCore } from "./server/autonomy/LeannaCore.js";
@@ -511,6 +512,39 @@ const leannaCore = new LeannaCore(runtimeV2, {
       };
     },
   },
+  // Phase 3 — bounded idle autonomy. During calm periods LeannaCore asks this
+  // runner to perform a READ-ONLY diagnostic. The caller (IdleWorker) already
+  // constrained `availableSkills` to read-only tools; we additionally force
+  // dryRun:true so the mission can never mutate anything, and we report the
+  // real accounted usage so the per-hour budget stays honest.
+  idleWork: {
+    runMission: async ({ title, description, availableSkills, budget }) => {
+      const executor = skillManager.missionExecutor;
+      if (!executor) {
+        return { success: false, escalate: true, summary: "Mission system is not initialized yet." };
+      }
+      const mission = await executor.startMission({
+        title: `Idle: ${title}`,
+        description,
+        priority: "low",
+        availableSkills,
+        budget,
+        dryRun: true, // read-only: side effects are simulated, never applied.
+      });
+      const completed = await executor.waitForMission(mission.id);
+      // Prefer the real accounted usage from telemetry; fall back to the
+      // mission's estimated tokens when telemetry has no record.
+      const usage = telemetryService.checkBudget(mission.id);
+      const tokens = usage.tokensUsed || completed?.getMetrics?.().estimatedTokens || 0;
+      return {
+        success: completed?.status === "completed",
+        escalate: !completed || completed.status === "blocked",
+        summary: completed?.toContextSummary?.() ?? "Idle diagnostic did not produce a terminal result.",
+        tokens,
+        costUsd: usage.costUsd || 0,
+      };
+    },
+  },
   onTask: async (task) => {
     // Autonomous tasks remain observable and use existing runtime memory; no tool
     // or mission action bypasses PermissionPolicy, DryRun or AutonomyPolicy.
@@ -713,6 +747,10 @@ async function startServer() {
   const { createMetricsRouter } = await import("./server/runtime/routes/metrics.js");
   app.use("/api/v2/agents", createAgentsRouterV2(runtimeV2));
   app.use("/api/v2/metrics", createMetricsRouter(runtimeV2, leannaCore));
+
+  // ─── Autonomie encadrée (Phase 3) : suivi & contrôle du travail idle ──────
+  const { createAutonomyRouter } = await import("./server/routes/autonomy.js");
+  app.use("/api/autonomy", createAutonomyRouter(leannaCore));
 
   // ─── Observability & Telemetry (OpenTelemetry + Cost Dashboard) ──────────
   const observabilityModule = await import("./server/routes/observability.js");

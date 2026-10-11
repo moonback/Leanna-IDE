@@ -143,6 +143,13 @@ export interface AnticipationEngineOptions {
    * omitted, the engine only emits proposals (observe-and-suggest mode).
    */
   submitTask?: AnticipationTaskSubmitter;
+  /**
+   * Phase 3 seam: returns true when bounded idle autonomy is active (and not
+   * paused). When it does, the static "I'm idle" reflection is suppressed —
+   * Leanna is about to run a real read-only diagnostic instead of merely
+   * saying she's available, avoiding a duplicate signal.
+   */
+  idleWorkActive?: () => boolean;
 }
 
 const PRIORITY_FROM_IMPORTANCE = (importance: number): AnticipationPriority =>
@@ -165,6 +172,7 @@ export class AnticipationEngine {
   private readonly briefing: DailyBriefing;
   private readonly config: AnticipationEngineConfig;
   private readonly submitTask?: AnticipationTaskSubmitter;
+  private readonly idleWorkActive?: () => boolean;
 
   private readonly unsubscribers: Array<() => void> = [];
   private readonly dedupe = new Map<string, number>();
@@ -185,6 +193,7 @@ export class AnticipationEngine {
     this.prediction = options.predictionEngine ?? predictionEngine;
     this.briefing = options.dailyBriefing ?? dailyBriefing;
     this.submitTask = options.submitTask;
+    this.idleWorkActive = options.idleWorkActive;
   }
 
   start(): void {
@@ -293,7 +302,11 @@ export class AnticipationEngine {
     // "Vivant" : si rien de plus pressant n'a émergé pendant une période calme,
     // Leanna remarque tout de même qu'elle est disponible et réfléchit au projet.
     // Faible importance → surfacé seulement, jamais transformé en mission.
-    if (dueForReflection && emitted.length === 0) {
+    //
+    // Phase 3: when bounded idle autonomy is active it will run a real read-only
+    // diagnostic during this calm period, so we suppress the static reflection
+    // to avoid a duplicate "I'm available" signal.
+    if (dueForReflection && emitted.length === 0 && !this.idleWorkActive?.()) {
       this.reflect(state);
     }
   }
