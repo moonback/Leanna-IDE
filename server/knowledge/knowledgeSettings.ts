@@ -25,12 +25,12 @@ const log = createLogger("KnowledgeSettings");
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface KnowledgeSettings {
-  /** Extraction automatique des documents du workspace (défaut: true). */
+  /** Extraction automatique des documents du workspace (défaut: false). */
   documentExtractionEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: KnowledgeSettings = {
-  documentExtractionEnabled: true,
+  documentExtractionEnabled: false,
 };
 
 // ─── Persistance (par projet) ─────────────────────────────────────────────────

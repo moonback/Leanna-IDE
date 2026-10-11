@@ -11,7 +11,8 @@ import { useToast } from '../ui/Toast.js';
  */
 function DocumentExtractionToggle() {
   const { success, error: toastError } = useToast();
-  const [enabled, setEnabled] = useState(true);
+  // Désactivée par défaut (aligné sur le défaut serveur) tant que l'API n'a pas répondu.
+  const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
