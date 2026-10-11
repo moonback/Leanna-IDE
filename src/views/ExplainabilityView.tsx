@@ -49,7 +49,7 @@ const PRESETS: string[] = [
   'Refactoriser sans casser les tests',
 ];
 
-export default function ExplainabilityView() {
+export default function ExplainabilityView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const [objective, setObjective] = useState('');
   const [data, setData] = useState<ExplainResponse | null>(null);
@@ -95,22 +95,24 @@ export default function ExplainabilityView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        {...viewHeaderProps('explainability')}
-        description="Les facteurs décisionnels derrière les choix de Leanna : probabilité, stratégie, historique, risques"
-        badge="Décision"
-        actions={data ? (
-          <button
-            type="button"
-            onClick={copyData}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copié' : 'Copier'}
-          </button>
-        ) : undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('explainability')}
+          description="Les facteurs décisionnels derrière les choix de Leanna : probabilité, stratégie, historique, risques"
+          badge="Décision"
+          actions={data ? (
+            <button
+              type="button"
+              onClick={copyData}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          ) : undefined}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

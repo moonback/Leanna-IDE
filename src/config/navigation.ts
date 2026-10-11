@@ -25,12 +25,16 @@ export const ROUTES = {
   home: '/',
   ide: '/ide',
   settings: '/settings',
-  missionControl: '/mission-control',
-  missionTimeline: '/mission-timeline',
+  // ── Pilotage hub (étape 3 : 6 vues fusionnées) ───────────────────────
+  pilotage: '/pilotage',
+  // Old individual routes — kept as aliases that redirect to /pilotage?tab=…
+  missionControl:    '/mission-control',
+  missionTimeline:   '/mission-timeline',
   missionSimulation: '/mission-simulation',
-  agentSwarm: '/agent-swarm',
-  explainability: '/explainability',
-  autonomy: '/autonomy',
+  agentSwarm:        '/agent-swarm',
+  explainability:    '/explainability',
+  autonomy:          '/autonomy',
+  // ────────────────────────────────────────────────────────────────────
   automation: '/automation',
   notebooks: '/notebooks',
   documents: '/documents',
@@ -42,6 +46,7 @@ export const ROUTES = {
 } as const;
 
 export type NavId =
+  | 'pilotage'
   | 'mission-control' | 'mission-timeline' | 'mission-simulation'
   | 'agent-swarm' | 'explainability' | 'autonomy'
   | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
@@ -52,6 +57,9 @@ export interface NavItem { id: string; path: string; label: string; icon: Lucide
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_ITEMS: Record<NavId, NavItem> = {
+  // ── Pilotage hub ──────────────────────────────────────────────────────
+  'pilotage':           { id: 'pilotage',           path: ROUTES.pilotage,          label: 'Pilotage',        icon: LayoutDashboard },
+  // Individual nav items (still used by viewHeaderProps + deep-link redirects)
   'mission-control':    { id: 'mission-control',    path: ROUTES.missionControl,    label: 'Mission Control', icon: LayoutDashboard },
   'mission-timeline':   { id: 'mission-timeline',   path: ROUTES.missionTimeline,   label: 'Missions',        icon: Milestone },
   'mission-simulation': { id: 'mission-simulation', path: ROUTES.missionSimulation, label: 'Simulation',      icon: FlaskConical },
@@ -74,12 +82,13 @@ export const NAV_ITEMS: Record<NavId, NavItem> = {
 const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
 
 /**
- * Regroupement par intention. « Pilotage » réunit les 6 vues qui lisent toutes
- * /api/missions : préparation de leur fusion en une page à onglets (étape 3).
+ * Regroupement par intention.
+ * « Pilotage » est maintenant une entrée unique qui pointe vers /pilotage
+ * (la page à onglets fusionnée — étape 3).
  */
 export const NAV_GROUPS: NavGroup[] = [
   { id: 'pilotage', label: 'Pilotage',
-    items: pick('mission-control', 'mission-timeline', 'mission-simulation', 'agent-swarm', 'autonomy', 'explainability') },
+    items: [NAV_ITEMS['pilotage']] },
   { id: 'travail', label: 'Travail',
     items: pick('ide', 'notebooks', 'documents', 'github', 'automation') },
   { id: 'memoire', label: 'Mémoire',

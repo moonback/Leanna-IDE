@@ -28,17 +28,19 @@ const SAFEGUARD_LABELS: { key: 'autoCheckpoint' | 'postEditValidation' | 'critic
   { key: 'autoRestart', label: 'Redémarrage contrôlé' },
 ];
 
-export default function AutonomyView() {
+export default function AutonomyView({ embedded = false }: { embedded?: boolean }) {
   const { config, update } = useSafeguardsConfig();
   const approvals = usePendingApprovals();
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        {...viewHeaderProps('autonomy')}
-        description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
-        badge="En direct"
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('autonomy')}
+          description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
+          badge="En direct"
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

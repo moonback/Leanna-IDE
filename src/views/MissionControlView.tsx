@@ -54,7 +54,7 @@ function scoreColor(n: number): string {
   return 'var(--color-error)';
 }
 
-export default function MissionControlView() {
+export default function MissionControlView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const { state, proposals, connection } = useAutonomyTimeline({ enabled: true });
@@ -103,23 +103,25 @@ export default function MissionControlView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        {...viewHeaderProps('mission-control')}
-        description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
-        badge={connection === 'open' ? 'En direct' : 'Hors ligne'}
-        actions={
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-60"
-            style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            Actualiser
-          </button>
-        }
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('mission-control')}
+          description="Ce que Leanna sait, fait, a découvert et propose — en un seul tableau de bord"
+          badge={connection === 'open' ? 'En direct' : 'Hors ligne'}
+          actions={
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-60"
+              style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Actualiser
+            </button>
+          }
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

@@ -41,7 +41,7 @@ const PRESETS: string[] = [
 
 type ViewMode = 'pipeline' | 'grouped';
 
-export default function AgentSwarmView() {
+export default function AgentSwarmView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const [objective, setObjective] = useState('');
@@ -127,22 +127,24 @@ export default function AgentSwarmView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        {...viewHeaderProps('agent-swarm')}
-        description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
-        badge="Composition"
-        actions={composition ? (
-          <button
-            type="button"
-            onClick={copyComposition}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copié' : 'Copier'}
-          </button>
-        ) : undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('agent-swarm')}
+          description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
+          badge="Composition"
+          actions={composition ? (
+            <button
+              type="button"
+              onClick={copyComposition}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          ) : undefined}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

@@ -346,7 +346,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 agent={agent}
                 collapsed={collapsed}
                 reduceMotion={reduceMotion}
-                onClick={() => navigate('/mission-control')}
+                onClick={() => navigate('/pilotage')}
               />
             )}
 

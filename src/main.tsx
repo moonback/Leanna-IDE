@@ -34,13 +34,8 @@ const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
-const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
-const MissionControlView = lazy(() => import('./views/MissionControlView.js'));
-const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'));
-const MissionSimulationView = lazy(() => import('./views/MissionSimulationView.js'));
-const AgentSwarmView = lazy(() => import('./views/AgentSwarmView.js'));
-const ExplainabilityView = lazy(() => import('./views/ExplainabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
+const PilotageView = lazy(() => import('./views/PilotageView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -512,12 +507,18 @@ function AnimatedRoutes() {
         <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
         <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
         <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
-        <Route path={ROUTES.autonomy}      element={wrap(<AutonomyView />)} />
-        <Route path={ROUTES.missionControl} element={wrap(<MissionControlView />)} />
-        <Route path={ROUTES.missionTimeline} element={wrap(<MissionTimelineView />)} />
-        <Route path={ROUTES.missionSimulation} element={wrap(<MissionSimulationView />)} />
-        <Route path={ROUTES.agentSwarm}   element={wrap(<AgentSwarmView />)} />
-        <Route path={ROUTES.explainability} element={wrap(<ExplainabilityView />)} />
+
+        {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
+        <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
+        {/* Old routes — backward-compatible deep links (navigate(ROUTES.missionTimeline) etc.) */}
+        <Route path={ROUTES.autonomy}          element={<Navigate to="/pilotage?tab=autonomie"        replace />} />
+        <Route path={ROUTES.missionControl}    element={<Navigate to="/pilotage"                     replace />} />
+        <Route path={ROUTES.missionTimeline}   element={<Navigate to="/pilotage?tab=missions"         replace />} />
+        <Route path={ROUTES.missionSimulation} element={<Navigate to="/pilotage?tab=simulation"       replace />} />
+        <Route path={ROUTES.agentSwarm}        element={<Navigate to="/pilotage?tab=swarm"            replace />} />
+        <Route path={ROUTES.explainability}    element={<Navigate to="/pilotage?tab=pourquoi"         replace />} />
+        {/* ──────────────────────────────────────────────────────────────────── */}
+
         {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}
         <Route path="*" element={<Navigate to={ROUTES.ide} replace />} />
       </Routes>
