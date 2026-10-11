@@ -21,8 +21,18 @@ export const AUDIT_WORKFLOW_DEFINITION = {
   description:
     "Audit automatique complet : vérifie l'état Git, génère le codebase.md, vérifie la compilation TypeScript, " +
     "exécute les tests, lance un audit de sécurité (SAST + dépendances), recense les missions en cours, " +
-    "et sauvegarde un rapport détaillé en mémoire. S'exécute toutes les 24h.",
+    "et sauvegarde un rapport détaillé en mémoire. S'exécute toutes les 24h. " +
+    "Exécution optimisée (DAG) : les étapes légères (git, missions) tournent en parallèle, " +
+    "tandis que les étapes lourdes (codebase, typecheck, tests, sécurité) sont sérialisées " +
+    "entre elles pour ne pas saturer la machine.",
   schedule: "24h",
+  // ── Plan d'exécution (DAG) ────────────────────────────────────────────────
+  //  Vague 1 (parallèle) : git-check | git-log-recent | check-missions | generate-codebase
+  //  Chaîne lourde (sérialisée) : generate-codebase → typecheck → run-tests → security-audit
+  //  Vague finale : save-report (dépend de tout)
+  //
+  //  Les étapes légères ne bloquent plus la chaîne lourde : gain net de temps
+  //  mural sans faire tourner tsc + tests + audit npm simultanément.
   steps: [
     {
       id: "git-check",
@@ -31,6 +41,7 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "État Git (branche, fichiers modifiés/staged/untracked)",
       onError: "skip" as const,
       maxRetries: 0,
+      // Léger → aucune dépendance : démarre immédiatement en parallèle.
     },
     {
       id: "generate-codebase",
@@ -42,6 +53,7 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       // Scan complet du projet + analyse LLM OpenRouter sur des centaines de
       // fichiers : 60s (défaut) est insuffisant. On accorde jusqu'à 10 min.
       timeoutMs: 600_000,
+      // Tête de la chaîne lourde → démarre en parallèle des étapes légères.
     },
     {
       id: "typecheck",
@@ -50,6 +62,8 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "Vérification TypeScript (tsc --noEmit) — détection d'erreurs de typage",
       onError: "skip" as const,
       maxRetries: 0,
+      // Sérialisé après la génération du codebase (évite tsc + scan simultanés).
+      dependsOn: ["generate-codebase"],
     },
     {
       id: "run-tests",
@@ -58,6 +72,8 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "Exécution complète de la suite de tests",
       onError: "skip" as const,
       maxRetries: 0,
+      // Sérialisé après le typecheck (évite tsc + suite de tests simultanés).
+      dependsOn: ["typecheck"],
     },
     {
       id: "security-audit",
@@ -68,6 +84,8 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       maxRetries: 0,
       // Scan SAST + audit npm sur l'ensemble du projet : peut dépasser 60s.
       timeoutMs: 300_000,
+      // Sérialisé après les tests (dernière étape lourde de la chaîne).
+      dependsOn: ["run-tests"],
     },
     {
       id: "check-missions",
@@ -76,6 +94,7 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "Liste des missions actives et récemment terminées",
       onError: "skip" as const,
       maxRetries: 0,
+      // Léger → aucune dépendance : démarre immédiatement en parallèle.
     },
     {
       id: "git-log-recent",
@@ -84,9 +103,21 @@ export const AUDIT_WORKFLOW_DEFINITION = {
       label: "Historique des 10 derniers commits (contexte des changements)",
       onError: "skip" as const,
       maxRetries: 0,
+      // Léger → aucune dépendance : démarre immédiatement en parallèle.
     },
     {
       id: "save-report",
+      // Dépend de toutes les étapes de collecte → exécuté en dernière vague,
+      // une fois toutes les données disponibles pour le rapport.
+      dependsOn: [
+        "git-check",
+        "generate-codebase",
+        "typecheck",
+        "run-tests",
+        "security-audit",
+        "check-missions",
+        "git-log-recent",
+      ],
       action: "save_memory",
       args: {
         content:

@@ -1,16 +1,36 @@
 /**
- * WorkflowEngine — Moteur d'exécution de workflows déclaratifs
- * 
+/**
+ * WorkflowEngine — Moteur d'exécution de workflows déclaratifs (Runtime V2)
+ *
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │ ⚠️  NON BRANCHÉ EN PRODUCTION — moteur de référence / expérimental.       │
+ * │                                                                           │
+ * │ Le moteur de workflow ACTIF de l'application est `server/skills/          │
+ * │ workflow.ts`. C'est lui qui est câblé au démarrage (setWorkflowSkillHandler│
+ * │ dans server.ts), chargé depuis Supabase, planifié par timers, exposé via  │
+ * │ les outils `workflow_*` (automation.ts) et les routes REST                │
+ * │ `/api/workflows`.                                                         │
+ * │                                                                           │
+ * │ Cette classe V2 n'est instanciée QUE dans les tests (runtime.test.ts).    │
+ * │ Ses apports (exécution DAG en vagues parallèles via `dependsOn`) ont été  │
+ * │ portés dans le moteur legacy actif (voir `planWorkflowWaves` et           │
+ * │ l'exécution par vagues dans skills/workflow.ts). Ne pas y ajouter de      │
+ * │ logique métier tant qu'il n'est pas officiellement adopté et branché au   │
+ * │ bootstrap serveur + persistance + scheduling.                            │
+ * └─────────────────────────────────────────────────────────────────────────┘
+ *
  * Exécute des workflows décrits en JSON/YAML avec résolution automatique
  * des dépendances entre étapes (DAG topologique).
- * 
+ *
  * Fonctionnalités :
- * - Chargement de workflows depuis fichiers ou BDD
  * - Résolution de dépendances (exécution parallèle quand possible)
  * - Templates dans les arguments ({{prev.result}}, {{steps.X.result}})
  * - Conditions d'exécution par étape
  * - Retry et error handling configurables
  * - Événements temps réel via EventBus
+ *
+ * Manques connus vs moteur legacy actif : pas de persistance BDD, pas de
+ * scheduling (timers), condition eval naïve (une seule comparaison).
  */
 
 import type {

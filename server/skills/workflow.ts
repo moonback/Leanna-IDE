@@ -18,6 +18,13 @@ export interface WorkflowStep {
   /** Nombre max de retries si onError = 'retry' */
   maxRetries?: number;
   /**
+   * IDs des étapes dont celle-ci dépend. Si fourni, le moteur construit un
+   * DAG et exécute en vagues parallèles (les étapes sans dépendance mutuelle
+   * tournent ensemble). Si absent sur toutes les étapes, l'exécution reste
+   * strictement séquentielle (ordre du tableau) — rétrocompatible.
+   */
+  dependsOn?: string[];
+  /**
    * Durée maximale d'exécution de l'étape en ms. Au-delà, la tentative est
    * considérée comme échouée (puis retry/skip/stop selon onError).
    * Par défaut: aucun timeout (l'action s'exécute jusqu'à son terme).
@@ -96,6 +103,7 @@ const workflowStepSchema = z.object({
   maxRetries: z.number().int().min(0).max(5).optional().default(2),
   // Plafond raisonnable (1h) pour éviter qu'une étape bloque indéfiniment un run planifié.
   timeoutMs: z.number().int().min(1_000).max(3_600_000).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
 });
 
 export const createWorkflowSchema = z.object({
@@ -140,10 +148,24 @@ export function getActiveRuns(): WorkflowRunState[] {
   return Array.from(activeRuns.values());
 }
 
+/**
+ * Annule et retire le timer de planification d'un workflow.
+ * Gère indifféremment les handles setInterval (intervalle) et setTimeout
+ * (planning calendaire récursif).
+ */
+function clearWorkflowTimer(id: string): void {
+  const timer = workflowTimers.get(id);
+  if (timer) {
+    clearInterval(timer);
+    clearTimeout(timer);
+    workflowTimers.delete(id);
+  }
+}
+
 // ─── Interval parsing (reused from automation) ────────────────────────────────
 
 function parseInterval(expr: string): number | null {
-  const match = expr.match(/^(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)$/i);
+  const match = expr.match(/^(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|jour|jours)$/i);
   if (!match) return null;
   const value = Number(match[1]);
   const unit = match[2].toLowerCase();
@@ -154,9 +176,52 @@ function parseInterval(expr: string): number | null {
       return value * 60 * 1000;
     case "h": case "hr": case "hrs": case "hour": case "hours":
       return value * 60 * 60 * 1000;
+    case "d": case "day": case "days": case "jour": case "jours":
+      return value * 24 * 60 * 60 * 1000;
     default:
       return null;
   }
+}
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+};
+
+/**
+ * Calcule le délai (ms) jusqu'à la prochaine occurrence d'un planning calendaire :
+ *   - "daily:HH:MM"          → chaque jour à l'heure dite
+ *   - "weekly:<day>@HH:MM"   → chaque semaine le jour dit (mon..sun) à l'heure dite
+ * Retourne null si l'expression n'est pas un planning calendaire reconnu.
+ */
+function nextCalendarDelay(expr: string, from: Date = new Date()): number | null {
+  const daily = expr.match(/^daily:(\d{1,2}):(\d{2})$/i);
+  if (daily) {
+    const h = Number(daily[1]);
+    const m = Number(daily[2]);
+    if (h > 23 || m > 59) return null;
+    const next = new Date(from);
+    next.setHours(h, m, 0, 0);
+    if (next.getTime() <= from.getTime()) next.setDate(next.getDate() + 1);
+    return next.getTime() - from.getTime();
+  }
+
+  const weekly = expr.match(/^weekly:([a-z]{3})@(\d{1,2}):(\d{2})$/i);
+  if (weekly) {
+    const dayKey = weekly[1].toLowerCase();
+    const targetDow = WEEKDAY_INDEX[dayKey];
+    if (targetDow === undefined) return null;
+    const h = Number(weekly[2]);
+    const m = Number(weekly[3]);
+    if (h > 23 || m > 59) return null;
+    const next = new Date(from);
+    next.setHours(h, m, 0, 0);
+    let dayDiff = (targetDow - next.getDay() + 7) % 7;
+    if (dayDiff === 0 && next.getTime() <= from.getTime()) dayDiff = 7;
+    next.setDate(next.getDate() + dayDiff);
+    return next.getTime() - from.getTime();
+  }
+
+  return null;
 }
 
 // ─── Template resolution ──────────────────────────────────────────────────────
@@ -207,36 +272,79 @@ function resolveStringTemplate(
   });
 }
 
+/**
+ * Accès sécurisé à une propriété imbriquée via un chemin ("a.b.0.c").
+ * Protège contre la prototype-pollution et supporte l'indexation de tableaux.
+ * Retourne `undefined` dès qu'un maillon est null/undefined.
+ */
+function getByPath(root: unknown, path: string[]): unknown {
+  let current: any = root;
+  for (const rawKey of path) {
+    if (current === null || current === undefined) return undefined;
+    const key = rawKey;
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      return undefined;
+    }
+    // Indexation de tableau par entier (ex: items.0)
+    if (Array.isArray(current) && /^\d+$/.test(key)) {
+      current = current[Number(key)];
+      continue;
+    }
+    if (typeof current !== "object" && typeof current !== "string") {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+/**
+ * Résout une référence de template.
+ * Supporte les champs de base (result/status/error) ET l'accès profond :
+ *   - prev.result.branch
+ *   - steps.ID.result.summary.total
+ *   - steps.ID.result.items.0.name  (indexation de tableau)
+ */
 function resolveReference(
   ref: string,
   stepResults: WorkflowStepResult[],
   prevResult: WorkflowStepResult | null
 ): unknown {
-  // prev.result / prev.status
+  // prev.<field>[.<deep.path>]
   if (ref.startsWith("prev.")) {
     if (!prevResult) return undefined;
-    const field = ref.slice(5);
-    if (field === "result") return prevResult.result;
-    if (field === "status") return prevResult.status;
-    if (field === "error") return prevResult.error;
-    return undefined;
+    const parts = ref.slice(5).split(".");
+    return resolveStepField(prevResult, parts);
   }
 
-  // steps.STEP_ID.result / steps.STEP_ID.status
+  // steps.STEP_ID.<field>[.<deep.path>]
   if (ref.startsWith("steps.")) {
     const parts = ref.slice(6).split(".");
     if (parts.length < 2) return undefined;
     const stepId = parts[0];
-    const field = parts[1];
     const step = stepResults.find((s) => s.stepId === stepId);
     if (!step) return undefined;
-    if (field === "result") return step.result;
-    if (field === "status") return step.status;
-    if (field === "error") return step.error;
-    return undefined;
+    return resolveStepField(step, parts.slice(1));
   }
 
   return undefined;
+}
+
+/**
+ * Résout `field[.deep.path]` sur un résultat d'étape.
+ * `field` ∈ { result, status, error } ; le reste du chemin descend dans la valeur.
+ */
+function resolveStepField(step: WorkflowStepResult, parts: string[]): unknown {
+  const field = parts[0];
+  const rest = parts.slice(1);
+  let base: unknown;
+  if (field === "result") base = step.result;
+  else if (field === "status") base = step.status;
+  else if (field === "error") base = step.error;
+  else return undefined;
+
+  if (rest.length === 0) return base;
+  return getByPath(base, rest);
 }
 
 // ─── Condition evaluation (safe, no eval/new Function) ───────────────────────
@@ -533,6 +641,156 @@ export function setWorkflowSkillHandler(handler: (name: string, args: any) => Pr
   skillHandler = handler;
 }
 
+// ─── DAG planning ─────────────────────────────────────────────────────────────
+
+/**
+ * Valide les références `dependsOn` et calcule l'ordre d'exécution en vagues
+ * (chaque vague = étapes dont toutes les dépendances sont déjà satisfaites).
+ * Lève une erreur explicite en cas de dépendance inexistante ou de cycle.
+ *
+ * Si aucune étape n'a de `dependsOn`, retourne une unique "vague" par étape
+ * dans l'ordre du tableau → équivalent strictement séquentiel (rétrocompatible).
+ */
+export function planWorkflowWaves(steps: WorkflowStep[]): WorkflowStep[][] {
+  const byId = new Map<string, WorkflowStep>();
+  for (const s of steps) {
+    if (byId.has(s.id)) {
+      throw new Error(`ID d'étape dupliqué: "${s.id}"`);
+    }
+    byId.set(s.id, s);
+  }
+
+  const hasDeps = steps.some((s) => (s.dependsOn?.length ?? 0) > 0);
+
+  // Pas de dépendances → séquentiel pur (une étape par vague, ordre d'origine).
+  if (!hasDeps) {
+    return steps.map((s) => [s]);
+  }
+
+  // Vérifier que chaque dépendance existe.
+  for (const s of steps) {
+    for (const dep of s.dependsOn ?? []) {
+      if (!byId.has(dep)) {
+        throw new Error(`Étape "${s.id}" dépend de "${dep}" qui n'existe pas.`);
+      }
+      if (dep === s.id) {
+        throw new Error(`Étape "${s.id}" ne peut pas dépendre d'elle-même.`);
+      }
+    }
+  }
+
+  // Vagues : tant qu'il reste des étapes, prendre celles dont toutes les
+  // dépendances sont déjà "complétées". Détecte les cycles (aucune progression).
+  const waves: WorkflowStep[][] = [];
+  const completed = new Set<string>();
+  const remaining = new Set(steps.map((s) => s.id));
+
+  while (remaining.size > 0) {
+    const wave: WorkflowStep[] = [];
+    for (const id of remaining) {
+      const step = byId.get(id)!;
+      const deps = step.dependsOn ?? [];
+      if (deps.every((d) => completed.has(d))) {
+        wave.push(step);
+      }
+    }
+
+    if (wave.length === 0) {
+      const stuck = Array.from(remaining).join(", ");
+      throw new Error(`Dépendance circulaire détectée entre les étapes: ${stuck}`);
+    }
+
+    // Préserver l'ordre de déclaration à l'intérieur d'une vague (déterminisme).
+    wave.sort((a, b) => steps.indexOf(a) - steps.indexOf(b));
+
+    for (const s of wave) {
+      remaining.delete(s.id);
+      completed.add(s.id);
+    }
+    waves.push(wave);
+  }
+
+  return waves;
+}
+
+/** Contexte mutable partagé pendant un run (suivi temps réel + résultats). */
+interface RunContext {
+  stepResults: WorkflowStepResult[];
+  runState: WorkflowRunState;
+  stepIndexById: Map<string, number>;
+}
+
+/**
+ * Exécute une étape unique (condition, templates, retry, timeout) et met à jour
+ * le suivi temps réel. Retourne le résultat typé de l'étape.
+ */
+async function runSingleStep(step: WorkflowStep, ctx: RunContext): Promise<WorkflowStepResult> {
+  const idx = ctx.stepIndexById.get(step.id)!;
+  const stateStep = ctx.runState.steps[idx];
+
+  // En mode DAG, `prev` = dernière étape complétée (ordre d'insertion).
+  const prevResult = ctx.stepResults.length > 0 ? ctx.stepResults[ctx.stepResults.length - 1] : null;
+
+  stateStep.status = "running";
+  stateStep.startedAt = new Date().toISOString();
+
+  // Évaluation de la condition
+  if (step.condition) {
+    const shouldRun = evaluateCondition(step.condition, ctx.stepResults, prevResult);
+    if (!shouldRun) {
+      console.log(`[Workflow]   ⏭ Étape "${step.id}" skipped (condition non remplie)`);
+      stateStep.status = "skipped";
+      const skipped: WorkflowStepResult = { stepId: step.id, action: step.action, status: "skipped", durationMs: 0 };
+      return skipped;
+    }
+  }
+
+  // Résolution des templates dans les arguments
+  const resolvedArgs = resolveTemplates(step.args, ctx.stepResults, prevResult);
+
+  const maxAttempts = step.onError === "retry" ? (step.maxRetries || 2) : 1;
+  let lastError: string | undefined;
+  let result: any;
+  let success = false;
+  const stepStart = Date.now();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      console.log(`[Workflow]   ▷ Étape "${step.id}" → ${step.action}${attempt > 0 ? ` (retry ${attempt})` : ""}${step.timeoutMs ? ` [timeout ${step.timeoutMs}ms]` : ""}`);
+      result = await withStepTimeout(skillHandler!(step.action, resolvedArgs), step.timeoutMs);
+
+      if (result && typeof result === "object" && result.error) {
+        lastError = typeof result.error === "string" ? result.error : JSON.stringify(result.error);
+        if (attempt < maxAttempts - 1) continue;
+      } else {
+        success = true;
+        break;
+      }
+    } catch (e: any) {
+      lastError = e.message || String(e);
+      if (attempt < maxAttempts - 1) {
+        console.log(`[Workflow]     ⟳ Retry ${attempt + 1}/${maxAttempts - 1}`);
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // backoff
+      }
+    }
+  }
+
+  const durationMs = Date.now() - stepStart;
+
+  if (success) {
+    stateStep.status = "success";
+    stateStep.durationMs = durationMs;
+    console.log(`[Workflow]   ✓ Étape "${step.id}" réussie (${durationMs}ms)`);
+    return { stepId: step.id, action: step.action, status: "success", result, durationMs };
+  }
+
+  stateStep.status = "failed";
+  stateStep.error = lastError;
+  stateStep.durationMs = durationMs;
+  console.log(`[Workflow]   ✗ Étape "${step.id}" échouée: ${lastError}`);
+  return { stepId: step.id, action: step.action, status: "failed", error: lastError, durationMs };
+}
+
 export async function executeWorkflow(workflow: WorkflowDefinition): Promise<WorkflowRunResult> {
   if (!skillHandler) {
     throw new Error("Workflow skill handler not configured. Call setWorkflowSkillHandler first.");
@@ -543,6 +801,9 @@ export async function executeWorkflow(workflow: WorkflowDefinition): Promise<Wor
   let overallStatus: "success" | "partial" | "failed" = "success";
 
   // ── Initialisation du suivi temps réel ────────────────────────────────
+  const stepIndexById = new Map<string, number>();
+  workflow.steps.forEach((s, i) => stepIndexById.set(s.id, i));
+
   const runState: WorkflowRunState = {
     workflowId: workflow.id,
     workflowName: workflow.name,
@@ -569,88 +830,54 @@ export async function executeWorkflow(workflow: WorkflowDefinition): Promise<Wor
     runState.elapsedMs = Date.now() - startTime;
   }, 250);
 
-  console.log(`[Workflow] ▶ Démarrage: "${workflow.name}" (${workflow.steps.length} étapes)`);
+  const ctx: RunContext = { stepResults, runState, stepIndexById };
 
-  for (let i = 0; i < workflow.steps.length; i++) {
-    const step = workflow.steps[i];
-    const prevResult = i > 0 ? stepResults[i - 1] : null;
+  // ── Planification (DAG en vagues, ou séquentiel pur si aucun dependsOn) ──
+  let waves: WorkflowStep[][];
+  try {
+    waves = planWorkflowWaves(workflow.steps);
+  } catch (planErr: any) {
+    clearInterval(elapsedTimer);
+    activeRuns.delete(workflow.id);
+    const msg = planErr?.message || String(planErr);
+    console.error(`[Workflow] ✗ Planification impossible pour "${workflow.name}": ${msg}`);
+    const completedAt = new Date().toISOString();
+    return { workflowId: workflow.id, workflowName: workflow.name, status: "failed", startedAt, completedAt, steps: [] };
+  }
 
-    // Mettre à jour l'état courant
-    runState.currentStepIndex = i;
-    runState.currentStepId = step.id;
-    runState.currentStepAction = step.action;
-    runState.progress = Math.round((i / workflow.steps.length) * 100);
-    runState.steps[i].status = "running";
-    runState.steps[i].startedAt = new Date().toISOString();
+  const isParallel = waves.some((w) => w.length > 1);
+  console.log(`[Workflow] ▶ Démarrage: "${workflow.name}" (${workflow.steps.length} étapes, ${waves.length} vague(s)${isParallel ? ", DAG parallèle" : ""})`);
 
-    // Évaluation de la condition
-    if (step.condition) {
-      const shouldRun = evaluateCondition(step.condition, stepResults, prevResult);
-      if (!shouldRun) {
-        console.log(`[Workflow]   ⏭ Étape "${step.id}" skipped (condition non remplie)`);
-        runState.steps[i].status = "skipped";
-        stepResults.push({
-          stepId: step.id,
-          action: step.action,
-          status: "skipped",
-          durationMs: 0,
-        });
-        continue;
-      }
-    }
+  let completedCount = 0;
+  let aborted = false;
 
-    // Résolution des templates dans les arguments
-    const resolvedArgs = resolveTemplates(step.args, stepResults, prevResult);
+  for (const wave of waves) {
+    if (aborted) break;
 
-    // Exécution avec retry
-    const maxAttempts = step.onError === "retry" ? (step.maxRetries || 2) : 1;
-    let lastError: string | undefined;
-    let result: any;
-    let success = false;
-    const stepStart = Date.now();
+    // Mettre à jour l'indicateur courant (première étape de la vague).
+    const firstStep = wave[0];
+    runState.currentStepIndex = stepIndexById.get(firstStep.id) ?? completedCount;
+    runState.currentStepId = firstStep.id;
+    runState.currentStepAction = firstStep.action;
+    runState.progress = Math.round((completedCount / workflow.steps.length) * 100);
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        console.log(`[Workflow]   ▷ Étape "${step.id}" → ${step.action}${attempt > 0 ? ` (retry ${attempt})` : ""}${step.timeoutMs ? ` [timeout ${step.timeoutMs}ms]` : ""}`);
-        result = await withStepTimeout(skillHandler(step.action, resolvedArgs), step.timeoutMs);
+    // Exécuter toutes les étapes de la vague en parallèle (1 seule si séquentiel).
+    const waveResults = await Promise.all(wave.map((step) => runSingleStep(step, ctx)));
 
-        // Vérifier si le skill a retourné une erreur
-        if (result && typeof result === "object" && result.error) {
-          lastError = result.error;
-          if (attempt < maxAttempts - 1) continue;
+    // Enregistrer les résultats dans l'ordre de la vague.
+    for (const res of waveResults) {
+      stepResults.push(res);
+      completedCount++;
+
+      if (res.status === "failed") {
+        const step = workflow.steps[stepIndexById.get(res.stepId)!];
+        if ((step.onError ?? "stop") === "stop") {
+          overallStatus = "failed";
+          aborted = true;
         } else {
-          success = true;
-          break;
+          // skip/retry épuisé — on continue mais le run est "partial".
+          if (overallStatus === "success") overallStatus = "partial";
         }
-      } catch (e: any) {
-        lastError = e.message || String(e);
-        if (attempt < maxAttempts - 1) {
-          console.log(`[Workflow]     ⟳ Retry ${attempt + 1}/${maxAttempts - 1}`);
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // backoff
-        }
-      }
-    }
-
-    const durationMs = Date.now() - stepStart;
-
-    if (success) {
-      stepResults.push({ stepId: step.id, action: step.action, status: "success", result, durationMs });
-      runState.steps[i].status = "success";
-      runState.steps[i].durationMs = durationMs;
-      console.log(`[Workflow]   ✓ Étape "${step.id}" réussie (${durationMs}ms)`);
-    } else {
-      stepResults.push({ stepId: step.id, action: step.action, status: "failed", error: lastError, durationMs });
-      runState.steps[i].status = "failed";
-      runState.steps[i].error = lastError;
-      runState.steps[i].durationMs = durationMs;
-      console.log(`[Workflow]   ✗ Étape "${step.id}" échouée: ${lastError}`);
-
-      if (step.onError === "stop") {
-        overallStatus = "failed";
-        break;
-      } else {
-        // skip — on continue
-        overallStatus = "partial";
       }
     }
   }
@@ -713,6 +940,7 @@ export async function createWorkflow(input: z.input<typeof createWorkflowSchema>
       onError: s.onError || "stop",
       maxRetries: s.maxRetries,
       timeoutMs: s.timeoutMs,
+      dependsOn: s.dependsOn,
     })),
     schedule: parsedInput.schedule,
     enabled: true,
@@ -754,11 +982,7 @@ export function listWorkflows(): WorkflowDefinition[] {
 
 export async function deleteWorkflow(id: string): Promise<boolean> {
   // Annuler le timer
-  const timer = workflowTimers.get(id);
-  if (timer) {
-    clearInterval(timer);
-    workflowTimers.delete(id);
-  }
+  clearWorkflowTimer(id);
 
   // Supprimer en BDD
   if (supabase) {
@@ -778,11 +1002,7 @@ export async function toggleWorkflow(id: string, enabled: boolean): Promise<Work
   if (enabled && wf.schedule) {
     scheduleWorkflow(wf);
   } else {
-    const timer = workflowTimers.get(id);
-    if (timer) {
-      clearInterval(timer);
-      workflowTimers.delete(id);
-    }
+    clearWorkflowTimer(id);
   }
 
   if (supabase) {
@@ -795,22 +1015,17 @@ export async function toggleWorkflow(id: string, enabled: boolean): Promise<Work
 // ─── Scheduling ───────────────────────────────────────────────────────────────
 
 function scheduleWorkflow(workflow: WorkflowDefinition): void {
-  // Clear existing timer
+  // Clear existing timer (setInterval ET setTimeout partagent le type Timeout).
   const existing = workflowTimers.get(workflow.id);
   if (existing) {
     clearInterval(existing);
+    clearTimeout(existing);
     workflowTimers.delete(workflow.id);
   }
 
   if (!workflow.schedule || !workflow.enabled) return;
 
-  const intervalMs = parseInterval(workflow.schedule);
-  if (!intervalMs) {
-    console.warn(`[Workflow] Schedule invalide pour "${workflow.name}": ${workflow.schedule}`);
-    return;
-  }
-
-  const timer = setInterval(async () => {
+  const runNow = async () => {
     const current = workflows.get(workflow.id);
     if (!current || !current.enabled) return;
     try {
@@ -818,10 +1033,38 @@ function scheduleWorkflow(workflow: WorkflowDefinition): void {
     } catch (e) {
       console.error(`[Workflow] Scheduled execution failed for "${workflow.name}":`, e);
     }
-  }, intervalMs);
+  };
 
-  workflowTimers.set(workflow.id, timer);
-  console.log(`[Workflow] Planifié: "${workflow.name}" toutes les ${workflow.schedule}`);
+  // ── Cas 1 : intervalle fixe (ex: "30m", "24h", "2d") ──────────────────
+  const intervalMs = parseInterval(workflow.schedule);
+  if (intervalMs) {
+    const timer = setInterval(runNow, intervalMs);
+    workflowTimers.set(workflow.id, timer);
+    console.log(`[Workflow] Planifié: "${workflow.name}" toutes les ${workflow.schedule}`);
+    return;
+  }
+
+  // ── Cas 2 : planning calendaire (ex: "daily:08:00", "weekly:mon@09:00") ──
+  const calendarDelay = nextCalendarDelay(workflow.schedule);
+  if (calendarDelay !== null) {
+    const scheduleNext = () => {
+      const delay = nextCalendarDelay(workflow.schedule!);
+      if (delay === null) return;
+      const timer = setTimeout(async () => {
+        await runNow();
+        // Re-planifier la prochaine occurrence après exécution.
+        const stillEnabled = workflows.get(workflow.id)?.enabled;
+        if (stillEnabled) scheduleNext();
+      }, delay);
+      if (typeof timer.unref === "function") timer.unref();
+      workflowTimers.set(workflow.id, timer);
+    };
+    scheduleNext();
+    console.log(`[Workflow] Planifié (calendaire): "${workflow.name}" → ${workflow.schedule} (prochaine occurrence dans ${Math.round(calendarDelay / 1000)}s)`);
+    return;
+  }
+
+  console.warn(`[Workflow] Schedule invalide pour "${workflow.name}": ${workflow.schedule}`);
 }
 
 // ─── Load from DB ─────────────────────────────────────────────────────────────
@@ -829,9 +1072,10 @@ function scheduleWorkflow(workflow: WorkflowDefinition): void {
 export async function loadWorkflows(): Promise<void> {
   if (!supabase) return;
 
-  // Clear existing timers
+  // Clear existing timers (interval + timeout)
   for (const timer of workflowTimers.values()) {
     clearInterval(timer);
+    clearTimeout(timer);
   }
   workflowTimers.clear();
   workflows.clear();
@@ -876,9 +1120,11 @@ export function getWorkflowsSnapshot(): WorkflowDefinition[] {
  * MaxListenersExceededWarning et les exécutions zombies après hot-reload.
  */
 export function stopAllWorkflowTimers(): void {
+  const count = workflowTimers.size;
   for (const timer of workflowTimers.values()) {
     clearInterval(timer);
+    clearTimeout(timer);
   }
   workflowTimers.clear();
-  console.log(`[Workflow] ${workflowTimers.size === 0 ? 'Tous les timers arrêtés.' : 'Arrêt partiel des timers.'}`);
+  console.log(`[Workflow] ${count} timer(s) arrêté(s).`);
 }

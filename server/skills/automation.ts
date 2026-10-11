@@ -484,7 +484,7 @@ export const automationSkill: Skill = {
     // ── Workflow (chaînes d'actions) ───────────────────────────────────────
     {
       name: "workflow_create",
-      description: "Crée un workflow (chaîne d'actions/pipeline). Enchaîne plusieurs skills séquentiellement avec passage de résultats entre étapes via des templates ({{prev.result}}, {{steps.ID.result}}). Peut être planifié avec un intervalle.",
+      description: "Crée un workflow (chaîne d'actions/pipeline). Enchaîne plusieurs skills avec passage de résultats entre étapes via des templates. Syntaxe des templates: {{prev.result}} (étape précédente), {{steps.<ID>.result}} (étape par id), et accès imbriqué {{steps.<ID>.result.champ.sous_champ}}. Par défaut l'exécution est séquentielle; fournir 'dependsOn' (liste d'IDs) sur des étapes pour construire un DAG exécuté en vagues parallèles. Peut être planifié avec un intervalle (ex: '24h', '30m').",
       parameters: z.object({
         name: z.string().min(1, "Nom requis").trim(),
         description: z.string().optional().default('Workflow sans description'),
@@ -495,7 +495,8 @@ export const automationSkill: Skill = {
           label: z.string().optional(),
           condition: z.string().optional(),
           onError: z.enum(['stop', 'skip', 'retry']).optional().default('stop'),
-          maxRetries: z.number().int().min(0).optional().default(2)
+          maxRetries: z.number().int().min(0).optional().default(2),
+          dependsOn: z.array(z.string().min(1)).optional()
         })).min(1, "Au moins une étape requise"),
         schedule: z.string().optional().default('')
       }),
@@ -520,7 +521,7 @@ export const automationSkill: Skill = {
               {
                 id: "step3",
                 action: "memory_store",
-                args: { key: "scraped-data", value: "{{step2.result}}" },
+                args: { key: "scraped-data", value: "{{steps.step2.result}}" },
                 label: "Sauvegarde des données en mémoire"
               }
             ],

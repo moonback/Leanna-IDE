@@ -130,6 +130,7 @@ router.post('/automate', async (req: Request, res: Response) => {
         args: s.args,
         label: s.label,
         onError: s.onError,
+        dependsOn: s.dependsOn,
       })),
       schedule: compiled.workflow.schedule,
     });
