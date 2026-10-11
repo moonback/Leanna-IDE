@@ -11,6 +11,58 @@ const sid = (id?: string): string => (id ? id.slice(0, 8) : "—");
 const truncate = (text: string, max = 80): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /**
+ * Marker error used when the mission hand-off outlives the cycle's wall-clock
+ * budget. Thrown by {@link withCycleTimeout} so the surrounding try/finally in
+ * execute()/executeAnticipation() can release the `activeCycles` slot even
+ * though the underlying executeMission promise is still pending in the
+ * background. See the concurrency-budget note below.
+ */
+class CycleTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Autonomy cycle exceeded its ${timeoutMs}ms wall-clock budget.`);
+    this.name = "CycleTimeoutError";
+  }
+}
+
+/**
+ * Race a mission hand-off against a wall-clock budget derived from the owning
+ * task's `timeoutMs`.
+ *
+ * Why this exists: `TaskManager` wraps `execute()` in its own `withTimeout`,
+ * but when that fires it only *rejects the awaited promise* — it cannot cancel
+ * the real `executeMission` work, which keeps running in the background. Because
+ * `activeCycles` is only decremented in the `finally` of execute(), the slot
+ * stayed pinned at 1/1 for the whole mission, so every TaskManager retry was
+ * rejected instantly ("concurrency budget exhausted") and the task went straight
+ * to the dead-letter queue.
+ *
+ * By racing the hand-off here with a budget slightly *shorter* than the task's
+ * own timeout, the cycle's `finally` runs first and frees the slot before the
+ * TaskManager abandons the attempt — so a retry (or the next task) can actually
+ * acquire a slot. The orphaned executeMission promise is left to settle on its
+ * own; its late result is ignored (the goal has already been marked escalated).
+ *
+ * A non-positive or absent `timeoutMs` disables the guard (awaits normally).
+ */
+const withCycleTimeout = async <T>(work: Promise<T>, timeoutMs: number): Promise<T> => {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return work;
+  // Free the cycle slot a touch before the TaskManager's own timeout so the
+  // finally{} releases activeCycles ahead of the attempt being abandoned.
+  const budget = Math.max(1_000, Math.floor(timeoutMs * 0.9));
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new CycleTimeoutError(budget)), budget);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/**
  * Shape of `task.metadata.anticipation` produced by AnticipationEngine when it
  * auto-launches a proactive proposal as a mission task. Kept in sync with the
  * metadata written in AnticipationEngine.emitProposal().
@@ -332,6 +384,9 @@ export class AutonomousExecutive {
     this.activeCycles++;
     const cycleId = randomUUID(); const traceId = `autonomy:${cycleId}`;
     const startedAt = Date.now();
+    // Captured in function scope so a CycleTimeoutError caught below (where the
+    // try-scoped `decision` is out of reach) can still park the goal as BLOCKED.
+    let decisionGoalId: string | undefined;
     try {
       log.info(`▶️  Cycle ${sid(cycleId)} started — reactive task ${sid(task.id)} (${event.type}), ${this.activeCycles}/${limit} in flight.`);
       this.emit("autonomy.cycle.started", traceId, cycleId, { taskId: task.id });
@@ -350,9 +405,13 @@ export class AutonomousExecutive {
         return;
       }
       this.goals.transition(decision.goal.id, "ACTIVE");
+      decisionGoalId = decision.goal.id;
       this.emit("autonomy.mission.created", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id });
       log.info(`🚀 Mission handoff [cycle ${sid(cycleId)}/goal ${sid(decision.goal.id)}] — "${truncate(decision.goal.description)}"`);
-      const result = await this.options.executeMission({ cycleId, traceId, goal: decision.goal, observation: this.perception.perceive(event), task });
+      const result = await withCycleTimeout(
+        this.options.executeMission({ cycleId, traceId, goal: decision.goal, observation: this.perception.perceive(event), task }),
+        task.timeoutMs,
+      );
       this.goals.transition(decision.goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
       await this.runtime.memory.set("project", `autonomy:outcome:${decision.goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
       // Persist a per-fingerprint tally so decide() can bias future cycles of the
@@ -371,6 +430,10 @@ export class AutonomousExecutive {
       const tally = result.success ? "" : ` (fingerprint failures: ${failures})`;
       log.info(`🏁 Cycle ${sid(cycleId)} ${outcome} in ${durationMs}ms [goal ${sid(decision.goal.id)}]${tally} — ${truncate(result.summary ?? decision.reason)}`);
     } catch (error) {
+      // A cycle timeout frees the slot here (via finally) while executeMission
+      // keeps running in the background; park the goal as BLOCKED so it is not
+      // left stranded in ACTIVE, then let TaskManager decide on a retry.
+      if (error instanceof CycleTimeoutError && decisionGoalId) this.goals.transition(decisionGoalId, "BLOCKED");
       log.error(`💥 Cycle ${sid(cycleId)} threw after ${Date.now() - startedAt}ms (task ${sid(task.id)}, ${event.type}): ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     } finally {
@@ -395,6 +458,9 @@ export class AutonomousExecutive {
     this.activeCycles++;
     const cycleId = randomUUID(); const traceId = `autonomy:${cycleId}`;
     const startedAt = Date.now();
+    // Captured in function scope so a CycleTimeoutError caught below (where the
+    // try-scoped `goal` is out of reach) can still park the goal as BLOCKED.
+    let decisionGoalId: string | undefined;
     try {
       log.info(`▶️  Cycle ${sid(cycleId)} started — anticipation ${a.scheduled ? "SCHEDULE" : a.kind} task ${sid(task.id)} (importance ${a.importance.toFixed(2)}): "${truncate(a.message)}"`);
       this.emit("autonomy.cycle.started", traceId, cycleId, { taskId: task.id });
@@ -439,9 +505,13 @@ export class AutonomousExecutive {
       };
 
       this.goals.transition(goal.id, "ACTIVE");
+      decisionGoalId = goal.id;
       this.emit("autonomy.mission.created", traceId, cycleId, { taskId: task.id, goalId: goal.id });
       log.info(`🚀 Mission handoff [cycle ${sid(cycleId)}/goal ${sid(goal.id)}] — anticipation "${truncate(a.suggestedAction)}"`);
-      const result = await this.options.executeMission({ cycleId, traceId, goal, observation, task });
+      const result = await withCycleTimeout(
+        this.options.executeMission({ cycleId, traceId, goal, observation, task }),
+        task.timeoutMs,
+      );
       this.goals.transition(goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
       await this.runtime.memory.set("project", `autonomy:outcome:${goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
       let failures = 0;
@@ -458,6 +528,10 @@ export class AutonomousExecutive {
       const tally = result.success ? "" : ` (fingerprint failures: ${failures})`;
       log.info(`🏁 Cycle ${sid(cycleId)} ${outcome} in ${Date.now() - startedAt}ms [goal ${sid(goal.id)}]${tally} — ${truncate(result.summary ?? a.message)}`);
     } catch (error) {
+      // A cycle timeout frees the slot here (via finally) while executeMission
+      // keeps running in the background; park the goal as BLOCKED so it is not
+      // left stranded in ACTIVE, then let TaskManager decide on a retry.
+      if (error instanceof CycleTimeoutError && decisionGoalId) this.goals.transition(decisionGoalId, "BLOCKED");
       log.error(`💥 Anticipation cycle ${sid(cycleId)} threw after ${Date.now() - startedAt}ms (task ${sid(task.id)}): ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     } finally {

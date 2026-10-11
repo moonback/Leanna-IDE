@@ -83,7 +83,22 @@ interface EventMessage {
   payload: Record<string, unknown>;
 }
 
-type IncomingMessage = SnapshotMessage | EventMessage;
+/**
+ * Mission lifecycle event relayed onto the /autonomy channel by the server
+ * (mission_started, mission_completed, goal_started, action_completed, …). The
+ * server also pushes these on the /live socket, but that one only exists during
+ * a Gemini Live session; relaying them here lets the Mission Timeline refresh in
+ * real time regardless of any voice/chat session.
+ */
+interface MissionEventMessage {
+  type: 'mission_event';
+  event: string;
+  timestamp: string;
+  /** Flat payload: missionId/title/goalTitle/skill/etc. are spread at top level. */
+  [key: string]: unknown;
+}
+
+type IncomingMessage = SnapshotMessage | EventMessage | MissionEventMessage;
 
 /** Normalise a server/event proposal into the client shape with a stable id. */
 function normalizeProposal(raw: RawServerProposal): AnticipationProposal {
@@ -98,6 +113,13 @@ function normalizeProposal(raw: RawServerProposal): AnticipationProposal {
     queuedAsTask: Boolean(raw.queuedAsTask),
   };
 }
+
+/**
+ * Module-level guard so a mission_event received by several concurrent
+ * useAutonomyTimeline instances (AgentStatusBar, GlobalSidebar, MissionControl,
+ * …) is only re-dispatched to the DOM once. Keyed by event+timestamp+missionId.
+ */
+let lastMissionEventKey = '';
 
 export type AutonomyConnectionStatus = 'connecting' | 'open' | 'closed';
 
@@ -180,6 +202,20 @@ export function useAutonomyTimeline({
       setState(data.state ?? null);
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
       if (Array.isArray(data.proposals)) setProposals(data.proposals.map(normalizeProposal));
+      return;
+    }
+
+    // Mission lifecycle events relayed on /autonomy. Re-dispatch the same DOM
+    // CustomEvent that MissionTimelineView (and useAgentStatus / usePendingApprovals)
+    // already listen to, so the Mission Timeline refreshes live even without an
+    // active Gemini Live session. Mirrors useLiveAPI's dispatch for parity.
+    if (data.type === 'mission_event') {
+      const key = `${data.event}|${data.timestamp}|${String((data as Record<string, unknown>).missionId ?? '')}`;
+      if (key === lastMissionEventKey) return; // already dispatched by a sibling connection
+      lastMissionEventKey = key;
+      try {
+        window.dispatchEvent(new CustomEvent('Leanna-mission-event', { detail: data }));
+      } catch { /* best-effort */ }
       return;
     }
 

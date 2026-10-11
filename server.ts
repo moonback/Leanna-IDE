@@ -1125,6 +1125,16 @@ async function startServer() {
             try { client.send(payload); } catch { /* ignore */ }
           }
         }
+        // Relais sur le canal /autonomy (toujours connecté, indépendant d'une
+        // session Gemini Live). Sans ça, la Mission Timeline ne se rafraîchit en
+        // temps réel que lorsqu'une session Live est active — car son seul
+        // déclencheur côté client (CustomEvent "Leanna-mission-event") n'était
+        // émis que depuis le socket /live. On diffuse donc aussi ici.
+        for (const client of autonomyWss.clients) {
+          if (client.readyState === WebSocket.OPEN) {
+            try { client.send(payload); } catch { /* ignore */ }
+          }
+        }
 
         // ── Relais Telegram de la boucle d'approbation humaine ──────────────
         // Quand l'AutonomyPolicy (mode "ask") met une action en attente, on

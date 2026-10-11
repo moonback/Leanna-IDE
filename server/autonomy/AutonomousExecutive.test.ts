@@ -149,3 +149,35 @@ test("a fresh executive restores non-terminal goals from the store", () => {
   assert.equal(restored!.description, "resume me");
   assert.equal(executive.goals.list().length, 1);
 });
+
+// ── Regression: a mission that outlives its task timeout must not pin the slot ──
+
+test("a timed-out mission releases the concurrency budget for the next cycle", async () => {
+  const runtime = memoryRuntime();
+  let starts = 0;
+  const executive = new AutonomousExecutive(runtime as never, {
+    maxConcurrentCycles: 1,
+    // First hand-off never settles (simulates a mission that outlives the task
+    // timeout, exactly as TaskManager.withTimeout would abandon it); the second
+    // resolves promptly. Before the fix, activeCycles stayed pinned at 1/1 and
+    // every subsequent cycle was rejected with "concurrency budget exhausted".
+    executeMission: () => {
+      starts++;
+      return starts === 1 ? new Promise(() => {}) : Promise.resolve({ success: true });
+    },
+  });
+  const task = (id: string) => ({
+    id, type: "maintenance" as const, title: "stuck", priority: "high" as const,
+    sourceEventId: id, fingerprint: id, createdAt: Date.now(), status: "pending" as const,
+    attempts: 0, maxRetries: 1, timeoutMs: 60, // 60ms task budget → ~54ms cycle budget
+    metadata: { event: { type: "task:failed" as const, taskId: id, error: "boom" } },
+  });
+
+  // The first cycle must reject (cycle timeout) rather than hang forever.
+  await assert.rejects(executive.execute(task("one")), /wall-clock budget/);
+  // The stuck goal is parked as BLOCKED, not left stranded in ACTIVE.
+  assert.equal(executive.goals.list().find((g) => g.description.includes("runtime task"))?.status, "BLOCKED");
+  // Crucially, the slot is free again: a fresh cycle runs to completion.
+  await executive.execute(task("two"));
+  assert.equal(executive.goals.list().filter((g) => g.status === "COMPLETED").length, 1);
+});
