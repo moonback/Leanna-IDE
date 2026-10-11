@@ -466,7 +466,7 @@ function NavSidebar() {
   const isIde = pathname === '/' || pathname === '/ide';
   const isSettings = pathname === '/settings';
 
-  // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
+  // Don't show on IDE (it renders GlobalSidebar with variant="ide")
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
   return <GlobalSidebar />;
