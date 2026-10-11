@@ -9,36 +9,194 @@ import type { AIProvider } from '../../context/UserProfileContext.js';
 // Source : openrouter.ai/api/v1/models — vérifié le 03/08/2026
 
 export const OPENROUTER_MODELS = [
-  // ── Coding agents ─────────────────────────────────────────────────────────
-  { id: 'openai/gpt-5.6-luna',                               name: 'GPT-5.6',               provider: 'Openai',      free: false, desc: 'MoE 72B-A7B, 128K contexte, excellent pour le code'},
-  { id: 'z-ai/glm-5.3-flash',                                name: 'GLM 5.3 Flash',         provider: 'ZAI',         free: false, desc: 'Multimodal, efficace pour le code et les tâches agentiques, 1M ctx' },
-  { id: 'deepseek/deepseek-v4-flash-0731',                   name: 'DeepSeek V4 Flash',     provider: 'DeepSeek',    free: false, desc: 'MoE 284B sparce, adapté code et raisonnement, GA release, 1.3M ctx' },
-  { id: 'minimax/minimax-m3',                                name: 'MiniMax M3',            provider: 'MiniMax',     free: false, desc: 'Multimodal, MSA sparse attention, rapide et économique, 1M ctx' },
-  // { id: 'moonshotai/kimi-k3',                                name: 'Kimi K3',               provider: 'MoonshotIA',  free: false, desc: '118B-A8B coding agent — meilleur score code de Poolside, 262K ctx' },
-  { id: 'nvidia/nemotron-3-ultra-550b-a55b:free',            name: 'Nemotron 3 Ultra',       provider: 'NVIDIA',    free: true, desc: 'MoE 550B-A55B, 1M contexte, raisonnement & orchestration' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free',            name: 'Nemotron 3 Super',       provider: 'NVIDIA',    free: true, desc: 'MoE 120B-A12B, 262K contexte, efficacité maximale' },
-  { id: 'nvidia/nemotron-3-nano-30b-a3b:free',               name: 'Nemotron 3 Nano 30B',    provider: 'NVIDIA',    free: true, desc: 'MoE 30B-A3B, 256K contexte, très léger' },
-  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',name: 'Nemotron 3 Nano Omni',   provider: 'NVIDIA',    free: true, desc: 'Multimodal 30B-A3B avec raisonnement, 256K contexte' },
-  { id: 'nvidia/nemotron-nano-12b-v2-vl:free',               name: 'Nemotron Nano 12B VL',   provider: 'NVIDIA',    free: true, desc: '12B vision-language, compréhension vidéo & raisonnement, 128K' },
-  { id: 'nvidia/nemotron-nano-9b-v2:free',                   name: 'Nemotron Nano 9B',       provider: 'NVIDIA',    free: true, desc: '9B unifié LLM+raisonnement, 128K contexte' },
-  { id: 'nvidia/nemotron-3.5-content-safety:free',           name: 'Nemotron 3.5 Safety',    provider: 'NVIDIA',    free: true, desc: '4B guardrail multimodal, modération de contenu, 128K' },
- // ── OpenAI open-weight ─────────────────────────────────────────────────────
-  { id: 'openai/gpt-oss-20b:free',                           name: 'GPT-OSS 20B',            provider: 'OpenAI',    free: true, desc: '21B Apache 2.0, MoE, polyvalent, 131K contexte' },
-  // ── Inclusion AI ───────────────────────────────────────────────────────────
-  { id: 'inclusionai/ling-3.0-flash:free',                   name: 'Ling 3.0 Flash',         provider: 'InclusionAI', free: true, desc: 'MoE 124B-A5B, rapide et multilingue, 262K contexte' },
+  // ── Coding agents ──────────────────────────────────────────────
+  {
+    id: 'openai/gpt-6-luna-decisions',
+    name: 'GPT-6 Luna Decisions',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Modèle de décision structuré pour classification, routage et évaluation, jusqu’à 1,05 M tokens de contexte.',
+  },
+  {
+    id: '~openai/gpt-luna-latest',
+    name: 'GPT Luna Latest',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Route automatiquement vers le dernier modèle GPT Luna disponible ; contexte variable jusqu’à 1,05 M tokens.',
+  },
+  {
+    id: 'anthropic/claude-haiku-5.5',
+    name: 'Claude Haiku 5.5',
+    provider: 'Anthropic',
+    free: false,
+    desc: 'Modèle rapide et économique pour le code, les agents, l’usage d’outils et l’analyse multimodale ; contexte de 1 M tokens.',
+  },
+  {
+    id: 'z-ai/glm-5.3-flash',
+    name: 'GLM 5.3 Flash',
+    provider: 'Z.ai',
+    free: false,
+    desc: 'Modèle multimodal rapide pour le développement logiciel, la compréhension visuelle et les tâches agentiques ; contexte de 1 M tokens.',
+  },
+  {
+    id: 'deepseek/deepseek-v4-flash-0731',
+    name: 'DeepSeek V4 Flash 0731',
+    provider: 'DeepSeek',
+    free: false,
+    desc: 'Modèle MoE sparse de 284 milliards de paramètres, adapté au code, au raisonnement et aux workflows agentiques ; contexte annoncé de 1,3 M tokens.',
+  },
+  {
+    id: 'minimax/minimax-m3',
+    name: 'MiniMax M3',
+    provider: 'MiniMax',
+    free: false,
+    desc: 'Modèle multimodal orienté génération de code, raisonnement et tâches agentiques ; caractéristiques et fenêtre de contexte à vérifier.',
+  },
+  {
+    id: 'openai/gpt-6-luna-pro',
+    name: 'GPT-6 Luna Pro',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Variante Pro de GPT-6 Luna pour les tâches avancées ; vérifier la fiche officielle pour les capacités et la fenêtre de contexte exactes.',
+  },
+  {
+    id: 'openai/gpt-6-luna',
+    name: 'GPT-6 Luna',
+    provider: 'OpenAI',
+    free: false,
+    desc: 'Modèle généraliste pour le raisonnement, le développement logiciel et les tâches complexes ; contexte disponible jusqu’à 1,05 M tokens.',
+  },
+    // ── Free models ────────────────────────────────────────────────
+  {
+    id: 'openrouter/free',
+    name: 'OpenRouter Free Router',
+    provider: 'OpenRouter',
+    free: true,
+    desc: 'Sélectionne automatiquement un modèle gratuit compatible avec la requête ; modèle utilisé variable.',
+  },
+  {
+    id: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    name: 'Nemotron 3 Ultra',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle MoE de 550B paramètres, raisonnement avancé, agents IA et programmation ; contexte de 1M tokens.',
+  },
+  {
+    id: 'nvidia/nemotron-3.5-lightning:free',
+    name: 'Nemotron 3.5 Lightning',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'MoE de 30B paramètres avec 3B actifs ; rapide pour les agents IA et les tâches spécialisées ; contexte de 1M tokens.',
+  },
+  {
+    id: 'nvidia/nemotron-3-super-120b-a12b:free',
+    name: 'Nemotron 3 Super',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'MoE de 120B paramètres avec 12B actifs ; orchestration multi-agents, planification et raisonnement ; contexte annoncé de 1M tokens.',
+  },
+  {
+    id: 'nvidia/nemotron-3-nano-omni:free',
+    name: 'Nemotron 3 Nano Omni',
+    provider: 'NVIDIA',
+    free: true,
+    desc: 'Modèle multimodal compact pour analyser du texte, des images, des vidéos et de l’audio ; contexte de 256K tokens.',
+  },
+  {
+    id: 'inclusionai/ling-3.1-flash:free',
+    name: 'Ling 3.1 Flash',
+    provider: 'InclusionAI',
+    free: true,
+    desc: 'Modèle de raisonnement MoE conçu pour les réponses rapides et les tâches générales ; contexte de 262K tokens.',
+  },
+  {
+    id: 'thinking-machines/inkling:free',
+    name: 'Inkling',
+    provider: 'Thinking Machines Lab',
+    free: true,
+    desc: 'Modèle multimodal MoE pour le code, le raisonnement, les agents IA et les outils ; contexte de 1,05M tokens.',
+  },
+  {
+    id: 'cohere/north-mini-code:free',
+    name: 'North Mini Code',
+    provider: 'Cohere',
+    free: true,
+    desc: 'Modèle spécialisé en génération de code, ingénierie logicielle et tâches terminal ; contexte de 256K tokens.',
+  },
+  {
+    id: 'poolside/laguna-s-2.1:free',
+    name: 'Laguna S 2.1',
+    provider: 'Poolside',
+    free: true,
+    desc: 'Modèle orienté programmation agentique, résolution de problèmes logiciels et tâches complexes ; contexte de 262K tokens.',
+  },
 ];
+
 
 // ─── Modèles de génération d'images disponibles via OpenRouter ────────────────
 
 export const OPENROUTER_IMAGE_MODELS = [
-  { id: 'google/gemini-3.6-flash-image',       name: 'Gemini 2.5 Flash Image',    free: true,  desc: 'Google — génération d\'images rapide et gratuite' },
-  { id: 'google/gemini-3.1-flash-image-preview',         name: 'Gemini 3.1 Flash Image Preview',      free: false, desc: 'Google — qualité supérieure, détails fins' },
-  { id: 'bytedance-seed/seedream-4.5',         name: 'SeedReam 4.5',              free: true,  desc: 'ByteDance — haute qualité, rapide' },
-  { id: 'black-forest-labs/flux-schnell',      name: 'FLUX Schnell',              free: true,  desc: 'Black Forest Labs — ultra-rapide, léger' },
-  { id: 'black-forest-labs/flux-1.1-pro',      name: 'FLUX 1.1 Pro',              free: false, desc: 'Black Forest Labs — qualité pro' },
-  { id: 'stabilityai/stable-diffusion-xl',     name: 'Stable Diffusion XL',       free: false, desc: 'Stability AI — SDXL, polyvalent' },
-  { id: 'openai/dall-e-3',                     name: 'DALL·E 3',                  free: false, desc: 'OpenAI — compréhension textuelle avancée' },
+  // ── Gratuits ──────────────────────────────────────────────
+  {
+    id: 'recraft/recraft-v3:free',
+    name: 'Recraft V3 Free',
+    free: true,
+    desc: 'Recraft — génération gratuite, illustrations, logos, visuels marketing et texte dans les images.',
+  },
+
+  // ── Meilleure qualité générale ────────────────────────────
+  {
+    id: 'google/gemini-3.1-flash-image',
+    name: 'Nano Banana 2',
+    free: false,
+    desc: 'Google — génération et édition avancées, excellente compréhension des prompts, rendu détaillé et rapide.',
+  },
+  {
+    id: 'openai/gpt-image-2.5-sunburst',
+    name: 'GPT Image 2.5 Sunburst',
+    free: false,
+    desc: 'OpenAI — génération précise, composition complexe, détails fins et édition contrôlée.',
+  },
+  {
+    id: 'google/gemini-3-pro-image',
+    name: 'Nano Banana Pro',
+    free: false,
+    desc: 'Google — visuels complexes, rendu haute fidélité, infographies et compositions multimodales.',
+  },
+
+  // ── Création et édition avancées ──────────────────────────
+  {
+    id: 'bytedance-seed/seedream-5.0-flash',
+    name: 'Seedream 5.0 Flash',
+    free: false,
+    desc: 'ByteDance — génération rapide, bonne fidélité au prompt et édition créative.',
+  },
+  {
+    id: 'black-forest-labs/flux.2-pro',
+    name: 'FLUX.2 Pro',
+    free: false,
+    desc: 'Black Forest Labs — photoréalisme, textures détaillées, éclairage précis et édition avec références.',
+  },
+  {
+    id: 'black-forest-labs/flux.2-flex',
+    name: 'FLUX.2 Flex',
+    free: false,
+    desc: 'Black Forest Labs — typographie, texte intégré, détails fins et édition multi-références.',
+  },
+  {
+    id: 'recraft/recraft-v4.1',
+    name: 'Recraft V4.1',
+    free: false,
+    desc: 'Recraft — rendu esthétique, illustrations, visuels commerciaux et génération polyvalente.',
+  },
+  {
+    id: 'recraft/recraft-v4.1-pro',
+    name: 'Recraft V4.1 Pro',
+    free: false,
+    desc: 'Recraft — qualité supérieure, rendu haute résolution et visuels professionnels.',
+  },
 ];
+
 
 export function OpenRouterSection() {
   const { profile, setField } = useProfile();
