@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
             'vendor-ui': ['lucide-react', 'motion', 'clsx', 'cva'],
             'vendor-ai': ['@google/genai', '@supabase/supabase-js'],
             'ide-core': [
-              './src/components/UnifiedSidebar',
+              './src/components/GlobalSidebar',
               './src/components/ide/FileExplorer',
               './src/components/ide/EditorTabs',
               './src/hooks/useFileSystem',
