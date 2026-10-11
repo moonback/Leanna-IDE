@@ -6,14 +6,14 @@ import {
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
   Github, Terminal, FolderDown, Settings,
-  FolderClock, Layers,
+  FolderClock, Layers, Search, GitFork,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
 // @ts-ignore - Asset handled by bundler
 import logo from '../../assets/images/icon-sombre.png';
 
-/** Clé sessionStorage pour le mode "sans projet" (réinitialisée à chaque fermeture du navigateur) */
+/** Clé sessionStorage pour le mode "sans projet" */
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
 /** Clé sessionStorage : le launcher a déjà été traité pour cette session */
 const LAUNCHER_DONE_KEY = 'Leanna-launcher-done';
@@ -36,21 +36,56 @@ function getElectronAPI(): { selectFolder: () => Promise<string | null> } | null
 
 const MODAL_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.35 };
 const OVERLAY_FADE = { duration: 0.2 };
-const INLINE_BANNER_TRANSITION = { duration: 0.15 };
 
 function formatDate(isoString: string): string {
   try {
     const d = new Date(isoString);
-    return d.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes < 60) return minutes <= 1 ? "À l'instant" : `Il y a ${minutes} min`;
+    if (hours < 24) return `Il y a ${hours}h`;
+    if (days < 7) return `Il y a ${days}j`;
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   } catch {
     return '—';
   }
 }
+
+function getWorkspaceColor(name: string): string {
+  const colors = [
+    'from-blue-500 to-indigo-600',
+    'from-violet-500 to-purple-600',
+    'from-emerald-500 to-teal-600',
+    'from-orange-500 to-amber-600',
+    'from-rose-500 to-pink-600',
+    'from-cyan-500 to-sky-600',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function getWorkspaceInitials(name: string): string {
+  return name.split(/[\s\-_]/).map(p => p[0]).slice(0, 2).join('').toUpperCase() || name.slice(0, 2).toUpperCase();
+}
+
+type TabId = 'recent' | 'open' | 'clone';
+
+interface TabDef {
+  id: TabId;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+}
+
+const TABS: TabDef[] = [
+  { id: 'recent',  label: 'Récents',  icon: FolderClock, description: 'Vos projets précédents' },
+  { id: 'open',    label: 'Ouvrir',   icon: FolderOpen,  description: 'Dossier local' },
+  { id: 'clone',   label: 'Cloner',   icon: Github,      description: 'Dépôt distant' },
+];
 
 export function StartupProjectModal() {
   const { pathname } = useLocation();
@@ -58,39 +93,31 @@ export function StartupProjectModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'recent' | 'open' | 'new' | 'clone'>('open');
+  const [activeTab, setActiveTab] = useState<TabId>('open');
 
-  // Onglet "Ouvrir"
   const [inputPath, setInputPath] = useState('');
   const [inputSiteUrl, setInputSiteUrl] = useState('');
   const [siteUrlError, setSiteUrlError] = useState<string | null>(null);
   const [showSiteUrl, setShowSiteUrl] = useState(false);
   const [pathValidation, setPathValidation] = useState<{
-    valid?: boolean;
-    error?: string;
-    isGit?: boolean;
-    gitBranch?: string;
+    valid?: boolean; error?: string; isGit?: boolean; gitBranch?: string;
   } | null>(null);
   const [validatingPath, setValidatingPath] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Onglet "Clone"
   const [cloneUrl, setCloneUrl] = useState('');
   const [cloneTargetDir, setCloneTargetDir] = useState('');
   const [cloneUrlError, setCloneUrlError] = useState<string | null>(null);
   const [cloneStatus, setCloneStatus] = useState<'idle' | 'cloning' | 'done' | 'error'>('idle');
   const [cloneLogs, setCloneLogs] = useState<Array<{ level: string; message: string }>>([]);
   const cloneLogsEndRef = useRef<HTMLDivElement>(null);
-  const cloneAbortRef   = useRef<(() => void) | null>(null);
+  const cloneAbortRef = useRef<(() => void) | null>(null);
   const returningFromSettingsRef = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Quand true : la sélection est imposée (ex. après « Changer de projet »).
-  // On ne peut PAS revenir en arrière vers l'ancien projet : ni bouton fermer,
-  // ni Échap, ni clic sur le fond. Seule l'ouverture d'un projet ferme la modale.
   const [forceSelection, setForceSelection] = useState(false);
   const { error: toastError } = useToast();
-
   const shouldReduceMotion = useReducedMotion();
 
   const fetchWorkspaces = useCallback(async () => {
@@ -107,9 +134,7 @@ export function StartupProjectModal() {
         }
         return data;
       }
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     return null;
   }, []);
 
@@ -118,16 +143,8 @@ export function StartupProjectModal() {
     try {
       const wsData = await fetchWorkspaces();
       if (!wsData?.activeRoot) {
-        // Si le launcher n'a pas encore été validé pour cette session, ne pas ouvrir StartupProjectModal en arrière-plan
-        if (sessionStorage.getItem(LAUNCHER_DONE_KEY) !== '1') {
-          setIsOpen(false);
-          return;
-        }
-        // Si l'utilisateur a choisi "sans projet" pour cette session, ne pas rouvrir la modale
-        if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') {
-          setIsOpen(false);
-          return;
-        }
+        if (sessionStorage.getItem(LAUNCHER_DONE_KEY) !== '1') { setIsOpen(false); return; }
+        if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') { setIsOpen(false); return; }
         setIsOpen(true);
         setActiveTab('open');
       }
@@ -141,9 +158,7 @@ export function StartupProjectModal() {
     }
   }, [fetchWorkspaces, toastError]);
 
-  useEffect(() => {
-    checkProjectStatus();
-  }, [checkProjectStatus]);
+  useEffect(() => { checkProjectStatus(); }, [checkProjectStatus]);
 
   useEffect(() => {
     if (pathname !== '/settings' && returningFromSettingsRef.current) {
@@ -152,26 +167,26 @@ export function StartupProjectModal() {
     }
   }, [pathname]);
 
-  // Fermeture au clavier (Échap) — seulement si une opération n'est pas en cours.
+  useEffect(() => {
+    if (workspaces.length > 0 && activeTab === 'open' && !inputPath) {
+      setActiveTab('recent');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaces.length]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (cloneStatus === 'cloning' || loading) return;
-      // Sélection imposée : Échap ne permet pas de revenir en arrière.
-      if (forceSelection) return;
+      if (e.key !== 'Escape' || cloneStatus === 'cloning' || loading || forceSelection) return;
       handleClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // handleClose dépend de currentPath via la closure ; isOpen + statuts suffisent au re-bind.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, cloneStatus, loading, currentPath, forceSelection]);
 
-  // Écouteur global pour ouvrir le switcher depuis n'importe où dans l'application
   useEffect(() => {
     const handleOpenModal = async (e: Event) => {
-      // Attendre un peu pour que le workspace soit fermé côté serveur
       await new Promise(resolve => setTimeout(resolve, 100));
       await fetchWorkspaces();
       const forced = !!(e as CustomEvent).detail?.force;
@@ -179,11 +194,7 @@ export function StartupProjectModal() {
       setIsOpen(true);
       setError(null);
     };
-    // Le launcher (choix IDE/Notebook) peut activer le mode "sans projet" :
-    // dans ce cas, fermer la modale de sélection de workspace si elle est ouverte.
-    const handleNoWorkspaceMode = () => {
-      setIsOpen(false);
-    };
+    const handleNoWorkspaceMode = () => setIsOpen(false);
     window.addEventListener('Leanna-open-workspace-switcher', handleOpenModal);
     window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspaceMode);
     return () => {
@@ -192,12 +203,8 @@ export function StartupProjectModal() {
     };
   }, [fetchWorkspaces]);
 
-  // Validation de chemin en direct
   useEffect(() => {
-    if (!inputPath.trim()) {
-      setPathValidation(null);
-      return;
-    }
+    if (!inputPath.trim()) { setPathValidation(null); return; }
     const timer = setTimeout(async () => {
       setValidatingPath(true);
       try {
@@ -206,24 +213,25 @@ export function StartupProjectModal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: inputPath.trim() }),
         });
-        const data = await res.json();
-        setPathValidation(data);
+        setPathValidation(await res.json());
       } catch {
         setPathValidation({ valid: false, error: 'Impossible de valider le chemin' });
       } finally {
         setValidatingPath(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [inputPath]);
 
+  useEffect(() => {
+    if (cloneStatus === 'cloning') {
+      cloneLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [cloneLogs, cloneStatus]);
+
   const activate = useCallback(async (newRoot: string) => {
-    // Quitter le mode "sans projet" si l'utilisateur ouvre finalement un projet
-    console.log('[StartupProjectModal] Activating new workspace:', newRoot);
     sessionStorage.removeItem(NO_WORKSPACE_KEY);
     ideApi.invalidateCache();
-    console.log('[StartupProjectModal] Dispatching workspace-changed event');
     window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
     setCurrentPath(newRoot);
@@ -231,38 +239,25 @@ export function StartupProjectModal() {
     setIsOpen(false);
   }, []);
 
-  // Auto-scroll des logs de clone vers le bas
-  useEffect(() => {
-    if (cloneStatus === 'cloning') {
-      cloneLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [cloneLogs, cloneStatus]);
-
-  // Validation de l'URL de clone (format uniquement, côté client)
   const validateCloneUrl = (url: string): string | null => {
     if (!url.trim()) return null;
-    if (!/^https?:\/\//i.test(url) && !/^git@/i.test(url)) {
-      return 'URL invalide — ex: https://github.com/user/repo ou git@github.com:user/repo.git';
-    }
+    if (!/^https?:\/\//i.test(url) && !/^git@/i.test(url))
+      return 'URL invalide — ex: https://github.com/user/repo';
     return null;
   };
 
   const handleClone = useCallback(async () => {
     const urlErr = validateCloneUrl(cloneUrl);
     if (urlErr) { setCloneUrlError(urlErr); return; }
-    if (!cloneUrl.trim()) { setCloneUrlError('L\'URL du dépôt est requise.'); return; }
-
+    if (!cloneUrl.trim()) { setCloneUrlError("L'URL du dépôt est requise."); return; }
     setCloneUrlError(null);
     setCloneStatus('cloning');
     setCloneLogs([]);
-
     const body: Record<string, string> = { url: cloneUrl.trim() };
     if (cloneTargetDir.trim()) body.targetDir = cloneTargetDir.trim();
-
     let aborted = false;
     const controller = new AbortController();
     cloneAbortRef.current = () => { aborted = true; controller.abort(); };
-
     try {
       const res = await fetch('/api/self-root/clone', {
         method: 'POST',
@@ -270,18 +265,15 @@ export function StartupProjectModal() {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
-
       if (!res.ok || !res.body) {
         const txt = await res.text().catch(() => 'Erreur réseau');
         setCloneStatus('error');
         setCloneLogs(prev => [...prev, { level: 'error', message: txt }]);
         return;
       }
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-
       while (true) {
         const { done, value } = await reader.read();
         if (done || aborted) break;
@@ -303,7 +295,7 @@ export function StartupProjectModal() {
               setCloneStatus('error');
               setCloneLogs(prev => [...prev, { level: 'error', message: event.error ?? 'Erreur inconnue' }]);
             }
-          } catch { /* ligne SSE malformée */ }
+          } catch { /* SSE malformée */ }
         }
       }
     } catch (err: any) {
@@ -316,20 +308,16 @@ export function StartupProjectModal() {
     }
   }, [cloneUrl, cloneTargetDir, activate, fetchWorkspaces]);
 
-  const handleCancelClone = () => {
-    cloneAbortRef.current?.();
-    setCloneStatus('idle');
-    setCloneLogs([]);
-  };
+  const handleCancelClone = () => { cloneAbortRef.current?.(); setCloneStatus('idle'); setCloneLogs([]); };
 
   const handleBrowse = async () => {
-    const electronAPI = getElectronAPI();
-    if (electronAPI) {
-      const selected = await electronAPI.selectFolder();
+    const api = getElectronAPI();
+    if (api) {
+      const selected = await api.selectFolder();
       if (selected) { setInputPath(selected); setError(null); }
     } else {
       try {
-        // @ts-ignore Web Directory Picker
+        // @ts-ignore
         const handle = await window.showDirectoryPicker({ mode: 'read' });
         if (handle?.name) { setInputPath(handle.name); setError(null); }
       } catch { /* cancelled */ }
@@ -337,51 +325,44 @@ export function StartupProjectModal() {
   };
 
   const handleCreateEmptyWorkspace = useCallback(async () => {
-    const electronAPI = getElectronAPI();
+    const api = getElectronAPI();
     let selectedPath: string | null = null;
-
-    if (electronAPI) {
-      selectedPath = await electronAPI.selectFolder();
+    if (api) {
+      selectedPath = await api.selectFolder();
     } else {
       try {
-        // @ts-ignore Web Directory Picker
+        // @ts-ignore
         const handle = await window.showDirectoryPicker({ mode: 'read' });
         selectedPath = handle?.name ?? null;
       } catch { /* cancelled */ }
     }
-
-    if (selectedPath) {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch('/api/self-root/change', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: selectedPath, userConfirmed: true, siteUrl: '' }),
-        });
-        const data = await res.json();
-        if (data.status === 'success') await activate(data.newRoot);
-        else setError(data.error || 'Erreur lors de la création du workspace');
-      } catch (e: any) {
-        setError(e.message || 'Erreur réseau');
-      } finally {
-        setLoading(false);
-      }
+    if (!selectedPath) return;
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch('/api/self-root/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedPath, userConfirmed: true, siteUrl: '' }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') await activate(data.newRoot);
+      else setError(data.error || 'Erreur lors de la création du workspace');
+    } catch (e: any) {
+      setError(e.message || 'Erreur réseau');
+    } finally {
+      setLoading(false);
     }
-  }, [activate, setLoading, setError]);
+  }, [activate]);
 
   const handleOpenProject = useCallback(async (targetPath?: string, siteUrl?: string) => {
     const pathToOpen = (targetPath || inputPath).trim();
     if (!pathToOpen) return;
-
     const urlTrimmed = (siteUrl !== undefined ? siteUrl : inputSiteUrl).trim();
     if (urlTrimmed) {
       try { new URL(urlTrimmed); setSiteUrlError(null); }
-      catch { setSiteUrlError("URL invalide — ex: https://mon-site.com"); return; }
+      catch { setSiteUrlError('URL invalide — ex: https://mon-site.com'); return; }
     }
-
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
@@ -389,11 +370,8 @@ export function StartupProjectModal() {
         body: JSON.stringify({ path: pathToOpen, userConfirmed: true, siteUrl: urlTrimmed }),
       });
       const data = await res.json();
-      if (data.status === 'success') {
-        await activate(data.newRoot);
-      } else {
-        setError(data.error || 'Erreur lors du changement de répertoire');
-      }
+      if (data.status === 'success') await activate(data.newRoot);
+      else setError(data.error || 'Erreur lors du changement de répertoire');
     } catch (e: any) {
       setError(e.message || 'Erreur réseau');
     } finally {
@@ -405,23 +383,13 @@ export function StartupProjectModal() {
     e.stopPropagation();
     try {
       const res = await fetch(`/api/self-root/workspaces/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setWorkspaces(prev => prev.filter(w => w.id !== id));
-      }
-    } catch {
-      /* ignore */
-    }
+      if (res.ok) setWorkspaces(prev => prev.filter(w => w.id !== id));
+    } catch { /* ignore */ }
   };
 
   const handleClose = () => {
-    if (currentPath) {
-      setIsOpen(false);
-    } else if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') {
-      // Déjà en mode sans projet — fermer simplement la modale
-      setIsOpen(false);
-    } else {
-      window.close();
-    }
+    if (currentPath || sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') setIsOpen(false);
+    else window.close();
   };
 
   const handleOpenSettings = () => {
@@ -431,687 +399,759 @@ export function StartupProjectModal() {
   };
 
   const canBrowse = !!getElectronAPI() || typeof (window as any).showDirectoryPicker === 'function';
+  const filteredWorkspaces = workspaces.filter(ws =>
+    !searchQuery || ws.name.toLowerCase().includes(searchQuery.toLowerCase()) || ws.path.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (!isOpen) return null;
 
   const cardMotionProps = shouldReduceMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
-    : { initial: { scale: 0.95, y: 15 }, animate: { scale: 1, y: 0 }, exit: { scale: 0.95, y: 15 } };
+    : { initial: { scale: 0.97, y: 20, opacity: 0 }, animate: { scale: 1, y: 0, opacity: 1 }, exit: { scale: 0.97, y: 20, opacity: 0 } };
+
+  const visibleTabs = workspaces.length > 0 ? TABS : TABS.filter(t => t.id !== 'recent');
 
   return (
     <AnimatePresence>
       <motion.div
+        key="workspace-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-hidden"
-        style={{ backgroundColor: 'rgba(5, 7, 12, 0.82)', backdropFilter: 'blur(14px)' }}
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-hidden"
+        style={{ backgroundColor: 'rgba(4, 6, 10, 0.88)', backdropFilter: 'blur(20px)' }}
+        onClick={!forceSelection ? handleClose : undefined}
       >
-        {/* ── Orbes de lumière atmosphériques ── */}
+        {/* Atmospheric glows */}
         {!shouldReduceMotion && (
           <>
             <motion.div
-              animate={{ x: [-20, 20, -20], y: [-15, 15, -15], opacity: [0.2, 0.4, 0.2] }}
-              transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full pointer-events-none blur-[120px]"
-              style={{ background: 'radial-gradient(circle, var(--accent-primary) 0%, transparent 70%)' }}
+              animate={{ x: [-30, 30, -30], y: [-20, 20, -20], opacity: [0.15, 0.28, 0.15] }}
+              transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-60 -left-40 w-[45rem] h-[45rem] rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, var(--accent-primary) 0%, transparent 65%)', filter: 'blur(80px)' }}
             />
             <motion.div
-              animate={{ x: [20, -20, 20], y: [15, -15, 15], opacity: [0.15, 0.35, 0.15] }}
-              transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -bottom-40 -right-40 w-[34rem] h-[34rem] rounded-full pointer-events-none blur-[130px]"
-              style={{ background: 'radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%)' }}
+              animate={{ x: [20, -20, 20], y: [15, -15, 15], opacity: [0.1, 0.2, 0.1] }}
+              transition={{ duration: 17, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -bottom-60 -right-40 w-[50rem] h-[50rem] rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, var(--accent-secondary) 0%, transparent 65%)', filter: 'blur(90px)' }}
             />
           </>
         )}
 
+        {/* Modal */}
         <motion.div
           {...cardMotionProps}
           transition={MODAL_SPRING}
           role="dialog"
           aria-modal="true"
           aria-labelledby="workspace-modal-title"
-          className="relative z-10 w-[calc(100%-16px)] max-w-7xl h-[min(780px,calc(100vh-32px))] rounded-3xl p-5 sm:p-7 shadow-2xl overflow-hidden flex flex-col border"
+          onClick={e => e.stopPropagation()}
+          className="relative z-10 flex w-full max-w-5xl rounded-3xl overflow-hidden border"
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 82%, rgba(13, 17, 26, 0.9))',
-            borderColor: 'color-mix(in srgb, var(--accent-primary) 24%, rgba(255, 255, 255, 0.1))',
-            boxShadow:
-              '0 32px 100px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 40px -10px color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+            height: 'min(680px, calc(100vh - 40px))',
+            backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--accent-primary) 18%, rgba(255,255,255,0.08))',
+            boxShadow: '0 40px 120px -20px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 60px -20px color-mix(in srgb, var(--accent-primary) 12%, transparent)',
           }}
         >
-          {/* Ligne lumineuse supérieure */}
+          {/* Top gradient line */}
           <div
-            className="absolute top-0 left-0 right-0 h-[1.5px] pointer-events-none"
-            style={{
-              background:
-                'linear-gradient(90deg, transparent 0%, var(--accent-primary) 30%, var(--accent-secondary) 70%, transparent 100%)',
-            }}
+            className="absolute top-0 left-0 right-0 h-px pointer-events-none z-20"
+            style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary) 30%, var(--accent-secondary) 70%, transparent)' }}
           />
 
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b flex-shrink-0" style={{ borderColor: 'color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
-            <div className="flex items-center gap-3.5">
-              <motion.div
-                whileHover={shouldReduceMotion ? undefined : { rotate: 10, scale: 1.06 }}
-                className="relative w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg"
-                style={{
-                  background:
-                    'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 30%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 20%, transparent) 100%)',
-                  border: '1px solid color-mix(in srgb, var(--accent-primary) 45%, transparent)',
-                  boxShadow: '0 8px 24px -4px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
-                }}
-              >
-                <img src={logo} alt="Leanna" className="w-16 h-16 object-contain" draggable={false} />
-              </motion.div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--accent-primary)' }}>
-                  Workspace manager
-                </p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 id="workspace-modal-title" className="text-xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                    Choisir un workspace
-                  </h2>
-                  <span
-                    className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
-                      borderColor: 'color-mix(in srgb, var(--color-success) 30%, transparent)',
-                      color: 'var(--color-success)',
-                    }}
-                  >
-                    <ShieldCheck className="w-3 h-3" />
-                    Périmètre sécurisé
-                  </span>
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Sélectionnez un dépôt, connectez un serveur ou ouvrez un dossier externe.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <motion.button
-                type="button"
-                onClick={handleOpenSettings}
-                whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
-                title="Ouvrir les paramètres"
-                aria-label="Ouvrir les paramètres"
-              >
-                <Settings className="w-4 h-4" />
-              </motion.button>
-              {!forceSelection && (
-                <motion.button
-                  type="button"
-                  onClick={handleClose}
-                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.7 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
-                  title={currentPath ? "Fermer" : "Quitter"}
-                >
-                  <X className="w-4 h-4" />
-                </motion.button>
-              )}
-            </div>
-          </div>
-
-          {/* Navigation Tabs */}
+          {/* ── LEFT SIDEBAR ── */}
           <div
-            className={`grid grid-cols-2 ${workspaces.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} items-center gap-1 p-1 rounded-2xl mb-5 flex-shrink-0`}
+            className="w-64 flex-shrink-0 flex flex-col border-r"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
-              border: '1px solid var(--border-base)',
+              backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 80%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--border-base) 60%, transparent)',
             }}
           >
-            {([
-              ...(workspaces.length > 0
-                ? [{ id: 'recent' as const, label: 'Dépôts récents', count: workspaces.length, icon: FolderClock }]
-                : []),
-              { id: 'open' as const, label: 'Ouvrir local', count: undefined, icon: FolderOpen },
-              { id: 'clone' as const, label: 'Cloner', count: undefined, icon: Github },
-            ]).map(({ id, label, count, icon: Icon }) => {
-              const selected = activeTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(id);
-                    if (id === 'clone') { setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }
-                  }}
-                  className="relative py-2 px-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            {/* Brand */}
+            <div className="flex items-center gap-3 px-5 py-5 border-b flex-shrink-0"
+              style={{ borderColor: 'color-mix(in srgb, var(--border-base) 50%, transparent)' }}>
+              <motion.div
+                whileHover={shouldReduceMotion ? undefined : { rotate: 8, scale: 1.08 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                className="relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 25%, transparent), color-mix(in srgb, var(--accent-secondary) 15%, transparent))',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                  boxShadow: '0 4px 16px -4px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                }}
+              >
+                <img src={logo} alt="Leanna" className="w-10 h-10 object-contain" draggable={false} />
+              </motion.div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] leading-none mb-1" style={{ color: 'var(--accent-primary)' }}>
+                  Workspace
+                </p>
+                <h2 id="workspace-modal-title" className="text-sm font-black tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>
+                  Leanna IDE
+                </h2>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-3 px-2" style={{ color: 'var(--text-dimmed)' }}>
+                Ouvrir un projet
+              </p>
+              {visibleTabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+                return (
+                  <motion.button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      if (tab.id === 'clone') { setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }
+                    }}
+                    whileHover={shouldReduceMotion ? undefined : { x: 2 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                    className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors"
+                    style={{ color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="tab-bg"
+                        className="absolute inset-0 rounded-xl"
+                        style={{
+                          backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, var(--bg-panel))',
+                          border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                        }}
+                        transition={{ type: 'spring', stiffness: 450, damping: 36 }}
+                      />
+                    )}
+                    <div
+                      className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+                      style={{
+                        backgroundColor: active ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'var(--bg-input)',
+                        color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
+                      }}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="relative z-10 min-w-0">
+                      <p className="text-xs font-semibold leading-none mb-0.5">{tab.label}</p>
+                      <p className="text-[10px] leading-none" style={{ color: active ? 'color-mix(in srgb, var(--accent-primary) 70%, var(--text-muted))' : 'var(--text-dimmed)' }}>
+                        {tab.description}
+                      </p>
+                    </div>
+                    {active && (
+                      <div
+                        className="absolute right-2.5 z-10 w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: 'var(--accent-primary)' }}
+                      />
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Sidebar footer */}
+            <div className="flex-shrink-0 border-t px-3 py-3 space-y-1"
+              style={{ borderColor: 'color-mix(in srgb, var(--border-base) 50%, transparent)' }}>
+              {currentPath && (
+                <div
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1"
                   style={{
-                    color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    backgroundColor: 'color-mix(in srgb, var(--color-success) 8%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-success) 20%, transparent)',
                   }}
                 >
-                  {selected && (
-                    <motion.span
-                      layoutId="ws-tab-active"
-                      className="absolute inset-0 rounded-xl -z-0"
-                      style={{
-                        backgroundColor: 'var(--bg-panel)',
-                        border: '1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-base))',
-                        boxShadow: '0 2px 10px -2px color-mix(in srgb, var(--accent-primary) 25%, transparent)',
-                      }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    />
-                  )}
-                  <Icon className="w-3.5 h-3.5 relative z-10" />
-                  <span className="relative z-10 truncate">
-                    {label}
-                    {count !== undefined && (
-                      <span className="ml-1 opacity-60">({count})</span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ── Tab Content ── */}
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
-            {activeTab === 'recent' && (
-              <div className="space-y-2">
-                {workspaces.length === 0 ? (
-                  <div className="text-center py-8 rounded-xl border border-dashed" style={{ borderColor: 'var(--border-base)' }}>
-                    <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                    <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                      Aucun workspace enregistré pour le moment.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('open')}
-                      className="mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                      style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
-                    >
-                      Ouvrir un dossier externe
-                    </button>
-                  </div>
-                ) : (
-                  workspaces.map((ws) => {
-                    const isActive = currentPath && ws.path.toLowerCase() === currentPath.toLowerCase();
-                    return (
+                  <div className="relative flex-shrink-0">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-success)' }} />
+                    {!shouldReduceMotion && (
                       <motion.div
-                        key={ws.id}
-                        onClick={() => handleOpenProject(ws.path, ws.siteUrl)}
-                        whileHover={shouldReduceMotion ? undefined : { x: 2 }}
-                        className="group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer"
-                        style={{
-                          backgroundColor: isActive
-                            ? 'color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary))'
-                            : 'var(--bg-secondary)',
-                          borderColor: isActive ? 'var(--accent-primary)' : 'var(--border-base)',
-                        }}
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{
-                              backgroundColor: isActive
-                                ? 'color-mix(in srgb, var(--accent-primary) 20%, transparent)'
-                                : 'var(--bg-input)',
-                              color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
-                            }}
-                          >
-                            <FolderOpen className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                                {ws.name}
-                              </span>
-                              {isActive && (
-                                <span
-                                  className="text-xs font-bold px-1.5 py-0.2 rounded"
-                                  style={{
-                                    backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)',
-                                    color: 'var(--color-success)',
-                                  }}
-                                >
-                                  Actif
-                                </span>
-                              )}
-                              {ws.isGit && (
-                                <span
-                                  className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.2 rounded"
-                                  style={{
-                                    backgroundColor: 'var(--bg-panel)',
-                                    border: '1px solid var(--border-base)',
-                                    color: 'var(--text-secondary)',
-                                  }}
-                                >
-                                  <GitBranch className="w-2.5 h-2.5" />
-                                  {ws.gitBranch || 'git'}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>
-                              {ws.path}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 pl-2 flex-shrink-0">
-                          <span className="text-xs flex items-center gap-1 opacity-60 hidden sm:flex" style={{ color: 'var(--text-muted)' }}>
-                            <Clock className="w-3 h-3" />
-                            {formatDate(ws.lastOpened)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteWorkspace(e, ws.id)}
-                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/50 hover:text-red-400 transition-all"
-                            style={{ color: 'var(--text-muted)' }}
-                            title="Retirer de l'historique"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <div className="p-1.5 rounded-lg text-primary opacity-60 group-hover:opacity-100 hover:text-green-400 group-hover:translate-x-0.5 transition-all">
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })
+                        className="absolute inset-0 rounded-full"
+                        style={{ backgroundColor: 'var(--color-success)' }}
+                        animate={{ scale: [1, 2.2, 1], opacity: [0.6, 0, 0.6] }}
+                        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-medium leading-none mb-0.5" style={{ color: 'var(--color-success)' }}>Projet actif</p>
+                    <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--text-primary)' }}>
+                      {currentPath.split(/[\\/]/).pop()}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-1">
+                <motion.button
+                  type="button"
+                  onClick={handleOpenSettings}
+                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Paramètres
+                </motion.button>
+                {!forceSelection && (
+                  <motion.button
+                    type="button"
+                    onClick={handleClose}
+                    whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+                    style={{ color: 'var(--text-muted)' }}
+                    title={currentPath ? 'Fermer' : 'Quitter'}
+                  >
+                    <X className="w-4 h-4" />
+                  </motion.button>
                 )}
               </div>
-            )}
+            </div>
+          </div>
 
-            {activeTab === 'open' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                    Chemin du dossier externe
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <FolderOpen
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                        style={{ color: 'var(--text-dimmed)' }}
-                      />
-                      <input
-                        type="text"
-                        value={inputPath}
-                        onChange={(e) => {
-                          setInputPath(e.target.value);
-                          setError(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleOpenProject();
-                        }}
-                        placeholder="C:\Users\...\mon-projet"
-                        className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
-                        style={{
-                          backgroundColor: 'var(--bg-input)',
-                          borderColor: pathValidation?.valid === false ? 'var(--color-error)' : 'var(--border-base)',
-                          color: 'var(--text-primary)',
-                          outline: 'none',
-                        }}
-                        autoFocus
-                        spellCheck={false}
-                      />
-                    </div>
-                    {canBrowse && (
-                      <motion.button
-                        type="button"
-                        onClick={handleBrowse}
-                        whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
-                        whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold flex-shrink-0"
-                        style={{
-                          backgroundColor: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-base)',
-                          color: 'var(--accent-primary)',
-                        }}
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        Parcourir
-                      </motion.button>
-                    )}
-                  </div>
+          {/* ── RIGHT CONTENT PANEL ── */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* Panel header */}
+            <div
+              className="flex items-center justify-between px-7 py-5 flex-shrink-0 border-b"
+              style={{ borderColor: 'color-mix(in srgb, var(--border-base) 50%, transparent)' }}
+            >
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-1" style={{ color: 'var(--accent-primary)' }}>
+                    {activeTab === 'recent' ? `${workspaces.length} workspace${workspaces.length !== 1 ? 's' : ''}` :
+                     activeTab === 'open'   ? 'Parcourir le système' :
+                     'Intégration Git'}
+                  </p>
+                  <h3 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                    {activeTab === 'recent' ? 'Projets récents' :
+                     activeTab === 'open'   ? 'Ouvrir un dossier' :
+                     'Cloner un dépôt'}
+                  </h3>
+                </motion.div>
+              </AnimatePresence>
+              <span
+                className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)',
+                  borderColor: 'color-mix(in srgb, var(--color-success) 25%, transparent)',
+                  color: 'var(--color-success)',
+                }}
+              >
+                <ShieldCheck className="w-3 h-3" />
+                Périmètre sécurisé
+              </span>
+            </div>
 
-                  {/* Validation status pill */}
-                  <AnimatePresence>
-                    {validatingPath && (
-                      <div className="flex items-center gap-1.5 mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Vérification de la sécurité du chemin…</span>
+            {/* Tab content */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <AnimatePresence mode="wait">
+
+                {/* RECENT */}
+                {activeTab === 'recent' && (
+                  <motion.div
+                    key="recent"
+                    initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: -12 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col h-full"
+                  >
+                    <div className="px-6 pt-5 pb-3 flex-shrink-0">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          placeholder="Rechercher un projet…"
+                          className="w-full rounded-xl border pl-9 pr-3 py-2.5 text-xs focus:ring-1 focus:ring-[var(--accent-primary)] outline-none transition-all"
+                          style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                        />
                       </div>
-                    )}
-                    {pathValidation && !validatingPath && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -2 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex items-center gap-2 mt-2 p-2 rounded-lg text-xs font-medium ${
-                          pathValidation.valid ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'
-                        }`}
-                      >
-                        {pathValidation.valid ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span>
-                              Dépôt valide
-                              {pathValidation.isGit && ` • Branche Git: ${pathValidation.gitBranch || 'défaut'}`}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span>{pathValidation.error || 'Chemin non autorisé ou inexistant'}</span>
-                          </>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-6 pb-5 space-y-2">
+                      {filteredWorkspaces.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                            style={{ backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 80%, transparent)', border: '1px solid var(--border-base)' }}>
+                            <FolderOpen className="w-6 h-6" style={{ color: 'var(--text-dimmed)' }} />
+                          </div>
+                          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>
+                            {searchQuery ? 'Aucun résultat' : 'Aucun projet récent'}
+                          </p>
+                          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+                            {searchQuery ? "Essayez d'autres mots-clés" : 'Ouvrez un dossier pour commencer'}
+                          </p>
+                          {!searchQuery && (
+                            <button type="button" onClick={() => setActiveTab('open')}
+                              className="px-4 py-2 rounded-xl text-xs font-semibold text-white"
+                              style={{ backgroundColor: 'var(--accent-primary)' }}>
+                              Ouvrir un dossier
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        filteredWorkspaces.map((ws, i) => {
+                          const isActive = currentPath && ws.path.toLowerCase() === currentPath.toLowerCase();
+                          const colorClass = getWorkspaceColor(ws.name);
+                          const initials = getWorkspaceInitials(ws.name);
+                          return (
+                            <motion.div
+                              key={ws.id}
+                              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2, delay: i * 0.04 }}
+                              onClick={() => handleOpenProject(ws.path, ws.siteUrl)}
+                              className="group relative flex items-center gap-4 p-4 rounded-2xl border cursor-pointer transition-all"
+                              style={{
+                                backgroundColor: isActive ? 'color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary))' : 'var(--bg-secondary)',
+                                borderColor: isActive ? 'color-mix(in srgb, var(--accent-primary) 40%, transparent)' : 'var(--border-base)',
+                              }}
+                            >
+                              {/* Hover gradient overlay */}
+                              <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                style={{
+                                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 3%, transparent), transparent)',
+                                  border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
+                                }}
+                              />
+                              {/* Avatar */}
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-black bg-gradient-to-br ${colorClass} shadow-lg`}>
+                                {initials}
+                              </div>
+                              {/* Info */}
+                              <div className="min-w-0 flex-1 relative z-10">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ws.name}</span>
+                                  {isActive && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                      style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>
+                                      Actif
+                                    </span>
+                                  )}
+                                  {ws.isGit && (
+                                    <span className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                      style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}>
+                                      <GitBranch className="w-2.5 h-2.5" />
+                                      {ws.gitBranch || 'main'}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>{ws.path}</p>
+                              </div>
+                              {/* Actions */}
+                              <div className="flex items-center gap-2 flex-shrink-0 relative z-10">
+                                <span className="text-[10px] items-center gap-1 hidden sm:flex" style={{ color: 'var(--text-dimmed)' }}>
+                                  <Clock className="w-3 h-3" />{formatDate(ws.lastOpened)}
+                                </span>
+                                <button type="button" onClick={e => handleDeleteWorkspace(e, ws.id)}
+                                  className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                  style={{ color: 'var(--text-dimmed)' }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#f87171'; (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(239,68,68,0.12)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dimmed)'; (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                                  title="Retirer de l'historique">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                <div className="p-1.5 rounded-lg opacity-60 group-hover:opacity-100 transition-all group-hover:translate-x-0.5"
+                                  style={{ color: 'var(--accent-primary)' }}>
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </motion.div>
+                )}
 
-                {/* URL Optionnelle */}
-                <div>
-                  <AnimatePresence>
-                    {showSiteUrl ? (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={INLINE_BANNER_TRANSITION}
-                      >
-                        <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                          URL du site associé <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
-                        </label>
-                        <div className="relative">
-                          <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                {/* OPEN */}
+                {activeTab === 'open' && (
+                  <motion.div
+                    key="open"
+                    initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: -12 }}
+                    transition={{ duration: 0.2 }}
+                    className="px-7 py-6 space-y-5"
+                  >
+                    <div>
+                      <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>
+                        Chemin du dossier
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                          {validatingPath && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin pointer-events-none" style={{ color: 'var(--accent-primary)' }} />}
+                          {!validatingPath && pathValidation?.valid === true && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none text-emerald-400" />}
+                          {!validatingPath && pathValidation?.valid === false && <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none text-red-400" />}
                           <input
-                            type="url"
-                            value={inputSiteUrl}
-                            onChange={(e) => {
-                              setInputSiteUrl(e.target.value);
-                              setSiteUrlError(null);
-                            }}
-                            placeholder="https://mon-site.com"
-                            className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                            type="text"
+                            value={inputPath}
+                            onChange={e => { setInputPath(e.target.value); setError(null); }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleOpenProject(); }}
+                            placeholder="C:\Users\...\mon-projet"
+                            className="w-full rounded-xl border pl-10 pr-10 py-3 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)] outline-none transition-all"
                             style={{
                               backgroundColor: 'var(--bg-input)',
-                              borderColor: siteUrlError ? 'var(--color-error)' : 'var(--border-base)',
+                              borderColor: pathValidation?.valid === false ? 'var(--color-error)' : pathValidation?.valid === true ? 'rgba(52,211,153,0.4)' : 'var(--border-base)',
                               color: 'var(--text-primary)',
-                              outline: 'none',
                             }}
+                            autoFocus
                             spellCheck={false}
                           />
                         </div>
-                        {siteUrlError && <p className="mt-1 text-xs text-red-400">{siteUrlError}</p>}
-                      </motion.div>
-                    ) : (
-                      <button
+                        {canBrowse && (
+                          <motion.button
+                            type="button"
+                            onClick={handleBrowse}
+                            whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                            whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                            className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-semibold flex-shrink-0 transition-all"
+                            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--accent-primary)' }}
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            Parcourir
+                          </motion.button>
+                        )}
+                      </div>
+                      <AnimatePresence>
+                        {pathValidation && !validatingPath && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4, height: 0 }}
+                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className={`flex items-center gap-2 mt-2.5 px-3 py-2 rounded-lg text-xs font-medium ${pathValidation.valid ? 'text-emerald-400' : 'text-red-400'}`}
+                            style={{ border: `1px solid ${pathValidation.valid ? 'rgba(52,211,153,0.2)' : 'rgba(239,68,68,0.2)'}`, backgroundColor: pathValidation.valid ? 'rgba(52,211,153,0.05)' : 'rgba(239,68,68,0.05)' }}
+                          >
+                            {pathValidation.valid ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>Dépôt valide{pathValidation.isGit && ` · branche ${pathValidation.gitBranch || 'main'}`}</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span>{pathValidation.error || 'Chemin non autorisé ou inexistant'}</span>
+                              </>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Site URL */}
+                    <div>
+                      <AnimatePresence>
+                        {showSiteUrl ? (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.18 }}
+                          >
+                            <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>
+                              URL du site associé <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel)</span>
+                            </label>
+                            <div className="relative">
+                              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                              <input
+                                type="url"
+                                value={inputSiteUrl}
+                                onChange={e => { setInputSiteUrl(e.target.value); setSiteUrlError(null); }}
+                                placeholder="https://mon-site.com"
+                                className="w-full rounded-xl border pl-10 pr-3 py-3 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)] outline-none transition-all"
+                                style={{ backgroundColor: 'var(--bg-input)', borderColor: siteUrlError ? 'var(--color-error)' : 'var(--border-base)', color: 'var(--text-primary)' }}
+                                spellCheck={false}
+                              />
+                            </div>
+                            {siteUrlError && <p className="mt-1.5 text-xs text-red-400">{siteUrlError}</p>}
+                          </motion.div>
+                        ) : (
+                          <button type="button" onClick={() => setShowSiteUrl(true)}
+                            className="flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-70"
+                            style={{ color: 'var(--accent-primary)' }}>
+                            <Globe className="w-3.5 h-3.5" />
+                            + Associer une URL de site ou de documentation
+                          </button>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                      <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-dimmed)' }}>ou</span>
+                      <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                    </div>
+
+                    {/* New workspace */}
+                    {canBrowse && (
+                      <motion.button
                         type="button"
-                        onClick={() => setShowSiteUrl(true)}
-                        className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:opacity-80"
-                        style={{ color: 'var(--accent-primary)' }}
-                      >
-                        <Globe className="w-3.5 h-3.5" />
-                        + Associer une URL de site ou documentation
-                      </button>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Créer un nouveau workspace vide */}
-                {canBrowse && (
-                  <div className="pt-2 border-t" style={{ borderColor: 'var(--border-base)' }}>
-                    <button
-                      type="button"
-                      onClick={handleCreateEmptyWorkspace}
-                      disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
-                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Créer un nouveau workspace vide
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'clone' && (
-              <div className="space-y-3">
-                {/* URL input */}
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                    URL du dépôt Git
-                  </label>
-                  <div className="relative">
-                    <Github
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                      style={{ color: 'var(--text-dimmed)' }}
-                    />
-                    <input
-                      type="url"
-                      value={cloneUrl}
-                      onChange={(e) => { setCloneUrl(e.target.value); setCloneUrlError(null); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && cloneStatus === 'idle') handleClone(); }}
-                      placeholder="https://github.com/user/repository"
-                      disabled={cloneStatus === 'cloning'}
-                      className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)] disabled:opacity-50"
-                      style={{
-                        backgroundColor: 'var(--bg-input)',
-                        borderColor: cloneUrlError ? 'var(--color-error)' : 'var(--border-base)',
-                        color: 'var(--text-primary)',
-                        outline: 'none',
-                      }}
-                      autoFocus
-                      spellCheck={false}
-                    />
-                  </div>
-                  {cloneUrlError && (
-                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                      {cloneUrlError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Dossier de destination optionnel */}
-                {cloneStatus === 'idle' && (
-                  <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                      Dossier de destination{' '}
-                      <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
-                        (optionnel — défaut: ~/Documents/Leanna-Projects)
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <FolderDown
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                        style={{ color: 'var(--text-dimmed)' }}
-                      />
-                      <input
-                        type="text"
-                        value={cloneTargetDir}
-                        onChange={(e) => setCloneTargetDir(e.target.value)}
-                        placeholder="C:\Users\...\mes-projets"
-                        className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)]"
+                        onClick={handleCreateEmptyWorkspace}
+                        disabled={loading}
+                        whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
+                        whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
+                        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                         style={{
-                          backgroundColor: 'var(--bg-input)',
-                          borderColor: 'var(--border-base)',
-                          color: 'var(--text-primary)',
-                          outline: 'none',
+                          backgroundColor: 'var(--bg-secondary)',
+                          border: '1px dashed color-mix(in srgb, var(--border-base) 80%, var(--accent-primary))',
+                          color: 'var(--text-secondary)',
                         }}
-                        spellCheck={false}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Terminal de logs SSE */}
-                {(cloneStatus === 'cloning' || cloneLogs.length > 0) && (
-                  <div
-                    className="rounded-xl border overflow-hidden"
-                    style={{ borderColor: 'var(--border-base)', backgroundColor: '#0d0d0d' }}
-                  >
-                    {/* Barre de titre terminal */}
-                    <div
-                      className="flex items-center gap-2 px-3 py-1.5 border-b"
-                      style={{ borderColor: 'var(--border-base)', backgroundColor: '#111' }}
-                    >
-                      <Terminal className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                        git clone
-                      </span>
-                      {cloneStatus === 'cloning' && (
-                        <Loader2 className="w-3 h-3 animate-spin ml-auto" style={{ color: 'var(--accent-primary)' }} />
-                      )}
-                      {cloneStatus === 'done' && (
-                        <CheckCircle2 className="w-3 h-3 ml-auto text-emerald-400" />
-                      )}
-                      {cloneStatus === 'error' && (
-                        <AlertCircle className="w-3 h-3 ml-auto text-red-400" />
-                      )}
-                    </div>
-                    {/* Logs scrollables */}
-                    <div className="max-h-48 overflow-y-auto p-3 space-y-0.5 font-mono text-xs leading-relaxed">
-                      {cloneLogs.map((log, i) => (
-                        <div
-                          key={i}
-                          className={
-                            log.level === 'error' ? 'text-red-400' :
-                            log.level === 'warn'  ? 'text-yellow-400/80' :
-                            'text-green-300/80'
-                          }
-                        >
-                          {log.message}
+                      >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}>
+                          <Plus className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
                         </div>
-                      ))}
-                      <div ref={cloneLogsEndRef} />
-                    </div>
-                  </div>
+                        <div className="text-left">
+                          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Nouveau projet vide</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sélectionner un dossier existant</p>
+                        </div>
+                      </motion.button>
+                    )}
+                  </motion.div>
                 )}
 
-                {/* État vide — invitation */}
-                {cloneStatus === 'idle' && cloneLogs.length === 0 && (
-                  <div
-                    className="rounded-xl border border-dashed flex items-center gap-3 p-3"
-                    style={{ borderColor: 'var(--border-base)' }}
+                {/* CLONE */}
+                {activeTab === 'clone' && (
+                  <motion.div
+                    key="clone"
+                    initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: -12 }}
+                    transition={{ duration: 0.2 }}
+                    className="px-7 py-6 space-y-5"
                   >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
-                    >
-                      <Github className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    <div>
+                      <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>
+                        URL du dépôt Git
+                      </label>
+                      <div className="relative">
+                        <Github className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                        <input
+                          type="url"
+                          value={cloneUrl}
+                          onChange={e => { setCloneUrl(e.target.value); setCloneUrlError(null); }}
+                          onKeyDown={e => { if (e.key === 'Enter' && cloneStatus === 'idle') handleClone(); }}
+                          placeholder="https://github.com/user/repository.git"
+                          disabled={cloneStatus === 'cloning'}
+                          className="w-full rounded-xl border pl-10 pr-3 py-3 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)] outline-none disabled:opacity-50 transition-all"
+                          style={{ backgroundColor: 'var(--bg-input)', borderColor: cloneUrlError ? 'var(--color-error)' : 'var(--border-base)', color: 'var(--text-primary)' }}
+                          autoFocus
+                          spellCheck={false}
+                        />
+                      </div>
+                      {cloneUrlError && (
+                        <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
+                          <AlertCircle className="w-3 h-3 flex-shrink-0" />{cloneUrlError}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Entrez l'URL d'un dépôt GitHub, GitLab ou autre et cliquez sur <strong style={{ color: 'var(--text-secondary)' }}>Cloner</strong>.
-                      Le dépôt sera téléchargé puis chargé automatiquement comme workspace.
-                    </p>
-                  </div>
+
+                    {cloneStatus === 'idle' && (
+                      <div>
+                        <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>
+                          Dossier de destination{' '}
+                          <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(optionnel — défaut: ~/Documents/Leanna-Projects)</span>
+                        </label>
+                        <div className="relative">
+                          <FolderDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-dimmed)' }} />
+                          <input
+                            type="text"
+                            value={cloneTargetDir}
+                            onChange={e => setCloneTargetDir(e.target.value)}
+                            placeholder="C:\Users\...\mes-projets"
+                            className="w-full rounded-xl border pl-10 pr-3 py-3 text-xs font-mono focus:ring-1 focus:ring-[var(--accent-primary)] outline-none transition-all"
+                            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                            spellCheck={false}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Terminal log */}
+                    {(cloneStatus !== 'idle' || cloneLogs.length > 0) && (
+                      <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-base)' }}>
+                        <div className="flex items-center gap-2 px-4 py-2 border-b"
+                          style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderColor: 'rgba(255,255,255,0.05)' }}>
+                          <div className="flex gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+                          </div>
+                          <Terminal className="w-3 h-3 ml-1" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                          <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>git clone</span>
+                          <div className="ml-auto flex items-center gap-1.5">
+                            {cloneStatus === 'cloning' && <><Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--accent-primary)' }} /><span className="text-[10px]" style={{ color: 'var(--accent-primary)' }}>En cours…</span></>}
+                            {cloneStatus === 'done' && <><CheckCircle2 className="w-3 h-3 text-emerald-400" /><span className="text-[10px] text-emerald-400">Terminé</span></>}
+                            {cloneStatus === 'error' && <><AlertCircle className="w-3 h-3 text-red-400" /><span className="text-[10px] text-red-400">Erreur</span></>}
+                          </div>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto p-4 space-y-0.5 font-mono text-xs leading-relaxed" style={{ backgroundColor: '#080a0f' }}>
+                          {cloneLogs.map((log, i) => (
+                            <div key={i} className={log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-yellow-400' : 'text-emerald-300/80'}>
+                              {log.level !== 'info' && <span className="opacity-50 mr-2">[{log.level}]</span>}
+                              {log.message}
+                            </div>
+                          ))}
+                          <div ref={cloneLogsEndRef} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty hint */}
+                    {cloneStatus === 'idle' && cloneLogs.length === 0 && (
+                      <div
+                        className="flex items-start gap-4 p-4 rounded-2xl border"
+                        style={{
+                          backgroundColor: 'color-mix(in srgb, var(--accent-primary) 4%, var(--bg-secondary))',
+                          borderColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                        }}
+                      >
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' }}>
+                          <GitFork className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                            Cloner depuis GitHub, GitLab ou autre
+                          </p>
+                          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                            Le dépôt sera téléchargé et chargé automatiquement comme workspace actif.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+              </AnimatePresence>
+            </div>
+
+            {/* ── FOOTER ── */}
+            <div
+              className="flex items-center justify-between gap-4 px-7 py-4 flex-shrink-0 border-t"
+              style={{ borderColor: 'color-mix(in srgb, var(--border-base) 50%, transparent)' }}
+            >
+              <span className="flex items-center gap-2 text-xs min-w-0" style={{ color: 'var(--text-dimmed)' }}>
+                <Layers className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--accent-primary) 60%, var(--text-dimmed))' }} />
+                <span className="truncate">
+                  {currentPath ? (
+                    <>Actif :<span className="font-mono font-medium ml-1" style={{ color: 'var(--text-secondary)' }}>{currentPath.split(/[\\/]/).pop()}</span></>
+                  ) : 'Aucun projet sélectionné'}
+                </span>
+              </span>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-400"
+                      style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="max-w-[200px] truncate">{error}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {activeTab === 'open' && (
+                  <motion.button
+                    type="button"
+                    onClick={() => handleOpenProject()}
+                    disabled={loading || !inputPath.trim() || pathValidation?.valid === false}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.03 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary)))',
+                      boxShadow: '0 4px 16px -4px color-mix(in srgb, var(--accent-primary) 50%, transparent)',
+                    }}
+                  >
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderInput className="w-3.5 h-3.5" />}
+                    Ouvrir le projet
+                  </motion.button>
+                )}
+
+                {activeTab === 'clone' && cloneStatus === 'idle' && (
+                  <motion.button
+                    type="button"
+                    onClick={handleClone}
+                    disabled={!cloneUrl.trim()}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.03 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary)))',
+                      boxShadow: '0 4px 16px -4px color-mix(in srgb, var(--accent-primary) 50%, transparent)',
+                    }}
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    Cloner et ouvrir
+                  </motion.button>
+                )}
+
+                {activeTab === 'clone' && cloneStatus === 'cloning' && (
+                  <motion.button
+                    type="button"
+                    onClick={handleCancelClone}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Annuler
+                  </motion.button>
+                )}
+
+                {activeTab === 'clone' && cloneStatus === 'error' && (
+                  <motion.button
+                    type="button"
+                    onClick={() => { setCloneStatus('idle'); setCloneLogs([]); }}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                    style={{ border: '1px solid var(--color-error)', color: 'var(--color-error)', backgroundColor: 'rgba(239,68,68,0.05)' }}
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    Réessayer
+                  </motion.button>
+                )}
+
+                {activeTab === 'recent' && !currentPath && (
+                  <motion.button
+                    type="button"
+                    onClick={handleCreateEmptyWorkspace}
+                    disabled={loading}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.03 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary)))',
+                      boxShadow: '0 4px 16px -4px color-mix(in srgb, var(--accent-primary) 50%, transparent)',
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Nouveau projet
+                  </motion.button>
                 )}
               </div>
-            )}
-
-            {/* Message d'erreur global */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2 bg-red-500/10 text-red-400 border border-red-500/20"
-                >
-                  <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                  <span>{error}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Footer Action */}
-          <div className="flex items-center justify-between gap-3 pt-4 mt-3 border-t flex-shrink-0" style={{ borderColor: 'color-mix(in srgb, var(--border-base) 60%, transparent)' }}>
-            <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-              <Layers className="w-3.5 h-3.5 opacity-70" style={{ color: 'var(--accent-primary)' }} />
-              {currentPath ? (
-                <>Actif : <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{currentPath.split(/[\\/]/).pop()}</span></>
-              ) : (
-                'Aucun projet sélectionné'
-              )}
-            </span>
-
-            <div className="flex items-center gap-2">
-              {/* Nouveau projet — visible uniquement quand aucun projet n'est actif */}
-              {!currentPath && (
-                <motion.button
-                  type="button"
-                  onClick={handleCreateEmptyWorkspace}
-                  disabled={loading}
-                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--border-base)',
-                    color: 'var(--text-muted)',
-                  }}
-                  title="Créer un nouveau projet dans un dossier vide"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Nouveau projet
-                </motion.button>
-              )}
-              
-              {activeTab === 'open' && (
-                <motion.button
-                  type="button"
-                  onClick={() => handleOpenProject()}
-                  disabled={loading || !inputPath.trim() || pathValidation?.valid === false}
-                  whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50 transition-all shadow-md"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                >
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderInput className="w-3.5 h-3.5" />}
-                  Ouvrir et verrouiller
-                </motion.button>
-              )}
-              {activeTab === 'clone' && cloneStatus === 'idle' && (
-                <motion.button
-                  type="button"
-                  onClick={handleClone}
-                  disabled={!cloneUrl.trim()}
-                  whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50 transition-all shadow-md"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                >
-                  <Github className="w-3.5 h-3.5" />
-                  Cloner et ouvrir
-                </motion.button>
-              )}
-              {activeTab === 'clone' && cloneStatus === 'cloning' && (
-                <motion.button
-                  type="button"
-                  onClick={handleCancelClone}
-                  whileHover={shouldReduceMotion ? undefined : { opacity: 0.8 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Annuler
-                </motion.button>
-              )}
-              {activeTab === 'clone' && cloneStatus === 'error' && (
-                <motion.button
-                  type="button"
-                  onClick={() => { setCloneStatus('idle'); setCloneLogs([]); }}
-                  whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                  whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold transition-all"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
-                >
-                  <Github className="w-3.5 h-3.5" />
-                  Réessayer
-                </motion.button>
-              )}
             </div>
           </div>
         </motion.div>
