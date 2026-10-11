@@ -217,3 +217,162 @@ test("proposals below minImportance are not emitted", async () => {
   assert.equal(seen.length, 0);
   engine.stop();
 });
+
+// ─── Phase 2: proactivité réelle ─────────────────────────────────────────────
+// These fakes isolate the new detectors from the real knowledge singletons so
+// each integration point is verified deterministically. Empty engines are the
+// default so the pre-Phase-2 tests above keep asserting exact counts.
+
+const emptyOpportunity = { scan: () => ({ opportunities: [], generatedAt: "", summary: "" }) } as never;
+const emptyDoctor = {
+  diagnose: () => ({ scores: {}, global: 100, issues: [], improvementMissions: [], generatedAt: "", summary: "" }),
+} as never;
+const emptyPrediction = {
+  predict: () => ({ successProbability: 1, successPercent: 100, riskLevel: "low", risks: [], estimatedDurationMs: 0, estimatedCostUsd: 0, estimatedTokens: 0, recommendedStrategy: [], steps: [], confidence: 1, generatedAt: "", summary: "" }),
+} as never;
+const emptyBriefing = {
+  generate: () => ({ greeting: "", projectName: "", healthScore: 0, counts: { critical: 0, pending: 0, improvement: 0 }, items: [], recommendedMissions: [], highlights: [], generatedAt: "", summary: "" }),
+} as never;
+
+/** All knowledge engines wired to empty fakes; override per-test as needed. */
+function phase2Engine(runtime: ReturnType<typeof fakeRuntime>, overrides: Record<string, unknown> = {}) {
+  return new AnticipationEngine(runtime as never, {
+    strategyMemory: emptyStrategy,
+    learningEngine: emptyLearning,
+    opportunityEngine: emptyOpportunity,
+    projectDoctor: emptyDoctor,
+    predictionEngine: emptyPrediction,
+    dailyBriefing: emptyBriefing,
+    ...overrides,
+  } as never);
+}
+
+test("sweep: OpportunityEngine opportunities become proposals", () => {
+  const runtime = fakeRuntime();
+  const opportunityEngine = {
+    scan: () => ({
+      opportunities: [
+        { id: "OPP-1", kind: "automation", message: "Workflow répété 5×", suggestedAction: "Créer un workflow.", value: 70, effort: 2, payoff: 35, affectedResources: ["x.ts"], signature: "automation:x" },
+      ],
+      generatedAt: "", summary: "",
+    }),
+  } as never;
+  const engine = phase2Engine(runtime, { opportunityEngine });
+
+  const emitted = engine.sweepNow();
+  const proposal = emitted.find((p) => p.fingerprint === "sweep:opportunity:automation:x");
+
+  assert.ok(proposal, "an opportunity should produce a proposal");
+  assert.equal(proposal!.kind, "automation");
+  assert.ok(proposal!.message.includes("Workflow répété"));
+});
+
+test("sweep: ProjectDoctor critical issue becomes a risk proposal", () => {
+  const runtime = fakeRuntime();
+  const projectDoctor = {
+    diagnose: () => ({
+      scores: {}, global: 40,
+      issues: [
+        { dimension: "security", severity: "critical", message: "secret commité", penalty: 40, affectedResources: [".env"], suggestedAction: "Révoquer et purger le secret." },
+        { dimension: "tests", severity: "low", message: "couverture faible", penalty: 5, affectedResources: [], suggestedAction: "Ajouter des tests." },
+      ],
+      improvementMissions: [], generatedAt: "", summary: "",
+    }),
+  } as never;
+  const engine = phase2Engine(runtime, { projectDoctor });
+
+  const emitted = engine.sweepNow();
+  const risk = emitted.find((p) => p.fingerprint.startsWith("sweep:health:security:"));
+
+  assert.ok(risk, "a critical health issue should surface");
+  assert.equal(risk!.kind, "risk");
+  assert.ok(risk!.importance >= 0.9);
+  // The low-severity issue must NOT produce a proposal.
+  assert.ok(!emitted.some((p) => p.fingerprint.startsWith("sweep:health:tests:")));
+});
+
+test("sweep: PredictionEngine flags a risky top improvement mission", () => {
+  const runtime = fakeRuntime();
+  const projectDoctor = {
+    diagnose: () => ({
+      scores: {}, global: 60, issues: [],
+      improvementMissions: [
+        { title: "Refonte sécurité", description: "...", priority: "high", dimension: "security", affectedResources: ["auth.ts"] },
+      ],
+      generatedAt: "", summary: "",
+    }),
+  } as never;
+  const predictionEngine = {
+    predict: () => ({ successProbability: 0.3, successPercent: 30, riskLevel: "critical", risks: [], estimatedDurationMs: 0, estimatedCostUsd: 0, estimatedTokens: 0, recommendedStrategy: ["analyser", "tester"], steps: [], confidence: 0.5, generatedAt: "", summary: "" }),
+  } as never;
+  const engine = phase2Engine(runtime, { projectDoctor, predictionEngine });
+
+  const emitted = engine.sweepNow();
+  const risk = emitted.find((p) => p.fingerprint === "sweep:prediction:security:critical");
+
+  assert.ok(risk, "a low-success top mission should raise a risk proposal");
+  assert.ok(risk!.message.includes("30%"));
+  assert.ok(risk!.suggestedAction.includes("analyser"));
+});
+
+test("daily briefing: emitted once per day, carries scheduled metadata on launch", () => {
+  const runtime = fakeRuntime();
+  const dailyBriefing = {
+    generate: () => ({
+      greeting: "", projectName: "demo", healthScore: 50,
+      counts: { critical: 2, pending: 1, improvement: 0 },
+      items: [], highlights: [],
+      recommendedMissions: [{ title: "Corriger X", description: "...", priority: "critical" }],
+      generatedAt: "", summary: "digest",
+    }),
+  } as never;
+  const submitted: Array<Record<string, unknown>> = [];
+  const engine = phase2Engine(runtime, {
+    dailyBriefing,
+    submitTask: (input: Record<string, unknown>) => {
+      submitted.push(input);
+      return { ...input, id: "task-brief", createdAt: Date.now(), status: "pending", attempts: 0, maxRetries: 1, timeoutMs: 1000 };
+    },
+  });
+
+  const first = engine.briefNow();
+  const second = engine.briefNow(); // same day → suppressed by dedupe
+
+  assert.ok(first, "first briefing of the day should emit");
+  assert.equal(second, undefined, "second briefing same day should be suppressed");
+  assert.ok(first!.message.includes("2 critique"));
+  // 2 criticals → importance 0.8 < autoLaunch 0.85 by default, so NOT launched.
+  assert.equal(first!.queuedAsTask, false);
+  assert.equal(submitted.length, 0);
+});
+
+test("daily briefing: a high-importance briefing auto-launches a scheduled goal", () => {
+  const runtime = fakeRuntime();
+  const dailyBriefing = {
+    generate: () => ({
+      greeting: "", projectName: "demo", healthScore: 10,
+      counts: { critical: 5, pending: 0, improvement: 0 },
+      items: [], highlights: [],
+      recommendedMissions: [{ title: "Corriger la faille", description: "...", priority: "critical" }],
+      generatedAt: "", summary: "digest",
+    }),
+  } as never;
+  const submitted: Array<{ metadata?: { anticipation?: { scheduled?: boolean; briefingSummary?: string } } }> = [];
+  const engine = phase2Engine(runtime, {
+    dailyBriefing,
+    // Lower the auto-launch threshold so the 0.8-importance briefing launches.
+    config: { sweepEveryTicks: 4, minImportance: 0.4, autoLaunchThreshold: 0.75, dedupeTtlMs: 600_000, historyLimit: 50, reflectEveryTicks: 0 },
+    submitTask: (input: { metadata?: { anticipation?: { scheduled?: boolean; briefingSummary?: string } } }) => {
+      submitted.push(input);
+      return { ...input, id: "task-brief", createdAt: Date.now(), status: "pending", attempts: 0, maxRetries: 1, timeoutMs: 1000 } as never;
+    },
+  });
+
+  const proposal = engine.briefNow();
+
+  assert.ok(proposal);
+  assert.equal(proposal!.queuedAsTask, true);
+  assert.equal(submitted.length, 1);
+  assert.equal(submitted[0].metadata?.anticipation?.scheduled, true, "scheduled flag must reach the task metadata");
+  assert.equal(submitted[0].metadata?.anticipation?.briefingSummary, "digest");
+});

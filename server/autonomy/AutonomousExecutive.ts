@@ -14,6 +14,10 @@ interface AnticipationMeta {
   suggestedAction: string;
   affectedResources: string[];
   importance: number;
+  /** True for scheduled proposals (e.g. the daily briefing) → SCHEDULE goal. */
+  scheduled?: boolean;
+  /** Optional Markdown digest carried from a daily briefing. */
+  briefingSummary?: string;
 }
 
 /** The action selected by the deterministic autonomy policy. */
@@ -59,9 +63,74 @@ export class PriorityEngine {
   }
 }
 
-/** In-memory, deduplicating goal index. Persistence remains the existing Memory/Mission stores. */
+/**
+ * Durable goal persistence seam. Best-effort and fully optional: every method
+ * may be sync or async and must never throw into the GoalManager. The default
+ * implementation (MemoryGoalStore) is backed by the runtime's project-level
+ * Memory, so goals survive a restart wherever project memory is persisted.
+ */
+export interface GoalStore {
+  save(goal: AutonomousGoal): Promise<void> | void;
+  loadActive(): AutonomousGoal[];
+  remove?(id: string): Promise<void> | void;
+}
+
+/**
+ * GoalStore implementation over the runtime Memory (project level). Keys goals
+ * under `autonomy:goal:<id>`. Terminal goals (COMPLETED/CANCELLED) are dropped
+ * so restore() only ever rehydrates goals that still need attention.
+ */
+export class MemoryGoalStore implements GoalStore {
+  private static readonly PREFIX = "autonomy:goal:";
+
+  constructor(private readonly memory: AgentRuntime["memory"]) {}
+
+  save(goal: AutonomousGoal): void {
+    const key = `${MemoryGoalStore.PREFIX}${goal.id}`;
+    if (goal.status === "COMPLETED" || goal.status === "CANCELLED") {
+      this.memory.delete?.("project", key);
+      return;
+    }
+    void this.memory.set("project", key, goal);
+  }
+
+  remove(id: string): void {
+    this.memory.delete?.("project", `${MemoryGoalStore.PREFIX}${id}`);
+  }
+
+  loadActive(): AutonomousGoal[] {
+    try {
+      const entries = this.memory.search?.("project", { prefix: MemoryGoalStore.PREFIX, limit: 500 }) ?? [];
+      return entries
+        .map((entry) => entry.value as AutonomousGoal)
+        .filter((goal): goal is AutonomousGoal => Boolean(goal?.id) && goal.status !== "COMPLETED" && goal.status !== "CANCELLED");
+    } catch {
+      return [];
+    }
+  }
+}
+
+/**
+ * In-memory, deduplicating goal index with an optional durable backing store.
+ * When a GoalStore is supplied, every create/update/transition is mirrored to
+ * it (best-effort) and `restore()` rehydrates non-terminal goals on startup.
+ */
 export class GoalManager {
   private readonly goals = new Map<string, AutonomousGoal>();
+
+  constructor(private readonly store?: GoalStore) {}
+
+  /** Rehydrate non-terminal goals from the store (idempotent; call once at startup). */
+  restore(): number {
+    if (!this.store) return 0;
+    let restored = 0;
+    for (const goal of this.store.loadActive()) {
+      if (this.goals.has(goal.id)) continue;
+      this.goals.set(goal.id, goal);
+      restored++;
+    }
+    return restored;
+  }
 
   createOrUpdate(input: Omit<AutonomousGoal, "id" | "createdAt" | "updatedAt" | "status">): { goal: AutonomousGoal; created: boolean } {
     const normalized = input.description.trim().toLowerCase().replace(/\s+/g, " ");
@@ -72,11 +141,13 @@ export class GoalManager {
       existing.priority = input.priority;
       existing.riskLevel = input.riskLevel;
       existing.updatedAt = Date.now();
+      this.persist(existing);
       return { goal: existing, created: false };
     }
     const now = Date.now();
     const goal: AutonomousGoal = { ...input, id: randomUUID(), status: "PENDING", createdAt: now, updatedAt: now };
     this.goals.set(goal.id, goal);
+    this.persist(goal);
     return { goal, created: true };
   }
 
@@ -84,7 +155,12 @@ export class GoalManager {
   get(id: string): AutonomousGoal | undefined { return this.goals.get(id); }
   transition(id: string, status: AutonomousGoalStatus): void {
     const goal = this.goals.get(id);
-    if (goal) { goal.status = status; goal.updatedAt = Date.now(); }
+    if (goal) { goal.status = status; goal.updatedAt = Date.now(); this.persist(goal); }
+  }
+
+  /** Best-effort mirror to the durable store; never throws into the caller. */
+  private persist(goal: AutonomousGoal): void {
+    try { void this.store?.save(goal); } catch { /* persistence is best-effort */ }
   }
 }
 
@@ -141,12 +217,18 @@ export interface AutonomousExecutiveEvent {
  * already configured Mission/Brain/ToolRegistry pipeline instead of bypassing it.
  */
 export class AutonomousExecutive {
-  readonly goals = new GoalManager();
+  readonly goals: GoalManager;
   readonly priorities = new PriorityEngine();
   private readonly perception = new PerceptionEngine();
   private activeCycles = 0;
 
-  constructor(private readonly runtime: AgentRuntime, private readonly options: AutonomousExecutiveOptions = {}) {}
+  constructor(private readonly runtime: AgentRuntime, private readonly options: AutonomousExecutiveOptions = {}) {
+    // Goals are mirrored to project-level Memory so they survive a restart
+    // wherever project memory is persisted. restore() rehydrates non-terminal
+    // goals once at construction; it is a safe no-op when nothing was stored.
+    this.goals = new GoalManager(new MemoryGoalStore(runtime.memory));
+    this.goals.restore();
+  }
 
   /**
    * Stable fingerprint of an event *class*, not a specific resource. This mirrors
@@ -277,7 +359,8 @@ export class AutonomousExecutive {
       const priority = this.priorities.toPriority(score);
       const { goal } = this.goals.createOrUpdate({
         description: `${a.suggestedAction} (${a.message})`,
-        source: "LEARNED", priority,
+        // Scheduled proposals (daily briefing) are time-driven, not learned.
+        source: a.scheduled ? "SCHEDULE" : "LEARNED", priority,
         riskLevel: priority === "critical" ? "critical" : priority === "high" ? "high" : "medium",
         constraints: ["Use the existing ToolRegistry, PermissionPolicy, DryRunController and confirmation flow."],
         successCriteria: ["The detected condition is resolved, mitigated, or escalated with a report."],

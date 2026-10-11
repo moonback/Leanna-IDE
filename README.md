@@ -35,7 +35,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
-<img src="https://img.shields.io/badge/version-1.7.0-A78BFA?style=for-the-badge" alt="Version" />
+<img src="https://img.shields.io/badge/version-1.8.0-A78BFA?style=for-the-badge" alt="Version" />
 
 <br>
 
@@ -2233,5 +2233,5 @@ fichier `LICENSE` pour les termes complets.
 <br>
 
 <div align="center">
-<sub>Leanna · v1.7.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
+<sub>Leanna · v1.8.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
 </div>

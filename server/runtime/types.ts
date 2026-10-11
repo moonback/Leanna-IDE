@@ -280,6 +280,61 @@ export type RuntimeEvent =
   | { type: "autonomy:taskStateChanged"; taskId: string; taskType: string; from: string; to: string; error?: string }
   | {
       /**
+       * Changement de fichier observé dans le workspace (création / modification /
+       * suppression). Émis par un producteur branché sur le FileWatcher. Permet à
+       * la perception de réagir à l'édition du code sans sonder le disque.
+       */
+      type: "fs:changed";
+      /** Chemin du fichier concerné (relatif au workspace quand connu). */
+      path: string;
+      /** Nature du changement. */
+      change: "created" | "modified" | "deleted";
+      /** Nombre de fichiers touchés dans la même salve (débounce), si groupé. */
+      batchSize?: number;
+    }
+  | {
+      /**
+       * Changement d'état Git (branche, commit, divergence avec le remote,
+       * arbre de travail sale). Émis par un producteur branché sur Git.
+       */
+      type: "git:stateChanged";
+      /** Branche courante, si connue. */
+      branch?: string;
+      /** Nombre de fichiers non commités (staged + unstaged). */
+      dirtyFiles: number;
+      /** Commits en avance / en retard par rapport au remote suivi. */
+      ahead?: number;
+      behind?: number;
+    }
+  | {
+      /**
+       * Résultat d'une exécution de tests. `failed > 0` est un signal rouge que la
+       * perception traite comme un problème nécessitant une attention.
+       */
+      type: "tests:completed";
+      passed: number;
+      failed: number;
+      /** Durée totale de la suite, en ms, si connue. */
+      durationMs?: number;
+      /** Suite/commande concernée (ex. "vitest", "npm test"), si connue. */
+      suite?: string;
+    }
+  | {
+      /**
+       * Échéance/temporisation arrivée à terme (ex. briefing quotidien, deadline
+       * d'un objectif, relance planifiée). Produit par un ordonnanceur (bucket
+       * temporel de l'AnticipationEngine ou automationScheduler).
+       */
+      type: "schedule:due";
+      /** Identifiant stable de l'échéance (ex. "daily-briefing"). */
+      scheduleId: string;
+      /** Libellé lisible de ce qui est dû. */
+      label: string;
+      /** Importance normalisée 0..1 suggérée par le producteur. */
+      importance?: number;
+    }
+  | {
+      /**
        * Proposition proactive émise par l'AnticipationEngine : Leanna a observé
        * l'environnement, détecté un problème/opportunité et propose une action.
        * C'est une *suggestion* — l'exécution reste derrière le pipeline existant
