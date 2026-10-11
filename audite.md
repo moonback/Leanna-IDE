@@ -2,14 +2,6 @@ Je commence par analyser la structure du front et chercher les doublons.Je suis 
 
 ## Ce que j'ai vérifié dans le code
 
-**Code mort (imports introuvables) :**
-- `UnifiedSidebar.tsx` (735 lignes) n'est importé nulle part. `GlobalSidebar` (950 lignes) fait le travail, et le commentaire dans `main.tsx` parle encore de l'ancienne sidebar.
-- 23 autres fichiers ne sont importés nulle part : `SystemLogsPanel`, `SessionTranscriptPanel`, `AuditPanel`, `SkillsPanel`, `WorkspacePanel`, `ScreenSharePanel`, `TokenCounter` (375 lignes), `ActivityFeed`, `AssistantActivityBar`, `MultiAgentIndicator`, `CheckpointPanel`, `ChatCards`, `useHotkeys`, `useSidebarExpanded`, etc.
-
-**Navigation incohérente :**
-- Les libellés changent d'une sidebar à l'autre : « Missions » et « Mission Timeline », « Automatisations » et « Tâches ».
-- 17 routes sont à plat. Six vues de pilotage appellent toutes `/api/missions` : Control, Timeline, Simulation, Swarm, Autonomie et Pourquoi ?.
-
 **Doublons côté serveur :**
 - Deux `AgentRuntime` (455 et 1204 lignes).
 - Quatre exécuteurs : `mission/Executor` (2744 lignes), `AgentExecutor` (1239), `AgentRuntimeExecutor` et `AgenticMissionRunner`.
@@ -48,8 +40,7 @@ Il faudrait aussi une seule config de navigation partagée par toutes les sideba
 
 ## Plan par risque croissant
 
-1. **Nettoyage** : supprimer le code mort (≈25 fichiers), vérifié par `tsc` et vos tests.
-2. **Navigation** : une seule config, des libellés unifiés, des routes regroupées avec redirections des anciennes URL.
-3. **Fusion des vues** : Pilotage en une page à onglets, avec le composant `ui/Tabs` que vous avez déjà.
-4. **Serveur** : choisir un runtime, un exécuteur et un superviseur de référence, puis migrer et supprimer les autres. C'est l'étape la plus risquée, à faire derrière vos 1193 tests.
-5. **UX** : états vides, onboarding, palette de commandes globale, découpage des gros fichiers.
+
+1. **Fusion des vues** : Pilotage en une page à onglets, avec le composant `ui/Tabs` que vous avez déjà.
+2. **Serveur** : choisir un runtime, un exécuteur et un superviseur de référence, puis migrer et supprimer les autres. C'est l'étape la plus risquée, à faire derrière vos 1193 tests.
+3. **UX** : états vides, onboarding, palette de commandes globale, découpage des gros fichiers.
