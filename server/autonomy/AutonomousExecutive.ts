@@ -3,6 +3,19 @@ import type { AgentPriority, AgentRuntime, RuntimeEvent } from "../runtime/index
 import type { AutonomousTask } from "./TaskManager.js";
 import { PerceptionEngine, type Perception } from "./PerceptionEngine.js";
 
+/**
+ * Shape of `task.metadata.anticipation` produced by AnticipationEngine when it
+ * auto-launches a proactive proposal as a mission task. Kept in sync with the
+ * metadata written in AnticipationEngine.emitProposal().
+ */
+interface AnticipationMeta {
+  kind: "problem" | "opportunity" | "optimization" | "risk" | "automation";
+  message: string;
+  suggestedAction: string;
+  affectedResources: string[];
+  importance: number;
+}
+
 /** The action selected by the deterministic autonomy policy. */
 export type ObservationDisposition = "IGNORE" | "STORE" | "MONITOR" | "INVESTIGATE" | "ACT" | "ESCALATE";
 export type AutonomousGoalSource = "USER" | "SYSTEM" | "MISSION" | "EVENT" | "SCHEDULE" | "AGENT" | "LEARNED";
@@ -197,6 +210,8 @@ export class AutonomousExecutive {
 
   async execute(task: AutonomousTask): Promise<void> {
     const event = task.metadata?.event as RuntimeEvent | undefined;
+    const anticipation = task.metadata?.anticipation as AnticipationMeta | undefined;
+    if (!event && anticipation) return this.executeAnticipation(task, anticipation);
     if (!event) return; // Restored legacy tasks remain safe no-ops until a planner provides context.
     const limit = this.options.maxConcurrentCycles ?? this.options.maxCycles ?? 1;
     if (this.activeCycles >= limit) throw new Error("Autonomy concurrency budget exhausted; task will be retried by TaskManager.");
@@ -231,6 +246,74 @@ export class AutonomousExecutive {
         await this.runtime.memory.set("project", `autonomy:fingerprint:${fingerprint}`, { failures, lastDisposition: decision.disposition, updatedAt: Date.now() });
       } catch { /* per-fingerprint tally is best-effort */ }
       this.emit(result.escalate ? "autonomy.cycle.escalated" : "autonomy.cycle.completed", traceId, cycleId, { taskId: task.id, goalId: decision.goal.id, status: result.success ? "completed" : "blocked" });
+    } finally {
+      this.activeCycles--;
+    }
+  }
+
+  /**
+   * Execute an auto-launched anticipation proposal. Unlike reactive tasks there
+   * is no RuntimeEvent, so we synthesise an equivalent goal + observation from
+   * the proposal metadata and reuse the same mission hand-off, memory tally and
+   * escalation-after-repeated-failure logic. The per-fingerprint tally keys on
+   * `anticipation:<signal>` (finer than event.type), so recurring instances of
+   * one problem class share a counter and escalate after 3 failures.
+   */
+  private async executeAnticipation(task: AutonomousTask, a: AnticipationMeta): Promise<void> {
+    const limit = this.options.maxConcurrentCycles ?? this.options.maxCycles ?? 1;
+    if (this.activeCycles >= limit) throw new Error("Autonomy concurrency budget exhausted; task will be retried by TaskManager.");
+    this.activeCycles++;
+    try {
+      const cycleId = randomUUID(); const traceId = `autonomy:${cycleId}`;
+      this.emit("autonomy.cycle.started", traceId, cycleId, { taskId: task.id });
+
+      const memory = this.recallOutcome(task.fingerprint);
+      const score = this.priorities.score({
+        importance: a.importance,
+        urgency: Math.min(1, a.importance * 0.8 + memory.urgencyBonus),
+        risk: a.kind === "risk" ? a.importance : a.importance * 0.6,
+        confidence: 0.7, impact: a.importance,
+      });
+      const priority = this.priorities.toPriority(score);
+      const { goal } = this.goals.createOrUpdate({
+        description: `${a.suggestedAction} (${a.message})`,
+        source: "LEARNED", priority,
+        riskLevel: priority === "critical" ? "critical" : priority === "high" ? "high" : "medium",
+        constraints: ["Use the existing ToolRegistry, PermissionPolicy, DryRunController and confirmation flow."],
+        successCriteria: ["The detected condition is resolved, mitigated, or escalated with a report."],
+      });
+      this.emit("autonomy.decision.made", traceId, cycleId, { taskId: task.id, goalId: goal.id, status: memory.escalate ? "ESCALATE" : "ACT" });
+
+      if (memory.escalate || !this.options.executeMission) {
+        this.goals.transition(goal.id, "ESCALATED");
+        this.emit("autonomy.cycle.escalated", traceId, cycleId, {
+          taskId: task.id, goalId: goal.id,
+          status: memory.escalate ? `${a.message} (échecs répétés — escalade)` : a.message,
+        });
+        return;
+      }
+
+      const observation: Perception = {
+        event: { type: "autonomy:anticipation", proposalId: task.sourceEventId, kind: a.kind,
+          importance: a.importance, priority, message: a.message,
+          affectedResources: a.affectedResources, suggestedAction: a.suggestedAction, queuedAsTask: true } as RuntimeEvent,
+        importance: a.importance, novelty: 1, requiresAttention: true,
+        affectedResources: a.affectedResources, possibleActions: ["mission"], reason: a.message,
+      };
+
+      this.goals.transition(goal.id, "ACTIVE");
+      this.emit("autonomy.mission.created", traceId, cycleId, { taskId: task.id, goalId: goal.id });
+      const result = await this.options.executeMission({ cycleId, traceId, goal, observation, task });
+      this.goals.transition(goal.id, result.escalate ? "ESCALATED" : result.success ? "COMPLETED" : "BLOCKED");
+      await this.runtime.memory.set("project", `autonomy:outcome:${goal.id}`, { result, cycleId, traceId, completedAt: Date.now() });
+      try {
+        const key = `autonomy:fingerprint:${task.fingerprint}`;
+        const prior = (this.runtime.memory.get?.("project", key) as { failures?: number } | undefined)?.failures ?? 0;
+        await this.runtime.memory.set("project", key, { failures: result.success ? 0 : prior + 1, lastDisposition: "ACT", updatedAt: Date.now() });
+      } catch { /* best-effort */ }
+      this.emit(result.escalate ? "autonomy.cycle.escalated" : "autonomy.cycle.completed", traceId, cycleId, {
+        taskId: task.id, goalId: goal.id, status: result.success ? "completed" : (result.summary ?? "blocked"),
+      });
     } finally {
       this.activeCycles--;
     }

@@ -41,7 +41,11 @@ export interface AutonomyTaskStore extends TaskPersistence {
   loadPendingTasks(): Promise<AutonomousTask[]>;
 }
 
-/** Autonomy event types forwarded to the real-time timeline. */
+/**
+ * Autonomy event types forwarded to the real-time timeline from the EventBus.
+ * These are the `autonomy:*` runtime events the coordinator subscribes to and
+ * re-broadcasts verbatim.
+ */
 export type AutonomyEventType =
   | "autonomy:heartbeat"
   | "autonomy:stateChanged"
@@ -51,13 +55,29 @@ export type AutonomyEventType =
   | "autonomy:anticipation";
 
 /**
+ * Executive cycle events emitted by AutonomousExecutive and forwarded verbatim
+ * by broadcastExecutive(). They travel the same broadcast channel but are NOT
+ * EventBus runtime events, so they are kept separate from AutonomyEventType.
+ */
+export type AutonomyExecutiveEventType =
+  | "autonomy.cycle.started"
+  | "autonomy.cycle.completed"
+  | "autonomy.cycle.escalated"
+  | "autonomy.decision.made"
+  | "autonomy.mission.created"
+  | "autonomy.memory.updated";
+
+/** Every event name a broadcast message can carry. */
+export type AutonomyBroadcastEventType = AutonomyEventType | AutonomyExecutiveEventType;
+
+/**
  * Envelope pushed to WebSocket clients for the autonomy timeline. It mirrors the
  * shape used by the existing agent/mission broadcasters (typed message + ISO
  * timestamp) so a single client can consume all real-time channels uniformly.
  */
 export interface AutonomyBroadcastMessage {
   type: "autonomy_event";
-  event: AutonomyEventType;
+  event: AutonomyBroadcastEventType;
   timestamp: string;
   payload: Record<string, unknown>;
 }
@@ -295,7 +315,7 @@ export class LeannaCore {
   private broadcastExecutive(event: { type: string; traceId: string; cycleId: string; timestamp: number; [key: string]: unknown }): void {
     if (!this.broadcaster) return;
     try {
-      this.broadcaster({ type: "autonomy_event", event: event.type as AutonomyEventType, timestamp: new Date(event.timestamp).toISOString(), payload: event });
+      this.broadcaster({ type: "autonomy_event", event: event.type as AutonomyBroadcastEventType, timestamp: new Date(event.timestamp).toISOString(), payload: event });
     } catch { /* observability is best-effort */ }
   }
 

@@ -1140,6 +1140,29 @@ async function startServer() {
         /* l'annonce vocale est best-effort et ne doit jamais casser la timeline */
       }
     }
+
+    // ── Push proactif Telegram (hors interface ouverte) ─────────────────────
+    // Seuil > 0,4 : les « réflexions » idle (importance 0,4) ne sont jamais envoyées.
+    try {
+      const p = message.payload as Record<string, unknown>;
+      const minImp = Number(process.env.LEANNA_TELEGRAM_MIN_IMPORTANCE ?? 0.6);
+      const esc = (s: unknown) => String(s ?? "").replace(/([_*`\[])/g, "\\$1");
+
+      if (message.event === "autonomy:anticipation" && Number(p?.importance) >= minImp) {
+        void telegramService.notify(
+          `💡 *Leanna a remarqué quelque chose*\n• ${esc(p.message)}\n• *Proposition :* ${esc(p.suggestedAction)}` +
+          (p.queuedAsTask ? "\n• _Mission lancée automatiquement._" : "")
+        ).catch(() => {});
+      } else if (message.event === "autonomy.cycle.escalated") {
+        void telegramService.notify(
+          `🚨 *Leanna a besoin de toi*\n• ${esc(p.status)}\n• Objectif : ${esc(p.goalId)}`
+        ).catch(() => {});
+      } else if (message.event === "autonomy.cycle.completed" && p?.status === "completed") {
+        void telegramService.notify(`✅ Mission autonome terminée (objectif ${esc(p.goalId)}).`).catch(() => {});
+      } else if (message.event === "autonomy:taskStateChanged" && p?.to === "dead_letter") {
+        void telegramService.notify(`❌ Tâche autonome en échec définitif : ${esc(p.taskType)}.\n${esc(p.error)}`).catch(() => {});
+      }
+    } catch { /* push best-effort */ }
   });
   console.log(`[Server] ✓ Autonomy broadcaster connecté au WebSocket dédié (/autonomy).`);
 
