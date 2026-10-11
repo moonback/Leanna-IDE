@@ -16,7 +16,6 @@ import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
-import { LauncherModal } from './components/LauncherModal.js';
 import { EnvSetupModal } from './components/EnvSetupModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
@@ -716,10 +715,8 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Proposition d'ouvrir la vue des missions à la création d'une mission */}
         <MissionCreatedPrompt />
-        {/* Modale de sélection du projet au démarrage */}
+        {/* Écran de démarrage & sélection du projet (reprise auto, ouvrir, cloner, notebooks) */}
         <StartupProjectModal />
-        {/* Écran de choix IDE / Notebook affiché après le splash */}
-        <LauncherModal />
         {/* Assistant de première configuration des clés .env (après le splash) */}
         <EnvSetupModal />
       </ScreenShareProvider>

@@ -7,7 +7,7 @@ import { KEY_GROUPS, ALL_SPECS, REQUIRED_KEYS } from './envSetupKeys.js';
 /**
  * EnvSetupModal — assistant de première configuration.
  *
- * Affiché APRÈS le splash (LauncherModal), uniquement si des clés principales
+ * Affiché APRÈS le splash (StartupProjectModal), uniquement si des clés principales
  * du .env ne sont pas encore renseignées. Permet de saisir les clés essentielles
  * et les enregistre via l'API /api/env (les secrets sont chiffrés au repos par
  * le serveur). Réutilise le design system existant (primitives + tokens CSS).

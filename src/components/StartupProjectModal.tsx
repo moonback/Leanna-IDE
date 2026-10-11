@@ -6,7 +6,7 @@ import {
   FolderInput, Globe, X, Plus, Trash2, GitBranch,
   CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Clock,
   Github, Terminal, FolderDown, Settings,
-  FolderClock, Layers, Search, GitFork,
+  FolderClock, Layers, Search, GitFork, BookOpen, Power,
 } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
@@ -17,6 +17,8 @@ import logo from '../../assets/images/icon-sombre.png';
 const NO_WORKSPACE_KEY = 'Leanna-no-workspace-mode';
 /** Clé sessionStorage : le launcher a déjà été traité pour cette session */
 const LAUNCHER_DONE_KEY = 'Leanna-launcher-done';
+/** Clé sessionStorage : la réouverture automatique du dernier projet a déjà été tentée pour cette session */
+const AUTO_REOPEN_KEY = 'Leanna-auto-reopen-done';
 
 interface WorkspaceItem {
   id: string;
@@ -32,6 +34,12 @@ interface WorkspaceItem {
 function getElectronAPI(): { selectFolder: () => Promise<string | null> } | null {
   const w = window as any;
   return w.electronAPI?.selectFolder ? w.electronAPI : null;
+}
+
+/** API Electron exposant quit() (fenêtre desktop uniquement). */
+function getElectronQuitAPI(): { quit: () => void } | null {
+  const w = window as any;
+  return typeof w.electronAPI?.quit === 'function' ? w.electronAPI : null;
 }
 
 const MODAL_SPRING = { type: 'spring' as const, bounce: 0, duration: 0.35 };
@@ -120,12 +128,30 @@ export function StartupProjectModal() {
   const { error: toastError } = useToast();
   const shouldReduceMotion = useReducedMotion();
 
+  // Reprise automatique du dernier projet (compte à rebours annulable)
+  const [lastWorkspace, setLastWorkspace] = useState<WorkspaceItem | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isOpeningLast, setIsOpeningLast] = useState(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Annule le compte à rebours de reprise automatique du dernier projet. */
+  const cancelAutoReopen = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    setCountdown(null);
+    sessionStorage.setItem(AUTO_REOPEN_KEY, '1');
+  }, []);
+
   const fetchWorkspaces = useCallback(async () => {
     try {
       const res = await fetch('/api/self-root/workspaces');
       if (res.ok) {
         const data = await res.json();
-        setWorkspaces(data.workspaces || []);
+        const list: WorkspaceItem[] = data.workspaces || [];
+        setWorkspaces(list);
+        setLastWorkspace(list.length > 0 ? list[0] : null);
         if (data.activeRoot) {
           setCurrentPath(data.activeRoot);
           if (data.siteUrl) setInputSiteUrl(data.siteUrl);
@@ -143,20 +169,25 @@ export function StartupProjectModal() {
     try {
       const wsData = await fetchWorkspaces();
       if (!wsData?.activeRoot) {
-        if (sessionStorage.getItem(LAUNCHER_DONE_KEY) !== '1') { setIsOpen(false); return; }
+        // Mode "sans projet" explicitement choisi (ex: Notebooks) → ne pas afficher
         if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') { setIsOpen(false); return; }
-        setIsOpen(true);
-        setActiveTab('open');
+        // Écran de démarrage : aucun projet actif → on propose la sélection.
+        // Affiché uniquement sur l'accueil ou l'IDE (pas sur /settings, /notebooks, etc.)
+        if (pathname === '/' || pathname === '/ide') {
+          setIsOpen(true);
+          const hasRecents = (wsData?.workspaces?.length ?? 0) > 0;
+          setActiveTab(hasRecents ? 'recent' : 'open');
+        } else {
+          setIsOpen(false);
+        }
       }
     } catch {
-      if (sessionStorage.getItem(LAUNCHER_DONE_KEY) === '1') {
-        setIsOpen(true);
-        toastError('Impossible de vérifier le statut du projet');
-      }
+      setIsOpen(true);
+      toastError('Impossible de vérifier le statut du projet');
     } finally {
       setLoading(false);
     }
-  }, [fetchWorkspaces, toastError]);
+  }, [fetchWorkspaces, toastError, pathname]);
 
   useEffect(() => { checkProjectStatus(); }, [checkProjectStatus]);
 
@@ -187,21 +218,35 @@ export function StartupProjectModal() {
 
   useEffect(() => {
     const handleOpenModal = async (e: Event) => {
+      // Ouverture explicite → on annule toute reprise automatique en attente.
+      cancelAutoReopen();
       await new Promise(resolve => setTimeout(resolve, 100));
-      await fetchWorkspaces();
-      const forced = !!(e as CustomEvent).detail?.force;
+      const data = await fetchWorkspaces();
+      const detail = (e as CustomEvent).detail || {};
+      const forced = !!detail.force;
+      const tab = detail.tab as TabId | undefined;
       setForceSelection(forced);
+      if (tab) setActiveTab(tab);
+      else if ((data?.workspaces?.length ?? 0) > 0) setActiveTab('recent');
+      else setActiveTab('open');
       setIsOpen(true);
       setError(null);
     };
+    // Rétro-compat : certains écrans (Notebooks) dispatchent encore "Leanna-open-launcher".
+    const handleOpenLauncher = () => {
+      sessionStorage.removeItem(NO_WORKSPACE_KEY);
+      void handleOpenModal(new CustomEvent('Leanna-open-launcher', { detail: {} }));
+    };
     const handleNoWorkspaceMode = () => setIsOpen(false);
     window.addEventListener('Leanna-open-workspace-switcher', handleOpenModal);
+    window.addEventListener('Leanna-open-launcher', handleOpenLauncher);
     window.addEventListener('Leanna-no-workspace-mode', handleNoWorkspaceMode);
     return () => {
       window.removeEventListener('Leanna-open-workspace-switcher', handleOpenModal);
+      window.removeEventListener('Leanna-open-launcher', handleOpenLauncher);
       window.removeEventListener('Leanna-no-workspace-mode', handleNoWorkspaceMode);
     };
-  }, [fetchWorkspaces]);
+  }, [fetchWorkspaces, cancelAutoReopen]);
 
   useEffect(() => {
     if (!inputPath.trim()) { setPathValidation(null); return; }
@@ -229,8 +274,39 @@ export function StartupProjectModal() {
     }
   }, [cloneLogs, cloneStatus]);
 
+  // Reprise automatique du dernier projet avec compte à rebours annulable.
+  useEffect(() => {
+    if (!isOpen || forceSelection || isOpeningLast) return;
+    if (currentPath || !lastWorkspace) return;
+    if (sessionStorage.getItem(AUTO_REOPEN_KEY) === '1') return;
+    if (cloneStatus !== 'idle') return;
+
+    setCountdown(3);
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          clearInterval(interval);
+          countdownTimerRef.current = null;
+          sessionStorage.setItem(AUTO_REOPEN_KEY, '1');
+          void openWorkspaceItem(lastWorkspace, { silent: true }).finally(() => setCountdown(null));
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    countdownTimerRef.current = interval;
+
+    return () => {
+      clearInterval(interval);
+      countdownTimerRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, forceSelection, isOpeningLast, currentPath, lastWorkspace]);
+
   const activate = useCallback(async (newRoot: string) => {
     sessionStorage.removeItem(NO_WORKSPACE_KEY);
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
     ideApi.invalidateCache();
     window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
     window.dispatchEvent(new CustomEvent('Leanna-workspace-changed', { detail: { workspace: newRoot } }));
@@ -238,6 +314,40 @@ export function StartupProjectModal() {
     setForceSelection(false);
     setIsOpen(false);
   }, []);
+
+  /** Ouvre un workspace de l'historique (chemin + éventuelle URL de site). */
+  const openWorkspaceItem = useCallback(async (ws: WorkspaceItem, options?: { silent?: boolean }): Promise<boolean> => {
+    try {
+      setIsOpeningLast(true);
+      const res = await fetch('/api/self-root/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: ws.path, userConfirmed: true, siteUrl: ws.siteUrl || '' }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        await activate(data.newRoot || ws.path);
+        navigate('/ide');
+        return true;
+      }
+      if (!options?.silent) setError(data.error || "Erreur lors de l'ouverture du projet");
+    } catch (e: any) {
+      if (!options?.silent) setError(e?.message || 'Erreur réseau');
+    } finally {
+      setIsOpeningLast(false);
+    }
+    return false;
+  }, [activate, navigate]);
+
+  /** Ouvre l'espace Notebooks (mode sans workspace). */
+  const openNotebooks = useCallback(() => {
+    cancelAutoReopen();
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+    sessionStorage.setItem(NO_WORKSPACE_KEY, '1');
+    window.dispatchEvent(new CustomEvent('Leanna-no-workspace-mode'));
+    setIsOpen(false);
+    navigate('/notebooks');
+  }, [cancelAutoReopen, navigate]);
 
   const validateCloneUrl = (url: string): string | null => {
     if (!url.trim()) return null;
@@ -247,6 +357,7 @@ export function StartupProjectModal() {
   };
 
   const handleClone = useCallback(async () => {
+    cancelAutoReopen();
     const urlErr = validateCloneUrl(cloneUrl);
     if (urlErr) { setCloneUrlError(urlErr); return; }
     if (!cloneUrl.trim()) { setCloneUrlError("L'URL du dépôt est requise."); return; }
@@ -306,11 +417,12 @@ export function StartupProjectModal() {
     } finally {
       cloneAbortRef.current = null;
     }
-  }, [cloneUrl, cloneTargetDir, activate, fetchWorkspaces]);
+  }, [cloneUrl, cloneTargetDir, activate, fetchWorkspaces, cancelAutoReopen]);
 
   const handleCancelClone = () => { cloneAbortRef.current?.(); setCloneStatus('idle'); setCloneLogs([]); };
 
   const handleBrowse = async () => {
+    cancelAutoReopen();
     const api = getElectronAPI();
     if (api) {
       const selected = await api.selectFolder();
@@ -325,6 +437,7 @@ export function StartupProjectModal() {
   };
 
   const handleCreateEmptyWorkspace = useCallback(async () => {
+    cancelAutoReopen();
     const api = getElectronAPI();
     let selectedPath: string | null = null;
     if (api) {
@@ -352,9 +465,10 @@ export function StartupProjectModal() {
     } finally {
       setLoading(false);
     }
-  }, [activate]);
+  }, [activate, cancelAutoReopen]);
 
   const handleOpenProject = useCallback(async (targetPath?: string, siteUrl?: string) => {
+    cancelAutoReopen();
     const pathToOpen = (targetPath || inputPath).trim();
     if (!pathToOpen) return;
     const urlTrimmed = (siteUrl !== undefined ? siteUrl : inputSiteUrl).trim();
@@ -377,7 +491,7 @@ export function StartupProjectModal() {
     } finally {
       setLoading(false);
     }
-  }, [inputPath, inputSiteUrl, activate]);
+  }, [inputPath, inputSiteUrl, activate, cancelAutoReopen]);
 
   const handleDeleteWorkspace = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -388,17 +502,38 @@ export function StartupProjectModal() {
   };
 
   const handleClose = () => {
+    cancelAutoReopen();
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
     if (currentPath || sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') setIsOpen(false);
     else window.close();
   };
 
   const handleOpenSettings = () => {
+    cancelAutoReopen();
     returningFromSettingsRef.current = true;
     setIsOpen(false);
     navigate('/settings');
   };
 
+  /** Rouvre / rentre dans le projet actuellement actif (sans re-sélection). */
+  const handleReopenActive = () => {
+    if (!currentPath) return;
+    cancelAutoReopen();
+    sessionStorage.setItem(LAUNCHER_DONE_KEY, '1');
+    sessionStorage.removeItem(NO_WORKSPACE_KEY);
+    setIsOpen(false);
+    navigate('/ide');
+  };
+
+  /** Quitte l'application Electron (fenêtre desktop uniquement). */
+  const handleQuit = () => {
+    const api = getElectronQuitAPI();
+    if (api) api.quit();
+    else window.close();
+  };
+
   const canBrowse = !!getElectronAPI() || typeof (window as any).showDirectoryPicker === 'function';
+  const canQuit = !!getElectronQuitAPI();
   const filteredWorkspaces = workspaces.filter(ws =>
     !searchQuery || ws.name.toLowerCase().includes(searchQuery.toLowerCase()) || ws.path.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -509,6 +644,7 @@ export function StartupProjectModal() {
                     key={tab.id}
                     type="button"
                     onClick={() => {
+                      cancelAutoReopen();
                       setActiveTab(tab.id);
                       if (tab.id === 'clone') { setCloneStatus('idle'); setCloneLogs([]); setCloneUrlError(null); }
                     }}
@@ -558,8 +694,13 @@ export function StartupProjectModal() {
             <div className="flex-shrink-0 border-t px-3 py-3 space-y-1"
               style={{ borderColor: 'color-mix(in srgb, var(--border-base) 50%, transparent)' }}>
               {currentPath && (
-                <div
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1"
+                <motion.button
+                  type="button"
+                  onClick={handleReopenActive}
+                  whileHover={shouldReduceMotion ? undefined : { x: 2 }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                  title="Rouvrir le projet actif"
+                  className="group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1 text-left transition-colors"
                   style={{
                     backgroundColor: 'color-mix(in srgb, var(--color-success) 8%, transparent)',
                     border: '1px solid color-mix(in srgb, var(--color-success) 20%, transparent)',
@@ -577,13 +718,44 @@ export function StartupProjectModal() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium leading-none mb-0.5" style={{ color: 'var(--color-success)' }}>Projet actif</p>
+                    <p className="text-[10px] font-medium leading-none mb-0.5" style={{ color: 'var(--color-success)' }}>Projet actif · rouvrir</p>
                     <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--text-primary)' }}>
                       {currentPath.split(/[\\/]/).pop()}
                     </p>
                   </div>
-                </div>
+                  <div
+                    className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center transition-all group-hover:translate-x-0.5"
+                    style={{ color: 'var(--color-success)' }}
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </motion.button>
               )}
+              {/* Espace Notebooks (mode sans projet) */}
+              <motion.button
+                type="button"
+                onClick={openNotebooks}
+                whileHover={shouldReduceMotion ? undefined : { x: 2 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors mb-1 hover:bg-[var(--bg-hover)]"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--accent-secondary) 15%, transparent)',
+                    color: 'var(--accent-secondary)',
+                  }}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold leading-none mb-0.5">Notebooks</p>
+                  <p className="text-[10px] leading-none" style={{ color: 'var(--text-dimmed)' }}>
+                    Chat & sources, sans projet
+                  </p>
+                </div>
+              </motion.button>
               <div className="flex items-center gap-1">
                 <motion.button
                   type="button"
@@ -596,6 +768,21 @@ export function StartupProjectModal() {
                   <Settings className="w-3.5 h-3.5" />
                   Paramètres
                 </motion.button>
+                {canQuit && (
+                  <motion.button
+                    type="button"
+                    onClick={handleQuit}
+                    whileHover={shouldReduceMotion ? undefined : { opacity: 0.9 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.96 }}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
+                    style={{ color: '#f87171' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(239,68,68,0.12)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                    title="Quitter l'application"
+                  >
+                    <Power className="w-4 h-4" />
+                  </motion.button>
+                )}
                 {!forceSelection && (
                   <motion.button
                     type="button"
@@ -640,17 +827,43 @@ export function StartupProjectModal() {
                   </h3>
                 </motion.div>
               </AnimatePresence>
-              <span
-                className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)',
-                  borderColor: 'color-mix(in srgb, var(--color-success) 25%, transparent)',
-                  color: 'var(--color-success)',
-                }}
-              >
-                <ShieldCheck className="w-3 h-3" />
-                Périmètre sécurisé
-              </span>
+              {countdown !== null && lastWorkspace ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                  }}
+                >
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Reprise de <strong className="font-semibold truncate max-w-[120px]">{lastWorkspace.name}</strong> dans
+                    <strong className="font-mono text-xs">{countdown}s</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={cancelAutoReopen}
+                    className="px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors"
+                    style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  >
+                    Annuler
+                  </button>
+                </motion.div>
+              ) : (
+                <span
+                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--color-success) 25%, transparent)',
+                    color: 'var(--color-success)',
+                  }}
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  Périmètre sécurisé
+                </span>
+              )}
             </div>
 
             {/* Tab content */}
