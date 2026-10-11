@@ -89,6 +89,15 @@ export class TelemetryService {
   
   /** In-memory token usage store (flush périodique) */
   private usageStore: TokenUsage[] = [];
+  /**
+   * Enregistrements RELUS depuis Supabase au démarrage (dernière heure). Gardés
+   * dans un store séparé en LECTURE SEULE : ils alimentent les agrégats (budget
+   * glissant, dashboard) pour que la consommation survive à un redémarrage,
+   * mais ne sont JAMAIS ré-émis au flush (ils sont déjà persistés — leur `id`
+   * est clé primaire, un ré-insert créerait un conflit). Purgés paresseusement
+   * dès qu'ils sortent de la fenêtre glissante d'une heure.
+   */
+  private hydratedStore: TokenUsage[] = [];
   private flushInterval: NodeJS.Timeout | null = null;
   /**
    * Persistance désactivée à chaud si la table `token_usage` est absente
@@ -133,9 +142,87 @@ export class TelemetryService {
     
     // Initialize Supabase if credentials available
     this.initSupabase();
-    
+
+    // Recharge la consommation de la dernière heure depuis Supabase pour que le
+    // budget glissant survive à un redémarrage. Best-effort, non bloquant.
+    void this.hydrateRollingHour().catch((err) => {
+      console.warn('[TelemetryService] Réhydratation de la dernière heure échouée:', err);
+    });
+
     // Start periodic flush
     this.startFlushTimer();
+  }
+
+  /**
+   * Recharge en mémoire les enregistrements `token_usage` de la dernière heure
+   * depuis Supabase. Appelé une fois au démarrage. Les lignes atterrissent dans
+   * `hydratedStore` (lecture seule, non flushé) afin que le budget glissant et
+   * le dashboard reflètent la consommation d'avant le redémarrage sans créer de
+   * doublons. Silencieux si Supabase n'est pas configuré ou la table absente.
+   */
+  private async hydrateRollingHour(now = Date.now()): Promise<void> {
+    if (!this.supabase || this.persistenceDisabled) return;
+    const cutoffIso = new Date(now - 60 * 60 * 1000).toISOString();
+    const { data, error } = await this.supabase
+      .from('token_usage')
+      .select('id, mission_id, task_id, agent_role, tool_name, provider, model, input_tokens, output_tokens, total_tokens, cost_usd, created_at')
+      .gte('created_at', cutoffIso)
+      .order('created_at', { ascending: true })
+      .limit(TelemetryService.MAX_IN_MEMORY);
+
+    if (error) {
+      if (error.code === 'PGRST205' || /Could not find the table/i.test(error.message ?? '')) {
+        this.persistenceDisabled = true;
+        return; // table absente : rien à réhydrater
+      }
+      throw new Error(error.message);
+    }
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    // Ne pas écraser une activité déjà enregistrée dans cette session pour un
+    // même id (évite un doublon si un flush a eu lieu avant la réhydratation).
+    const liveIds = new Set(this.usageStore.map((u) => u.id));
+    this.hydratedStore = data
+      .filter((row: Record<string, unknown>) => !liveIds.has(String(row.id)))
+      .map((row: Record<string, unknown>) => ({
+        id: String(row.id),
+        missionId: (row.mission_id as string) ?? undefined,
+        taskId: (row.task_id as string) ?? undefined,
+        agentRole: (row.agent_role as string) ?? undefined,
+        toolName: (row.tool_name as string) ?? undefined,
+        provider: (row.provider as 'gemini' | 'openrouter') ?? 'gemini',
+        model: String(row.model ?? 'unknown'),
+        inputTokens: Number(row.input_tokens ?? 0),
+        outputTokens: Number(row.output_tokens ?? 0),
+        totalTokens: Number(row.total_tokens ?? 0),
+        costUsd: Number(row.cost_usd ?? 0),
+        timestamp: String(row.created_at ?? new Date(now).toISOString()),
+      }));
+
+    if (this.hydratedStore.length > 0) {
+      console.log(
+        `[TelemetryService] ✓ ${this.hydratedStore.length} enregistrement(s) de la dernière heure rechargé(s) depuis Supabase.`,
+      );
+    }
+  }
+
+  /**
+   * Vue combinée (lecture seule) des enregistrements vivants + réhydratés, en
+   * purgeant au passage les lignes réhydratées sorties de la fenêtre d'une
+   * heure (elles ne sont plus utiles à aucun agrégat glissant). Toutes les
+   * lectures agrégées passent par ici ; les écritures/flush ne touchent QUE
+   * `usageStore`.
+   */
+  private allRecords(now = Date.now()): TokenUsage[] {
+    if (this.hydratedStore.length > 0) {
+      const cutoff = now - 60 * 60 * 1000;
+      this.hydratedStore = this.hydratedStore.filter(
+        (r) => new Date(r.timestamp).getTime() >= cutoff,
+      );
+    }
+    return this.hydratedStore.length > 0
+      ? [...this.hydratedStore, ...this.usageStore]
+      : this.usageStore;
   }
 
   private initSupabase(): void {
@@ -392,7 +479,7 @@ export class TelemetryService {
     provider?: string;
     limit?: number;
   }): TokenUsage[] {
-    let records = [...this.usageStore];
+    let records = [...this.allRecords()];
     
     if (filters?.missionId) {
       records = records.filter(r => r.missionId === filters.missionId);
@@ -424,7 +511,7 @@ export class TelemetryService {
       ? Date.now() - 60 * 60 * 1000
       : 0;
     
-    const records = this.usageStore.filter(r => 
+    const records = this.allRecords().filter(r => 
       new Date(r.timestamp).getTime() >= cutoff
     );
     
@@ -469,6 +556,33 @@ export class TelemetryService {
     }
     
     return stats;
+  }
+
+  /**
+   * Rolling-hour usage across ALL recorded model calls (every mission, agent,
+   * tool), not just a single mission. Powers the global autonomy budget panel:
+   * `missionCount` counts the distinct missions seen in the window (used as the
+   * "actions" meter), while tokens/cost are summed over the same window. Reads
+   * the same in-memory store as the dashboard, so it reflects live activity.
+   */
+  getRollingHourUsage(now = Date.now()): {
+    windowMs: number;
+    totalTokens: number;
+    totalCost: number;
+    missionCount: number;
+  } {
+    const windowMs = 60 * 60 * 1000;
+    const cutoff = now - windowMs;
+    let totalTokens = 0;
+    let totalCost = 0;
+    const missions = new Set<string>();
+    for (const record of this.allRecords(now)) {
+      if (new Date(record.timestamp).getTime() < cutoff) continue;
+      totalTokens += record.totalTokens;
+      totalCost += record.costUsd;
+      if (record.missionId) missions.add(record.missionId);
+    }
+    return { windowMs, totalTokens, totalCost, missionCount: missions.size };
   }
 
   // ─── Persistence ───────────────────────────────────────────────────────────

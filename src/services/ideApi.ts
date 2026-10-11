@@ -432,6 +432,18 @@ export const autonomyApi = {
     return (data?.budget ?? null) as IdleBudgetSnapshot | null;
   },
 
+  /**
+   * GLOBAL rolling-hour autonomy budget: real consumption across ALL autonomous
+   * activity (idle diagnostics + anticipation/executive missions), surfaced
+   * against the per-hour ceilings. Same shape as the idle budget.
+   */
+  async getAutonomyBudget(): Promise<IdleBudgetSnapshot | null> {
+    const response = await fetchWithRetry('/api/autonomy/autonomy-budget', { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return (data?.budget ?? null) as IdleBudgetSnapshot | null;
+  },
+
   /** Readable audit trail of self-initiated idle work (oldest first). */
   async getIdleAudit(limit = 100): Promise<IdleAuditEntry[]> {
     const response = await fetchWithRetry(`/api/autonomy/idle-audit?limit=${encodeURIComponent(limit)}`, { headers: getAuthHeaders() });

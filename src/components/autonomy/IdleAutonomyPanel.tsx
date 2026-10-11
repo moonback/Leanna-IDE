@@ -21,9 +21,7 @@ import { useIdleAutonomy } from '../../hooks/useIdleAutonomy.js';
 import type { IdleAuditEntry, IdleAuditPhase, IdleBudgetSnapshot } from '../../services/ideApi.js';
 
 export function IdleAutonomyPanel({ enabled = true }: { enabled?: boolean }) {
-  const { budget, audit, paused, loading, error, toggling, pause, resume, refresh } = useIdleAutonomy({ enabled });
-
-  const idleWired = budget !== null;
+  const { budget, idleWired, audit, paused, loading, error, toggling, pause, resume, refresh } = useIdleAutonomy({ enabled });
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,8 +84,8 @@ export function IdleAutonomyPanel({ enabled = true }: { enabled?: boolean }) {
         </p>
       )}
 
-      {/* ── Budget meters ──────────────────────────────────────────────── */}
-      {idleWired && budget && <BudgetMeters budget={budget} />}
+      {/* ── Budget meters (consommation autonome GLOBALE) ──────────────── */}
+      {budget && <BudgetMeters budget={budget} />}
 
       {/* ── Audit trail ────────────────────────────────────────────────── */}
       <div>
@@ -122,9 +120,13 @@ function BudgetMeters({ budget }: { budget: IdleBudgetSnapshot }) {
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-secondary)' }}>
-        Budget (fenêtre glissante : {windowLabel})
+      <h3 className="mb-0.5 text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-secondary)' }}>
+        Budget autonomie (fenêtre glissante : {windowLabel})
       </h3>
+      <p className="mb-2 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
+        Consommation réelle de toute l'activité autonome (diagnostics en période calme
+        + missions d'anticipation/exécutive), mesurée sur l'heure glissante.
+      </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Meter
           icon={Activity}

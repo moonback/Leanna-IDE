@@ -42,6 +42,13 @@ export function createAutonomyRouter(autonomy: LeannaCore): Router {
     res.json({ budget: autonomy.getIdleBudget() ?? null });
   });
 
+  // GET /api/autonomy/autonomy-budget — GLOBAL rolling-hour budget across ALL
+  // autonomous activity (idle diagnostics + anticipation/executive missions).
+  // Real consumption from telemetry, surfaced against the per-hour ceilings.
+  router.get("/autonomy-budget", (_req: Request, res: Response) => {
+    res.json({ budget: autonomy.getAutonomyBudget() ?? null });
+  });
+
   // GET /api/autonomy/idle-audit — readable append-only trail of idle actions.
   router.get("/idle-audit", (req: Request, res: Response) => {
     const limit = clampLimit(req.query.limit, 100, 1000);

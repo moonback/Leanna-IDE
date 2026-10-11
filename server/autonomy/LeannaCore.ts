@@ -9,6 +9,7 @@ import { AutonomousExecutive, autonomousExecutiveConfigFromEnv, type AutonomousE
 import { IdleWorker, type IdleMissionRunner } from "./IdleWorker.js";
 import { AutonomyBudget, autonomyBudgetConfigFromEnv } from "./AutonomyBudget.js";
 import type { AutonomyAuditEntry } from "./AutonomyAuditLog.js";
+import { telemetryService } from "../observability/TelemetryService.js";
 import {
   TaskManager,
   taskManagerConfigFromEnv,
@@ -353,6 +354,34 @@ export class LeannaCore {
   /** Current idle-autonomy budget snapshot (actions/tokens/cost per hour). */
   getIdleBudget() {
     return this.idleWorker?.getBudget().snapshot();
+  }
+
+  /**
+   * GLOBAL autonomy budget snapshot: real consumption across ALL autonomous
+   * activity (idle diagnostics + anticipation/executive missions) measured over
+   * the rolling hour, surfaced against the same per-hour ceilings as the idle
+   * budget. Same shape as `getIdleBudget()` so the UI can render it unchanged.
+   *
+   * Design note: the `used` values come from `TelemetryService` (which records
+   * every model call, regardless of what launched it), NOT from the idle
+   * `AutonomyBudget` — that budget deliberately counts only self-initiated idle
+   * work and must keep doing so (it is a safety ceiling for the idle loop). We
+   * only borrow its ceilings here for display. When idle work is not wired, the
+   * ceilings fall back to the env-configured defaults so the panel still shows
+   * real consumption against a sensible limit.
+   */
+  getAutonomyBudget() {
+    const usage = telemetryService.getRollingHourUsage();
+    // Ceilings: prefer the live idle budget's config; else the env defaults.
+    const ceilings = this.idleWorker?.getBudget().snapshot()
+      ?? new AutonomyBudget(autonomyBudgetConfigFromEnv()).snapshot();
+    return {
+      windowMs: usage.windowMs,
+      actions: { used: usage.missionCount, max: ceilings.actions.max },
+      tokens: { used: usage.totalTokens, max: ceilings.tokens.max },
+      costUsd: { used: usage.totalCost, max: ceilings.costUsd.max },
+      perMission: ceilings.perMission,
+    };
   }
 
   private get events(): EventBus {

@@ -15,8 +15,19 @@ export interface UseIdleAutonomyOptions {
 }
 
 export interface UseIdleAutonomyResult {
-  /** Rolling-hour budget, `null` when idle autonomy is not wired/enabled. */
+  /**
+   * GLOBAL rolling-hour budget across all autonomous activity (idle +
+   * anticipation/executive missions). May be non-null even when the idle loop
+   * itself is not wired (it then shows real consumption against the env
+   * ceilings). `null` only on fetch failure before the first success.
+   */
   budget: IdleBudgetSnapshot | null;
+  /**
+   * True when the idle loop is actually wired on the server (a runner is
+   * supplied and the budget is enabled). Drives the kill-switch availability,
+   * independently of the global budget above.
+   */
+  idleWired: boolean;
   /** Audit trail, newest first (reversed from the server's oldest-first order). */
   audit: IdleAuditEntry[];
   /** Kill-switch state. */
@@ -46,6 +57,7 @@ export function useIdleAutonomy({
   auditLimit = 100,
 }: UseIdleAutonomyOptions = {}): UseIdleAutonomyResult {
   const [budget, setBudget] = useState<IdleBudgetSnapshot | null>(null);
+  const [idleWired, setIdleWired] = useState(false);
   const [audit, setAudit] = useState<IdleAuditEntry[]>([]);
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -60,13 +72,20 @@ export function useIdleAutonomy({
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      const [budgetRes, auditRes, pausedRes] = await Promise.all([
+      const [budgetRes, idleBudgetRes, auditRes, pausedRes] = await Promise.all([
+        // Budget GLOBAL : reflète toute l'activité autonome (idle + missions
+        // d'anticipation/executive), pas seulement les diagnostics idle.
+        autonomyApi.getAutonomyBudget(),
+        // Budget idle "brut" : sert UNIQUEMENT à savoir si la boucle idle est
+        // câblée côté serveur (null = non câblée). Le journal d'audit et le
+        // kill switch restent spécifiques à la boucle idle (ses contrôles).
         autonomyApi.getIdleBudget(),
         autonomyApi.getIdleAudit(auditLimit),
         autonomyApi.getIdlePaused(),
       ]);
       if (!mountedRef.current) return;
       setBudget(budgetRes);
+      setIdleWired(idleBudgetRes !== null);
       // Server returns oldest-first; show newest-first in the UI.
       setAudit([...auditRes].reverse());
       setPaused(pausedRes);
@@ -127,5 +146,5 @@ export function useIdleAutonomy({
     };
   }, [enabled, intervalMs, load]);
 
-  return { budget, audit, paused, loading, error, toggling, pause, resume, refresh };
+  return { budget, idleWired, audit, paused, loading, error, toggling, pause, resume, refresh };
 }
