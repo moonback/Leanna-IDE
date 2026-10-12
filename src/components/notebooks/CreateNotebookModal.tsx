@@ -10,6 +10,8 @@ import { motion, useReducedMotion } from 'motion/react';
 import { BookOpen, Plus, X, Loader2 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
+import { api } from './api/client.js';
+import { errorMessage } from './utils.js';
 
 interface CreateNotebookModalProps {
   onClose: () => void;
@@ -37,20 +39,17 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
     if (!title.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/notebooks', {
+      const data = await api<{ notebook: { title: string } }>('/api/notebooks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), description: description.trim() }),
+        json: { title: title.trim(), description: description.trim() },
       });
-      if (!res.ok) throw new Error('Erreur création');
-      const data = await res.json();
       success(`Notebook "${data.notebook.title}" créé`);
       setTitle('');
       setDescription('');
       onCreated();
       onClose();
-    } catch (e: any) {
-      toastError(e.message);
+    } catch (e: unknown) {
+      toastError(errorMessage(e));
     } finally {
       setCreating(false);
     }

@@ -11,6 +11,7 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { embeddingStore } from "./EmbeddingStore.js";
+import { chatResponseCache, ragSearchCache } from "./ResponseCache.js";
 import type { Notebook, NotebookNote, Source, ChatMessage, GeneratedDocument, AudioOverview } from "./types.js";
 
 const log = createLogger("NotebookManager");
@@ -219,6 +220,9 @@ export class NotebookManager {
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
+    // Les sources ont changé : les réponses chat/RAG en cache ne sont plus fiables.
+    chatResponseCache.invalidateNotebook(notebookId);
+    ragSearchCache.invalidateNotebook(notebookId);
     log.info(`📄 Source ajoutée au notebook "${notebook.title}": "${source.title}"`);
     return notebook;
   }
@@ -236,6 +240,10 @@ export class NotebookManager {
 
     // Nettoyer les embeddings associés
     embeddingStore.removeSource(sourceId, notebookId);
+
+    // Invalider les caches chat/RAG — le corpus de sources a changé.
+    chatResponseCache.invalidateNotebook(notebookId);
+    ragSearchCache.invalidateNotebook(notebookId);
 
     return true;
   }
@@ -323,6 +331,72 @@ export class NotebookManager {
     notebook.chatHistory = [];
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
+  }
+
+  /**
+   * Retourne les messages d'un thread de conversation (vide si introuvable).
+   * Permet au chat groundé de construire un contexte ISOLÉ par thread plutôt
+   * que de mélanger tous les threads via l'historique global.
+   */
+  getThreadMessages(notebookId: string, threadId: string): ChatMessage[] {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook?.chatThreads) return [];
+    const thread = notebook.chatThreads.find(t => t.id === threadId);
+    return thread ? thread.messages : [];
+  }
+
+  /**
+   * Ajoute un message aux messages d'un thread spécifique (sans toucher à
+   * l'historique global). Met à jour le titre du thread à partir de la
+   * première question. Retourne true si le thread existe.
+   */
+  addThreadMessage(notebookId: string, threadId: string, message: ChatMessage): boolean {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook?.chatThreads) return false;
+    const thread = notebook.chatThreads.find(t => t.id === threadId);
+    if (!thread) return false;
+
+    thread.messages.push(message);
+
+    // Titre dérivé de la première question utilisateur du thread.
+    if (message.role === "user" && thread.messages.filter(m => m.role === "user").length === 1) {
+      const q = message.content.trim();
+      thread.title = q.slice(0, 50) + (q.length > 50 ? "..." : "");
+    }
+
+    notebook.updatedAt = new Date().toISOString();
+    this.persist(notebook);
+    return true;
+  }
+
+  /**
+   * Enregistre le retour utilisateur (pouce haut/bas) sur un message assistant.
+   * Cherche le message dans l'historique global ET dans les threads de conversation.
+   * Retourne true si un message a été trouvé et mis à jour.
+   */
+  setMessageFeedback(
+    notebookId: string,
+    messageId: string,
+    feedback: "up" | "down" | null
+  ): boolean {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook) return false;
+
+    let target = notebook.chatHistory.find(m => m.id === messageId);
+
+    if (!target && notebook.chatThreads) {
+      for (const thread of notebook.chatThreads) {
+        target = thread.messages.find(m => m.id === messageId);
+        if (target) break;
+      }
+    }
+
+    if (!target) return false;
+
+    target.feedback = feedback;
+    notebook.updatedAt = new Date().toISOString();
+    this.persist(notebook);
+    return true;
   }
 
   // ─── Generated Documents ─────────────────────────────────────────────────

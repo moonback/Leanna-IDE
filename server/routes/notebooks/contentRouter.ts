@@ -1,7 +1,19 @@
 import { Router, Request, Response } from "express";
+import fs from "fs";
+import path from "path";
 import { notebookManager, contentGenerator, sourceIngester } from "../../notebooks/index.js";
 import type { GeneratedDocType, ReportSuggestion } from "../../notebooks/types.js";
 import { buildRevealPresentation, countSlides } from "./slidesTheme.js";
+import { getSandboxRoot } from "../../utils/sandbox.js";
+
+const IMAGE_CONTENT_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+};
 
 /**
  * Types de documents générés dont le `content` est un blob JSON (image, data D3)
@@ -81,6 +93,63 @@ export function createContentRouter(): Router {
         return;
       }
       res.json({ status: "success", documents: notebook.generatedDocuments });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Sert le fichier image d'un document généré (infographie) depuis la sandbox.
+  // Le PNG n'est plus stocké en base64 dans le notebook JSON — il est lu sur disque.
+  router.get("/:id/generated/:docId/image", (req: Request, res: Response): void => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const doc = notebook.generatedDocuments.find((d) => d.id === req.params.docId);
+      if (!doc) {
+        res.status(404).json({ error: "Document introuvable." });
+        return;
+      }
+
+      // Extraire le chemin relatif de l'image depuis le content JSON.
+      let relativePath: string | undefined;
+      try {
+        const meta = JSON.parse(doc.content);
+        relativePath = meta.filePath;
+      } catch {
+        /* content non-JSON — pas une infographie */
+      }
+
+      if (!relativePath || typeof relativePath !== "string") {
+        res.status(404).json({ error: "Aucune image associée à ce document." });
+        return;
+      }
+
+      // Résoudre et confiner le chemin dans la sandbox (anti path-traversal).
+      const sandboxRoot = getSandboxRoot();
+      const resolved = path.resolve(sandboxRoot, relativePath);
+      const sandboxPrefix = path.resolve(sandboxRoot) + path.sep;
+      if (!resolved.startsWith(sandboxPrefix)) {
+        res.status(400).json({ error: "Chemin d'image invalide." });
+        return;
+      }
+
+      if (!fs.existsSync(resolved)) {
+        res.status(404).json({ error: "Fichier image introuvable sur disque." });
+        return;
+      }
+
+      const ext = path.extname(resolved).toLowerCase();
+      res.setHeader("Content-Type", IMAGE_CONTENT_TYPES[ext] || "application/octet-stream");
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      fs.createReadStream(resolved)
+        .on("error", () => {
+          if (!res.headersSent) res.status(500).json({ error: "Erreur lecture image." });
+        })
+        .pipe(res);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

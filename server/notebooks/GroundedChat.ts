@@ -16,6 +16,7 @@ import { createLogger } from "../utils/logger.js";
 import { generateText, generateTextStream } from "../utils/textGeneration.js";
 import { ragEngine } from "./RAGEngine.js";
 import { notebookManager } from "./NotebookManager.js";
+import { chatResponseCache } from "./ResponseCache.js";
 import type { ChatMessage, Citation } from "./types.js";
 
 const log = createLogger("GroundedChat");
@@ -45,7 +46,7 @@ export class GroundedChat {
   /**
    * Envoie une question au notebook et retourne une réponse groundée avec citations.
    */
-  async ask(notebookId: string, question: string): Promise<ChatMessage> {
+  async ask(notebookId: string, question: string, threadId?: string): Promise<ChatMessage> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) {
       throw new Error("Notebook introuvable.");
@@ -59,23 +60,37 @@ export class GroundedChat {
       );
     }
 
-    // 1. Sauvegarder le message utilisateur
-    const userMessage: ChatMessage = this.buildMessage("user", question, []);
-    notebookManager.addChatMessage(notebookId, userMessage);
+    // 1. Historique de conversation : isolé par thread si threadId est fourni,
+    //    sinon historique global. Construit AVANT d'ajouter la question courante
+    //    pour éviter de la dupliquer dans le prompt (historique + section dédiée).
+    const conversation = threadId
+      ? notebookManager.getThreadMessages(notebookId, threadId)
+      : notebook.chatHistory;
+    const recentHistory = this.buildRecentHistory(conversation);
 
-    // 2. Recherche RAG hybride (embeddings + TF-IDF) dans les chunks des sources
+    // 2. Sauvegarder le message utilisateur (dans le thread ou l'historique global)
+    const userMessage: ChatMessage = this.buildMessage("user", question, []);
+    this.persistMessage(notebookId, threadId, userMessage);
+
+    // 3. Cache sémantique : si une question proche a déjà été répondue pour ce
+    //    notebook (et que les sources n'ont pas changé entre-temps — le cache est
+    //    invalidé à chaque mutation de source), on réutilise la réponse.
+    const cached = chatResponseCache.getSimilar(question, notebookId);
+    if (cached) {
+      log.debug(`💾 Réponse chat servie depuis le cache (notebook ${notebookId.slice(0, 8)})`);
+      const cachedMessage = this.buildMessage("assistant", cached.content, cached.citations as Citation[]);
+      this.persistMessage(notebookId, threadId, cachedMessage);
+      return cachedMessage;
+    }
+
+    // 4. Recherche RAG hybride (embeddings + TF-IDF) dans les chunks des sources
     const ragResults = await ragEngine.searchHybrid(question, notebook.sources, {
       maxChunks: 8,
       minRelevance: 0.1,
     });
 
-    // 3. Construire le contexte groundé
+    // 5. Construire le contexte groundé
     const context = ragEngine.buildContext(ragResults);
-
-    // 4. Construire le prompt avec l'historique récent
-    const recentHistory = notebook.chatHistory.slice(-6).map(msg =>
-      `${msg.role === "user" ? "Utilisateur" : "Assistant"}: ${msg.content}`
-    ).join("\n\n");
 
     const fullPrompt = `${GROUNDED_SYSTEM_PROMPT}
 
@@ -93,8 +108,9 @@ ${question}
 
 Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N].`;
 
-    // 5. Génération de la réponse
+    // 6. Génération de la réponse
     let responseText = "";
+    let generationFailed = false;
     try {
       const result = await generateText({
         prompt: fullPrompt,
@@ -105,14 +121,20 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
     } catch (e: any) {
       log.error(`Erreur génération réponse: ${e.message}`);
       responseText = "Désolé, une erreur est survenue lors de la génération de la réponse. Veuillez réessayer.";
+      generationFailed = true;
     }
 
-    // 6. Extraire les citations
+    // 7. Extraire les citations
     const citations = ragEngine.extractCitations(responseText, ragResults);
 
-    // 7. Construire et sauvegarder le message assistant
+    // 8. Construire et sauvegarder le message assistant
     const assistantMessage = this.buildMessage("assistant", responseText, citations);
-    notebookManager.addChatMessage(notebookId, assistantMessage);
+    this.persistMessage(notebookId, threadId, assistantMessage);
+
+    // 9. Mettre en cache uniquement les réponses valides (jamais les erreurs).
+    if (!generationFailed) {
+      chatResponseCache.set(question, { content: responseText, citations }, notebookId);
+    }
 
     return assistantMessage;
   }
@@ -127,7 +149,8 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
     notebookId: string,
     question: string,
     onChunk: (chunk: string) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    threadId?: string
   ): Promise<ChatMessage> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
@@ -138,23 +161,36 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
       return this.buildMessage("assistant", msg, []);
     }
 
-    // 1. Sauvegarder le message utilisateur
-    const userMessage: ChatMessage = this.buildMessage("user", question, []);
-    notebookManager.addChatMessage(notebookId, userMessage);
+    // 1. Historique isolé par thread (ou global), construit AVANT d'ajouter la
+    //    question courante (évite la duplication de la question dans le prompt).
+    const conversation = threadId
+      ? notebookManager.getThreadMessages(notebookId, threadId)
+      : notebook.chatHistory;
+    const recentHistory = this.buildRecentHistory(conversation);
 
-    // 2. Recherche RAG (non-streamée — rapide)
+    // 2. Sauvegarder le message utilisateur (thread ou historique global)
+    const userMessage: ChatMessage = this.buildMessage("user", question, []);
+    this.persistMessage(notebookId, threadId, userMessage);
+
+    // 3. Cache sémantique : réémettre la réponse mise en cache sous forme de
+    //    chunk unique pour conserver le contrat de streaming côté client.
+    const cached = chatResponseCache.getSimilar(question, notebookId);
+    if (cached) {
+      log.debug(`💾 Réponse chat (stream) servie depuis le cache (notebook ${notebookId.slice(0, 8)})`);
+      onChunk(cached.content);
+      const cachedMessage = this.buildMessage("assistant", cached.content, cached.citations as Citation[]);
+      this.persistMessage(notebookId, threadId, cachedMessage);
+      return cachedMessage;
+    }
+
+    // 4. Recherche RAG (non-streamée — rapide)
     const ragResults = await ragEngine.searchHybrid(question, notebook.sources, {
       maxChunks: 8,
       minRelevance: 0.1,
     });
 
-    // 3. Contexte
+    // 5. Contexte
     const context = ragEngine.buildContext(ragResults);
-
-    // 4. Prompt
-    const recentHistory = notebook.chatHistory.slice(-6).map(msg =>
-      `${msg.role === "user" ? "Utilisateur" : "Assistant"}: ${msg.content}`
-    ).join("\n\n");
 
     const fullPrompt = `${GROUNDED_SYSTEM_PROMPT}
 
@@ -172,8 +208,9 @@ ${question}
 
 Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N].`;
 
-    // 5. Génération en streaming
+    // 6. Génération en streaming
     let responseText = "";
+    let generationFailed = false;
     try {
       responseText = await generateTextStream({
         prompt: fullPrompt,
@@ -187,12 +224,18 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
       const errMsg = "Désolé, une erreur est survenue. Veuillez réessayer.";
       onChunk(errMsg);
       responseText = errMsg;
+      generationFailed = true;
     }
 
-    // 6. Citations + sauvegarde
+    // 7. Citations + sauvegarde
     const citations = ragEngine.extractCitations(responseText, ragResults);
     const assistantMessage = this.buildMessage("assistant", responseText, citations);
-    notebookManager.addChatMessage(notebookId, assistantMessage);
+    this.persistMessage(notebookId, threadId, assistantMessage);
+
+    // 8. Mise en cache (hors erreurs et hors annulation client).
+    if (!generationFailed && !signal?.aborted) {
+      chatResponseCache.set(question, { content: responseText, citations }, notebookId);
+    }
 
     return assistantMessage;
   }
@@ -608,6 +651,30 @@ Réponds en JSON strict :
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  /**
+   * Construit le bloc "historique récent" (6 derniers messages) à injecter dans
+   * le prompt. À appeler AVANT d'ajouter la question courante à l'historique,
+   * sinon celle-ci apparaît en double (historique + section dédiée).
+   */
+  private buildRecentHistory(chatHistory: ChatMessage[]): string {
+    return chatHistory
+      .slice(-6)
+      .map(msg => `${msg.role === "user" ? "Utilisateur" : "Assistant"}: ${msg.content}`)
+      .join("\n\n");
+  }
+
+  /**
+   * Sauvegarde un message dans le thread ciblé (si threadId fourni et valide),
+   * sinon dans l'historique global. Évite la double écriture thread + historique
+   * global qui mélangeait auparavant les conversations.
+   */
+  private persistMessage(notebookId: string, threadId: string | undefined, message: ChatMessage): void {
+    if (threadId && notebookManager.addThreadMessage(notebookId, threadId, message)) {
+      return;
+    }
+    notebookManager.addChatMessage(notebookId, message);
+  }
 
   private buildMessage(role: "user" | "assistant", content: string, citations: Citation[]): ChatMessage {
     return {

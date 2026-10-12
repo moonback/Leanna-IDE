@@ -17,7 +17,14 @@ export function renderInfographicContent(content: string): JSX.Element {
   try {
     const data = JSON.parse(content);
     if (data.type === 'infographic-image') {
-      imageSrc = `data:${data.mediaType};base64,${data.imageBase64}`;
+      // Préférer l'URL de l'image servie par le serveur (le base64 n'est plus
+      // persisté dans le notebook). Repli sur le base64 pour les anciens
+      // documents générés avant cette migration.
+      if (data.imageUrl) {
+        imageSrc = data.imageUrl;
+      } else if (data.imageBase64) {
+        imageSrc = `data:${data.mediaType};base64,${data.imageBase64}`;
+      }
       prompt = data.prompt || '';
       model = data.model || '';
       filePath = data.filePath || '';

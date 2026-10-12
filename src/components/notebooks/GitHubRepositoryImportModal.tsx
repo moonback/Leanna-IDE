@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { SPRING_MODAL } from './motion.js';
+import { api } from './api/client.js';
+import { errorMessage } from './utils.js';
 
 interface Repository {
   full_name: string;
@@ -174,8 +176,7 @@ export function GitHubRepositoryImportModal({
   const checkGitHubAuth = useCallback(async () => {
     setAuthLoading(true);
     try {
-      const res = await fetch('/api/github/user');
-      const data = await res.json();
+      const data = await api<GitHubUser & { error?: string }>('/api/github/user');
       if (data && !data.error && data.login) {
         setGithubUser(data);
       } else {
@@ -197,8 +198,7 @@ export function GitHubRepositoryImportModal({
   const loadMyRepos = useCallback(async () => {
     setMyReposLoading(true);
     try {
-      const res = await fetch('/api/github/repos?limit=100&sort=updated');
-      const data = await res.json();
+      const data = await api<{ repos?: any[] }>('/api/github/repos?limit=100&sort=updated');
       if (data.repos && Array.isArray(data.repos)) {
         const repos: Repository[] = data.repos.map((r: any) => ({
           full_name: r.full_name,
@@ -215,16 +215,19 @@ export function GitHubRepositoryImportModal({
           updated_at: r.updated_at,
         }));
         setMyRepos(repos);
-        if (!selectedRepo && repos.length > 0) {
-          setSelectedRepo(repos[0]);
+        // Sélection par défaut uniquement si rien n'est sélectionné — via le
+        // setter fonctionnel pour ne PAS dépendre de `selectedRepo` (sinon la
+        // liste se rechargeait à chaque changement de sélection).
+        if (repos.length > 0) {
+          setSelectedRepo(prev => prev ?? repos[0]);
         }
       }
-    } catch (e: any) {
-      console.warn('Erreur chargement mes dépôts:', e.message);
+    } catch (e: unknown) {
+      console.warn('Erreur chargement mes dépôts:', errorMessage(e));
     } finally {
       setMyReposLoading(false);
     }
-  }, [selectedRepo]);
+  }, []);
 
   useEffect(() => {
     if (githubUser) {
@@ -250,8 +253,7 @@ export function GitHubRepositoryImportModal({
         limit: '15',
       });
 
-      const res = await fetch(`/api/github/search?${params}`);
-      const data = await res.json();
+      const data = await api<{ repos?: any[]; error?: string }>(`/api/github/search?${params}`);
 
       if (data.error) {
         setSearchError(data.error);
@@ -273,8 +275,8 @@ export function GitHubRepositoryImportModal({
       }));
 
       setSearchResults(repos);
-    } catch (e: any) {
-      setSearchError(`Erreur de recherche: ${e.message}`);
+    } catch (e: unknown) {
+      setSearchError(`Erreur de recherche: ${errorMessage(e)}`);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
@@ -326,8 +328,7 @@ export function GitHubRepositoryImportModal({
     setDirectError(null);
 
     try {
-      const res = await fetch(`/api/github/repo-info?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`);
-      const data = await res.json();
+      const data = await api<any>(`/api/github/repo-info?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`);
 
       if (data.error) {
         setDirectError(`Dépôt introuvable ou inaccessible: ${data.error}`);
@@ -353,8 +354,8 @@ export function GitHubRepositoryImportModal({
         setBranch(foundRepo.default_branch);
       }
       success(`Dépôt ${foundRepo.full_name} identifié (${foundRepo.private ? 'Privé' : 'Public'})`);
-    } catch (e: any) {
-      setDirectError(`Erreur lors de la vérification : ${e.message}`);
+    } catch (e: unknown) {
+      setDirectError(`Erreur lors de la vérification : ${errorMessage(e)}`);
     } finally {
       setDirectLoading(false);
     }
@@ -375,8 +376,7 @@ export function GitHubRepositoryImportModal({
       });
       if (branch) params.append('ref', branch);
 
-      const res = await fetch(`/api/github/repo-files?${params}`);
-      const data = await res.json();
+      const data = await api<{ files?: any[]; error?: string }>(`/api/github/repo-files?${params}`);
 
       if (data.error) {
         setFilesError(data.error);
@@ -392,8 +392,8 @@ export function GitHubRepositoryImportModal({
       }));
 
       setRepositoryFiles(files);
-    } catch (e: any) {
-      setFilesError(`Erreur: ${e.message}`);
+    } catch (e: unknown) {
+      setFilesError(`Erreur: ${errorMessage(e)}`);
     } finally {
       setFilesLoading(false);
     }
@@ -413,14 +413,13 @@ export function GitHubRepositoryImportModal({
   const loadNotebooks = useCallback(async () => {
     setNotebooksLoading(true);
     try {
-      const res = await fetch('/api/notebooks');
-      const data = await res.json();
+      const data = await api<{ notebooks?: Notebook[] }>('/api/notebooks');
       if (data.notebooks) {
         setNotebooks(data.notebooks);
-        setSelectedNotebookId(prev => prev || (data.notebooks.length > 0 ? data.notebooks[0].id : null));
+        setSelectedNotebookId(prev => prev || (data.notebooks!.length > 0 ? data.notebooks![0].id : null));
       }
-    } catch (e: any) {
-      console.error('Erreur notebooks:', e);
+    } catch (e: unknown) {
+      console.error('Erreur notebooks:', errorMessage(e));
     } finally {
       setNotebooksLoading(false);
     }
@@ -435,24 +434,23 @@ export function GitHubRepositoryImportModal({
   const handleCreateNotebook = async () => {
     const title = newNotebookTitle.trim() || `Import - ${selectedRepo?.repo || 'GitHub'}`;
     try {
-      const res = await fetch('/api/notebooks', {
+      const data = await api<{ notebook?: Notebook }>('/api/notebooks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           title,
           description: `Notebook créé pour l'analyse du dépôt GitHub ${selectedRepo?.full_name || ''}`,
-        }),
+        },
       });
-      const data = await res.json();
       if (data.notebook) {
-        setNotebooks(prev => [data.notebook, ...prev]);
-        setSelectedNotebookId(data.notebook.id);
+        const created = data.notebook;
+        setNotebooks(prev => [created, ...prev]);
+        setSelectedNotebookId(created.id);
         setCreatingNotebook(false);
         setNewNotebookTitle('');
         success(`Notebook « ${title} » créé avec succès !`);
       }
-    } catch (e: any) {
-      toastError(`Erreur de création : ${e.message}`);
+    } catch (e: unknown) {
+      toastError(`Erreur de création : ${errorMessage(e)}`);
     }
   };
 
@@ -462,12 +460,10 @@ export function GitHubRepositoryImportModal({
     if (!tokenInput.trim()) return;
     setTokenSaving(true);
     try {
-      const res = await fetch('/api/tokens', {
+      const data = await api<{ status?: string; error?: string }>('/api/tokens', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'GITHUB_TOKEN', value: tokenInput.trim() }),
+        json: { key: 'GITHUB_TOKEN', value: tokenInput.trim() },
       });
-      const data = await res.json();
       if (data.status === 'success') {
         success('Token GitHub configuré avec succès !');
         setTokenModalOpen(false);
@@ -477,8 +473,8 @@ export function GitHubRepositoryImportModal({
       } else {
         toastError(data.error || 'Erreur lors de la sauvegarde du token');
       }
-    } catch (e: any) {
-      toastError(`Erreur: ${e.message}`);
+    } catch (e: unknown) {
+      toastError(`Erreur: ${errorMessage(e)}`);
     } finally {
       setTokenSaving(false);
     }
@@ -501,20 +497,17 @@ export function GitHubRepositoryImportModal({
         .map(ext => ext.trim())
         .filter(ext => ext.startsWith('.'));
 
-      const response = await fetch('/api/github/ingest-repository', {
+      const data = await api<{ status?: string; error?: string }>('/api/github/ingest-repository', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           owner: selectedRepo.owner,
           repo: selectedRepo.repo,
           notebook_id: selectedNotebookId,
           branch: branch || undefined,
           max_files: maxFiles,
           file_extensions: extensions.length > 0 ? extensions : undefined,
-        }),
+        },
       });
-
-      const data = await response.json();
 
       if (data.error) {
         setIngestionError(data.error);
@@ -529,9 +522,9 @@ export function GitHubRepositoryImportModal({
       } else {
         setIngestionError('Réponse inattendue du serveur.');
       }
-    } catch (e: any) {
-      setIngestionError(`Erreur: ${e.message}`);
-      toastError(`Erreur d'ingestion: ${e.message}`);
+    } catch (e: unknown) {
+      setIngestionError(`Erreur: ${errorMessage(e)}`);
+      toastError(`Erreur d'ingestion: ${errorMessage(e)}`);
     } finally {
       setIngesting(false);
     }

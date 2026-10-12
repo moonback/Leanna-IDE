@@ -9,6 +9,7 @@ import type { McpBridge } from "./mcp/McpBridge.js";
 import type { NotebookManager } from "./notebooks/NotebookManager.js";
 import type { EmbeddingStore } from "./notebooks/EmbeddingStore.js";
 import { telemetryService } from "./observability/TelemetryService.js";
+import { backupService } from "./notebooks/BackupService.js";
 
 export interface GracefulShutdownDeps {
   server: HttpServer;
@@ -61,7 +62,10 @@ export function setupGracefulShutdown(deps: GracefulShutdownDeps): GracefulShutd
     await deps.mcpBridge.shutdown();
     console.log('[Lifecycle] Serveurs MCP déconnectés.');
 
-    // 3c. Flush persistance : ProjectMemory, KnowledgeGraph, NotebookManager et EmbeddingStore
+    // 3c. Arrêter le timer de backup automatique avant le flush final.
+    try { backupService.stop(); console.log('[Lifecycle] BackupService arrêté.'); } catch {}
+
+    // 3c-bis. Flush persistance : ProjectMemory, KnowledgeGraph, NotebookManager et EmbeddingStore
     try { deps.projectMemory.save(); console.log('[Lifecycle] ProjectMemory flushé.'); } catch {}
     try { deps.knowledgeGraph.flushAll(); console.log('[Lifecycle] KnowledgeGraph flushé.'); } catch {}
     try { (deps.notebookManager as any).flushAll?.(); console.log('[Lifecycle] NotebookManager flushé.'); } catch {}
