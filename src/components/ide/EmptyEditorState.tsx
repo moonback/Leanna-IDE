@@ -40,6 +40,33 @@ type IconType = React.ComponentType<{ size?: number; style?: React.CSSProperties
 
 interface GitInfo { branch?: string; files?: unknown; repository?: string }
 
+// ─── Hook : horloge temps réel (HH:MM) ──────────────────────────────────
+
+function useClock() {
+  const [time, setTime] = useState(() => (
+    typeof Date !== 'undefined'
+      ? new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : ''
+  ));
+
+  useEffect(() => {
+    const tick = () => setTime(
+      new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    );
+    // Aligne le premier tick sur la prochaine minute pleine, puis chaque minute.
+    const now = new Date();
+    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    let interval: ReturnType<typeof setInterval>;
+    const timeout = setTimeout(() => {
+      tick();
+      interval = setInterval(tick, 60_000);
+    }, msToNextMinute);
+    return () => { clearTimeout(timeout); if (interval) clearInterval(interval); };
+  }, []);
+
+  return time;
+}
+
 function useGitInfo() {
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
 
@@ -246,6 +273,27 @@ function GlobalStyles() {
         width: 48px; height: 48px; border-radius: 14px;
       }
 
+      /* Spotlight suivant le curseur sur le hero (variables --mx/--my en %) */
+      .ee-card-hero::after {
+        content: '';
+        position: absolute; inset: 0; z-index: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%),
+          color-mix(in srgb, var(--primary) 22%, transparent) 0%, transparent 60%);
+        transition: opacity 220ms ease-out;
+      }
+      .ee-card-hero:hover:not(:disabled)::after { opacity: 1; }
+      @media (prefers-reduced-motion: reduce) {
+        .ee-card-hero::after { display: none; }
+      }
+
+      /* Icône hero : pastille d'onde douce au survol */
+      .ee-card-hero:hover:not(:disabled) .ee-card-icon {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent);
+      }
+
       /* Cartes d'action rapide : accent coloré par carte */
       .ee-card {
         position: relative;
@@ -368,8 +416,24 @@ function GlobalStyles() {
       .ee-dot-live { animation: ee-pulse 2s ease-in-out infinite; }
       @keyframes ee-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
+      /* Anneau d'activité (connexion en cours) : halo qui se propage */
+      .ee-dot-busy { position: relative; }
+      .ee-dot-busy::after {
+        content: '';
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        border: 1px solid var(--text-muted);
+        animation: ee-ring 1.4s ease-out infinite;
+      }
+      @keyframes ee-ring {
+        0%   { transform: scale(0.6); opacity: 0.7; }
+        100% { transform: scale(2.2); opacity: 0; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .ee-dot-live { animation: none; }
+        .ee-dot-busy::after { animation: none; display: none; }
       }
     `}</style>
   );
@@ -411,10 +475,22 @@ const ActionCard = React.memo(function ActionCard({
   hero?: boolean;
 }) {
   const descId = useId();
+
+  // Spotlight : suit le curseur sur la carte hero uniquement.
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!hero || reduceMotion || disabled) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    e.currentTarget.style.setProperty('--mx', `${x}%`);
+    e.currentTarget.style.setProperty('--my', `${y}%`);
+  }, [hero, reduceMotion, disabled]);
+
   return (
     <motion.button
       type="button"
       onClick={onClick}
+      onMouseMove={hero ? handleMouseMove : undefined}
       disabled={disabled}
       aria-describedby={descId}
       className={`ee-card ee-focus group flex items-start text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed${primary ? ' ee-card-primary' : ''}${hero ? ' ee-card-hero gap-4 p-5' : ' gap-3 p-4'}`}
@@ -639,6 +715,21 @@ function dirname(p: string): string {
   return parts.join('/');
 }
 
+/** Heure relative compacte : « à l'instant », « 5 min », « 3 h », « 2 j ». */
+function relativeTime(ts?: number): string {
+  if (!ts || !Number.isFinite(ts)) return '';
+  const diff = Date.now() - ts;
+  if (diff < 0) return '';
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} j`;
+  return `${Math.floor(d / 7)} sem`;
+}
+
 const RecentFilesSection = React.memo(function RecentFilesSection({
   onOpenFile, reduceMotion = false,
 }: { onOpenFile: (path: string) => void; reduceMotion?: boolean }) {
@@ -670,6 +761,7 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
           {visible.map((f) => {
             const name = basename(f.path);
             const dir = dirname(f.path);
+            const when = relativeTime(f.openedAt);
             return (
               <motion.li
                 key={f.path}
@@ -693,11 +785,22 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
                   <span className="text-sm font-medium leading-tight truncate" style={{ color: 'var(--text)' }}>
                     {name}
                   </span>
-                  {dir && (
-                    <span className="hidden lg:block text-xs leading-tight truncate ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>
-                      {dir}
-                    </span>
-                  )}
+                  <span className="hidden lg:flex items-center gap-2 ml-auto flex-shrink-0 min-w-0">
+                    {dir && (
+                      <span className="text-xs leading-tight truncate font-mono max-w-[140px]" style={{ color: 'var(--text-muted)' }}>
+                        {dir}
+                      </span>
+                    )}
+                    {when && (
+                      <span
+                        className="text-xs leading-tight whitespace-nowrap tabular-nums"
+                        style={{ color: 'var(--text-dimmed, var(--text-muted))' }}
+                        title={new Date(f.openedAt).toLocaleString('fr-FR')}
+                      >
+                        {when}
+                      </span>
+                    )}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -748,6 +851,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const geminiStatus = useGeminiStatus();
   const gitInfo = useGitInfo();
+  const clock = useClock();
   useFocusTrap(showShortcuts || showSystem);
 
   const aiName = profile.aiName || 'Leanna';
@@ -847,8 +951,16 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
           {/* ── En-tête ── */}
           <motion.header className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3" {...enter(0)}>
             <div>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                {dateLabel}
+              <p className="text-sm flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                <span>{dateLabel}</span>
+                {clock && (
+                  <>
+                    <span aria-hidden="true" style={{ opacity: 0.5 }}>·</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                      {clock}
+                    </span>
+                  </>
+                )}
               </p>
               <h1
                 className="text-3xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight mt-1"
@@ -863,7 +975,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
             <div className="ee-chip" role="status" aria-live="polite">
               <span
-                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ee-dot-live' : ''}`}
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ee-dot-live' : ''}${isBusy && !connected ? ' ee-dot-busy' : ''}`}
                 style={{
                   backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
                   boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,

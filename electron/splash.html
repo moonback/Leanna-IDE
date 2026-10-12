@@ -6,212 +6,136 @@
   <title>Leanna</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@200;300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="splash.css" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Overrides ciblés pour le splash (intégration vidéo + finitions) ── */
+    html, body { background: var(--bg-base); }
 
-    :root {
-      --bg: #0a0b0d;
-      --surface: #111317;
-      --border: rgba(255,255,255,0.06);
-      --border-strong: rgba(255,255,255,0.10);
-      --text: #e8eaed;
-      --text-dim: #6b7280;
-      --text-mute: #3f4550;
-      --accent: #00c2ff;
-      --mono: 'JetBrains Mono', ui-monospace, monospace;
-      --sans: 'Manrope', system-ui, sans-serif;
-    }
+    /* Le body translucide permet l'effet "frameless" d'Electron */
+    body { background: rgba(10, 22, 40, 0.6); }
 
-    html, body {
-      height: 100%;
-      background: rgba(10, 11, 13, 0.55);
-      color: var(--text);
-      font-family: var(--sans);
-      font-weight: 400;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Halo subtil derrière le logo */
-    .glow {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 700px;
-      height: 700px;
-      background: radial-gradient(circle, rgba(0,194,255,0.06) 0%, transparent 65%);
-      filter: blur(40px);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Centrage plein écran */
-    .stage {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 40px 24px;
-      gap: 40px;
-    }
-
-    /* ── Logo ── */
-    .logo-wrap {
-      position: relative;
-      width: 88px;
-      height: 88px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .logo-wrap::before {
-      content: '';
-      position: absolute;
-      inset: -32px;
-      background: radial-gradient(circle, rgba(0,194,255,0.14) 0%, transparent 65%);
-      filter: blur(20px);
-      pointer-events: none;
-    }
-    .logo-box {
-      position: relative;
-      width: 88px;
-      height: 88px;
-      border-radius: 18px;
-      overflow: hidden;
-      border: 1px solid var(--border-strong);
-      background: var(--surface);
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.02),
-        0 24px 60px -20px rgba(0,194,255,0.25);
-    }
-    .logo-box video,
-    .logo-box img {
-      width: 100%; height: 100%; object-fit: cover; display: block;
-    }
-
-    /* ── Texte ── */
-    .title {
-      font-size: 44px;
-      font-weight: 200;
-      letter-spacing: -0.03em;
-      line-height: 1;
-      color: var(--text);
-    }
-    .title .cursor {
-      color: var(--accent);
-      font-weight: 300;
-      animation: blink 1.1s steps(1) infinite;
-    }
-    @keyframes blink { 50% { opacity: 0; } }
-
-    .subtitle {
-      margin-top: 14px;
-      font-size: 13px;
-      font-weight: 300;
-      color: var(--text-dim);
-      line-height: 1.6;
-      max-width: 420px;
-      letter-spacing: 0.005em;
-    }
-
-    /* ── Progress ── */
-    .progress {
+    /* Logo vidéo dans le hero */
+    .hero-logo-box video {
       width: 100%;
-      max-width: 380px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .progress-status {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 0.02em;
-    }
-    .status-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text-dim);
-    }
-    .dot {
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent);
-      animation: pulse 1.6s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.35; }
-    }
-    .percent {
-      color: var(--text);
-      font-weight: 500;
-      min-width: 34px;
-      text-align: right;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 27px;
     }
 
-    .track {
-      height: 1px;
+    /* Logo vidéo dans le header */
+    .logo-container video {
       width: 100%;
-      background: var(--border);
-      border-radius: 1px;
-      overflow: hidden;
-    }
-    .bar {
       height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), #7ad8ff);
-      box-shadow: 0 0 10px rgba(0,194,255,0.6);
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      object-fit: cover;
+      display: block;
+      position: relative;
+      z-index: 2;
     }
+
+    /* Petit raffinement : apparition en cascade des éléments internes */
+    .header     { animation: splashFadeIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.15s both; }
+    .hero       { animation: splashFadeIn 0.9s cubic-bezier(0.16,1,0.3,1) 0.30s both; }
+    .progress-section { animation: splashFadeIn 0.9s cubic-bezier(0.16,1,0.3,1) 0.45s both; }
+    .footer-tags{ animation: splashFadeIn 0.9s cubic-bezier(0.16,1,0.3,1) 0.60s both; }
   </style>
 </head>
 <body>
 
-  <div class="glow"></div>
+  <!-- Halos d'ambiance -->
+  <div class="ambient-glow glow-top-left"></div>
+  <div class="ambient-glow glow-bottom-right"></div>
+  <div class="ambient-glow glow-center"></div>
+
+  <!-- Particules -->
   <canvas id="bg-canvas"></canvas>
 
-  <div class="stage">
+  <div class="splash-card">
 
-    <div class="logo-wrap">
-      <div class="logo-box">
-        <video id="heroLogo" src="../assets/video-splash.mp4"
-               autoplay loop muted playsinline></video>
-      </div>
-    </div>
-
-    <div>
-      <h1 class="title">Leanna<span class="cursor">_</span></h1>
-      <p class="subtitle">
-        Analyse de code, génération et refactoring prédictif.
-        Une flotte d'agents autonomes intégrée à votre IDE.
-      </p>
-    </div>
-
-    <div class="progress">
-      <div class="progress-status">
-        <div class="status-left">
-          <span class="dot"></span>
-          <span id="statusLabel">Initialisation de l'environnement sécurisé...</span>
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-container">
+          <video src="../assets/video-splash.mp4" autoplay loop muted playsinline></video>
         </div>
-        <span class="percent" id="percentLabel">0%</span>
+        <div class="title-group">
+          <div class="title-row">
+            <span class="app-name">Leanna</span>
+            <span class="badge-version" id="badgeVersion">v1.0</span>
+          </div>
+          <span class="app-tagline">Autonomous AI Development Environment</span>
+        </div>
       </div>
-      <div class="track">
-        <div class="bar" id="progressBar"></div>
+
+      <div class="header-right">
+        <div class="sys-stat">
+          <span class="sys-stat-label">Serveur</span>
+          <span class="sys-stat-value" id="statServer">:4000</span>
+        </div>
+        <div class="sys-stat">
+          <span class="sys-stat-label">Heure</span>
+          <span class="sys-stat-value" id="statTime">--:--:--</span>
+        </div>
       </div>
-    </div>
+    </header>
+
+    <!-- ── Hero ── -->
+    <section class="hero">
+      <div class="hero-logo-wrap">
+        <div class="hero-logo-rings">
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="ring"></div>
+        </div>
+        <div class="hero-glow-back"></div>
+        <div class="hero-logo-box">
+          <video id="heroLogo" src="../assets/video-splash.mp4" autoplay loop muted playsinline></video>
+        </div>
+      </div>
+
+      <div class="hero-text">
+        <span class="hero-badge-pill">
+          <span class="hero-badge-dot"></span>
+          Initialisation du système
+        </span>
+        <h1 class="hero-title">Leanna<span class="cursor-blink">_</span></h1>
+        <p class="hero-sub">
+          Analyse de code, génération et refactoring prédictif.
+          Une flotte d'agents autonomes intégrée à votre IDE.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Progress ── -->
+    <section class="progress-section">
+      <div class="status-row">
+        <span class="status-text">
+          <span class="status-dot"></span>
+          <span id="statusLabel">Initialisation de l'environnement sécurisé...</span>
+        </span>
+        <span class="percent-text" id="percentLabel">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="footer-tags">
+      <div class="tag-list">
+        <div class="tag-item" data-step="0"><span class="indicator"></span>Environnement</div>
+        <div class="tag-item" data-step="1"><span class="indicator"></span>Serveur</div>
+        <div class="tag-item" data-step="2"><span class="indicator"></span>Knowledge</div>
+        <div class="tag-item" data-step="3"><span class="indicator"></span>Call-Graph</div>
+        <div class="tag-item" data-step="4"><span class="indicator"></span>Agents</div>
+        <div class="tag-item" data-step="5"><span class="indicator"></span>Skills</div>
+      </div>
+      <div class="footer-right">
+        <span class="security-badge">Secure Sandbox</span>
+        <span class="build-info" id="buildInfo">build local</span>
+      </div>
+    </footer>
 
   </div>
 
@@ -219,6 +143,8 @@
     const progressBar  = document.getElementById('progressBar');
     const percentLabel = document.getElementById('percentLabel');
     const statusLabel  = document.getElementById('statusLabel');
+    const statTime     = document.getElementById('statTime');
+    const tagItems     = Array.from(document.querySelectorAll('.tag-item'));
 
     const STEPS = [
       { pct: 15,  label: "Initialisation de l'environnement sécurisé..." },
@@ -227,17 +153,32 @@
       { pct: 78,  label: "Chargement du moteur AST & Call-Graph..." },
       { pct: 92,  label: "Initialisation de la flotte d'agents autonomes..." },
       { pct: 98,  label: "Initialisation des skills..." },
-      { pct: 100, label: "Système opérationnel • Lancement de leanna..." },
+      { pct: 100, label: "Système opérationnel • Lancement de Leanna..." },
     ];
 
     let currentPct = 0, targetPct = 12, stepIndex = 0, serverHealthy = false;
+
+    function syncTags(index) {
+      tagItems.forEach((el, i) => el.classList.toggle('active', i <= index));
+    }
 
     function updateProgressUI(pct, text) {
       currentPct = Math.min(100, Math.max(currentPct, pct));
       if (progressBar) progressBar.style.width = currentPct + '%';
       if (percentLabel) percentLabel.textContent = Math.round(currentPct) + '%';
       if (text && statusLabel) statusLabel.textContent = text;
+      syncTags(stepIndex);
     }
+
+    // Horloge temps réel dans le header
+    function updateClock() {
+      if (!statTime) return;
+      const now = new Date();
+      const p = n => String(n).padStart(2, '0');
+      statTime.textContent = `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
 
     async function checkServerHealth() {
       try {
@@ -275,65 +216,82 @@
       updateProgressUI(pct, text);
     };
 
-     window.markComplete = function() {
-       clearInterval(progressTimer);
-       clearInterval(stepInterval);
-       updateProgressUI(100, "Système opérationnel • Lancement de leanna...");
-     };
+    window.markComplete = function() {
+      clearInterval(progressTimer);
+      clearInterval(stepInterval);
+      stepIndex = STEPS.length - 1;
+      updateProgressUI(100, "Système opérationnel • Lancement de Leanna...");
+      syncTags(tagItems.length - 1);
+    };
 
-     // Particules de fond
-     const canvas = document.getElementById('bg-canvas');
-     const ctx = canvas.getContext('2d');
-     let width = canvas.width = window.innerWidth;
-     let height = canvas.height = window.innerHeight;
-     const particles = [];
+    // ── Particules de fond ──
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    const particles = [];
 
-     class Particle {
-       constructor() {
-         this.reset();
-       }
-       reset() {
-         this.x = Math.random() * width;
-         this.y = Math.random() * height;
-         this.size = Math.random() * 1.5 + 0.5;
-         this.speedX = Math.random() * 0.4 - 0.2;
-         this.speedY = Math.random() * 0.4 - 0.2;
-         this.opacity = Math.random() * 0.5 + 0.1;
-       }
-       update() {
-         this.x += this.speedX;
-         this.y += this.speedY;
-         if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
-           this.reset();
-         }
-       }
-       draw() {
-         ctx.fillStyle = `rgba(0, 194, 255, ${this.opacity})`;
-         ctx.beginPath();
-         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-         ctx.fill();
-       }
-     }
+    class Particle {
+      constructor() { this.reset(true); }
+      reset(initial = false) {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.size = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 0.4 - 0.2;
+        this.speedY = Math.random() * 0.4 - 0.2;
+        this.opacity = Math.random() * 0.45 + 0.1;
+        // Teinte : majorité cyan, quelques particules orange (accent Leanna)
+        this.hue = Math.random() > 0.82 ? 'orange' : 'cyan';
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) this.reset();
+      }
+      draw() {
+        ctx.fillStyle = this.hue === 'orange'
+          ? `rgba(255, 140, 0, ${this.opacity * 0.8})`
+          : `rgba(0, 194, 255, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
-     for (let i = 0; i < 100; i++) {
-       particles.push(new Particle());
-     }
+    const PARTICLE_COUNT = 90;
+    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
 
-     function animate() {
-       ctx.clearRect(0, 0, width, height);
-       particles.forEach(p => {
-         p.update();
-         p.draw();
-       });
-       requestAnimationFrame(animate);
-     }
-     animate();
+    // Lignes de connexion entre particules proches (effet réseau)
+    function drawConnections() {
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.strokeStyle = `rgba(0, 194, 255, ${0.08 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
 
-     window.addEventListener('resize', () => {
-       width = canvas.width = window.innerWidth;
-       height = canvas.height = window.innerHeight;
-     });
-   </script>
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      drawConnections();
+      particles.forEach(p => { p.update(); p.draw(); });
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
   </script>
 </body>
 </html>
