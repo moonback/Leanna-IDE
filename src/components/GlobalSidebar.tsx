@@ -26,15 +26,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 import {
-  LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
-  Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History, ListChecks,
-  BarChart2, Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
+  Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
   Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
 import { useAgentStatus } from '../hooks/useAgentStatus.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
+import { NAV_GROUPS, type NavItem } from '../config/navigation.js';
 import type { UnifiedSidebarProps } from './sidebar/types.js';
 // @ts-ignore - Asset handled by bundler
 import logoDark from '../../assets/images/icon-sombre.png';
@@ -42,9 +41,6 @@ import logoDark from '../../assets/images/icon-sombre.png';
 /* ------------------------------------------------------------------ */
 /* Types & données                                                     */
 /* ------------------------------------------------------------------ */
-
-interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
-interface NavGroup { id: string; label: string; items: NavItem[] }
 
 /** Outil IDE : bascule un panneau au lieu de naviguer. */
 interface ToolItem {
@@ -56,49 +52,6 @@ interface ToolItem {
   onClick: () => void;
 }
 interface ToolGroup { id: string; label: string; items: ToolItem[] }
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    id: 'pilotage', label: 'Pilotage',
-    items: [
-      { id: 'mission-control', path: '/mission-control', label: 'Mission Control', icon: LayoutDashboard },
-      { id: 'mission-timeline', path: '/mission-timeline', label: 'Missions', icon: Milestone },
-      { id: 'mission-simulation', path: '/mission-simulation', label: 'Simulation', icon: FlaskConical },
-    ],
-  },
-  {
-    id: 'intelligence', label: 'Intelligence',
-    items: [
-      { id: 'agent-swarm', path: '/agent-swarm', label: 'Agent Swarm', icon: Network },
-      { id: 'explainability', path: '/explainability', label: 'Pourquoi ?', icon: HelpCircle },
-      { id: 'autonomy', path: '/autonomy', label: 'Autonomie', icon: Gauge },
-    ],
-  },
-  {
-    id: 'travail', label: 'Travail',
-    items: [
-      { id: 'ide', path: '/ide', label: 'IDE', icon: Code2 },
-      { id: 'automation', path: '/automation', label: 'Automatisations', icon: Zap },
-      { id: 'notebooks', path: '/notebooks', label: 'Notebooks', icon: NotebookPen },
-      { id: 'documents', path: '/documents', label: 'Documents', icon: FileText },
-      { id: 'github', path: '/github', label: 'GitHub', icon: Github },
-    ],
-  },
-  {
-    id: 'memoire', label: 'Mémoire',
-    items: [
-      { id: 'memories', path: '/memories', label: 'Mémoires', icon: BrainCircuit },
-      { id: 'history', path: '/history', label: 'Historique', icon: History },
-      { id: 'lists', path: '/lists', label: 'Listes', icon: ListChecks },
-    ],
-  },
-  {
-    id: 'observabilite', label: 'Observabilité',
-    items: [
-      { id: 'observability', path: '/observability', label: 'Coûts & Tokens', icon: BarChart2 },
-    ],
-  },
-];
 
 const COLLAPSE_KEY = 'leanna_global_sidebar_collapsed';
 const GROUPS_KEY = 'leanna_global_sidebar_closed_groups';
@@ -363,7 +316,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   <span className="block truncate text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                     Leanna{mode === 'ide' ? ' · IDE' : ''}
                   </span>
-                  <span className="block truncate text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+                  <span className="block truncate text-xs font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
                     {mode === 'ide' ? 'Espace de travail' : 'Centre de pilotage'}
                   </span>
                 </span>
@@ -393,7 +346,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 agent={agent}
                 collapsed={collapsed}
                 reduceMotion={reduceMotion}
-                onClick={() => navigate('/mission-control')}
+                onClick={() => navigate('/pilotage')}
               />
             )}
 
@@ -569,7 +522,7 @@ function Group({
           aria-expanded={open}
           className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1.5 pt-3 text-left ${FOCUS_RING}`}
         >
-          <span className="text-[11px] font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
             {label}
           </span>
           <motion.span
@@ -922,7 +875,7 @@ function IdeAssistantBlock({
                 onClick={() => { if (!current) onToggleMode?.(); }}
                 aria-pressed={current}
                 title={m === 'full' ? 'Mode complet' : 'Mode question'}
-                className={`relative rounded px-2 py-0.5 text-[10px] font-semibold ${FOCUS_RING}`}
+                className={`relative rounded px-2 py-0.5 text-xs font-semibold ${FOCUS_RING}`}
                 style={{ color: current ? 'var(--text-primary)' : 'var(--text-dimmed)' }}
               >
                 {current && (

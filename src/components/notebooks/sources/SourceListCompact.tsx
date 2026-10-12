@@ -87,7 +87,7 @@ export function SourceListCompact(props: Props) {
                   onClick={onDeleteSelected}
                   disabled={uploading}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: 'var(--red-500)', color: 'var(--color-error)' }}
+                  style={{ backgroundColor: 'var(--color-error-subtle)', color: 'var(--color-error)' }}
                 >
                   {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   <span>Supprimer ({selectedSources.length})</span>
@@ -109,7 +109,7 @@ export function SourceListCompact(props: Props) {
                     onClick={onDeleteAll}
                     disabled={uploading}
                     className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-                    style={confirmDeleteAll ? { backgroundColor: 'var(--red-500)' } : {}}
+                    style={confirmDeleteAll ? { backgroundColor: 'var(--color-error-subtle)' } : {}}
                     onMouseEnter={(e) => { if (!confirmDeleteAll) (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(239,68,68,0.1)'; }}
                     onMouseLeave={(e) => { if (!confirmDeleteAll) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
                     title={confirmDeleteAll ? 'Cliquez pour confirmer' : 'Supprimer toutes les sources'}

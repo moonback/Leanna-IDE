@@ -21,10 +21,18 @@ import {
   Wifi,
   WifiOff,
   MoreHorizontal,
+  Power,
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
+import { QuitConfirmDialog } from '../sidebar/QuitConfirmDialog.js';
+
+/** API Electron exposant quit() — présente uniquement dans la fenêtre desktop. */
+function getElectronQuitAPI(): { quit: () => void } | null {
+  const w = window as any;
+  return typeof w.electronAPI?.quit === 'function' ? w.electronAPI : null;
+}
 
 
 import { type TelegramStatus } from './TelegramStatusModal.js';
@@ -257,6 +265,16 @@ export const StatusBar = memo(function StatusBar({
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
 
+
+  // Quitter l'application (fenêtre Electron uniquement).
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const canQuit = !!getElectronQuitAPI();
+  const handleQuitConfirm = useCallback(() => {
+    setShowQuitConfirm(false);
+    const api = getElectronQuitAPI();
+    if (api) api.quit();
+    else window.close();
+  }, []);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetCode, setResetCode] = useState('');
@@ -1041,6 +1059,26 @@ export const StatusBar = memo(function StatusBar({
               P
             </kbd>
           </button>
+
+          {/* Quitter l'application — tout à droite, fenêtre desktop uniquement */}
+          {canQuit && (
+            <>
+              <Divider />
+              <button
+                type="button"
+                onClick={() => setShowQuitConfirm(true)}
+                className="flex items-center gap-1 px-2 h-[22px] rounded-md text-xs font-medium leading-none transition-all duration-200 hover:bg-[var(--color-error-subtle)] active:scale-95"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-error)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                title="Quitter Leanna"
+                aria-label="Quitter Leanna"
+              >
+                <Power size={12} strokeWidth={1.8} />
+                <span className="hidden sm:inline">Quitter</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1049,6 +1087,12 @@ export const StatusBar = memo(function StatusBar({
           <ToolsMenuModal items={toolsMenuItems} onClose={() => setShowToolsMenu(false)} />
         )}
       </AnimatePresence>
+
+      <QuitConfirmDialog
+        open={showQuitConfirm}
+        onClose={() => setShowQuitConfirm(false)}
+        onConfirm={handleQuitConfirm}
+      />
 
       <AnimatePresence>
       {showResetConfirm && (

@@ -28,7 +28,7 @@ export function AgentCard({ task, isOpen, onToggle, reduceMotion }: {
               <Clock className="h-3 w-3" />{formatDuration(task.durationMs)}
             </span>
           )}
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+          <span className="rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
             style={{ backgroundColor: 'color-mix(in srgb, ' + color + ' 14%, transparent)', color }}>
             {STATUS_LABEL_FR[task.status]}
           </span>
@@ -36,7 +36,7 @@ export function AgentCard({ task, isOpen, onToggle, reduceMotion }: {
 
         <div className="mt-1.5 flex items-center gap-1.5">
           {task.role && (
-            <span className="rounded-[var(--radius-xs)] px-1.5 py-px font-mono text-[10px] uppercase tracking-wide" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-dimmed)' }}>
+            <span className="rounded-[var(--radius-xs)] px-1.5 py-px font-mono text-xs uppercase tracking-wide" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-dimmed)' }}>
               {task.role}
             </span>
           )}

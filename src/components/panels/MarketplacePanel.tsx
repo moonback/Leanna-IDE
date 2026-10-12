@@ -1041,7 +1041,7 @@ export function MarketplacePanel({ onClose }: MarketplacePanelProps) {
   // ── Contenu ───────────────────────────────────────────────────────────
 
   const content = (
-    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--bg-main)' }}>
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--bg-base)' }}>
       <AnimatePresence mode="wait">
 
         {/* ── VUE DÉTAIL ── */}

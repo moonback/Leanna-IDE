@@ -12,6 +12,7 @@
  * - Meilleure traçabilité et audit
  */
 
+import { parse as parseYAML } from "yaml";
 import { z } from "zod";
 import type { AgentRole, TaskPriority, AgentTask, TaskContext } from "./types.js";
 import { isDelegationAllowed } from "./AgentCommunication.js";
@@ -287,82 +288,12 @@ export class DelegationManager {
   }
 
   /**
-   * Convertisseur simple YAML -> JSON (pour les cas basiques)
+   * Convertit du YAML en JSON via la lib `yaml` (gère valeurs contenant ":",
+   * listes, objets imbriqués). Remplace l'ancien parseur maison qui
+   * transformait ces cas en `{}`.
    */
-  private simpleYAMLToJSON(yaml: string): string {
-    // Ce convertisseur gère seulement les cas simples
-    // Pour une implémentation complète, utiliser js-yaml
-    const lines = yaml.split('\n');
-    const result: Record<string, unknown> = {};
-    let current: Record<string, unknown> = result;
-    const stack: Record<string, unknown>[] = [result];
-    let indentStack: number[] = [0];
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const indent = line.search(/\S/);
-      const content = line.slice(indent);
-
-      // Pop stack si moins indenté
-      while (indentStack.length > 1 && indent <= indentStack[indentStack.length - 1]!) {
-        indentStack.pop();
-        stack.pop();
-      }
-
-      current = stack[stack.length - 1]!;
-
-      // Key: value
-      const colonIdx = content.indexOf(':');
-      if (colonIdx > 0) {
-        const key = content.slice(0, colonIdx).trim();
-        let value = content.slice(colonIdx + 1).trim();
-
-        // Check if value starts a block
-        if (value === '' || value.startsWith('-') || value.includes(':')) {
-          const newObj: Record<string, unknown> = {};
-          current[key] = newObj;
-          stack.push(newObj);
-          indentStack.push(indent + 2);
-        } else if (value.startsWith('-')) {
-          // Array
-          const items = value.split('-').slice(1).map(v => v.trim()).filter(Boolean);
-          current[key] = items.length === 1 ? items[0] : items;
-        } else {
-          // Simple value
-          current[key] = this.parseYAMLValue(value);
-        }
-      } else if (content.startsWith('-')) {
-        // Array item
-        const value = content.slice(1).trim();
-        const parent = stack[stack.length - 2] || current;
-        const lastKey = Object.keys(current)[Object.keys(current).length - 1];
-        if (lastKey && Array.isArray(parent[lastKey])) {
-          (parent[lastKey] as unknown[]).push(value);
-        } else {
-          Object.values(parent).pop()
-        }
-      }
-    }
-
-    return JSON.stringify(result);
-  }
-
-  /**
-   * Parse une valeur YAML simple
-   */
-  private parseYAMLValue(value: string): unknown {
-    if (value === 'true' || value === 'True') return true;
-    if (value === 'false' || value === 'False') return false;
-    if (value === 'null' || value === 'Null' || value === '~') return null;
-    if (/^-?\d+$/.test(value)) return parseInt(value, 10);
-    if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value);
-    if ((value.startsWith('"') && value.endsWith('"')) || 
-        (value.startsWith("'") && value.endsWith("'"))) {
-      return value.slice(1, -1);
-    }
-    return value;
+  private simpleYAMLToJSON(yamlInput: string): string {
+    return JSON.stringify(parseYAML(yamlInput));
   }
 
   /**

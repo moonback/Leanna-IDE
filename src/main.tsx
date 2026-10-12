@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+// import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
@@ -22,7 +24,10 @@ import { useAgentEventStream } from './hooks/useAgentEventStream.js';
 import { installIdeRemoteForwarder, installIdeRemoteReceiver } from './lib/ideRemoteBridge.js';
 import { Loader2, X } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
+import { ROUTES } from './config/navigation.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
+import { GlobalCommandPalette } from './components/GlobalCommandPalette.js';
+import { ConnectionBanner } from './components/ui/ConnectionBanner.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -33,13 +38,8 @@ const GitHubView = lazy(() => import('./views/GitHubView.js'));
 const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
-const AutonomyView = lazy(() => import('./views/AutonomyView.js'));
-const MissionControlView = lazy(() => import('./views/MissionControlView.js'));
-const MissionTimelineView = lazy(() => import('./views/MissionTimelineView.js'));
-const MissionSimulationView = lazy(() => import('./views/MissionSimulationView.js'));
-const AgentSwarmView = lazy(() => import('./views/AgentSwarmView.js'));
-const ExplainabilityView = lazy(() => import('./views/ExplainabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
+const PilotageView = lazy(() => import('./views/PilotageView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 
@@ -178,9 +178,9 @@ try {
     if (p.accentColor) document.documentElement.style.setProperty('--accent-primary', p.accentColor);
     if (p.fontFamily)  document.documentElement.style.setProperty('--font-sans', p.fontFamily);
   } else {
-    document.documentElement.setAttribute('data-theme', 'cyberpunk');
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
-} catch { document.documentElement.setAttribute('data-theme', 'cyberpunk'); }
+} catch { document.documentElement.setAttribute('data-theme', 'dark'); }
 
 // ── Sync profile to server on startup ──────────────────────────────────────
 // This ensures the WS session always uses the latest saved identity/voice.
@@ -446,7 +446,7 @@ function ScreenShareSourcePicker() {
 
 function LoadingFallback() {
   return (
-    <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
@@ -466,7 +466,7 @@ function NavSidebar() {
   const isIde = pathname === '/' || pathname === '/ide';
   const isSettings = pathname === '/settings';
 
-  // Don't show on IDE (it has its own UnifiedSidebar in context='ide')
+  // Don't show on IDE (IdeView monte sa propre GlobalSidebar en variant='ide')
   // Don't show on Settings (SettingsView has its own left nav)
   if (isIde || isSettings) return null;
   return <GlobalSidebar />;
@@ -500,23 +500,31 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/"              element={<Navigate to="/ide" replace />} />
-        <Route path="/ide"           element={wrap(<IdeView />)} />
-        <Route path="/memories"      element={wrap(<MemoriesView />)} />
-        <Route path="/history"       element={wrap(<HistoryView />)} />
-        <Route path="/settings"      element={wrap(<SettingsView />)} />
-        <Route path="/lists"         element={wrap(<ListsView />)} />
-        <Route path="/github"        element={wrap(<GitHubView />)} />
-        <Route path="/automation"    element={wrap(<AutomationView />)} />
-        <Route path="/documents"     element={wrap(<DocumentsView />)} />
-        <Route path="/notebooks"     element={wrap(<NotebooksView />)} />
-        <Route path="/observability" element={wrap(<ObservabilityView />)} />
-        <Route path="/autonomy"      element={wrap(<AutonomyView />)} />
-        <Route path="/mission-control" element={wrap(<MissionControlView />)} />
-        <Route path="/mission-timeline" element={wrap(<MissionTimelineView />)} />
-        <Route path="/mission-simulation" element={wrap(<MissionSimulationView />)} />
-        <Route path="/agent-swarm"   element={wrap(<AgentSwarmView />)} />
-        <Route path="/explainability" element={wrap(<ExplainabilityView />)} />
+        <Route path={ROUTES.home}          element={<Navigate to={ROUTES.ide} replace />} />
+        <Route path={ROUTES.ide}           element={wrap(<IdeView />)} />
+        <Route path={ROUTES.memories}      element={wrap(<MemoriesView />)} />
+        <Route path={ROUTES.history}       element={wrap(<HistoryView />)} />
+        <Route path={ROUTES.settings}      element={wrap(<SettingsView />)} />
+        <Route path={ROUTES.lists}         element={wrap(<ListsView />)} />
+        <Route path={ROUTES.github}        element={wrap(<GitHubView />)} />
+        <Route path={ROUTES.automation}    element={wrap(<AutomationView />)} />
+        <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
+        <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
+        <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
+
+        {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
+        <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
+        {/* Old routes — backward-compatible deep links (navigate(ROUTES.missionTimeline) etc.) */}
+        <Route path={ROUTES.autonomy}          element={<Navigate to="/pilotage?tab=autonomie"        replace />} />
+        <Route path={ROUTES.missionControl}    element={<Navigate to="/pilotage"                     replace />} />
+        <Route path={ROUTES.missionTimeline}   element={<Navigate to="/pilotage?tab=missions"         replace />} />
+        <Route path={ROUTES.missionSimulation} element={<Navigate to="/pilotage?tab=simulation"       replace />} />
+        <Route path={ROUTES.agentSwarm}        element={<Navigate to="/pilotage?tab=swarm"            replace />} />
+        <Route path={ROUTES.explainability}    element={<Navigate to="/pilotage?tab=pourquoi"         replace />} />
+        {/* ──────────────────────────────────────────────────────────────────── */}
+
+        {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}
+        <Route path="*" element={<Navigate to={ROUTES.ide} replace />} />
       </Routes>
     </AnimatePresence>
   );
@@ -702,6 +710,7 @@ function Layout() {
           <NavSidebar />
           <main id="main-content" className="app-content" tabIndex={-1}>
             <IdeNavigationBridge />
+            <ConnectionBanner />
             <GlobalAgentStatusBar />
             <AnimatedRoutes />
           </main>
@@ -715,6 +724,8 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Proposition d'ouvrir la vue des missions à la création d'une mission */}
         <MissionCreatedPrompt />
+        {/* Palette de commandes globale (Cmd/Ctrl+K) */}
+        <GlobalCommandPalette />
         {/* Écran de démarrage & sélection du projet (reprise auto, ouvrir, cloner, notebooks) */}
         <StartupProjectModal />
         {/* Assistant de première configuration des clés .env (après le splash) */}

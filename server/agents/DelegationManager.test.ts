@@ -18,6 +18,26 @@ describe("DelegationManager", () => {
 
   // ─── Tests de parsing JSON ────────────────────────────────────────────────
   
+  // ─── Régression : parseur YAML (valeurs avec ":" et listes) ───────────────
+
+  describe("parseFromYAML", () => {
+    it("conserve les valeurs contenant ':' et les listes", async () => {
+      const yaml = [
+        "targetRole: coder",
+        "title: Appeler l'API",
+        "description: voir http://localhost:4000/health (ratio 3:1)",
+        "files:",
+        "  - src/a.ts",
+        "  - src/b.ts",
+      ].join("\n");
+
+      const [d] = await manager.parseFromYAML(yaml, "planner");
+
+      assert.equal(d!.description, "voir http://localhost:4000/health (ratio 3:1)");
+      assert.deepEqual(d!.files, ["src/a.ts", "src/b.ts"]);
+    });
+  });
+
   describe("parseFromJSON", () => {
     it("devrait parser une délégation simple valide", () => {
       const json = `{

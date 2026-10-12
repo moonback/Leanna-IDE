@@ -206,7 +206,7 @@ function ActiveRunTracker({ run }: { run: WorkflowRunState }) {
         </div>
 
         {/* Barre de progression */}
-        <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
           <motion.div
             className="h-full rounded-full relative overflow-hidden"
             initial={{ width: 0 }}
@@ -568,7 +568,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
 
                         {/* Mini progress bar quand en cours */}
                         {isRunning && activeRun && (
-                          <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                          <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
                             <motion.div
                               className="h-full rounded-full"
                               animate={{ width: `${activeRun.progress}%` }}
@@ -584,7 +584,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             type="button"
                             onClick={() => runAction(`/api/workflows/${wf.id}/run`)}
                             disabled={busyId !== null || isRunning}
-                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-base)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                           >
                             {isRunning ? (
@@ -597,7 +597,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                             type="button"
                             onClick={() => runAction(`/api/workflows/${wf.id}/toggle`, 'POST', { enabled: !wf.enabled })}
                             disabled={busyId !== null}
-                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-base)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
                           >
                             <Pause className="w-3 h-3" />
@@ -606,7 +606,7 @@ export const WorkflowsPanel = React.memo(function WorkflowsPanel({ workflows, on
                           <button
                             type="button"
                             onClick={() => toggleExpand(wf.id)}
-                            className="rounded-lg border px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-primary)]"
+                            className="rounded-lg border px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5 transition-colors hover:bg-[var(--bg-base)]"
                             style={{ borderColor: 'var(--border-base)', color: 'var(--text-dimmed)' }}
                           >
                             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}

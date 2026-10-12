@@ -170,7 +170,6 @@ export const envSchema = z
     TOOL_LOG_TRANSCRIPT: optionalString,
 
     // ── Workspace & résolution de chemins ──
-    JARVIS_DEFAULT_WORKSPACE: optionalString,
     Leanna_CONFIG_PATH: optionalString,
     ELECTRON_APP_PATH: optionalString,
   })

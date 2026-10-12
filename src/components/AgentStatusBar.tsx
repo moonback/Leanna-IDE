@@ -4,6 +4,7 @@ import {
   Brain, Cog, ShieldCheck, Gauge, CircleDot, AlertTriangle, Clock, CheckCircle2,
 } from 'lucide-react';
 import { useAgentStatus, type AgentState } from '../hooks/useAgentStatus.js';
+import { ROUTES } from '../config/navigation.js';
 
 /**
  * AgentStatusBar — persistent global strip (task-ui.md §4). Shows WHAT Leanna is
@@ -36,7 +37,7 @@ export function AgentStatusBar() {
   return (
     <button
       type="button"
-      onClick={() => navigate('/mission-control')}
+      onClick={() => navigate(ROUTES.missionControl)}
       aria-label={`État de Leanna : ${status.label}. ${status.reason}. Ouvrir Mission Control.`}
       className="group flex w-full items-center gap-2.5 border-b px-4 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] lg:px-6"
       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}

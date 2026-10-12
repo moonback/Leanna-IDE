@@ -45,7 +45,7 @@ function useGitInfo() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/git/status')
+    fetch('/api/github/status')
       .then(res => res.json())
       .then(data => {
         if (!cancelled && data.status === 'success') {
@@ -439,7 +439,7 @@ const ActionCard = React.memo(function ActionCard({
           </span>
           {comingSoon && (
             <span
-              className="inline-flex items-center h-[16px] px-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+              className="inline-flex items-center h-5 px-1.5 rounded-full text-xs font-semibold uppercase tracking-wide"
               style={{ color: 'var(--text-muted)', backgroundColor: 'color-mix(in srgb, var(--surface-soft) 70%, transparent)' }}
             >
               Bientôt
@@ -655,7 +655,7 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
             Récents
           </h2>
           <span
-            className="inline-flex items-center justify-center h-[16px] min-w-[16px] px-1 rounded-full text-[10px] font-semibold"
+            className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-xs font-semibold"
             style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)', color: 'var(--primary)' }}
           >
             {files.length}
@@ -690,11 +690,11 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
                   <span className="flex items-center justify-center flex-shrink-0">
                     <FileIcon filePath={f.path} size={14} />
                   </span>
-                  <span className="text-[13px] font-medium leading-tight truncate" style={{ color: 'var(--text)' }}>
+                  <span className="text-sm font-medium leading-tight truncate" style={{ color: 'var(--text)' }}>
                     {name}
                   </span>
                   {dir && (
-                    <span className="hidden lg:block text-[11px] leading-tight truncate ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>
+                    <span className="hidden lg:block text-xs leading-tight truncate ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>
                       {dir}
                     </span>
                   )}

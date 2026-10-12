@@ -313,7 +313,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
         {/* Filtre */}
         <div
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
-          style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-base)' }}
+          style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
         >
           <Search size={11} style={{ color: 'var(--text-dimmed)' }} />
           <input
@@ -344,7 +344,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
       <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border-base)' }}>
         <table className="w-full text-xs">
           <thead>
-            <tr style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+            <tr style={{ backgroundColor: 'var(--bg-secondary)' }}>
               {block.columns.map((col, i) => (
                 <th
                   key={i}
@@ -691,7 +691,7 @@ function CardRenderer({ block }: { block: CardBlock }) {
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
             style={{
-              backgroundColor: block.badge.color ? `${block.badge.color}22` : 'var(--bg-tertiary)',
+              backgroundColor: block.badge.color ? `${block.badge.color}22` : 'var(--bg-secondary)',
               color: block.badge.color ?? 'var(--accent-primary)',
               border: `1px solid ${block.badge.color ? `${block.badge.color}44` : 'var(--border-base)'}`,
             }}
@@ -746,7 +746,7 @@ function ListRenderer({ block }: { block: ListBlock }) {
           >
             <span
               className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
-              style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
+              style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent-primary)' }}
             >
               {block.ordered ? i + 1 : (item.icon ?? '•')}
             </span>
@@ -763,7 +763,7 @@ function ListRenderer({ block }: { block: ListBlock }) {
             {item.badge && (
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+                style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
               >
                 {item.badge}
               </span>
@@ -834,7 +834,7 @@ function CodeRenderer({ block }: { block: CodeBlock }) {
         {block.language && (
           <span
             className="text-xs font-mono px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent-primary)' }}
           >
             {block.language}
           </span>
@@ -898,7 +898,7 @@ function ProgressRenderer({ block }: { block: ProgressBlock }) {
               </div>
               <div
                 className="relative h-2 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                style={{ backgroundColor: 'var(--bg-secondary)' }}
               >
                 <div
                   className="h-full rounded-full"
@@ -1134,7 +1134,7 @@ function RichBlock({ block, index }: { block: RichBlock; index: number }) {
       >
         <span
           className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-primary)' }}
+          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent-primary)' }}
         >
           <BlockIcon type={block.type} />
           <BlockLabel type={block.type} />
@@ -1249,7 +1249,7 @@ function SaveModal({
           </label>
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-base)' }}
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
           >
             <FolderOpen size={13} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} />
             <input
@@ -1494,7 +1494,7 @@ export const RichDocumentViewer = memo(function RichDocumentViewer({ document, o
             <span
               key={type}
               className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+              style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
             >
               <BlockIcon type={type as RichBlockType} />
               {count}× <BlockLabel type={type as RichBlockType} />

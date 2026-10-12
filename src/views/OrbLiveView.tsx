@@ -154,13 +154,13 @@ export default function OrbLiveView() {
             </span>
             <div className="flex flex-col leading-none">
               <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{profile.aiName || 'Leanna'}</span>
-              <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.2em]" style={{ color: 'var(--text-dimmed)' }}>Présence vocale</span>
+              <span className="mt-0.5 text-xs font-medium uppercase tracking-[0.2em]" style={{ color: 'var(--text-dimmed)' }}>Présence vocale</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2" style={{ ['WebkitAppRegion' as never]: 'no-drag' }}>
             {connected && <span className="font-mono text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{elapsedLabel}</span>}
-            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
               style={{
                 backgroundColor: connected ? 'var(--color-success-subtle)' : connecting ? 'var(--color-warning-subtle)' : 'var(--bg-secondary)',
                 color: connected ? 'var(--color-success)' : connecting ? 'var(--color-warning)' : 'var(--text-dimmed)',
@@ -180,7 +180,7 @@ export default function OrbLiveView() {
               }}>
               <Activity className="h-4 w-4" />
               {!activityOpen && liveCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
                   style={{ backgroundColor: 'var(--accent-primary)', color: '#fff', boxShadow: '0 0 0 2px var(--bg-sidebar)' }}>
                   {liveCount}
                 </span>
@@ -300,7 +300,7 @@ export default function OrbLiveView() {
                 <>
                   {activeMissions.length > 0 && (
                     <section className="flex flex-col gap-2">
-                      <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                         <Target className="h-3 w-3" />Missions
                       </h3>
                       {activeMissions.map(m => (
@@ -311,7 +311,7 @@ export default function OrbLiveView() {
 
                   {sortedAgents.length > 0 && (
                     <section className="flex flex-col gap-2">
-                      <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                         <Bot className="h-3 w-3" />Agents
                       </h3>
                       <AnimatePresence initial={false}>
@@ -325,10 +325,10 @@ export default function OrbLiveView() {
                   {recentTools.length > 0 && (
                     <section className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                           <Wrench className="h-3 w-3" />Actions récentes
                         </h3>
-                        <span className="font-mono text-[11px]" style={{ color: 'var(--text-dimmed)' }}>{allToolsReversed.length}</span>
+                        <span className="font-mono text-xs" style={{ color: 'var(--text-dimmed)' }}>{allToolsReversed.length}</span>
                       </div>
                       <AnimatePresence initial={false}>
                         {recentTools.map(tool => (

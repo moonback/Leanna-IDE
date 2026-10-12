@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
-  History, RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
+  RefreshCw, Loader2, FlagTriangleRight, Search, Wrench,
   AlertTriangle, RotateCcw, CheckCircle2, CircleDot, Target, ShieldAlert,
   Pause, Play, XCircle, Trash2, ChevronLeft, ChevronRight, SkipBack, SkipForward,
   Copy, Check, Filter, Clock, Zap, Activity, X,
 } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { missionApi } from '../services/ideApi.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the MissionTimeTravel engine ────────────────────────
 
@@ -99,7 +100,7 @@ function humanDuration(startAt?: string, endAt?: string): string {
   } catch { return '—'; }
 }
 
-export default function MissionTimelineView() {
+export default function MissionTimelineView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const [missions, setMissions] = useState<MissionListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -256,24 +257,25 @@ export default function MissionTimelineView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        title="Mission Timeline"
-        icon={History}
-        description="Parcours chronologique d'une mission — clique une étape ou utilise le scrubber pour « voyager » dans le temps"
-        badge="Time Travel"
-        actions={
-          <button
-            type="button"
-            onClick={() => { void loadMissions(); if (selectedId) void loadTimeline(selectedId); }}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-60"
-            style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            Actualiser
-          </button>
-        }
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('mission-timeline')}
+          description="Parcours chronologique d'une mission — clique une étape ou utilise le scrubber pour « voyager » dans le temps"
+          badge="Time Travel"
+          actions={
+            <button
+              type="button"
+              onClick={() => { void loadMissions(); if (selectedId) void loadTimeline(selectedId); }}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-60"
+              style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Actualiser
+            </button>
+          }
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="mx-auto flex h-full w-full max-w-7xl gap-4 px-4 py-4 lg:px-6">

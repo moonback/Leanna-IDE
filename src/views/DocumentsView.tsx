@@ -20,6 +20,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
 import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -176,8 +177,7 @@ export default function DocumentsView() {
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Header */}
       <ViewHeader
-        icon={FileText}
-        title="Knowledge System"
+        {...viewHeaderProps('documents')}
         badge="Documents"
         description="Gérez vos documents, faits extraits et relations"
       />

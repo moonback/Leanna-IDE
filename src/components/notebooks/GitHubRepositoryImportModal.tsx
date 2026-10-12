@@ -621,7 +621,7 @@ export function GitHubRepositoryImportModal({
             {/* GitHub Auth Status Pill & Actions */}
             <div className="flex items-center gap-3">
               {authLoading ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-muted)]">
                   <Loader2 size={13} className="animate-spin" />
                   <span>Vérification...</span>
                 </div>
@@ -668,7 +668,7 @@ export function GitHubRepositoryImportModal({
             <div className="w-[44%] border-r border-[var(--border-base)] flex flex-col bg-[var(--bg-base)]">
               {/* Segmented Tab Controls */}
               <div className="p-4 pb-2 border-b border-[var(--border-base)]">
-                <div className="grid grid-cols-3 p-1 rounded-xl bg-[var(--bg-input)] border border-[var(--border-input)] text-xs font-medium">
+                <div className="grid grid-cols-3 p-1 rounded-xl bg-[var(--bg-input)] border border-[var(--border-base)] text-xs font-medium">
                   <button
                     onClick={() => setSourceTab('my_repos')}
                     className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
@@ -724,7 +724,7 @@ export function GitHubRepositoryImportModal({
                         value={myReposSearch}
                         onChange={e => setMyReposSearch(e.target.value)}
                         placeholder="Filtrer mes projets..."
-                        className="w-full pl-9 pr-8 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                        className="w-full pl-9 pr-8 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                       />
                       {myReposSearch && (
                         <button
@@ -825,7 +825,7 @@ export function GitHubRepositoryImportModal({
                             className={`p-3 rounded-xl border cursor-pointer transition-all ${
                               isSelected
                                 ? 'bg-[var(--accent-primary)]/10 border-[var(--accent-primary)]/60 shadow-sm'
-                                : 'bg-[var(--bg-surface)]/50 border-[var(--border-base)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-input)]'
+                                : 'bg-[var(--bg-surface)]/50 border-[var(--border-base)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-base)]'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
@@ -900,7 +900,7 @@ export function GitHubRepositoryImportModal({
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Rechercher sur GitHub (ex: langchain, fastify)..."
-                        className="w-full pl-9 pr-8 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                        className="w-full pl-9 pr-8 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                       />
                       {searchLoading && (
                         <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[var(--text-muted)]" />
@@ -939,7 +939,7 @@ export function GitHubRepositoryImportModal({
                           className={`p-3 rounded-xl border cursor-pointer transition-all ${
                             isSelected
                               ? 'bg-[var(--accent-primary)]/10 border-[var(--accent-primary)]/60 shadow-sm'
-                              : 'bg-[var(--bg-surface)]/50 border-[var(--border-base)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-input)]'
+                              : 'bg-[var(--bg-surface)]/50 border-[var(--border-base)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-base)]'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -1001,7 +1001,7 @@ export function GitHubRepositoryImportModal({
                             onChange={e => setDirectInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleInspectDirect()}
                             placeholder="https://github.com/mon-org/mon-projet-prive"
-                            className="w-full pl-9 pr-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                            className="w-full pl-9 pr-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                           />
                         </div>
                         <button
@@ -1130,7 +1130,7 @@ export function GitHubRepositoryImportModal({
                               value={newNotebookTitle}
                               onChange={e => setNewNotebookTitle(e.target.value)}
                               placeholder={`Import ${selectedRepo.repo}`}
-                              className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)]"
+                              className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)]"
                             />
                             <button
                               onClick={handleCreateNotebook}
@@ -1150,7 +1150,7 @@ export function GitHubRepositoryImportModal({
                         <select
                           value={selectedNotebookId || ''}
                           onChange={e => setSelectedNotebookId(e.target.value)}
-                          className="w-full px-3 py-2.5 rounded-xl text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-medium"
+                          className="w-full px-3 py-2.5 rounded-xl text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-medium"
                         >
                           {notebooks.length === 0 ? (
                             <option value="" disabled>Aucun notebook disponible</option>
@@ -1186,7 +1186,7 @@ export function GitHubRepositoryImportModal({
                               className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
                                 isActive
                                   ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-sm'
-                                  : 'bg-[var(--bg-input)] border-[var(--border-input)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                  : 'bg-[var(--bg-input)] border-[var(--border-base)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                               }`}
                             >
                               {preset.name}
@@ -1200,7 +1200,7 @@ export function GitHubRepositoryImportModal({
                         value={fileExtensions}
                         onChange={e => setFileExtensions(e.target.value)}
                         placeholder=".ts, .tsx, .py, .md, .json"
-                        className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                        className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                       />
 
                       {/* Aperçu des fichiers correspondants */}
@@ -1247,7 +1247,7 @@ export function GitHubRepositoryImportModal({
                           value={branch}
                           onChange={e => setBranch(e.target.value)}
                           placeholder={selectedRepo.default_branch || 'main'}
-                          className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)]"
+                          className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)]"
                         />
                       </div>
 
@@ -1371,7 +1371,7 @@ export function GitHubRepositoryImportModal({
                     value={tokenInput}
                     onChange={e => setTokenInput(e.target.value)}
                     placeholder="ghp_..."
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-[var(--bg-input)] border border-[var(--border-input)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-[var(--bg-input)] border border-[var(--border-base)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono"
                   />
                 </div>
 

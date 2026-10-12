@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  Users, Loader2, Network, AlertTriangle, Search, DraftingCompass, Code2,
+  Users, Loader2, AlertTriangle, Search, DraftingCompass, Code2,
   FlaskConical, ShieldCheck, Eye, Gauge, FileText, ArrowDown, Lightbulb,
   Copy, Check, RotateCcw, Sparkles, Play, LayoutList, GitBranch, History, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the SwarmComposer (agent_compose_swarm) ─────────────
 
@@ -40,7 +41,7 @@ const PRESETS: string[] = [
 
 type ViewMode = 'pipeline' | 'grouped';
 
-export default function AgentSwarmView() {
+export default function AgentSwarmView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const [objective, setObjective] = useState('');
@@ -86,7 +87,7 @@ export default function AgentSwarmView() {
       });
       const data = await res.json();
       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
-      navigate('/mission-timeline');
+      navigate(ROUTES.missionTimeline);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -126,23 +127,24 @@ export default function AgentSwarmView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        title="Agent Swarm"
-        icon={Network}
-        description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
-        badge="Composition"
-        actions={composition ? (
-          <button
-            type="button"
-            onClick={copyComposition}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copié' : 'Copier'}
-          </button>
-        ) : undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('agent-swarm')}
+          description="Leanna compose dynamiquement l'équipe d'agents adaptée à l'objectif, puis la dissout après la mission"
+          badge="Composition"
+          actions={composition ? (
+            <button
+              type="button"
+              onClick={copyComposition}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          ) : undefined}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -305,7 +307,7 @@ export default function AgentSwarmView() {
                             <div className="flex items-center gap-2.5">
                               <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 12%, transparent)` }}>
                                 <Icon size={15} style={{ color: meta.color }} />
-                                <span className="absolute -left-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: meta.color, color: 'var(--bg-base)' }}>{i + 1}</span>
+                                <span className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: meta.color, color: 'var(--bg-base)' }}>{i + 1}</span>
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">

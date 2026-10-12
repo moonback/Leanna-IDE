@@ -58,7 +58,7 @@ export function BrowserExtensionsMenu({
         <Puzzle size={13} style={{ color: count > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
         {count > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[9px] font-bold rounded-full"
+            className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-xs font-bold rounded-full"
             style={{
               minWidth: '14px',
               height: '14px',
@@ -112,7 +112,7 @@ export function BrowserExtensionsMenu({
                 <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }} title={ext.name}>
                   {ext.name}
                 </span>
-                <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }} title={ext.path}>
+                <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }} title={ext.path}>
                   v{ext.version}
                 </span>
               </div>

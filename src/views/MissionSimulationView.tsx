@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 
 // ─── Types mirrored from the MissionSimulator engine (mission_simulate) ──────
 
@@ -51,7 +52,7 @@ function formatDuration(ms: number): string {
   return m > 0 ? `${m}m${String(s % 60).padStart(2, '0')}` : `${s}s`;
 }
 
-export default function MissionSimulationView() {
+export default function MissionSimulationView({ embedded = false }: { embedded?: boolean }) {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   const [objective, setObjective] = useState('');
@@ -94,7 +95,7 @@ export default function MissionSimulationView() {
       });
       const data = await res.json();
       if (!res.ok || data?.error) { setError(data?.error ?? 'Échec du lancement.'); return; }
-      navigate('/mission-timeline');
+      navigate(ROUTES.missionTimeline);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -133,23 +134,24 @@ export default function MissionSimulationView() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        title="Simulation de mission"
-        icon={FlaskConical}
-        description="Prévisualise ce que Leanna ferait — fichiers, commandes, agents, coût, risque — avant d'exécuter réellement"
-        badge="Dry-run"
-        actions={report ? (
-          <button
-            type="button"
-            onClick={copyReport}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
-            style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copié' : 'Copier le rapport'}
-          </button>
-        ) : undefined}
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('mission-simulation')}
+          description="Prévisualise ce que Leanna ferait — fichiers, commandes, agents, coût, risque — avant d'exécuter réellement"
+          badge="Dry-run"
+          actions={report ? (
+            <button
+              type="button"
+              onClick={copyReport}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+              style={{ backgroundColor: 'var(--bg-input)', color: copied ? 'var(--color-success)' : 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copié' : 'Copier le rapport'}
+            </button>
+          ) : undefined}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

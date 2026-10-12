@@ -172,7 +172,7 @@ export function TokensSection() {
                 <input type="text" value={newKeyLabel} onChange={e => setNewKeyLabel(e.target.value)}
                   placeholder="Label (ex: Compte perso, Compte pro…)"
                   className="rounded-lg px-2.5 py-1.5 text-sm outline-none"
-                  style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }} />
+                  style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }} />
                 <SecretInput
                   value={newKeyValue}
                   onChange={setNewKeyValue}
@@ -207,7 +207,7 @@ export function TokensSection() {
             {geminiKeys.map((gk) => (
               <div key={gk.index} className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
                 style={{ 
-                  backgroundColor: gk.disabled ? 'color-mix(in srgb, var(--bg-primary) 50%, transparent)' : 'var(--bg-primary)', 
+                  backgroundColor: gk.disabled ? 'color-mix(in srgb, var(--bg-base) 50%, transparent)' : 'var(--bg-base)', 
                   border: '1px solid var(--border-base)',
                   opacity: gk.disabled ? 0.6 : 1,
                 }}>

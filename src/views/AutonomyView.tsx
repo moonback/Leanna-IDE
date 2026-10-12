@@ -19,6 +19,7 @@ import { AutonomyTimeline } from '../components/AutonomyTimeline.js';
 import { AutonomyLevelSelector } from '../components/autonomy/AutonomyLevelSelector.js';
 import { useSafeguardsConfig } from '../hooks/useSafeguardsConfig.js';
 import { usePendingApprovals, clearPendingApproval, type PendingApprovalInfo } from '../hooks/usePendingApprovals.js';
+import { viewHeaderProps } from '../config/navigation.js';
 
 const SAFEGUARD_LABELS: { key: 'autoCheckpoint' | 'postEditValidation' | 'criticalFileConfirm' | 'autoRestart'; label: string }[] = [
   { key: 'autoCheckpoint', label: 'Checkpoint auto' },
@@ -27,18 +28,19 @@ const SAFEGUARD_LABELS: { key: 'autoCheckpoint' | 'postEditValidation' | 'critic
   { key: 'autoRestart', label: 'Redémarrage contrôlé' },
 ];
 
-export default function AutonomyView() {
+export default function AutonomyView({ embedded = false }: { embedded?: boolean }) {
   const { config, update } = useSafeguardsConfig();
   const approvals = usePendingApprovals();
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
-      <ViewHeader
-        title="Centre de contrôle Autonomie"
-        icon={SlidersHorizontal}
-        description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
-        badge="En direct"
-      />
+      {!embedded && (
+        <ViewHeader
+          {...viewHeaderProps('autonomy')}
+          description="Niveau d'autonomie, approbations, garde-fous et activité du runtime — en un seul endroit"
+          badge="En direct"
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">

@@ -143,7 +143,7 @@ export function NotebookPickerModal({
   }, [filePath, fileName, onClose]);
 
   const handleDeleteNotebook = useCallback(async (notebookId: string, title: string) => {
-    // ← useConfirm() remplace window.confirm (lot 5b)
+    // ← useConfirm() remplace la confirmation native du navigateur (lot 5b)
     const ok = await confirm({
       title: 'Supprimer le notebook',
       message: `Supprimer le notebook « ${title} » et toutes ses sources ?`,
