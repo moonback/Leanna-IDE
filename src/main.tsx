@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+// import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
@@ -24,6 +26,8 @@ import { Loader2, X } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
 import { ROUTES } from './config/navigation.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
+import { GlobalCommandPalette } from './components/GlobalCommandPalette.js';
+import { ConnectionBanner } from './components/ui/ConnectionBanner.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -174,9 +178,9 @@ try {
     if (p.accentColor) document.documentElement.style.setProperty('--accent-primary', p.accentColor);
     if (p.fontFamily)  document.documentElement.style.setProperty('--font-sans', p.fontFamily);
   } else {
-    document.documentElement.setAttribute('data-theme', 'cyberpunk');
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
-} catch { document.documentElement.setAttribute('data-theme', 'cyberpunk'); }
+} catch { document.documentElement.setAttribute('data-theme', 'dark'); }
 
 // ── Sync profile to server on startup ──────────────────────────────────────
 // This ensures the WS session always uses the latest saved identity/voice.
@@ -496,7 +500,7 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path={ROUTES.home}    element={<Navigate to={ROUTES.ide} replace />} />
+        <Route path={ROUTES.home}          element={<Navigate to={ROUTES.ide} replace />} />
         <Route path={ROUTES.ide}           element={wrap(<IdeView />)} />
         <Route path={ROUTES.memories}      element={wrap(<MemoriesView />)} />
         <Route path={ROUTES.history}       element={wrap(<HistoryView />)} />
@@ -706,6 +710,7 @@ function Layout() {
           <NavSidebar />
           <main id="main-content" className="app-content" tabIndex={-1}>
             <IdeNavigationBridge />
+            <ConnectionBanner />
             <GlobalAgentStatusBar />
             <AnimatedRoutes />
           </main>
@@ -719,6 +724,8 @@ function Layout() {
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
         {/* Proposition d'ouvrir la vue des missions à la création d'une mission */}
         <MissionCreatedPrompt />
+        {/* Palette de commandes globale (Cmd/Ctrl+K) */}
+        <GlobalCommandPalette />
         {/* Écran de démarrage & sélection du projet (reprise auto, ouvrir, cloner, notebooks) */}
         <StartupProjectModal />
         {/* Assistant de première configuration des clés .env (après le splash) */}

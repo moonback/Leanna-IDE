@@ -31,6 +31,7 @@ export const RESPONSE_STYLES: { id: ResponseStyle; label: string; desc: string }
  * police native de l'OS.
  */
 export const FONTS: { id: string; label: string; value: string; desc: string }[] = [
+  { id: 'inter',  label: 'Inter',     value: '"Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif', desc: 'Moderne, très lisible (recommandé)' },
   { id: 'system', label: 'Système',   value: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', desc: 'Police native de l\'OS' },
   { id: 'arial',  label: 'Arial',     value: 'Arial, "Helvetica Neue", Helvetica, sans-serif',                       desc: 'Sans-serif classique' },
   { id: 'helvetica', label: 'Helvetica', value: '"Helvetica Neue", Helvetica, Arial, sans-serif',                    desc: 'Neutre & lisible' },

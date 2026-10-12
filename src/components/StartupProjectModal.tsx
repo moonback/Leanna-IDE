@@ -171,6 +171,12 @@ export function StartupProjectModal() {
     try {
       const wsData = await fetchWorkspaces();
       if (!wsData?.activeRoot) {
+        // Launcher déjà traité cette session (projet activé/fermé, ou Notebooks
+        // choisis) → le launcher automatique est un comportement une-fois-au-
+        // démarrage. On ne rouvre PLUS la modale sur simple navigation (ex. retour
+        // /pilotage → /ide). Les ouvertures explicites passent par handleOpenModal
+        // (événement Leanna-open-workspace-switcher) et ne sont pas affectées.
+        if (sessionStorage.getItem(LAUNCHER_DONE_KEY) === '1') { setIsOpen(false); return; }
         // Mode "sans projet" explicitement choisi (ex: Notebooks) → ne pas afficher
         if (sessionStorage.getItem(NO_WORKSPACE_KEY) === '1') { setIsOpen(false); return; }
         // Écran de démarrage : aucun projet actif → on propose la sélection.

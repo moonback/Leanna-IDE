@@ -109,6 +109,13 @@ export interface UserProfile {
 
 const STORAGE_KEY = 'Leanna_user_profile';
 
+// Font default migration — fontFamily is applied inline on <html> and overrides
+// any CSS, so changing the default alone is not enough: users who never picked a
+// font still carry the old Arial stack in localStorage. We migrate only that
+// exact old-default value (meaning "they never chose") to the new Inter stack.
+const OLD_DEFAULT_FONT = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
+const NEW_DEFAULT_FONT = '"Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
 const DEFAULT_PROFILE: UserProfile = {
   userName:      '',
   userRole:      '',
@@ -132,9 +139,9 @@ const DEFAULT_PROFILE: UserProfile = {
   openrouterModel:  'minimax/minimax-m3',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-3.6-flash-image',
-  theme:         'cyberpunk',
+  theme:         'dark',
   accentColor:   '#0ea5e9',
-  fontFamily:    'Arial, "Helvetica Neue", Helvetica, sans-serif',
+  fontFamily:    NEW_DEFAULT_FONT,
   floatingOrb:   false,
   compactPrompt: true,
   // Agents
@@ -157,7 +164,15 @@ const DEFAULT_PROFILE: UserProfile = {
 function load(): UserProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    if (raw) {
+      const stored = JSON.parse(raw);
+      // Only migrate the untouched old default — a user who actively chose Arial
+      // (or any other font) keeps their choice. The theme is NOT migrated: an
+      // existing user may have deliberately picked cyberpunk; only the default
+      // for brand-new profiles changes.
+      if (stored.fontFamily === OLD_DEFAULT_FONT) stored.fontFamily = NEW_DEFAULT_FONT;
+      return { ...DEFAULT_PROFILE, ...stored };
+    }
   } catch { /* ignore */ }
   return { ...DEFAULT_PROFILE };
 }

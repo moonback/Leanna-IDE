@@ -1,9 +1,10 @@
 @import "tailwindcss";
 @import "./styles/layers.css";
+@import "./styles/pro-polish.css";
 @theme {
   /* Typography */
---font-sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
---font-mono: "Courier New", Courier, monospace;
+--font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+--font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
 
 /* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
 --text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
@@ -74,6 +75,28 @@
   }
 
 }
+
+/* ═══════════════════════════════════════════════
+   SEMANTIC COLOR TOKENS → Tailwind utilities
+   Expose theme-aware CSS variables as Tailwind colors so
+   components can write `className="text-fg-muted bg-surface
+   border border-line"` instead of inline `style={{ color:
+   'var(--text-muted)' }}`. These map to the per-theme tokens
+   defined below, so they stay theme-aware automatically.
+═══════════════════════════════════════════════ */
+@theme inline {
+  --color-base:          var(--bg-base);
+  --color-surface:       var(--bg-secondary);
+  --color-elevated:      var(--bg-elevated);
+  --color-hover:         var(--bg-hover);
+  --color-line:          var(--border-base);
+  --color-line-strong:   var(--border-strong);
+  --color-fg:            var(--text-primary);
+  --color-fg-muted:      var(--text-muted);
+  --color-accent:        var(--accent-primary);
+  --color-accent-subtle: var(--accent-subtle);
+}
+
 /* New design variables for EmptyEditorState - Default fallback */
 :root {
   --bg: #f7f8fa;
