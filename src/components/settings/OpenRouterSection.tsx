@@ -180,6 +180,18 @@ export const OPENROUTER_IMAGE_MODELS = [
     free: false,
     desc: 'Recraft — qualité supérieure, rendu haute résolution et visuels professionnels.',
   },
+  {
+    id: 'bytedance-seed/seedream-5-0-flash',
+    name: 'seedream-5-0-flash',
+    free: false,
+    desc: 'seedream-5-0-flash — qualité supérieure, rendu haute résolution et visuels professionnels.',
+  },
+  {
+    id: 'inclusionai/ming-image-0.1-design',
+    name: 'ming-image-0.1-design',
+    free: false,
+    desc: 'ming-image-0.1-design — qualité supérieure, rendu haute résolution et visuels professionnels.',
+  },
 ];
 
 
@@ -187,6 +199,11 @@ export function OpenRouterSection() {
   const { profile, setField } = useProfile();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [testMessage, setTestMessage] = useState<string>('');
+  // Test du modèle d'image (indépendant du test texte).
+  const [testingImage, setTestingImage] = useState(false);
+  const [imageTestResult, setImageTestResult] = useState<'success' | 'error' | null>(null);
+  const [imageTestMessage, setImageTestMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [freeOnly, setFreeOnly] = useState(false);
 
@@ -210,12 +227,22 @@ export function OpenRouterSection() {
 
   const freeCount = useMemo(() => OPENROUTER_MODELS.filter(m => m.free).length, []);
 
-  // Réinitialise le résultat du test quand la clé ou le modèle change.
-  useEffect(() => { setTestResult(null); }, [profile.openrouterApiKey, profile.openrouterModel]);
+  // Réinitialise le résultat du test texte quand la clé ou le modèle change.
+  useEffect(() => {
+    setTestResult(null);
+    setTestMessage('');
+  }, [profile.openrouterApiKey, profile.openrouterModel]);
+
+  // Réinitialise le résultat du test image quand la clé ou le modèle image change.
+  useEffect(() => {
+    setImageTestResult(null);
+    setImageTestMessage('');
+  }, [profile.openrouterApiKey, profile.openrouterImageModel]);
 
   const testConnection = async () => {
     setTesting(true);
     setTestResult(null);
+    setTestMessage('');
     try {
       const res = await fetch('/api/openrouter/test', {
         method: 'POST',
@@ -226,11 +253,49 @@ export function OpenRouterSection() {
         }),
       });
       const data = await res.json();
-      setTestResult(data.status === 'success' ? 'success' : 'error');
-    } catch {
+      if (data.status === 'success') {
+        setTestResult('success');
+        const reply = typeof data.reply === 'string' ? data.reply.trim() : '';
+        setTestMessage(reply ? `Réponse : « ${reply.slice(0, 80)} »` : 'Le modèle a répondu.');
+      } else {
+        setTestResult('error');
+        setTestMessage(typeof data.error === 'string' ? data.error : 'Le modèle n\'a pas répondu.');
+      }
+    } catch (e: any) {
       setTestResult('error');
+      setTestMessage(e?.message || 'Connexion échouée.');
     } finally {
       setTesting(false);
+    }
+  };
+
+  const testImageModel = async () => {
+    setTestingImage(true);
+    setImageTestResult(null);
+    setImageTestMessage('');
+    try {
+      const res = await fetch('/api/openrouter/test-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: profile.openrouterApiKey,
+          model: profile.openrouterImageModel,
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setImageTestResult('success');
+        const size = typeof data.sizeKB === 'number' ? ` (${data.sizeKB} Ko)` : '';
+        setImageTestMessage(`Image générée avec succès${size}.`);
+      } else {
+        setImageTestResult('error');
+        setImageTestMessage(typeof data.error === 'string' ? data.error : 'La génération a échoué.');
+      }
+    } catch (e: any) {
+      setImageTestResult('error');
+      setImageTestMessage(e?.message || 'Génération échouée.');
+    } finally {
+      setTestingImage(false);
     }
   };
 
@@ -305,6 +370,14 @@ export function OpenRouterSection() {
                   )}
                 </motion.button>
               </div>
+              {testMessage && (
+                <p
+                  className="mt-1.5 text-xs leading-relaxed break-words"
+                  style={{ color: testResult === 'error' ? 'var(--color-error)' : 'var(--color-success)' }}
+                >
+                  {testResult === 'error' ? '⚠️ ' : '✓ '}{testMessage}
+                </p>
+              )}
             </Field>
 
             {/* Model Selector */}
@@ -435,6 +508,38 @@ export function OpenRouterSection() {
 
       {/* Image Model for Infographics */}
       <Field label="🖼️ Modèle d'infographie" hint="Modèle OpenRouter utilisé pour la génération d'images/infographies dans les notebooks.">
+        {/* Bouton de test du modèle image sélectionné */}
+        <div className="mb-2 flex items-center gap-2">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.95 }}
+            onClick={testImageModel}
+            disabled={testingImage || !profile.openrouterImageModel?.trim()}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ backgroundColor: imageTestResult === 'success' ? 'var(--color-success)' : imageTestResult === 'error' ? 'var(--color-error)' : 'var(--accent-primary)' }}
+          >
+            {testingImage ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }} className="h-3 w-3 rounded-full border-2 border-white border-t-transparent" />
+            ) : imageTestResult === 'success' ? (
+              <><Check size={12} /> OK</>
+            ) : imageTestResult === 'error' ? (
+              <><AlertCircle size={12} /> Erreur</>
+            ) : (
+              'Tester le modèle image'
+            )}
+          </motion.button>
+          {testingImage && (
+            <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Génération d'une image de test…</span>
+          )}
+        </div>
+        {imageTestMessage && (
+          <p
+            className="mb-2 text-xs leading-relaxed break-words"
+            style={{ color: imageTestResult === 'error' ? 'var(--color-error)' : 'var(--color-success)' }}
+          >
+            {imageTestResult === 'error' ? '⚠️ ' : '✓ '}{imageTestMessage}
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-1.5 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
           {OPENROUTER_IMAGE_MODELS.map(model => {
             const active = profile.openrouterImageModel === model.id;
