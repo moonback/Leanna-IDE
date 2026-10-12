@@ -45,7 +45,7 @@ function useGitInfo() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/git/status')
+    fetch('/api/github/status')
       .then(res => res.json())
       .then(data => {
         if (!cancelled && data.status === 'success') {
