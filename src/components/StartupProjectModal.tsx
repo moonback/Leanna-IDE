@@ -625,7 +625,7 @@ export function StartupProjectModal() {
                 <img src={logo} alt="Leanna" className="w-10 h-10 object-contain" draggable={false} />
               </motion.div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] leading-none mb-1" style={{ color: 'var(--accent-primary)' }}>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] leading-none mb-1" style={{ color: 'var(--accent-primary)' }}>
                   Workspace
                 </p>
                 <h2 id="workspace-modal-title" className="text-sm font-black tracking-tight leading-none" style={{ color: 'var(--text-primary)' }}>
@@ -636,7 +636,7 @@ export function StartupProjectModal() {
 
             {/* Tabs */}
             <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-              <p className="text-[10px] font-semibold uppercase tracking-widest mb-3 px-2" style={{ color: 'var(--text-dimmed)' }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3 px-2" style={{ color: 'var(--text-dimmed)' }}>
                 Ouvrir un projet
               </p>
               {visibleTabs.map((tab) => {
@@ -678,7 +678,7 @@ export function StartupProjectModal() {
                     </div>
                     <div className="relative z-10 min-w-0">
                       <p className="text-xs font-semibold leading-none mb-0.5">{tab.label}</p>
-                      <p className="text-[10px] leading-none" style={{ color: active ? 'color-mix(in srgb, var(--accent-primary) 70%, var(--text-muted))' : 'var(--text-dimmed)' }}>
+                      <p className="text-xs leading-none" style={{ color: active ? 'color-mix(in srgb, var(--accent-primary) 70%, var(--text-muted))' : 'var(--text-dimmed)' }}>
                         {tab.description}
                       </p>
                     </div>
@@ -721,7 +721,7 @@ export function StartupProjectModal() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium leading-none mb-0.5" style={{ color: 'var(--color-success)' }}>Projet actif · rouvrir</p>
+                    <p className="text-xs font-medium leading-none mb-0.5" style={{ color: 'var(--color-success)' }}>Projet actif · rouvrir</p>
                     <p className="text-xs font-semibold truncate leading-none" style={{ color: 'var(--text-primary)' }}>
                       {currentPath.split(/[\\/]/).pop()}
                     </p>
@@ -754,7 +754,7 @@ export function StartupProjectModal() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold leading-none mb-0.5">Notebooks</p>
-                  <p className="text-[10px] leading-none" style={{ color: 'var(--text-dimmed)' }}>
+                  <p className="text-xs leading-none" style={{ color: 'var(--text-dimmed)' }}>
                     Chat & sources, sans projet
                   </p>
                 </div>
@@ -806,7 +806,7 @@ export function StartupProjectModal() {
                   exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-1" style={{ color: 'var(--accent-primary)' }}>
+                  <p className="text-xs font-bold uppercase tracking-[0.15em] mb-1" style={{ color: 'var(--accent-primary)' }}>
                     {activeTab === 'recent' ? `${workspaces.length} workspace${workspaces.length !== 1 ? 's' : ''}` :
                      activeTab === 'open'   ? 'Parcourir le système' :
                      'Intégration Git'}
@@ -828,7 +828,7 @@ export function StartupProjectModal() {
                     borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
                   }}
                 >
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                  <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Reprise de <strong className="font-semibold truncate max-w-[120px]">{lastWorkspace.name}</strong> dans
                     <strong className="font-mono text-xs">{countdown}s</strong>
@@ -836,7 +836,7 @@ export function StartupProjectModal() {
                   <button
                     type="button"
                     onClick={cancelAutoReopen}
-                    className="px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors"
+                    className="px-2 py-0.5 rounded-md text-xs font-semibold transition-colors"
                     style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                   >
                     Annuler
@@ -844,7 +844,7 @@ export function StartupProjectModal() {
                 </motion.div>
               ) : (
                 <span
-                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border"
                   style={{
                     backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)',
                     borderColor: 'color-mix(in srgb, var(--color-success) 25%, transparent)',
@@ -939,24 +939,24 @@ export function StartupProjectModal() {
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ws.name}</span>
                                   {isActive && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
                                       style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>
                                       Actif
                                     </span>
                                   )}
                                   {ws.isGit && (
-                                    <span className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                    <span className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
                                       style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}>
                                       <GitBranch className="w-2.5 h-2.5" />
                                       {ws.gitBranch || 'main'}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>{ws.path}</p>
+                                <p className="text-xs font-mono truncate" style={{ color: 'var(--text-dimmed)' }}>{ws.path}</p>
                               </div>
                               {/* Actions */}
                               <div className="flex items-center gap-2 flex-shrink-0 relative z-10">
-                                <span className="text-[10px] items-center gap-1 hidden sm:flex" style={{ color: 'var(--text-dimmed)' }}>
+                                <span className="text-xs items-center gap-1 hidden sm:flex" style={{ color: 'var(--text-dimmed)' }}>
                                   <Clock className="w-3 h-3" />{formatDate(ws.lastOpened)}
                                 </span>
                                 <button type="button" onClick={e => handleDeleteWorkspace(e, ws.id)}
@@ -1096,7 +1096,7 @@ export function StartupProjectModal() {
                     {/* Divider */}
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
-                      <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--text-dimmed)' }}>ou</span>
+                      <span className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-dimmed)' }}>ou</span>
                       <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
                     </div>
 
@@ -1121,7 +1121,7 @@ export function StartupProjectModal() {
                         </div>
                         <div className="text-left">
                           <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Nouveau projet vide</p>
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sélectionner un dossier existant</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Sélectionner un dossier existant</p>
                         </div>
                       </motion.button>
                     )}
@@ -1196,11 +1196,11 @@ export function StartupProjectModal() {
                             <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
                           </div>
                           <Terminal className="w-3 h-3 ml-1" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                          <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>git clone</span>
+                          <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>git clone</span>
                           <div className="ml-auto flex items-center gap-1.5">
-                            {cloneStatus === 'cloning' && <><Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--accent-primary)' }} /><span className="text-[10px]" style={{ color: 'var(--accent-primary)' }}>En cours…</span></>}
-                            {cloneStatus === 'done' && <><CheckCircle2 className="w-3 h-3 text-emerald-400" /><span className="text-[10px] text-emerald-400">Terminé</span></>}
-                            {cloneStatus === 'error' && <><AlertCircle className="w-3 h-3 text-red-400" /><span className="text-[10px] text-red-400">Erreur</span></>}
+                            {cloneStatus === 'cloning' && <><Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--accent-primary)' }} /><span className="text-xs" style={{ color: 'var(--accent-primary)' }}>En cours…</span></>}
+                            {cloneStatus === 'done' && <><CheckCircle2 className="w-3 h-3 text-emerald-400" /><span className="text-xs text-emerald-400">Terminé</span></>}
+                            {cloneStatus === 'error' && <><AlertCircle className="w-3 h-3 text-red-400" /><span className="text-xs text-red-400">Erreur</span></>}
                           </div>
                         </div>
                         <div className="max-h-44 overflow-y-auto p-4 space-y-0.5 font-mono text-xs leading-relaxed" style={{ backgroundColor: '#080a0f' }}>
@@ -1232,7 +1232,7 @@ export function StartupProjectModal() {
                           <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
                             Cloner depuis GitHub, GitLab ou autre
                           </p>
-                          <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                             Le dépôt sera téléchargé et chargé automatiquement comme workspace actif.
                           </p>
                         </div>

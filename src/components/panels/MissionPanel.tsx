@@ -1366,7 +1366,7 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
                 <DollarSign size={10} />
                 <span className="text-xs font-bold">{fmtCost(plan.estimatedCostUsd)}</span>
               </div>
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Coût estimé</span>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Coût estimé</span>
             </div>
           )}
 
@@ -1377,7 +1377,7 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
                 <Timer size={10} />
                 <span className="text-xs font-bold">{fmtDuration(plan.estimatedDurationMs)}</span>
               </div>
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Durée estimée</span>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Durée estimée</span>
             </div>
           )}
 
@@ -1388,7 +1388,7 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
                 <Shield size={10} />
                 <span className="text-xs font-bold">{riskConfig[plan.riskLevel].label}</span>
               </div>
-              <span className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Risque</span>
+              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Risque</span>
             </div>
           )}
         </div>
@@ -1411,7 +1411,7 @@ function MissionPlanSummary({ plan }: { plan: MissionPlan }) {
               }}
             />
           </div>
-          <span className="text-[10px] font-mono" style={{ color: 'var(--text-dimmed)', flexShrink: 0 }}>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)', flexShrink: 0 }}>
             {Math.round(plan.estimationConfidence * 100)}% confiance
           </span>
         </div>

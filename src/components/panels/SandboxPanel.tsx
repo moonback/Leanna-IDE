@@ -876,7 +876,7 @@ function ActionRow({ icon, label, color, onClick, busy, tooltip, transition }: {
         <span className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr]">
           <span className="overflow-hidden">
             <span
-              className="mt-0.5 block text-[11px] leading-snug opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+              className="mt-0.5 block text-xs leading-snug opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
               style={{ color: 'var(--text-muted)' }}
             >
               {tooltip}

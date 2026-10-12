@@ -564,7 +564,7 @@ export function PromptsSection() {
                     </span>
                     {typeof f.tokens === 'number' && (
                       <span
-                        className="flex items-center gap-0.5 text-[10px] font-mono tabular-nums"
+                        className="flex items-center gap-0.5 text-xs font-mono tabular-nums"
                         style={{ color: 'var(--text-dimmed)' }}
                         title={`${formatExactTokenCount(f.tokens)} tokens estimés`}
                       >

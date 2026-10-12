@@ -647,7 +647,7 @@ function InputArea({ connected, onConnect: _onConnect, isBusy, onSend, onDocumen
           >
             {/* Header */}
             <div
-              className="flex items-center gap-1.5 mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest"
+              className="flex items-center gap-1.5 mb-2 px-0.5 text-xs font-semibold uppercase tracking-widest"
               style={{ color: 'var(--accent-primary)', opacity: 0.75 }}
             >
               <Sparkles size={9} />

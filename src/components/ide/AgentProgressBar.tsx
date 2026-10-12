@@ -266,7 +266,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
                 </span>
               </div>
               {/* Résumé compact : progression + outils actifs. Ex. « 8/14 étapes · 2 outils actifs » */}
-              <div className="text-[10px] leading-tight truncate font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+              <div className="text-xs leading-tight truncate font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
                 {total > 0 && <>{doneCount}/{total} étapes</>}
                 {activeCount > 0 && <> · {activeCount} outil{activeCount > 1 ? 's' : ''} actif{activeCount > 1 ? 's' : ''}</>}
               </div>
@@ -276,7 +276,7 @@ export function AgentProgressBar({ steps, connected, onClear, reasoning }: Agent
               <span className="text-xs font-medium truncate" style={{ color: errorCount > 0 ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
                 {errorCount > 0 ? 'Terminé avec erreurs' : 'Terminé'}
               </span>
-              <span className="text-[10px] truncate font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs truncate font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
                 {doneSummary}
               </span>
             </div>

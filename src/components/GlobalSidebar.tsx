@@ -316,7 +316,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   <span className="block truncate text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                     Leanna{mode === 'ide' ? ' · IDE' : ''}
                   </span>
-                  <span className="block truncate text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+                  <span className="block truncate text-xs font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
                     {mode === 'ide' ? 'Espace de travail' : 'Centre de pilotage'}
                   </span>
                 </span>
@@ -522,7 +522,7 @@ function Group({
           aria-expanded={open}
           className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1.5 pt-3 text-left ${FOCUS_RING}`}
         >
-          <span className="text-[11px] font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
             {label}
           </span>
           <motion.span
@@ -875,7 +875,7 @@ function IdeAssistantBlock({
                 onClick={() => { if (!current) onToggleMode?.(); }}
                 aria-pressed={current}
                 title={m === 'full' ? 'Mode complet' : 'Mode question'}
-                className={`relative rounded px-2 py-0.5 text-[10px] font-semibold ${FOCUS_RING}`}
+                className={`relative rounded px-2 py-0.5 text-xs font-semibold ${FOCUS_RING}`}
                 style={{ color: current ? 'var(--text-primary)' : 'var(--text-dimmed)' }}
               >
                 {current && (

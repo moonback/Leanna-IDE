@@ -193,7 +193,7 @@ export function PromptInspectorPanel({
                     {tab.icon}
                     {tab.label}
                     <span
-                      className="px-1.5 py-0.5 rounded-full text-[10px] leading-none"
+                      className="px-1.5 py-0.5 rounded-full text-xs leading-none"
                       style={{
                         backgroundColor: 'var(--bg-active)',
                         color: 'var(--text-dimmed)',

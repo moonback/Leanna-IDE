@@ -307,7 +307,7 @@ export default function AgentSwarmView({ embedded = false }: { embedded?: boolea
                             <div className="flex items-center gap-2.5">
                               <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 12%, transparent)` }}>
                                 <Icon size={15} style={{ color: meta.color }} />
-                                <span className="absolute -left-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: meta.color, color: 'var(--bg-base)' }}>{i + 1}</span>
+                                <span className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: meta.color, color: 'var(--bg-base)' }}>{i + 1}</span>
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
