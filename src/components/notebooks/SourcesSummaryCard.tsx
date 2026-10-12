@@ -519,7 +519,7 @@ export function SourcesSummaryCard({
           border-radius: 0.65rem;
           background: color-mix(
             in srgb,
-            var(--bg-primary) 70%,
+            var(--bg-base) 70%,
             var(--bg-panel) 30%
           );
         }

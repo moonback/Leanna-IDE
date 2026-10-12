@@ -1347,7 +1347,7 @@ export default function IdeView() {
           fallback={
             <div
               className="fixed inset-0 z-50 flex items-center justify-center"
-              style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)' }}
+              style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)' }}
             >
               Chargement de la comparaison...
             </div>

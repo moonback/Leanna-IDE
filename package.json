@@ -13,14 +13,14 @@
     "desktop": "concurrently --kill-others --names dev,desktop --success command-desktop \"npm run dev\" \"node scripts/start-desktop.cjs\"",
     "desktop:debug": "concurrently --kill-others --names dev,desktop --success command-desktop \"npm run dev\" \"node scripts/start-desktop.cjs --debug\"",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node -e \"for (const p of ['dist','server.js']) require('fs').rmSync(p,{recursive:true,force:true})\"",
     "lint": "node scripts/lint.cjs",
     "lint:eslint": "eslint .",
     "lint:eslint:fix": "eslint . --fix",
     "lint:eslint:notebooks": "eslint \"src/components/notebooks/**/*.{ts,tsx}\" --max-warnings=-1",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "test": "node --import tsx --test server/**/*.test.ts",
+    "test": "node --import tsx --test \"server/**/*.test.ts\"",
     "test:ui": "vitest run --config vitest.config.ts",
     "test:ui:watch": "vitest --config vitest.config.ts",
     "test:soak": "cross-env LEANNA_SOAK=1 node --import tsx --test server/autonomy/TaskManager.soak.test.ts",
@@ -35,7 +35,7 @@
   },
   "build": {
     "appId": "com.Leanna.os",
-    "productName": "Leanna ",
+    "productName": "Leanna",
     "directories": {
       "output": "release"
     },
@@ -65,7 +65,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Leanna "
+      "shortcutName": "Leanna"
     }
   },
   "dependencies": {
@@ -111,6 +111,7 @@
     "typescript": "^5.0.0",
     "web-tree-sitter": "^0.27.0",
     "ws": "^8.21.0",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -109,7 +109,7 @@ export function DiffViewer({ filePath, currentContent, theme = 'vs-dark', onClos
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col"
-      style={{ backgroundColor: 'var(--bg-main)' }}
+      style={{ backgroundColor: 'var(--bg-base)' }}
     >
       {/* Header */}
       <div

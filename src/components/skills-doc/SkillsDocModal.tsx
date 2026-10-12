@@ -31,7 +31,7 @@ export function SkillsDocModal({ isOpen, onClose, initialToolName }: SkillsDocMo
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="w-full max-w-8xl max-h-[92vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden"
             style={{
-              backgroundColor: 'var(--bg-primary)',
+              backgroundColor: 'var(--bg-base)',
               borderColor: 'var(--border-strong, var(--border-base))',
             }}
           >

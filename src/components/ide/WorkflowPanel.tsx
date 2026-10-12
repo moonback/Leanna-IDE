@@ -415,7 +415,7 @@ export function WorkflowPanel({ onClose }: WorkflowPanelProps) {
                           {/* Description */}
                           {wf.description && (
                             <p className="text-xs leading-relaxed pl-1 py-1.5 px-2.5 rounded-md"
-                              style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-primary)' }}>
+                              style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-base)' }}>
                               {wf.description}
                             </p>
                           )}

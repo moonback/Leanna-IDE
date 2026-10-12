@@ -19,12 +19,13 @@
  * ViewHeader — c'est PilotageView qui fournit le header partagé.
  */
 
-import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard, Milestone, FlaskConical, Network,
   HelpCircle, Gauge, Loader2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Tabs } from '../components/ui/Tabs.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 
@@ -52,7 +53,7 @@ const DEFAULT_TAB: PilotageTab = 'tableau-de-bord';
 const TABS: Array<{
   value: PilotageTab;
   label: string;
-  icon: React.FC<{ size?: number }>;
+  icon: LucideIcon;
   description: string;
 }> = [
   {

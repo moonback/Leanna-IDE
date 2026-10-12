@@ -281,7 +281,7 @@ export function SystemHealthDashboard({ onClose }: SystemHealthDashboardProps) {
         className="flex items-center justify-between gap-2 px-3 py-2 flex-shrink-0"
         style={{
           borderBottom: '1px solid var(--border-base)',
-          backgroundColor: 'var(--bg-panel-alt)',
+          backgroundColor: 'var(--bg-panel)',
         }}
       >
         <div className="flex items-center gap-2">

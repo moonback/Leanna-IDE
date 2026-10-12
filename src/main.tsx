@@ -442,7 +442,7 @@ function ScreenShareSourcePicker() {
 
 function LoadingFallback() {
   return (
-    <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Chargement…</span>

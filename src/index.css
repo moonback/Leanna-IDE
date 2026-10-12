@@ -205,8 +205,6 @@
   --surface: var(--bg-secondary);
   --surface-soft: var(--bg-elevated);
   --text: var(--text-primary);
-  --text-secondary: #c4c4cc;
-  --text-muted: #8a8a95;
   --primary: var(--accent-primary);
   --primary-dark: #4d8ae8;
   --border: var(--border-base);
@@ -250,11 +248,11 @@
   --accent-hover:    #1d4ed8;
   --accent-subtle:   rgba(37, 99, 235, 0.08);
   --accent-glow:     rgba(37, 99, 235, 0.18);
-  --accent-secondary: #f59e0b;
+  --accent-secondary: #cc8308;
 
   /* Semantic colours — vibrant but readable */
-  --color-success:  #059669;
-  --color-warning:  #d97706;
+  --color-success:  #05875f;
+  --color-warning:  #b16105;
   --color-error:    #dc2626;
   --color-info:     #2563eb;
 
@@ -321,8 +319,6 @@
   --surface: #ffffff;
   --surface-soft: #f1f3f7;
   --text: #111827;
-  --text-secondary: #667085;
-  --text-muted: #98a2b3;
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
   --border: rgba(37, 99, 235, 0.1);
@@ -455,15 +451,15 @@
   --text-muted:     #85694b;
   --text-dimmed:    #7d6444;  /* WCAG AA: ~4.7:1 on #fbf0d9 (was #a88c6b ~2.8:1) */
 
-  --accent-primary:  #b58900;
+  --accent-primary:  #8a6800;
   --accent-hover:    #cb4b16;
   --accent-subtle:   rgba(181, 137, 0, 0.12);
   --accent-glow:     rgba(181, 137, 0, 0.25);
-  --accent-secondary: #d33682;
+  --accent-secondary: #c92c78;
 
-  --color-success:  #859900;
-  --color-warning:  #b58900;
-  --color-error:    #dc322f;
+  --color-success:  #667500;
+  --color-warning:  #8a6800;
+  --color-error:    #d32724;
   --color-info:     #268bd2;
 
   /* Semantic colours — subtle variants (12% opacity backgrounds) */
