@@ -67,6 +67,28 @@ export function DataSection() {
     finally { setClearingMemory(false); setConfirmMemory(false); }
   };
 
+  // Effacement complet du stockage local (localStorage) du navigateur.
+  const [clearingLocal, setClearingLocal] = useState(false);
+  const [confirmLocal, setConfirmLocal] = useState(false);
+  const [localResult, setLocalResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleClearLocalStorage = () => {
+    setClearingLocal(true); setLocalResult(null);
+    try {
+      const count = localStorage.length;
+      localStorage.clear();
+      try { sessionStorage.clear(); } catch { /* best-effort */ }
+      setLocalResult({ type: 'success', message: `${count} clé(s) effacée(s). Rechargement…` });
+      // Le profil, le thème, le token et l'état de session viennent d'être
+      // supprimés : on recharge pour repartir d'un état propre et cohérent.
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e: any) {
+      setLocalResult({ type: 'error', message: e?.message || 'Impossible d\'effacer le stockage local' });
+      setClearingLocal(false);
+      setConfirmLocal(false);
+    }
+  };
+
   const handleClearSelected = async () => {
     setClearingSel(true); setSelResult(null);
     try {
@@ -231,6 +253,44 @@ export function DataSection() {
               className="rounded-lg px-3 py-2 text-xs font-medium"
               style={{ backgroundColor: selResult.type === 'success' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: selResult.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }}>
               {selResult.type === 'success' ? '✓' : '✗'} {selResult.message}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--border-base)' }} />
+
+        <Field label="Stockage local du navigateur" hint="Efface tout le localStorage (profil, thème, token d'accès, préférences, état de session). L'application se recharge ensuite. Irréversible.">
+          {!confirmLocal ? (
+            <motion.button type="button" onClick={() => setConfirmLocal(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-200"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 30%, transparent)', color: 'var(--color-error)' }}>
+              <Trash2 className="h-3.5 w-3.5" /> Effacer tout le stockage local
+            </motion.button>
+          ) : (
+            <div className="rounded-xl p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, var(--bg-secondary))', border: '1px solid color-mix(in srgb, var(--color-error) 40%, transparent)' }}>
+              <p className="mb-3 text-xs font-medium" style={{ color: 'var(--color-error)' }}>
+                ⚠️ Tout le stockage local sera effacé (profil, thème, token d'accès, préférences). L'application se rechargera.
+              </p>
+              <div className="flex gap-2">
+                <motion.button type="button" onClick={handleClearLocalStorage} disabled={clearingLocal} whileTap={{ scale: 0.97 }}
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-error)' }}>
+                  {clearingLocal ? 'Effacement…' : 'Confirmer'}
+                </motion.button>
+                <motion.button type="button" onClick={() => { setConfirmLocal(false); setLocalResult(null); }} disabled={clearingLocal} whileTap={{ scale: 0.97 }}
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}>
+                  Annuler
+                </motion.button>
+              </div>
+            </div>
+          )}
+        </Field>
+        <AnimatePresence>
+          {localResult && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              className="rounded-lg px-3 py-2 text-xs font-medium"
+              style={{ backgroundColor: localResult.type === 'success' ? 'color-mix(in srgb, var(--color-success) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: localResult.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }}>
+              {localResult.type === 'success' ? '✓' : '✗'} {localResult.message}
             </motion.div>
           )}
         </AnimatePresence>
