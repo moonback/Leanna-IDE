@@ -13,17 +13,46 @@ export interface AuthResult {
   error?: string;
 }
 
-export function authenticateRequest(req: { headers?: Record<string, string | string[] | undefined> }, options: AuthOptions = {}): AuthResult {
+/** Extrait le cookie `Leanna_token` d'un en-tête Cookie brut, s'il existe. */
+function readTokenCookie(cookieHeader: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+  if (!raw) return undefined;
+  for (const part of raw.split(';')) {
+    const [name, ...rest] = part.trim().split('=');
+    if (name === 'Leanna_token') return decodeURIComponent(rest.join('='));
+  }
+  return undefined;
+}
+
+export function authenticateRequest(
+  req: {
+    headers?: Record<string, string | string[] | undefined>;
+    query?: Record<string, unknown>;
+  },
+  options: AuthOptions = {},
+): AuthResult {
   const configuredToken = options.apiToken;
   if (!configuredToken) {
     return { ok: true };
   }
 
+  // Priorité à l'en-tête (chemin standard du fetch applicatif). Repli sur le
+  // cookie httpOnly `Leanna_token` et sur le paramètre de requête `?token=` :
+  // ces deux canaux couvrent les chargements de ressources natifs (ex. <img
+  // src>, <audio>, téléchargements) qui ne peuvent pas poser d'en-tête custom.
+  // Ils sont déjà acceptés par les handshakes WebSocket (voir authenticateToken).
   // Note: Node/Express always lowercases header names in req.headers
   const headerValue = req.headers?.['x-leanna-token'];
-  const token = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
-  if (token === configuredToken) {
+  const queryValue = req.query?.token;
+  const queryToken = Array.isArray(queryValue)
+    ? (queryValue[0] as string | undefined)
+    : (typeof queryValue === 'string' ? queryValue : undefined);
+
+  const cookieToken = readTokenCookie(req.headers?.cookie);
+
+  if (headerToken === configuredToken || queryToken === configuredToken || cookieToken === configuredToken) {
     return { ok: true };
   }
 

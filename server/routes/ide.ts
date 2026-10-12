@@ -624,6 +624,19 @@ function getWorkspaceRoot(_req: Request): string {
 }
 
 function resolveRequestedWritePath(requestedPath: string): { ok: boolean; absolutePath: string; status?: number; error?: string } {
+  // Hors sandbox : écrire dans le workspace par défaut (cohérent avec les
+  // lectures via getWorkspaceRoot). Auparavant on passait TOUJOURS par le garde
+  // sandbox, qui lève SANDBOX_NOT_READY → 503 quand aucun sandbox n'est actif,
+  // faisant échouer « Importer dans le workspace » tant qu'aucun sandbox n'était
+  // ouvert.
+  if (!isSandboxActive()) {
+    const result = resolveWorkspacePath(requestedPath, getDefaultWorkspaceRoot());
+    if (!result.ok) {
+      return { ok: false, absolutePath: "", status: result.status, error: result.error };
+    }
+    return { ok: true, absolutePath: result.absolutePath };
+  }
+
   try {
     return { ok: true, absolutePath: assertSafeSandboxPath(requestedPath) };
   } catch (error: any) {

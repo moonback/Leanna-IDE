@@ -6,6 +6,23 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Lightbulb, Download, Folder, Brain } from 'lucide-react';
 
+/**
+ * Ajoute le token d'API en paramètre de requête aux URL d'images servies par
+ * le serveur. Les balises <img> natives ne passent pas par le wrapper fetch de
+ * main.tsx et ne peuvent pas poser l'en-tête `x-leanna-token` ; sans token en
+ * query, la route /api/* protégée répond 401. Les sources `data:` (base64) et
+ * les URL absolues externes sont laissées intactes.
+ */
+function withApiToken(url: string): string {
+  if (!url.startsWith('/api/')) return url;
+  const token = (() => {
+    try { return localStorage.getItem('Leanna_api_token'); } catch { return null; }
+  })();
+  if (!token) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}token=${encodeURIComponent(token)}`;
+}
+
 /** Render infographic content — affiche l'image PNG directement */
 export function renderInfographicContent(content: string): JSX.Element {
   let imageSrc = '';
@@ -21,7 +38,7 @@ export function renderInfographicContent(content: string): JSX.Element {
       // persisté dans le notebook). Repli sur le base64 pour les anciens
       // documents générés avant cette migration.
       if (data.imageUrl) {
-        imageSrc = data.imageUrl;
+        imageSrc = withApiToken(data.imageUrl);
       } else if (data.imageBase64) {
         imageSrc = `data:${data.mediaType};base64,${data.imageBase64}`;
       }
