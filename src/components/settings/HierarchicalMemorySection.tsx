@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useConfirm } from '../ui/ConfirmDialog.js';
 import {
   Layers, Database, Clock, HardDrive, Cloud, ArrowUpRight,
   Search, Plus, Trash2, RefreshCw, Tag, CheckCircle2,
@@ -55,6 +56,7 @@ const TIER_COLORS: Record<HierarchicalTier, { bg: string; border: string; text: 
 };
 
 export function HierarchicalMemorySection() {
+  const { confirm } = useConfirm();
   const [stats, setStats] = useState<HierarchicalStats | null>(null);
   const [items, setItems] = useState<HierarchicalMemoryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -201,7 +203,13 @@ export function HierarchicalMemorySection() {
 
   // Supprimer une entrée
   const handleDelete = async (tier: HierarchicalTier, id: string) => {
-    if (!window.confirm('Voulez-vous vraiment supprimer cette mémoire ?')) return;
+    const ok = await confirm({
+      title: 'Supprimer la mémoire',
+      message: 'Voulez-vous vraiment supprimer cette mémoire ?',
+      confirmLabel: 'Supprimer',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/memory/hierarchical/${tier}/${encodeURIComponent(id)}`, {
         method: 'DELETE',
@@ -222,7 +230,13 @@ export function HierarchicalMemorySection() {
   // Nettoyer un palier
   const handleClearTier = async (tier: HierarchicalTier) => {
     const tierName = TIER_COLORS[tier].label;
-    if (!window.confirm(`Voulez-vous vraiment vider toutes les mémoires de '${tierName}' ? Cette action est irréversible.`)) return;
+    const ok = await confirm({
+      title: 'Vider le palier',
+      message: `Voulez-vous vraiment vider toutes les mémoires de '${tierName}' ? Cette action est irréversible.`,
+      confirmLabel: 'Tout vider',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/memory/hierarchical/${tier}/clear`, {

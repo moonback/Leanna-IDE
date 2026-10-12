@@ -9,6 +9,7 @@ import {
 import { Section } from './SettingsPrimitives.js';
 import { Modal } from '../ui/Modal.js';
 import { useToast } from '../ui/Toast.js';
+import { useConfirm } from '../ui/ConfirmDialog.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { MarkdownPromptEditor } from './MarkdownPromptEditor.js';
 import { MarkdownPromptDiff } from './MarkdownPromptDiff.js';
@@ -81,6 +82,7 @@ function prettyLabel(name: string): string {
 
 export function PromptsSection() {
   const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const { profile } = useProfile();
   const dark = DARK_THEMES.has(profile.theme);
 
@@ -134,7 +136,7 @@ export function PromptsSection() {
   }, []);
 
   const resolveSelModal = useCallback((value: string | null) => {
-    selModalOpen && setSelModalOpen(false);
+    if (selModalOpen) setSelModalOpen(false);
     const r = selModalResolver.current;
     selModalResolver.current = null;
     r?.(value);
@@ -215,13 +217,19 @@ export function PromptsSection() {
 
   // ── Sélection d'un fichier (confirme si modifications non enregistrées) ───────
 
-  const selectFile = useCallback((name: string) => {
+  const selectFile = useCallback(async (name: string) => {
     if (name === selected) return;
-    if (dirty && !window.confirm('Modifications non enregistrées. Changer de fichier et les perdre ?')) {
-      return;
+    if (dirty) {
+      const ok = await confirm({
+        title: 'Modifications non enregistrées',
+        message: 'Changer de fichier et perdre les modifications en cours ?',
+        confirmLabel: 'Changer de fichier',
+        variant: 'warning',
+      });
+      if (!ok) return;
     }
     setSelected(name);
-  }, [selected, dirty]);
+  }, [selected, dirty, confirm]);
 
   // ── Sauvegarde ────────────────────────────────────────────────────────────────
 
@@ -264,9 +272,13 @@ export function PromptsSection() {
 
   const handleReset = useCallback(async () => {
     if (!selected) return;
-    if (!window.confirm(`Réinitialiser "${selected}" à sa version par défaut ? La personnalisation sera supprimée.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Réinitialiser le prompt',
+      message: `Réinitialiser "${selected}" à sa version par défaut ? La personnalisation sera supprimée.`,
+      confirmLabel: 'Réinitialiser',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       setResetting(true);
       const res = await fetch(`/api/prompts/${encodeURIComponent(selected)}`, { method: 'DELETE' });
@@ -282,7 +294,7 @@ export function PromptsSection() {
     } finally {
       setResetting(false);
     }
-  }, [selected, loadFile, success, toastError]);
+  }, [selected, loadFile, success, toastError, confirm]);
 
   const handleRevert = useCallback(() => {
     setContent(originalContent);

@@ -3,7 +3,7 @@
   "hardcoded_hex": 217,
   "tailwind_palette": 371,
   "manual_overlay": 32,
-  "window_confirm": 3,
+  "window_confirm": 0,
   "title_tooltip": 363,
   "console_log": 34,
   "z_index_literal": 64,
