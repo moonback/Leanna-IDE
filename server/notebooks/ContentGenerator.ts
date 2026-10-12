@@ -297,13 +297,19 @@ Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explicati
       options.onChunk(`![Infographie](data:${imageResult.mediaType};base64,${imageResult.imageBase64})\n`);
     }
 
-    // Étape 4 : Stocker les métadonnées (le content contient le chemin + la base64 pour affichage)
+    // Étape 4 : Stocker UNIQUEMENT les métadonnées + le chemin disque.
+    // Le PNG vit dans la sandbox ; on ne persiste PAS le base64 dans le notebook
+    // JSON (sinon chaque fichier notebook grossit de plusieurs Mo, ralentissant
+    // loadAll / persist / backup). Le frontend récupère l'image via l'endpoint
+    // GET /:id/generated/:docId/image.
+    const docId = randomUUID();
     const content = JSON.stringify({
       type: "infographic-image",
       filePath: relativePath,
       fullPath: filePath,
       mediaType: imageResult.mediaType,
-      imageBase64: imageResult.imageBase64,
+      // URL de récupération de l'image (sert le fichier disque, pas de base64).
+      imageUrl: `/api/notebooks/${notebookId}/generated/${docId}/image`,
       model: imageResult.model,
       prompt: imagePrompt,
       cost: imageResult.cost,
@@ -311,7 +317,7 @@ Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explicati
     });
 
     const doc: GeneratedDocument = {
-      id: randomUUID(),
+      id: docId,
       notebookId,
       type: "infographic",
       title: "Infographie",

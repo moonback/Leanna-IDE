@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
 import { notebookManager, groundedChat } from "../../notebooks/index.js";
@@ -24,7 +25,7 @@ export function createChatRouter(): Router {
 
   router.post("/:id/chat/stream", async (req: Request, res: Response): Promise<void> => {
     try {
-      const { question, threadId } = req.body;
+      const { question, threadId, followUps: wantFollowUps } = req.body;
       if (!question || typeof question !== "string") {
         res.status(400).json({ error: "Le champ 'question' est requis." });
         return;
@@ -38,39 +39,27 @@ export function createChatRouter(): Router {
 
       res.write(`event: start\ndata: ${JSON.stringify({ status: "streaming" })}\n\n`);
 
+      // Le thread (si fourni) est géré DANS askStream : les messages y sont
+      // écrits de façon isolée, et le contexte RAG est construit à partir du
+      // thread. Plus de double écriture thread + historique global ici.
       const message = await groundedChat.askStream(
         req.params.id,
         question.trim(),
         (chunk: string) => {
           res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
-        }
+        },
+        undefined,
+        typeof threadId === "string" ? threadId : undefined
       );
 
-      if (threadId) {
-        const notebook = notebookManager.getNotebook(req.params.id);
-        if (notebook?.chatThreads) {
-          const thread = notebook.chatThreads.find((t: any) => t.id === threadId);
-          if (thread) {
-            thread.messages.push({
-              id: `msg-${Date.now()}-u`,
-              role: 'user',
-              content: question.trim(),
-              citations: [],
-              timestamp: new Date().toISOString(),
-            });
-            thread.messages.push(message);
-            if (thread.messages.length <= 2) {
-              thread.title = question.trim().slice(0, 50) + (question.length > 50 ? '...' : '');
-            }
-            notebookManager.persistNotebook(req.params.id);
-          }
-        }
-      }
-
+      // Follow-ups activés par défaut (l'UI chat les affiche), mais désactivables
+      // via `followUps: false` dans la requête pour économiser un appel LLM.
       let followUps: string[] = [];
-      try {
-        followUps = await groundedChat.generateFollowUps(req.params.id);
-      } catch { /* ignore */ }
+      if (wantFollowUps !== false) {
+        try {
+          followUps = await groundedChat.generateFollowUps(req.params.id);
+        } catch { /* ignore */ }
+      }
 
       res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
       res.end();
@@ -117,12 +106,9 @@ export function createChatRouter(): Router {
         }
       );
 
-      let followUps: string[] = [];
-      try {
-        followUps = await groundedChat.generateFollowUps(req.params.id);
-      } catch { /* ignore */ }
-
-      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      // Pas de follow-ups ici : l'UI deep-dive ne les affiche pas. L'appel LLM
+      // supplémentaire était un coût caché. Utiliser GET /chat/follow-ups si besoin.
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps: [] })}\n\n`);
       res.end();
     } catch (e: any) {
       if (res.headersSent) {
@@ -181,7 +167,7 @@ export function createChatRouter(): Router {
       if (!notebook.chatThreads) notebook.chatThreads = [];
 
       const thread = {
-        id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: `thread-${randomUUID()}`,
         title: req.body.title || `Conversation ${notebook.chatThreads.length + 1}`,
         messages: [],
         createdAt: new Date().toISOString(),
@@ -367,9 +353,20 @@ export function createChatRouter(): Router {
       const markdown = lines.join("\n");
 
       const sandboxRoot = getSandboxRoot();
-      const targetFolder = folder
-        ? path.join(sandboxRoot, folder.replace(/\.\./g, ""))
-        : path.join(sandboxRoot, "chat-exports");
+      // Confinement strict dans la sandbox : on résout le chemin complet puis on
+      // vérifie qu'il reste sous sandboxRoot. Un simple remplacement de ".." est
+      // contournable (encodages, slashes absolus/UNC) — path.resolve + préfixe
+      // est la seule garantie fiable.
+      const sandboxPrefix = path.resolve(sandboxRoot) + path.sep;
+      const requestedFolder = folder
+        ? path.resolve(sandboxRoot, folder)
+        : path.resolve(sandboxRoot, "chat-exports");
+
+      if (requestedFolder !== path.resolve(sandboxRoot) && !requestedFolder.startsWith(sandboxPrefix)) {
+        res.status(400).json({ error: "Dossier de destination invalide (hors sandbox)." });
+        return;
+      }
+      const targetFolder = requestedFolder;
 
       if (!fs.existsSync(targetFolder)) {
         fs.mkdirSync(targetFolder, { recursive: true });
@@ -458,12 +455,8 @@ export function createChatRouter(): Router {
         }
       );
 
-      let followUps: string[] = [];
-      try {
-        followUps = await groundedChat.generateFollowUps(req.params.id);
-      } catch { /* ignore */ }
-
-      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      // Pas de follow-ups ici (UI comparaison ne les affiche pas) — coût LLM évité.
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps: [] })}\n\n`);
       res.end();
     } catch (e: any) {
       if (res.headersSent) {
@@ -492,12 +485,8 @@ export function createChatRouter(): Router {
         }
       );
 
-      let followUps: string[] = [];
-      try {
-        followUps = await groundedChat.generateFollowUps(req.params.id);
-      } catch { /* ignore */ }
-
-      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps })}\n\n`);
+      // Pas de follow-ups ici (UI insights ne les affiche pas) — coût LLM évité.
+      res.write(`event: done\ndata: ${JSON.stringify({ message, followUps: [] })}\n\n`);
       res.end();
     } catch (e: any) {
       if (res.headersSent) {

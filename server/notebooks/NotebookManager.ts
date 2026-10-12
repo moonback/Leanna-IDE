@@ -334,6 +334,42 @@ export class NotebookManager {
   }
 
   /**
+   * Retourne les messages d'un thread de conversation (vide si introuvable).
+   * Permet au chat groundé de construire un contexte ISOLÉ par thread plutôt
+   * que de mélanger tous les threads via l'historique global.
+   */
+  getThreadMessages(notebookId: string, threadId: string): ChatMessage[] {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook?.chatThreads) return [];
+    const thread = notebook.chatThreads.find(t => t.id === threadId);
+    return thread ? thread.messages : [];
+  }
+
+  /**
+   * Ajoute un message aux messages d'un thread spécifique (sans toucher à
+   * l'historique global). Met à jour le titre du thread à partir de la
+   * première question. Retourne true si le thread existe.
+   */
+  addThreadMessage(notebookId: string, threadId: string, message: ChatMessage): boolean {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook?.chatThreads) return false;
+    const thread = notebook.chatThreads.find(t => t.id === threadId);
+    if (!thread) return false;
+
+    thread.messages.push(message);
+
+    // Titre dérivé de la première question utilisateur du thread.
+    if (message.role === "user" && thread.messages.filter(m => m.role === "user").length === 1) {
+      const q = message.content.trim();
+      thread.title = q.slice(0, 50) + (q.length > 50 ? "..." : "");
+    }
+
+    notebook.updatedAt = new Date().toISOString();
+    this.persist(notebook);
+    return true;
+  }
+
+  /**
    * Enregistre le retour utilisateur (pouce haut/bas) sur un message assistant.
    * Cherche le message dans l'historique global ET dans les threads de conversation.
    * Retourne true si un message a été trouvé et mis à jour.

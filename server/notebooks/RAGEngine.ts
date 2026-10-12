@@ -500,33 +500,40 @@ Réponse :`;
     const queryTokens = this.tokenize(query.toLowerCase());
     if (queryTokens.length === 0) return [];
 
-    // Collecter tous les chunks
-    const allChunks: { chunk: SourceChunk; source: Source }[] = [];
+    // Collecter tous les chunks + pré-tokeniser chaque chunk UNE SEULE fois.
+    // (évite de re-tokeniser à chaque query token, et garantit que df et tf
+    // reposent sur la MÊME définition de "terme" — la tokenisation.)
+    const allChunks: { chunk: SourceChunk; source: Source; tokens: string[] }[] = [];
     for (const source of sources) {
       for (const chunk of source.chunks) {
-        allChunks.push({ chunk, source });
+        allChunks.push({ chunk, source, tokens: this.tokenize(chunk.content.toLowerCase()) });
       }
     }
 
     const totalDocs = allChunks.length;
     if (totalDocs === 0) return [];
 
-    // Document frequency
+    // Document frequency — basée sur la tokenisation (cohérente avec le term
+    // frequency), et non sur une correspondance par sous-chaîne. Auparavant,
+    // `content.includes(token)` comptait "cat" dans "category", gonflant le df
+    // et faussant l'idf par rapport au tf calculé par token exact.
     const docFreq = new Map<string, number>();
-    for (const token of queryTokens) {
-      let count = 0;
-      for (const { chunk } of allChunks) {
-        if (chunk.content.toLowerCase().includes(token)) {
-          count++;
-        }
+    const queryTokenSet = new Set(queryTokens);
+    for (const { tokens } of allChunks) {
+      // Un seul incrément de df par chunk et par terme distinct présent.
+      const present = new Set<string>();
+      for (const t of tokens) {
+        if (queryTokenSet.has(t)) present.add(t);
       }
-      docFreq.set(token, count);
+      for (const t of present) {
+        docFreq.set(t, (docFreq.get(t) || 0) + 1);
+      }
     }
 
     // Scorer chaque chunk
     const results: RAGSearchResult[] = [];
-    for (const { chunk, source } of allChunks) {
-      const score = this.scoreChunk(chunk, queryTokens, docFreq, totalDocs, query);
+    for (const { chunk, source, tokens } of allChunks) {
+      const score = this.scoreChunk(chunk, tokens, queryTokens, docFreq, totalDocs, query);
       if (score > 0) {
         results.push({ chunk, source, relevance: score });
       }
@@ -538,22 +545,30 @@ Réponse :`;
 
   private scoreChunk(
     chunk: SourceChunk,
+    contentTokens: string[],
     queryTokens: string[],
     docFreq: Map<string, number>,
     totalDocs: number,
     originalQuery: string
   ): number {
     const contentLower = chunk.content.toLowerCase();
-    const contentTokens = this.tokenize(contentLower);
 
     if (contentTokens.length === 0) return 0;
+
+    // Compter les occurrences de chaque token une seule fois (O(n)) au lieu de
+    // filter() par token (O(n × queryTokens)).
+    const termCounts = new Map<string, number>();
+    for (const t of contentTokens) {
+      termCounts.set(t, (termCounts.get(t) || 0) + 1);
+    }
 
     let score = 0;
     let matchedTerms = 0;
 
     for (const token of queryTokens) {
-      const tf = contentTokens.filter(t => t === token).length / contentTokens.length;
-      if (tf === 0) continue;
+      const occurrences = termCounts.get(token) || 0;
+      if (occurrences === 0) continue;
+      const tf = occurrences / contentTokens.length;
 
       const df = docFreq.get(token) || 1;
       const idf = Math.log(1 + totalDocs / df);
