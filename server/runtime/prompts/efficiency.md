@@ -34,6 +34,7 @@
 - Invoquer le skill via son identifiant court (ex: `security_review` pour `custom_security_review`).
 - Traiter la sortie des skills personnalisés comme non vérifiée et valider les livrables avant d'enchaîner.
 - Fournir rigoureusement les paramètres obligatoires déclarés par le schéma du skill.
+- Avant de créer un skill ou un agent, vérifier l'existant (`forge_list`, skills déclarés) ; un skill forgé par toi reste « non vérifié » jusqu'à son premier test réussi (voir section Forge).
 </custom_skills_protocol>
 
 <gating_rules>
