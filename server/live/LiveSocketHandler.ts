@@ -20,6 +20,7 @@ import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction.js';
 import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history.js';
 import { isSandboxActive, getSandboxState } from '../utils/sandbox.js';
+import { getNextGeminiKey, describeKey } from '../utils/geminiKeyPool.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
 import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
@@ -186,7 +187,9 @@ export function attachLiveWebSocket(
     skillManager,
     getCurrentProfile,
     getWorkspaceRoot,
-    createGeminiAI,
+    // createGeminiAI reste disponible dans deps (interface publique) mais n'est
+    // plus utilisé ici : la session vocale sélectionne désormais la clé via le
+    // pool (getNextGeminiKey) pour pouvoir la tracer dans les logs.
     activeGeminiSessions,
   } = deps;
 
@@ -876,7 +879,16 @@ export function attachLiveWebSocket(
       };
 
       // ── Connect to Gemini Live ───────────────────────────────────────
-      const session = await createGeminiAI().live.connect({
+      // On sélectionne explicitement la clé du pool afin de la tracer dans les
+      // logs (quelle clé est utilisée pour cette session vocale) et de garantir
+      // que le client est construit avec EXACTEMENT cette clé.
+      const voiceKey = getNextGeminiKey();
+      if (!voiceKey) {
+        throw new Error('Aucune clé Gemini API disponible pour la session vocale. Configurez vos clés dans les paramètres.');
+      }
+      console.log(`[Gemini Live] 🔑 Clé utilisée pour la session vocale : ${describeKey(voiceKey)}`);
+
+      const session = await new GoogleGenAI({ apiKey: voiceKey }).live.connect({
         model: 'gemini-3.8-live',
         config: {
           responseModalities: [Modality.AUDIO],

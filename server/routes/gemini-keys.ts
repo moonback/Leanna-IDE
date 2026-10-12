@@ -26,13 +26,13 @@ export function createGeminiKeysRouter(): Router {
   });
 
   // POST /api/gemini-keys — ajouter une clé
-  router.post('/', (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response) => {
     const { key, label } = req.body as { key?: string; label?: string };
     if (!key || typeof key !== 'string' || !key.trim()) {
       return res.status(400).json({ status: 'error', error: 'La clé API est requise.' });
     }
     try {
-      addGeminiKey(key.trim(), label?.trim() || undefined);
+      await addGeminiKey(key.trim(), label?.trim() || undefined);
       return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
       return res.status(400).json({ status: 'error', error: e.message });
@@ -40,13 +40,13 @@ export function createGeminiKeysRouter(): Router {
   });
 
   // DELETE /api/gemini-keys/:index — supprimer une clé par index
-  router.delete('/:index', (req: Request, res: Response) => {
+  router.delete('/:index', async (req: Request, res: Response) => {
     const index = parseInt(req.params.index, 10);
     if (isNaN(index)) {
       return res.status(400).json({ status: 'error', error: 'Index invalide.' });
     }
     try {
-      removeGeminiKey(index);
+      await removeGeminiKey(index);
       return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
       return res.status(400).json({ status: 'error', error: e.message });
@@ -54,13 +54,13 @@ export function createGeminiKeysRouter(): Router {
   });
 
   // PATCH /api/gemini-keys/:index/toggle — activer/désactiver une clé
-  router.patch('/:index/toggle', (req: Request, res: Response) => {
+  router.patch('/:index/toggle', async (req: Request, res: Response) => {
     const index = parseInt(req.params.index, 10);
     if (isNaN(index)) {
       return res.status(400).json({ status: 'error', error: 'Index invalide.' });
     }
     try {
-      const enabled = toggleGeminiKey(index);
+      const enabled = await toggleGeminiKey(index);
       return res.json({ status: 'success', enabled, keys: getGeminiKeys() });
     } catch (e: any) {
       return res.status(400).json({ status: 'error', error: e.message });
@@ -68,7 +68,7 @@ export function createGeminiKeysRouter(): Router {
   });
 
   // PATCH /api/gemini-keys/:index/label — renommer une clé
-  router.patch('/:index/label', (req: Request, res: Response) => {
+  router.patch('/:index/label', async (req: Request, res: Response) => {
     const index = parseInt(req.params.index, 10);
     const { label } = req.body as { label?: string };
     if (isNaN(index)) {
@@ -78,7 +78,7 @@ export function createGeminiKeysRouter(): Router {
       return res.status(400).json({ status: 'error', error: 'Le label est requis.' });
     }
     try {
-      updateGeminiKeyLabel(index, label.trim());
+      await updateGeminiKeyLabel(index, label.trim());
       return res.json({ status: 'success', keys: getGeminiKeys() });
     } catch (e: any) {
       return res.status(400).json({ status: 'error', error: e.message });

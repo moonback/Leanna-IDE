@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import { encrypt, decrypt } from "./crypto.js";
+import { encrypt, decrypt, isEncrypted } from "./crypto.js";
 import { SELF_ROOT } from "./selfRoot.js";
 
 /**
@@ -47,9 +47,16 @@ export async function loadGeminiKeys(): Promise<void> {
 
   // If no keys from file, fall back to env var
   if (keyPool.length === 0) {
-    const envKey = process.env.GEMINI_API_KEY;
-    if (envKey && envKey.trim()) {
-      keyPool.push({ key: decrypt(envKey.trim()), label: "Default (env)" });
+    const envKey = process.env.GEMINI_API_KEY?.trim();
+    if (envKey) {
+      // La valeur d'env peut être soit en clair (cas courant : saisie manuelle
+      // dans .env), soit chiffrée sur disque par l'UI (updateEnvFile → encrypt()).
+      // On ne déchiffre QUE si le format est reconnu comme chiffré, sinon on
+      // garde la valeur telle quelle. Déchiffrer une clé en clair à l'aveugle
+      // dépendait du fallback silencieux de decrypt() et masquait les clés
+      // réellement invalides (ex: master key changée).
+      const finalKey = isEncrypted(envKey) ? decrypt(envKey) : envKey;
+      keyPool.push({ key: finalKey, label: "Default (env)" });
     }
   }
 
@@ -69,13 +76,40 @@ export async function saveGeminiKeys(): Promise<void> {
 }
 
 /**
+ * Construit un aperçu masqué d'une clé pour l'UI.
+ * Robuste aux clés courtes/vides : `key.length - 6` pouvait être négatif et
+ * faire planter `"•".repeat(négatif)` (RangeError) → la route GET renvoyait
+ * alors une 500 et le pool ne se chargeait plus du tout.
+ */
+function buildKeyPreview(key: string): string {
+  const safe = key || "";
+  const visible = safe.slice(0, 6);
+  const maskCount = Math.min(Math.max(safe.length - 6, 0), 20);
+  return visible + "•".repeat(maskCount);
+}
+
+/**
+ * Décrit une clé de façon sûre pour les logs : index (1-based) dans le pool,
+ * label, et aperçu masqué — jamais le secret complet. Utile pour tracer quelle
+ * clé est utilisée (ex: ouverture d'une session vocale) sans fuite de secret.
+ */
+export function describeKey(key: string | null | undefined): string {
+  if (!key) return "aucune clé";
+  const idx = keyPool.findIndex((e) => e.key === key);
+  const entry = idx >= 0 ? keyPool[idx] : undefined;
+  const label = entry?.label || (idx >= 0 ? `Clé ${idx + 1}` : "Clé inconnue");
+  const position = idx >= 0 ? `#${idx + 1}/${keyPool.length}` : "#?";
+  return `${position} « ${label} » (${buildKeyPreview(key)})`;
+}
+
+/**
  * Get all keys (for settings UI). Masks the actual key values.
  */
 export function getGeminiKeys(): Array<{ index: number; label: string; preview: string; disabled: boolean }> {
   return keyPool.map((entry, i) => ({
     index: i,
     label: entry.label || `Clé ${i + 1}`,
-    preview: entry.key.slice(0, 6) + "•".repeat(Math.min(entry.key.length - 6, 20)),
+    preview: buildKeyPreview(entry.key),
     disabled: !!entry.disabled,
   }));
 }

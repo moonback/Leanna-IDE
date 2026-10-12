@@ -39,16 +39,17 @@ function ensureMasterKey(): Buffer {
   // Generate a new secure key
   const newKey = generateSecureMasterKey();
   
-  // Determine which .env file to update
-  // Note: SELF_ROOT may not be available during early initialization,
-  // so we use process.cwd() as fallback
-  let rootPath: string;
-  try {
-    // Try to import SELF_ROOT dynamically to avoid circular dependency
-    rootPath = process.cwd();
-  } catch {
-    rootPath = process.cwd();
-  }
+  // Determine which .env file to update.
+  // IMPORTANT (Bug pool/chargement) : en Electron empaqueté, process.cwd() ne
+  // pointe pas vers le dossier de config persistant. Si la master key était
+  // écrite au mauvais endroit, elle n'était pas relue au lancement suivant →
+  // une nouvelle clé était régénérée → toutes les clés Gemini chiffrées
+  // devenaient indéchiffrables. On privilégie donc le même dossier persistant
+  // que le reste de la config (Leanna_CONFIG_PATH / ELECTRON_APP_PATH).
+  const rootPath =
+    process.env.Leanna_CONFIG_PATH ||
+    process.env.ELECTRON_APP_PATH ||
+    process.cwd();
   
   const envPath = path.join(rootPath, '.env');
   const envLocalPath = path.join(rootPath, '.env.local');
@@ -217,4 +218,42 @@ export function decrypt(encryptedText: string): string {
     // Fallback texte brut si la clé a changé ou si le texte n'était pas chiffré
     return encryptedText;
   }
+}
+
+/**
+ * Indique si une chaîne a l'un des formats chiffrés reconnus par `decrypt()` :
+ *  1. AES-256-GCM : `gcm:<iv_hex>:<tag_hex>:<ciphertext_hex>`
+ *  2. Legacy AES-256-CBC : `<iv_32hex>:<ciphertext_hex>`
+ *
+ * Permet d'appeler `decrypt()` uniquement sur des valeurs réellement chiffrées,
+ * et de laisser les valeurs en clair intactes (évite les faux positifs du
+ * fallback silencieux de `decrypt()`).
+ */
+export function isEncrypted(value: string): boolean {
+  if (!value) return false;
+
+  // Format GCM
+  if (value.startsWith('gcm:')) {
+    const parts = value.split(':');
+    return (
+      parts.length === 4 &&
+      parts[1].length === GCM_IV_LENGTH * 2 &&
+      parts[2].length === 32 &&
+      /^[0-9a-fA-F]+$/.test(parts[1]) &&
+      /^[0-9a-fA-F]+$/.test(parts[2]) &&
+      /^[0-9a-fA-F]+$/.test(parts[3])
+    );
+  }
+
+  // Format legacy CBC : <iv_32hex>:<ciphertext_hex>
+  const parts = value.split(':');
+  if (parts.length === 2) {
+    return (
+      parts[0].length === CBC_IV_LENGTH * 2 &&
+      /^[0-9a-fA-F]+$/.test(parts[0]) &&
+      /^[0-9a-fA-F]+$/.test(parts[1])
+    );
+  }
+
+  return false;
 }
