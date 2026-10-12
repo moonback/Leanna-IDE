@@ -226,6 +226,29 @@ export class Executor {
     forcedArtifact: boolean;
   }> = new Map();
 
+  /**
+   * Outils de RECHERCHE WEB. Observé en prod : l'exécuteur relance la même
+   * recherche quasi identique 6-8 fois (reformulations mineures), brûlant des
+   * tokens sans progresser. On déduplique sur une signature normalisée de la
+   * requête.
+   */
+  private static readonly WEB_SEARCH_TOOLS = new Set<string>([
+    "browser_web_search", "browser_research", "web_search", "web_fetch",
+  ]);
+
+  /**
+   * Nombre maximal d'exécutions d'une même recherche web (signature normalisée)
+   * tolérées au sein d'une mission avant de refuser la répétition.
+   */
+  private static readonly WEB_SEARCH_MAX_REPEATS = 2;
+
+  /**
+   * Signatures de recherches web déjà effectuées, par mission :
+   * `missionId → (signature → nombre d'exécutions)`. Permet de couper une
+   * boucle de reformulations équivalentes.
+   */
+  private webSearchSignatures: Map<string, Map<string, number>> = new Map();
+
   /** Estimateur coût / durée / risque avant exécution. */
   private planEstimator!: PlanEstimator;
 
@@ -1635,6 +1658,44 @@ export class Executor {
       }
     }
 
+    // ── Garde anti-boucle de recherche web ──────────────────────────────────
+    // Refuse une recherche web dont la signature normalisée a déjà été exécutée
+    // au-delà du seuil toléré dans cette mission. Évite de relancer la même
+    // requête reformulée en boucle (symptôme observé en prod) ; pousse l'agent
+    // à exploiter les résultats déjà obtenus ou à changer d'approche.
+    if (Executor.WEB_SEARCH_TOOLS.has(action.skillName)) {
+      const signature = Executor.webSearchSignature(action.args);
+      if (signature) {
+        let perMission = this.webSearchSignatures.get(mission.id);
+        if (!perMission) {
+          perMission = new Map<string, number>();
+          this.webSearchSignatures.set(mission.id, perMission);
+        }
+        const seen = perMission.get(signature) ?? 0;
+        if (seen >= Executor.WEB_SEARCH_MAX_REPEATS) {
+          const reason =
+            `Recherche web redondante refusée : requête équivalente déjà exécutée ` +
+            `${seen} fois dans cette mission. Exploiter les résultats précédents ou ` +
+            `changer d'approche plutôt que de reformuler la même recherche.`;
+          console.log(`[Executor]    ⛔ ${action.skillName} ignoré: ${reason}`);
+          mission.recordActionResult(action.id, { error: reason }, false);
+          this.scorer.recordUsage(action.skillName, false, Date.now() - startTime);
+          try { strategyMemory.recordSkillOutcome(action.skillName, false, Date.now() - startTime); } catch { /* best-effort */ }
+          this.emit("action_completed", {
+            missionId: mission.id,
+            goalId,
+            actionId: action.id,
+            skill: action.skillName,
+            success: false,
+            error: reason,
+            durationMs: Date.now() - startTime,
+          });
+          return this.createDefaultReflection(action.id, false);
+        }
+        perMission.set(signature, seen + 1);
+      }
+    }
+
     try {
       const dryRun = mission.getConfig().dryRun;
       const signal = this.getAbortController(mission.id).signal;
@@ -2074,6 +2135,88 @@ JSON:`;
    *
    * @returns `null` si succès, sinon un message d'échec lisible.
    */
+  /**
+   * Enrichit un message d'échec générique avec les détails structurés que
+   * certains skills de vérification joignent au résultat (`parsedErrors` de
+   * `verify_typecheck`/`verify_file`/`verify_lint`, ou `output` brut tsc).
+   *
+   * Sans ça, l'agent ne recevait que « Erreurs de typage détectées (code
+   * inconnu) » — un message inexploitable qui provoquait des boucles d'échec
+   * du typecheck : impossible de corriger des erreurs qu'on ne voit pas. On
+   * expose désormais fichier/ligne/message pour chaque erreur détectée.
+   */
+  private static withFailureDetails(
+    base: string,
+    r: Record<string, unknown>,
+  ): string {
+    // Nombre d'erreurs détaillées listées pour ne pas noyer la preuve.
+    const MAX_LISTED = 20;
+
+    const parsed = r.parsedErrors;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const lines = parsed.slice(0, MAX_LISTED).map((e) => {
+        const err = e as Record<string, unknown>;
+        const file = typeof err.file === "string" ? err.file : "?";
+        const line = err.line ?? "?";
+        const col = err.column ?? err.col ?? "?";
+        const code = typeof err.code === "string" ? err.code : "";
+        const msg =
+          typeof err.message === "string"
+            ? err.message
+            : typeof err.text === "string"
+              ? err.text
+              : "";
+        const codePart = code ? ` ${code}` : "";
+        return `  - ${file}:${line}:${col}${codePart} ${msg}`.trimEnd();
+      });
+      const extra =
+        parsed.length > MAX_LISTED
+          ? `\n  … et ${parsed.length - MAX_LISTED} autre(s).`
+          : "";
+      return `${base}\n${lines.join("\n")}${extra}`;
+    }
+
+    // Pas d'erreurs structurées : retomber sur la sortie brute tronquée.
+    if (typeof r.output === "string" && r.output.trim()) {
+      const out = r.output.trim();
+      const MAX_OUTPUT = 1500;
+      const clipped =
+        out.length > MAX_OUTPUT
+          ? `${out.slice(0, MAX_OUTPUT)}\n  … (sortie tronquée)`
+          : out;
+      return `${base}\n${clipped}`;
+    }
+
+    return base;
+  }
+
+  /**
+   * Construit une signature normalisée d'une requête de recherche web afin de
+   * reconnaître des reformulations équivalentes : minuscules, accents retirés,
+   * ponctuation supprimée, mots dédupliqués et triés, mots vides courts écartés.
+   * Deux requêtes ne différant que par l'ordre des mots-clés ou une virgule
+   * produisent la même signature.
+   *
+   * @returns la signature, ou `null` si aucune requête exploitable.
+   */
+  private static webSearchSignature(args: unknown): string | null {
+    if (!args || typeof args !== "object") return null;
+    const a = args as Record<string, unknown>;
+    const raw = a.query ?? a.q ?? a.search ?? a.url;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+
+    const tokens = raw
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // accents
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ") // ponctuation → espace
+      .split(/\s+/)
+      .filter((w) => w.length > 2); // écarte les mots vides courts
+
+    const unique = Array.from(new Set(tokens)).sort();
+    return unique.length > 0 ? unique.join(" ") : null;
+  }
+
   static detectSkillFailure(result: unknown): string | null {
     if (result === null || result === undefined) return null;
     if (typeof result !== "object") return null;
@@ -2086,21 +2229,21 @@ JSON:`;
 
     // 2. Drapeau booléen de succès explicitement faux.
     if (r.ok === false || r.success === false) {
-      return (
+      const base =
         (typeof r.message === "string" && r.message) ||
         (typeof r.stderr === "string" && r.stderr) ||
-        "Le skill a signalé un échec (ok/success = false)."
-      );
+        "Le skill a signalé un échec (ok/success = false).";
+      return Executor.withFailureDetails(base, r);
     }
 
     // 3. Champ `status` explicitement en échec.
     if (typeof r.status === "string") {
       const s = r.status.toLowerCase();
       if (s === "failed" || s === "error" || s === "failure") {
-        return (
+        const base =
           (typeof r.message === "string" && r.message) ||
-          `Le skill a renvoyé status="${r.status}".`
-        );
+          `Le skill a renvoyé status="${r.status}".`;
+        return Executor.withFailureDetails(base, r);
       }
     }
 
@@ -2336,6 +2479,8 @@ JSON:`;
 
     // Libérer le contrôleur d'annulation (plus de skill à interrompre).
     this.abortControllers.delete(mission.id);
+    // Libérer le suivi anti-boucle des recherches web de cette mission.
+    this.webSearchSignatures.delete(mission.id);
 
     this.activeMissions.delete(mission.id);
     this.completedMissions.push(mission);

@@ -114,6 +114,21 @@ const MAX_RESULT_CHARS = 4_000;
 const Executor_MAX_FORCED_WRITE_NUDGES = 3;
 
 /**
+ * Nombre d'itérations CONSÉCUTIVES où l'agent appelle des outils (lecture,
+ * raisonnement…) sans jamais écrire, au-delà duquel on force une consigne
+ * d'écriture et le passage en phase « write ».
+ *
+ * Le garde `prematureNarration` existant ne couvre que le cas « l'agent conclut
+ * SANS appeler d'outil » (`calls.length === 0`). Observé en prod : un agent
+ * producteur d'artefact qui appelle `read_file_outline`/`read_project_file`/
+ * `reasoning_think` à CHAQUE tour (`calls.length > 0`) échappait à ce garde et
+ * explorait jusqu'au budget (8 itérations, 95s, 0 fichier). `reasoning_think`
+ * étant classé « other », il ne consommait même pas le quota de lecture. Ce
+ * second garde ferme ce trou en comptant les itérations improductives.
+ */
+const MAX_UNPRODUCTIVE_ITERATIONS = 4;
+
+/**
  * Détecte un échec métier dans le RÉSULTAT d'un outil (le handler n'a pas levé
  * mais signale un échec). Reconnaît les conventions `{ error }`, `{ ok:false }`,
  * `{ success:false }`, `{ status:"failed"|"error" }`, `exitCode != 0`,
@@ -127,19 +142,21 @@ function detectResultError(result: unknown): string | null {
 
   if ("error" in r && r.error) {
     const base = typeof r.error === "string" ? r.error : "Erreur retournée par l'outil";
-    return typeof r.action === "string" ? `${base} — ${r.action}` : base;
+    const withAction = typeof r.action === "string" ? `${base} — ${r.action}` : base;
+    return withFailureDetails(withAction, r);
   }
   if (r.ok === false || r.success === false) {
-    return (
+    const base =
       (typeof r.message === "string" && r.message) ||
       (typeof r.stderr === "string" && r.stderr) ||
-      "L'outil a signalé un échec (ok/success = false)."
-    );
+      "L'outil a signalé un échec (ok/success = false).";
+    return withFailureDetails(base, r);
   }
   if (typeof r.status === "string") {
     const s = r.status.toLowerCase();
     if (s === "failed" || s === "error" || s === "failure") {
-      return (typeof r.message === "string" && r.message) || `L'outil a renvoyé status="${r.status}".`;
+      const base = (typeof r.message === "string" && r.message) || `L'outil a renvoyé status="${r.status}".`;
+      return withFailureDetails(base, r);
     }
   }
   if (typeof r.exitCode === "number" && r.exitCode !== 0) {
@@ -149,6 +166,49 @@ function detectResultError(result: unknown): string | null {
     return `L'outil a renvoyé un statut HTTP ${r.statusCode}.`;
   }
   return null;
+}
+
+/**
+ * Enrichit un message d'échec générique avec les détails structurés joints par
+ * les skills de vérification (`parsedErrors` de `verify_typecheck`/`verify_file`/
+ * `verify_lint`, ou `output` brut tsc). Sans ça, un agent délégué ne recevait
+ * que « Erreurs de typage détectées (code inconnu) » — inexploitable — et
+ * bouclait sur l'échec du typecheck. Aligné sur `Executor.withFailureDetails`.
+ */
+function withFailureDetails(base: string, r: Record<string, unknown>): string {
+  const MAX_LISTED = 20;
+
+  const parsed = r.parsedErrors;
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    const lines = parsed.slice(0, MAX_LISTED).map((e) => {
+      const err = e as Record<string, unknown>;
+      const file = typeof err.file === "string" ? err.file : "?";
+      const line = err.line ?? "?";
+      const col = err.column ?? err.col ?? "?";
+      const code = typeof err.code === "string" ? err.code : "";
+      const msg =
+        typeof err.message === "string"
+          ? err.message
+          : typeof err.text === "string"
+            ? err.text
+            : "";
+      const codePart = code ? ` ${code}` : "";
+      return `  - ${file}:${line}:${col}${codePart} ${msg}`.trimEnd();
+    });
+    const extra =
+      parsed.length > MAX_LISTED ? `\n  … et ${parsed.length - MAX_LISTED} autre(s).` : "";
+    return `${base}\n${lines.join("\n")}${extra}`;
+  }
+
+  if (typeof r.output === "string" && r.output.trim()) {
+    const out = r.output.trim();
+    const MAX_OUTPUT = 1500;
+    const clipped =
+      out.length > MAX_OUTPUT ? `${out.slice(0, MAX_OUTPUT)}\n  … (sortie tronquée)` : out;
+    return `${base}\n${clipped}`;
+  }
+
+  return base;
 }
 
 /** Classe un outil par nature, pour la comptabilité séparée et la règle d'arrêt. */
@@ -632,6 +692,45 @@ export class AgenticRuntime implements IAgentRuntime {
       log.warn(
         `[${session.taskId.slice(0, 8)}] ⚠️ ${agent.name} — conclusion sans livrable écrit ` +
           `(itération ${iteration}, relance ${session.forcedWriteNudges}/${Executor_MAX_FORCED_WRITE_NUDGES}) → relance forcée vers l'écriture`
+      );
+    }
+
+    // ── Garde anti-boucle d'EXPLORATION (appels d'outils sans écriture) ──
+    // Complète `prematureNarration` : ce dernier ne mord que si l'agent conclut
+    // sans aucun appel (`calls.length === 0`). Ici on traite l'agent qui appelle
+    // des outils à chaque tour (lecture, reasoning_think…) sans jamais écrire.
+    // On compte les itérations improductives consécutives ; au seuil, on force
+    // une consigne d'écriture et le passage en phase « write ».
+    const wroteThisIteration = toolOutcomes.some(
+      (o) => o.success && WRITE_TOOLS.has(o.invocation.name)
+    );
+    if (wroteThisIteration || session.filesModified.size > 0) {
+      session.unproductiveStreak = 0;
+      session.explorationNudged = false;
+    } else if (calls.length > 0) {
+      session.unproductiveStreak = (session.unproductiveStreak ?? 0) + 1;
+    }
+
+    if (
+      agentCanWrite(tools) &&
+      session.filesModified.size === 0 &&
+      !session.explorationNudged &&
+      (session.unproductiveStreak ?? 0) >= MAX_UNPRODUCTIVE_ITERATIONS
+    ) {
+      session.explorationNudged = true;
+      session.phase = "write";
+      const verifyHint = agentCanVerify(tools)
+        ? " puis vérifie avec verify_file / verify_typecheck."
+        : " Ne tente aucune vérification : conclus dès que le fichier est écrit.";
+      session.pendingInstruction =
+        `Tu explores depuis ${session.unproductiveStreak} itérations sans produire de LIVRABLE. ` +
+        "Arrête de lire/analyser/raisonner et ÉCRIS maintenant le résultat via un tool_calls JSON " +
+        "(write_project_file pour créer, ou modify_project_file si le fichier existe). " +
+        "Choisis un chemin de sortie explicite (ex. docs/<sujet>.md) si aucun n'est fourni," +
+        verifyHint;
+      log.warn(
+        `[${session.taskId.slice(0, 8)}] 🧭 ${agent.name} — boucle d'exploration détectée ` +
+          `(${session.unproductiveStreak} itérations d'outils sans écriture) → consigne d'écriture forcée (itération ${iteration})`
       );
     }
 
@@ -1350,6 +1449,14 @@ interface RunSession {
   replans: number;
   /** Nombre de relances forcées « produis le livrable » déjà injectées (borné). */
   forcedWriteNudges?: number;
+  /**
+   * Itérations consécutives avec appels d'outils mais SANS écriture. Remis à
+   * zéro dès qu'un fichier est écrit. Alimente le garde anti-boucle d'exploration
+   * (MAX_UNPRODUCTIVE_ITERATIONS).
+   */
+  unproductiveStreak?: number;
+  /** Vrai une fois la consigne anti-exploration injectée (évite de spammer). */
+  explorationNudged?: boolean;
   lastPlan?: Plan;
   /** Phase courante de la boucle (règle d'arrêt intelligente). */
   phase: AgentPhase;
