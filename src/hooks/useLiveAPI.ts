@@ -233,8 +233,18 @@ export function useLiveAPI() {
       vadSilenceDuration: profile.vadSilenceDuration,
       // Étape A : fin de capture (VAD silence long atteint)
       onVadSilence: () => probe('vadSilence'),
-      // Étape E : premier chunk audio schedulé pour lecture effective
-      onFirstAudioScheduled: () => probe('audioPlay'),
+      // Étapes F + G : programmation de lecture, puis audibilité estimée.
+      onFirstAudioScheduled: ({ scheduledInMs, outputLatencyMs }) => {
+        // F : instant où source.start a été appelé (programmation).
+        const scheduledAtNow = performance.now();
+        probe('firstAudioScheduled', { tAbs: scheduledAtNow });
+        // G : instant estimé d'audibilité réelle = programmation + délai avant
+        // début de lecture + latence de sortie matérielle/OS. Peut être dans le
+        // futur par rapport à performance.now(), d'où le timestamp explicite.
+        probe('firstAudioAudible', {
+          tAbs: scheduledAtNow + scheduledInMs + outputLatencyMs,
+        });
+      },
     });
 
   // Define onMessage handler for WS events
@@ -410,9 +420,20 @@ export function useLiveAPI() {
       window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: 'generate_image' } }));
       if (typeof msg.dataUri === 'string' && msg.dataUri.startsWith('data:image/')) {
         const alt = (typeof msg.alt === 'string' && msg.alt.trim()) ? msg.alt.trim() : 'Image générée';
+        // Légende sous l'image : modèle générateur (+ taille si connue). Rendue
+        // en italique markdown (<em>, autorisé par le sanitizer). On neutralise
+        // les caractères markdown actifs du nom de modèle par prudence.
+        const modelName = typeof msg.model === 'string' ? msg.model.trim() : '';
+        const sizeKB = typeof msg.sizeKB === 'number' ? msg.sizeKB : null;
+        let caption = '';
+        if (modelName) {
+          const safeModel = modelName.replace(/[*_`[\]()]/g, '');
+          const sizePart = sizeKB != null ? ` · ${sizeKB} Ko` : '';
+          caption = `\n\n*🎨 Généré par \`${safeModel}\`${sizePart}*`;
+        }
         // Insère l'image comme message assistant. Le sanitizer markdown autorise
         // les <img> en data-URI, donc l'image s'affiche directement dans la bulle.
-        addTranscript('assistant', `\n\n![${alt}](${msg.dataUri})\n\n`);
+        addTranscript('assistant', `\n\n![${alt}](${msg.dataUri})${caption}\n\n`);
       }
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {
@@ -577,6 +598,11 @@ export function useLiveAPI() {
   ]);
 
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
+    // Étape E : premier chunk audio de réponse reçu via WS (côté client).
+    // C'est le point d'arrivée de userEndToFirstAudio (depuis vadSilence) et de
+    // lastSentToFirstAudio (depuis wsSend). probe() ignore les doublons, donc
+    // seul le TOUT premier chunk de l'utterance est enregistré.
+    probe('firstChunkReceived');
     if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
       const now = performance.now();
       const elapsed = Math.round(now - utteranceStartRef.current);

@@ -194,10 +194,12 @@ function VoiceLatencyBadge({
   const probeLines: string[] = [];
   if (lastProbeReport) {
     const { steps, serverGeminiMs } = lastProbeReport as any;
-    if (steps.vadSilence)  probeLines.push(`A  VAD silence   +${steps.vadSilence.tFromPrev}ms`);
-    if (steps.wsSend)      probeLines.push(`B  WS send       +${steps.wsSend.tFromPrev}ms`);
-    if (serverGeminiMs != null) probeLines.push(`D  Gemini API   ~${serverGeminiMs}ms (serveur)`);
-    if (steps.audioPlay)   probeLines.push(`E  Audio play    +${steps.audioPlay.tFromPrev}ms`);
+    if (steps.vadSilence)          probeLines.push(`A  VAD silence     +${steps.vadSilence.tFromPrev}ms`);
+    if (steps.wsSend)              probeLines.push(`B  WS send         +${steps.wsSend.tFromPrev}ms`);
+    if (serverGeminiMs != null)    probeLines.push(`D  Gemini API     ~${serverGeminiMs}ms (serveur)`);
+    if (steps.firstChunkReceived)  probeLines.push(`E  1er chunk reçu  +${steps.firstChunkReceived.tFromPrev}ms`);
+    if (steps.firstAudioScheduled) probeLines.push(`F  Audio programmé +${steps.firstAudioScheduled.tFromPrev}ms`);
+    if (steps.firstAudioAudible)   probeLines.push(`G  Audio audible   +${steps.firstAudioAudible.tFromPrev}ms`);
     probeLines.push(`─────────────────────`);
     probeLines.push(`Total client     ${lastProbeReport.total}ms`);
   }

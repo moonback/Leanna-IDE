@@ -92,6 +92,13 @@ const TOOL_MAX_RETRIES = 2;
 /** Délai de base en ms entre les tentatives (backoff exponentiel : 1s, 2s). */
 const TOOL_RETRY_DELAY_MS = 1000;
 
+/**
+ * Modèle image de repli quand le profil Leanna ne définit pas
+ * `openrouterImageModel`. La génération d'image utilise TOUJOURS le modèle du
+ * profil (choix utilisateur) ; cette constante n'intervient qu'en son absence.
+ */
+const IMAGE_MODEL_FALLBACK = 'recraft/recraft-v3:free';
+
 // ─── Court-circuit des échecs répétitifs ─────────────────────────────────────
 
 /**
@@ -1814,6 +1821,18 @@ async function handleToolCall(
         sendSafe({ tool_used: call.name, info: '[BLOQUÉ - Mode Ask]' });
         return { settled: true, response: { error: 'Mode Ask actif : seule la création de documents (md, txt, csv, json, yaml, html) est autorisée.' } };
       }
+    }
+
+    // Modèle image : TOUJOURS celui du profil Leanna (openrouterImageModel).
+    // On ignore volontairement tout modèle que l'agent aurait passé dans
+    // l'appel : le choix appartient à l'utilisateur (réglage UI). À défaut de
+    // valeur dans le profil, on retombe sur IMAGE_MODEL_FALLBACK.
+    if (call.name === 'generate_image') {
+      const profileImageModel = currentProfile.openrouterImageModel?.trim();
+      call.args = {
+        ...(call.args ?? {}),
+        model: profileImageModel || IMAGE_MODEL_FALLBACK,
+      };
     }
 
     sendSafe({ tool_start: call.name, args: call.args });
