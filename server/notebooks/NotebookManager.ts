@@ -11,6 +11,7 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { embeddingStore } from "./EmbeddingStore.js";
+import { chatResponseCache, ragSearchCache } from "./ResponseCache.js";
 import type { Notebook, NotebookNote, Source, ChatMessage, GeneratedDocument, AudioOverview } from "./types.js";
 
 const log = createLogger("NotebookManager");
@@ -219,6 +220,9 @@ export class NotebookManager {
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
+    // Les sources ont changé : les réponses chat/RAG en cache ne sont plus fiables.
+    chatResponseCache.invalidateNotebook(notebookId);
+    ragSearchCache.invalidateNotebook(notebookId);
     log.info(`📄 Source ajoutée au notebook "${notebook.title}": "${source.title}"`);
     return notebook;
   }
@@ -236,6 +240,10 @@ export class NotebookManager {
 
     // Nettoyer les embeddings associés
     embeddingStore.removeSource(sourceId, notebookId);
+
+    // Invalider les caches chat/RAG — le corpus de sources a changé.
+    chatResponseCache.invalidateNotebook(notebookId);
+    ragSearchCache.invalidateNotebook(notebookId);
 
     return true;
   }
@@ -323,6 +331,36 @@ export class NotebookManager {
     notebook.chatHistory = [];
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
+  }
+
+  /**
+   * Enregistre le retour utilisateur (pouce haut/bas) sur un message assistant.
+   * Cherche le message dans l'historique global ET dans les threads de conversation.
+   * Retourne true si un message a été trouvé et mis à jour.
+   */
+  setMessageFeedback(
+    notebookId: string,
+    messageId: string,
+    feedback: "up" | "down" | null
+  ): boolean {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook) return false;
+
+    let target = notebook.chatHistory.find(m => m.id === messageId);
+
+    if (!target && notebook.chatThreads) {
+      for (const thread of notebook.chatThreads) {
+        target = thread.messages.find(m => m.id === messageId);
+        if (target) break;
+      }
+    }
+
+    if (!target) return false;
+
+    target.feedback = feedback;
+    notebook.updatedAt = new Date().toISOString();
+    this.persist(notebook);
+    return true;
   }
 
   // ─── Generated Documents ─────────────────────────────────────────────────

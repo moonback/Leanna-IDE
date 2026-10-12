@@ -216,7 +216,24 @@ export function createChatRouter(): Router {
 
   router.post("/:id/chat/feedback", (req: Request, res: Response): void => {
     try {
-      const { messageId, feedback } = req.body;
+      const { messageId, feedback } = req.body ?? {};
+
+      if (typeof messageId !== "string" || messageId.trim().length === 0) {
+        res.status(400).json({ error: "messageId requis." });
+        return;
+      }
+      // Accepte 'up'/'down' pour poser un vote, ou null pour le retirer.
+      if (feedback !== "up" && feedback !== "down" && feedback !== null) {
+        res.status(400).json({ error: "feedback doit valoir 'up', 'down' ou null." });
+        return;
+      }
+
+      const updated = notebookManager.setMessageFeedback(req.params.id, messageId, feedback);
+      if (!updated) {
+        res.status(404).json({ error: "Message ou notebook introuvable." });
+        return;
+      }
+
       res.json({ status: "success", messageId, feedback });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

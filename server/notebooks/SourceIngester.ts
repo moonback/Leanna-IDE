@@ -169,10 +169,11 @@ export class SourceIngester {
       // (transcription nécessiterait une API dédiée)
     }
 
+    let browser: import("puppeteer").Browser | undefined;
     try {
       // Extraction via Puppeteer pour les pages web
       const puppeteer = await import("puppeteer");
-      const browser = await puppeteer.default.launch({
+      browser = await puppeteer.default.launch({
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
@@ -197,8 +198,6 @@ export class SourceIngester {
 
         return target?.innerText || "";
       });
-
-      await browser.close();
     } catch (e: any) {
       log.warn(`Puppeteer failed, fallback fetch: ${e.message}`);
       // Fallback: fetch simple
@@ -209,6 +208,14 @@ export class SourceIngester {
       const html = await response.text();
       title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || url;
       rawText = this.stripHTML(html);
+    } finally {
+      // Toujours fermer le navigateur, même si goto/evaluate a échoué,
+      // pour éviter les processus Chrome zombies.
+      if (browser) {
+        await browser.close().catch(err =>
+          log.warn(`Échec fermeture navigateur Puppeteer: ${err?.message || err}`)
+        );
+      }
     }
 
     if (!rawText.trim()) {

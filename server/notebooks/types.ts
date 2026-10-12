@@ -136,6 +136,8 @@ export interface ChatMessage {
   /** Citations (uniquement pour les messages assistant) */
   citations: Citation[];
   timestamp: string;
+  /** Retour utilisateur sur un message assistant (pouce haut/bas) */
+  feedback?: 'up' | 'down' | null;
 }
 
 export interface ChatThread {

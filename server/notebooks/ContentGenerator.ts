@@ -420,6 +420,12 @@ Génère le script complet du podcast.`;
       log.error(`Erreur génération podcast: ${e.message}`);
       overview.status = "error";
       overview.script = `Erreur: ${e.message}`;
+    } finally {
+      // Persister explicitement le statut final (ready/error). `addAudioOverview`
+      // n'a persisté que l'état initial "generating" ; sans ce flush, un podcast
+      // prêt pourrait réapparaître "generating" après un redémarrage (la mutation
+      // de `overview` ne déclenche aucune écriture par elle-même).
+      notebookManager.persistNotebook(notebookId);
     }
 
     return overview;

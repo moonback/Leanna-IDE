@@ -176,6 +176,19 @@ export class EmbeddingStore {
     for (const [notebookId] of sorted) {
       if (this.vectors.size <= this.maxVectorsInMemory * 0.8) break;
 
+      // ⚠️ Flush synchrone AVANT éviction : si des vecteurs de ce notebook ont été
+      // modifiés mais pas encore persistés (fenêtre de debounce), les évincer de la
+      // RAM maintenant écraserait l'index disque avec une version incomplète lors
+      // du prochain flushNotebook. On écrit donc d'abord l'état complet sur disque.
+      const pendingTimer = this.persistTimers.get(notebookId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.persistTimers.delete(notebookId);
+      }
+      // Toujours flusher avant de retirer les vecteurs de la RAM, afin de garantir
+      // que le fichier disque reflète tous les vecteurs actuellement en mémoire.
+      this.flushNotebookSync(notebookId);
+
       const toDelete: string[] = [];
       for (const [chunkId, entry] of this.vectors) {
         if (entry.notebookId === notebookId) toDelete.push(chunkId);
@@ -229,6 +242,37 @@ export class EmbeddingStore {
       if (err) log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${err.message}`);
       else log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (${entries.length} vecteurs)`);
     });
+  }
+
+  /**
+   * Variante synchrone de flushNotebook — utilisée avant une éviction LRU
+   * pour garantir qu'aucun vecteur modifié n'est perdu (le fichier disque est
+   * écrit avant que les vecteurs ne quittent la RAM).
+   */
+  private flushNotebookSync(notebookId: string): void {
+    ensureDataDir();
+    const entries: StoredEmbedding[] = [];
+    for (const entry of this.vectors.values()) {
+      if (entry.notebookId === notebookId) entries.push(entry);
+    }
+
+    // Rien à écrire : ne pas créer de fichier vide inutile.
+    if (entries.length === 0) return;
+
+    const index: EmbeddingIndex = {
+      version: 1,
+      model: EMBEDDING_MODEL,
+      dimensions: EMBEDDING_DIMENSIONS,
+      entries,
+    };
+
+    const filePath = this.getIndexPath(notebookId);
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(index), "utf-8");
+      log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (sync, ${entries.length} vecteurs)`);
+    } catch (err: any) {
+      log.warn(`Erreur persistence sync notebook ${notebookId.slice(0, 8)}: ${err.message}`);
+    }
   }
 
   /**
