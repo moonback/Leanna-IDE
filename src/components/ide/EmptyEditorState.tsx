@@ -67,6 +67,34 @@ function useClock() {
   return time;
 }
 
+// ─── Hook : tick périodique pour rafraîchir les durées relatives ─────────
+// Renvoie un timestamp qui se met à jour toutes les `intervalMs`.
+// Suspendu quand l'onglet est caché pour éviter les rendus inutiles.
+
+function useNow(intervalMs = 30_000): number {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    const start = () => {
+      if (timer) return;
+      setNow(Date.now());
+      timer = setInterval(() => setNow(Date.now()), intervalMs);
+    };
+    const stop = () => {
+      if (timer) { clearInterval(timer); timer = undefined; }
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
+  }, [intervalMs]);
+
+  return now;
+}
+
 function useGitInfo() {
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
 
@@ -716,9 +744,9 @@ function dirname(p: string): string {
 }
 
 /** Heure relative compacte : « à l'instant », « 5 min », « 3 h », « 2 j ». */
-function relativeTime(ts?: number): string {
+function relativeTime(ts?: number, now: number = Date.now()): string {
   if (!ts || !Number.isFinite(ts)) return '';
-  const diff = Date.now() - ts;
+  const diff = now - ts;
   if (diff < 0) return '';
   const min = Math.floor(diff / 60_000);
   if (min < 1) return "à l'instant";
@@ -735,6 +763,7 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
 }: { onOpenFile: (path: string) => void; reduceMotion?: boolean }) {
   const { files, remove, clear } = useRecentFiles();
   const visible = useMemo(() => files.slice(0, 6), [files]);
+  const now = useNow(30_000); // rafraîchit les durées relatives
 
   if (visible.length === 0) return null;
 
@@ -761,7 +790,7 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
           {visible.map((f) => {
             const name = basename(f.path);
             const dir = dirname(f.path);
-            const when = relativeTime(f.openedAt);
+            const when = relativeTime(f.openedAt, now);
             return (
               <motion.li
                 key={f.path}
