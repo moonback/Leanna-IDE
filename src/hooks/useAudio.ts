@@ -62,8 +62,17 @@ export interface UseAudioOptions {
   vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
   /** Appelé une seule fois par utterance quand le VAD détecte le silence long (étape A). */
   onVadSilence?: () => void;
-  /** Appelé une seule fois quand le premier chunk audio est schedulé pour lecture (étape E). */
-  onFirstAudioScheduled?: () => void;
+  /**
+   * Appelé une seule fois quand le premier chunk audio de réponse est programmé
+   * pour lecture via source.start (étape F — PROGRAMMATION, pas audibilité).
+   *
+   * @param info.scheduledInMs  Délai (ms, relatif à performance.now()) avant le
+   *   début programmé de la lecture. 0 si la lecture démarre immédiatement.
+   * @param info.outputLatencyMs Latence de sortie matérielle/OS estimée (ms),
+   *   issue de AudioContext.outputLatency (fallback baseLatency, puis 0).
+   *   scheduledInMs + outputLatencyMs ≈ délai avant audibilité réelle (étape G).
+   */
+  onFirstAudioScheduled?: (info: { scheduledInMs: number; outputLatencyMs: number }) => void;
 }
 
 export function useAudio({ 
@@ -93,8 +102,8 @@ export function useAudio({
   // Callback étape A (sonde latence) — ne se déclenche qu'une fois par utterance
   const onVadSilenceRef = useRef<(() => void) | undefined>(onVadSilence);
   const vadSilenceFiredRef = useRef(false); // garde pour n'appeler qu'une fois
-  // Callback étape E (sonde latence) — premier chunk audio schedulé pour lecture
-  const onFirstAudioScheduledRef = useRef<(() => void) | undefined>(onFirstAudioScheduled);
+  // Callback étape F (sonde latence) — premier chunk audio programmé pour lecture
+  const onFirstAudioScheduledRef = useRef<UseAudioOptions['onFirstAudioScheduled']>(onFirstAudioScheduled);
   const firstAudioScheduledFiredRef = useRef(false);
 
   // Keep refs in sync
@@ -199,14 +208,26 @@ export function useAudio({
 
       const now = audioCtx.currentTime;
       if (nextStartTimeRef.current < now) nextStartTimeRef.current = now + 0.05;
-      source.start(nextStartTimeRef.current);
+      const scheduledAt = nextStartTimeRef.current;
+      source.start(scheduledAt);
       nextStartTimeRef.current += audioBuffer.duration;
 
-      // Étape E : premier chunk audio schedulé pour lecture effective.
+      // Étape F : premier chunk audio PROGRAMMÉ pour lecture (source.start).
       // On réarme après chaque interruption (handleInterrupt recrée l'AudioContext).
       if (!firstAudioScheduledFiredRef.current) {
         firstAudioScheduledFiredRef.current = true;
-        onFirstAudioScheduledRef.current?.();
+        // Délai avant le début programmé de la lecture (horloge AudioContext).
+        const scheduledInMs = Math.max(0, (scheduledAt - now) * 1000);
+        // Latence de sortie matérielle/OS : outputLatency est la plus fidèle,
+        // baseLatency un fallback, 0 si aucune n'est exposée par le navigateur.
+        const outputLatencySec =
+          (typeof audioCtx.outputLatency === 'number' ? audioCtx.outputLatency : undefined) ??
+          (typeof audioCtx.baseLatency === 'number' ? audioCtx.baseLatency : undefined) ??
+          0;
+        onFirstAudioScheduledRef.current?.({
+          scheduledInMs,
+          outputLatencyMs: outputLatencySec * 1000,
+        });
       }
     } catch (e) {
       console.error('Error playing audio chunk', e);

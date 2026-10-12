@@ -71,6 +71,60 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
     } finally { clearTimeout(timeoutId); }
   });
 
+  // POST /api/openrouter/test-image
+  // Vérifie qu'un modèle de génération d'image répond réellement : effectue une
+  // génération minimale (petit prompt) et confirme la présence de données image.
+  // La clé peut venir du corps de requête ou des variables d'environnement.
+  router.post('/test-image', async (req: Request, res: Response) => {
+    const { apiKey, model } = req.body as { apiKey?: string; model?: string };
+    const key = apiKey?.trim() || process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_API_KEY;
+    if (!key) {
+      res.status(400).json({ status: 'error', error: 'Clé API requise.' });
+      return;
+    }
+    if (!model || !model.trim()) {
+      res.status(400).json({ status: 'error', error: 'Modèle image requis.' });
+      return;
+    }
+    const controller = new AbortController();
+    // La génération d'image est plus lente que le chat : marge de 30s.
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(`${OPENROUTER_BASE_URL}/images/generations`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.OPENROUTER_REFERER || 'https://Leanna.local',
+          'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
+        },
+        body: JSON.stringify({
+          model: model.trim(),
+          prompt: 'A small blue circle on a white background, minimal test image.',
+          n: 1,
+          response_format: 'b64_json',
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        res.json({ status: 'error', error: `HTTP ${response.status}: ${errText.slice(0, 200)}` });
+        return;
+      }
+      const data: any = await response.json();
+      const b64 = data?.data?.[0]?.b64_json as string | undefined;
+      if (!b64) {
+        res.json({ status: 'error', error: 'Réponse sans données image (b64_json absent).' });
+        return;
+      }
+      const sizeKB = Math.round((b64.length * 3 / 4) / 1024);
+      res.json({ status: 'success', model: data?.model || model.trim(), sizeKB });
+    } catch (e: any) {
+      if (e.name === 'AbortError') res.json({ status: 'error', error: 'Génération échouée (timeout 30s)' });
+      else res.json({ status: 'error', error: e.message || 'Génération échouée' });
+    } finally { clearTimeout(timeoutId); }
+  });
+
   // POST /api/openrouter/chat
   router.post('/chat', async (req: Request, res: Response) => {
     const { apiKey, model, messages, temperature, topP, maxTokens } = req.body as {

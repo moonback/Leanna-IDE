@@ -21,10 +21,12 @@ import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("imageGenerationSkill");
 
-// Modèle image par défaut : Gemini via OpenRouter. Surchargable par
-// OPENROUTER_IMAGE_MODEL puis par l'argument `model` de l'appel.
+// Modèle image par défaut via OpenRouter. Surchargable par
+// OPENROUTER_IMAGE_MODEL puis par l'argument `model` de l'appel (lequel est,
+// pour la session Live, systématiquement renseigné depuis le profil Leanna
+// `openrouterImageModel` — voir LiveSocketHandler).
 const DEFAULT_IMAGE_MODEL =
-  process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-3.1-flash-image";
+  process.env.OPENROUTER_IMAGE_MODEL || "recraft/recraft-v3:free";
 
 const ALLOWED_ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] as const;
 
@@ -75,7 +77,7 @@ export const imageGenerationSkill: Skill = {
     {
       name: "generate_image",
       description: [
-        "🎨 Génère une image à partir d'une description en langage naturel (OpenRouter / Gemini).",
+        "🎨 Génère une image à partir d'une description en langage naturel (OpenRouter).",
         "Utilise cet outil dès que l'utilisateur demande de créer, dessiner, générer ou illustrer une image.",
         "L'image est enregistrée automatiquement dans le sandbox (dossier `generated-images/`)",
         "ET affichée automatiquement dans le panneau de chat — tu n'as RIEN à recopier.",
@@ -85,6 +87,7 @@ export const imageGenerationSkill: Skill = {
         "",
         "Rédige un `prompt` riche et précis (sujet, cadrage, style, ambiance, couleurs, éclairage).",
         "Le prompt fonctionne mieux en anglais.",
+        "Le modèle d'image est fixé par l'utilisateur dans ses réglages : tu ne le choisis pas.",
       ].join("\n"),
       permissions: ["network", "write"],
       parameters: {
@@ -94,10 +97,6 @@ export const imageGenerationSkill: Skill = {
             type: "STRING",
             description:
               "Description détaillée de l'image à générer (sujet, style, cadrage, ambiance, couleurs). De préférence en anglais.",
-          },
-          model: {
-            type: "STRING",
-            description: `Modèle OpenRouter optionnel. Par défaut: ${DEFAULT_IMAGE_MODEL}.`,
           },
           style: {
             type: "STRING",
@@ -148,6 +147,12 @@ export const imageGenerationSkill: Skill = {
       });
     } catch (e: any) {
       log.error(`generate_image: échec de l'appel — ${e?.message}`);
+      // Notifier le client pour que le placeholder animé passe en état d'échec
+      // (sinon l'animation « Génération… » tournerait indéfiniment).
+      context?.emitToClient?.({
+        image_generation: "error",
+        message: `Échec de la génération de l'image : ${e?.message || "erreur inconnue"}.`,
+      });
       return {
         error: `Échec de la génération de l'image : ${e?.message || "erreur inconnue"}.`,
         hint: "Vérifie la clé OPENROUTER_API_KEY et le modèle image configuré.",
@@ -155,6 +160,11 @@ export const imageGenerationSkill: Skill = {
     }
 
     if (!result) {
+      context?.emitToClient?.({
+        image_generation: "error",
+        message:
+          "La génération d'image a échoué. Vérifie OPENROUTER_API_KEY et le modèle image configuré.",
+      });
       return {
         error:
           "La génération d'image a échoué. Vérifie que OPENROUTER_API_KEY est configurée et que le modèle image est valide.",

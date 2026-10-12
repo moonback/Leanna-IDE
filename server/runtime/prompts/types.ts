@@ -134,6 +134,8 @@ export interface ProfileConfig {
   topP?: number;
   textProvider?: 'gemini' | 'openrouter';
   openrouterModel?: string;
+  /** Modèle OpenRouter utilisé pour la génération d'images (outil generate_image). */
+  openrouterImageModel?: string;
   openrouterApiKey?: string;
   /** Enable compact system prompt to save tokens */
   compactPrompt?: boolean;

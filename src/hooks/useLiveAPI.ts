@@ -92,6 +92,9 @@ export function useLiveAPI() {
     transcript,
     addTranscript,
     clearTranscript,
+    addPendingImage,
+    resolvePendingImage,
+    failPendingImage,
   } = useTranscript();
 
   const {
@@ -233,8 +236,18 @@ export function useLiveAPI() {
       vadSilenceDuration: profile.vadSilenceDuration,
       // Étape A : fin de capture (VAD silence long atteint)
       onVadSilence: () => probe('vadSilence'),
-      // Étape E : premier chunk audio schedulé pour lecture effective
-      onFirstAudioScheduled: () => probe('audioPlay'),
+      // Étapes F + G : programmation de lecture, puis audibilité estimée.
+      onFirstAudioScheduled: ({ scheduledInMs, outputLatencyMs }) => {
+        // F : instant où source.start a été appelé (programmation).
+        const scheduledAtNow = performance.now();
+        probe('firstAudioScheduled', { tAbs: scheduledAtNow });
+        // G : instant estimé d'audibilité réelle = programmation + délai avant
+        // début de lecture + latence de sortie matérielle/OS. Peut être dans le
+        // futur par rapport à performance.now(), d'où le timestamp explicite.
+        probe('firstAudioAudible', {
+          tAbs: scheduledAtNow + scheduledInMs + outputLatencyMs,
+        });
+      },
     });
 
   // Define onMessage handler for WS events
@@ -404,16 +417,38 @@ export function useLiveAPI() {
     if (msg.image_generation === 'start') {
       startActivity('generate_image', { prompt: msg.prompt });
       window.dispatchEvent(new CustomEvent('Leanna-tool-start', { detail: { tool: 'generate_image', args: { prompt: msg.prompt } } }));
+      // Placeholder animé dans le chat pendant la génération.
+      addPendingImage();
     }
     if (msg.image_generation === 'done') {
       completeActivity('generate_image');
       window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: 'generate_image' } }));
       if (typeof msg.dataUri === 'string' && msg.dataUri.startsWith('data:image/')) {
         const alt = (typeof msg.alt === 'string' && msg.alt.trim()) ? msg.alt.trim() : 'Image générée';
-        // Insère l'image comme message assistant. Le sanitizer markdown autorise
-        // les <img> en data-URI, donc l'image s'affiche directement dans la bulle.
-        addTranscript('assistant', `\n\n![${alt}](${msg.dataUri})\n\n`);
+        // Légende sous l'image : modèle générateur (+ taille si connue). Rendue
+        // en italique markdown (<em>, autorisé par le sanitizer). On neutralise
+        // les caractères markdown actifs du nom de modèle par prudence.
+        const modelName = typeof msg.model === 'string' ? msg.model.trim() : '';
+        const sizeKB = typeof msg.sizeKB === 'number' ? msg.sizeKB : null;
+        let caption = '';
+        if (modelName) {
+          const safeModel = modelName.replace(/[*_`[\]()]/g, '');
+          const sizePart = sizeKB != null ? ` · ${sizeKB} Ko` : '';
+          caption = `\n\n*🎨 Généré par \`${safeModel}\`${sizePart}*`;
+        }
+        // Remplace le placeholder animé par l'image. Le sanitizer markdown
+        // autorise les <img> en data-URI, donc l'image s'affiche dans la bulle.
+        resolvePendingImage(`\n\n![${alt}](${msg.dataUri})${caption}\n\n`);
+      } else {
+        // Génération terminée sans image exploitable → passer en état d'échec
+        // plutôt que de laisser l'animation tourner indéfiniment.
+        failPendingImage('Image indisponible (réponse sans données exploitables).');
       }
+    }
+    if (msg.image_generation === 'error') {
+      completeActivity('generate_image');
+      window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: 'generate_image' } }));
+      failPendingImage(typeof msg.message === 'string' ? msg.message : undefined);
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {
       window.dispatchEvent(new CustomEvent('Leanna-browser-read-request', {
@@ -570,6 +605,9 @@ export function useLiveAPI() {
     setIsBusy,
     setReasoning,
     addTranscript,
+    addPendingImage,
+    resolvePendingImage,
+    failPendingImage,
     addTokenUsage,
     updatePromptContext,
     clearTokenUsage,
@@ -577,6 +615,11 @@ export function useLiveAPI() {
   ]);
 
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
+    // Étape E : premier chunk audio de réponse reçu via WS (côté client).
+    // C'est le point d'arrivée de userEndToFirstAudio (depuis vadSilence) et de
+    // lastSentToFirstAudio (depuis wsSend). probe() ignore les doublons, donc
+    // seul le TOUT premier chunk de l'utterance est enregistré.
+    probe('firstChunkReceived');
     if (waitingFirstResponseChunkRef.current && utteranceStartRef.current !== null) {
       const now = performance.now();
       const elapsed = Math.round(now - utteranceStartRef.current);

@@ -6,21 +6,36 @@
  * précises pour identifier le composant responsable des délais observés.
  *
  * Étapes instrumentées :
- *   A  vadSilence    Fin de capture audio (VAD détecte silence long)
- *   B  wsSend        Envoi du dernier chunk audio au serveur via WS
- *   C  — (serveur)   Réception côté serveur → sendRealtimeInput    [log Node]
- *   D  — (serveur)   Premier onmessage Gemini avec audio            [log Node]
- *   E  audioPlay     Premier chunk schedulé pour lecture effective
+ *   A  vadSilence           Fin de capture audio (VAD détecte silence long)
+ *   B  wsSend               Envoi du dernier chunk audio au serveur via WS
+ *   C  — (serveur)          Réception côté serveur → sendRealtimeInput    [log Node]
+ *   D  — (serveur)          Premier onmessage Gemini avec audio            [log Node]
+ *   E  firstChunkReceived   Premier chunk audio de réponse reçu via WS (côté client)
+ *   F  firstAudioScheduled  Premier chunk schedulé pour lecture (source.start)
+ *   G  firstAudioAudible    Instant estimé où le son devient réellement audible
+ *                           (= scheduled + outputLatency du contexte audio)
+ *
+ * Distinction clé : `firstAudioScheduled` est un événement de PROGRAMMATION de
+ * lecture (appel à source.start), pas le moment où le son devient audible.
+ * `firstAudioAudible` ajoute la latence de sortie matérielle/OS pour refléter la
+ * perception réelle de l'utilisateur. Ces deux mesures ne sont pas interchangeables.
  *
  * Utilisation :
  *   import { probe, flushProbe } from '../lib/latencyProbe';
  *
- *   probe('vadSilence');   // marque l'étape A
- *   probe('wsSend');       // marque l'étape B
- *   probe('audioPlay');    // marque l'étape E → flush automatique
+ *   probe('vadSilence');          // étape A
+ *   probe('wsSend');              // étape B
+ *   probe('firstChunkReceived');  // étape E
+ *   probe('firstAudioScheduled'); // étape F
+ *   probe('firstAudioAudible', { tAbs }); // étape G → flush automatique
  */
 
-export type ProbeStep = 'vadSilence' | 'wsSend' | 'audioPlay';
+export type ProbeStep =
+  | 'vadSilence'
+  | 'wsSend'
+  | 'firstChunkReceived'
+  | 'firstAudioScheduled'
+  | 'firstAudioAudible';
 
 interface ProbeEntry {
   step: ProbeStep;
@@ -30,7 +45,15 @@ interface ProbeEntry {
 // Une seule session de mesure à la fois (une utterance = un jeu de sondes).
 let session: ProbeEntry[] = [];
 // Séquence attendue pour garantir qu'on ne mélange pas deux utterances
-const STEP_ORDER: ProbeStep[] = ['vadSilence', 'wsSend', 'audioPlay'];
+const STEP_ORDER: ProbeStep[] = [
+  'vadSilence',
+  'wsSend',
+  'firstChunkReceived',
+  'firstAudioScheduled',
+  'firstAudioAudible',
+];
+// Étape terminale qui déclenche le flush automatique du rapport.
+const FINAL_STEP: ProbeStep = 'firstAudioAudible';
 
 /**
  * Enregistre un point de passage dans la chaîne.
@@ -39,8 +62,11 @@ const STEP_ORDER: ProbeStep[] = ['vadSilence', 'wsSend', 'audioPlay'];
  * L'étape 'wsSend' est spéciale : elle est mise à jour à chaque appel pour
  * capturer le timestamp du DERNIER chunk audio envoyé (fin d'utterance réelle).
  */
-export function probe(step: ProbeStep): void {
-  const t = performance.now();
+export function probe(step: ProbeStep, opts?: { tAbs?: number }): void {
+  // Permet de fournir un timestamp explicite (ex. instant d'audibilité estimé
+  // à partir de l'horloge AudioContext, qui peut être dans le futur par rapport
+  // à performance.now() au moment de la programmation).
+  const t = opts?.tAbs ?? performance.now();
 
   // Réinitialiser si une nouvelle utterance commence avant que la précédente
   // ne soit terminée (ex. interruption, barge-in).
@@ -79,7 +105,7 @@ export function probe(step: ProbeStep): void {
 
   session.push({ t, step });
 
-  if (step === 'audioPlay') {
+  if (step === FINAL_STEP) {
     flushProbe();
   }
 }
@@ -127,7 +153,7 @@ export function flushProbe(): LatencyReport | null {
       const e = report.steps[s];
       if (!e) return '';
       const arrow = e.tFromPrev > 0 ? ` (+${e.tFromPrev}ms)` : '';
-      return `  ${s.padEnd(12)} ${e.tFromStart}ms${arrow}`;
+      return `  ${s.padEnd(20)} ${e.tFromStart}ms${arrow}`;
     })
     .filter(Boolean);
 
