@@ -136,14 +136,7 @@ export const OPENROUTER_MODELS = [
 // ─── Modèles de génération d'images disponibles via OpenRouter ────────────────
 
 export const OPENROUTER_IMAGE_MODELS = [
-  // ── Gratuits ──────────────────────────────────────────────
-  {
-    id: 'recraft/recraft-v3:free',
-    name: 'Recraft V3 Free',
-    free: true,
-    desc: 'Recraft — génération gratuite, illustrations, logos, visuels marketing et texte dans les images.',
-  },
-
+  
   // ── Meilleure qualité générale ────────────────────────────
   {
     id: 'google/gemini-3.1-flash-image',
@@ -162,14 +155,6 @@ export const OPENROUTER_IMAGE_MODELS = [
     name: 'Nano Banana Pro',
     free: false,
     desc: 'Google — visuels complexes, rendu haute fidélité, infographies et compositions multimodales.',
-  },
-
-  // ── Création et édition avancées ──────────────────────────
-  {
-    id: 'bytedance-seed/seedream-5.0-flash',
-    name: 'Seedream 5.0 Flash',
-    free: false,
-    desc: 'ByteDance — génération rapide, bonne fidélité au prompt et édition créative.',
   },
   {
     id: 'black-forest-labs/flux.2-pro',

@@ -92,6 +92,9 @@ export function useLiveAPI() {
     transcript,
     addTranscript,
     clearTranscript,
+    addPendingImage,
+    resolvePendingImage,
+    failPendingImage,
   } = useTranscript();
 
   const {
@@ -414,6 +417,8 @@ export function useLiveAPI() {
     if (msg.image_generation === 'start') {
       startActivity('generate_image', { prompt: msg.prompt });
       window.dispatchEvent(new CustomEvent('Leanna-tool-start', { detail: { tool: 'generate_image', args: { prompt: msg.prompt } } }));
+      // Placeholder animé dans le chat pendant la génération.
+      addPendingImage();
     }
     if (msg.image_generation === 'done') {
       completeActivity('generate_image');
@@ -431,10 +436,19 @@ export function useLiveAPI() {
           const sizePart = sizeKB != null ? ` · ${sizeKB} Ko` : '';
           caption = `\n\n*🎨 Généré par \`${safeModel}\`${sizePart}*`;
         }
-        // Insère l'image comme message assistant. Le sanitizer markdown autorise
-        // les <img> en data-URI, donc l'image s'affiche directement dans la bulle.
-        addTranscript('assistant', `\n\n![${alt}](${msg.dataUri})${caption}\n\n`);
+        // Remplace le placeholder animé par l'image. Le sanitizer markdown
+        // autorise les <img> en data-URI, donc l'image s'affiche dans la bulle.
+        resolvePendingImage(`\n\n![${alt}](${msg.dataUri})${caption}\n\n`);
+      } else {
+        // Génération terminée sans image exploitable → passer en état d'échec
+        // plutôt que de laisser l'animation tourner indéfiniment.
+        failPendingImage('Image indisponible (réponse sans données exploitables).');
       }
+    }
+    if (msg.image_generation === 'error') {
+      completeActivity('generate_image');
+      window.dispatchEvent(new CustomEvent('Leanna-tool-done', { detail: { tool: 'generate_image' } }));
+      failPendingImage(typeof msg.message === 'string' ? msg.message : undefined);
     }
     if (msg.type === 'browser-read-request' && msg.requestId) {
       window.dispatchEvent(new CustomEvent('Leanna-browser-read-request', {
@@ -591,6 +605,9 @@ export function useLiveAPI() {
     setIsBusy,
     setReasoning,
     addTranscript,
+    addPendingImage,
+    resolvePendingImage,
+    failPendingImage,
     addTokenUsage,
     updatePromptContext,
     clearTokenUsage,

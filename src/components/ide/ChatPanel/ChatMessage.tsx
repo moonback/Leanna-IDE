@@ -1,10 +1,11 @@
 import { memo, useCallback, useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Bot, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil } from 'lucide-react';
+import { User, Bot, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
 import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { BUBBLE_STYLES, TRANSITIONS } from './theme.js';
 import { ChatMarkdown } from './ChatMarkdown.js';
+import { BreathingDots } from './BreathingDots.js';
 
 export interface ChatMessageProps {
   entry: TranscriptEntry;
@@ -40,6 +41,79 @@ function highlightText(text: string, term: string): React.ReactNode {
     ) : (
       part
     ),
+  );
+}
+
+/**
+ * Carte de chargement affichée pendant la génération d'une image : cadre en
+ * aspect 1:1 avec un balayage lumineux (shimmer) + libellé animé. Remplacée par
+ * l'image réelle une fois la génération terminée (voir useTranscript).
+ */
+function GeneratingImage({ reduceMotion }: { reduceMotion: boolean }) {
+  return (
+    <div className="flex flex-col gap-2" style={{ minWidth: '220px' }}>
+      <div
+        className="relative overflow-hidden rounded-lg"
+        style={{
+          width: '220px',
+          aspectRatio: '1 / 1',
+          backgroundColor: 'color-mix(in srgb, var(--accent-primary) 6%, var(--bg-panel))',
+          border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
+        }}
+      >
+        {!reduceMotion && (
+          <motion.div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(110deg, transparent 20%, color-mix(in srgb, var(--accent-primary) 22%, transparent) 50%, transparent 80%)',
+            }}
+            initial={{ x: '-100%' }}
+            animate={{ x: '100%' }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span style={{ fontSize: '28px', lineHeight: 1 }}>🎨</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} size={5} />
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Génération de l'image…
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Carte d'échec affichée quand la génération d'image a raté : cadre statique
+ * avec icône « image barrée » + message d'erreur. Remplace l'animation de
+ * chargement (voir useTranscript.failPendingImage).
+ */
+function FailedImage({ message }: { message?: string }) {
+  return (
+    <div className="flex flex-col gap-2" style={{ minWidth: '220px' }}>
+      <div
+        className="relative overflow-hidden rounded-lg flex items-center justify-center"
+        style={{
+          width: '220px',
+          aspectRatio: '1 / 1',
+          backgroundColor: 'color-mix(in srgb, var(--color-error) 7%, var(--bg-panel))',
+          border: '1px solid color-mix(in srgb, var(--color-error) 32%, transparent)',
+        }}
+      >
+        <ImageOff size={30} style={{ color: 'var(--color-error)', opacity: 0.75 }} />
+      </div>
+      <div className="flex items-start gap-2">
+        <ImageOff size={13} style={{ color: 'var(--color-error)', marginTop: '2px', flexShrink: 0 }} />
+        <span className="text-xs" style={{ color: 'var(--color-error)' }}>
+          {message && message.trim() ? message : "La génération de l'image a échoué."}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -116,7 +190,11 @@ export const ChatMessage = memo(function ChatMessage({
               <Pin size={10} />
             </span>
           )}
-          {isAssistant ? <ChatMarkdown text={entry.text} /> : (
+          {entry.pending === 'image' ? (
+            <GeneratingImage reduceMotion={reduceMotion} />
+          ) : entry.pending === 'image-error' ? (
+            <FailedImage message={entry.imageError} />
+          ) : isAssistant ? <ChatMarkdown text={entry.text} /> : (
             <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {highlight ? highlightText(entry.text, highlight) : entry.text}
             </span>

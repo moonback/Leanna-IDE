@@ -17,6 +17,17 @@ export interface TranscriptEntry {
   text: string;
   timestamp: Date;
   sources?: ContextSource[];
+  /**
+   * État spécial d'un message de génération d'image, rendu dans la bulle au
+   * lieu du texte markdown :
+   *  - 'image'       : génération en cours → animation de chargement
+   *  - 'image-error' : génération échouée → carte d'échec (voir `imageError`)
+   * Transitions : `addPendingImage` (→ image), `resolvePendingImage` (→ image
+   * remplacée par le markdown final), `failPendingImage` (→ image-error).
+   */
+  pending?: 'image' | 'image-error';
+  /** Message d'erreur affiché quand `pending === 'image-error'`. */
+  imageError?: string;
 }
 
 export function useTranscript() {
@@ -68,6 +79,85 @@ export function useTranscript() {
     setTranscript([]);
   }, []);
 
+  // ── Placeholder « génération d'image » ──────────────────────────────────────
+  // On insère un message assistant marqué `pending: 'image'` dès le début de la
+  // génération (animation de chargement), puis on le remplace par l'image une
+  // fois reçue. Un seul placeholder image à la fois : si un ancien traîne (ex.
+  // échec silencieux), on le remplace. `id` stable pour le retrouver.
+  const PENDING_IMAGE_ID = '__pending_image__';
+
+  const addPendingImage = useCallback(() => {
+    setTranscript(prev => {
+      // Retirer un éventuel placeholder image orphelin avant d'en créer un neuf.
+      const cleaned = prev.filter(e => e.id !== PENDING_IMAGE_ID);
+      const entry: TranscriptEntry = {
+        id: PENDING_IMAGE_ID,
+        role: 'assistant',
+        text: '',
+        timestamp: new Date(),
+        pending: 'image',
+      };
+      const next = [...cleaned, entry];
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+  }, []);
+
+  const resolvePendingImage = useCallback((markdown: string) => {
+    setTranscript(prev => {
+      const idx = prev.findIndex(e => e.id === PENDING_IMAGE_ID);
+      if (idx === -1) {
+        // Pas de placeholder (ex. start manqué) → simple ajout en fin.
+        const entry: TranscriptEntry = {
+          id: Date.now().toString() + Math.random(),
+          role: 'assistant',
+          text: markdown,
+          timestamp: new Date(),
+        };
+        return [...prev, entry];
+      }
+      const resolved: TranscriptEntry = {
+        ...prev[idx],
+        id: Date.now().toString() + Math.random(),
+        text: markdown,
+        timestamp: new Date(),
+        pending: undefined,
+      };
+      return [...prev.slice(0, idx), resolved, ...prev.slice(idx + 1)];
+    });
+  }, []);
+
+  const failPendingImage = useCallback((message?: string) => {
+    const errorText = (message && message.trim())
+      ? message.trim()
+      : "La génération de l'image a échoué.";
+    setTranscript(prev => {
+      const idx = prev.findIndex(e => e.id === PENDING_IMAGE_ID);
+      if (idx === -1) {
+        // Pas de placeholder (ex. start manqué) → créer directement une carte
+        // d'échec pour que l'utilisateur voie que la génération a raté.
+        const entry: TranscriptEntry = {
+          id: Date.now().toString() + Math.random(),
+          role: 'assistant',
+          text: '',
+          timestamp: new Date(),
+          pending: 'image-error',
+          imageError: errorText,
+        };
+        return [...prev, entry];
+      }
+      // Convertir le placeholder animé en carte d'échec (id réaffecté pour qu'il
+      // ne soit plus ciblé comme « pending image » par une génération ultérieure).
+      const failed: TranscriptEntry = {
+        ...prev[idx],
+        id: Date.now().toString() + Math.random(),
+        timestamp: new Date(),
+        pending: 'image-error',
+        imageError: errorText,
+      };
+      return [...prev.slice(0, idx), failed, ...prev.slice(idx + 1)];
+    });
+  }, []);
+
   // ── Listener: résumé automatique du contexte ─────────────────────────────
   // Quand useLiveAPI déclenche 'Leanna-summarize-context', on remplace le
   // transcript par le résumé + les tours conservés.
@@ -105,6 +195,9 @@ export function useTranscript() {
     transcript,
     addTranscript,
     clearTranscript,
+    addPendingImage,
+    resolvePendingImage,
+    failPendingImage,
     transcriptRestored: hasRestoredTranscript,
   };
 }

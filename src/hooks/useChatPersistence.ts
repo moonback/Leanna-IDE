@@ -67,7 +67,13 @@ export function useChatPersistence(sessionId = 'default') {
   const saveTranscript = useCallback((transcript: TranscriptEntry[]) => {
     if (typeof window === 'undefined') return;
     try {
-      const persisted = transcript.slice(-MAX_PERSISTED_MESSAGES).map(entry => ({
+      const persisted = transcript
+        // Ne jamais persister un placeholder « en cours » (génération d'image) :
+        // au rechargement il resterait bloqué en animation sans jamais se résoudre.
+        // En revanche l'état d'échec ('image-error') est conservé.
+        .filter(entry => entry.pending !== 'image')
+        .slice(-MAX_PERSISTED_MESSAGES)
+        .map(entry => ({
         ...entry,
         // Les images inline en data-URI (générées par Leanna) sont trop
         // volumineuses pour localStorage et feraient échouer TOUT l'enregistrement

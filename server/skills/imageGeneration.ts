@@ -147,6 +147,12 @@ export const imageGenerationSkill: Skill = {
       });
     } catch (e: any) {
       log.error(`generate_image: échec de l'appel — ${e?.message}`);
+      // Notifier le client pour que le placeholder animé passe en état d'échec
+      // (sinon l'animation « Génération… » tournerait indéfiniment).
+      context?.emitToClient?.({
+        image_generation: "error",
+        message: `Échec de la génération de l'image : ${e?.message || "erreur inconnue"}.`,
+      });
       return {
         error: `Échec de la génération de l'image : ${e?.message || "erreur inconnue"}.`,
         hint: "Vérifie la clé OPENROUTER_API_KEY et le modèle image configuré.",
@@ -154,6 +160,11 @@ export const imageGenerationSkill: Skill = {
     }
 
     if (!result) {
+      context?.emitToClient?.({
+        image_generation: "error",
+        message:
+          "La génération d'image a échoué. Vérifie OPENROUTER_API_KEY et le modèle image configuré.",
+      });
       return {
         error:
           "La génération d'image a échoué. Vérifie que OPENROUTER_API_KEY est configurée et que le modèle image est valide.",

@@ -278,7 +278,13 @@ function IdeNavigationBridge() {
 
       // File was modified on disk by the assistant — reload it in the editor
       if (detail.type === 'file-changed' && typeof detail.path === 'string') {
-        if (location.pathname !== '/' && location.pathname !== '/ide') {
+        // Les images générées (generated-images/) s'affichent dans la conversation
+        // et ne doivent pas forcer le passage à l'IDE ni ouvrir d'onglet. On relaie
+        // tout de même l'événement pour rafraîchir l'arbre sandbox, mais sans
+        // navigation (IdeView ignore déjà l'ouverture d'onglet pour ces fichiers).
+        const normalizedPath = detail.path.replace(/\\/g, '/');
+        const isGeneratedImage = /(^|\/)generated-images\//.test(normalizedPath);
+        if (!isGeneratedImage && location.pathname !== '/' && location.pathname !== '/ide') {
           navigate('/ide');
         }
         setTimeout(() => {

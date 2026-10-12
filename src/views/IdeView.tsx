@@ -382,6 +382,11 @@ export default function IdeView() {
       const detail = (event as CustomEvent).detail;
       if (!detail || typeof detail.path !== 'string') return;
       const filePath: string = detail.path;
+      // Les images générées par Leanna (dossier generated-images/) ne doivent PAS
+      // s'ouvrir dans l'IDE : elles s'affichent déjà inline dans la conversation.
+      // On rafraîchit l'arbre sandbox mais on n'ouvre jamais d'onglet pour elles.
+      const normalized = filePath.replace(/\\/g, '/');
+      const isGeneratedImage = /(^|\/)generated-images\//.test(normalized);
       // Show self-edit banner when the IA modifies an open file
       setSelfEditingFile(filePath);
       setTimeout(() => setSelfEditingFile(null), 5000);
@@ -389,7 +394,7 @@ export default function IdeView() {
       if (isOpen) {
         await fileSystem.forceReloadFile(filePath);
         setReloadKeys(prev => ({ ...prev, [filePath]: (prev[filePath] ?? 0) + 1 }));
-      } else {
+      } else if (!isGeneratedImage) {
         openFileAt(filePath);
       }
       // Rafraîchir le diff sandbox si actif (pour les agents autonomes sans session Live)
