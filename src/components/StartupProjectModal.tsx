@@ -593,9 +593,9 @@ export function StartupProjectModal() {
           aria-modal="true"
           aria-labelledby="workspace-modal-title"
           onClick={e => e.stopPropagation()}
-          className="relative z-10 flex w-full max-w-5xl rounded-3xl overflow-hidden border"
+          className="relative z-10 flex w-full max-w-12xl rounded-3xl overflow-hidden border"
           style={{
-            height: 'min(680px, calc(100vh - 40px))',
+            height: 'min(980px, calc(100vh - 40px))',
             backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
             borderColor: 'color-mix(in srgb, var(--accent-primary) 18%, rgba(255,255,255,0.08))',
             boxShadow: '0 40px 120px -20px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 60px -20px color-mix(in srgb, var(--accent-primary) 12%, transparent)',
