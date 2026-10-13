@@ -188,6 +188,7 @@ export function useChatStream({
               } else if (parsed.message) {
                 setStreamingText('');
                 setMessages(prev => [...prev, parsed.message!]);
+                setFollowUps(Array.isArray(parsed.followUps) ? parsed.followUps : []);
 
                 if (!document.hidden) {
                   onSuccess('✓ Réponse générée avec succès');
@@ -223,7 +224,7 @@ export function useChatStream({
       setLoading(false);
       inputRef.current?.focus();
     }
-  }, [notebookId, onError, onSuccess]);
+  }, [notebookId, onError, onSuccess, setFollowUps]);
 
   const handleSend = useCallback((question: string) => {
     const q = (question ?? '').trim();
@@ -248,11 +249,12 @@ export function useChatStream({
     };
 
     setMessages(prev => [...prev, tempUserMsg]);
+    setFollowUps([]);
     requestQueueRef.current.push(request);
     setQueuedCount(requestQueueRef.current.length);
 
     void processChatQueue();
-  }, [selectedSources, personality, activeThreadId, processChatQueue]);
+  }, [selectedSources, personality, activeThreadId, processChatQueue, setFollowUps]);
 
   const handleRetry = useCallback(async (msgId: string) => {
     const current = messagesRef.current;

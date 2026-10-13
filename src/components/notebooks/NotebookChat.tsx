@@ -38,8 +38,13 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
-  const [followUps, setFollowUps] = useState<string[]>([]);
+  const [followUps, setFollowUpsState] = useState<string[]>([]);
   const [followUpOffset, setFollowUpOffset] = useState(0);
+  // Chaque nouvelle série de questions de suivi repart de la première page.
+  const setFollowUps = useCallback((next: string[]) => {
+    setFollowUpsState(next);
+    setFollowUpOffset(0);
+  }, []);
   const [showCitations, setShowCitations] = useState<string | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);

@@ -83,6 +83,8 @@ export interface SseFrame<T = unknown> {
 export interface ChatStreamData {
   text?: string;
   message?: ChatMessage;
+  /** Questions de suivi proposées avec la trame `done` */
+  followUps?: string[];
   error?: string;
 }
 
