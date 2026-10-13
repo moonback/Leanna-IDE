@@ -627,3 +627,126 @@ html:root[data-theme="light"] {
   background: var(--bg-active) !important;
   box-shadow: inset 0 0 0 2px var(--accent-primary);
 }
+
+/* ═══════════════════════════════════════════════
+   6. SANDBOX — visualiseur de diff (components/sandbox)
+═══════════════════════════════════════════════ */
+.lea-diff-header,
+.lea-diff-filebar {
+  background: color-mix(in srgb, var(--bg-panel) 85%, transparent);
+  backdrop-filter: saturate(150%) blur(12px);
+  -webkit-backdrop-filter: saturate(150%) blur(12px);
+}
+.lea-diff-seg {
+  background: var(--bg-input);
+  border: 1px solid var(--border-base);
+}
+.lea-diff-icon {
+  color: var(--text-muted);
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms var(--ease-out-quart, ease);
+}
+.lea-diff-icon:not(:disabled):hover { background: var(--bg-hover); color: var(--text-primary); }
+.lea-diff-icon:not(:disabled):active { transform: scale(0.92); }
+.lea-diff-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+.lea-diff-icon[data-active="true"] { color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 12%, transparent); }
+
+.lea-diff-btn {
+  color: var(--text-muted);
+  border: 1px solid var(--border-base);
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.lea-diff-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.lea-diff-btn[data-active="true"] {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+/* Boutons d'action teintés (--tone = succès / erreur) */
+.lea-diff-action {
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+  transition: background-color 140ms ease, box-shadow 200ms ease, transform 140ms var(--ease-out-quart, ease);
+}
+.lea-diff-action:not(:disabled):hover {
+  background: color-mix(in srgb, var(--tone) 18%, transparent);
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--tone) 70%, transparent);
+}
+.lea-diff-action:not(:disabled):active { transform: scale(0.97); }
+.lea-diff-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.lea-diff-action--solid {
+  color: #fff;
+  background: color-mix(in srgb, var(--tone) 88%, #000);
+  border-color: transparent;
+}
+.lea-diff-action--solid:not(:disabled):hover { background: var(--tone); }
+
+/* Liste des fichiers */
+.lea-diff-search {
+  background: var(--bg-input);
+  border: 1px solid var(--border-base);
+  transition: border-color 140ms ease, box-shadow 200ms ease;
+}
+.lea-diff-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+.lea-diff-chip {
+  color: var(--text-muted);
+  border: 1px solid var(--border-base);
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.lea-diff-chip:hover { color: var(--text-primary); background: var(--bg-hover); }
+.lea-diff-chip[data-active="true"] {
+  color: var(--chip);
+  border-color: color-mix(in srgb, var(--chip) 40%, transparent);
+  background: color-mix(in srgb, var(--chip) 12%, transparent);
+}
+.lea-diff-file {
+  position: relative;
+  transition: background-color 120ms ease, opacity 200ms ease;
+}
+.lea-diff-file:hover { background: var(--bg-hover); }
+.lea-diff-file[data-active="true"] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--file-accent) 15%, transparent), color-mix(in srgb, var(--file-accent) 4%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--file-accent) 22%, transparent);
+}
+.lea-diff-file[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--file-accent);
+}
+
+/* Lignes de code */
+.lea-diff-row:hover { background-image: linear-gradient(var(--bg-hover), var(--bg-hover)); }
+.lea-diff-fold {
+  color: var(--text-muted);
+  background: repeating-linear-gradient(-45deg,
+    color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary)) 0 6px,
+    var(--bg-secondary) 6px 12px);
+  border-top: 1px solid var(--border-base);
+  border-bottom: 1px solid var(--border-base);
+  font-family: var(--font-sans);
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.lea-diff-fold:hover { color: var(--accent-primary); }
+
+:root[data-theme="high-contrast"] .lea-diff-header,
+:root[data-theme="high-contrast"] .lea-diff-filebar { backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-theme="high-contrast"] .lea-diff-fold { background: var(--bg-secondary); }
+.lea-sbx-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-success) 50%, transparent), transparent 60%);
+}
