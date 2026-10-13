@@ -7,12 +7,29 @@
 import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Upload, Globe, Type, ClipboardPaste, Github, FolderCode, Loader2,
+  Upload, Globe, Type, ClipboardPaste, Github, FolderCode,
 } from 'lucide-react';
+import { clsx } from 'clsx';
 import { ACCEPTED_EXTENSIONS } from './constants.js';
+import { NbButton, NbInput, NbTextarea } from '../ui/primitives.js';
 import type { useSourceUpload } from './useSourceUpload.js';
 
 type UploadApi = ReturnType<typeof useSourceUpload>;
+
+// Bouton des notebooks, animable (whileTap) comme les anciens motion.button.
+const MotionButton = motion.create(NbButton);
+
+/** Chip d'onglet d'ajout ; état actif aligné sur l'accent des notebooks. */
+function chipClass(active = false): string {
+  return clsx(
+    'notebook-chip',
+    active && 'notebook-chip--active !border-[var(--notebook-accent)] !bg-[var(--notebook-accent-surface)] !text-[var(--notebook-accent)]',
+  );
+}
+
+/** Carte de formulaire (URL / Texte / Codebase). */
+const FORM_CARD = 'notebook-card space-y-3 p-4';
+const FIELD_LABEL = 'mb-1.5 block text-xs font-medium text-[var(--text-secondary)]';
 
 interface Props {
   upload: UploadApi;
@@ -36,17 +53,17 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
   return (
     <>
       {/* Actions row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <motion.button
+      <div className="flex flex-wrap items-center gap-2">
+        <MotionButton
           {...tapScale}
+          variant="primary"
+          size="sm"
+          icon={Upload}
+          loading={uploading}
           onClick={openFilePicker}
-          disabled={uploading}
-          className="notebook-fab disabled:opacity-50"
-          style={{ padding: '7px 12px', fontSize: '12px' }}
         >
-          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
           Uploader
-        </motion.button>
+        </MotionButton>
         <input
           ref={fileInputRef}
           type="file"
@@ -58,53 +75,54 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
 
         <motion.button
           {...tapScale}
+          type="button"
           onClick={() => { setShowUrlForm(!showUrlForm); setShowTextForm(false); setShowCodebaseForm(false); }}
-          className={`notebook-chip ${showUrlForm ? 'notebook-chip--active' : ''}`}
-          style={showUrlForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
+          className={chipClass(showUrlForm)}
         >
-          <Globe className="w-3.5 h-3.5" />
+          <Globe className="h-3.5 w-3.5" aria-hidden />
           URL
         </motion.button>
 
         <motion.button
           {...tapScale}
+          type="button"
           onClick={() => { setShowTextForm(!showTextForm); setShowUrlForm(false); setShowCodebaseForm(false); }}
-          className={`notebook-chip ${showTextForm ? 'notebook-chip--active' : ''}`}
-          style={showTextForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
+          className={chipClass(showTextForm)}
         >
-          <Type className="w-3.5 h-3.5" />
+          <Type className="h-3.5 w-3.5" aria-hidden />
           Texte
         </motion.button>
 
         <motion.button
           {...tapScale}
+          type="button"
           onClick={handleClipboardPaste}
-          className="notebook-chip"
+          className={chipClass()}
           title="Coller depuis le presse-papier"
         >
-          <ClipboardPaste className="w-3.5 h-3.5" />
+          <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
           Coller
         </motion.button>
 
         <motion.button
           {...tapScale}
+          type="button"
           onClick={onOpenGitHub}
-          className="notebook-chip"
+          className={chipClass()}
           title="Importer un dépôt GitHub"
-          style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-primary)' }}
         >
-          <Github className="w-3.5 h-3.5" />
+          <Github className="h-3.5 w-3.5" aria-hidden />
           GitHub
         </motion.button>
 
         <motion.button
           {...tapScale}
+          type="button"
           onClick={() => { setShowCodebaseForm(!showCodebaseForm); setShowUrlForm(false); setShowTextForm(false); }}
-          className={`notebook-chip ${showCodebaseForm ? 'notebook-chip--active' : ''}`}
-          style={showCodebaseForm ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
+          className={chipClass(showCodebaseForm)}
           title="Importer le codebase du workspace"
         >
-          <FolderCode className="w-3.5 h-3.5" />
+          <FolderCode className="h-3.5 w-3.5" aria-hidden />
           Codebase
         </motion.button>
       </div>
@@ -119,13 +137,12 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
             transition={spring}
             className="overflow-hidden"
           >
-            <div className="p-5 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Globe className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Importer une URL</p>
+            <div className={FORM_CARD}>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
+                <p className="text-sm font-medium text-[var(--text-primary)]">Importer une URL</p>
               </div>
-              <input
+              <NbInput
                 type="url"
                 value={url}
                 onChange={e => setUrl(e.target.value)}
@@ -135,25 +152,25 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 // l'onglet URL ; focus immédiat attendu pour la saisie.
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-shadow focus:ring-2"
-                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="flex gap-2">
-                <motion.button
+                <MotionButton
                   {...tapScale}
+                  variant="primary"
+                  size="sm"
                   onClick={handleUrlIngest}
-                  disabled={!url.trim() || uploading}
-                  className="notebook-fab disabled:opacity-40"
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  disabled={!url.trim()}
+                  loading={uploading}
                 >
-                  {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Ingestion…</> : 'Importer'}
-                </motion.button>
-                <button
+                  {uploading ? 'Ingestion…' : 'Importer'}
+                </MotionButton>
+                <NbButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setShowUrlForm(false); setUrl(''); }}
-                  className="notebook-chip"
                 >
                   Annuler
-                </button>
+                </NbButton>
               </div>
             </div>
           </motion.div>
@@ -170,51 +187,49 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
             transition={spring}
             className="overflow-hidden"
           >
-            <div className="p-5 rounded-2xl border space-y-3"
-              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Type className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Ajouter du texte</p>
+            <div className={FORM_CARD}>
+              <div className="flex items-center gap-2">
+                <Type className="h-4 w-4 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
+                <p className="text-sm font-medium text-[var(--text-primary)]">Ajouter du texte</p>
               </div>
-              <input
+              <NbInput
                 type="text"
                 value={textTitle}
                 onChange={e => setTextTitle(e.target.value)}
                 placeholder="Titre (optionnel)"
-                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-shadow focus:ring-2"
-                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
               <div className="relative">
-                <textarea
+                <NbTextarea
                   value={textContent}
                   onChange={e => setTextContent(e.target.value)}
                   placeholder="Collez votre texte ici..."
                   rows={6}
-                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none transition-shadow focus:ring-2"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                  className="!pb-6"
                 />
                 {textContent && (
-                  <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <span className="absolute bottom-2 right-3 text-xs text-[var(--text-muted)]">
                     ~{textContent.split(/\s+/).filter(Boolean).length} mots
                   </span>
                 )}
               </div>
               <div className="flex gap-2">
-                <motion.button
+                <MotionButton
                   {...tapScale}
+                  variant="primary"
+                  size="sm"
                   onClick={handleTextAdd}
-                  disabled={!textContent.trim() || uploading}
-                  className="notebook-fab disabled:opacity-40"
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  disabled={!textContent.trim()}
+                  loading={uploading}
                 >
-                  {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Ajout…</> : 'Ajouter'}
-                </motion.button>
-                <button
+                  {uploading ? 'Ajout…' : 'Ajouter'}
+                </MotionButton>
+                <NbButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setShowTextForm(false); setTextTitle(''); setTextContent(''); }}
-                  className="notebook-chip"
                 >
                   Annuler
-                </button>
+                </NbButton>
               </div>
             </div>
           </motion.div>
@@ -231,94 +246,88 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
             transition={spring}
             className="overflow-hidden"
           >
-            <div className="p-5 rounded-2xl border space-y-4"
-              style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}>
+            <div className="notebook-card space-y-4 p-4">
               <div className="flex items-center gap-2">
-                <FolderCode className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Importer le codebase du workspace</p>
+                <FolderCode className="h-4 w-4 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
+                <p className="text-sm font-medium text-[var(--text-primary)]">Importer le codebase du workspace</p>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
                 Scanne tous les fichiers texte du projet actif et les consolide en un seul document Markdown indexé dans ce notebook.
               </p>
 
-              <input
+              <NbInput
                 type="text"
                 value={codebaseTitle}
                 onChange={e => setCodebaseTitle(e.target.value)}
                 placeholder="Titre de la source (optionnel)"
-                className="w-full px-4 py-2.5 rounded-full text-sm outline-none transition-shadow focus:ring-2"
-                style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
               />
 
               <div>
-                <label htmlFor="codebase-extensions" className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  Extensions à inclure <span style={{ color: 'var(--text-dimmed)' }}>(vide = toutes les extensions texte)</span>
+                <label htmlFor="codebase-extensions" className={FIELD_LABEL}>
+                  Extensions à inclure <span className="text-[var(--text-dimmed)]">(vide = toutes les extensions texte)</span>
                 </label>
-                <input
+                <NbInput
                   id="codebase-extensions"
                   type="text"
                   value={codebaseExtensions}
                   onChange={e => setCodebaseExtensions(e.target.value)}
                   placeholder=".ts .tsx .js .py .md ..."
-                  className="w-full px-4 py-2.5 rounded-full text-sm outline-none font-mono transition-shadow focus:ring-2"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                  className="font-mono"
                 />
               </div>
 
-              <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex flex-wrap items-center gap-6">
                 <div>
-                  <label htmlFor="codebase-max-size" className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <label htmlFor="codebase-max-size" className={FIELD_LABEL}>
                     Taille max par fichier
                   </label>
                   <div className="flex items-center gap-2">
-                    <input
+                    <NbInput
                       id="codebase-max-size"
                       type="number"
                       min={10}
                       max={500}
                       value={codebaseMaxSizeKb}
                       onChange={e => setCodebaseMaxSizeKb(Number(e.target.value))}
-                      className="w-20 px-3 py-2 rounded-full text-sm outline-none text-center transition-shadow focus:ring-2"
-                      style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                      className="!w-20 text-center"
                     />
-                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Ko</span>
+                    <span className="text-xs text-[var(--text-dimmed)]">Ko</span>
                   </div>
                 </div>
 
-                <label htmlFor="codebase-include-config" className="flex items-center gap-2 cursor-pointer select-none">
+                <label htmlFor="codebase-include-config" className="flex cursor-pointer select-none items-center gap-2">
                   <input
                     id="codebase-include-config"
                     type="checkbox"
                     checked={codebaseIncludeConfig}
                     onChange={e => setCodebaseIncludeConfig(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded accent-[var(--notebook-accent)]"
+                    className="h-3.5 w-3.5 rounded accent-[var(--notebook-accent)]"
                   />
-                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <span className="text-xs text-[var(--text-secondary)]">
                     Inclure les fichiers de config
-                    <span className="block text-xs" style={{ color: 'var(--text-dimmed)' }}>package.json, tsconfig.json…</span>
+                    <span className="block text-xs text-[var(--text-dimmed)]">package.json, tsconfig.json…</span>
                   </span>
                 </label>
               </div>
 
               <div className="flex gap-2">
-                <motion.button
+                <MotionButton
                   {...tapScale}
+                  variant="primary"
+                  size="sm"
+                  icon={FolderCode}
                   onClick={handleCodebaseImport}
-                  disabled={uploading}
-                  className="notebook-fab disabled:opacity-40"
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  loading={uploading}
                 >
-                  {uploading
-                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scan en cours…</>
-                    : <><FolderCode className="w-3.5 h-3.5" /> Importer le codebase</>
-                  }
-                </motion.button>
-                <button
+                  {uploading ? 'Scan en cours…' : 'Importer le codebase'}
+                </MotionButton>
+                <NbButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setShowCodebaseForm(false); setCodebaseTitle(''); setCodebaseExtensions(''); }}
-                  className="notebook-chip"
                 >
                   Annuler
-                </button>
+                </NbButton>
               </div>
             </div>
           </motion.div>
