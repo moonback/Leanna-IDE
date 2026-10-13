@@ -16,7 +16,12 @@ export function createChatRouter(): Router {
         return;
       }
 
-      const message = await groundedChat.ask(req.params.id, question.trim());
+      const { threadId, sourceIds, personality } = req.body;
+      const message = await groundedChat.ask(req.params.id, question.trim(), {
+        threadId: typeof threadId === "string" ? threadId : undefined,
+        sourceIds: parseSourceIds(sourceIds),
+        personality: typeof personality === "string" ? personality : undefined,
+      });
       res.json({ status: "success", message });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -25,7 +30,7 @@ export function createChatRouter(): Router {
 
   router.post("/:id/chat/stream", async (req: Request, res: Response): Promise<void> => {
     try {
-      const { question, threadId, followUps: wantFollowUps } = req.body;
+      const { question, threadId, followUps: wantFollowUps, sourceIds, personality } = req.body;
       if (!question || typeof question !== "string") {
         res.status(400).json({ error: "Le champ 'question' est requis." });
         return;
@@ -37,27 +42,41 @@ export function createChatRouter(): Router {
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
+      // Arrêter la génération LLM dès que le client interrompt (bouton Stop,
+      // changement de fil, fermeture) au lieu de consommer des tokens pour rien.
+      const abort = new AbortController();
+      res.on("close", () => {
+        if (!res.writableEnded) abort.abort();
+      });
+
       res.write(`event: start\ndata: ${JSON.stringify({ status: "streaming" })}\n\n`);
 
+      const thread = typeof threadId === "string" ? threadId : undefined;
       // Le thread (si fourni) est géré DANS askStream : les messages y sont
       // écrits de façon isolée, et le contexte RAG est construit à partir du
-      // thread. Plus de double écriture thread + historique global ici.
+      // thread. Le filtre de sources et la personnalité viennent du composer.
       const message = await groundedChat.askStream(
         req.params.id,
         question.trim(),
         (chunk: string) => {
-          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+          if (!abort.signal.aborted) res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         },
-        undefined,
-        typeof threadId === "string" ? threadId : undefined
+        abort.signal,
+        {
+          threadId: thread,
+          sourceIds: parseSourceIds(sourceIds),
+          personality: typeof personality === "string" ? personality : undefined,
+        }
       );
+
+      if (abort.signal.aborted) return;
 
       // Follow-ups activés par défaut (l'UI chat les affiche), mais désactivables
       // via `followUps: false` dans la requête pour économiser un appel LLM.
       let followUps: string[] = [];
       if (wantFollowUps !== false) {
         try {
-          followUps = await groundedChat.generateFollowUps(req.params.id);
+          followUps = await groundedChat.generateFollowUps(req.params.id, thread);
         } catch { /* ignore */ }
       }
 
@@ -75,7 +94,7 @@ export function createChatRouter(): Router {
 
   router.get("/:id/chat/follow-ups", async (req: Request, res: Response): Promise<void> => {
     try {
-      const followUps = await groundedChat.generateFollowUps(req.params.id);
+      const followUps = await groundedChat.generateFollowUps(req.params.id, typeof req.query.threadId === "string" ? req.query.threadId : undefined);
       res.json({ status: "success", followUps });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -499,4 +518,11 @@ export function createChatRouter(): Router {
   });
 
   return router;
+}
+
+/** Filtre de sources envoyé par le composer : tableau d'ids non vides, sinon undefined. */
+function parseSourceIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value.filter((id): id is string => typeof id === "string" && id.length > 0);
+  return ids.length > 0 ? ids : undefined;
 }

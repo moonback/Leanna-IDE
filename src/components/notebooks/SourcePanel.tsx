@@ -24,6 +24,7 @@ import { UploadQueue } from './sources/UploadQueue.js';
 import { SourceListFull } from './sources/SourceListFull.js';
 import { SourceListCompact } from './sources/SourceListCompact.js';
 import type { SourceItem } from './sources/constants.js';
+import { NbIconButton } from './ui/primitives.js';
 
 interface Props {
   notebookId: string;
@@ -121,26 +122,20 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={springSnappy}
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl pointer-events-none"
-            style={{
-              backgroundColor: 'var(--notebook-accent-surface)',
-              border: '2.5px dashed var(--notebook-accent)',
-              backdropFilter: 'blur(4px)',
-            }}
+            className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               transition={spring}
-              className="notebook-empty-state-icon"
-              style={{ width: 64, height: 64 }}
+              className="notebook-empty-state-icon !h-16 !w-16"
             >
-              <Upload className="w-7 h-7" />
+              <Upload className="h-7 w-7" aria-hidden />
             </motion.div>
-            <p className="text-sm font-medium" style={{ color: 'var(--notebook-accent)' }}>
+            <p className="text-sm font-medium text-[var(--notebook-accent)]">
               Déposez vos fichiers ici
             </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[var(--text-muted)]">
               PDF, texte, Markdown, HTML, DOCX, CSV, JSON, YAML, Images
             </p>
           </motion.div>
@@ -148,17 +143,14 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       </AnimatePresence>
 
       {/* ── Sticky header + actions ─────────────────────────── */}
-      <div
-        className="flex-shrink-0 px-4 pt-3 pb-2 space-y-2"
-        style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))', borderBottom: '1px solid var(--notebook-border)' }}
-      >
+      <div className="flex-shrink-0 space-y-2 border-b border-[var(--notebook-border)] bg-[var(--notebook-canvas)] px-4 pb-2 pt-3">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          <div className="min-w-0">
+            <h1 className="notebook-panel-title">
               Sources
             </h1>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[var(--text-muted)]">
               {sources.length === 0
                 ? 'Aucun document pour le moment'
                 : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
@@ -173,7 +165,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         {/* Search (when >3 sources) */}
         {sources.length > 3 && (
           <div className="notebook-search-field">
-            <Search className="h-4 w-4 flex-shrink-0" />
+            <Search className="h-4 w-4 flex-shrink-0" aria-hidden />
             <input
               type="text"
               value={searchQuery}
@@ -182,9 +174,13 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               aria-label="Rechercher dans les sources"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-[var(--bg-active)]">
-                <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
-              </button>
+              <NbIconButton
+                icon={X}
+                size="sm"
+                label="Effacer la recherche"
+                onClick={() => setSearchQuery('')}
+                className="!h-6 !w-6 flex-shrink-0"
+              />
             )}
           </div>
         )}

@@ -13,6 +13,7 @@ import type { LucideIcon } from 'lucide-react';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
 import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
 import { api } from './api/client.js';
+import { NbBadge, NbButton, NbIconButton, NbSectionLabel } from './ui/primitives.js';
 
 interface SourceData {
   id: string;
@@ -44,8 +45,8 @@ function TypeIcon({ type, size = 20 }: { type: string; size?: number }) {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
-  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
+  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--notebook-accent)',
+  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--notebook-accent)', image: 'var(--color-success)',
 };
 
 export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
@@ -96,26 +97,23 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2 }}
-      className="h-full flex flex-col overflow-hidden"
+      className="flex h-full flex-col overflow-hidden"
     >
       {/* Header */}
-      <div
-        className="flex items-center gap-3 px-5 py-4 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
-      >
-        <span className="flex-shrink-0 inline-flex items-center">
+      <div className="notebook-panel-header !gap-3 bg-[var(--notebook-surface)] !px-5 !py-3">
+        <span className="inline-flex flex-shrink-0 items-center">
           <TypeIcon type={source?.type || ''} size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="notebook-panel-title truncate">
               {source?.title || 'Source'}
             </h2>
             {source?.type && (
               <span
-                className="text-xs px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0"
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-bold uppercase"
                 style={{
-                  backgroundColor: `${TYPE_COLORS[source.type] || 'var(--text-muted)'}15`,
+                  backgroundColor: `color-mix(in srgb, ${TYPE_COLORS[source.type] || 'var(--text-muted)'} 12%, transparent)`,
                   color: TYPE_COLORS[source.type] || 'var(--text-dimmed)',
                 }}
               >
@@ -123,79 +121,57 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-0.5">
+          <div className="mt-0.5 flex items-center gap-3 text-xs text-[var(--text-dimmed)]">
             {source?.wordCount && (
-              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+              <span>
                 {source.wordCount.toLocaleString()} mots
               </span>
             )}
             {source?.chunksCount && (
-              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+              <span>
                 {source.chunksCount} passages
               </span>
             )}
             {source?.language && (
-              <span className="text-xs uppercase" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="uppercase">
                 {source.language}
               </span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-1">
           {/* Toggle view mode for HTML sources */}
           {htmlData && (
-            <div className="flex items-center rounded-lg overflow-hidden border mr-2" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="notebook-segmented mr-2">
               <button
+                type="button"
                 onClick={() => setViewMode('visual')}
-                className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
-                style={{
-                  backgroundColor: viewMode === 'visual' ? 'var(--accent-primary)' : 'transparent',
-                  color: viewMode === 'visual' ? 'white' : 'var(--text-muted)',
-                }}
+                className="notebook-segment !px-3 !py-1 !text-xs"
+                data-active={viewMode === 'visual'}
               >
-                <span className="inline-flex items-center gap-1"><Globe size={12} /> Visuel</span>
+                <span className="inline-flex items-center gap-1"><Globe size={12} aria-hidden /> Visuel</span>
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('text')}
-                className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
-                style={{
-                  backgroundColor: viewMode === 'text' ? 'var(--accent-primary)' : 'transparent',
-                  color: viewMode === 'text' ? 'white' : 'var(--text-muted)',
-                }}
+                className="notebook-segment !px-3 !py-1 !text-xs"
+                data-active={viewMode === 'text'}
               >
-                <span className="inline-flex items-center gap-1"><FileText size={12} /> Texte</span>
+                <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden /> Texte</span>
               </button>
             </div>
           )}
-          <button
-            onClick={fetchContent}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
-            title="Recharger le contenu"
-          >
-            <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
-            title="Fermer"
-          >
-            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          </button>
+          <NbIconButton icon={RefreshCw} label="Recharger le contenu" onClick={fetchContent} />
+          <NbIconButton icon={X} label="Fermer" onClick={onClose} />
         </div>
       </div>
 
       {/* Keywords */}
       {source?.keywords && source.keywords.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
-          <Tag className="w-3 h-3 mt-0.5" style={{ color: 'var(--text-dimmed)' }} />
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--notebook-border)] px-5 py-3">
+          <Tag className="h-3 w-3 text-[var(--text-dimmed)]" aria-hidden />
           {source.keywords.map((kw) => (
-            <span
-              key={kw}
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
-            >
-              {kw}
-            </span>
+            <NbBadge key={kw}>{kw}</NbBadge>
           ))}
         </div>
       )}
@@ -203,40 +179,35 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 lg:p-7">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement du contenu...</p>
+          <div className="flex h-full flex-col items-center justify-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--notebook-accent)]" aria-hidden />
+            <p className="text-sm text-[var(--text-muted)]">Chargement du contenu...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <FileText className="w-8 h-8" style={{ color: 'var(--color-error)' }} />
-            <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
-            <button
-              onClick={fetchContent}
-              className="px-4 py-2 rounded-full text-xs font-semibold transition active:scale-95"
-              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
-            >
+          <div className="flex h-full flex-col items-center justify-center gap-3">
+            <FileText className="h-8 w-8 text-[var(--color-error)]" aria-hidden />
+            <p className="text-sm text-[var(--color-error)]">{error}</p>
+            <NbButton variant="primary" size="sm" onClick={fetchContent}>
               Réessayer
-            </button>
+            </NbButton>
           </div>
         ) : imageData ? (
           <div className="space-y-4">
             {/* Image display */}
-            <div
-              className="rounded-2xl overflow-hidden border shadow-sm"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
-            >
+            <div className="overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] shadow-sm">
               <img
                 src={`data:${imageData.mimeType};base64,${imageData.base64}`}
                 alt={source?.title || 'Image source'}
-                className="w-full h-auto"
-                style={{ maxHeight: '600px', objectFit: 'contain' }}
+                className="h-auto max-h-[600px] w-full object-contain"
               />
             </div>
 
             {/* Download button */}
             <div className="flex items-center gap-2">
-              <button
+              <NbButton
+                variant="secondary"
+                size="sm"
+                icon={Download}
                 onClick={() => {
                   const link = document.createElement('a');
                   link.href = `data:${imageData.mimeType};base64,${imageData.base64}`;
@@ -245,44 +216,33 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
-                style={{
-                  backgroundColor: 'var(--color-success)20',
-                  color: 'var(--color-success)',
-                  border: '1px solid var(--color-success)40',
-                }}
+                className="!border-[color-mix(in_srgb,var(--color-success)_40%,transparent)] !bg-[var(--color-success-subtle)] !text-[var(--color-success)]"
               >
-                <span className="inline-flex items-center gap-1.5"><Download size={13} /> Télécharger l'image</span>
-              </button>
+                Télécharger l'image
+              </NbButton>
             </div>
 
             {/* AI description */}
             {content && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide inline-flex items-center gap-1.5" style={{ color: 'var(--text-dimmed)' }}>
-                  <Bot size={13} /> Description IA
-                </p>
-                <div
-                  className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"
-                  style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}
-                >
+                <NbSectionLabel className="inline-flex items-center gap-1.5">
+                  <Bot size={13} aria-hidden /> Description IA
+                </NbSectionLabel>
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] p-4 text-sm leading-relaxed text-[var(--text-primary)]">
                   {content}
                 </div>
               </div>
             )}
           </div>
         ) : htmlData && viewMode === 'visual' ? (
-          <div className="h-full flex flex-col gap-3">
-            <div
-              className="flex-1 rounded-2xl overflow-hidden border shadow-sm"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: 'white' }}
-            >
+          <div className="flex h-full flex-col gap-3">
+            {/* Fond blanc volontaire : rendu fidèle d'une page HTML externe. */}
+            <div className="flex-1 overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-white shadow-sm">
               <iframe
                 srcDoc={htmlData}
                 title={source?.title || 'HTML source'}
-                className="w-full h-full border-0"
+                className="h-full min-h-[500px] w-full border-0"
                 sandbox="allow-same-origin"
-                style={{ minHeight: '500px' }}
               />
             </div>
           </div>
@@ -316,8 +276,7 @@ function RenderedContent({ content, type }: { content: string; type?: string }) 
 
   return (
     <div
-      className="markdown-body max-w-none"
-      style={{ color: 'var(--text-primary)' }}
+      className="markdown-body max-w-none text-[var(--text-primary)]"
       // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with sanitizeMarkdownHtml
       dangerouslySetInnerHTML={{ __html: html }}
     />

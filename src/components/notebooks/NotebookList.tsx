@@ -1,8 +1,8 @@
 /**
  * NotebookList — Page d'accueil des notebooks (style NotebookLM)
  *
- * Design épuré et moderne avec cards colorées, animations fluides,
- * création rapide, recherche et tri.
+ * Grille de cartes `.notebook-card`, recherche, tri, création rapide et
+ * confirmation de suppression via NbModal.
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -17,6 +17,7 @@ import { useToast } from '../ui/Toast.js';
 import { timeAgoLong as timeAgo } from './utils.js';
 import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
 import { api, apiVoid } from './api/client.js';
+import { NbButton, NbEmptyState, NbIconButton, NbModal } from './ui/primitives.js';
 
 interface NotebookSummary {
   id: string;
@@ -145,225 +146,142 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   }, [deleteTarget, success, toastError]);
 
   return (
-    <div className="notebook-workspace h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
+    <div className="notebook-workspace flex h-full flex-col overflow-hidden bg-[var(--notebook-bg)]">
 
       {/* ─── Header ─────────────────────────────────────────── */}
-      <header className="flex-shrink-0 px-6 lg:px-12 pt-8 pb-6">
-        <div className="flex items-start justify-between gap-4 max-w-8xl mx-auto">
+      <header className="flex-shrink-0 px-6 pb-6 pt-8 lg:px-12">
+        <div className="mx-auto flex max-w-8xl items-start justify-between gap-4">
           {/* Title block */}
-          <div>
-            <div
-              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{
-                color: 'var(--notebook-accent)',
-              }}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
+          <div className="min-w-0">
+            <div className="notebook-eyebrow mb-3 flex items-center gap-2 uppercase text-[var(--notebook-accent)]">
+              <BookOpen className="h-3.5 w-3.5" aria-hidden />
               {workspaceName || 'Espace de recherche'}
             </div>
-            <h1
-              className="text-2xl font-bold tracking-tight notebook-heading"
-              style={{ color: 'var(--text-primary)' }}
-            >
+            <h1 className="notebook-heading truncate text-2xl font-bold tracking-tight text-[var(--text-primary)]">
               {workspaceName ? `Notebooks · ${workspaceName}` : 'Vos notebooks'}
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
               Retrouvez vos recherches et continuez là où vous vous êtes arrêté.
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
-            <motion.button
-              onClick={() => setShowCreateModal(true)}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.96 }}
-              transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              style={{
-                backgroundColor: 'var(--notebook-accent)',
-                color: 'var(--notebook-accent-text)',
-              }}
-            >
-              <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-              <span>Nouveau</span>
-            </motion.button>
-            
-            <motion.button
+          <div className="notebook-actions flex-shrink-0">
+            <NbButton variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
+              Nouveau
+            </NbButton>
+            <NbIconButton
+              icon={Github}
+              label="Importer depuis GitHub"
               onClick={() => setShowGitHubImport(true)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="notebook-icon-button rounded-lg"
-              style={{ borderColor: 'var(--border-base)' }}
-              title="Importer depuis GitHub"
-            >
-              <Github className="w-4 h-4" />
-            </motion.button>
-            
+            />
             {onClose && (
-              <motion.button
+              <NbIconButton
+                icon={LayoutGrid}
+                label="Retour au sélecteur IDE / Notebook"
                 onClick={onClose}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.92 }}
-                transition={{ duration: 0.1 }}
-                className="notebook-icon-button rounded-lg"
-                aria-label="Retour au sélecteur IDE / Notebook"
-                title="Retour au sélecteur IDE / Notebook"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </motion.button>
+              />
             )}
           </div>
         </div>
       </header>
 
-      {/* ─── Divider ────────────────────────────────────────── */}
-      {notebooks.length > 0 && (
-        <div className="flex-shrink-0 mx-6 lg:mx-12" style={{ height: 1, backgroundColor: 'var(--notebook-border)' }} />
-      )}
-
       {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
-        <div className="flex-shrink-0 px-6 lg:px-12 py-4">
-          <div className="flex items-center gap-3 max-w-8xl mx-auto">
+        <div className="flex-shrink-0 border-t border-[var(--notebook-border)] mx-6 py-4 lg:mx-12">
+          <div className="mx-auto flex max-w-8xl items-center gap-3">
             {/* Search */}
-            <div
-              className="flex items-center gap-2.5 flex-1 max-w-md px-3.5 py-2.5 rounded-lg transition-all duration-150 focus-within:ring-2"
-              style={{
-                backgroundColor: 'var(--notebook-surface-muted)',
-                border: '1px solid var(--notebook-border)',
-                ['--tw-ring-color' as any]: 'var(--accent-primary)',
-              }}
-            >
-              <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+            <div className="notebook-search-field max-w-md flex-1">
+              <Search className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Rechercher…"
-                className="flex-1 bg-transparent outline-none text-xs"
-                style={{ color: 'var(--text-primary)' }}
               />
               {searchQuery && (
-                <motion.button
+                <NbIconButton
+                  icon={X}
+                  label="Effacer"
+                  size="sm"
+                  className="flex-shrink-0"
                   onClick={() => setSearchQuery('')}
-                  whileTap={{ scale: 0.85 }}
-                  className="p-0.5 rounded-full"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
-                >
-                  <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
-                </motion.button>
+                />
               )}
             </div>
 
             {/* Sort controls */}
-            <div className="flex items-center gap-1.5 ml-auto">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Trier par</span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="whitespace-nowrap text-xs text-[var(--text-muted)]">Trier par</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer transition-colors duration-150"
-                style={{
-                  backgroundColor: 'var(--notebook-surface-muted)',
-                  border: '1px solid var(--notebook-border)',
-                  color: 'var(--text-secondary)',
-                }}
+                className="notebook-input w-auto cursor-pointer text-xs font-medium text-[var(--text-secondary)]"
               >
                 <option value="updatedAt">Récent</option>
                 <option value="title">Titre</option>
                 <option value="sourcesCount">Sources</option>
               </select>
-              <motion.button
+              <NbIconButton
+                icon={sortDesc ? SortDesc : SortAsc}
+                label={sortDesc ? 'Décroissant' : 'Croissant'}
                 onClick={() => setSortDesc(!sortDesc)}
-                whileTap={{ scale: 0.9, rotate: sortDesc ? -8 : 8 }}
-                transition={{ duration: 0.1 }}
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ color: 'var(--text-dimmed)' }}
-                title={sortDesc ? 'Décroissant' : 'Croissant'}
-              >
-                {sortDesc ? <SortDesc className="w-3.5 h-3.5" /> : <SortAsc className="w-3.5 h-3.5" />}
-              </motion.button>
+              />
             </div>
           </div>
         </div>
       )}
 
       {/* ─── Notebook Cards ─────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 lg:px-12 pb-10 pt-2">
-        <div className="max-w-8xl mx-auto">
+      <div className="custom-scrollbar flex-1 overflow-y-auto px-6 pb-10 pt-2 lg:px-12">
+        <div className="mx-auto max-w-8xl">
         {loading ? (
           /* ─── Skeleton ─── */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={`skeleton-${i}`}
-                className="rounded-xl border overflow-hidden"
-                style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-card-bg)' }}
-              >
-                <div className="h-1" style={{ background: 'var(--notebook-surface-muted)' }} />
-                <div className="p-5 space-y-3">
+              <div key={`skeleton-${i}`} className="notebook-card overflow-hidden rounded-xl">
+                <div className="h-1 bg-[var(--notebook-surface-muted)]" />
+                <div className="space-y-3 p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-4 w-2/3 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-                      <div className="h-3 w-1/3 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                    <div className="h-10 w-10 animate-pulse rounded-xl bg-[var(--notebook-surface-muted)]" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-2/3 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
+                      <div className="h-3 w-1/3 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
                     </div>
                   </div>
-                  <div className="h-3 w-full rounded-lg animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-                  <div className="h-3 w-4/5 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                  <div className="h-3 w-full animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
+                  <div className="h-3 w-4/5 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
                   <div className="flex gap-2 pt-2">
-                    <div className="h-6 w-20 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-                    <div className="h-6 w-16 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+                    <div className="h-6 w-20 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
+                    <div className="h-6 w-16 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : notebooks.length === 0 ? (
-            /* ─── Empty state ─── */
+          /* ─── Empty state ─── */
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={SPRING_UI}
-            className="flex flex-col items-center justify-center text-center py-20 gap-5 border rounded-xl"
-            style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}
+            className="notebook-card rounded-xl py-16"
           >
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{
-                backgroundColor: 'var(--notebook-accent-surface)',
-                color: 'var(--notebook-accent)',
-              }}
-            >
-              <BookOpen className="h-7 w-7" />
-            </div>
-            <div className="space-y-2">
-              <h2
-                className="text-lg font-bold notebook-heading"
-                style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
-              >
-                Créez votre premier notebook
-              </h2>
-              <p className="text-sm max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Importez vos documents et posez des questions.
-                L'IA répondra en citant les passages pertinents.
-              </p>
-            </div>
-
-            <motion.button
-              onClick={() => setShowCreateModal(true)}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.96 }}
-              transition={SPRING_MOMENTUM}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold"
-              style={{
-                backgroundColor: 'var(--notebook-accent)',
-                color: 'var(--notebook-accent-text)',
-              }}
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              Créer un notebook
-            </motion.button>
+            <NbEmptyState
+              icon={BookOpen}
+              title="Créez votre premier notebook"
+              description={
+                <>
+                  Importez vos documents et posez des questions.
+                  L'IA répondra en citant les passages pertinents.
+                </>
+              }
+              action={
+                <NbButton variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
+                  Créer un notebook
+                </NbButton>
+              }
+            />
           </motion.div>
 
         ) : filteredNotebooks.length === 0 ? (
@@ -371,141 +289,95 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center text-center py-16 gap-3"
+            className="py-12"
           >
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--notebook-surface-muted)' }}
-            >
-              <Search className="w-5 h-5" style={{ color: 'var(--text-dimmed)' }} />
-            </div>
-            <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Aucun résultat
-              </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                Aucun notebook pour « {searchQuery} »
-              </p>
-            </div>
-            <button
-              onClick={() => setSearchQuery('')}
-              className="text-xs font-semibold mt-1 px-3 py-1.5 rounded-full transition-colors duration-150"
-              style={{
-                color: 'var(--accent-primary)',
-                backgroundColor: 'var(--notebook-accent-surface)',
-              }}
-            >
-              Effacer la recherche
-            </button>
+            <NbEmptyState
+              icon={Search}
+              title="Aucun résultat"
+              description={<>Aucun notebook pour « {searchQuery} »</>}
+              action={
+                <NbButton variant="ghost" size="sm" onClick={() => setSearchQuery('')}>
+                  Effacer la recherche
+                </NbButton>
+              }
+            />
           </motion.div>
 
         ) : (
           /* ─── Grid View ─── */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence initial={false}>
               {filteredNotebooks.map((nb, i) => (
-                  <motion.div
-                    key={nb.id}
-                    layout
-                    initial={{ opacity: 0, y: 14, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                    whileHover={prefersReducedMotion ? undefined : { y: -4, scale: 1.008 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{
-                      ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
-                      delay: i < 12 ? i * 0.03 : 0,
-                    }}
-                    onClick={() => onSelectNotebook(nb.id)}
-                    data-spotlight
-                    className="group cursor-pointer rounded-xl border border-transparent overflow-hidden flex flex-col relative transition-all duration-200"
-                    style={{
-                      backgroundColor: 'var(--notebook-card-bg)',
-                      borderColor: 'var(--notebook-border)',
-                      boxShadow: 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = nb.color || 'var(--accent-primary)';
-                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), 0 0 0 1px var(--notebook-border)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--notebook-border)';
-                      e.currentTarget.style.boxShadow = 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))';
-                    }}
-                  >
+                <motion.div
+                  key={nb.id}
+                  layout
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                  whileHover={prefersReducedMotion ? undefined : { y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{
+                    ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
+                    delay: i < 12 ? i * 0.03 : 0,
+                  }}
+                  onClick={() => onSelectNotebook(nb.id)}
+                  data-spotlight
+                  data-interactive="true"
+                  className="notebook-card group relative flex cursor-pointer flex-col overflow-hidden rounded-xl hover:shadow-lg"
+                >
+                  {/* Couleur du notebook (donnée) */}
                   <div
                     className="h-1 w-full flex-shrink-0"
-                    style={{ backgroundColor: nb.color || 'var(--accent-primary)' }}
+                    style={{ backgroundColor: nb.color || 'var(--notebook-accent)' }}
                   />
 
-                  <div className="p-4 flex flex-col gap-4 flex-1">
+                  <div className="flex flex-1 flex-col gap-3 p-4">
                     {/* Card header */}
-                    <div className="flex items-start justify-between gap-2">
-                        <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg leading-none transition-colors duration-200"
-                          style={{
-                            backgroundColor: 'var(--notebook-surface-muted)',
-                            border: `1px solid var(--notebook-border)`,
-                          }}
-                        >
-                          {nb.icon || '📓'}
-                        </div>
-                        <div className="min-w-0">
-                          <h3
-                            className="text-sm font-semibold truncate notebook-body transition-colors duration-200 group-hover:text-[var(--notebook-accent)]"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {nb.title}
-                          </h3>
-                          <p className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                            <Clock className="w-3 h-3 flex-shrink-0" />
-                            {timeAgo(nb.updatedAt)}
-                          </p>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-muted)] text-lg leading-none">
+                        {nb.icon || '📓'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="notebook-body truncate text-sm font-semibold text-[var(--text-primary)] transition-colors duration-200 group-hover:text-[var(--notebook-accent)]">
+                          {nb.title}
+                        </h3>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                          <Clock className="h-3 w-3 flex-shrink-0" aria-hidden />
+                          {timeAgo(nb.updatedAt)}
+                        </p>
+                      </div>
 
                       {/* Delete button */}
-                      <motion.button
+                      <NbIconButton
+                        icon={Trash2}
+                        label="Supprimer"
+                        size="sm"
+                        tone="danger"
                         onClick={(e) => handleDeleteClick(nb.id, e)}
-                        whileTap={{ scale: 0.82 }}
-                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 flex-shrink-0"
-                        style={{ color: 'var(--color-error, #ef4444)' }}
-                        title="Supprimer"
-                        aria-label="Supprimer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </motion.button>
+                        className="flex-shrink-0 opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100"
+                      />
                     </div>
 
                     {/* Description */}
                     {nb.description && (
-                      <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-muted)]">
                         {nb.description}
                       </p>
                     )}
 
                     {/* Footer stats + open cta */}
-                    {/* Footer stats + open cta */}
-                    <div className="flex items-center gap-4 mt-auto pt-4 border-t" style={{ borderColor: 'var(--notebook-surface-muted)' }}>
-                      <span
-                        className="flex items-center gap-1.5 text-xs font-medium"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                    <div className="mt-auto flex items-center gap-4 border-t border-[var(--notebook-border)] pt-3">
+                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                        <FileText className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
                         {nb.sourcesCount}
                       </span>
-                      <span
-                        className="flex items-center gap-1.5 text-xs font-medium"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
                         {nb.notesCount}
                       </span>
-                      <span
-                        className="ml-auto flex items-center gap-1.5 text-xs font-semibold opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 -translate-x-1"
-                        style={{ color: 'var(--notebook-accent)' }}
-                      >
+                      <span className="ml-auto flex -translate-x-1 items-center gap-1 text-xs font-semibold text-[var(--notebook-accent)] opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100">
                         Ouvrir
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                       </span>
                     </div>
                   </div>
@@ -517,94 +389,44 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
       </div>
 
       {/* ─── Create Notebook Modal ──────────────────────────── */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <CreateNotebookModal
-            onClose={() => setShowCreateModal(false)}
-            onCreated={loadNotebooks}
-          />
-        )}
-      </AnimatePresence>
+      {showCreateModal && (
+        <CreateNotebookModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={loadNotebooks}
+        />
+      )}
 
       {/* ─── Delete Confirmation Modal ──────────────────────── */}
-      <AnimatePresence>
-        {deleteTarget && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setDeleteTarget(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.88, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: 4 }}
-              transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
-              onClick={e => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl border p-6"
-              style={{
-                backgroundColor: 'var(--notebook-surface-elevated)',
-                borderColor: 'var(--notebook-border)',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.3)',
-              }}
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
-                >
-                  <Trash2 className="w-4.5 h-4.5 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Supprimer ce notebook ?
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Cette action est irréversible
-                  </p>
-                </div>
-              </div>
+      <NbModal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Supprimer ce notebook ?"
+        tone="danger"
+        size="sm"
+      >
+        <NbModal.Body className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--color-error-subtle)] text-[var(--color-error)]">
+              <Trash2 className="h-4 w-4" aria-hidden />
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">
+              Cette action est irréversible
+            </p>
+          </div>
+          <p className="rounded-xl bg-[var(--notebook-surface-muted)] p-3 text-xs leading-relaxed text-[var(--text-muted)]">
+            Toutes les sources, notes et conversations associées seront définitivement supprimées.
+          </p>
+        </NbModal.Body>
+        <NbModal.Footer>
+          <NbButton variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>
+            Annuler
+          </NbButton>
+          <NbButton variant="danger" size="sm" onClick={handleDeleteConfirm}>
+            Supprimer
+          </NbButton>
+        </NbModal.Footer>
+      </NbModal>
 
-              <p className="text-xs leading-relaxed mb-6 p-3 rounded-xl" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--notebook-surface-muted)' }}>
-                Toutes les sources, notes et conversations associées seront définitivement supprimées.
-              </p>
-
-              <div className="flex items-center justify-end gap-2">
-                <motion.button
-                  onClick={() => setDeleteTarget(null)}
-                  whileTap={{ scale: 0.96 }}
-                  className="px-4 py-2 rounded-full text-xs font-semibold transition-colors"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    backgroundColor: 'var(--notebook-surface-muted)',
-                    border: '1px solid var(--notebook-border)',
-                  }}
-                >
-                  Annuler
-                </motion.button>
-                <motion.button
-                  onClick={handleDeleteConfirm}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={SPRING_MOMENTUM}
-                  className="px-5 py-2 rounded-full text-xs font-semibold"
-                  style={{
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    boxShadow: '0 2px 8px rgba(239,68,68,0.35)',
-                  }}
-                >
-                  Supprimer
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
       {/* GitHub Import Modal */}
       {showGitHubImport && (
         <GitHubRepositoryImportModal
@@ -616,7 +438,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
           }}
         />
       )}
-      
+
       </div>
     </div>
   );

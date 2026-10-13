@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { safeMarkdownParse } from '../../utils/sanitizeMarkdownHtml.js';
+import { NbBadge, NbIconButton } from './ui/primitives.js';
 
 interface Props {
   notebookId: string;
@@ -115,23 +116,12 @@ export function SourcesSummaryCard({
         duration: 0.25,
         ease: 'easeOut',
       }}
-      className="group relative overflow-hidden rounded-2xl border"
-      style={{
-        background:
-          'linear-gradient(145deg, color-mix(in srgb, var(--bg-panel) 94%, var(--accent-primary) 6%), var(--bg-panel))',
-        borderColor:
-          'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
-        boxShadow:
-          '0 8px 30px color-mix(in srgb, var(--accent-primary) 5%, transparent)',
-      }}
+      className="notebook-card group relative overflow-hidden"
     >
       {/* Accent lumineux supérieur */}
       <div
-        className="absolute inset-x-0 top-0 h-px opacity-60"
-        style={{
-          background:
-            'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
-        }}
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--notebook-accent),transparent)] opacity-60"
       />
 
       {/* Header */}
@@ -145,51 +135,27 @@ export function SourcesSummaryCard({
             setCollapsed((value) => !value);
           }
         }}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025] cursor-pointer"
+        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--notebook-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--notebook-accent)]"
         aria-expanded={!collapsed}
       >
         {/* Icône */}
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-          style={{
-            background:
-              'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-            border:
-              '1px solid color-mix(in srgb, var(--accent-primary) 16%, transparent)',
-          }}
-        >
-          <Sparkles
-            className="h-3.5 w-3.5"
-            style={{ color: 'var(--accent-primary)' }}
-          />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
         </div>
 
         {/* Titre */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span
-              className="text-xs font-semibold tracking-wide"
-              style={{ color: 'var(--text-primary)' }}
-            >
+            <span className="notebook-panel-title">
               Résumé IA
             </span>
 
-            <span
-              className="rounded-full px-1.5 py-0.5 text-xs font-medium"
-              style={{
-                color: 'var(--text-muted)',
-                background:
-                  'color-mix(in srgb, var(--text-primary) 6%, transparent)',
-              }}
-            >
+            <NbBadge>
               {sourcesCount} source{sourcesCount > 1 ? 's' : ''}
-            </span>
+            </NbBadge>
           </div>
 
-          <p
-            className="mt-0.5 truncate text-xs"
-            style={{ color: 'var(--text-dimmed)' }}
-          >
+          <p className="mt-0.5 truncate text-xs text-[var(--text-dimmed)]">
             Synthèse automatique de votre documentation
           </p>
         </div>
@@ -200,52 +166,25 @@ export function SourcesSummaryCard({
           onClick={(event) => event.stopPropagation()}
         >
           {loading && (
-            <div
-              className="mr-1 flex items-center gap-1.5 rounded-full px-2 py-1"
-              style={{
-                background:
-                  'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
-              }}
-            >
-              <Loader2
-                className="h-3 w-3 animate-spin"
-                style={{ color: 'var(--accent-primary)' }}
-              />
-              <span
-                className="text-xs"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Mise à jour
-              </span>
-            </div>
+            <NbBadge tone="accent" icon={Loader2} className="mr-1 [&_svg]:animate-spin">
+              Mise à jour
+            </NbBadge>
           )}
 
-          <button
-            type="button"
+          <NbIconButton
+            icon={RefreshCw}
+            size="sm"
+            label="Régénérer le résumé"
             onClick={() => fetchSummary(true)}
             disabled={loading}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:bg-white/[0.07] active:scale-95 disabled:pointer-events-none disabled:opacity-30"
-            title="Régénérer le résumé"
-            aria-label="Régénérer le résumé"
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
-              style={{ color: 'var(--text-dimmed)' }}
-            />
-          </button>
+            className={loading ? '[&_svg]:animate-spin' : undefined}
+          />
 
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{
-              color: 'var(--text-dimmed)',
-              background:
-                'color-mix(in srgb, var(--text-primary) 4%, transparent)',
-            }}
-          >
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--notebook-surface-muted)] text-[var(--text-dimmed)]">
             {collapsed ? (
-              <ChevronDown className="h-3.5 w-3.5" />
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
             ) : (
-              <ChevronUp className="h-3.5 w-3.5" />
+              <ChevronUp className="h-3.5 w-3.5" aria-hidden />
             )}
           </div>
         </div>
@@ -269,48 +208,21 @@ export function SourcesSummaryCard({
             }}
             className="overflow-hidden"
           >
-            <div
-              className="mx-4 border-t"
-              style={{
-                borderColor:
-                  'color-mix(in srgb, var(--text-primary) 6%, transparent)',
-              }}
-            />
+            <div className="mx-4 border-t border-[var(--notebook-border)]" />
 
             <div className="px-4 pb-4 pt-3">
               {/* Génération initiale */}
               {loading && !summary && (
-                <div
-                  className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-xl"
-                  style={{
-                    background:
-                      'color-mix(in srgb, var(--accent-primary) 4%, transparent)',
-                  }}
-                >
-                  <div
-                    className="flex h-8 w-8 items-center justify-center rounded-full"
-                    style={{
-                      background:
-                        'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                    }}
-                  >
-                    <Sparkles
-                      className="h-3.5 w-3.5 animate-pulse"
-                      style={{ color: 'var(--accent-primary)' }}
-                    />
+                <div className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-xl bg-[var(--notebook-surface-muted)]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
+                    <Sparkles className="h-3.5 w-3.5 animate-pulse" aria-hidden />
                   </div>
 
                   <div className="text-center">
-                    <p
-                      className="text-xs font-medium"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
+                    <p className="text-xs font-medium text-[var(--text-secondary)]">
                       Génération du résumé
                     </p>
-                    <p
-                      className="mt-0.5 text-xs"
-                      style={{ color: 'var(--text-dimmed)' }}
-                    >
+                    <p className="mt-0.5 text-xs text-[var(--text-dimmed)]">
                       Analyse de vos {sourcesCount} sources...
                     </p>
                   </div>
@@ -319,31 +231,14 @@ export function SourcesSummaryCard({
 
               {/* Erreur */}
               {error && (
-                <div
-                  className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
-                  style={{
-                    background:
-                      'color-mix(in srgb, var(--color-error) 7%, transparent)',
-                    border:
-                      '1px solid color-mix(in srgb, var(--color-error) 12%, transparent)',
-                  }}
-                >
-                  <AlertCircle
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                    style={{ color: 'var(--color-error)' }}
-                  />
+                <div className="flex items-start gap-2 rounded-xl border border-[color-mix(in_srgb,var(--color-error)_20%,transparent)] bg-[var(--color-error-subtle)] px-3 py-2">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-error)]" aria-hidden />
 
                   <div className="min-w-0">
-                    <p
-                      className="text-xs font-medium"
-                      style={{ color: 'var(--color-error)' }}
-                    >
+                    <p className="text-xs font-medium text-[var(--color-error)]">
                       Impossible de générer le résumé
                     </p>
-                    <p
-                      className="mt-0.5 text-xs leading-relaxed"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
+                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--text-muted)]">
                       {error}
                     </p>
                   </div>
@@ -353,14 +248,7 @@ export function SourcesSummaryCard({
               {/* Résumé */}
               {summary && (
                 <div
-                  className="
-                    sources-summary-content
-                    text-xs
-                    leading-[1.75]
-                  "
-                  style={{
-                    color: 'var(--text-secondary)',
-                  }}
+                  className="sources-summary-content text-xs leading-[1.75] text-[var(--text-secondary)]"
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with safeMarkdownParse
                   dangerouslySetInnerHTML={{
                     __html: safeMarkdownParse(summary),
@@ -373,21 +261,11 @@ export function SourcesSummaryCard({
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="mt-3 flex items-center justify-center gap-1.5 border-t pt-2.5"
-                  style={{
-                    borderColor:
-                      'color-mix(in srgb, var(--text-primary) 5%, transparent)',
-                  }}
+                  className="mt-3 flex items-center justify-center gap-1.5 border-t border-[var(--notebook-border)] pt-2"
                 >
-                  <Loader2
-                    className="h-2.5 w-2.5 animate-spin"
-                    style={{ color: 'var(--accent-primary)' }}
-                  />
+                  <Loader2 className="h-3 w-3 animate-spin text-[var(--notebook-accent)]" aria-hidden />
 
-                  <span
-                    className="text-xs"
-                    style={{ color: 'var(--text-dimmed)' }}
-                  >
+                  <span className="text-xs text-[var(--text-dimmed)]">
                     Actualisation du résumé...
                   </span>
                 </motion.div>
@@ -395,30 +273,15 @@ export function SourcesSummaryCard({
 
               {/* Footer */}
               {!loading && summary && !error && (
-                <div
-                  className="mt-3 flex items-center gap-1.5 border-t pt-2.5"
-                  style={{
-                    borderColor:
-                      'color-mix(in srgb, var(--text-primary) 5%, transparent)',
-                  }}
-                >
-                  <FileText
-                    className="h-2.5 w-2.5"
-                    style={{ color: 'var(--text-dimmed)' }}
-                  />
+                <div className="mt-3 flex items-center gap-1.5 border-t border-[var(--notebook-border)] pt-2 text-xs text-[var(--text-dimmed)]">
+                  <FileText className="h-3 w-3" aria-hidden />
 
-                  <span
-                    className="text-xs"
-                    style={{ color: 'var(--text-dimmed)' }}
-                  >
+                  <span>
                     Résumé basé sur {sourcesCount} source
                     {sourcesCount > 1 ? 's' : ''}
                   </span>
 
-                  <span
-                    className="ml-auto text-xs"
-                    style={{ color: 'var(--text-dimmed)' }}
-                  >
+                  <span className="ml-auto">
                     IA
                   </span>
                 </div>
@@ -490,11 +353,11 @@ export function SourcesSummaryCard({
         .sources-summary-content blockquote {
           margin: 0.7rem 0;
           padding: 0.55rem 0.75rem;
-          border-left: 2px solid var(--accent-primary);
+          border-left: 2px solid var(--notebook-accent);
           border-radius: 0 0.5rem 0.5rem 0;
           background: color-mix(
             in srgb,
-            var(--accent-primary) 5%,
+            var(--notebook-accent) 5%,
             transparent
           );
           color: var(--text-muted);
@@ -519,8 +382,8 @@ export function SourcesSummaryCard({
           border-radius: 0.65rem;
           background: color-mix(
             in srgb,
-            var(--bg-base) 70%,
-            var(--bg-panel) 30%
+            var(--notebook-canvas) 70%,
+            var(--notebook-surface) 30%
           );
         }
 
@@ -530,7 +393,7 @@ export function SourcesSummaryCard({
         }
 
         .sources-summary-content a {
-          color: var(--accent-primary);
+          color: var(--notebook-accent);
           text-decoration: none;
         }
 

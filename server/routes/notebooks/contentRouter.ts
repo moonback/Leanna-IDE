@@ -21,17 +21,24 @@ const IMAGE_CONTENT_TYPES: Record<string, string> = {
  */
 const NON_PROSE_DOC_TYPES = new Set<string>(["infographic", "visualization", "chart"]);
 
+/** Types acceptés par /generate et /generate/stream. */
+const GENERATABLE_TYPES: GeneratedDocType[] = [
+  "summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary",
+  "infographic", "full-report", "roadmap", "comparative-analysis", "synthesis-report",
+  "report-business", "report-market", "report-technical", "report-competitive", "report-financial",
+  "report-marketing", "report-product", "report-risk", "report-executive", "report-project",
+];
+
 export function createContentRouter(): Router {
   const router = Router();
 
   router.post("/:id/generate", async (req: Request, res: Response): Promise<void> => {
     try {
       const { type, sourceIds, language, customInstructions, imageModel, notebookModel } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
-      if (!type || !validTypes.includes(type)) {
+      if (!type || !GENERATABLE_TYPES.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit être l'un de: ${GENERATABLE_TYPES.join(", ")}`,
         });
         return;
       }
@@ -46,11 +53,10 @@ export function createContentRouter(): Router {
   router.post("/:id/generate/stream", async (req: Request, res: Response): Promise<void> => {
     try {
       const { type, sourceIds, language, customInstructions, imageModel, notebookModel } = req.body;
-      const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
-      if (!type || !validTypes.includes(type)) {
+      if (!type || !GENERATABLE_TYPES.includes(type)) {
         res.status(400).json({
-          error: `Le champ 'type' doit être l'un de: ${validTypes.join(", ")}`,
+          error: `Le champ 'type' doit être l'un de: ${GENERATABLE_TYPES.join(", ")}`,
         });
         return;
       }
@@ -61,6 +67,12 @@ export function createContentRouter(): Router {
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
+      // Arrêter la génération si le client annule ou ferme la connexion.
+      const abort = new AbortController();
+      res.on("close", () => {
+        if (!res.writableEnded) abort.abort();
+      });
+
       res.write(`event: start\ndata: ${JSON.stringify({ type, status: "generating" })}\n\n`);
 
       const doc = await contentGenerator.generate(req.params.id, type, {
@@ -69,8 +81,9 @@ export function createContentRouter(): Router {
         customInstructions,
         imageModel,
         notebookModel,
+        signal: abort.signal,
         onChunk: (chunk: string) => {
-          res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+          if (!abort.signal.aborted) res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         },
       });
 

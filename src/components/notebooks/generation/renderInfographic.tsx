@@ -5,6 +5,7 @@
 
 import { useEffect, useState, type JSX } from 'react';
 import { Lightbulb, Download, Folder, Brain } from 'lucide-react';
+import { NbButton, NbBadge } from '../ui/primitives.js';
 
 /**
  * Ajoute le token d'API en paramètre de requête aux URL d'images servies par
@@ -54,15 +55,9 @@ export function renderInfographicContent(content: string): JSX.Element {
 
   if (!imageSrc) {
     return (
-      <div
-        className="flex flex-col items-center gap-4 p-8 rounded-2xl"
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          border: '1px dashed var(--border-base)',
-        }}
-      >
-        <Lightbulb className="w-8 h-8 opacity-50" style={{ color: 'var(--color-warning)' }} />
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-8">
+        <Lightbulb className="h-8 w-8 text-[var(--color-warning)] opacity-50" aria-hidden />
+        <p className="text-sm text-[var(--text-muted)]">
           Aucune image trouvée
         </p>
       </div>
@@ -80,88 +75,48 @@ export function renderInfographicContent(content: string): JSX.Element {
 
   return (
     <div className="notebooklm-infographic space-y-6">
-      <div
-        className="rounded-3xl overflow-hidden shadow-2xl border"
-        style={{
-          borderColor: 'var(--border-base)',
-          backgroundColor: 'var(--bg-base)',
-        }}
-      >
+      <div className="overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] shadow-2xl">
         <img
           src={imageSrc}
           alt="Infographie générée"
-          className="w-full h-auto"
-          style={{ maxHeight: '850px', objectFit: 'contain' }}
+          className="h-auto max-h-[850px] w-full object-contain"
         />
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          onClick={handleDownload}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-md active:scale-[0.98]"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
-            color: 'var(--color-warning)',
-            border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
-          }}
-        >
-          <Download className="w-4 h-4" />
+      <div className="flex flex-wrap items-center gap-3">
+        <NbButton variant="primary" icon={Download} onClick={handleDownload}>
           Télécharger PNG
-        </button>
+        </NbButton>
 
         {filePath && (
-          <span
-            className="text-xs px-3 py-1.5 rounded-xl"
-            style={{
-              backgroundColor: 'var(--bg-base)',
-              color: 'var(--text-dimmed)',
-            }}
-          >
-            <span className="inline-flex items-center gap-1"><Folder size={12} /> {filePath.split('/').pop()}</span>
-          </span>
+          <NbBadge icon={Folder} className="px-3 py-1">
+            {filePath.split('/').pop()}
+          </NbBadge>
         )}
         {sizeKB > 0 && (
-          <span
-            className="text-xs px-2 py-1 rounded-full"
-            style={{
-              backgroundColor: 'var(--bg-panel)',
-              color: 'var(--text-dimmed)',
-            }}
-          >
+          <NbBadge className="px-3 py-1">
             {sizeKB} KB
-          </span>
+          </NbBadge>
         )}
       </div>
 
       {(prompt || model) && (
-        <div
-          className="p-4 rounded-xl border space-y-3"
-          style={{
-            borderColor: 'var(--border-base)',
-            backgroundColor: 'var(--bg-panel)',
-          }}
-        >
+        <div className="notebook-card space-y-3 rounded-xl p-4">
           {model && (
-            <p className="text-sm flex items-center gap-2">
-              <Brain
-                className="w-4 h-4"
-                style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
-              />
-              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+            <p className="flex items-center gap-2 text-sm">
+              <Brain className="h-4 w-4 text-[var(--notebook-accent)] opacity-70" aria-hidden />
+              <span className="font-medium text-[var(--text-primary)]">
                 Modèle:
               </span>
-              <span style={{ color: 'var(--text-dimmed)' }}> {model}</span>
+              <span className="text-[var(--text-dimmed)]"> {model}</span>
             </p>
           )}
           {prompt && (
             <p className="text-sm">
-              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+              <span className="font-medium text-[var(--text-primary)]">
                 Prompt:
               </span>
-              <span
-                className="ml-2 leading-relaxed"
-                style={{ color: 'var(--text-dimmed)' }}
-              >
+              <span className="ml-2 leading-relaxed text-[var(--text-dimmed)]">
                 {prompt.slice(0, 250)}
                 {prompt.length > 250 ? '...' : ''}
               </span>

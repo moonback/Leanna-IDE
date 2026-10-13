@@ -5,7 +5,7 @@
 
 import {
   FileBarChart, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles,
+  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -19,7 +19,7 @@ export interface DocTypeEntry {
 
 export const DOC_TYPES: DocTypeEntry[] = [
   { key: 'full-report', label: 'Rapport complet', icon: FileBarChart, desc: 'Rapport pro : résumé exécutif, analyse, recommandations', color: 'var(--color-error)' },
-  { key: 'summary', label: 'Résumé', icon: FileText, desc: 'Synthèse structurée des sources', color: 'var(--accent-primary)' },
+  { key: 'summary', label: 'Résumé', icon: FileText, desc: 'Synthèse structurée des sources', color: 'var(--notebook-accent)' },
   { key: 'faq', label: 'FAQ', icon: HelpCircle, desc: '15-20 questions/réponses', color: 'var(--color-accent-alt)' },
   { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, desc: 'Concepts, quiz, résumé', color: 'var(--color-success)' },
   { key: 'briefing', label: 'Briefing', icon: Briefcase, desc: 'Document exécutif concis', color: 'var(--color-warning)' },
@@ -36,7 +36,7 @@ export const DOC_TYPES: DocTypeEntry[] = [
 export const REPORT_TYPES: DocTypeEntry[] = [
   { key: 'report-business', label: 'Business Plan', icon: Briefcase, desc: 'Vision, modèle économique, stratégie et projections', color: 'var(--color-warning)' },
   { key: 'report-market', label: 'Étude de marché', icon: Target, desc: 'Taille du marché, segments, tendances, concurrence', color: 'var(--color-info)' },
-  { key: 'report-technical', label: 'Rapport technique', icon: FileBarChart, desc: 'Architecture, choix techniques, spécifications', color: 'var(--accent-primary)' },
+  { key: 'report-technical', label: 'Rapport technique', icon: FileBarChart, desc: 'Architecture, choix techniques, spécifications', color: 'var(--notebook-accent)' },
   { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, desc: 'Positionnement, forces/faiblesses des concurrents', color: 'var(--color-accent-alt)' },
   { key: 'report-financial', label: 'Rapport financier', icon: FileBarChart, desc: 'Projections, coûts, rentabilité, KPIs', color: 'var(--color-success)' },
   { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, desc: 'Stratégie d\'acquisition, canaux, messaging', color: 'var(--color-error)' },
@@ -44,11 +44,13 @@ export const REPORT_TYPES: DocTypeEntry[] = [
   { key: 'report-risk', label: 'Analyse des risques', icon: Target, desc: 'Risques identifiés, probabilité, mitigation', color: 'var(--color-error)' },
   { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, desc: 'Résumé décisionnel pour dirigeants', color: 'var(--color-error)' },
   { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: 'var(--color-accent-alt)' },
+  { key: 'comparative-analysis', label: 'Analyse comparative', icon: GitCompare, desc: 'Croise les sources : convergences, divergences, angles morts', color: 'var(--color-info)' },
+  { key: 'synthesis-report', label: 'Rapport de synthèse', icon: Scale, desc: 'Aide à la décision : options, arbitrages, recommandation', color: 'var(--color-success)' },
 ];
 
 /** Thèmes disponibles pour le code */
 export const CODE_THEMES: Record<string, { bg: string; text: string; border: string }> = {
-  default: { bg: 'var(--bg-base)', text: 'var(--text-primary)', border: 'var(--border-base)' },
+  default: { bg: 'var(--notebook-canvas)', text: 'var(--text-primary)', border: 'var(--notebook-border)' },
 };
 
 export const MAX_PARALLEL_GENERATIONS = 3;
