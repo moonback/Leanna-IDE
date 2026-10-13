@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic, MicOff, X, Trash2, Power, GripVertical, Minus, PanelRight,
   Maximize2, Minimize2, Download, MessageSquare, MoreVertical,
-  Hash, Loader2, Volume2, FileSearch, Search,
+  Hash, Loader2, Volume2, FileSearch, Search, Sparkles,
 } from 'lucide-react';
 import { MenuButton } from './MenuButton.js';
 
@@ -68,14 +68,16 @@ export function ChatHeader({
   const statusLabel = connecting
     ? 'Connexion…'
     : isBusy ? 'Réflexion…' : connected ? 'En ligne' : 'Hors ligne';
+  // État visuel de l'orbe et du liseré d'en-tête (voir styles/workspace-pro.css)
+  const orbState = connecting ? 'connecting' : !connected ? 'offline' : isBusy ? 'busy' : 'online';
 
   return (
     <div
       {...(docked || fullscreen ? {} : dragHandlers)}
-      className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0 relative"
+      className="lea-chat-header flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0 relative"
+      data-state={orbState}
       style={{
         borderBottom: '1px solid var(--border-base)',
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 7%, var(--bg-panel)) 0%, var(--bg-panel) 55%, color-mix(in srgb, var(--accent-secondary) 4%, var(--bg-panel)) 100%)',
         cursor: docked || fullscreen ? 'default' : 'grab',
         touchAction: docked || fullscreen ? undefined : 'none',
       }}
@@ -83,6 +85,12 @@ export function ChatHeader({
       {!docked && !fullscreen && (
         <GripVertical size={14} className="flex-shrink-0" style={{ color: 'var(--text-dimmed)', opacity: 0.35 }} />
       )}
+
+      {/* Orbe de l'assistante : pulse quand elle réfléchit, grisée hors ligne */}
+      <span className="lea-orb" data-state={orbState} style={{ width: 30, height: 30 }} aria-hidden="true">
+        <Sparkles size={14} />
+        <span className="lea-orb__status" style={{ backgroundColor: statusColor }} />
+      </span>
 
       {/* Title + status */}
       <div className="flex-1 min-w-0">
@@ -118,7 +126,7 @@ export function ChatHeader({
             ) : (
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
             )}
-            {statusLabel}
+            <span className={isBusy && !reduceMotion ? 'lea-shimmer-text' : undefined}>{statusLabel}</span>
           </span>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Sparkles } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
 import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { InlineApproval } from '../InlineApproval.js';
@@ -68,14 +68,16 @@ export function ChatMessageList({
 
           {/* Connecting indicator */}
           {connecting && (
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-              style={{ backgroundColor: 'var(--bg-secondary)' }}
-            >
-              <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Connexion en cours…
+            <div className="flex items-start gap-3">
+              <span className="lea-orb" data-state="connecting" style={{ width: 32, height: 32 }} aria-hidden="true">
+                <Sparkles size={14} />
               </span>
+              <div className="lea-thinking">
+                <BreathingDots color="var(--color-warning)" reduceMotion={reduceMotion} size={5} />
+                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Connexion en cours…
+                </span>
+              </div>
             </div>
           )}
 
@@ -126,12 +128,22 @@ export function ChatMessageList({
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
-              className="flex items-center gap-3 pl-11"
+              className="flex items-start gap-3"
+              role="status"
+              aria-live="polite"
             >
-              <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} />
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {aiName} réfléchit…
+              <span className="lea-orb" data-state="busy" style={{ width: 32, height: 32 }} aria-hidden="true">
+                <Sparkles size={14} />
               </span>
+              <div className="lea-thinking">
+                <BreathingDots color="var(--accent-primary)" reduceMotion={reduceMotion} size={5} />
+                <span
+                  className={`text-xs font-medium${reduceMotion ? '' : ' lea-shimmer-text'}`}
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {aiName} réfléchit…
+                </span>
+              </div>
             </motion.div>
           )}
 
@@ -190,9 +202,9 @@ export function ChatMessageList({
             onClick={onScrollToBottom}
             className="absolute right-3 bottom-3 p-2.5 rounded-full shadow-lg z-30 flex items-center justify-center cursor-pointer"
             style={{
-              backgroundColor: 'var(--accent-primary)',
+              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))',
               color: '#fff',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.15)',
+              boxShadow: '0 8px 22px -6px color-mix(in srgb, var(--accent-primary) 70%, transparent), 0 0 0 1px rgba(255,255,255,0.18)',
             }}
             title="Aller au dernier message"
             aria-label="Aller au dernier message"

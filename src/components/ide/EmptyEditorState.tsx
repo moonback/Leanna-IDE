@@ -1,11 +1,10 @@
 import React, {
-  useState, useEffect, useMemo, useCallback, useId, useRef,
+  useState, useEffect, useMemo, useCallback, useId,
 } from 'react';
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
   Bot, Target, Globe, X, GitPullRequest, History, CalendarClock, ClipboardCheck, Stethoscope,
-  ArrowUp, MessageSquareText,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { FileIcon } from './FileIcon.js';
@@ -530,46 +529,6 @@ function GlobalStyles() {
       .ee-card-icon svg { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
       .ee-card:hover:not(:disabled) .ee-card-icon svg { transform: scale(1.14) rotate(-6deg); }
 
-      /* Barre « Demander à … » */
-      .ee-ask {
-        position: relative;
-        display: flex; align-items: center; gap: 10px;
-        padding: 8px 8px 8px 16px; border-radius: 16px;
-        background-color: color-mix(in srgb, var(--surface) 62%, transparent);
-        border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
-                    0 10px 30px color-mix(in srgb, #000 14%, transparent);
-        transition: border-color 200ms ease-out, box-shadow 260ms ease-out;
-      }
-      .ee-ask:focus-within {
-        border-color: color-mix(in srgb, var(--primary) 60%, transparent);
-        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
-                    0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent),
-                    0 14px 40px color-mix(in srgb, var(--primary) 18%, transparent);
-      }
-      .ee-ask input {
-        flex: 1; min-width: 0; height: 36px;
-        background: transparent; border: 0; outline: none; box-shadow: none !important;
-        font-size: 0.9375rem; color: var(--text);
-      }
-      .ee-ask-placeholder {
-        position: absolute; left: 44px; right: 96px; top: 50%;
-        transform: translateY(-50%);
-        pointer-events: none; overflow: hidden; height: 1.5em;
-        font-size: 0.9375rem; color: var(--text-muted);
-      }
-      .ee-ask-send {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0;
-        color: #fff; background-color: var(--primary);
-        box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--primary) 70%, transparent);
-        transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1), opacity 160ms, box-shadow 200ms;
-      }
-      .ee-ask-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--primary) 80%, transparent); }
-      .ee-ask-send:active:not(:disabled) { transform: scale(0.94); }
-      .ee-ask-send:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
-
       :root[data-theme="high-contrast"] .ee-aurora,
       :root[data-theme="high-contrast"] .ee-dots,
       :root[data-theme="high-contrast"] .ee-card-glow::before { display: none; }
@@ -709,104 +668,6 @@ const RevealText = React.memo(function RevealText({
         </React.Fragment>
       ))}
     </>
-  );
-});
-
-// ─── Barre « Demander à … » ──────────────────────────────────────────────
-// Envoie l'invite à l'assistante via onAskAssistant (qui ouvre le chat et
-// connecte si besoin). « / » place le focus dans la barre depuis l'accueil.
-
-const ASK_SUGGESTIONS = [
-  'Explique-moi l’architecture de ce projet',
-  'Trouve les bugs potentiels dans les fichiers modifiés',
-  'Écris les tests du dernier fichier ouvert',
-  'Résume l’activité Git du jour',
-  'Propose un plan pour la prochaine fonctionnalité',
-];
-
-const AskBar = React.memo(function AskBar({
-  aiName, onAsk, reduceMotion = false,
-}: { aiName: string; onAsk: (prompt: string) => void; reduceMotion?: boolean }) {
-  const [value, setValue] = useState('');
-  const [focused, setFocused] = useState(false);
-  const [hint, setHint] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const inputId = useId();
-
-  // Suggestions qui défilent dans le placeholder (en pause pendant la saisie).
-  useEffect(() => {
-    if (reduceMotion || focused || value) return;
-    const id = setInterval(() => setHint(h => (h + 1) % ASK_SUGGESTIONS.length), 3600);
-    return () => clearInterval(id);
-  }, [reduceMotion, focused, value]);
-
-  // « / » : focus rapide depuis l'écran d'accueil
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      e.preventDefault();
-      inputRef.current?.focus();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const submit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const prompt = value.trim();
-    if (!prompt) return;
-    onAsk(prompt);
-    setValue('');
-  };
-
-  // Tab sur la barre vide : reprend la suggestion affichée.
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && !value && !e.shiftKey) {
-      e.preventDefault();
-      setValue(ASK_SUGGESTIONS[hint]);
-    }
-    if (e.key === 'Escape') inputRef.current?.blur();
-  };
-
-  return (
-    <form className="ee-ask" onSubmit={submit} role="search" aria-label={`Demander à ${aiName}`}>
-      <MessageSquareText size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} aria-hidden="true" />
-      <label htmlFor={inputId} className="sr-only">{`Demander à ${aiName}`}</label>
-      <input
-        ref={inputRef}
-        id={inputId}
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onKeyDown={onKeyDown}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      {!value && (
-        <span className="ee-ask-placeholder" aria-hidden="true">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={hint}
-              className="block truncate"
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: '70%' }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: '-70%' }}
-              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {`Demander à ${aiName} : ${ASK_SUGGESTIONS[hint]}…`}
-            </motion.span>
-          </AnimatePresence>
-        </span>
-      )}
-      {!value && !focused && <Kbd className="hidden sm:inline-flex">/</Kbd>}
-      {!value && focused && <Kbd className="hidden sm:inline-flex">Tab</Kbd>}
-      <button type="submit" className="ee-ask-send ee-focus" disabled={!value.trim()} aria-label="Envoyer">
-        <ArrowUp size={16} strokeWidth={2.4} />
-      </button>
-    </form>
   );
 });
 
@@ -1368,13 +1229,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             </div>
           </motion.header>
 
-          {/* ── Barre « Demander à … » (masquée sans clé valide) ── */}
-          {onAskAssistant && !geminiProblem && (
-            <motion.div className="mb-6" {...enter(0.08)}>
-              <AskBar aiName={aiName} onAsk={onAskAssistant} reduceMotion={reduceMotion} />
-            </motion.div>
-          )}
-
           {/* ── Alerte clé Gemini (visible seulement si nécessaire) ── */}
           <AnimatePresence initial={false}>
             {geminiProblem && (
@@ -1461,8 +1315,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             </div>
           </motion.section>
 
-          {/* ── Suggestions proactives (masquées sans clé valide : l'assistante ne pourrait pas répondre) ── */}
-          {onAskAssistant && !geminiProblem && (
+          {/* ── Suggestions proactives (visibles uniquement quand l'assistante est activée) ── */}
+          {onAskAssistant && !geminiProblem && connected && (
             <motion.div {...enter(0.15)}>
               <ProactiveInsightsSection
                 insights={insights}

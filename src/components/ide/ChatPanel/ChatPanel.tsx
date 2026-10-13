@@ -304,7 +304,7 @@ export function ChatPanel({
 
       <motion.div
         ref={panelRef}
-        className="fixed flex flex-col overflow-hidden"
+        className="lea-chat-panel fixed flex flex-col overflow-hidden"
         style={{
           top:    fullscreen ? '0' : docked ? '0'    : '80px',
           right:  fullscreen ? '0' : docked ? '0'    : '24px',

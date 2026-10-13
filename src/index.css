@@ -2,6 +2,7 @@
 @import "./styles/layers.css";
 @import "./styles/pro-polish.css";
 @import "./styles/motion-pro.css";
+@import "./styles/workspace-pro.css";
 @theme {
   /* Typography */
 --font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;

@@ -18,17 +18,19 @@ export const TRANSITIONS = {
 };
 
 export const BUBBLE_STYLES = {
+  // Assistant : surface calme, presque « document » — le contenu prime.
   assistant: {
-    bg:           'color-mix(in srgb, var(--bg-secondary) 85%, transparent)',
-    border:       'var(--border-base)',
+    bg:           'color-mix(in srgb, var(--bg-secondary) 72%, transparent)',
+    border:       'color-mix(in srgb, var(--border-base) 85%, transparent)',
     borderRadius: `4px ${RADII.lg} ${RADII.lg} ${RADII.lg}`,
-    shadow:       '0 2px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.03)',
+    shadow:       '0 1px 2px rgba(0,0,0,0.16), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent)',
   },
+  // Utilisateur : teinte d'accent pleine, lisible dans tous les thèmes.
   user: {
-    bg:           'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 22%, transparent), color-mix(in srgb, var(--accent-primary) 12%, transparent))',
-    border:       'color-mix(in srgb, var(--accent-primary) 38%, transparent)',
+    bg:           'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 26%, var(--bg-secondary)), color-mix(in srgb, var(--accent-primary) 14%, var(--bg-secondary)))',
+    border:       'color-mix(in srgb, var(--accent-primary) 34%, transparent)',
     borderRadius: `${RADII.lg} 4px ${RADII.lg} ${RADII.lg}`,
-    shadow:       '0 2px 12px color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+    shadow:       '0 6px 18px -10px color-mix(in srgb, var(--accent-primary) 65%, transparent)',
   },
 } as const;
 
