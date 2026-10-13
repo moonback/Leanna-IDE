@@ -54,7 +54,12 @@ Les 9 échecs restants sont tous documentés : 6 relèvent de BUG-004 (bloqué) 
 - **Résultat** : `npm audit --omit=dev` passe de 23 vulnérabilités à 2 faibles. Il reste 18 vulnérabilités dans les dépendances de dev, qui exigent des montées de version majeures.
 - **Validation après mise à jour** : `npm run typecheck` OK ; vitest 40/40 ✓ ; `npm run build` OK (Vite et esbuild) ; `npm test` 1 300/1 309 ✓, avec les 9 mêmes échecs documentés, aucune régression ; `.Leanna-telegram.json` non modifié.
 
+## Cycle 7 — TEST-003 et BUG-005 : isolation de l'état et emplacement du jeton
+
+- **Fichiers** : `server/utils/selfRoot.ts` (`LEANNA_STATE_DIR`), `server/security.ts` (`ensureApiToken`), `scripts/test-isolation.mjs` (nouveau), `package.json` (scripts `test` et `test:soak`), `server/security.test.ts` (+2 tests).
+- **Tests** : les 2 nouveaux tests échouent avant correction et passent après (17/17). `npm test` : 1 302/1 311 ✓, avec les 9 mêmes échecs documentés. L'état de l'app est identique avant et après la suite, et `.env` n'est pas recréé. Typecheck OK. ESLint : 1 erreur préexistante (`@ts-ignore`, `selfRoot.ts:27`).
+
 ## Bilan de session
 
-- Corrigés et vérifiés par test : BUG-001, TEST-001, BUG-002, BUG-003, TEST-002, DEP-001 (production).
-- Restants : BUG-004 (bloqué, choix d'architecture), TEST-003, CFG-001, TEST-004, UX-001. Voir `NEXT_STEPS.md`.
+- Corrigés et vérifiés par test : BUG-001, TEST-001, BUG-002, BUG-003, TEST-002, DEP-001 (production), TEST-003, BUG-005.
+- Restants : BUG-004 (bloqué, choix d'architecture), CFG-001, TEST-004, UX-001. Voir `NEXT_STEPS.md`.

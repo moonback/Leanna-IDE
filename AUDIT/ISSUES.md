@@ -12,7 +12,8 @@
 | TEST-002 | P2 | Tests (faux échecs) | Corrigé |
 | DEP-001 | P1 | Dépendances vulnérables (prod) | Corrigé (reste 2 faibles en prod, 18 en dev) |
 | BUG-004 | P2 | Runtime plugins (sandbox) | Bloqué |
-| TEST-003 | P2 | Tests (état `.Leanna/` réel modifié) | Confirmé, non corrigé |
+| TEST-003 | P2 | Tests (état `.Leanna/` réel modifié) | Corrigé |
+| BUG-005 | P2 | Jeton API écrit hors du `.env` relu au démarrage | Corrigé |
 | CFG-001 | P3 | Fichiers runtime versionnés | Confirmé, non corrigé |
 | TEST-004 | P3 | Tests dépendant de l'environnement | Confirmé, non corrigé |
 | UX-001 | P3 | Sécurité / UX des paramètres | À décider |
@@ -78,10 +79,19 @@ Exposition atténuée : écoute en local, jeton obligatoire, Mermaid en `securit
 - **Impact** : limité à la fonction opt-in `LEANNA_PLUGIN_SANDBOX=true`, dont l'isolation des plugins ne fonctionne pas en dev.
 - **Blocage** : la correction demande un choix d'architecture (point d'entrée Worker dédié et compilé, ou transmission du loader). Elle n'a pas été tentée.
 
-## TEST-003 — Les tests modifient `.Leanna/` réel (dernier projet, registre des workspaces)
+## TEST-003 — Les tests modifient `.Leanna/` réel et créent `.env`
 
-`setSelfRoot()` persiste dans `<racine app>/.Leanna/lastProject.json` et dans le registre des workspaces. Les tests l'appellent avec des dossiers temporaires. Après `npm test`, l'application peut donc rouvrir un dossier de test supprimé. Ces fichiers sont ignorés par git mais font partie de l'état utilisateur. Les tests génèrent aussi `.env` (clé maître et jeton) à la racine si celui-ci est absent.
-Correction proposée : un répertoire d'état surchargeable (ex. `LEANNA_STATE_DIR`) défini par le runner de tests.
+- **Problème** : `setSelfRoot()` persiste dans `<racine app>/.Leanna/lastProject.json` et `workspaces.json`, et les tests l'appellent avec des dossiers temporaires. Après `npm test`, l'app pouvait rouvrir un dossier de test supprimé. Les tests généraient aussi un `.env` (clé maître, jeton API) à la racine.
+- **Correction** : le dossier d'état est surchargeable via `LEANNA_STATE_DIR` (`server/utils/selfRoot.ts`). `scripts/test-isolation.mjs`, préchargé par `npm test` et `test:soak`, redirige `LEANNA_STATE_DIR`, `Leanna_CONFIG_PATH` et `LEANNA_TELEGRAM_CONFIG_PATH` vers un dossier temporaire, supprimé en fin de processus.
+- **Vérification** : un test dédié (`security.test.ts`) échoue avant correction et passe après. Sur la suite complète, les empreintes de `.Leanna/lastProject.json`, `.Leanna/workspaces.json` et `.Leanna-telegram.json` sont identiques avant et après, et `.env`, supprimé avant le run, n'est pas recréé.
+- **Hors périmètre** : `.Leanna-audit.log` et `.project-memory.json` sont propres au projet (`SELF_ROOT`). Ils apparaissent parce que certains tests utilisent le dépôt lui-même comme projet ; ils sont ignorés par git.
+
+## BUG-005 — `ensureApiToken()` écrivait le jeton dans le mauvais `.env`
+
+- **Fichier** : `server/security.ts`.
+- **Problème** : le jeton généré était écrit dans `SELF_ROOT/.env`. Or `SELF_ROOT` désigne le projet ouvert par l'utilisateur, et il vaut toujours `""` au démarrage, ce qui donne `./.env` relatif au répertoire courant. Le bootstrap, lui, relit `.env` depuis `Leanna_CONFIG_PATH`, que Electron fait pointer vers un dossier persistant (`electron/main.cjs`). Dans l'app empaquetée, le jeton n'était donc pas relu et un nouveau jeton était généré à chaque lancement.
+- **Correction** : même racine que le bootstrap et `crypto.ts` (`Leanna_CONFIG_PATH`, puis `ELECTRON_APP_PATH`, puis le répertoire courant). Comportement inchangé en dev quand le répertoire courant est la racine de config.
+- **Vérification** : un test dédié échoue avant correction et passe après ; il vérifie aussi que le `.env` du projet reste intact. Non vérifié dans un build Electron réel.
 
 ## CFG-001 — Fichiers runtime versionnés malgré `.gitignore`
 

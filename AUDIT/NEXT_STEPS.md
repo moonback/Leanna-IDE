@@ -13,7 +13,6 @@
 
 | Priorité | Sujet | Proposition |
 |---|---|---|
-| P2 | TEST-003 : les tests modifient `.Leanna/` (dernier projet, registre des workspaces) et créent `.env` à la racine | Rendre le répertoire d'état surchargeable (ex. `LEANNA_STATE_DIR`), le définir vers un dossier temporaire pour `npm test`. Même approche pour la génération de `.env` dans `crypto.ts` et `security.ts`. |
 | P2 | Dépendances de dev vulnérables (18 restantes après `npm audit fix`, dont 3 critiques) | Analyser `npm audit` (sans `--omit=dev`) : les correctifs restants exigent des montées de version majeures (`--force`) et sont à tester un par un. |
 | P3 | 3 erreurs ESLint préexistantes (`ide.ts:533` `prefer-const`, `TelegramService.ts:928/961` `no-useless-escape`) | Corrections triviales, non faites pour garder les commits ciblés. |
 | P3 | Environ 5 400 avertissements de lint (lint maison) | Traiter par module, en commençant par `no-explicit-any` sur les routes sensibles. |
