@@ -92,12 +92,22 @@ function startBackendServer() {
 // ── Splash Screen ───────────────────────────────────────────────────────────
 
 function createSplashWindow() {
+  // Carte compacte centrée (et non plus plein écran) : l'utilisateur garde la
+  // main sur son bureau pendant le démarrage. 20 px de marge transparente
+  // autour de la carte pour son ombre portée (voir splash.css).
   const splash = new BrowserWindow({
-    fullscreen: true,
+    width: 760,
+    height: 480,
+    center: true,
+    show: false, // affichée au premier rendu : pas de flash de fenêtre vide
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     resizable: false,
-    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     icon: getWindowIcon(),
@@ -108,7 +118,18 @@ function createSplashWindow() {
     },
   });
 
-  splash.loadFile(path.join(__dirname, 'splash.html'));
+  splash.once('ready-to-show', () => {
+    if (!splash.isDestroyed()) splash.show();
+  });
+
+  // Version réelle, port et mode transmis au splash (plus de valeurs codées en dur)
+  splash.loadFile(path.join(__dirname, 'splash.html'), {
+    query: {
+      version: app.getVersion(),
+      port: String(process.env.VITE_SERVER_PORT || 4000),
+      mode: isPackaged ? '' : 'dev',
+    },
+  });
   return splash;
 }
 
@@ -151,15 +172,20 @@ function createWindow(splash, splashMinEnd) {
       splash.webContents.executeJavaScript('if (typeof window.markComplete === "function") window.markComplete();').catch(() => {});
     }
 
-    // Attendre la fin du cycle splash (minimum 4.5 secondes)
-    const remaining = Math.max(400, (splashMinEnd || 0) - Date.now());
+    // Laisser la barre atteindre 100 % puis fermer le splash en fondu.
+    // Le délai minimum évite seulement un clignotement si tout est déjà prêt.
+    const remaining = Math.max(450, (splashMinEnd || 0) - Date.now());
     setTimeout(() => {
+      const SPLASH_FADE_MS = 280;
       if (splash && !splash.isDestroyed()) {
-        splash.close();
+        splash.webContents.executeJavaScript('if (typeof window.splashExit === "function") window.splashExit();').catch(() => {});
       }
       win.maximize();
       win.show();
       win.focus();
+      setTimeout(() => {
+        if (splash && !splash.isDestroyed()) splash.close();
+      }, SPLASH_FADE_MS);
     }, remaining);
   });
 
@@ -325,7 +351,9 @@ function createTray(win) {
 
 app.whenReady().then(() => {
   const splash = createSplashWindow();
-  const splashMinEnd = Date.now() + 5000; // splash visible au moins 5 secondes
+  // Durée minimale du splash : juste assez pour éviter un clignotement.
+  // (Avant : 5 s imposées même quand l'application était déjà prête.)
+  const splashMinEnd = Date.now() + 1800;
 
   // Démarrer le serveur backend en mode packagé
   if (isPackaged) {
