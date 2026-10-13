@@ -47,6 +47,12 @@ export interface AgentTask {
    */
   onProgress?: (phase: RuntimePhase) => void;
   /**
+   * Callback de trace d'exécution : appelé après la planification puis à
+   * chaque fin d'étape, avec le plan (statut par étape) et le budget consommé.
+   * Permet à l'UI d'afficher le plan de l'agent EN DIRECT.
+   */
+  onTrace?: (trace: ExecutionTrace) => void;
+  /**
    * Signal d'annulation coopératif. Quand il est déclenché (abort), le runtime
    * interrompt la planification/boucle au prochain point de contrôle et ne
    * lance plus de nouvel appel LLM.
@@ -59,6 +65,33 @@ export interface AgentTask {
  * internes (budget) : ce sont les jalons visibles de l'exécution.
  */
 export type RuntimePhase = "planning" | "acting" | "verifying" | "finalizing";
+
+/** Instantané lisible du plan et du budget d'une exécution (pour l'UI). */
+export interface ExecutionTrace {
+  intent: string;
+  successCriteria: string[];
+  steps: Array<{ description: string; status: PlanStepStatus }>;
+  budget: {
+    iterations: number;
+    maxIterations: number;
+    toolCalls: number;
+    maxToolCalls: number;
+    readCalls: number;
+    writeCalls: number;
+    verifyCalls: number;
+    recoveryCalls: number;
+  };
+  recoveries: number;
+  replans: number;
+}
+
+/** Délégation PROPOSÉE par l'agent dans son rapport (jamais exécutée seule). */
+export interface ProposedDelegation {
+  /** Rôle cible ; absent = sous-tâche à mettre aux enchères. */
+  role?: string;
+  reason: string;
+  files: string[];
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Budget — les gardes-fous de la boucle
@@ -340,6 +373,8 @@ export interface FinalResult {
   details: string;
   deliverables: string[];
   suggestions: string[];
+  /** Délégations proposées par l'agent (blocs ## Délégation du rapport). */
+  delegations?: ProposedDelegation[];
 }
 
 /** Résultat complet retourné par `run()`. */

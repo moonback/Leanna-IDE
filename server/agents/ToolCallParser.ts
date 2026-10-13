@@ -40,13 +40,21 @@ export function extractCallParams(call: {
   return {};
 }
 
+/**
+ * Borne de sécurité du scan JSON. L'ancienne borne (2 000 car.) tronquait
+ * silencieusement tout appel d'écriture dont le contenu dépassait ~2 Ko :
+ * l'objet n'était jamais refermé, l'appel était perdu et l'agent « concluait
+ * sans livrable ». 500 Ko couvre largement un fichier source réécrit.
+ */
+const MAX_JSON_SCAN_CHARS = 500_000;
+
 /** Parse un objet JSON en respectant les accolades imbriquées. */
 export function extractJsonObject(text: string, startIdx: number): Record<string, unknown> | null {
   if (startIdx < 0 || text[startIdx] !== "{") return null;
   let depth = 0;
   let inString = false;
   let escape = false;
-  for (let i = startIdx; i < text.length && i < startIdx + 2000; i++) {
+  for (let i = startIdx; i < text.length && i < startIdx + MAX_JSON_SCAN_CHARS; i++) {
     const ch = text[i];
     if (escape) {
       escape = false;
@@ -76,10 +84,28 @@ export function extractJsonObject(text: string, startIdx: number): Record<string
   return null;
 }
 
-export function extractToolCalls(resultText: string): AgentToolCall[] {
-  // Format 1: JSON structuré {"tool_calls": [...]}
+/**
+ * Localise l'objet `{"tool_calls": [...]}` même quand le modèle l'entoure de
+ * texte (« Pensée : … ») ou d'une clôture ```json — cas très fréquent qui
+ * faisait échouer le format 1 strict.
+ */
+function findToolCallsEnvelope(text: string): { tool_calls?: unknown } | null {
+  const trimmed = text.trim();
   try {
-    const parsed = JSON.parse(resultText.trim());
+    return JSON.parse(trimmed);
+  } catch {
+    /* pas un JSON pur : on cherche l'enveloppe dans le texte */
+  }
+  const keyIdx = trimmed.indexOf('"tool_calls"');
+  if (keyIdx === -1) return null;
+  const start = trimmed.lastIndexOf("{", keyIdx);
+  return start === -1 ? null : extractJsonObject(trimmed, start);
+}
+
+export function extractToolCalls(resultText: string): AgentToolCall[] {
+  // Format 1: JSON structuré {"tool_calls": [...]} (pur, préfixé ou en bloc ```json)
+  try {
+    const parsed = findToolCallsEnvelope(resultText);
     if (Array.isArray(parsed?.tool_calls)) {
       const rawCalls: unknown[] = parsed.tool_calls;
       const calls = rawCalls

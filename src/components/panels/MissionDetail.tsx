@@ -10,14 +10,38 @@
  * - Les fichiers sont cliquables (ouverture dans l'éditeur via
  *   l'événement « Leanna-open-file » écouté par IdeView).
  * - « Copier le rapport » exporte la mission en Markdown.
+ * - Plan d'exécution de l'agent (étapes + budget consommé) suivi en direct.
+ * - Les délégations proposées par l'agent se lancent en un clic.
  */
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import {
   AlertTriangle, Check, CheckCircle2, ChevronDown, ClipboardCopy, Clock, FileCode2,
-  FileSearch, Flag, Lightbulb, Loader2, ShieldCheck, ShieldX, Target, Terminal, Wrench, XCircle,
+  FileSearch, Flag, Gauge, Lightbulb, ListChecks, Loader2, Play, Send, ShieldCheck, ShieldX,
+  Target, Terminal, Wrench, XCircle,
 } from 'lucide-react';
 
 // ─── Types (miroir de serializeTaskDetail côté serveur) ───────────────────────
+
+export type PlanStepStatus = 'pending' | 'running' | 'verifying' | 'done' | 'failed' | 'skipped';
+
+export interface ExecutionTrace {
+  intent: string;
+  successCriteria: string[];
+  steps: Array<{ description: string; status: PlanStepStatus }>;
+  budget: {
+    iterations: number; maxIterations: number;
+    toolCalls: number; maxToolCalls: number;
+    readCalls: number; writeCalls: number; verifyCalls: number; recoveryCalls: number;
+  };
+  recoveries: number;
+  replans: number;
+}
+
+export interface ProposedDelegation {
+  role?: string;
+  reason: string;
+  files: string[];
+}
 
 export interface MissionDetailData {
   id: string;
@@ -31,6 +55,7 @@ export interface MissionDetailData {
   startedAt?: string | number;
   completedAt?: string | number;
   timeoutMs?: number;
+  execution?: ExecutionTrace;
   context?: {
     files: string[];
     instructions?: string;
@@ -49,6 +74,7 @@ export interface MissionDetailData {
     error?: string;
     durationMs?: number;
     delegatedSubTasks: string[];
+    proposedDelegations?: ProposedDelegation[];
     evidence?: {
       filesRead: string[];
       filesModified: string[];
@@ -123,6 +149,9 @@ function toMarkdown(d: MissionDetailData): string {
   if (r?.durationMs) lines.push(`- **Durée** : ${formatMs(r.durationMs)}`);
   if (d.description) lines.push('', '## Brief', '', d.description);
   if (d.context?.successCriteria.length) lines.push('', '## Critères de réussite', '', ...d.context.successCriteria.map(c => `- ${c}`));
+  if (d.execution?.steps.length) {
+    lines.push('', '## Plan d\'exécution', '', ...d.execution.steps.map(s => `- [${s.status === 'done' ? 'x' : ' '}] ${s.description}${s.status === 'failed' ? ' — échec' : ''}`));
+  }
   if (r?.summary) lines.push('', '## Résultat', '', r.summary);
   if (r?.error) lines.push('', '## Erreur', '', r.error);
   const modified = [...new Set([...(r?.filesModified ?? []), ...(ev?.filesModified ?? [])])];
@@ -130,6 +159,9 @@ function toMarkdown(d: MissionDetailData): string {
   if (ev?.commandsExecuted.length) lines.push('', '## Commandes', '', ...ev.commandsExecuted.map(c => `- \`${c}\``));
   if (ev) lines.push('', `## Vérification : ${ev.verification.passed ? 'réussie' : 'échouée'}`, '', ...ev.verification.checks.map(c => `- ✓ ${c}`), ...ev.verification.errors.map(e => `- ✗ ${e}`));
   if (r?.suggestions.length) lines.push('', '## Suggestions', '', ...r.suggestions.map(s => `- ${s}`));
+  if (r?.proposedDelegations?.length) {
+    lines.push('', '## Délégations proposées', '', ...r.proposedDelegations.map(p => `- **${p.role ?? 'aux enchères'}** : ${p.reason}`));
+  }
   return lines.join('\n');
 }
 
@@ -246,6 +278,154 @@ function Timeline({ d, now }: { d: MissionDetailData; now: number }) {
         </p>
       )}
     </div>
+  );
+}
+
+const STEP_META: Record<PlanStepStatus, { label: string; color: string }> = {
+  pending: { label: 'À faire', color: 'var(--text-dimmed)' },
+  running: { label: 'En cours', color: 'var(--mission-color, var(--accent-primary))' },
+  verifying: { label: 'Vérification', color: 'var(--mission-color, var(--accent-primary))' },
+  done: { label: 'Fait', color: 'var(--color-success)' },
+  failed: { label: 'Échec', color: 'var(--color-error)' },
+  skipped: { label: 'Ignorée', color: 'var(--text-dimmed)' },
+};
+
+/** Plan de l'agent : frise d'étapes, l'étape active pulse pendant l'exécution. */
+function ExecutionPlan({ trace, live }: { trace: ExecutionTrace; live: boolean }) {
+  // L'étape active est la première non terminée tant que la mission tourne.
+  const activeIdx = live ? trace.steps.findIndex(s => s.status !== 'done' && s.status !== 'skipped') : -1;
+  return (
+    <div className="space-y-2">
+      {trace.intent && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <span className="font-semibold">Intention : </span>{trace.intent}
+        </p>
+      )}
+      <ol className="lea-steps m-0 list-none p-0" aria-label="Plan d'exécution de l'agent">
+        {trace.steps.map((step, i) => {
+          const status: PlanStepStatus = i === activeIdx && step.status === 'pending' ? 'running' : step.status;
+          const meta = STEP_META[status] ?? STEP_META.pending;
+          return (
+            <li key={i} className="lea-step" data-status={status} data-live={i === activeIdx ? 'true' : undefined}>
+              <span className="lea-step__dot" aria-hidden="true" />
+              <span className="min-w-0 flex-1 text-xs leading-relaxed" style={{ color: status === 'pending' ? 'var(--text-muted)' : 'var(--text-secondary)' }}>
+                {step.description}
+              </span>
+              <span className="lea-step__status" style={{ color: meta.color }}>{meta.label}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {(trace.recoveries > 0 || trace.replans > 0) && (
+        <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
+          {trace.recoveries} récupération{trace.recoveries > 1 ? 's' : ''}
+          {trace.replans > 0 && ` · ${trace.replans} replanification${trace.replans > 1 ? 's' : ''}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Jauges de budget : l'utilisateur voit si l'agent explore trop ou s'essouffle. */
+function BudgetMeters({ budget }: { budget: ExecutionTrace['budget'] }) {
+  const meters: Array<{ label: string; used: number; max: number }> = [
+    { label: 'Itérations', used: budget.iterations, max: budget.maxIterations },
+    { label: 'Appels d\'outils', used: budget.toolCalls, max: budget.maxToolCalls },
+  ];
+  const split: Array<[string, number, string]> = [
+    ['lecture', budget.readCalls, 'var(--text-dimmed)'],
+    ['écriture', budget.writeCalls, 'var(--color-warning)'],
+    ['vérification', budget.verifyCalls, 'var(--color-success)'],
+    ['récupération', budget.recoveryCalls, 'var(--color-error)'],
+  ];
+  return (
+    <div className="space-y-2">
+      {meters.map(m => {
+        const pct = m.max > 0 ? Math.min(100, (m.used / m.max) * 100) : 0;
+        const tone = pct > 85 ? 'var(--color-error)' : pct > 60 ? 'var(--color-warning)' : 'var(--accent-primary)';
+        return (
+          <div key={m.label} className="lea-budget">
+            <div className="flex items-center justify-between text-xs">
+              <span className="lea-mission-dt">{m.label}</span>
+              <span className="tabular-nums">{m.used}/{Number.isFinite(m.max) ? m.max : '∞'}</span>
+            </div>
+            <div className="lea-mission-bar" role="meter" aria-label={m.label} aria-valuenow={m.used} aria-valuemin={0} aria-valuemax={m.max}>
+              <span style={{ width: `${pct}%`, background: tone }} />
+            </div>
+          </div>
+        );
+      })}
+      <div className="flex flex-wrap gap-1">
+        {split.filter(([, n]) => n > 0).map(([label, n, c]) => (
+          <span key={label} className="lea-mission-chip">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} aria-hidden="true" />
+            {label}<b>{n}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type LaunchState = { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; role: string } | { kind: 'error'; message: string };
+
+/** Délégation proposée par l'agent, lançable en un clic (jamais automatique). */
+function DelegationCard({ proposal, parentTitle }: { proposal: ProposedDelegation; parentTitle: string }) {
+  const [state, setState] = useState<LaunchState>({ kind: 'idle' });
+
+  const launch = async () => {
+    setState({ kind: 'busy' });
+    try {
+      const res = await fetch('/api/agents/delegate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({
+          role: proposal.role,
+          title: proposal.reason.length > 80 ? `${proposal.reason.slice(0, 77)}…` : proposal.reason,
+          description: `${proposal.reason}\n\nSuite de la mission « ${parentTitle} ».`,
+          files: proposal.files,
+          priority: 'medium',
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? `Erreur ${res.status}`);
+      setState({ kind: 'done', role: json.role ?? proposal.role ?? 'agent' });
+    } catch (e) {
+      setState({ kind: 'error', message: (e as Error).message });
+    }
+  };
+
+  return (
+    <li className="lea-delegation">
+      <div className="flex items-start gap-2">
+        <span className="lea-mission-tag" style={{ color: 'var(--color-accent-alt)', background: mix('var(--color-accent-alt)', 12) }}>
+          <Send size={10} /> {proposal.role ?? 'aux enchères'}
+        </span>
+        <p className="min-w-0 flex-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{proposal.reason}</p>
+        {state.kind === 'done' ? (
+          <span className="lea-mission-action" style={{ color: 'var(--color-success)' }} role="status">
+            <Check size={11} /> Lancée ({state.role})
+          </span>
+        ) : (
+          <button type="button" onClick={launch} disabled={state.kind === 'busy'} className="lea-mission-action" title="Lancer cette sous-tâche">
+            {state.kind === 'busy' ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
+            Lancer
+          </button>
+        )}
+      </div>
+      {proposal.files.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {proposal.files.slice(0, 6).map(f => (
+            <button key={f} type="button" onClick={() => openFile(f)} className="lea-mission-chip" title={`Ouvrir ${f}`}>
+              <FileCode2 size={10} /> {f.split('/').pop()}
+            </button>
+          ))}
+        </div>
+      )}
+      {state.kind === 'error' && (
+        <p className="mt-1 text-xs" style={{ color: 'var(--color-error)' }} role="alert">{state.message}</p>
+      )}
+    </li>
   );
 }
 
@@ -376,6 +556,24 @@ export function MissionDetail({
         <Timeline d={data} now={now} />
       </Section>
 
+      {data.execution && data.execution.steps.length > 0 && (
+        <Section
+          icon={ListChecks}
+          title="Plan d'exécution"
+          count={data.execution.steps.length}
+          color={color}
+          defaultOpen={live || r?.success === false}
+        >
+          <ExecutionPlan trace={data.execution} live={live} />
+        </Section>
+      )}
+
+      {data.execution && (
+        <Section icon={Gauge} title="Budget consommé" color="var(--text-muted)" defaultOpen={false}>
+          <BudgetMeters budget={data.execution.budget} />
+        </Section>
+      )}
+
       {(data.description || data.context?.instructions || criteria.length > 0) && (
         <Section icon={Target} title="Brief de mission" count={criteria.length || undefined} color={color} defaultOpen={live}>
           {data.description && <p className="whitespace-pre-wrap text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{data.description}</p>}
@@ -465,6 +663,16 @@ export function MissionDetail({
         <Section icon={Lightbulb} title="Suggestions de l'agent" count={r.suggestions.length} color="var(--color-accent-alt)" defaultOpen={false}>
           <ul className="m-0 list-disc space-y-1 pl-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
             {r.suggestions.map(s => <li key={s}>{s}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {r?.proposedDelegations && r.proposedDelegations.length > 0 && (
+        <Section icon={Send} title="Délégations proposées" count={r.proposedDelegations.length} color="var(--color-accent-alt)">
+          <ul className="m-0 list-none space-y-1.5 p-0">
+            {r.proposedDelegations.map(p => (
+              <DelegationCard key={`${p.role ?? '*'}-${p.reason}`} proposal={p} parentTitle={data.title} />
+            ))}
           </ul>
         </Section>
       )}

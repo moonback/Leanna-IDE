@@ -22,6 +22,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { ToolRegistry } from "../ToolRegistry.js";
 import type { EventBus } from "../EventBus.js";
 import type { ToolDeclaration } from "../types.js";
@@ -39,6 +40,7 @@ import {
   buildObservationHistory,
 } from "./ToolPromptBuilder.js";
 import { buildPhaseGuidance } from "../../agents/phasePrompts.js";
+import { parseFinalReport, noteItems, proposedDelegations } from "../../agents/FinalReportParser.js";
 import {
   DEFAULT_AGENT_BUDGET,
   emptyBudgetUsage,
@@ -49,6 +51,7 @@ import {
   type AgentResult,
   type AgentTask,
   type BudgetUsage,
+  type ExecutionTrace,
   type FinalResult,
   type IAgentRuntime,
   type Observation,
@@ -75,7 +78,7 @@ const WRITE_TOOLS = new Set([
 
 /** Outils de vérification exécutables pour valider une étape. */
 const VERIFY_TOOLS = ["verify_full", "verify_typecheck", "verify_lint", "verify_file"];
-const VERIFY_TOOL_SET = new Set([...VERIFY_TOOLS, "verify_format", "quality_loop", "run_project_command"]);
+const VERIFY_TOOL_SET = new Set([...VERIFY_TOOLS, "verify_format", "verify_run_script", "quality_loop", "run_project_command"]);
 
 /** Outils de lecture/exploration (comptabilisés en phase discovery). */
 const READ_TOOLS = new Set([
@@ -104,6 +107,13 @@ const CACHEABLE_TOOLS = new Set([
 ]);
 
 const MAX_HISTORY_CHARS = 60_000;
+
+/**
+ * Nombre maximum d'étapes retenues dans un plan. Chaque étape coûte au moins un
+ * tour LLM : un plan de 10 micro-étapes épuisait le budget d'itérations avant
+ * l'écriture. Le modèle est invité à regrouper (lire + modifier = une étape).
+ */
+const MAX_PLAN_STEPS = 6;
 const MAX_RESULT_CHARS = 4_000;
 
 /**
@@ -266,7 +276,18 @@ export class AgenticRuntime implements IAgentRuntime {
   private readonly defaultBudget: AgentBudget;
   private readonly model: GenerateTextFn;
 
-  // État par exécution (reconstruit à chaque run pour rester réentrant).
+  /**
+   * Session de l'exécution COURANTE, isolée par contexte asynchrone.
+   *
+   * Le runtime est un singleton partagé par l'orchestrateur, et le scheduler
+   * lance les tâches prêtes EN PARALLÈLE (`Promise.allSettled`). Avec un simple
+   * champ d'instance, la tâche B écrasait la session de la tâche A pendant ses
+   * `await` : A planifiait/agissait avec l'agent et les outils de B, puis
+   * échouait sur « aucune session active » quand B se terminait.
+   * `AsyncLocalStorage` donne à chaque `run()` sa propre session.
+   */
+  private readonly sessionScope = new AsyncLocalStorage<RunSession>();
+  /** Session amorcée hors `run()` — réservé à `_seedSessionForTest`. */
   private session: RunSession | null = null;
 
   constructor(deps: AgenticRuntimeDeps) {
@@ -289,13 +310,18 @@ export class AgenticRuntime implements IAgentRuntime {
 
   async run(task: AgentTask): Promise<AgentResult> {
     const startedAt = Date.now();
+    if (!hasAgent(task.role)) {
+      return this.failFast(task, task.id ?? randomUUID(), startedAt, `Agent "${task.role}" introuvable`);
+    }
+    const session = this.createSession(task, startedAt);
+    return this.sessionScope.run(session, () => this.runSession(task, session));
+  }
+
+  /** Construit l'état d'exécution d'une tâche (agent, outils, budget, workspace). */
+  private createSession(task: AgentTask, startedAt: number): RunSession {
     const taskId = task.id ?? randomUUID();
     // Le budget est normalisé : maxToolCalls = somme des quotas de phase absolus.
     const budget: AgentBudget = normalizeBudget({ ...this.defaultBudget, ...task.budget });
-
-    if (!hasAgent(task.role)) {
-      return this.failFast(task, taskId, startedAt, `Agent "${task.role}" introuvable`);
-    }
     const agent = getAgentDefinitionOrThrow(task.role);
     const tools = resolveAgentTools(agent.capabilities, this.registry);
 
@@ -334,8 +360,11 @@ export class AgenticRuntime implements IAgentRuntime {
       blockedFiles: new Set<string>(),
       lastPatchByFile: new Map<string, string>(),
     };
-    this.session = session;
+    return session;
+  }
 
+  private async runSession(task: AgentTask, session: RunSession): Promise<AgentResult> {
+    const { taskId, agent, tools } = session;
     log.info(
       `[${taskId.slice(0, 8)}] ▶ ${agent.name} — objectif: "${truncate(task.goal, 120)}" | ` +
         `${tools.length} outil(s) réellement disponible(s) sur ${agent.capabilities.length} déclaré(s)`
@@ -355,6 +384,7 @@ export class AgenticRuntime implements IAgentRuntime {
       // bloquer la tâche indéfiniment sur « Planification ».
       plan = await this.withPlanningGuard(session, task.signal, () => this.plan(task));
       session.lastPlan = plan;
+      this.emitTrace(task, session);
     } catch (err) {
       const aborted = task.signal?.aborted || (err as Error).name === "AbortError";
       return this.finish(
@@ -413,6 +443,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
       if (verification.passed) {
         step.status = "done";
+        this.emitTrace(task, session);
         stepIdx++;
         // Si le modèle a produit une réponse finale, on peut clore tôt.
         if (observation.isFinal && this.allRemainingTrivial(plan, stepIdx)) break;
@@ -421,6 +452,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
       // ── FAILURE → RECOVER ──
       step.status = "failed";
+      this.emitTrace(task, session);
       // Identifie le premier fichier écrit non vérifié pour piloter la réparation.
       const failedFile = this.firstUnverifiedWrite(session, observation);
       const recovery = await this.recover({
@@ -527,6 +559,13 @@ export class AgenticRuntime implements IAgentRuntime {
       `OUTILS QUE TU POURRAS UTILISER : ${toolNames}`,
       "",
       "Analyse l'intention puis produis un plan d'action minimal et vérifiable.",
+      "RÈGLES DU PLAN :",
+      `- ${MAX_PLAN_STEPS} étapes au maximum ; chaque étape = un tour d'exécution qui peut enchaîner plusieurs outils (ex. lire puis modifier).`,
+      "- Ne cite que des outils de la liste ci-dessus.",
+      agentCanWrite(tools)
+        ? "- Tu es producteur d'artefact : le plan DOIT contenir une étape d'écriture puis une étape de vérification."
+        : "- Tu es en lecture seule : la dernière étape produit la réponse finale (analyse, rapport, recommandations).",
+      "- Les critères de succès sont OBSERVABLES (fichier écrit, typecheck à 0 erreur, test vert…), jamais « c'est fait ».",
       "Réponds UNIQUEMENT avec un JSON strict de la forme :",
       JSON.stringify(
         {
@@ -552,6 +591,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
     const steps: PlanStep[] = rawSteps
       .filter((s): s is Record<string, unknown> => Boolean(s && typeof s === "object"))
+      .slice(0, MAX_PLAN_STEPS)
       .map((s, i) => ({
         id: `step-${i + 1}`,
         description: typeof s.description === "string" ? s.description : `Étape ${i + 1}`,
@@ -593,6 +633,9 @@ export class AgenticRuntime implements IAgentRuntime {
     const systemPrompt = this.buildSystemPrompt(agent, tools, session);
     const stepPrompt = [
       `OBJECTIF GLOBAL : ${task.goal}`,
+      task.instructions ? `INSTRUCTIONS : ${task.instructions}` : "",
+      task.files?.length ? `FICHIERS DE CONTEXTE : ${task.files.join(", ")}` : "",
+      session.lastPlan ? renderPlanProgress(session.lastPlan, step) : "",
       `ÉTAPE COURANTE : ${step.description}`,
       step.suggestedTools?.length ? `OUTILS SUGGÉRÉS : ${step.suggestedTools.join(", ")}` : "",
       step.verification ? `VÉRIFICATION ATTENDUE : ${step.verification}` : "",
@@ -805,6 +848,7 @@ export class AgenticRuntime implements IAgentRuntime {
       // le fichier dans le WorkspaceState (chaîne WRITE → observe → hash).
       if (kind === "write") {
         const path = extractPath(parameters);
+        invalidateReadCache(session.readCache, name, path);
         if (path) {
           session.filesModified.add(path);
           session.usage.filesModified = session.filesModified.size;
@@ -1076,6 +1120,22 @@ export class AgenticRuntime implements IAgentRuntime {
     const session = this.requireSession();
     const { agent } = session;
 
+    // Chemin rapide : l'agent a déjà rendu son rapport final au contrat XML
+    // (<result><summary>…). On l'exploite directement au lieu de payer un appel
+    // LLM supplémentaire (latence + coût) pour re-synthétiser la mission.
+    const lastFinal = [...session.observations].reverse().find((o) => o.isFinal);
+    const report = lastFinal ? parseFinalReport(lastFinal.reasoning) : null;
+    if (report) {
+      return {
+        summary: report.summary,
+        details: [report.deliverable, report.notes].filter(Boolean).join("\n\n"),
+        // Les livrables PROUVÉS (écritures confirmées) priment sur la déclaration.
+        deliverables: session.filesModified.size > 0 ? [...session.filesModified] : report.filesModified,
+        suggestions: noteItems(report.notes).slice(0, 8),
+        delegations: proposedDelegations(lastFinal!.reasoning, agent.role),
+      };
+    }
+
     const finalPrompt = [
       `OBJECTIF : ${task.goal}`,
       `FICHIERS MODIFIÉS : ${[...session.filesModified].join(", ") || "aucun"}`,
@@ -1120,6 +1180,16 @@ export class AgenticRuntime implements IAgentRuntime {
   }
 
   // ─── Helpers internes ───────────────────────────────────────────────────────
+
+  /** Publie un instantané plan + budget vers l'appelant (UI en direct). */
+  private emitTrace(task: AgentTask, session: RunSession): void {
+    if (!task.onTrace || !session.lastPlan) return;
+    try {
+      task.onTrace(buildExecutionTrace(session.lastPlan, session));
+    } catch (err) {
+      log.debug(`onTrace a levé : ${(err as Error).message}`);
+    }
+  }
 
   private buildSystemPrompt(agent: AgentDefinition, tools: ToolDeclaration[], session: RunSession): string {
     // Guidage contextuel par phase (plan/act/verify/recover) : recentre l'agent
@@ -1350,7 +1420,7 @@ export class AgenticRuntime implements IAgentRuntime {
         `${session.usage.toolCalls} appel(s) outil | ${session.usage.iterations} itération(s) | ` +
         `${(result.durationMs / 1000).toFixed(1)}s`
     );
-    this.session = null;
+    if (this.session === session) this.session = null;
     return result;
   }
 
@@ -1382,10 +1452,11 @@ export class AgenticRuntime implements IAgentRuntime {
   }
 
   private requireSession(): RunSession {
-    if (!this.session) {
+    const session = this.sessionScope.getStore() ?? this.session;
+    if (!session) {
       throw new Error("AgenticRuntime: aucune session active. Appelez run() (les phases ne sont pas réentrantes hors run).");
     }
-    return this.session;
+    return session;
   }
 
   /**
@@ -1487,6 +1558,81 @@ function clampResult(result: unknown): unknown {
     return result.length > MAX_RESULT_CHARS ? `${result.slice(0, MAX_RESULT_CHARS)}…` : result;
   }
   return result;
+}
+
+/**
+ * Invalide le cache de lecture après une écriture réussie. Sans cela, relire un
+ * fichier qu'on vient de modifier resservait l'ANCIEN contenu : l'agent
+ * vérifiait ou re-patchait une version périmée (searchText introuvable, boucle
+ * de réparation). Les entrées du fichier écrit et toutes les recherches /
+ * listings (potentiellement périmés) sont retirées ; un renommage ou une
+ * écriture sans chemin identifiable vide tout le cache.
+ */
+function invalidateReadCache(cache: Map<string, unknown>, toolName: string, path: string | undefined): void {
+  if (!path || toolName === "rename_project_file" || toolName === "delete_project_file") {
+    cache.clear();
+    return;
+  }
+  const variants = new Set([path, normPath(path), `./${normPath(path)}`].map((p) => JSON.stringify(p)));
+  for (const key of [...cache.keys()]) {
+    const toolPart = key.slice(0, key.indexOf(":"));
+    if (toolPart === "search_in_files" || toolPart === "list_project_files") {
+      cache.delete(key);
+      continue;
+    }
+    for (const v of variants) {
+      if (key.includes(v)) {
+        cache.delete(key);
+        break;
+      }
+    }
+  }
+}
+
+function buildExecutionTrace(plan: Plan, session: RunSession): ExecutionTrace {
+  const { usage, budget } = session;
+  return {
+    intent: plan.intent,
+    successCriteria: [...plan.successCriteria],
+    steps: plan.steps.map((s) => ({ description: s.description, status: s.status })),
+    budget: {
+      iterations: usage.iterations,
+      maxIterations: budget.maxIterations,
+      toolCalls: usage.toolCalls,
+      maxToolCalls: budget.maxToolCalls,
+      readCalls: usage.readCalls,
+      writeCalls: usage.writeCalls,
+      verifyCalls: usage.verifyCalls,
+      recoveryCalls: usage.recoveryCalls,
+    },
+    recoveries: session.recoveries.length,
+    replans: session.replans,
+  };
+}
+
+/**
+ * Vue compacte du plan pour le tour courant : l'agent sait où il en est, ce qui
+ * reste à faire et quels critères prouveront la réussite — sans quoi chaque
+ * tour ne voyait que l'étape isolée et perdait le fil sur les missions longues.
+ */
+function renderPlanProgress(plan: Plan, current: PlanStep): string {
+  const marks: Record<PlanStep["status"], string> = {
+    pending: "[ ]",
+    running: "[▶]",
+    verifying: "[▶]",
+    done: "[x]",
+    failed: "[!]",
+    skipped: "[-]",
+  };
+  const lines = plan.steps.map((s) => `${s.id === current.id ? marks.running : marks[s.status] ?? "[ ]"} ${truncate(s.description, 140)}`);
+  const idx = plan.steps.findIndex((s) => s.id === current.id) + 1;
+  return [
+    `PLAN (étape ${idx}/${plan.steps.length}) :`,
+    ...lines,
+    plan.successCriteria.length ? `CRITÈRES DE SUCCÈS : ${plan.successCriteria.map((c) => truncate(c, 120)).join(" | ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** Clé de cache stable pour un appel d'outil de lecture. */

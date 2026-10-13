@@ -91,6 +91,7 @@ export const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_lint",
   "verify_format",
   "verify_full",
+  "verify_run_script",
   "run_project_command",
   "quality_loop",
   "knowledge_build_context",

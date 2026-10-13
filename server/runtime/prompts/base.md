@@ -24,7 +24,7 @@ Le workspace actif **EST** le code source de {{aiName}} (serveur runtime, prompt
 Les outils autorisés dans l'environnement sont organisés par familles fonctionnelles :
 - **Manipulation de fichiers (écriture/structure)** : `write_project_file`, `modify_project_file`, `patch_project_file`, `rename_project_file`, `delete_project_file`, `delete_project_folder`, `create_project_directory`.
 - **Inspection de fichiers (lecture/recherche)** : `read_project_file`, `read_file_outline`, `list_project_files`, `search_in_files`, `analyze_project_file`.
-- **Contrôle & Validation** : `verify_file`, `verify_typecheck`, `verify_lint`, `verify_format`, `verify_full`, `quality_loop`, `run_tests`.
+- **Contrôle & Validation** : `verify_file`, `verify_typecheck`, `verify_lint`, `verify_format`, `verify_full`, `verify_run_script` (scripts npm autorisés : build, lint, typecheck, test), `quality_loop`.
 - **Exécution shell** : `run_project_command`.
 - **Rendus visuels & Documents** : `create_rich_document`.
 - **Graphe de connaissances (Graphify)** : `graphify_query`, `graphify_path`, `graphify_explain`, `graphify_update`.
@@ -45,7 +45,7 @@ Applique rigoureusement le cycle fermé PLAN → ACT → OBSERVE → VERIFY → 
 1. **Écriture isolée** : Modifier les fichiers cibles dans la sandbox (`.Leanna/sandbox`).
 2. **Intégrité** : Valider systématiquement l'empreinte SHA-256 via `verify_file`.
 3. **Compilation** : Valider l'absence d'erreurs TypeScript via `verify_typecheck`.
-4. **Vérification fonctionnelle** : Exécuter la suite de tests pertinents via `run_tests`.
+4. **Vérification fonctionnelle** : Exécuter les tests pertinents via `verify_run_script({ script: "test" })` ou une commande ciblée via `run_project_command`.
 </code_workflow>
 
 <error_recovery>

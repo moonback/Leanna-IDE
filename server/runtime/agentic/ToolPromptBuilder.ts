@@ -48,12 +48,12 @@ export function buildToolSection(tools: ToolDeclaration[]): string {
     tools.map(renderTool).join("\n"),
     "",
     "PROTOCOLE D'APPEL D'OUTIL — impératif :",
-    "- Pour agir, réponds UNIQUEMENT avec un objet JSON strict :",
+    "- Pour agir, réponds avec un objet JSON strict (une ligne « Pensée : … » peut le précéder) :",
     '  {"tool_calls": [{"name": "<outil>", "parameters": { ... }}]}',
-    "- Tu peux enchaîner plusieurs appels dans le même tableau tool_calls.",
-    "- N'invente jamais un outil hors de la liste ci-dessus.",
+    "- Regroupe les appels indépendants dans le même tableau tool_calls (6 max par tour).",
+    "- Respecte exactement les noms de paramètres déclarés. N'invente jamais un outil hors de la liste.",
     "- Quand la tâche est terminée et vérifiée, ne renvoie AUCUN tool_calls :",
-    "  produis une réponse finale en texte (résumé, détails, livrables).",
+    "  rends le rapport final <result status=…><summary>…</summary><deliverable>…</deliverable><notes>…</notes></result>.",
   ].join("\n");
 }
 
@@ -84,8 +84,30 @@ export function buildBudgetSection(budget: AgentBudget, usage: BudgetUsage, phas
 }
 
 /**
+ * Fidélité du rendu des résultats d'outils dans l'historique.
+ *
+ * Les tours RÉCENTS sont rendus quasi intégralement : c'est là que se trouve le
+ * contenu de fichier lu ou le diagnostic de vérification sur lequel l'agent va
+ * agir. L'ancien rendu tronquait TOUT résultat à 500 caractères : un fichier lu
+ * n'était visible qu'en partie (le `searchText` d'un modify devenait introuvable)
+ * et les `parsedErrors` d'un typecheck étaient coupés derrière `stdout`.
+ */
+const RECENT_TURNS_FULL_FIDELITY = 2;
+const RECENT_RESULT_CHARS = 8_000;
+const OLD_RESULT_CHARS = 400;
+
+/** Clés rendues en premier : statut, erreur et diagnostic structuré d'abord. */
+const PRIORITY_KEYS = [
+  "status", "ok", "success", "error", "message", "path", "exitCode",
+  "parsedErrors", "issues", "errors", "summary",
+];
+/** Sorties brutes redondantes dès qu'un diagnostic structuré est présent. */
+const RAW_OUTPUT_KEYS = new Set(["stdout", "stderr", "output"]);
+
+/**
  * Rend l'historique des observations sous une forme dense mais informative,
- * en bornant la taille pour ne pas exploser le contexte.
+ * en bornant la taille pour ne pas exploser le contexte. Le tour le plus récent
+ * est toujours conservé ; les plus anciens sont abandonnés en premier.
  */
 export function buildObservationHistory(
   observations: readonly Observation[],
@@ -93,37 +115,100 @@ export function buildObservationHistory(
 ): string {
   if (observations.length === 0) return "";
   const parts: string[] = [];
-  // On parcourt du plus récent au plus ancien puis on inverse, pour privilégier
-  // les tours récents quand on atteint la borne.
+  let total = 0;
+  // Du plus récent au plus ancien : le budget profite d'abord aux tours récents.
   for (let i = observations.length - 1; i >= 0; i--) {
     const obs = observations[i];
+    const recent = observations.length - 1 - i < RECENT_TURNS_FULL_FIDELITY;
+    const resultChars = recent ? RECENT_RESULT_CHARS : OLD_RESULT_CHARS;
     const toolLines = obs.toolOutcomes.map((o) => {
-      const status = o.success ? "OK" : `ERREUR: ${o.error ?? "inconnue"}`;
-      const preview = previewResult(o.result);
-      return `  • ${o.invocation.name}(${JSON.stringify(o.invocation.parameters)}) → ${status}${preview ? ` | ${preview}` : ""}`;
+      const status = o.success ? (o.cached ? "OK (cache)" : "OK") : `ERREUR: ${o.error ?? "inconnue"}`;
+      const preview = renderResultForModel(o.result, resultChars);
+      return `  • ${o.invocation.name}(${renderParams(o.invocation.parameters)}) → ${status}${preview ? `\n${indent(preview)}` : ""}`;
     });
     const block = [
       `— Tour ${obs.iteration} —`,
-      obs.reasoning ? `raisonnement: ${truncate(obs.reasoning, 800)}` : "",
+      obs.reasoning ? `raisonnement: ${truncate(obs.reasoning, recent ? 1_500 : 600)}` : "",
       toolLines.length ? `actions:\n${toolLines.join("\n")}` : "(aucune action)",
     ]
       .filter(Boolean)
       .join("\n");
+
+    if (parts.length === 0) {
+      // Le tour le plus récent est toujours présent (tronqué si nécessaire).
+      const kept = truncate(block, maxChars);
+      parts.push(kept);
+      total = kept.length;
+      continue;
+    }
+    if (total + block.length + 2 > maxChars) {
+      parts.unshift(`(… ${i + 1} tour(s) plus ancien(s) omis pour tenir dans le contexte)`);
+      break;
+    }
     parts.unshift(block);
-    if (parts.join("\n\n").length > maxChars) break;
+    total += block.length + 2;
   }
-  return `HISTORIQUE DES TOURS PRÉCÉDENTS :\n${truncate(parts.join("\n\n"), maxChars)}`;
+  return `HISTORIQUE DES TOURS PRÉCÉDENTS :\n${parts.join("\n\n")}`;
 }
 
-function previewResult(result: unknown): string {
+/**
+ * Rendu d'un résultat d'outil pour le modèle :
+ *  - le contenu de fichier (`content`) est rendu en texte brut, pas en JSON
+ *    échappé (lisible, et ~30 % de jetons en moins sur du code) ;
+ *  - statut / erreurs / diagnostics structurés passent avant le reste ;
+ *  - stdout/stderr bruts sont omis quand un diagnostic structuré existe.
+ */
+export function renderResultForModel(result: unknown, maxChars: number): string {
   if (result === undefined || result === null) return "";
-  let text: string;
-  try {
-    text = typeof result === "string" ? result : JSON.stringify(result);
-  } catch {
-    text = String(result);
+  if (typeof result === "string") return truncate(result, maxChars);
+  if (typeof result !== "object" || Array.isArray(result)) {
+    return truncate(safeStringify(result), maxChars);
   }
-  return truncate(text, 500);
+
+  const obj = result as Record<string, unknown>;
+  const hasStructuredDiagnostics = ["parsedErrors", "issues", "errors"].some((k) => {
+    const v = obj[k];
+    return Array.isArray(v) ? v.length > 0 : Boolean(v);
+  });
+
+  const ordered: Record<string, unknown> = {};
+  for (const key of PRIORITY_KEYS) {
+    if (key in obj) ordered[key] = obj[key];
+  }
+  for (const [key, value] of Object.entries(obj)) {
+    if (key in ordered || key === "content") continue;
+    if (hasStructuredDiagnostics && RAW_OUTPUT_KEYS.has(key)) continue;
+    ordered[key] = value;
+  }
+
+  const meta = Object.keys(ordered).length > 0 ? safeStringify(ordered) : "";
+  if (typeof obj.content !== "string") return truncate(meta, maxChars);
+
+  const head = meta ? `${truncate(meta, Math.min(600, maxChars))}\n` : "";
+  return `${head}--- contenu ---\n${truncate(obj.content, Math.max(0, maxChars - head.length))}`;
+}
+
+/** Paramètres d'appel compacts : les longs contenus écrits ne sont pas re-cités. */
+function renderParams(params: Record<string, unknown>): string {
+  const compact: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    compact[key] = typeof value === "string" && value.length > 200
+      ? `${value.slice(0, 200)}… [${value.length} car.]`
+      : value;
+  }
+  return safeStringify(compact);
+}
+
+function indent(text: string): string {
+  return text.split("\n").map((l) => `    ${l}`).join("\n");
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function truncate(text: string, max: number): string {

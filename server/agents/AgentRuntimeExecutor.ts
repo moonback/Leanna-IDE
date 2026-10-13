@@ -129,6 +129,10 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
           const step = RUNTIME_PHASE_PROGRESS[phase];
           if (step) this.notifier.notify(task, "progress", step);
         },
+        // Plan + budget en direct : lus par GET /api/agents/tasks/:id (MissionDetail).
+        onTrace: (trace) => {
+          task.execution = trace;
+        },
       };
 
       const result = await this.agentic.run(agenticTask);
@@ -202,6 +206,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       details: result.final.details,
       filesModified: result.filesModified,
       suggestions: result.final.suggestions,
+      proposedDelegations: result.final.delegations?.length ? result.final.delegations : undefined,
       error: result.error,
       durationMs: result.durationMs,
       evidence: {
