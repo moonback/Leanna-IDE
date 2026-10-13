@@ -351,9 +351,8 @@ function createTray(win) {
 
 app.whenReady().then(() => {
   const splash = createSplashWindow();
-  // Durée minimale du splash : juste assez pour éviter un clignotement.
-  // (Avant : 5 s imposées même quand l'application était déjà prête.)
-  const splashMinEnd = Date.now() + 1800;
+  // Durée minimale du splash : visible au moins 5 secondes.
+  const splashMinEnd = Date.now() + 5000;
 
   // Démarrer le serveur backend en mode packagé
   if (isPackaged) {
