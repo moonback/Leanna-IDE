@@ -184,6 +184,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const collapsed = pinnedCollapsed && !hovered;
+  /** Dépliée au survol par-dessus le contenu (et non épinglée ouverte). */
+  const overlay = pinnedCollapsed && hovered;
 
   /* Halo de survol partagé. */
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -263,22 +265,26 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   return (
     <SidebarContext.Provider value={ctx}>
       <LayoutGroup id="leanna-global-sidebar">
-        {/* Emplacement réservé : il suit l'état réellement affiché (survol inclus)
-            pour que le contenu central s'adapte à la largeur de la barre. */}
+        {/* Emplacement réservé : il ne suit que l'état ÉPINGLÉ. Le dépliage au
+            survol se fait en overlay par-dessus le contenu — sans redimensionner
+            la page ni l'éditeur à chaque passage de la souris. */}
         <motion.div
           className="relative h-full flex-shrink-0"
           initial={false}
-          animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+          animate={{ width: pinnedCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
           transition={spring}
         >
           <motion.nav
             ref={navRef}
             aria-label="Navigation Leanna"
-            className="absolute inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r"
+            className="lea-sidebar absolute inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r"
+            data-overlay={overlay ? 'true' : undefined}
             initial={false}
             animate={{
               width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
-              boxShadow: '0 0 0 0 rgba(0,0,0,0)',
+              boxShadow: overlay
+                ? '18px 0 48px -16px rgba(0,0,0,0.5), 1px 0 0 0 rgba(0,0,0,0)'
+                : '0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0)',
             }}
             transition={spring}
             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
@@ -379,6 +385,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       collapsed={collapsed}
                       open={!closedGroups[group.id]}
                       onToggle={toggleGroup}
+                      count={group.items.length}
+                      hasActive={group.items.some((i) => i.active)}
                     >
                       {group.items.map((item) => (
                         <li key={item.id}>
@@ -403,6 +411,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       collapsed={collapsed}
                       open={!closedGroups[group.id]}
                       onToggle={toggleGroup}
+                      count={group.items.length}
+                      hasActive={group.items.some((i) => isActive(i.path))}
                     >
                       {group.items.map((item) => (
                         <li key={item.id}>
@@ -506,15 +516,21 @@ function IconButton({
 
 /** Groupe repliable : en-tête cliquable, hauteur animée, séparateur en mode icônes. */
 function Group({
-  id, label, first, collapsed, open, onToggle, children,
-}: { id: string; label: string; first: boolean; collapsed: boolean; open: boolean; onToggle: (id: string) => void; children: ReactNode }) {
+  id, label, first, collapsed, open, onToggle, children, count = 0, hasActive = false,
+}: {
+  id: string; label: string; first: boolean; collapsed: boolean; open: boolean; onToggle: (id: string) => void; children: ReactNode;
+  /** Nombre d'items (affiché quand le groupe est replié). */
+  count?: number;
+  /** Un item du groupe est actif : signalé même groupe replié. */
+  hasActive?: boolean;
+}) {
   const { reduceMotion } = useContext(SidebarContext);
   const showItems = collapsed || open; // en mode icônes tout reste visible
 
   return (
     <section className="mb-0.5" aria-label={label || undefined}>
       {collapsed ? (
-        !first && <div className="" style={{ backgroundColor: 'var(--border-base)' }} aria-hidden />
+        !first && <div className="lea-sidebar__sep mx-3 my-2 h-px" aria-hidden />
       ) : label ? (
         <button
           type="button"
@@ -522,8 +538,30 @@ function Group({
           aria-expanded={open}
           className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1.5 pt-3 text-left ${FOCUS_RING}`}
         >
-          <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
-            {label}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
+              {label}
+            </span>
+            {/* Groupe replié : nombre d'items + point si l'item actif est caché dedans */}
+            <AnimatePresence initial={false}>
+              {!open && (
+                <motion.span
+                  key="count"
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.6 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.16 }}
+                  className="inline-flex items-center gap-1 rounded-full px-1.5 text-xs tabular-nums leading-4"
+                  style={{
+                    color: hasActive ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+                    backgroundColor: hasActive ? 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' : 'var(--bg-hover)',
+                  }}
+                >
+                  {hasActive && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: 'var(--accent-primary)' }} aria-hidden />}
+                  {count}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </span>
           <motion.span
             aria-hidden
@@ -602,15 +640,13 @@ function NavButton({
             <motion.span
               aria-hidden
               layoutId="nav-active-bg"
-              className="absolute inset-0 rounded-lg"
-              style={{ backgroundColor: 'var(--bg-active)' }}
+              className="lea-sidebar__active absolute inset-0 rounded-lg"
               transition={layoutTransition}
             />
             <motion.span
               aria-hidden
               layoutId="nav-active-bar"
-              className="absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="lea-sidebar__bar absolute -left-2 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full"
               transition={layoutTransition}
             />
           </>
@@ -620,14 +656,17 @@ function NavButton({
           className="relative z-10 flex flex-shrink-0"
           animate={{ scale: isHovered ? 1.1 : 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-          style={{ color: active ? 'var(--accent-primary)' : isHovered ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          style={{
+            color: active ? 'var(--accent-primary)' : isHovered ? 'var(--text-primary)' : 'var(--text-muted)',
+            filter: active ? 'drop-shadow(0 0 6px color-mix(in srgb, var(--accent-primary) 55%, transparent))' : undefined,
+          }}
         >
           <Icon size={18} />
         </motion.span>
 
         <span className="relative z-10 flex min-w-0 flex-1 items-center">
           <FadeSlide show={!collapsed} className="min-w-0 flex-1" reduceMotion={reduceMotion}>
-            <span className="block truncate text-sm font-medium">{item.label}</span>
+            <span className={`block truncate text-sm ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
           </FadeSlide>
         </span>
 
@@ -660,7 +699,7 @@ function AgentPill({
       aria-label={`État de Leanna : ${agent.label}. Ouvrir Mission Control.`}
       whileHover={reduceMotion ? undefined : { x: 2 }}
       whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-      className={`group/pill mx-2 mb-2 mt-1 flex flex-shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:border-[var(--accent-primary)] ${collapsed ? 'justify-center' : ''} ${FOCUS_RING}`}
+      className={`group/pill mx-2 mb-2 mt-1 flex flex-shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:border-[var(--accent-primary)] ${collapsed ? 'justify-center' : ''}${agent.active && !reduceMotion ? ' lea-glow-border' : ''} ${FOCUS_RING}`}
       style={{
         background: 'linear-gradient(180deg, var(--bg-panel) 0%, color-mix(in srgb, var(--bg-panel) 70%, var(--bg-secondary)) 100%)',
         border: '1px solid var(--border-base)',
@@ -901,4 +940,4 @@ function IdeAssistantBlock({
       </div>
     </motion.div>
   );
-}
+}
