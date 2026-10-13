@@ -1306,7 +1306,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       <div className="ee-grain absolute inset-0 pointer-events-none" aria-hidden="true" />
 
       <div className="relative z-10 flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-14">
-        <main className="w-full max-w-[880px] my-auto">
+        <main className="w-full max-w-[1000px] my-auto">
 
           {/* ── En-tête ── */}
           <motion.header className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3" {...enter(0)}>
@@ -1535,4 +1535,4 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       </AnimatePresence>
     </div>
   );
-});
+});
