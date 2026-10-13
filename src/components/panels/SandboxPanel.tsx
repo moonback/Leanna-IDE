@@ -1,12 +1,34 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Box, RefreshCw, Upload, Trash2, Loader2, CheckCircle2,
   XCircle, Power, Lock, ShieldCheck, ShieldOff,
   GitCompareArrows, FileCode2,
   ChevronDown, RotateCcw, X, FolderOpen, Clock, Sparkles,
+  Check, Copy, Search, Undo2,
 } from 'lucide-react';
 import { useSandboxWatcher } from '../../hooks/useSandboxWatcher.js';
+import { useConfirm } from '../ui/ConfirmDialog.js';
+
+type FileStatus = 'added' | 'modified' | 'deleted';
+
+const FILE_STATUS_META: Record<FileStatus, { letter: string; label: string; color: string }> = {
+  added: { letter: 'A', label: 'Ajouté', color: 'var(--color-success)' },
+  modified: { letter: 'M', label: 'Modifié', color: 'var(--color-warning)' },
+  deleted: { letter: 'D', label: 'Supprimé', color: 'var(--color-error)' },
+};
+
+/** « il y a 5 min » — horodatage relatif lisible. */
+function relativeTime(iso: string, now: number): string {
+  const diff = Math.max(0, now - Date.parse(iso));
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  return `il y a ${d} j`;
+}
 
 interface SandboxStatus {
   active: boolean;
@@ -47,6 +69,17 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const resetCodeRef = useRef<HTMLInputElement>(null);
   const hasFetched = useRef(false);
   const [showAdvancedActions, setShowAdvancedActions] = useState(false);
+  const { confirm } = useConfirm();
+  // Statut par fichier (A/M/D) issu de /api/sandbox/diff
+  const [fileStatus, setFileStatus] = useState<Map<string, FileStatus>>(() => new Map());
+  const [fileQuery, setFileQuery] = useState('');
+  const [fileBusy, setFileBusy] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   // Progression de la réinitialisation du sandbox (0 → 100).
   const [resetProgress, setResetProgress] = useState(0);
   const resetProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,12 +98,40 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/sandbox/status', { headers: authHeaders() });
+      const [res, diffRes] = await Promise.all([
+        fetch('/api/sandbox/status', { headers: authHeaders() }),
+        fetch('/api/sandbox/diff', { headers: authHeaders() }).catch(() => null),
+      ]);
       const data = await res.json();
       if (data.status === 'success') setStatus(data.sandbox);
+      if (diffRes?.ok) {
+        const diff = await diffRes.json().catch(() => null);
+        if (diff?.status === 'success' && Array.isArray(diff.diffs)) {
+          setFileStatus(new Map(diff.diffs.map((d: { path: string; status: FileStatus }) => [d.path, d.status])));
+        }
+      }
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
+
+  // Rafraîchissement regroupé : une rafale d'événements (écritures d'agent,
+  // acceptations dans le visualiseur de diff) ne déclenche qu'un seul appel.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => { void fetchStatus(); }, 250);
+  }, [fetchStatus]);
+  useEffect(() => () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); }, []);
+
+  // Changements faits ailleurs (visualiseur de diff, agents) → panneau à jour
+  useEffect(() => {
+    window.addEventListener('Leanna-sandbox-changed', scheduleRefresh);
+    window.addEventListener('Leanna-sandbox-file-changed', scheduleRefresh);
+    return () => {
+      window.removeEventListener('Leanna-sandbox-changed', scheduleRefresh);
+      window.removeEventListener('Leanna-sandbox-file-changed', scheduleRefresh);
+    };
+  }, [scheduleRefresh]);
 
   useEffect(() => {
     if (hasFetched.current) return;
@@ -91,16 +152,14 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
   useSandboxWatcher({
     enabled: status?.active ?? false,
     onFileChanged: useCallback((_rp: string) => {
-      fetchStatus();
-    }, [fetchStatus]),
+      scheduleRefresh();
+    }, [scheduleRefresh]),
     onTreeChanged: useCallback(() => {
-      fetchStatus();
-      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
-    }, [fetchStatus]),
+      window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed')); // → scheduleRefresh
+    }, []),
     onFileDeleted: useCallback((_rp: string) => {
-      fetchStatus();
       window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
-    }, [fetchStatus]),
+    }, []),
   });
 
   const doAction = useCallback(async (action: string, method = 'POST', body?: object) => {
@@ -147,7 +206,12 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           setResetCode('');
         }
       } else if (data.status === 'validation_failed') {
-        setFeedback({ type: 'error', msg: 'Synchronisation refusée' });
+        const errs = Number(data.errorCount ?? 0);
+        const warns = Number(data.warningCount ?? 0);
+        setFeedback({
+          type: 'error',
+          msg: `Synchronisation refusée par la validation : ${errs} erreur${errs > 1 ? 's' : ''}${warns ? `, ${warns} avertissement${warns > 1 ? 's' : ''}` : ''}. Corrigez-les dans le sandbox puis réessayez.`,
+        });
       } else {
         setFeedback({ type: 'error', msg: data.error || 'Erreur' });
       }
@@ -163,6 +227,90 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       }
     }
   }, [fetchStatus]);
+
+  // Actions groupées irréversibles : toujours confirmées
+  const handleSyncAll = useCallback(async () => {
+    const n = status?.modifiedCount ?? 0;
+    const ok = await confirm({
+      title: `Appliquer ${n} fichier${n > 1 ? 's' : ''} au projet ?`,
+      message: 'Toutes les modifications du sandbox seront écrites dans le workspace réel (après validation).',
+      confirmLabel: 'Tout appliquer',
+      cancelLabel: 'Annuler',
+      variant: 'warning',
+    });
+    if (ok) void doAction('sync');
+  }, [confirm, doAction, status?.modifiedCount]);
+
+  const handleDiscardAll = useCallback(async () => {
+    const n = status?.modifiedCount ?? 0;
+    const ok = await confirm({
+      title: `Rejeter ${n} modification${n > 1 ? 's' : ''} ?`,
+      message: 'Toutes les modifications en attente dans le sandbox seront définitivement perdues.',
+      confirmLabel: 'Tout rejeter',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    });
+    if (ok) void doAction('discard');
+  }, [confirm, doAction, status?.modifiedCount]);
+
+  /** Applique ou rejette un seul fichier (mêmes routes que le visualiseur de diff). */
+  const handleFileAction = useCallback(async (path: string, kind: 'accept' | 'reject') => {
+    const name = path.split('/').pop();
+    if (kind === 'reject') {
+      const ok = await confirm({
+        title: 'Rejeter ce fichier ?',
+        message: `Les modifications de « ${name} » dans le sandbox seront définitivement annulées.`,
+        confirmLabel: 'Rejeter',
+        cancelLabel: 'Annuler',
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
+    setFileBusy(path);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/sandbox/${kind === 'accept' ? 'accept-file' : 'reject-file'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ path }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const done = kind === 'accept' ? data.applied === true : data.reverted === true;
+      if (res.ok && data.status === 'success' && done) {
+        setFeedback({ type: 'success', msg: kind === 'accept' ? `${name} appliqué au projet` : `${name} rejeté` });
+        window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+      } else {
+        setFeedback({ type: 'error', msg: data.error || (kind === 'accept' ? 'Le fichier n’a pas pu être appliqué' : 'Le fichier n’a pas pu être rejeté') });
+      }
+    } catch {
+      setFeedback({ type: 'error', msg: 'Erreur réseau' });
+    } finally {
+      setFileBusy(null);
+    }
+  }, [confirm]);
+
+  const copySandboxPath = useCallback(() => {
+    if (!status?.path) return;
+    navigator.clipboard?.writeText(status.path).then(() => {
+      setCopiedPath(true);
+      setTimeout(() => setCopiedPath(false), 1500);
+    }).catch(() => { /* presse-papiers indisponible */ });
+  }, [status?.path]);
+
+  // Liste filtrée + compte par statut
+  const visibleFiles = useMemo(() => {
+    const q = fileQuery.trim().toLowerCase();
+    const list = status?.modifiedFiles ?? [];
+    return q ? list.filter(f => f.toLowerCase().includes(q)) : list;
+  }, [status?.modifiedFiles, fileQuery]);
+  const statusCounts = useMemo(() => {
+    const c: Record<FileStatus, number> = { added: 0, modified: 0, deleted: 0 };
+    for (const f of status?.modifiedFiles ?? []) {
+      const st = fileStatus.get(f);
+      if (st) c[st]++;
+    }
+    return c;
+  }, [status?.modifiedFiles, fileStatus]);
 
   const handleDeactivate = useCallback(() => {
     if (!showCodeInput) {
@@ -344,13 +492,25 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                 <span className="truncate font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                   {status.path}
                 </span>
+                <button
+                  type="button"
+                  onClick={copySandboxPath}
+                  className="flex-shrink-0 rounded p-0.5 transition-colors hover:bg-[var(--bg-hover)]"
+                  title="Copier le chemin du sandbox"
+                  aria-label="Copier le chemin du sandbox"
+                >
+                  {copiedPath ? <Check size={11} style={{ color: 'var(--color-success)' }} /> : <Copy size={11} style={{ color: 'var(--text-dimmed)' }} />}
+                </button>
               </span>
             )}
             {status?.lastSync && (
-              <span className="flex items-center gap-1.5">
+              <span
+                className="flex items-center gap-1.5"
+                title={new Date(status.lastSync).toLocaleString('fr-FR')}
+              >
                 <Clock size={11} style={{ color: 'var(--text-dimmed)' }} />
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {new Date(status.lastSync).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                  Dernière synchro {relativeTime(status.lastSync, now)}
                 </span>
               </span>
             )}
@@ -398,6 +558,34 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         />
       )}
 
+      {/* Actions rapides : appliquer / rejeter tout (confirmées) */}
+      {isActive && modCount > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleSyncAll}
+            disabled={busy !== null}
+            className="lea-sbx-quick flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
+            style={{ ['--tone' as string]: 'var(--color-success)' }}
+            title="Appliquer toutes les modifications au projet"
+          >
+            {busy === 'sync' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            Tout appliquer
+          </button>
+          <button
+            type="button"
+            onClick={handleDiscardAll}
+            disabled={busy !== null}
+            className="lea-sbx-quick flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
+            style={{ ['--tone' as string]: 'var(--color-error)' }}
+            title="Rejeter toutes les modifications"
+          >
+            {busy === 'discard' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Tout rejeter
+          </button>
+        </div>
+      )}
+
       {isActive && modCount === 0 && (
         <div
           className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3"
@@ -420,7 +608,8 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={spring}
-            className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-medium"
+            role={feedback.type === 'error' ? 'alert' : 'status'}
+            className="flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs font-medium"
             style={{
               backgroundColor: feedback.type === 'success'
                 ? 'color-mix(in srgb, var(--color-success) 8%, transparent)'
@@ -467,6 +656,19 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
               {status.modifiedFiles.length}
             </span>
           )}
+          <span className="ml-auto flex items-center gap-1.5 normal-case">
+            {(Object.keys(FILE_STATUS_META) as FileStatus[]).map(k => statusCounts[k] > 0 && (
+              <span
+                key={k}
+                className="inline-flex items-center gap-1 text-xs font-medium tabular-nums"
+                style={{ color: FILE_STATUS_META[k].color }}
+                title={`${statusCounts[k]} ${FILE_STATUS_META[k].label.toLowerCase()}${statusCounts[k] > 1 ? 's' : ''}`}
+              >
+                <span className="lea-sbx-letter" style={{ ['--tone' as string]: FILE_STATUS_META[k].color }}>{FILE_STATUS_META[k].letter}</span>
+                {statusCounts[k]}
+              </span>
+            ))}
+          </span>
         </div>
 
         {isActive && status && status.modifiedFiles.length > 0 ? (
@@ -474,28 +676,79 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
             className="overflow-hidden rounded-xl border"
             style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
           >
-            <div className="custom-scrollbar max-h-[28rem] space-y-0.5 overflow-y-auto p-1.5">
-              {status.modifiedFiles.map(f => (
-                <button
-                  key={f}
-                  onClick={() => onOpenDiff(f)}
-                  className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-all hover:bg-[var(--bg-hover)]"
-                >
-                  <FileCode2 size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                  <span
-                    className="flex-1 truncate font-mono text-xs transition-colors group-hover:text-[var(--text-primary)]"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {f}
-                  </span>
-                  <GitCompareArrows
-                    size={11}
-                    className="opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ color: 'var(--text-dimmed)' }}
-                  />
-                </button>
-              ))}
-            </div>
+            {status.modifiedFiles.length > 5 && (
+              <label className="lea-sbx-search m-1.5 mb-0 flex items-center gap-2 rounded-lg px-2.5" style={{ height: 30 }}>
+                <Search size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} aria-hidden="true" />
+                <input
+                  value={fileQuery}
+                  onChange={e => setFileQuery(e.target.value)}
+                  placeholder="Filtrer les fichiers…"
+                  aria-label="Filtrer les fichiers modifiés"
+                  className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+                  style={{ color: 'var(--text-primary)', boxShadow: 'none' }}
+                />
+                {fileQuery && (
+                  <button type="button" onClick={() => setFileQuery('')} aria-label="Effacer le filtre" className="rounded p-0.5 hover:bg-[var(--bg-hover)]">
+                    <X size={11} style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                )}
+              </label>
+            )}
+            <ul className="custom-scrollbar m-0 max-h-[28rem] list-none space-y-0.5 overflow-y-auto p-1.5">
+              {visibleFiles.length === 0 && (
+                <li className="py-6 text-center text-xs" style={{ color: 'var(--text-dimmed)' }}>Aucun fichier ne correspond.</li>
+              )}
+              {visibleFiles.map(f => {
+                const st = fileStatus.get(f);
+                const meta = st ? FILE_STATUS_META[st] : null;
+                const name = f.split('/').pop() ?? f;
+                const dir = f.slice(0, Math.max(0, f.length - name.length - 1));
+                const working = fileBusy === f;
+                return (
+                  <li key={f} className="lea-sbx-file group flex items-center gap-1 rounded-lg pr-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDiff(f)}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left"
+                      title={`Comparer ${f}`}
+                    >
+                      {meta ? (
+                        <span className="lea-sbx-letter" style={{ ['--tone' as string]: meta.color }} aria-label={meta.label}>{meta.letter}</span>
+                      ) : (
+                        <FileCode2 size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className="block truncate text-xs font-medium transition-colors group-hover:text-[var(--text-primary)]"
+                          style={{ color: 'var(--text-secondary)', textDecoration: st === 'deleted' ? 'line-through' : undefined }}
+                        >
+                          {name}
+                        </span>
+                        {dir && <span className="block truncate font-mono text-xs" style={{ color: 'var(--text-dimmed)' }}>{dir}</span>}
+                      </span>
+                    </button>
+                    {/* Actions par fichier : visibles au survol / focus clavier */}
+                    <span className="lea-sbx-file-actions flex flex-shrink-0 items-center gap-0.5">
+                      {working ? (
+                        <Loader2 size={13} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => onOpenDiff(f)} className="lea-sbx-icon" title="Voir le diff" aria-label={`Voir le diff de ${name}`}>
+                            <GitCompareArrows size={12} />
+                          </button>
+                          <button type="button" onClick={() => void handleFileAction(f, 'accept')} disabled={fileBusy !== null} className="lea-sbx-icon" data-tone="success" title="Appliquer ce fichier au projet" aria-label={`Appliquer ${name}`}>
+                            <Check size={12} />
+                          </button>
+                          <button type="button" onClick={() => void handleFileAction(f, 'reject')} disabled={fileBusy !== null} className="lea-sbx-icon" data-tone="error" title="Rejeter ce fichier" aria-label={`Rejeter ${name}`}>
+                            <Undo2 size={12} />
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ) : (
           <div
@@ -532,7 +785,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                     icon={<Upload size={13} />}
                     label="Synchroniser tout"
                     color="var(--color-success)"
-                    onClick={() => doAction('sync')}
+                    onClick={handleSyncAll}
                     busy={busy === 'sync'}
                     tooltip="Appliquer toutes les modifications au repo principal"
                     transition={hoverSpring}
@@ -543,7 +796,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
                     icon={<Trash2 size={13} />}
                     label="Tout rejeter"
                     color="var(--color-error)"
-                    onClick={() => doAction('discard')}
+                    onClick={handleDiscardAll}
                     busy={busy === 'discard'}
                     tooltip="Supprimer toutes les modifications et réinitialiser le sandbox"
                     transition={hoverSpring}
