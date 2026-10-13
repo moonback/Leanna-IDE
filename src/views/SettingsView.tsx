@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, ChevronRight, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, Layers, Send, Lock, FileCog
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, BookText, Layers, Send, Lock, FileCog
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { useProfile } from '../context/UserProfileContext.js';
@@ -26,6 +26,7 @@ import {
   KnowledgeHealthSection,
   SystemPromptSection,
   PromptsSection,
+  NotebookPromptsSection,
   SkillsDocumentationSection,
   HierarchicalMemorySection,
   TelegramSection,
@@ -48,6 +49,7 @@ const NAV_GROUPS = [
       { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna Leanna identité' },
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'prompts-settings', icon: FileCog, label: 'Prompts (.md)', keywords: 'prompts markdown md fichiers base autonomy safety security persona editer modifier runtime template' },
+      { id: 'notebook-prompts-settings', icon: BookText, label: 'Prompts Notebooks', keywords: 'notebook notebooks prompt systeme chat generation rapport rag voix vocal resume faq swot roadmap personnaliser' },
       { id: 'agents-settings', icon: Bot, label: 'Agents', keywords: 'agent multi-agents coder test docs refactor security review architect délégation solo' },
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'skills-doc-settings', icon: BookOpen, label: 'Documentation Skills', keywords: 'documentation doc skills outils tools paramètres schéma tester interactif auto-généré' },
@@ -485,6 +487,7 @@ export default function SettingsView() {
                 {activeSection === 'ai-settings' && <AiSection />}
                 {activeSection === 'systemprompt-settings' && <SystemPromptSection />}
                 {activeSection === 'prompts-settings' && <PromptsSection />}
+                {activeSection === 'notebook-prompts-settings' && <NotebookPromptsSection />}
                 {activeSection === 'agents-settings' && <AgentsSection />}
                 {activeSection === 'custom-skills-settings' && <CustomSkillsSection />}
                 {activeSection === 'openrouter-settings' && <OpenRouterSection />}
@@ -518,6 +521,7 @@ function getSectionDescription(id: string): string {
     'ai-settings': 'Configurez le nom et la voix de votre assistant IA.',
     'systemprompt-settings': 'Personnalisez les instructions système de l\'assistant.',
     'prompts-settings': 'Affichez et modifiez les fichiers Markdown du prompt système (server/runtime/prompts).',
+    'notebook-prompts-settings': 'Personnalisez tous les prompts système des notebooks (chat, génération, rapports, RAG, voix).',
     'agents-settings': 'Activez ou désactivez les agents spécialisés (coder, test, docs, etc.).',
     'custom-skills-settings': 'Créez et gérez vos skills personnalisés stockés en BDD.',
     'openrouter-settings': 'Sélectionnez votre provider et modèle pour les requêtes texte.',

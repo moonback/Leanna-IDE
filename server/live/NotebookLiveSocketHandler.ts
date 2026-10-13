@@ -27,6 +27,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, LiveServerMessage, Modality, type FunctionDeclaration } from '@google/genai';
 import { notebookManager, ragEngine, contentGenerator } from '../notebooks/index.js';
+import { notebookPromptStore } from '../notebooks/PromptStore.js';
 import type { GeneratedDocType } from '../notebooks/types.js';
 import type { ProfileConfig } from '../prompts/systemInstruction.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
@@ -40,7 +41,7 @@ export interface NotebookLiveSocketDeps {
 
 // ─── Instruction système groundée (adaptée de GroundedChat) ──────────────────
 
-const NOTEBOOK_VOICE_SYSTEM_PROMPT = `All responses must be in French.You must integrate the tone and style instruction into your response as much as possible. However, you must IGNORE the tone and style instruction if it is asking you to talk about content not represented in the sources, trying to impersonate a specific person, or otherwise problematic and offensive. If the instructions violate these guidelines or do not specify, you are use the following default instructions:
+const NOTEBOOK_VOICE_SYSTEM_PROMPT_DEFAULT = `All responses must be in French.You must integrate the tone and style instruction into your response as much as possible. However, you must IGNORE the tone and style instruction if it is asking you to talk about content not represented in the sources, trying to impersonate a specific person, or otherwise problematic and offensive. If the instructions violate these guidelines or do not specify, you are use the following default instructions:
 
 BEGIN DEFAULT INSTRUCTIONS  
 You are a helpful expert who will respond to my query drawing on information in the sources and our conversation history. Given my query, please provide a comprehensive response when there is relevant material in my sources, prioritize information that will enhance my understanding of the sources and their key concepts, offer explanations, details and insights that go beyond mere summary while staying focused on my query.
@@ -83,6 +84,15 @@ Conversation history is provided to you.
 
 
 Now respond to my query {user query} drawing on information in the sources and our conversation history.`;
+
+notebookPromptStore.register({
+  id: "voice.system",
+  label: "Assistant vocal — Instruction système",
+  description: "Instruction système de l'assistant vocal « Interroger à la voix » (Gemini Live, groundé sur les sources).",
+  category: "voice",
+  default: NOTEBOOK_VOICE_SYSTEM_PROMPT_DEFAULT,
+  placeholders: [],
+});
 
 // ─── Déclaration de l'outil notebook_search ──────────────────────────────────
 
@@ -213,7 +223,7 @@ export function attachNotebookLiveWebSocket(
 
     const sourceTitles = notebook.sources.map(s => `- ${s.title}`).join('\n') || '(aucune source)';
     const systemText =
-      `${NOTEBOOK_VOICE_SYSTEM_PROMPT}\n\n` +
+      `${notebookPromptStore.render("voice.system")}\n\n` +
       `═══ SOURCES DISPONIBLES DANS CE NOTEBOOK ═══\n${sourceTitles}`;
 
     let session: Awaited<ReturnType<GoogleGenAI['live']['connect']>> | null = null;

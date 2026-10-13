@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 
+import { createNotebookPromptsRouter } from "./promptsRouter.js";
 import { createNotebooksCrudRouter } from "./notebooksCrudRouter.js";
 import { createSourcesRouter } from "./sourcesRouter.js";
 import { createChatRouter } from "./chatRouter.js";
@@ -34,6 +35,9 @@ const upload = multer({
 export function createNotebooksRouter(): Router {
   const router = Router();
 
+  // Monté EN PREMIER : les routes littérales /prompts doivent précéder le
+  // routeur CRUD qui capture /:id (sinon « prompts » = id de notebook).
+  router.use(createNotebookPromptsRouter());
   router.use(createNotebooksCrudRouter());
   router.use(createSourcesRouter(upload));
   router.use(createChatRouter());
@@ -48,6 +52,7 @@ export function createNotebooksRouter(): Router {
   return router;
 }
 
+export { createNotebookPromptsRouter } from "./promptsRouter.js";
 export { createNotebooksCrudRouter } from "./notebooksCrudRouter.js";
 export { createSourcesRouter } from "./sourcesRouter.js";
 export { createChatRouter } from "./chatRouter.js";

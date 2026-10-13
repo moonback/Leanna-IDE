@@ -13,7 +13,13 @@ import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { notebookManager } from "./NotebookManager.js";
+import { notebookPromptStore } from "./PromptStore.js";
 import type { GeneratedDocument, GeneratedDocType, AudioOverview, ReportSuggestion } from "./types.js";
+
+/** Instruction de langue standard, injectée en tête des prompts de génération. */
+function langInstructionFor(lang: string): string {
+  return lang === "fr" ? "Réponds en français." : "Reply in English.";
+}
 
 const log = createLogger("ContentGenerator");
 
@@ -238,20 +244,10 @@ export class ContentGenerator {
     }
 
     const promptResult = await generateText({
-      prompt: `Analyse le contenu suivant et génère un prompt concis (en anglais, max 200 mots) pour créer une infographie professionnelle qui résume visuellement les points clés.
-
-Le prompt doit décrire :
-- Le titre principal de l'infographie
-- Les 3-5 sections/blocs principaux avec leurs données clés
-- Le style visuel souhaité (couleurs, icônes, mise en page)
-- Les chiffres/statistiques importants à mettre en avant
-
-SOURCES :
-${sourcesContext.slice(0, 4000)}
-
-${options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : ""}
-
-Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explication supplémentaire.`,
+      prompt: notebookPromptStore.render("content.infographic.imagePrompt", {
+        context: sourcesContext.slice(0, 4000),
+        custom: options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : "",
+      }),
       temperature: 0.7,
       maxOutputTokens: 500,
     });
@@ -387,22 +383,14 @@ Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explicati
       ? `\n- Instructions supplémentaires de l'utilisateur : ${options.customInstructions}`
       : "";
 
-    const prompt = `Tu es un scénariste de podcast éducatif. Génère un script de conversation entre deux hôtes (Alex et Sam) qui discutent du contenu des documents suivants.
-
-SOURCES :
-${sourcesContext}
-
-INSTRUCTIONS :
-- Durée cible : ~${durationMinutes} minutes de conversation (environ ${durationMinutes * 150} mots)
-- ${toneInstructions[tone]}
-- Alex pose des questions, fait des analogies. Sam explique en profondeur.
-- Commencer par une introduction engageante du sujet
-- Couvrir les points clés de TOUTES les sources
-- Terminer par un résumé et les points à retenir
-- Langue : ${lang === "fr" ? "français" : "anglais"}
-- Format : dialogue avec "Alex:" et "Sam:" comme préfixes${customPart}
-
-Génère le script complet du podcast.`;
+    const prompt = notebookPromptStore.render("content.audioOverview", {
+      context: sourcesContext,
+      durationMinutes,
+      wordTarget: durationMinutes * 150,
+      tone: toneInstructions[tone],
+      lang: lang === "fr" ? "français" : "anglais",
+      custom: customPart,
+    });
 
     log.info(`🎙️ Génération Audio Overview pour "${notebook.title}" (~${durationMinutes}min, ton=${tone})`);
 
@@ -449,330 +437,52 @@ Génère le script complet du podcast.`;
   // ─── Prompts spécialisés ─────────────────────────────────────────────────
 
   private buildSummaryPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Génère un résumé synthétique et structuré du contenu suivant. Le résumé doit :
-- Capturer les points essentiels de CHAQUE source
-- Être organisé avec des titres et sous-titres
-- Inclure les conclusions ou recommandations clés
-- Faire 500-1000 mots
-
-SOURCES :
-${context}
-
-Génère le résumé en Markdown.`;
+    return notebookPromptStore.render("content.summary", { lang: langInstructionFor(lang), context });
   }
 
   private buildFAQPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Génère une FAQ complète (15-20 questions) basée sur le contenu suivant. Les questions doivent :
-- Couvrir les concepts clés
-- Varier entre questions basiques et avancées
-- Avoir des réponses concises mais complètes
-- Être organisées par thème
-
-SOURCES :
-${context}
-
-Format Markdown avec ## pour chaque question et la réponse en dessous.`;
+    return notebookPromptStore.render("content.faq", { lang: langInstructionFor(lang), context });
   }
 
   private buildStudyGuidePrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Crée un guide d'étude complet basé sur les sources suivantes. Le guide doit inclure :
-- 📚 Concepts clés à maîtriser (avec définitions)
-- 🔗 Liens entre les concepts
-- ⚡ Points importants à retenir
-- ❓ Questions d'auto-évaluation (avec réponses)
-- 📝 Résumé en une page
-
-SOURCES :
-${context}
-
-Génère le guide en Markdown structuré.`;
+    return notebookPromptStore.render("content.studyGuide", { lang: langInstructionFor(lang), context });
   }
 
   private buildBriefingPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Crée un document de briefing exécutif basé sur les sources suivantes. Le briefing doit :
-- Être concis et actionnable (max 2 pages)
-- Commencer par les conclusions/recommandations clés
-- Inclure le contexte nécessaire
-- Identifier les risques ou points d'attention
-- Proposer les prochaines étapes
-
-SOURCES :
-${context}
-
-Génère le briefing en Markdown professionnel.`;
+    return notebookPromptStore.render("content.briefing", { lang: langInstructionFor(lang), context });
   }
 
   private buildTimelinePrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Extrais et organise les événements, dates et jalons mentionnés dans les sources suivantes sous forme de chronologie.
-- Ordre chronologique
-- Inclure le contexte de chaque événement
-- Identifier les relations cause-effet
-- Si les dates sont imprécises, utiliser des périodes approximatives
-
-SOURCES :
-${context}
-
-Génère la chronologie en Markdown (format tableau ou liste).`;
+    return notebookPromptStore.render("content.timeline", { lang: langInstructionFor(lang), context });
   }
 
   private buildOutlinePrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Crée un plan structuré et détaillé qui synthétise l'ensemble des sources suivantes.
-- Structure hiérarchique (I, A, 1, a)
-- 3-4 niveaux de profondeur
-- Couvrir TOUS les sujets abordés dans les sources
-- Inclure des notes sous chaque point
-
-SOURCES :
-${context}
-
-Génère le plan en Markdown.`;
+    return notebookPromptStore.render("content.outline", { lang: langInstructionFor(lang), context });
   }
 
   private buildMindmapPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Crée une carte mentale (mindmap) structurée qui organise visuellement les concepts des sources suivantes.
-
-INSTRUCTIONS :
-- Identifie le THÈME CENTRAL qui relie toutes les sources (nom court, 1-3 mots)
-- Crée 4-6 BRANCHES PRINCIPALES équilibrées (catégories/thèmes majeurs, noms courts)
-- Chaque branche principale a 2-4 SOUS-BRANCHES (concepts clés, 2-4 mots max)
-- Ajoute au plus 2 FEUILLES par sous-branche, uniquement lorsqu'elles apportent une information utile
-- Limite le diagramme à 35 NŒUDS au total pour conserver une carte aérée et lisible
-- Utilise 3 niveaux de profondeur uniquement pour les idées les plus importantes ; évite les chaînes de nœuds inutiles
-- Répartis les branches de façon équilibrée : aucune branche ne doit contenir plus de 6 descendants
-- Les noms de nœuds doivent être COURTS et CONCIS (pas de phrases longues)
-- Utilise le format Mermaid mindmap pour la représentation visuelle
-- Après le diagramme Mermaid, ajoute une section textuelle détaillée
-
-FORMAT ATTENDU :
-1. Un bloc \`\`\`mermaid avec le mindmap en utilisant l'indentation pour la hiérarchie
-
-EXEMPLE DE STRUCTURE MERMAID :
-\`\`\`mermaid
-mindmap
-  root((Thème Central))
-    Branche 1
-      Sous-branche 1A
-        Détail 1
-        Détail 2
-      Sous-branche 1B
-        Détail 3
-    Branche 2
-      Sous-branche 2A
-        Détail 4
-        Détail 5
-      Sous-branche 2B
-\`\`\`
-
-2. Une section "## Détails par branche" qui développe chaque nœud avec des explications
-
-IMPORTANT :
-- Garde les labels COURTS (2-5 mots max par nœud)
-- Assure-toi d'avoir au moins 3 niveaux de profondeur sur chaque branche
-- Le résultat doit former un ARBRE large et profond, pas un simple schéma plat
-
-SOURCES :
-${context}
-
-Génère la carte mentale complète.`;
+    return notebookPromptStore.render("content.mindmap", { lang: langInstructionFor(lang), context });
   }
 
   private buildSWOTPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Réalise une analyse SWOT (Forces, Faiblesses, Opportunités, Menaces) complète basée sur les sources suivantes.
-
-INSTRUCTIONS :
-- Identifie le SUJET principal de l'analyse (entreprise, projet, technologie, concept)
-- Pour chaque quadrant, liste 5-8 éléments avec une brève explication
-- Appuie chaque point sur des éléments concrets des sources
-- Ajoute une section "Recommandations stratégiques" à la fin
-- Inclus une matrice de priorisation si pertinent
-
-FORMAT :
-## 📊 Analyse SWOT — [Sujet]
-
-### 💪 Forces (Strengths)
-- ...
-
-### ⚠️ Faiblesses (Weaknesses)
-- ...
-
-### 🚀 Opportunités (Opportunities)
-- ...
-
-### 🔴 Menaces (Threats)
-- ...
-
-### 🎯 Recommandations stratégiques
-- ...
-
-SOURCES :
-${context}
-
-Génère l'analyse SWOT complète en Markdown.`;
+    return notebookPromptStore.render("content.swot", { lang: langInstructionFor(lang), context });
   }
 
   private buildGlossaryPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Extrais et définis TOUS les termes techniques, acronymes, concepts spécialisés et jargon présents dans les sources suivantes.
-
-INSTRUCTIONS :
-- Organise alphabétiquement
-- Pour chaque terme : définition concise (1-2 phrases) + contexte d'usage
-- Identifie les ACRONYMES et donne leur forme complète
-- Regroupe les termes par CATÉGORIE/DOMAINE si > 20 termes
-- Ajoute des renvois entre termes liés (ex: "Voir aussi : X, Y")
-- Inclus des exemples d'usage quand c'est utile pour la compréhension
-
-FORMAT :
-## 📖 Glossaire
-
-### [Catégorie]
-
-**Terme** — Définition. _Contexte ou exemple._ → Voir aussi : terme lié
-
-SOURCES :
-${context}
-
-Génère le glossaire complet en Markdown.`;
+    return notebookPromptStore.render("content.glossary", { lang: langInstructionFor(lang), context });
   }
 
   private buildRoadmapPrompt(title: string, description: string, sourcesContext: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Tu es un consultant stratégique expert. On travaille sur un projet avec les informations suivantes :
-
-TITRE DU PROJET : ${title}
-DESCRIPTION : ${description || "(Pas de description fournie)"}
-
-SOURCES DISPONIBLES :
-${sourcesContext}
-
-Génère une **ROADMAP COMPLÈTE** et détaillée pour ce projet, enrichie par les sources. Elle doit inclure :
-
-## Structure attendue :
-
-### 📋 1. Résumé du projet
-- Vision et objectif principal
-- Public cible
-- Proposition de valeur
-
-### 📊 2. Étude de marché
-- Analyse du marché basée sur les sources
-- Segments identifiés
-- Concurrents et positionnement
-- Tendances du secteur
-
-### 💼 3. Business Plan
-- Modèle économique
-- Sources de revenus
-- Structure de coûts
-- Objectifs financiers à 6/12/24 mois
-
-### 🎯 4. Roadmap de développement
-- **Phase 1 — Validation (Mois 1-2)** : Recherche, validation, premiers retours
-- **Phase 2 — MVP (Mois 2-4)** : Produit minimum viable
-- **Phase 3 — Lancement (Mois 4-6)** : Go-to-market, premiers utilisateurs
-- **Phase 4 — Croissance (Mois 6-12)** : Scaling, optimisation
-
-### 📢 5. Stratégie marketing & acquisition
-- Canaux recommandés
-- Actions prioritaires
-- Budget indicatif
-
-### ⚠️ 6. Risques et points d'attention
-- Risques principaux
-- Hypothèses à valider
-- Plans de contingence
-
-### ✅ 7. Prochaines actions immédiates
-- 5-10 actions concrètes priorisées par impact
-
-RÈGLES :
-- Adapte au contexte du projet
-- Sois concret et actionnable
-- Format Markdown riche avec emojis
-- Vise 1500-2500 mots`;
+    return notebookPromptStore.render("content.roadmap", {
+      lang: langInstructionFor(lang),
+      title,
+      description: description || "(Pas de description fournie)",
+      context: sourcesContext,
+    });
   }
 
   private buildFullReportPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Tu es un analyste expert. Génère un RAPPORT COMPLET et professionnel basé sur l'ensemble des sources fournies.
-
-Le rapport doit être exhaustif et structuré comme un vrai document professionnel. Il doit inclure :
-
-## Structure attendue :
-
-### 1. 📋 Résumé exécutif (Executive Summary)
-- Synthèse en 3-5 paragraphes des points clés
-- Conclusions principales
-- Recommandations prioritaires
-
-### 2. 📊 Contexte et périmètre
-- Contexte du sujet / projet / domaine
-- Périmètre d'analyse (ce qui est couvert et ce qui ne l'est pas)
-- Méthodologie d'analyse
-
-### 3. 🔍 Analyse détaillée
-- Analyse approfondie de chaque thématique identifiée dans les sources
-- Données et faits clés extraits
-- Comparaisons et mises en perspective
-- Forces et faiblesses identifiées
-
-### 4. 📈 Constats et observations
-- Tendances identifiées
-- Points de convergence et divergence entre les sources
-- Risques et opportunités
-
-### 5. 💡 Recommandations
-- Recommandations actionables (priorisées : court/moyen/long terme)
-- Conditions de succès
-- Points d'attention et risques associés
-
-### 6. 📎 Annexes
-- Glossaire des termes clés
-- Références aux sources
-- Tableau récapitulatif
-
-RÈGLES :
-- Être factuel et s'appuyer exclusivement sur le contenu des sources
-- Citer les sources quand c'est pertinent
-- Utiliser des tableaux, listes et mise en forme Markdown riche
-- Viser 2000-4000 mots pour un rapport substantiel
-- Ton professionnel et analytique
-- Inclure des insights et connections que les sources ne font pas explicitement
-
-SOURCES :
-${context}
-
-Génère le rapport complet en Markdown.`;
+    return notebookPromptStore.render("content.fullReport", { lang: langInstructionFor(lang), context });
   }
 
   /**
@@ -1132,129 +842,22 @@ RÈGLE SPÉCIALE : Ce document doit être CONCIS (max 2 pages). Chaque mot compt
       return this.buildFullReportPrompt(context, lang);
     }
 
-    return `${langInstruction}
-
-Tu es un expert en rédaction de rapports professionnels. Génère un **${reportConfig.title}** complet et structuré basé sur les sources fournies.
-
-${reportConfig.structure}
-
-RÈGLES :
-- S'appuyer EXCLUSIVEMENT sur le contenu des sources fournies
-- Être factuel, précis et professionnel
-- Utiliser des tableaux, listes et mise en forme Markdown riche
-- Viser 2000-4000 mots pour un rapport substantiel
-- Ton professionnel et analytique
-- Si des informations manquent dans les sources, le signaler clairement avec [Information non disponible dans les sources]
-- Inclure des insights et connexions entre les différentes sources
-
-SOURCES :
-${context}
-
-Génère le ${reportConfig.title} complet en Markdown.`;
+    return notebookPromptStore.render("content.report", {
+      lang: langInstruction,
+      title: reportConfig.title,
+      structure: reportConfig.structure,
+      context,
+    });
   }
 
   // ─── Prompts pour les nouveaux types de documents (1.3) ────────────────────
 
   private buildComparativeAnalysisPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Réalise une **analyse comparative automatique** détaillée basée sur les sources suivantes. L'analyse doit identifier, comparer et évaluer les différents éléments (produits, solutions, approches, stratégies, etc.) mentionnés dans les documents.
-
-## Structure attendue :
-
-### 📊 1. Introduction
-- Objectif de la comparaison
-- Critères de comparaison retenus
-- Méthodologie utilisée
-
-### 📋 2. Éléments à comparer
-- Liste des produits/solutions/approches identifiés dans les sources
-- Classification par catégorie si pertinent
-
-### 🔍 3. Analyse comparative détaillée
-Pour chaque critère pertinent (fonctionnalités, prix, performance, avantages, inconvénients, etc.) :
-- Tableau comparatif clair et structuré
-- Évaluation objective de chaque élément
-- Sources des informations
-
-### 📈 4. Synthèse des résultats
-- Classement ou scoring global
-- Points forts et points faibles de chaque élément
-- Recommandations basées sur l'analyse
-
-### 🎯 5. Conclusion et recommandations
-- Quel élément se distingue et pourquoi
-- Dans quel contexte chaque élément est le plus adapté
-- Prochaines étapes recommandées
-
-RÈGLES :
-- Identifier TOUS les éléments comparables dans les sources
-- Utiliser des critères objectifs et mesurables quand possible
-- Citer les sources pour chaque information
-- Être neutre et factuel
-- Utiliser des tableaux pour les comparaisons
-- Viser 1500-3000 mots
-
-SOURCES :
-${context}
-
-Génère l'analyse comparative complète en Markdown structuré.`;
+    return notebookPromptStore.render("content.comparativeAnalysis", { lang: langInstructionFor(lang), context });
   }
 
   private buildSynthesisReportPrompt(context: string, lang: string): string {
-    const langInstruction = lang === "fr" ? "Réponds en français." : "Reply in English.";
-    return `${langInstruction}
-
-Génère un **rapport de synthèse structuré pour l'aide à la décision** basé sur l'ensemble des sources fournies. Ce rapport doit condenser les informations clés et fournir une base solide pour prendre des décisions éclairées.
-
-## Structure attendue :
-
-### 🎯 1. Résumé exécutif
-- Objectif du rapport de synthèse
-- Questions clés adressées
-- Principales conclusions (3-5 points)
-
-### 📊 2. Contexte et périmètre
-- Contexte général du sujet
-- Périmètre de l'analyse (ce qui est couvert et ce qui ne l'est pas)
-- Sources utilisées et leur pertinence
-
-### 🔍 3. Analyse des informations
-- Points clés extraits de chaque source
-- Convergences et divergences entre les sources
-- Informations manquantes ou incertaines
-
-### 💡 4. Synthèse des connaissances
-- Faits établis
-- Tendances identifiées
-- Implications et impacts potentiels
-- Scénarios possibles
-
-### ⚖️ 5. Options et recommandations
-- Options/alternatives identifiées
-- Critères d'évaluation
-- Analyse SWOT pour chaque option si pertinent
-- Recommandation principale avec justification
-
-### ✅ 6. Plan d'action
-- Décisions à prendre
-- Prochaines étapes prioritaires
-- Responsables et échéances
-- Indicateur de succès
-
-RÈGLES :
-- Être concis mais exhaustif
-- Hiérarchiser l'information par importance
-- Distinguer faits, opinions et recommandations
-- Fournir des éléments actionnables
-- Utiliser des listes et tableaux pour la clarté
-- Viser 2000-4000 mots
-
-SOURCES :
-${context}
-
-Génère le rapport de synthèse complet en Markdown professionnel.`;
+    return notebookPromptStore.render("content.synthesisReport", { lang: langInstructionFor(lang), context });
   }
 
   // ─── Suggestions intelligentes de rapports ──────────────────────────────────
@@ -1279,47 +882,10 @@ Génère le rapport de synthèse complet en Markdown professionnel.`;
 
     const alreadyGenerated = notebook.generatedDocuments.map(d => d.type);
 
-    const prompt = `Tu es un assistant qui analyse des documents et recommande des rapports à générer.
-
-Voici les sources disponibles dans un notebook :
-${sourcesInfo.map((s, i) => `${i + 1}. "${s.title}" (${s.type}, ${s.wordCount} mots) — ${s.summary}\n   Mots-clés: ${s.keywords.join(", ")}`).join("\n\n")}
-
-Documents déjà générés : ${alreadyGenerated.length > 0 ? alreadyGenerated.join(", ") : "aucun"}
-
-Types de rapports disponibles :
-- "report-business" : Business Plan (vision, modèle économique, stratégie, projections)
-- "report-market" : Étude de marché (taille, segments, tendances, concurrence)
-- "report-technical" : Rapport technique (architecture, choix technos, spécifications)
-- "report-competitive" : Analyse concurrentielle (positionnement, benchmark, différenciation)
-- "report-financial" : Rapport financier (projections, coûts, rentabilité, KPIs)
-- "report-marketing" : Plan marketing (acquisition, canaux, messaging, personas)
-- "report-product" : Rapport produit (roadmap, fonctionnalités, priorisation, UX)
-- "report-risk" : Analyse des risques (identification, probabilité, mitigation)
-- "report-executive" : Synthèse exécutive (résumé décisionnel pour dirigeants)
-- "report-project" : Rapport de projet (avancement, livrables, jalons, blocages)
-- "full-report" : Rapport complet généraliste (résumé exécutif, analyse, recommandations)
-
-INSTRUCTIONS :
-- Analyse le contenu et la nature des sources
-- Suggère les 3-5 rapports les PLUS PERTINENTS par rapport au contenu réel des sources
-- Par exemple : si les sources parlent d'un MVP et de fonctionnalités → suggère business plan, rapport produit, étude de marché
-- Ne suggère PAS un rapport qui n'a pas de sens par rapport aux sources
-- Priorise par pertinence
-- Explique POURQUOI chaque rapport serait utile pour ces sources spécifiques
-
-Réponds UNIQUEMENT en JSON valide avec ce format exact :
-[
-  {
-    "type": "report-business",
-    "title": "Titre descriptif personnalisé du rapport",
-    "description": "Ce que le rapport contiendra spécifiquement pour ces sources",
-    "reason": "Pourquoi ce rapport est pertinent pour ces sources",
-    "relevance": 95,
-    "recommendedSourceIds": ["id1", "id2"]
-  }
-]
-
-Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`;
+    const prompt = notebookPromptStore.render("content.suggestReports", {
+      sources: sourcesInfo.map((s, i) => `${i + 1}. "${s.title}" (${s.type}, ${s.wordCount} mots) — ${s.summary}\n   Mots-clés: ${s.keywords.join(", ")}`).join("\n\n"),
+      alreadyGenerated: alreadyGenerated.length > 0 ? alreadyGenerated.join(", ") : "aucun",
+    });
 
     try {
       const result = await generateText({
@@ -1457,34 +1023,12 @@ Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`;
     ).join("\n\n---\n\n");
 
     // Étape 1 : Demander au LLM d'extraire les données et de suggérer une visualisation
-    const extractionPrompt = `${langInstr}
-
-Analyse le contenu suivant et extrais les données numériques ou catégorielles pertinentes pour créer une visualisation.
-
-INSTRUCTIONS :
-- Identifie les données quantitatives (chiffres, pourcentages, statistiques)
-- Identifie les catégories ou dimensions pertinentes
-- Suggère le type de visualisation le plus adapté (bar, line, pie, scatter, network, timeline, etc.)
-- Formate les données en JSON valide, prêt à être utilisé avec D3.js
-- Si ${vizType} === 'auto', choisis le type de visualisation le plus approprié
-- Si ${vizType} !== 'auto', utilise ce type de visualisation
-
-Type de visualisation demandée : ${vizType}
-
-SOURCES :
-${sourcesContext.slice(0, 6000)}
-
-${options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : ""}
-
-Réponds UNIQUEMENT avec un objet JSON contenant :
-{
-  "chartType": "type de graphique",
-  "title": "titre de la visualisation",
-  "description": "description brève",
-  "data": { ... les données structurées ... },
-  "config": { ... configuration optionnelle ... }
-}
-`;
+    const extractionPrompt = notebookPromptStore.render("content.visual.extraction", {
+      lang: langInstr,
+      vizType,
+      context: sourcesContext.slice(0, 6000),
+      custom: options.customInstructions ? `INSTRUCTIONS UTILISATEUR : ${options.customInstructions}` : "",
+    });
 
     log.info(`📊 Extraction des données pour visualisation (type: ${vizType})`);
 
@@ -1557,15 +1101,12 @@ Réponds UNIQUEMENT avec un objet JSON contenant :
   private async renderSvgFromData(data: any, lang: string): Promise<string> {
     const { generateText } = await import("../utils/textGeneration.js");
     
-    const svgPrompt = `${lang === "fr" ? "Génère" : "Generate"} a simple SVG visualization based on this data and configuration.
-The SVG should be self-contained and valid XML. Use basic SVG elements (rect, circle, path, line, text).
-
-Data: ${JSON.stringify(data.data)}
-Chart type: ${data.chartType}
-Config: ${JSON.stringify(data.config)}
-
-Return ONLY the SVG XML code, without any explanation or markdown formatting.
-`;
+    const svgPrompt = notebookPromptStore.render("content.visual.renderSvg", {
+      verb: lang === "fr" ? "Génère" : "Generate",
+      data: JSON.stringify(data.data),
+      chartType: data.chartType,
+      config: JSON.stringify(data.config),
+    });
 
     const result = await generateText({
       prompt: svgPrompt,
@@ -1591,10 +1132,714 @@ Return ONLY the SVG XML code, without any explanation or markdown formatting.
     description: string
   ): Promise<GeneratedDocument | null> {
     try {
-      const prompt = `Tu es un consultant stratégique expert. On vient de créer un nouveau projet/notebook avec les informations suivantes :
+      const prompt = notebookPromptStore.render("content.roadmap.autoCreate", {
+        title,
+        description: description || "(Pas de description fournie)",
+      });
 
-TITRE DU PROJET : ${title}
-DESCRIPTION : ${description || "(Pas de description fournie)"}
+      log.info(`🗺️ Génération roadmap automatique pour "${title}" (notebook: ${notebookId})`);
+
+      const { generateText } = await import("../utils/textGeneration.js");
+      const result = await generateText({
+        prompt,
+        temperature: 0.6,
+        maxOutputTokens: 8192,
+      });
+
+      const doc: GeneratedDocument = {
+        id: randomUUID(),
+        notebookId,
+        type: "roadmap" as GeneratedDocType,
+        title: `🗺️ Roadmap — ${title}`,
+        content: result.text,
+        sourceIds: [],
+        createdAt: new Date().toISOString(),
+      };
+
+      notebookManager.addGeneratedDocument(notebookId, doc);
+      log.info(`✅ Roadmap auto-générée pour "${title}" (${result.text.length} chars)`);
+
+      return doc;
+    } catch (e: any) {
+      log.error(`❌ Erreur génération roadmap pour "${title}": ${e.message}`);
+      return null;
+    }
+  }
+}
+
+
+export const contentGenerator = new ContentGenerator();
+
+// ─── Enregistrement des prompts éditables (PromptStore) ──────────────────────
+// Les textes ci-dessous sont les DÉFAUTS (source de vérité). L'utilisateur peut
+// les surcharger depuis les Settings. Placeholders : {{lang}} = instruction de
+// langue, {{context}} = contexte des sources, etc.
+
+const PH_LANG = { name: "lang", description: "Instruction de langue (ex: « Réponds en français. »)" };
+const PH_CONTEXT = { name: "context", description: "Contexte assemblé des sources (titres + résumés + extraits)" };
+
+notebookPromptStore.register({
+  id: "content.summary", label: "Génération — Résumé", category: "generation",
+  description: "Résumé synthétique structuré des sources.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Génère un résumé synthétique et structuré du contenu suivant. Le résumé doit :
+- Capturer les points essentiels de CHAQUE source
+- Être organisé avec des titres et sous-titres
+- Inclure les conclusions ou recommandations clés
+- Faire 500-1000 mots
+
+SOURCES :
+{{context}}
+
+Génère le résumé en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.faq", label: "Génération — FAQ", category: "generation",
+  description: "FAQ de 15-20 questions couvrant les concepts clés.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Génère une FAQ complète (15-20 questions) basée sur le contenu suivant. Les questions doivent :
+- Couvrir les concepts clés
+- Varier entre questions basiques et avancées
+- Avoir des réponses concises mais complètes
+- Être organisées par thème
+
+SOURCES :
+{{context}}
+
+Format Markdown avec ## pour chaque question et la réponse en dessous.`,
+});
+
+notebookPromptStore.register({
+  id: "content.studyGuide", label: "Génération — Guide d'étude", category: "generation",
+  description: "Guide d'étude avec concepts clés, liens, auto-évaluation.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Crée un guide d'étude complet basé sur les sources suivantes. Le guide doit inclure :
+- 📚 Concepts clés à maîtriser (avec définitions)
+- 🔗 Liens entre les concepts
+- ⚡ Points importants à retenir
+- ❓ Questions d'auto-évaluation (avec réponses)
+- 📝 Résumé en une page
+
+SOURCES :
+{{context}}
+
+Génère le guide en Markdown structuré.`,
+});
+
+notebookPromptStore.register({
+  id: "content.briefing", label: "Génération — Briefing", category: "generation",
+  description: "Document de briefing exécutif concis et actionnable.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Crée un document de briefing exécutif basé sur les sources suivantes. Le briefing doit :
+- Être concis et actionnable (max 2 pages)
+- Commencer par les conclusions/recommandations clés
+- Inclure le contexte nécessaire
+- Identifier les risques ou points d'attention
+- Proposer les prochaines étapes
+
+SOURCES :
+{{context}}
+
+Génère le briefing en Markdown professionnel.`,
+});
+
+notebookPromptStore.register({
+  id: "content.timeline", label: "Génération — Chronologie", category: "generation",
+  description: "Chronologie des événements et jalons des sources.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Extrais et organise les événements, dates et jalons mentionnés dans les sources suivantes sous forme de chronologie.
+- Ordre chronologique
+- Inclure le contexte de chaque événement
+- Identifier les relations cause-effet
+- Si les dates sont imprécises, utiliser des périodes approximatives
+
+SOURCES :
+{{context}}
+
+Génère la chronologie en Markdown (format tableau ou liste).`,
+});
+
+notebookPromptStore.register({
+  id: "content.outline", label: "Génération — Plan structuré", category: "generation",
+  description: "Plan hiérarchique détaillé synthétisant les sources.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Crée un plan structuré et détaillé qui synthétise l'ensemble des sources suivantes.
+- Structure hiérarchique (I, A, 1, a)
+- 3-4 niveaux de profondeur
+- Couvrir TOUS les sujets abordés dans les sources
+- Inclure des notes sous chaque point
+
+SOURCES :
+{{context}}
+
+Génère le plan en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.mindmap", label: "Génération — Carte mentale", category: "generation",
+  description: "Carte mentale Mermaid + détails par branche.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Crée une carte mentale (mindmap) structurée qui organise visuellement les concepts des sources suivantes.
+
+INSTRUCTIONS :
+- Identifie le THÈME CENTRAL qui relie toutes les sources (nom court, 1-3 mots)
+- Crée 4-6 BRANCHES PRINCIPALES équilibrées (catégories/thèmes majeurs, noms courts)
+- Chaque branche principale a 2-4 SOUS-BRANCHES (concepts clés, 2-4 mots max)
+- Ajoute au plus 2 FEUILLES par sous-branche, uniquement lorsqu'elles apportent une information utile
+- Limite le diagramme à 35 NŒUDS au total pour conserver une carte aérée et lisible
+- Utilise 3 niveaux de profondeur uniquement pour les idées les plus importantes ; évite les chaînes de nœuds inutiles
+- Répartis les branches de façon équilibrée : aucune branche ne doit contenir plus de 6 descendants
+- Les noms de nœuds doivent être COURTS et CONCIS (pas de phrases longues)
+- Utilise le format Mermaid mindmap pour la représentation visuelle
+- Après le diagramme Mermaid, ajoute une section textuelle détaillée
+
+FORMAT ATTENDU :
+1. Un bloc \`\`\`mermaid avec le mindmap en utilisant l'indentation pour la hiérarchie
+
+EXEMPLE DE STRUCTURE MERMAID :
+\`\`\`mermaid
+mindmap
+  root((Thème Central))
+    Branche 1
+      Sous-branche 1A
+        Détail 1
+        Détail 2
+      Sous-branche 1B
+        Détail 3
+    Branche 2
+      Sous-branche 2A
+        Détail 4
+        Détail 5
+      Sous-branche 2B
+\`\`\`
+
+2. Une section "## Détails par branche" qui développe chaque nœud avec des explications
+
+IMPORTANT :
+- Garde les labels COURTS (2-5 mots max par nœud)
+- Assure-toi d'avoir au moins 3 niveaux de profondeur sur chaque branche
+- Le résultat doit former un ARBRE large et profond, pas un simple schéma plat
+
+SOURCES :
+{{context}}
+
+Génère la carte mentale complète.`,
+});
+
+notebookPromptStore.register({
+  id: "content.swot", label: "Génération — Analyse SWOT", category: "generation",
+  description: "Analyse SWOT complète avec recommandations.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Réalise une analyse SWOT (Forces, Faiblesses, Opportunités, Menaces) complète basée sur les sources suivantes.
+
+INSTRUCTIONS :
+- Identifie le SUJET principal de l'analyse (entreprise, projet, technologie, concept)
+- Pour chaque quadrant, liste 5-8 éléments avec une brève explication
+- Appuie chaque point sur des éléments concrets des sources
+- Ajoute une section "Recommandations stratégiques" à la fin
+- Inclus une matrice de priorisation si pertinent
+
+FORMAT :
+## 📊 Analyse SWOT — [Sujet]
+
+### 💪 Forces (Strengths)
+- ...
+
+### ⚠️ Faiblesses (Weaknesses)
+- ...
+
+### 🚀 Opportunités (Opportunities)
+- ...
+
+### 🔴 Menaces (Threats)
+- ...
+
+### 🎯 Recommandations stratégiques
+- ...
+
+SOURCES :
+{{context}}
+
+Génère l'analyse SWOT complète en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.glossary", label: "Génération — Glossaire", category: "generation",
+  description: "Glossaire des termes techniques et acronymes.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Extrais et définis TOUS les termes techniques, acronymes, concepts spécialisés et jargon présents dans les sources suivantes.
+
+INSTRUCTIONS :
+- Organise alphabétiquement
+- Pour chaque terme : définition concise (1-2 phrases) + contexte d'usage
+- Identifie les ACRONYMES et donne leur forme complète
+- Regroupe les termes par CATÉGORIE/DOMAINE si > 20 termes
+- Ajoute des renvois entre termes liés (ex: "Voir aussi : X, Y")
+- Inclus des exemples d'usage quand c'est utile pour la compréhension
+
+FORMAT :
+## 📖 Glossaire
+
+### [Catégorie]
+
+**Terme** — Définition. _Contexte ou exemple._ → Voir aussi : terme lié
+
+SOURCES :
+{{context}}
+
+Génère le glossaire complet en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.roadmap", label: "Génération — Roadmap (depuis sources)", category: "generation",
+  description: "Roadmap projet complète enrichie par les sources.",
+  placeholders: [
+    PH_LANG,
+    { name: "title", description: "Titre du projet / notebook" },
+    { name: "description", description: "Description du projet" },
+    { name: "context", description: "Contexte des sources disponibles" },
+  ],
+  default: `{{lang}}
+
+Tu es un consultant stratégique expert. On travaille sur un projet avec les informations suivantes :
+
+TITRE DU PROJET : {{title}}
+DESCRIPTION : {{description}}
+
+SOURCES DISPONIBLES :
+{{context}}
+
+Génère une **ROADMAP COMPLÈTE** et détaillée pour ce projet, enrichie par les sources. Elle doit inclure :
+
+## Structure attendue :
+
+### 📋 1. Résumé du projet
+- Vision et objectif principal
+- Public cible
+- Proposition de valeur
+
+### 📊 2. Étude de marché
+- Analyse du marché basée sur les sources
+- Segments identifiés
+- Concurrents et positionnement
+- Tendances du secteur
+
+### 💼 3. Business Plan
+- Modèle économique
+- Sources de revenus
+- Structure de coûts
+- Objectifs financiers à 6/12/24 mois
+
+### 🎯 4. Roadmap de développement
+- **Phase 1 — Validation (Mois 1-2)** : Recherche, validation, premiers retours
+- **Phase 2 — MVP (Mois 2-4)** : Produit minimum viable
+- **Phase 3 — Lancement (Mois 4-6)** : Go-to-market, premiers utilisateurs
+- **Phase 4 — Croissance (Mois 6-12)** : Scaling, optimisation
+
+### 📢 5. Stratégie marketing & acquisition
+- Canaux recommandés
+- Actions prioritaires
+- Budget indicatif
+
+### ⚠️ 6. Risques et points d'attention
+- Risques principaux
+- Hypothèses à valider
+- Plans de contingence
+
+### ✅ 7. Prochaines actions immédiates
+- 5-10 actions concrètes priorisées par impact
+
+RÈGLES :
+- Adapte au contexte du projet
+- Sois concret et actionnable
+- Format Markdown riche avec emojis
+- Vise 1500-2500 mots`,
+});
+
+notebookPromptStore.register({
+  id: "content.fullReport", label: "Génération — Rapport complet", category: "report",
+  description: "Rapport professionnel généraliste exhaustif.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Tu es un analyste expert. Génère un RAPPORT COMPLET et professionnel basé sur l'ensemble des sources fournies.
+
+Le rapport doit être exhaustif et structuré comme un vrai document professionnel. Il doit inclure :
+
+## Structure attendue :
+
+### 1. 📋 Résumé exécutif (Executive Summary)
+- Synthèse en 3-5 paragraphes des points clés
+- Conclusions principales
+- Recommandations prioritaires
+
+### 2. 📊 Contexte et périmètre
+- Contexte du sujet / projet / domaine
+- Périmètre d'analyse (ce qui est couvert et ce qui ne l'est pas)
+- Méthodologie d'analyse
+
+### 3. 🔍 Analyse détaillée
+- Analyse approfondie de chaque thématique identifiée dans les sources
+- Données et faits clés extraits
+- Comparaisons et mises en perspective
+- Forces et faiblesses identifiées
+
+### 4. 📈 Constats et observations
+- Tendances identifiées
+- Points de convergence et divergence entre les sources
+- Risques et opportunités
+
+### 5. 💡 Recommandations
+- Recommandations actionables (priorisées : court/moyen/long terme)
+- Conditions de succès
+- Points d'attention et risques associés
+
+### 6. 📎 Annexes
+- Glossaire des termes clés
+- Références aux sources
+- Tableau récapitulatif
+
+RÈGLES :
+- Être factuel et s'appuyer exclusivement sur le contenu des sources
+- Citer les sources quand c'est pertinent
+- Utiliser des tableaux, listes et mise en forme Markdown riche
+- Viser 2000-4000 mots pour un rapport substantiel
+- Ton professionnel et analytique
+- Inclure des insights et connections que les sources ne font pas explicitement
+
+SOURCES :
+{{context}}
+
+Génère le rapport complet en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.report", label: "Génération — Gabarit de rapport spécialisé", category: "report",
+  description: "Enveloppe commune des rapports spécialisés (business, marché, technique, etc.). La structure propre à chaque type reste câblée.",
+  placeholders: [
+    PH_LANG,
+    { name: "title", description: "Titre du type de rapport (ex: Business Plan)" },
+    { name: "structure", description: "Structure attendue propre au type de rapport" },
+    PH_CONTEXT,
+  ],
+  default: `{{lang}}
+
+Tu es un expert en rédaction de rapports professionnels. Génère un **{{title}}** complet et structuré basé sur les sources fournies.
+
+{{structure}}
+
+RÈGLES :
+- S'appuyer EXCLUSIVEMENT sur le contenu des sources fournies
+- Être factuel, précis et professionnel
+- Utiliser des tableaux, listes et mise en forme Markdown riche
+- Viser 2000-4000 mots pour un rapport substantiel
+- Ton professionnel et analytique
+- Si des informations manquent dans les sources, le signaler clairement avec [Information non disponible dans les sources]
+- Inclure des insights et connexions entre les différentes sources
+
+SOURCES :
+{{context}}
+
+Génère le {{title}} complet en Markdown.`,
+});
+
+notebookPromptStore.register({
+  id: "content.comparativeAnalysis", label: "Génération — Analyse comparative", category: "generation",
+  description: "Analyse comparative automatique des éléments des sources.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Réalise une **analyse comparative automatique** détaillée basée sur les sources suivantes. L'analyse doit identifier, comparer et évaluer les différents éléments (produits, solutions, approches, stratégies, etc.) mentionnés dans les documents.
+
+## Structure attendue :
+
+### 📊 1. Introduction
+- Objectif de la comparaison
+- Critères de comparaison retenus
+- Méthodologie utilisée
+
+### 📋 2. Éléments à comparer
+- Liste des produits/solutions/approches identifiés dans les sources
+- Classification par catégorie si pertinent
+
+### 🔍 3. Analyse comparative détaillée
+Pour chaque critère pertinent (fonctionnalités, prix, performance, avantages, inconvénients, etc.) :
+- Tableau comparatif clair et structuré
+- Évaluation objective de chaque élément
+- Sources des informations
+
+### 📈 4. Synthèse des résultats
+- Classement ou scoring global
+- Points forts et points faibles de chaque élément
+- Recommandations basées sur l'analyse
+
+### 🎯 5. Conclusion et recommandations
+- Quel élément se distingue et pourquoi
+- Dans quel contexte chaque élément est le plus adapté
+- Prochaines étapes recommandées
+
+RÈGLES :
+- Identifier TOUS les éléments comparables dans les sources
+- Utiliser des critères objectifs et mesurables quand possible
+- Citer les sources pour chaque information
+- Être neutre et factuel
+- Utiliser des tableaux pour les comparaisons
+- Viser 1500-3000 mots
+
+SOURCES :
+{{context}}
+
+Génère l'analyse comparative complète en Markdown structuré.`,
+});
+
+notebookPromptStore.register({
+  id: "content.synthesisReport", label: "Génération — Rapport de synthèse décisionnel", category: "report",
+  description: "Rapport de synthèse structuré pour l'aide à la décision.",
+  placeholders: [PH_LANG, PH_CONTEXT],
+  default: `{{lang}}
+
+Génère un **rapport de synthèse structuré pour l'aide à la décision** basé sur l'ensemble des sources fournies. Ce rapport doit condenser les informations clés et fournir une base solide pour prendre des décisions éclairées.
+
+## Structure attendue :
+
+### 🎯 1. Résumé exécutif
+- Objectif du rapport de synthèse
+- Questions clés adressées
+- Principales conclusions (3-5 points)
+
+### 📊 2. Contexte et périmètre
+- Contexte général du sujet
+- Périmètre de l'analyse (ce qui est couvert et ce qui ne l'est pas)
+- Sources utilisées et leur pertinence
+
+### 🔍 3. Analyse des informations
+- Points clés extraits de chaque source
+- Convergences et divergences entre les sources
+- Informations manquantes ou incertaines
+
+### 💡 4. Synthèse des connaissances
+- Faits établis
+- Tendances identifiées
+- Implications et impacts potentiels
+- Scénarios possibles
+
+### ⚖️ 5. Options et recommandations
+- Options/alternatives identifiées
+- Critères d'évaluation
+- Analyse SWOT pour chaque option si pertinent
+- Recommandation principale avec justification
+
+### ✅ 6. Plan d'action
+- Décisions à prendre
+- Prochaines étapes prioritaires
+- Responsables et échéances
+- Indicateur de succès
+
+RÈGLES :
+- Être concis mais exhaustif
+- Hiérarchiser l'information par importance
+- Distinguer faits, opinions et recommandations
+- Fournir des éléments actionnables
+- Utiliser des listes et tableaux pour la clarté
+- Viser 2000-4000 mots
+
+SOURCES :
+{{context}}
+
+Génère le rapport de synthèse complet en Markdown professionnel.`,
+});
+
+notebookPromptStore.register({
+  id: "content.audioOverview", label: "Génération — Script Audio (podcast)", category: "generation",
+  description: "Script de podcast à deux voix (Alex & Sam) à partir des sources.",
+  placeholders: [
+    PH_CONTEXT,
+    { name: "durationMinutes", description: "Durée cible en minutes" },
+    { name: "wordTarget", description: "Nombre de mots cible" },
+    { name: "tone", description: "Instruction de ton (décontracté, académique, etc.)" },
+    { name: "lang", description: "Langue (« français » ou « anglais »)" },
+    { name: "custom", description: "Instructions supplémentaires de l'utilisateur (peut être vide)" },
+  ],
+  default: `Tu es un scénariste de podcast éducatif. Génère un script de conversation entre deux hôtes (Alex et Sam) qui discutent du contenu des documents suivants.
+
+SOURCES :
+{{context}}
+
+INSTRUCTIONS :
+- Durée cible : ~{{durationMinutes}} minutes de conversation (environ {{wordTarget}} mots)
+- {{tone}}
+- Alex pose des questions, fait des analogies. Sam explique en profondeur.
+- Commencer par une introduction engageante du sujet
+- Couvrir les points clés de TOUTES les sources
+- Terminer par un résumé et les points à retenir
+- Langue : {{lang}}
+- Format : dialogue avec "Alex:" et "Sam:" comme préfixes{{custom}}
+
+Génère le script complet du podcast.`,
+});
+
+notebookPromptStore.register({
+  id: "content.infographic.imagePrompt", label: "Génération — Prompt d'infographie", category: "generation",
+  description: "Prompt texte→image (en anglais) décrivant l'infographie à générer à partir des sources.",
+  placeholders: [
+    PH_CONTEXT,
+    { name: "custom", description: "Instructions utilisateur (peut être vide)" },
+  ],
+  default: `Analyse le contenu suivant et génère un prompt concis (en anglais, max 200 mots) pour créer une infographie professionnelle qui résume visuellement les points clés.
+
+Le prompt doit décrire :
+- Le titre principal de l'infographie
+- Les 3-5 sections/blocs principaux avec leurs données clés
+- Le style visuel souhaité (couleurs, icônes, mise en page)
+- Les chiffres/statistiques importants à mettre en avant
+
+SOURCES :
+{{context}}
+
+{{custom}}
+
+Réponds UNIQUEMENT avec le prompt pour le générateur d'images, sans explication supplémentaire.`,
+});
+
+notebookPromptStore.register({
+  id: "content.suggestReports", label: "Génération — Suggestions de rapports", category: "generation",
+  description: "Recommande 3-5 types de rapports pertinents selon les sources (sortie JSON).",
+  placeholders: [
+    { name: "sources", description: "Liste des sources (titre, type, mots, résumé, mots-clés)" },
+    { name: "alreadyGenerated", description: "Types de documents déjà générés" },
+  ],
+  default: `Tu es un assistant qui analyse des documents et recommande des rapports à générer.
+
+Voici les sources disponibles dans un notebook :
+{{sources}}
+
+Documents déjà générés : {{alreadyGenerated}}
+
+Types de rapports disponibles :
+- "report-business" : Business Plan (vision, modèle économique, stratégie, projections)
+- "report-market" : Étude de marché (taille, segments, tendances, concurrence)
+- "report-technical" : Rapport technique (architecture, choix technos, spécifications)
+- "report-competitive" : Analyse concurrentielle (positionnement, benchmark, différenciation)
+- "report-financial" : Rapport financier (projections, coûts, rentabilité, KPIs)
+- "report-marketing" : Plan marketing (acquisition, canaux, messaging, personas)
+- "report-product" : Rapport produit (roadmap, fonctionnalités, priorisation, UX)
+- "report-risk" : Analyse des risques (identification, probabilité, mitigation)
+- "report-executive" : Synthèse exécutive (résumé décisionnel pour dirigeants)
+- "report-project" : Rapport de projet (avancement, livrables, jalons, blocages)
+- "full-report" : Rapport complet généraliste (résumé exécutif, analyse, recommandations)
+
+INSTRUCTIONS :
+- Analyse le contenu et la nature des sources
+- Suggère les 3-5 rapports les PLUS PERTINENTS par rapport au contenu réel des sources
+- Par exemple : si les sources parlent d'un MVP et de fonctionnalités → suggère business plan, rapport produit, étude de marché
+- Ne suggère PAS un rapport qui n'a pas de sens par rapport aux sources
+- Priorise par pertinence
+- Explique POURQUOI chaque rapport serait utile pour ces sources spécifiques
+
+Réponds UNIQUEMENT en JSON valide avec ce format exact :
+[
+  {
+    "type": "report-business",
+    "title": "Titre descriptif personnalisé du rapport",
+    "description": "Ce que le rapport contiendra spécifiquement pour ces sources",
+    "reason": "Pourquoi ce rapport est pertinent pour ces sources",
+    "relevance": 95,
+    "recommendedSourceIds": ["id1", "id2"]
+  }
+]
+
+Génère entre 3 et 5 suggestions, triées par pertinence décroissante.`,
+});
+
+notebookPromptStore.register({
+  id: "content.visual.extraction", label: "Génération — Visualisation : extraction de données", category: "generation",
+  description: "Extrait les données et propose un type de graphique (sortie JSON pour D3.js).",
+  placeholders: [
+    PH_LANG,
+    { name: "vizType", description: "Type de visualisation demandé (ou « auto »)" },
+    { name: "context", description: "Contexte des sources (tronqué)" },
+    { name: "custom", description: "Instructions utilisateur (peut être vide)" },
+  ],
+  default: `{{lang}}
+
+Analyse le contenu suivant et extrais les données numériques ou catégorielles pertinentes pour créer une visualisation.
+
+INSTRUCTIONS :
+- Identifie les données quantitatives (chiffres, pourcentages, statistiques)
+- Identifie les catégories ou dimensions pertinentes
+- Suggère le type de visualisation le plus adapté (bar, line, pie, scatter, network, timeline, etc.)
+- Formate les données en JSON valide, prêt à être utilisé avec D3.js
+- Si {{vizType}} === 'auto', choisis le type de visualisation le plus approprié
+- Si {{vizType}} !== 'auto', utilise ce type de visualisation
+
+Type de visualisation demandée : {{vizType}}
+
+SOURCES :
+{{context}}
+
+{{custom}}
+
+Réponds UNIQUEMENT avec un objet JSON contenant :
+{
+  "chartType": "type de graphique",
+  "title": "titre de la visualisation",
+  "description": "description brève",
+  "data": { ... les données structurées ... },
+  "config": { ... configuration optionnelle ... }
+}
+`,
+});
+
+notebookPromptStore.register({
+  id: "content.visual.renderSvg", label: "Génération — Visualisation : rendu SVG", category: "generation",
+  description: "Génère un SVG autonome à partir des données de visualisation.",
+  placeholders: [
+    { name: "verb", description: "Verbe localisé (« Génère » / « Generate »)" },
+    { name: "data", description: "Données JSON de la visualisation" },
+    { name: "chartType", description: "Type de graphique" },
+    { name: "config", description: "Configuration JSON" },
+  ],
+  default: `{{verb}} a simple SVG visualization based on this data and configuration.
+The SVG should be self-contained and valid XML. Use basic SVG elements (rect, circle, path, line, text).
+
+Data: {{data}}
+Chart type: {{chartType}}
+Config: {{config}}
+
+Return ONLY the SVG XML code, without any explanation or markdown formatting.
+`,
+});
+
+notebookPromptStore.register({
+  id: "content.roadmap.autoCreate", label: "Génération — Roadmap auto (création notebook)", category: "generation",
+  description: "Roadmap générée automatiquement à la création d'un notebook (sans sources).",
+  placeholders: [
+    { name: "title", description: "Titre du projet / notebook" },
+    { name: "description", description: "Description du projet" },
+  ],
+  default: `Tu es un consultant stratégique expert. On vient de créer un nouveau projet/notebook avec les informations suivantes :
+
+TITRE DU PROJET : {{title}}
+DESCRIPTION : {{description}}
 
 Génère une **ROADMAP COMPLÈTE** et détaillée pour ce projet. Cette roadmap doit servir de guide structuré pour avancer étape par étape. Elle doit inclure :
 
@@ -1647,37 +1892,5 @@ RÈGLES :
 - Utilise le titre et la description pour personnaliser chaque section
 - Réponds en français
 - Format Markdown riche avec emojis pour la lisibilité
-- Vise 1500-2500 mots`;
-
-      log.info(`🗺️ Génération roadmap automatique pour "${title}" (notebook: ${notebookId})`);
-
-      const { generateText } = await import("../utils/textGeneration.js");
-      const result = await generateText({
-        prompt,
-        temperature: 0.6,
-        maxOutputTokens: 8192,
-      });
-
-      const doc: GeneratedDocument = {
-        id: randomUUID(),
-        notebookId,
-        type: "roadmap" as GeneratedDocType,
-        title: `🗺️ Roadmap — ${title}`,
-        content: result.text,
-        sourceIds: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      notebookManager.addGeneratedDocument(notebookId, doc);
-      log.info(`✅ Roadmap auto-générée pour "${title}" (${result.text.length} chars)`);
-
-      return doc;
-    } catch (e: any) {
-      log.error(`❌ Erreur génération roadmap pour "${title}": ${e.message}`);
-      return null;
-    }
-  }
-}
-
-
-export const contentGenerator = new ContentGenerator();
+- Vise 1500-2500 mots`,
+});

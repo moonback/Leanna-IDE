@@ -17,6 +17,7 @@
 import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { embeddingStore } from "./EmbeddingStore.js";
+import { notebookPromptStore } from "./PromptStore.js";
 import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
 
 const log = createLogger("RAGEngine");
@@ -45,6 +46,61 @@ const QUERY_EXPANSION_ENABLED = true;
 
 /** Nombre maximum de sous-questions générées lors de l'expansion */
 const QUERY_EXPANSION_MAX_SUBQUERIES = 3;
+
+// ─── Prompts éditables (PromptStore) ─────────────────────────────────────────
+
+notebookPromptStore.register({
+  id: "rag.queryExpansion",
+  label: "RAG — Expansion de requête",
+  description: "Décompose la question en 2-3 sous-questions pour améliorer le rappel de recherche (sortie JSON).",
+  category: "rag",
+  default: `Tu es un moteur d'expansion de requête pour un système de recherche documentaire.
+
+TÂCHE : Décompose la question suivante en sous-questions distinctes pour améliorer le rappel de recherche.
+
+QUESTION ORIGINALE : "{{query}}"
+
+RÈGLES :
+- Génère 2 à {{maxSubqueries}} sous-questions MAXIMUM
+- Chaque sous-question doit couvrir un angle ou aspect différent de la question
+- Les sous-questions doivent être concises (< 80 caractères chacune)
+- Utilise des reformulations sémantiques variées (synonymes, perspectives différentes)
+- Si la question est déjà simple et atomique, retourne un tableau vide []
+- Ne répète PAS la question originale dans les sous-questions
+
+Réponds UNIQUEMENT en JSON strict :
+["sous-question 1", "sous-question 2"]
+
+Si la question est trop simple pour être décomposée :
+[]`,
+  placeholders: [
+    { name: "query", description: "Question originale de l'utilisateur" },
+    { name: "maxSubqueries", description: "Nombre maximum de sous-questions" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "rag.rerank",
+  label: "RAG — Re-ranking des passages",
+  description: "Re-score de 0 à 10 chaque passage candidat selon sa pertinence (sortie JSON de nombres).",
+  category: "rag",
+  default: `Tu es un système de re-ranking. Score chaque passage de 0 à 10 selon sa pertinence pour la question.
+
+QUESTION : "{{query}}"
+
+PASSAGES :
+{{passages}}
+
+Scoring :
+- 0 = hors sujet, 5 = partiellement pertinent, 10 = répond directement
+
+Réponds UNIQUEMENT avec un tableau JSON de nombres, rien d'autre. Exemple : [7, 3, 9, 5]
+Réponse :`,
+  placeholders: [
+    { name: "query", description: "Question de l'utilisateur" },
+    { name: "passages", description: "Liste indexée des passages candidats" },
+  ],
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -216,25 +272,10 @@ export class RAGEngine {
     }
 
     try {
-      const prompt = `Tu es un moteur d'expansion de requête pour un système de recherche documentaire.
-
-TÂCHE : Décompose la question suivante en sous-questions distinctes pour améliorer le rappel de recherche.
-
-QUESTION ORIGINALE : "${query}"
-
-RÈGLES :
-- Génère 2 à ${QUERY_EXPANSION_MAX_SUBQUERIES} sous-questions MAXIMUM
-- Chaque sous-question doit couvrir un angle ou aspect différent de la question
-- Les sous-questions doivent être concises (< 80 caractères chacune)
-- Utilise des reformulations sémantiques variées (synonymes, perspectives différentes)
-- Si la question est déjà simple et atomique, retourne un tableau vide []
-- Ne répète PAS la question originale dans les sous-questions
-
-Réponds UNIQUEMENT en JSON strict :
-["sous-question 1", "sous-question 2"]
-
-Si la question est trop simple pour être décomposée :
-[]`;
+      const prompt = notebookPromptStore.render("rag.queryExpansion", {
+        query,
+        maxSubqueries: QUERY_EXPANSION_MAX_SUBQUERIES,
+      });
 
       const result = await generateText({
         prompt,
@@ -291,18 +332,10 @@ Si la question est trop simple pour être décomposée :
       source: c.source.title,
     }));
 
-    const prompt = `Tu es un système de re-ranking. Score chaque passage de 0 à 10 selon sa pertinence pour la question.
-
-QUESTION : "${query}"
-
-PASSAGES :
-${passages.map(p => `[${p.index}] (${p.source}) ${p.text}`).join("\n\n")}
-
-Scoring :
-- 0 = hors sujet, 5 = partiellement pertinent, 10 = répond directement
-
-Réponds UNIQUEMENT avec un tableau JSON de nombres, rien d'autre. Exemple : [7, 3, 9, 5]
-Réponse :`;
+    const prompt = notebookPromptStore.render("rag.rerank", {
+      query,
+      passages: passages.map(p => `[${p.index}] (${p.source}) ${p.text}`).join("\n\n"),
+    });
 
     const result = await generateText({
       prompt,

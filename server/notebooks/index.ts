@@ -11,6 +11,8 @@ export { embeddingStore } from "./EmbeddingStore.js";
 export { ragEngine } from "./RAGEngine.js";
 export { groundedChat } from "./GroundedChat.js";
 export { contentGenerator } from "./ContentGenerator.js";
+export { notebookPromptStore } from "./PromptStore.js";
+export type { NotebookPromptView, NotebookPromptCategory } from "./PromptStore.js";
 export { backupService } from "./BackupService.js";
 export { sourceProcessingQueue } from "./ProcessingQueue.js";
 export { chatResponseCache, ragSearchCache } from "./ResponseCache.js";

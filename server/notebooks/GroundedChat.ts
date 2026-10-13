@@ -17,13 +17,15 @@ import { generateText, generateTextStream } from "../utils/textGeneration.js";
 import { ragEngine } from "./RAGEngine.js";
 import { notebookManager } from "./NotebookManager.js";
 import { chatResponseCache } from "./ResponseCache.js";
+import { notebookPromptStore } from "./PromptStore.js";
 import type { ChatMessage, Citation } from "./types.js";
 
 const log = createLogger("GroundedChat");
 
 // ─── System Prompt pour le chat groundé ──────────────────────────────────────
+// Éditable depuis les Settings via le PromptStore (id: chat.grounded.system).
 
-const GROUNDED_SYSTEM_PROMPT = `Tu es Leanna un assistant de recherche intelligent. Tu réponds aux questions de l'utilisateur en te basant EXCLUSIVEMENT sur les sources fournies dans le contexte.
+const GROUNDED_SYSTEM_PROMPT_DEFAULT = `Tu es Leanna un assistant de recherche intelligent. Tu réponds aux questions de l'utilisateur en te basant EXCLUSIVEMENT sur les sources fournies dans le contexte.
 
 RÈGLES STRICTES :
 1. Base tes réponses UNIQUEMENT sur le contenu des sources fournies.
@@ -38,6 +40,224 @@ FORMAT DE RÉPONSE :
 - Réponse structurée et concise
 - Citations [SOURCE N] intégrées dans le texte
 - Section "Sources citées" en fin de réponse si > 2 citations`;
+
+notebookPromptStore.register({
+  id: "chat.grounded.system",
+  label: "Chat — Instruction système (groundé)",
+  description: "Instruction système principale du chat Q&A ancré sur les sources. Utilisée aussi par le mode Deep Dive.",
+  category: "chat",
+  default: GROUNDED_SYSTEM_PROMPT_DEFAULT,
+  placeholders: [],
+});
+
+/** Instruction système effective (override éditable ou défaut). */
+function groundedSystemPrompt(): string {
+  return notebookPromptStore.render("chat.grounded.system");
+}
+
+notebookPromptStore.register({
+  id: "chat.grounded.user",
+  label: "Chat — Gabarit de requête (groundé)",
+  description: "Assemble l'instruction système, le contexte des sources, l'historique et la question. Utilisé en mode normal et streaming.",
+  category: "chat",
+  default: `{{system}}
+
+═══ CONTEXTE DES SOURCES ═══
+
+{{context}}
+
+═══ HISTORIQUE RÉCENT ═══
+
+{{history}}
+
+═══ QUESTION DE L'UTILISATEUR ═══
+
+{{question}}
+
+Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N].`,
+  placeholders: [
+    { name: "system", description: "Instruction système groundée" },
+    { name: "context", description: "Passages pertinents retrouvés dans les sources (RAG)" },
+    { name: "history", description: "Historique récent de la conversation" },
+    { name: "question", description: "Question posée par l'utilisateur" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.deepdive.synthesis",
+  label: "Chat — Deep Dive : synthèse finale",
+  description: "Synthèse approfondie du mode Deep Dive à partir d'un contexte étendu multi-recherche.",
+  category: "chat",
+  default: `{{system}}
+
+MODE DEEP DIVE — Tu as accès à un contexte étendu issu de MULTIPLES recherches complémentaires.
+
+Ta réponse doit être :
+- EXHAUSTIVE : couvre tous les aspects trouvés dans les sources
+- STRUCTURÉE : utilise des sections, sous-titres, bullet points
+- SYNTHÉTIQUE : croise les informations de différentes sources
+- NUANCÉE : mentionne les contradictions ou limites si elles existent
+
+═══ CONTEXTE ÉTENDU (MULTI-RECHERCHE) ═══
+
+{{context}}
+
+═══ QUESTION DE L'UTILISATEUR ═══
+
+{{question}}
+{{subtopics}}
+
+Fournis une réponse approfondie et structurée. Cite avec [SOURCE N].`,
+  placeholders: [
+    { name: "system", description: "Instruction système groundée" },
+    { name: "context", description: "Contexte étendu issu de plusieurs recherches" },
+    { name: "question", description: "Question posée par l'utilisateur" },
+    { name: "subtopics", description: "Ligne listant les sous-thèmes explorés (peut être vide)" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.deepdive.gapAnalysis",
+  label: "Chat — Deep Dive : analyse des lacunes",
+  description: "Identifie 2-3 sous-thèmes mal couverts pour lancer des recherches complémentaires (sortie JSON).",
+  category: "chat",
+  default: `Tu es un assistant de recherche approfondie.
+
+QUESTION DE L'UTILISATEUR : "{{question}}"
+
+PREMIERS RÉSULTATS DE RECHERCHE (contexte partiel) :
+{{context}}
+
+TÂCHE : Identifie 2-3 aspects ou sous-thèmes de la question qui ne sont PAS bien couverts par ces premiers résultats, ou qui méritent une exploration plus poussée.
+
+Réponds UNIQUEMENT en JSON strict — un tableau de requêtes de recherche complémentaires :
+["requête complémentaire 1", "requête complémentaire 2", "requête complémentaire 3"]
+
+Si les premiers résultats couvrent déjà bien le sujet, retourne : []`,
+  placeholders: [
+    { name: "question", description: "Question posée par l'utilisateur" },
+    { name: "context", description: "Contexte partiel des premiers résultats" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.followups",
+  label: "Chat — Questions de suivi",
+  description: "Génère 3 questions de suivi après une réponse (sortie JSON).",
+  category: "chat",
+  default: `Tu es un assistant de recherche. À partir de l'échange ci-dessous, propose exactement 3 questions de suivi pertinentes que l'utilisateur pourrait poser pour approfondir le sujet.
+
+QUESTION PRÉCÉDENTE : "{{lastQuestion}}"
+
+RÉPONSE DONNÉE (extrait) : "{{lastAnswer}}"
+
+RÈGLES :
+- 3 questions exactement
+- Questions courtes (< 80 caractères chacune)
+- Chaque question explore un angle différent : approfondissement, comparaison, application pratique
+- Les questions doivent être naturelles et en lien direct avec l'échange
+- Même langue que la question de l'utilisateur
+
+Réponds UNIQUEMENT en JSON strict :
+["question 1", "question 2", "question 3"]`,
+  placeholders: [
+    { name: "lastQuestion", description: "Dernière question de l'utilisateur" },
+    { name: "lastAnswer", description: "Extrait de la dernière réponse (800 car.)" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.compareSources",
+  label: "Chat — Comparaison de sources",
+  description: "Compare 2+ sources : points communs, différences, contradictions, complémentarité.",
+  category: "chat",
+  default: `Tu es un analyste expert en comparaison documentaire. Compare les sources suivantes de manière détaillée et structurée.
+
+{{sourcesContext}}
+
+ANALYSE DEMANDÉE :
+
+## 🔄 Comparaison : {{titles}}
+
+Structure ta réponse avec :
+
+### 📌 Points communs
+Les idées, faits ou concepts partagés par les sources.
+
+### ⚡ Différences clés
+Les divergences d'approche, de perspective ou de contenu.
+
+### ⚠️ Contradictions
+Les points où les sources se contredisent (si applicable).
+
+### 🎯 Synthèse comparative
+Un tableau ou résumé qui met en perspective les forces/limites de chaque source.
+
+### 💡 Complémentarité
+Comment ces sources se complètent mutuellement.
+
+Cite les sources avec leur nom entre guillemets. Sois précis et factuel.`,
+  placeholders: [
+    { name: "sourcesContext", description: "Contexte détaillé de chaque source comparée" },
+    { name: "titles", description: "Titres des sources (format « A » vs « B »)" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.extractInsights",
+  label: "Chat — Extraction d'insights",
+  description: "Analyse approfondie des sources : findings, tendances, connexions cachées, conclusions.",
+  category: "chat",
+  default: `Tu es un analyste de recherche senior. Analyse en profondeur les sources suivantes et extrais des insights de haut niveau.
+
+SOURCES :
+{{sourcesContext}}
+
+ANALYSE DEMANDÉE — Structure ta réponse exactement ainsi :
+
+## 💡 Insights clés
+
+### 🔑 Findings principaux
+Les découvertes ou informations les plus importantes (5-8 points, classés par importance).
+
+### 📈 Tendances identifiées
+Les patterns, évolutions ou tendances qui émergent de l'ensemble des sources.
+
+### 🔗 Connexions cachées
+Les liens non évidents entre différentes sources ou concepts qui apportent une compréhension plus profonde.
+
+### ⚠️ Points de vigilance
+Les risques, limites, biais ou zones d'ombre dans les sources.
+
+### 🎯 Conclusions actionables
+Ce qu'un décideur devrait retenir et les actions recommandées.
+
+### ❓ Questions ouvertes
+Les questions que les sources soulèvent mais ne répondent pas (pistes de recherche future).
+
+Sois analytique, rigoureux et surprenant dans tes connexions. Chaque insight doit apporter une valeur au-delà de la simple lecture des sources.`,
+  placeholders: [
+    { name: "sourcesContext", description: "Titre + résumé + mots-clés + extraits de chaque source" },
+  ],
+});
+
+notebookPromptStore.register({
+  id: "chat.suggestQuestions",
+  label: "Chat — Suggestions de questions",
+  description: "Propose 5 questions pertinentes à partir des résumés de sources (sortie JSON).",
+  category: "chat",
+  default: `Voici les résumés de documents dans un notebook de recherche :
+
+{{summaries}}
+
+Génère exactement 5 questions intéressantes et pertinentes que l'utilisateur pourrait poser sur ces documents. Les questions doivent être variées (compréhension, comparaison, synthèse, détail).
+
+Réponds en JSON strict :
+["question 1", "question 2", "question 3", "question 4", "question 5"]`,
+  placeholders: [
+    { name: "summaries", description: "Liste des résumés de sources (max 5)" },
+  ],
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -92,21 +312,12 @@ export class GroundedChat {
     // 5. Construire le contexte groundé
     const context = ragEngine.buildContext(ragResults);
 
-    const fullPrompt = `${GROUNDED_SYSTEM_PROMPT}
-
-═══ CONTEXTE DES SOURCES ═══
-
-${context}
-
-═══ HISTORIQUE RÉCENT ═══
-
-${recentHistory || "(première question)"}
-
-═══ QUESTION DE L'UTILISATEUR ═══
-
-${question}
-
-Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N].`;
+    const fullPrompt = notebookPromptStore.render("chat.grounded.user", {
+      system: groundedSystemPrompt(),
+      context,
+      history: recentHistory || "(première question)",
+      question,
+    });
 
     // 6. Génération de la réponse
     let responseText = "";
@@ -192,21 +403,12 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
     // 5. Contexte
     const context = ragEngine.buildContext(ragResults);
 
-    const fullPrompt = `${GROUNDED_SYSTEM_PROMPT}
-
-═══ CONTEXTE DES SOURCES ═══
-
-${context}
-
-═══ HISTORIQUE RÉCENT ═══
-
-${recentHistory || "(première question)"}
-
-═══ QUESTION DE L'UTILISATEUR ═══
-
-${question}
-
-Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N].`;
+    const fullPrompt = notebookPromptStore.render("chat.grounded.user", {
+      system: groundedSystemPrompt(),
+      context,
+      history: recentHistory || "(première question)",
+      question,
+    });
 
     // 6. Génération en streaming
     let responseText = "";
@@ -259,21 +461,10 @@ Réponds en te basant sur les sources ci-dessus. Cite tes sources avec [SOURCE N
 
     try {
       const result = await generateText({
-        prompt: `Tu es un assistant de recherche. À partir de l'échange ci-dessous, propose exactement 3 questions de suivi pertinentes que l'utilisateur pourrait poser pour approfondir le sujet.
-
-QUESTION PRÉCÉDENTE : "${lastQuestion}"
-
-RÉPONSE DONNÉE (extrait) : "${lastAnswer.slice(0, 800)}"
-
-RÈGLES :
-- 3 questions exactement
-- Questions courtes (< 80 caractères chacune)
-- Chaque question explore un angle différent : approfondissement, comparaison, application pratique
-- Les questions doivent être naturelles et en lien direct avec l'échange
-- Même langue que la question de l'utilisateur
-
-Réponds UNIQUEMENT en JSON strict :
-["question 1", "question 2", "question 3"]`,
+        prompt: notebookPromptStore.render("chat.followups", {
+          lastQuestion,
+          lastAnswer: lastAnswer.slice(0, 800),
+        }),
         temperature: 0.6,
         maxOutputTokens: 256,
         thinkingBudget: 0,
@@ -336,19 +527,10 @@ Réponds UNIQUEMENT en JSON strict :
     let subTopics: string[] = [];
     try {
       const analysisResult = await generateText({
-        prompt: `Tu es un assistant de recherche approfondie.
-
-QUESTION DE L'UTILISATEUR : "${question}"
-
-PREMIERS RÉSULTATS DE RECHERCHE (contexte partiel) :
-${initialContext.slice(0, 2000)}
-
-TÂCHE : Identifie 2-3 aspects ou sous-thèmes de la question qui ne sont PAS bien couverts par ces premiers résultats, ou qui méritent une exploration plus poussée.
-
-Réponds UNIQUEMENT en JSON strict — un tableau de requêtes de recherche complémentaires :
-["requête complémentaire 1", "requête complémentaire 2", "requête complémentaire 3"]
-
-Si les premiers résultats couvrent déjà bien le sujet, retourne : []`,
+        prompt: notebookPromptStore.render("chat.deepdive.gapAnalysis", {
+          question,
+          context: initialContext.slice(0, 2000),
+        }),
         temperature: 0.4,
         maxOutputTokens: 256,
         thinkingBudget: 0,
@@ -393,27 +575,12 @@ Si les premiers résultats couvrent déjà bien le sujet, retourne : []`,
     onProgress?.("synthesis", "Synthèse finale en cours...");
 
     // ── Étape 4 : Synthèse finale ─────────────────────────────────────────
-    const synthesisPrompt = `${GROUNDED_SYSTEM_PROMPT}
-
-MODE DEEP DIVE — Tu as accès à un contexte étendu issu de MULTIPLES recherches complémentaires.
-
-Ta réponse doit être :
-- EXHAUSTIVE : couvre tous les aspects trouvés dans les sources
-- STRUCTURÉE : utilise des sections, sous-titres, bullet points
-- SYNTHÉTIQUE : croise les informations de différentes sources
-- NUANCÉE : mentionne les contradictions ou limites si elles existent
-
-═══ CONTEXTE ÉTENDU (MULTI-RECHERCHE) ═══
-
-${fullContext}
-
-═══ QUESTION DE L'UTILISATEUR ═══
-
-${question}
-
-${subTopics.length > 0 ? `\nSous-thèmes explorés : ${subTopics.join(", ")}` : ""}
-
-Fournis une réponse approfondie et structurée. Cite avec [SOURCE N].`;
+    const synthesisPrompt = notebookPromptStore.render("chat.deepdive.synthesis", {
+      system: groundedSystemPrompt(),
+      context: fullContext,
+      question,
+      subtopics: subTopics.length > 0 ? `\nSous-thèmes explorés : ${subTopics.join(", ")}` : "",
+    });
 
     let responseText = "";
     try {
@@ -477,32 +644,10 @@ Fournis une réponse approfondie et structurée. Cite avec [SOURCE N].`;
       `═══ SOURCE : "${s.title}" ═══\nRésumé : ${s.summary}\n\nContenu clé :\n${s.chunks.slice(0, 6).map(c => c.content).join("\n\n")}`
     ).join("\n\n────────────────────────────\n\n");
 
-    const prompt = `Tu es un analyste expert en comparaison documentaire. Compare les sources suivantes de manière détaillée et structurée.
-
-${sourcesContext}
-
-ANALYSE DEMANDÉE :
-
-## 🔄 Comparaison : ${sources.map(s => `"${s.title}"`).join(" vs ")}
-
-Structure ta réponse avec :
-
-### 📌 Points communs
-Les idées, faits ou concepts partagés par les sources.
-
-### ⚡ Différences clés
-Les divergences d'approche, de perspective ou de contenu.
-
-### ⚠️ Contradictions
-Les points où les sources se contredisent (si applicable).
-
-### 🎯 Synthèse comparative
-Un tableau ou résumé qui met en perspective les forces/limites de chaque source.
-
-### 💡 Complémentarité
-Comment ces sources se complètent mutuellement.
-
-Cite les sources avec leur nom entre guillemets. Sois précis et factuel.`;
+    const prompt = notebookPromptStore.render("chat.compareSources", {
+      sourcesContext,
+      titles: sources.map(s => `"${s.title}"`).join(" vs "),
+    });
 
     let responseText = "";
     try {
@@ -554,34 +699,7 @@ Cite les sources avec leur nom entre guillemets. Sois précis et factuel.`;
       `## ${s.title}\nRésumé : ${s.summary}\nMots-clés : ${s.keywords.join(", ")}\n\nExtraits :\n${s.chunks.slice(0, 4).map(c => c.content).join("\n\n")}`
     ).join("\n\n---\n\n");
 
-    const prompt = `Tu es un analyste de recherche senior. Analyse en profondeur les sources suivantes et extrais des insights de haut niveau.
-
-SOURCES :
-${sourcesContext}
-
-ANALYSE DEMANDÉE — Structure ta réponse exactement ainsi :
-
-## 💡 Insights clés
-
-### 🔑 Findings principaux
-Les découvertes ou informations les plus importantes (5-8 points, classés par importance).
-
-### 📈 Tendances identifiées
-Les patterns, évolutions ou tendances qui émergent de l'ensemble des sources.
-
-### 🔗 Connexions cachées
-Les liens non évidents entre différentes sources ou concepts qui apportent une compréhension plus profonde.
-
-### ⚠️ Points de vigilance
-Les risques, limites, biais ou zones d'ombre dans les sources.
-
-### 🎯 Conclusions actionables
-Ce qu'un décideur devrait retenir et les actions recommandées.
-
-### ❓ Questions ouvertes
-Les questions que les sources soulèvent mais ne répondent pas (pistes de recherche future).
-
-Sois analytique, rigoureux et surprenant dans tes connexions. Chaque insight doit apporter une valeur au-delà de la simple lecture des sources.`;
+    const prompt = notebookPromptStore.render("chat.extractInsights", { sourcesContext });
 
     let responseText = "";
     try {
@@ -626,14 +744,7 @@ Sois analytique, rigoureux et surprenant dans tes connexions. Chaque insight doi
 
     try {
       const result = await generateText({
-        prompt: `Voici les résumés de documents dans un notebook de recherche :
-
-${summaries}
-
-Génère exactement 5 questions intéressantes et pertinentes que l'utilisateur pourrait poser sur ces documents. Les questions doivent être variées (compréhension, comparaison, synthèse, détail).
-
-Réponds en JSON strict :
-["question 1", "question 2", "question 3", "question 4", "question 5"]`,
+        prompt: notebookPromptStore.render("chat.suggestQuestions", { summaries }),
         temperature: 0.7,
         maxOutputTokens: 512,
       });
