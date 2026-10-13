@@ -18,6 +18,7 @@ import { ragEngine } from "./RAGEngine.js";
 import { notebookManager } from "./NotebookManager.js";
 import { chatResponseCache } from "./ResponseCache.js";
 import { notebookPromptStore } from "./PromptStore.js";
+import { buildSourcesContext } from "./generationContext.js";
 import type { ChatMessage, Citation } from "./types.js";
 
 const log = createLogger("GroundedChat");
@@ -674,9 +675,11 @@ export class GroundedChat {
     notebookManager.addChatMessage(notebookId, userMsg);
 
     // Construire le contexte de chaque source
-    const sourcesContext = sources.map(s =>
-      `═══ SOURCE : "${s.title}" ═══\nRésumé : ${s.summary}\n\nContenu clé :\n${s.chunks.slice(0, 6).map(c => c.content).join("\n\n")}`
-    ).join("\n\n────────────────────────────\n\n");
+    const sourcesContext = buildSourcesContext(sources, {
+      heading: s => `═══ SOURCE : "${s.title}" ═══`,
+      excerptsLabel: "Contenu clé :",
+      separator: "\n\n────────────────────────────\n\n",
+    });
 
     const prompt = notebookPromptStore.render("chat.compareSources", {
       sourcesContext,
@@ -729,9 +732,10 @@ export class GroundedChat {
     notebookManager.addChatMessage(notebookId, userMsg);
 
     // Construire le contexte enrichi
-    const sourcesContext = notebook.sources.map(s =>
-      `## ${s.title}\nRésumé : ${s.summary}\nMots-clés : ${s.keywords.join(", ")}\n\nExtraits :\n${s.chunks.slice(0, 4).map(c => c.content).join("\n\n")}`
-    ).join("\n\n---\n\n");
+    const sourcesContext = buildSourcesContext(notebook.sources, {
+      includeKeywords: true,
+      excerptsLabel: "Extraits :",
+    });
 
     const prompt = notebookPromptStore.render("chat.extractInsights", { sourcesContext });
 

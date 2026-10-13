@@ -5,7 +5,7 @@
 
 import {
   FileBarChart, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles,
+  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -44,6 +44,8 @@ export const REPORT_TYPES: DocTypeEntry[] = [
   { key: 'report-risk', label: 'Analyse des risques', icon: Target, desc: 'Risques identifiés, probabilité, mitigation', color: 'var(--color-error)' },
   { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, desc: 'Résumé décisionnel pour dirigeants', color: 'var(--color-error)' },
   { key: 'report-project', label: 'Rapport de projet', icon: Clock, desc: 'Avancement, livrables, jalons, blocages', color: 'var(--color-accent-alt)' },
+  { key: 'comparative-analysis', label: 'Analyse comparative', icon: GitCompare, desc: 'Croise les sources : convergences, divergences, angles morts', color: 'var(--color-info)' },
+  { key: 'synthesis-report', label: 'Rapport de synthèse', icon: Scale, desc: 'Aide à la décision : options, arbitrages, recommandation', color: 'var(--color-success)' },
 ];
 
 /** Thèmes disponibles pour le code */

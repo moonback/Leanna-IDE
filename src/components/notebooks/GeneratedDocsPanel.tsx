@@ -62,6 +62,8 @@ const REPORT_TYPES = [
   { key: 'report-risk', label: 'Analyse des risques', icon: Target, color: 'var(--color-error)' },
   { key: 'report-executive', label: 'Synthèse exécutive', icon: Briefcase, color: 'var(--color-error)' },
   { key: 'report-project', label: 'Rapport de projet', icon: Clock, color: 'var(--color-accent-alt)' },
+  { key: 'comparative-analysis', label: 'Analyse comparative', icon: Target, color: 'var(--color-info)' },
+  { key: 'synthesis-report', label: 'Rapport de synthèse', icon: Briefcase, color: 'var(--color-success)' },
 ];
 
 /**
