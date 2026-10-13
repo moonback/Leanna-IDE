@@ -239,9 +239,12 @@ test("a runner that exceeds the timeout counts as a failed attempt", async () =>
   let aborted = false;
   const slowRunner: MissionRunner = ({ signal }) =>
     new Promise((resolve) => {
-      signal?.addEventListener("abort", () => { aborted = true; });
-      // Ne se résout jamais à temps : le timeout doit gagner.
-      setTimeout(() => resolve({ success: true }), 5000).unref?.();
+      // Ne se résout jamais à temps : le timeout doit gagner. Le timer n'est
+      // pas unref() : comme un vrai runner (I/O en cours), il maintient la
+      // boucle d'événements active ; sinon le processus de test se termine
+      // avant que le timeout (lui-même unref) du superviseur ne se déclenche.
+      const slow = setTimeout(() => resolve({ success: true }), 5000);
+      signal?.addEventListener("abort", () => { aborted = true; clearTimeout(slow); });
     });
 
   const result = await sup.runMission({ missionId: "m-timeout", goal: "slow", runner: slowRunner });

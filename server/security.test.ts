@@ -48,7 +48,8 @@ test('resolveWorkspacePath rejects paths escaping the workspace root', () => {
 });
 
 test('resolveWorkspacePath accepts paths inside the workspace root', () => {
-  const workspaceRoot = path.join('C:', 'workspace', 'app');
+  // Racine absolue portable : C:\workspace\app sous Windows, /workspace/app ailleurs.
+  const workspaceRoot = path.resolve(path.sep, 'workspace', 'app');
   const result = resolveWorkspacePath(path.join('src', 'App.tsx'), workspaceRoot);
   assert.equal(result.ok, true);
   assert.equal(result.absolutePath, path.join(workspaceRoot, 'src', 'App.tsx'));
