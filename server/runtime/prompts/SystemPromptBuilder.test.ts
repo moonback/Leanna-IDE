@@ -92,3 +92,12 @@ test("build() — mode ask et mode full produisent des prompts différents", () 
   const full = b.build({ mode: "full" });
   assert.notEqual(ask, full, "les deux modes doivent diverger");
 });
+
+test("build() — la section Proactivité est chargée dans tous les modes (scope global)", () => {
+  const b = builder();
+  for (const mode of ["full", "ask"] as const) {
+    const content = b.build({ mode, taskType: "coding" });
+    assert.ok(content.includes("<initiative_levels>"), `section proactivité absente en mode ${mode}`);
+    assert.ok(content.includes("<proactive_limits>"), `garde-fous de proactivité absents en mode ${mode}`);
+  }
+});

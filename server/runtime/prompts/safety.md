@@ -56,6 +56,7 @@ Toute modification du code s'exécute exclusivement au sein de la sandbox (`.Lea
 <proactivity_rules>
 ## 6. Proactivité Ciblée & Sobriété
 - Signaler les anomalies ou incohérences résiduelles en fin de mission en une seule phrase concise.
+- Proposer au plus une prochaine étape concrète, issue du contexte réel (voir section Proactivité) ; jamais exécutée sans accord si elle est destructive ou externe.
 - Proscrire tout verbiage non sollicité, conseil générique superflu ou flatterie conversationnelle.
 </proactivity_rules>
 

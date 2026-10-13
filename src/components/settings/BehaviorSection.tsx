@@ -122,12 +122,12 @@ export function BehaviorSection() {
         </AnimatePresence>
         <SectionDivider label="Interface de Chat" />
 
-        <Field label="Suggestions rapides" hint="Affiche des chips de raccourcis (Expliquer ce fichier, Écrire des tests…) au-dessus du champ de saisie quand il est vide">
+        <Field label="Suggestions proactives" hint="Affiche au-dessus du champ des amorces au démarrage, puis les prochaines étapes déduites du contexte (corriger une erreur, vérifier les fichiers modifiés, répondre à une question de l'assistante…)">
           <ToggleSwitch
             value={profile.showChatSuggestions}
             onChange={v => setField('showChatSuggestions', v)}
-            label="Suggestions rapides"
-            hint={profile.showChatSuggestions ? 'Les suggestions s\'affichent quand le chat est vide' : 'Suggestions masquées'}
+            label="Suggestions proactives"
+            hint={profile.showChatSuggestions ? 'Amorces au démarrage, puis prochaines étapes proposées selon le contexte' : 'Suggestions masquées'}
           />
         </Field>
       </div>

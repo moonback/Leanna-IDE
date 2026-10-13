@@ -22,6 +22,7 @@ import { useResizablePanel } from './useResizablePanel.js';
 import { useChatScroll } from './useChatScroll.js';
 import { usePinnedMessages } from './usePinnedMessages.js';
 import { useChatSearch } from './useChatSearch.js';
+import { buildProactiveSuggestions } from './proactiveSuggestions.js';
 
 /**
  * Panneau de conversation flottant / ancré de Leanna.
@@ -128,6 +129,12 @@ export function ChatPanel({
     lastEntryId: lastEntry?.id,
     extraDeps: [queue.length, isBusy, connecting, activity.length],
   });
+
+  // ── Suggestions proactives (prochaines étapes déduites du contexte) ─────────
+  const suggestions = useMemo(
+    () => buildProactiveSuggestions({ transcript, activity }),
+    [transcript, activity],
+  );
 
   // ── Send helpers ─────────────────────────────────────────────────────────────
   const handleSend = useCallback((text: string, displayText?: string) => {
@@ -455,6 +462,7 @@ export function ChatPanel({
                 onDocumentAnalyzed={handleDocumentAnalyzed}
                 onToast={showToast}
                 showChips={profile.showChatSuggestions ?? true}
+                proactiveSuggestions={suggestions}
               />
             )}
           </>
