@@ -11,6 +11,7 @@ release/
 .Leanna/
 .kiro/
 .vscode/
+.claude/skills
 .Leanna-audit.log
 .Leanna-profile.json
 # TypeScript build info
