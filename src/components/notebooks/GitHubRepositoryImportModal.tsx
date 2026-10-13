@@ -11,8 +11,7 @@
  * - Aperçu de la structure des fichiers et progression d'ingestion
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useCallback, useEffect, useMemo, useId } from 'react';
 import {
   Search, Github, Loader2, XCircle, AlertCircle,
   FileCode, FolderOpen, Star, GitFork,
@@ -21,9 +20,9 @@ import {
   Sliders, ShieldCheck, ChevronRight
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
-import { SPRING_MODAL } from './motion.js';
 import { api } from './api/client.js';
 import { errorMessage } from './utils.js';
+import { NbBadge, NbButton, NbIconButton, NbInput, NbModal } from './ui/primitives.js';
 
 interface Repository {
   full_name: string;
@@ -126,6 +125,7 @@ export function GitHubRepositoryImportModal({
   const [authLoading, setAuthLoading] = useState(true);
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
+  const tokenInputId = useId();
   const [tokenSaving, setTokenSaving] = useState(false);
 
   // Onglet "Mes Dépôts"
@@ -571,87 +571,62 @@ export function GitHubRepositoryImportModal({
   }, [notebooks, selectedNotebookId]);
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-        onClick={onClose}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="github-modal-title"
+    <>
+      <NbModal
+        open
+        onClose={onClose}
+        title="Importer un dépôt GitHub"
+        size="xl"
+        className="h-[min(88vh,850px)] overflow-hidden"
       >
-        <motion.div
-          initial={{ scale: 0.96, opacity: 0, y: 15 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.96, opacity: 0, y: 15 }}
-          transition={SPRING_MODAL}
-          className="w-full max-w-5xl h-[88vh] max-h-[850px] bg-[var(--notebook-canvas)] border border-[var(--notebook-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* ─── Top Header ────────────────────────────────────────────── */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)]/60">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[color-mix(in_srgb,var(--notebook-accent)_20%,transparent)] to-[color-mix(in_srgb,var(--color-accent-alt)_20%,transparent)] border border-[color-mix(in_srgb,var(--notebook-accent)_30%,transparent)] text-[var(--notebook-accent)]">
-                <Github size={22} />
+          {/* ─── Sous-en-tête : contexte & statut d'authentification ───── */}
+          <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-5 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
+                <Github size={20} aria-hidden />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 id="github-modal-title" className="text-base font-semibold text-[var(--text-primary)]">
-                    Importer un dépôt GitHub
-                  </h2>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[color-mix(in_srgb,var(--notebook-accent)_10%,transparent)] text-[var(--notebook-accent)] border border-[color-mix(in_srgb,var(--notebook-accent)_20%,transparent)]">
-                    Sources & Codebase
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--text-muted)]">
+              <div className="min-w-0">
+                <NbBadge tone="accent">Sources & Codebase</NbBadge>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Ingérez le code et la documentation de vos dépôts publics ou privés directement dans un Notebook
                 </p>
               </div>
             </div>
 
-            {/* GitHub Auth Status Pill & Actions */}
-            <div className="flex items-center gap-3">
+            {/* GitHub Auth Status Pill */}
+            <div className="flex flex-shrink-0 items-center gap-3">
               {authLoading ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-muted)]">
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Vérification...</span>
-                </div>
+                <NbBadge icon={Loader2} className="[&>svg]:animate-spin">
+                  Vérification...
+                </NbBadge>
               ) : githubUser ? (
                 <button
+                  type="button"
                   onClick={() => setTokenModalOpen(true)}
-                  className="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-success)_15%,transparent)] border border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] text-[var(--color-success)] transition-colors"
+                  className="group flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] bg-[var(--color-success-subtle)] px-3 py-1 text-xs text-[var(--color-success)] transition-colors hover:border-[var(--color-success)]"
                   title="Accès GitHub connecté. Cliquez pour gérer votre token."
                 >
                   {githubUser.avatar_url ? (
-                    <img src={githubUser.avatar_url} alt={githubUser.login} className="w-4 h-4 rounded-full" />
+                    <img src={githubUser.avatar_url} alt={githubUser.login} className="h-4 w-4 rounded-full" />
                   ) : (
                     <ShieldCheck size={14} />
                   )}
                   <span className="font-medium">@{githubUser.login}</span>
-                  <span className="text-xs px-1.5 py-0.2 rounded bg-[color-mix(in_srgb,var(--color-success)_20%,transparent)] text-[var(--color-success)]">
+                  <span className="rounded-full bg-[var(--color-success-subtle)] px-2 text-xs text-[var(--color-success)]">
                     Privé & Public
                   </span>
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setTokenModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] border border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)] text-[var(--color-warning)] transition-colors font-medium"
+                  className="flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)] bg-[var(--color-warning-subtle)] px-3 py-1 text-xs font-medium text-[var(--color-warning)] transition-colors hover:border-[var(--color-warning)]"
                   title="Ajoutez votre token personnel pour accéder à vos dépôts privés"
                 >
                   <Key size={13} />
                   <span>Connecter token (dépôts privés)</span>
                 </button>
               )}
-
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg transition-colors hover:bg-[var(--notebook-accent-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                title="Fermer"
-              >
-                <X size={18} />
-              </button>
             </div>
           </div>
 
@@ -661,43 +636,37 @@ export function GitHubRepositoryImportModal({
             <div className="w-[44%] border-r border-[var(--notebook-border)] flex flex-col bg-[var(--notebook-canvas)]">
               {/* Segmented Tab Controls */}
               <div className="p-4 pb-2 border-b border-[var(--notebook-border)]">
-                <div className="grid grid-cols-3 p-1 rounded-xl bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-xs font-medium">
+                <div className="notebook-segmented grid grid-cols-3 text-xs font-medium">
                   <button
+                    type="button"
                     onClick={() => setSourceTab('my_repos')}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
-                      sourceTab === 'my_repos'
-                        ? 'bg-[var(--notebook-accent)] text-white shadow-sm'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                    }`}
+                    data-active={sourceTab === 'my_repos' ? 'true' : undefined}
+                    className="notebook-segment gap-1 px-2 text-xs hover:text-[var(--text-primary)]"
                   >
                     <FolderGit2 size={13} />
                     <span>Mes Projets</span>
                     {myRepos.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.2 rounded-full bg-[var(--notebook-accent-surface)]">
+                      <span className="notebook-count">
                         {myRepos.length}
                       </span>
                     )}
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setSourceTab('search')}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
-                      sourceTab === 'search'
-                        ? 'bg-[var(--notebook-accent)] text-white shadow-sm'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                    }`}
+                    data-active={sourceTab === 'search' ? 'true' : undefined}
+                    className="notebook-segment gap-1 px-2 text-xs hover:text-[var(--text-primary)]"
                   >
                     <Search size={13} />
                     <span>Explorer</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setSourceTab('direct')}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
-                      sourceTab === 'direct'
-                        ? 'bg-[var(--notebook-accent)] text-white shadow-sm'
-                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                    }`}
+                    data-active={sourceTab === 'direct' ? 'true' : undefined}
+                    className="notebook-segment gap-1 px-2 text-xs hover:text-[var(--text-primary)]"
                   >
                     <LinkIcon size={13} />
                     <span>Lien Direct</span>
@@ -717,15 +686,16 @@ export function GitHubRepositoryImportModal({
                         value={myReposSearch}
                         onChange={e => setMyReposSearch(e.target.value)}
                         placeholder="Filtrer mes projets..."
-                        className="w-full pl-9 pr-8 py-1.5 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)]"
+                        className="notebook-input pl-9 pr-10 text-xs"
                       />
                       {myReposSearch && (
-                        <button
+                        <NbIconButton
+                          icon={X}
+                          label="Effacer le filtre"
+                          size="sm"
                           onClick={() => setMyReposSearch('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          <X size={12} />
-                        </button>
+                          className="absolute right-1 top-1/2 -translate-y-1/2"
+                        />
                       )}
                     </div>
 
@@ -733,20 +703,22 @@ export function GitHubRepositoryImportModal({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs">
                         <button
+                          type="button"
                           onClick={() => setMyReposFilter('all')}
-                          className={`px-2 py-0.5 rounded-lg border transition-colors ${
+                          className={`px-2 py-1 rounded-full border transition-colors ${
                             myReposFilter === 'all'
-                              ? 'bg-[var(--notebook-accent-surface)] text-[var(--text-primary)] border-[var(--border-strong)]'
+                              ? 'bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)] border-[var(--notebook-accent)]'
                               : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--notebook-surface-muted)]'
                           }`}
                         >
                           Tous ({myRepos.length})
                         </button>
                         <button
+                          type="button"
                           onClick={() => setMyReposFilter('private')}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-colors ${
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full border transition-colors ${
                             myReposFilter === 'private'
-                              ? 'bg-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] text-[var(--color-warning)] border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)]'
+                              ? 'bg-[var(--color-warning-subtle)] text-[var(--color-warning)] border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)]'
                               : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--notebook-surface-muted)]'
                           }`}
                         >
@@ -754,10 +726,11 @@ export function GitHubRepositoryImportModal({
                           <span>Privés ({myRepos.filter(r => r.private).length})</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => setMyReposFilter('public')}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-colors ${
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full border transition-colors ${
                             myReposFilter === 'public'
-                              ? 'bg-[color-mix(in_srgb,var(--color-info)_20%,transparent)] text-[var(--color-info)] border-[color-mix(in_srgb,var(--color-info)_30%,transparent)]'
+                              ? 'bg-[var(--color-info-subtle)] text-[var(--color-info)] border-[color-mix(in_srgb,var(--color-info)_30%,transparent)]'
                               : 'text-[var(--text-muted)] border-transparent hover:bg-[var(--notebook-surface-muted)]'
                           }`}
                         >
@@ -766,14 +739,14 @@ export function GitHubRepositoryImportModal({
                         </button>
                       </div>
 
-                      <button
+                      <NbIconButton
+                        icon={RefreshCw}
+                        label="Actualiser la liste"
+                        size="sm"
                         onClick={loadMyRepos}
                         disabled={myReposLoading}
-                        className="p-1 rounded hover:bg-[var(--notebook-surface-muted)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        title="Actualiser la liste"
-                      >
-                        <RefreshCw size={12} className={myReposLoading ? 'animate-spin' : ''} />
-                      </button>
+                        className={myReposLoading ? '[&>svg]:animate-spin' : undefined}
+                      />
                     </div>
                   </div>
 
@@ -786,7 +759,7 @@ export function GitHubRepositoryImportModal({
                       </div>
                     ) : !githubUser ? (
                       <div className="p-6 text-center">
-                        <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] text-[var(--color-warning)]">
+                        <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center bg-[var(--color-warning-subtle)] text-[var(--color-warning)]">
                           <Lock size={20} />
                         </div>
                         <h4 className="text-sm font-medium text-[var(--text-primary)] mb-1">
@@ -795,13 +768,9 @@ export function GitHubRepositoryImportModal({
                         <p className="text-xs text-[var(--text-muted)] mb-4 max-w-xs mx-auto">
                           Configurez un Personal Access Token GitHub avec les droits de lecture pour importer directement vos dépôts privés et organisationnels.
                         </p>
-                        <button
-                          onClick={() => setTokenModalOpen(true)}
-                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--notebook-accent)] text-white hover:opacity-90 shadow-md transition-all inline-flex items-center gap-2"
-                        >
-                          <Key size={14} />
-                          <span>Ajouter mon Token GitHub</span>
-                        </button>
+                        <NbButton variant="primary" size="sm" icon={Key} onClick={() => setTokenModalOpen(true)}>
+                          Ajouter mon Token GitHub
+                        </NbButton>
                       </div>
                     ) : filteredMyRepos.length === 0 ? (
                       <div className="py-12 text-center text-xs text-[var(--text-muted)]">
@@ -815,25 +784,22 @@ export function GitHubRepositoryImportModal({
                           <div
                             key={repo.full_name}
                             onClick={() => setSelectedRepo(repo)}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-[var(--notebook-accent)]/10 border-[var(--notebook-accent)]/60 shadow-sm'
-                                : 'bg-[var(--notebook-surface)]/50 border-[var(--notebook-border)] hover:bg-[var(--notebook-surface)] hover:border-[var(--notebook-border)]'
+                            data-interactive="true"
+                            className={`notebook-card p-3 cursor-pointer ${
+                              isSelected ? '!border-[var(--notebook-accent)] !bg-[var(--notebook-accent-surface)]' : ''
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 mb-1">
                                   {repo.private ? (
-                                    <span className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-[color-mix(in_srgb,var(--color-warning)_15%,transparent)] text-[var(--color-warning)] border border-[color-mix(in_srgb,var(--color-warning)_25%,transparent)] flex-shrink-0">
-                                      <Lock size={9} />
+                                    <NbBadge tone="warning" icon={Lock} className="flex-shrink-0">
                                       Privé
-                                    </span>
+                                    </NbBadge>
                                   ) : (
-                                    <span className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-[color-mix(in_srgb,var(--color-info)_15%,transparent)] text-[var(--color-info)] border border-[color-mix(in_srgb,var(--color-info)_25%,transparent)] flex-shrink-0">
-                                      <Globe size={9} />
+                                    <NbBadge tone="info" icon={Globe} className="flex-shrink-0">
                                       Public
-                                    </span>
+                                    </NbBadge>
                                   )}
                                   <h3 className="font-semibold text-xs text-[var(--text-primary)] truncate">
                                     {repo.repo}
@@ -866,7 +832,7 @@ export function GitHubRepositoryImportModal({
 
                               <div className="flex-shrink-0 mt-0.5">
                                 {isSelected ? (
-                                  <div className="w-5 h-5 rounded-full bg-[var(--notebook-accent)] flex items-center justify-center text-white">
+                                  <div className="w-5 h-5 rounded-full bg-[var(--notebook-accent)] flex items-center justify-center text-[var(--notebook-accent-text)]">
                                     <Check size={12} strokeWidth={3} />
                                   </div>
                                 ) : (
@@ -893,7 +859,7 @@ export function GitHubRepositoryImportModal({
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Rechercher sur GitHub (ex: langchain, fastify)..."
-                        className="w-full pl-9 pr-8 py-2 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)]"
+                        className="notebook-input pl-9 pr-8 text-xs"
                       />
                       {searchLoading && (
                         <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[var(--text-muted)]" />
@@ -929,10 +895,9 @@ export function GitHubRepositoryImportModal({
                         <div
                           key={repo.full_name}
                           onClick={() => setSelectedRepo(repo)}
-                          className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-[var(--notebook-accent)]/10 border-[var(--notebook-accent)]/60 shadow-sm'
-                              : 'bg-[var(--notebook-surface)]/50 border-[var(--notebook-border)] hover:bg-[var(--notebook-surface)] hover:border-[var(--notebook-border)]'
+                          data-interactive="true"
+                          className={`notebook-card p-3 cursor-pointer ${
+                            isSelected ? '!border-[var(--notebook-accent)] !bg-[var(--notebook-accent-surface)]' : ''
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -962,7 +927,7 @@ export function GitHubRepositoryImportModal({
                               </div>
                             </div>
                             {isSelected && (
-                              <div className="w-5 h-5 rounded-full bg-[var(--notebook-accent)] flex items-center justify-center text-white">
+                              <div className="w-5 h-5 rounded-full bg-[var(--notebook-accent)] flex items-center justify-center text-[var(--notebook-accent-text)]">
                                 <Check size={12} strokeWidth={3} />
                               </div>
                             )}
@@ -994,28 +959,30 @@ export function GitHubRepositoryImportModal({
                             onChange={e => setDirectInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleInspectDirect()}
                             placeholder="https://github.com/mon-org/mon-projet-prive"
-                            className="w-full pl-9 pr-3 py-2 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)]"
+                            className="notebook-input pl-9 text-xs"
                           />
                         </div>
-                        <button
+                        <NbButton
+                          variant="primary"
+                          size="sm"
+                          icon={ArrowRight}
+                          loading={directLoading}
                           onClick={handleInspectDirect}
-                          disabled={directLoading || !directInput.trim()}
-                          className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-[var(--notebook-accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5"
+                          disabled={!directInput.trim()}
                         >
-                          {directLoading ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
-                          <span>Inspecter</span>
-                        </button>
+                          Inspecter
+                        </NbButton>
                       </div>
 
                       {directError && (
-                        <div className="mt-3 p-2.5 rounded-lg bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-error)_20%,transparent)] text-[var(--color-error)] text-xs flex items-center gap-2">
+                        <div className="mt-3 p-3 rounded-lg bg-[var(--color-error-subtle)] border border-[color-mix(in_srgb,var(--color-error)_20%,transparent)] text-[var(--color-error)] text-xs flex items-center gap-2">
                           <AlertCircle size={14} className="flex-shrink-0" />
                           <span>{directError}</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-[var(--notebook-surface)] border border-[var(--notebook-border)] space-y-2">
+                    <div className="notebook-card rounded-xl p-4 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
                         <Lock size={13} className="text-[var(--color-warning)]" />
                         <span>Dépôts privés pris en charge</span>
@@ -1030,10 +997,10 @@ export function GitHubRepositoryImportModal({
             </div>
 
             {/* ─── Colonne de Droite : Hub de Configuration & Ingestion (56%) ── */}
-            <div className="w-[56%] flex flex-col bg-[var(--notebook-surface)]/30">
+            <div className="w-[56%] flex flex-col bg-[var(--notebook-surface)]">
               {!selectedRepo ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--notebook-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--notebook-accent)_20%,transparent)] text-[var(--notebook-accent)] mb-4 shadow-inner">
+                  <div className="w-16 h-16 rounded-xl flex items-center justify-center bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)] mb-4">
                     <Github size={32} />
                   </div>
                   <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
@@ -1043,13 +1010,13 @@ export function GitHubRepositoryImportModal({
                     Choisissez l'un de vos projets dans la liste de gauche ou collez une URL directe pour configurer les fichiers à ingérer.
                   </p>
                   <div className="grid grid-cols-2 gap-3 max-w-md w-full text-left text-xs">
-                    <div className="p-3 rounded-xl bg-[var(--notebook-canvas)] border border-[var(--notebook-border)]">
+                    <div className="notebook-card rounded-xl p-3">
                       <span className="font-semibold block text-[var(--text-primary)] mb-1">🔒 Dépôts Privés</span>
                       <span className="text-xs text-[var(--text-muted)]">
                         Accès authentifié à votre code propriétaire via votre token personnel.
                       </span>
                     </div>
-                    <div className="p-3 rounded-xl bg-[var(--notebook-canvas)] border border-[var(--notebook-border)]">
+                    <div className="notebook-card rounded-xl p-3">
                       <span className="font-semibold block text-[var(--text-primary)] mb-1">⚡ Ingestion IA</span>
                       <span className="text-xs text-[var(--text-muted)]">
                         Indexation vectorielle et citations précises dans le Notebook sélectionné.
@@ -1060,7 +1027,7 @@ export function GitHubRepositoryImportModal({
               ) : (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Selected Repo Header Card */}
-                  <div className="p-5 border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)]/60">
+                  <div className="p-4 border-b border-[var(--notebook-border)] bg-[var(--notebook-surface-muted)]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1068,15 +1035,13 @@ export function GitHubRepositoryImportModal({
                             {selectedRepo.full_name}
                           </h3>
                           {selectedRepo.private ? (
-                            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--color-warning)_15%,transparent)] text-[var(--color-warning)] border border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)]">
-                              <Lock size={10} />
+                            <NbBadge tone="warning" icon={Lock}>
                               Dépôt Privé
-                            </span>
+                            </NbBadge>
                           ) : (
-                            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--color-info)_15%,transparent)] text-[var(--color-info)] border border-[color-mix(in_srgb,var(--color-info)_30%,transparent)]">
-                              <Globe size={10} />
+                            <NbBadge tone="info" icon={Globe}>
                               Dépôt Public
-                            </span>
+                            </NbBadge>
                           )}
                         </div>
                         <p className="text-xs text-[var(--text-muted)] line-clamp-2">
@@ -1088,7 +1053,7 @@ export function GitHubRepositoryImportModal({
                         href={selectedRepo.html_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--notebook-canvas)] border border-[var(--notebook-border)] transition-colors flex-shrink-0"
+                        className="notebook-secondary-button notebook-btn-sm flex-shrink-0"
                       >
                         <span>GitHub</span>
                         <ExternalLink size={11} />
@@ -1097,7 +1062,7 @@ export function GitHubRepositoryImportModal({
                   </div>
 
                   {/* Scrollable Configuration Options */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-5">
                     {/* Étape 1 : Notebook de destination */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1105,17 +1070,13 @@ export function GitHubRepositoryImportModal({
                           <BookOpen size={14} className="text-[var(--notebook-accent)]" />
                           <span>1. Notebook de destination</span>
                         </label>
-                        <button
-                          onClick={() => setCreatingNotebook(true)}
-                          className="text-xs text-[var(--notebook-accent)] hover:underline flex items-center gap-1 font-semibold"
-                        >
-                          <Plus size={12} />
-                          <span>Nouveau notebook</span>
-                        </button>
+                        <NbButton variant="ghost" size="sm" icon={Plus} onClick={() => setCreatingNotebook(true)}>
+                          Nouveau notebook
+                        </NbButton>
                       </div>
 
                       {creatingNotebook ? (
-                        <div className="p-3 rounded-xl bg-[var(--notebook-canvas)] border border-[var(--notebook-border)] space-y-2">
+                        <div className="notebook-card rounded-xl p-3 space-y-2">
                           <span className="text-xs font-semibold text-[var(--text-primary)]">Nom du nouveau notebook</span>
                           <div className="flex gap-2">
                             <input
@@ -1123,27 +1084,21 @@ export function GitHubRepositoryImportModal({
                               value={newNotebookTitle}
                               onChange={e => setNewNotebookTitle(e.target.value)}
                               placeholder={`Import ${selectedRepo.repo}`}
-                              className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)]"
+                              className="notebook-input flex-1 text-xs"
                             />
-                            <button
-                              onClick={handleCreateNotebook}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--notebook-accent)] text-white hover:opacity-90"
-                            >
+                            <NbButton variant="primary" size="sm" onClick={handleCreateNotebook}>
                               Créer
-                            </button>
-                            <button
-                              onClick={() => setCreatingNotebook(false)}
-                              className="px-2 py-1.5 rounded-lg text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                            >
+                            </NbButton>
+                            <NbButton variant="ghost" size="sm" onClick={() => setCreatingNotebook(false)}>
                               Annuler
-                            </button>
+                            </NbButton>
                           </div>
                         </div>
                       ) : (
                         <select
                           value={selectedNotebookId || ''}
                           onChange={e => setSelectedNotebookId(e.target.value)}
-                          className="w-full px-3 py-2.5 rounded-xl text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)] font-medium"
+                          className="notebook-input cursor-pointer text-xs font-medium"
                         >
                           {notebooks.length === 0 ? (
                             <option value="" disabled>Aucun notebook disponible</option>
@@ -1174,11 +1129,12 @@ export function GitHubRepositoryImportModal({
                           const isActive = fileExtensions === preset.extensions;
                           return (
                             <button
+                              type="button"
                               key={preset.name}
                               onClick={() => setFileExtensions(preset.extensions)}
-                              className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                                 isActive
-                                  ? 'bg-[var(--notebook-accent)] text-white border-[var(--notebook-accent)] shadow-sm'
+                                  ? 'bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)] border-[var(--notebook-accent)]'
                                   : 'bg-[var(--notebook-surface-muted)] border-[var(--notebook-border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                               }`}
                             >
@@ -1193,11 +1149,11 @@ export function GitHubRepositoryImportModal({
                         value={fileExtensions}
                         onChange={e => setFileExtensions(e.target.value)}
                         placeholder=".ts, .tsx, .py, .md, .json"
-                        className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)]"
+                        className="notebook-input text-xs"
                       />
 
                       {/* Aperçu des fichiers correspondants */}
-                      <div className="p-3 rounded-xl bg-[var(--notebook-canvas)] border border-[var(--notebook-border)] flex items-center justify-between">
+                      <div className="notebook-card rounded-xl p-3 flex items-center justify-between">
                         {filesLoading ? (
                           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                             <Loader2 size={14} className="animate-spin text-[var(--notebook-accent)]" />
@@ -1240,7 +1196,7 @@ export function GitHubRepositoryImportModal({
                           value={branch}
                           onChange={e => setBranch(e.target.value)}
                           placeholder={selectedRepo.default_branch || 'main'}
-                          className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)]"
+                          className="notebook-input text-xs"
                         />
                       </div>
 
@@ -1267,14 +1223,15 @@ export function GitHubRepositoryImportModal({
                   </div>
 
                   {/* Bottom Actions Footer */}
-                  <div className="p-5 border-t border-[var(--notebook-border)] bg-[var(--notebook-surface)]/80 space-y-3">
+                  <div className="p-4 border-t border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] space-y-3">
                     {ingestionError && (
-                      <div className="p-3 rounded-xl bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-error)_20%,transparent)] text-[var(--color-error)] text-xs flex items-center gap-2">
+                      <div className="p-3 rounded-xl bg-[var(--color-error-subtle)] border border-[color-mix(in_srgb,var(--color-error)_20%,transparent)] text-[var(--color-error)] text-xs flex items-center gap-2">
                         <XCircle size={15} className="flex-shrink-0" />
                         <span className="flex-1">{ingestionError}</span>
                         <button
+                          type="button"
                           onClick={() => setIngestionError(null)}
-                          className="text-xs underline hover:opacity-80"
+                          className="rounded-lg px-1 text-xs underline hover:opacity-80"
                         >
                           Fermer
                         </button>
@@ -1287,31 +1244,19 @@ export function GitHubRepositoryImportModal({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={onClose}
-                          disabled={ingesting}
-                          className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--notebook-surface-muted)] transition-colors"
-                        >
+                        <NbButton variant="ghost" onClick={onClose} disabled={ingesting}>
                           Annuler
-                        </button>
+                        </NbButton>
 
-                        <button
+                        <NbButton
+                          variant="primary"
+                          icon={FolderGit2}
+                          loading={ingesting}
                           onClick={handleIngest}
-                          disabled={ingesting || !selectedRepo || !selectedNotebookId}
-                          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[var(--notebook-accent)] to-[var(--color-accent-alt)] hover:from-[var(--notebook-accent)] hover:to-[var(--color-accent-alt)] disabled:opacity-50 transition-all shadow-md flex items-center gap-2"
+                          disabled={!selectedRepo || !selectedNotebookId}
                         >
-                          {ingesting ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              <span>Ingestion en cours...</span>
-                            </>
-                          ) : (
-                            <>
-                              <FolderGit2 size={14} />
-                              <span>Importer le dépôt dans le Notebook</span>
-                            </>
-                          )}
-                        </button>
+                          {ingesting ? 'Ingestion en cours...' : 'Importer le dépôt dans le Notebook'}
+                        </NbButton>
                       </div>
                     </div>
                   </div>
@@ -1319,76 +1264,50 @@ export function GitHubRepositoryImportModal({
               )}
             </div>
           </div>
-        </motion.div>
+      </NbModal>
 
-        {/* ─── Modal / Tiroir Token GitHub ─────────────────────────────────── */}
-        <AnimatePresence>
-          {tokenModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-              onClick={() => setTokenModalOpen(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-md bg-[var(--notebook-canvas)] border border-[var(--notebook-border)] rounded-2xl p-6 shadow-2xl space-y-4"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-[var(--text-primary)] font-bold text-sm">
-                    <Key size={18} className="text-[var(--color-warning)]" />
-                    <span>Configuration Token GitHub</span>
-                  </div>
-                  <button
-                    onClick={() => setTokenModalOpen(false)}
-                    className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+      {/* ─── Modale Token GitHub ─────────────────────────────────────── */}
+      <NbModal
+        open={tokenModalOpen}
+        onClose={() => setTokenModalOpen(false)}
+        title="Configuration Token GitHub"
+        size="sm"
+      >
+        <NbModal.Body className="space-y-4">
+          <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+            Pour accéder à vos dépôts privés et éviter les quotas de l'API publique, générez un <strong>Personal Access Token (classic ou fine-grained)</strong> avec la permission <code>repo</code>.
+          </p>
 
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  Pour accéder à vos dépôts privés et éviter les quotas de l'API publique, générez un <strong>Personal Access Token (classic ou fine-grained)</strong> avec la permission <code>repo</code>.
-                </p>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--text-primary)] block">
-                    Personal Access Token (PAT)
-                  </label>
-                  <input
-                    type="password"
-                    value={tokenInput}
-                    onChange={e => setTokenInput(e.target.value)}
-                    placeholder="ghp_..."
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-[var(--notebook-surface-muted)] border border-[var(--notebook-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--notebook-accent)] font-mono"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    onClick={() => setTokenModalOpen(false)}
-                    className="px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  >
-                    Fermer
-                  </button>
-                  <button
-                    onClick={handleSaveToken}
-                    disabled={tokenSaving || !tokenInput.trim()}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[var(--notebook-accent)] hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
-                  >
-                    {tokenSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                    <span>Enregistrer et Connecter</span>
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </AnimatePresence>
+          <div className="space-y-1">
+            <label htmlFor={tokenInputId} className="block text-xs font-semibold text-[var(--text-primary)]">
+              Personal Access Token (PAT)
+            </label>
+            <NbInput
+              id={tokenInputId}
+              type="password"
+              value={tokenInput}
+              onChange={e => setTokenInput(e.target.value)}
+              placeholder="ghp_..."
+              className="font-mono text-xs"
+            />
+          </div>
+        </NbModal.Body>
+        <NbModal.Footer>
+          <NbButton variant="ghost" size="sm" onClick={() => setTokenModalOpen(false)}>
+            Fermer
+          </NbButton>
+          <NbButton
+            variant="primary"
+            size="sm"
+            icon={Check}
+            loading={tokenSaving}
+            onClick={handleSaveToken}
+            disabled={!tokenInput.trim()}
+          >
+            Enregistrer et Connecter
+          </NbButton>
+        </NbModal.Footer>
+      </NbModal>
+    </>
   );
 }
