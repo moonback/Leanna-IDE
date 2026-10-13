@@ -20,7 +20,7 @@ import { ThreadBar } from './chat/ThreadBar.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
 import { FolderPickerModal } from './chat/FolderPickerModal.js';
-import { NotebookVoicePanel } from './chat/NotebookVoicePanel.js';
+import { NotebookVoiceConfigBridge } from './chat/NotebookLiveContext.js';
 
 interface Props {
   notebookId: string;
@@ -234,22 +234,23 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         onDeleteThread={handleDeleteThread}
         onNewThread={handleNewThread}
         prefersReducedMotion={prefersReducedMotion}
-        voiceSlot={
-          <NotebookVoicePanel
-            notebookId={notebookId}
-            selectedSources={selectedSources}
-            prefersReducedMotion={prefersReducedMotion}
-            onError={toastError}
-            onInfo={toastSuccess}
-            onDocumentGenerated={() => {
-              // On NE recharge PAS tout le notebook ici : loadNotebook() repasse par
-              // l'état "loading" qui démonte NotebookChat → coupe la session vocale.
-              // Les panneaux concernés (Historique, barre de progression) se
-              // rafraîchissent via ces CustomEvents ciblés, sans remontage.
-              window.dispatchEvent(new CustomEvent('notebook-generated-docs-changed', { detail: { notebookId } }));
-            }}
-          />
-        }
+      />
+
+      {/* Le bouton « Interroger à la voix » est désormais rendu dans le header
+          de NotebookDetail (à côté de Sources / Chat). On garde ici un pont
+          sans rendu qui pousse les sources filtrées + callbacks à la session
+          vocale partagée. */}
+      <NotebookVoiceConfigBridge
+        selectedSources={selectedSources}
+        onError={toastError}
+        onInfo={toastSuccess}
+        onDocumentGenerated={() => {
+          // On NE recharge PAS tout le notebook ici : loadNotebook() repasse par
+          // l'état "loading" qui démonte NotebookChat. Les panneaux concernés
+          // (Historique, barre de progression) se rafraîchissent via ce
+          // CustomEvent ciblé, sans remontage.
+          window.dispatchEvent(new CustomEvent('notebook-generated-docs-changed', { detail: { notebookId } }));
+        }}
       />
 
       <MessageList

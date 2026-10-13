@@ -21,6 +21,8 @@ import { api, apiVoid } from './api/client.js';
 import { SourcePanel } from './SourcePanel.js';
 import { SourceViewer } from './SourceViewer.js';
 import { NotebookChat } from './NotebookChat.js';
+import { NotebookLiveProvider } from './chat/NotebookLiveContext.js';
+import { NotebookVoicePanel } from './chat/NotebookVoicePanel.js';
 import { NotesPanel, type NoteEditorData } from './NotesPanel.js';
 import { GeneratePanel } from './GeneratePanel.js';
 import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
@@ -218,6 +220,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [generatedCount, setGeneratedCount] = useState(0);
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
   const { spring, fadeOnly } = useFluidTransition();
+  const prefersReducedMotion = useReducedMotion();
   
   // Détecte prefers-reduced-transparency pour le header
   const [reducedTransparency, setReducedTransparency] = useState(false);
@@ -405,6 +408,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const centerMotion = fadeOnly({});
 
   return (
+    <NotebookLiveProvider notebookId={notebookId}>
     <div className="notebook-workspace h-full flex flex-col overflow-hidden">
       {/* ─── Header ─────────────────────────────────────────── */}
       <header
@@ -466,6 +470,14 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             <MessageSquare className="h-4 w-4" />
             <span>Chat</span>
           </button>
+
+          {/* Assistant vocal — « Interroger à la voix », à côté de Sources / Chat.
+              Il consomme la session partagée via NotebookLiveProvider : reste
+              connecté quelle que soit la vue centrale affichée. */}
+          <NotebookVoicePanel
+            notebookId={notebookId}
+            prefersReducedMotion={prefersReducedMotion}
+          />
         </nav>
 
         {/* Right actions */}
@@ -634,5 +646,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         )}
       </div>
     </div>
+    </NotebookLiveProvider>
   );
 }

@@ -23,7 +23,7 @@ const log = createLogger("GroundedChat");
 
 // ─── System Prompt pour le chat groundé ──────────────────────────────────────
 
-const GROUNDED_SYSTEM_PROMPT = `Tu es un assistant de recherche intelligent. Tu réponds aux questions de l'utilisateur en te basant EXCLUSIVEMENT sur les sources fournies dans le contexte.
+const GROUNDED_SYSTEM_PROMPT = `Tu es Leanna un assistant de recherche intelligent. Tu réponds aux questions de l'utilisateur en te basant EXCLUSIVEMENT sur les sources fournies dans le contexte.
 
 RÈGLES STRICTES :
 1. Base tes réponses UNIQUEMENT sur le contenu des sources fournies.

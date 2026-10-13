@@ -16,12 +16,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Loader2, Volume2 } from 'lucide-react';
 import { LiveAPIContext } from '../../../context/LiveAPIContext.js';
 import { useNotebookLive } from './useNotebookLive.js';
+import { useNotebookLiveContext } from './NotebookLiveContext.js';
 
 interface Props {
   notebookId: string;
-  selectedSources: string[];
+  /**
+   * Sources filtrées + callbacks. Optionnels : quand le composant est rendu
+   * dans le header (via le provider), ils sont fournis par la vue chat au
+   * contexte, pas en props. Le bouton n'a alors besoin que de `notebookId`.
+   */
+  selectedSources?: string[];
   prefersReducedMotion: boolean | null;
-  onError: (message: string) => void;
+  onError?: (message: string) => void;
   /** Notification de progression quand l'assistant génère un document. */
   onInfo?: (message: string) => void;
   /** Appelé quand l'assistant a généré un document (rafraîchir l'historique). */
@@ -29,13 +35,18 @@ interface Props {
 }
 
 export function NotebookVoicePanel({ notebookId, selectedSources, prefersReducedMotion, onError, onInfo, onDocumentGenerated }: Props) {
-  const live = useNotebookLive({
+  // Session partagée via le provider (montée au niveau de NotebookDetail) : elle
+  // survit au démontage de NotebookChat quand on change de vue dans le notebook.
+  const shared = useNotebookLiveContext();
+
+  // Fallback : si aucun provider n'enveloppe ce composant (tests isolés), on
+  // instancie une session locale comme avant.
+  const localLive = useNotebookLive({
     notebookId,
-    selectedSources,
+    selectedSources: selectedSources ?? [],
     onError,
     onDocumentGenerating: (info) => {
       onInfo?.(`Génération du document (${info.type})…`);
-      // Refléter la génération dans la barre de progression du panneau « Générer ».
       window.dispatchEvent(new CustomEvent('notebook-voice-generation-start', {
         detail: { notebookId, taskId: info.taskId, type: info.type },
       }));
@@ -53,6 +64,18 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
       }));
     },
   });
+
+  // Quand le provider existe ET que cette instance porte une config (vue chat),
+  // on la pousse au contexte sans recréer la session. Rendu dans le header, le
+  // bouton ne passe aucune de ces props : on ne touche donc pas à la config.
+  useEffect(() => {
+    if (!shared) return;
+    const hasConfig = selectedSources !== undefined || onError || onInfo || onDocumentGenerated;
+    if (!hasConfig) return;
+    shared.setVoiceConfig({ selectedSources, onError, onInfo, onDocumentGenerated });
+  }, [shared, selectedSources, onError, onInfo, onDocumentGenerated]);
+
+  const live = shared ? shared.live : localLive;
   const {
     connected, connecting, busy, muted, toggleMute, transcript, toggle,
     amplitude, inputLevel, outputLevel, isSpeaking, isListening,
