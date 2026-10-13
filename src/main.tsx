@@ -42,6 +42,7 @@ const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
 const PilotageView = lazy(() => import('./views/PilotageView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
+import { dedupKeyFor } from './lib/fetchDedup.js';
 
 const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
 if (configuredApiToken) {
@@ -100,18 +101,6 @@ if (configuredApiToken) {
     });
   }
 
-  function dedupKeyFor(input: RequestInfo | URL, init?: RequestInit): string | null {
-    if (init && init.method && init.method !== 'GET') return null;
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
-    const method =
-      (init?.method as string | undefined) ||
-      (typeof input !== 'string' && !(input instanceof URL) ? (input as Request).method : 'GET');
-    if (method !== 'GET') return null;
-    const isApi = url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
-    if (!isApi) return null;
-    return url;
-  }
-
   window.fetch = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
     const isApi = rawUrl.startsWith('/api/') || rawUrl.startsWith(window.location.origin + '/api/');
@@ -137,7 +126,7 @@ if (configuredApiToken) {
       }
     }
 
-    const key = dedupKeyFor(input, resolvedInit);
+    const key = dedupKeyFor(input, resolvedInit, window.location.origin);
     if (key) {
       const existing = inflight.get(key);
       if (existing) {
