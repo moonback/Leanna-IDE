@@ -10,6 +10,8 @@ import {
   Check, Copy, RefreshCw, Square, Volume2, StickyNote, Download,
   ThumbsUp, ThumbsDown, Pencil, Quote, ChevronDown, ExternalLink,
 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { NbBadge, NbButton, NbIconButton, NbTextarea } from '../ui/primitives.js';
 import { renderMessageContent } from './renderHelpers.js';
 import type { Citation, ChatMessage } from './types.js';
 
@@ -46,6 +48,12 @@ export const MessageItem = memo(function MessageItem({
   onCopy, onRetry, onTTS, onSaveToNote, onOpenFolderPicker, onFeedback,
   onEditStart, onEditCancel, onEditSubmit, onFetchCitation,
 }: Props) {
+  const isCopied = copiedMsgId === msg.id;
+  const isSpeaking = speakingMsgId === msg.id;
+  const feedback = feedbackMap[msg.id];
+  /** Boutons texte de la barre d'actions : discrets, plus marqués au survol. */
+  const actionClass = '!min-h-0 !px-2 !py-1 !text-xs';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
@@ -54,23 +62,19 @@ export const MessageItem = memo(function MessageItem({
       className={`mx-auto mb-6 flex w-full max-w-4xl ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       <div
-        className="notebook-chat-message"
+        className={clsx(
+          'notebook-chat-message text-[var(--text-primary)]',
+          msg.role === 'assistant' && 'border border-[var(--notebook-border)]',
+        )}
         data-role={msg.role}
-        style={{
-          backgroundColor: msg.role === 'user' ? 'var(--notebook-chat-user)' : 'var(--notebook-chat-ai)',
-          color: 'var(--text-primary)',
-          border: msg.role === 'assistant' ? '1px solid var(--notebook-border)' : '1px solid transparent',
-          maxWidth: msg.role === 'user' ? '75%' : '100%',
-        }}
       >
         {/* Message content — with edit mode for user messages */}
         {msg.role === 'user' && editingMsgId === msg.id ? (
           <div className="space-y-2">
-            <textarea
+            <NbTextarea
               value={editingContent}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="w-full px-3 py-2 rounded-full text-sm outline-none resize-none"
-              style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+              className="text-sm"
               rows={3}
               // autoFocus justifié : le champ n'apparaît qu'après action explicite
               // (clic sur « Modifier ») ; focus immédiat attendu pour l'édition.
@@ -78,197 +82,168 @@ export const MessageItem = memo(function MessageItem({
               autoFocus
             />
             <div className="flex items-center gap-2">
-              <button
+              <NbButton
+                variant="primary"
+                size="sm"
                 onClick={() => onEditSubmit(msg.id)}
                 disabled={!editingContent.trim()}
-                className="px-3 py-1.5 rounded-full text-smfont-medium transition-colors disabled:opacity-40"
-                style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
               >
                 Renvoyer
-              </button>
-              <button
-                onClick={onEditCancel}
-                className="px-3 py-1.5 rounded-full text-smfont-medium notebook-chip"
-              >
+              </NbButton>
+              <NbButton variant="secondary" size="sm" onClick={onEditCancel}>
                 Annuler
-              </button>
+              </NbButton>
             </div>
           </div>
         ) : msg.role === 'assistant' ? (
           renderMessageContent(msg.content)
         ) : (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
         )}
 
         {/* Actions bar */}
         {editingMsgId !== msg.id && (
-          <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-1">
-            <p className="text-sm opacity-40">
+          <div className="mt-2 flex flex-wrap items-center gap-1 pt-1">
+            <p className="text-xs text-[var(--text-dimmed)]">
               {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </p>
 
             {/* Separator dot */}
-            <span className="text-sm opacity-20" aria-hidden="true">•</span>
+            <span className="text-xs text-[var(--text-dimmed)]" aria-hidden="true">•</span>
 
             {msg.role === 'assistant' && (
               <>
                 {/* Copy */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={isCopied ? Check : Copy}
                   onClick={() => onCopy(msg.id, msg.content)}
-                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 ${
-                    copiedMsgId === msg.id
-                      ? 'opacity-100 bg-[var(--color-success)]/10'
-                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
-                  }`}
-                  style={{ color: copiedMsgId === msg.id ? 'var(--color-success)' : undefined }}
+                  className={clsx(actionClass, isCopied && '!bg-[var(--color-success-subtle)] !text-[var(--color-success)]')}
                   title="Copier la réponse"
-                  aria-label={copiedMsgId === msg.id ? "Copié" : "Copier la réponse"}
+                  aria-label={isCopied ? "Copié" : "Copier la réponse"}
                 >
-                  {copiedMsgId === msg.id ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  <span className="text-xs">{copiedMsgId === msg.id ? 'Copié' : 'Copier'}</span>
-                </button>
+                  {isCopied ? 'Copié' : 'Copier'}
+                </NbButton>
 
                 {/* Retry */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={RefreshCw}
                   onClick={() => onRetry(msg.id)}
                   disabled={loading}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  className={actionClass}
                   title="Régénérer la réponse"
                   aria-label="Régénérer la réponse"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span className="text-xs">Retry</span>
-                </button>
+                  Retry
+                </NbButton>
 
                 {/* TTS */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={isSpeaking ? Square : Volume2}
                   onClick={() => onTTS(msg.id, msg.content)}
-                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 ${
-                    speakingMsgId === msg.id
-                      ? 'opacity-100 bg-[var(--notebook-accent)]/10'
-                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
-                  }`}
-                  style={{ color: speakingMsgId === msg.id ? 'var(--notebook-accent)' : undefined }}
-                  title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
-                  aria-label={speakingMsgId === msg.id ? "Arrêter la lecture" : "Lire à voix haute"}
+                  data-active={isSpeaking ? 'true' : undefined}
+                  className={actionClass}
+                  title={isSpeaking ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
+                  aria-label={isSpeaking ? "Arrêter la lecture" : "Lire à voix haute"}
                 >
-                  {speakingMsgId === msg.id ? (
+                  {isSpeaking ? (
                     <>
-                      <Square className="w-3.5 h-3.5" />
-                      <span className="flex items-center gap-1">
-                        <div className="flex gap-[2px]">
-                          {Array.from({ length: 4 }).map((_, i) => (
-                            <span
-                              key={i}
-                              className="w-[2px] h-2 bg-current rounded-full"
-                              style={{ animationDelay: `${i * 0.15}s` }}
-                              aria-hidden="true"
-                            />
-                          ))}
-                        </div>
+                      <span className="flex gap-[2px]" aria-hidden="true">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <span
+                            key={i}
+                            className="h-2 w-[2px] rounded-full bg-current"
+                            style={{ animationDelay: `${i * 0.15}s` }}
+                          />
+                        ))}
                       </span>
-                      <span className="text-xs">Stop</span>
+                      Stop
                     </>
                   ) : (
-                    <>
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span className="text-xs">Écouter</span>
-                    </>
+                    'Écouter'
                   )}
-                </button>
+                </NbButton>
 
                 {/* Save to notes */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={StickyNote}
                   onClick={() => onSaveToNote(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
+                  className={actionClass}
                   title="Sauvegarder dans les notes"
                   aria-label="Sauvegarder dans les notes"
                 >
-                  <StickyNote className="w-3.5 h-3.5" />
-                  <span className="text-xs">Note</span>
-                </button>
+                  Note
+                </NbButton>
 
                 {/* Save as Markdown */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={Download}
                   onClick={() => onOpenFolderPicker(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
+                  className={actionClass}
                   title="Enregistrer ce message en fichier Markdown (.md)"
                   aria-label="Enregistrer en Markdown"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="text-xs">MD</span>
-                </button>
+                  MD
+                </NbButton>
 
                 {/* Separator */}
-                <span className="text-sm opacity-20" aria-hidden="true">•</span>
+                <span className="text-xs text-[var(--text-dimmed)]" aria-hidden="true">•</span>
 
                 {/* Feedback thumbs */}
-                <div className="flex gap-0.5">
-                  <button
-                    type="button"
+                <div className="flex gap-1">
+                  <NbIconButton
+                    icon={ThumbsUp}
+                    label="Bonne réponse"
+                    size="sm"
                     onClick={() => onFeedback(msg.id, 'up')}
-                    className={`p-1.5 rounded-lg transition-all duration-200 ${
-                      feedbackMap[msg.id] === 'up'
-                        ? 'opacity-100 bg-[var(--color-success)]/10'
-                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
-                    }`}
-                    style={{ color: feedbackMap[msg.id] === 'up' ? 'var(--color-success)' : undefined }}
-                    title="Bonne réponse"
-                    aria-label="Bonne réponse"
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
+                    className={clsx(feedback === 'up' && '!bg-[var(--color-success-subtle)] !text-[var(--color-success)]')}
+                  />
+                  <NbIconButton
+                    icon={ThumbsDown}
+                    label="Mauvaise réponse"
+                    size="sm"
                     onClick={() => onFeedback(msg.id, 'down')}
-                    className={`p-1.5 rounded-lg transition-all duration-200 ${
-                      feedbackMap[msg.id] === 'down'
-                        ? 'opacity-100 bg-[var(--color-error)]/10'
-                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
-                    }`}
-                    style={{ color: feedbackMap[msg.id] === 'down' ? 'var(--color-error)' : undefined }}
-                    title="Mauvaise réponse"
-                    aria-label="Mauvaise réponse"
-                  >
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                  </button>
+                    className={clsx(feedback === 'down' && '!bg-[var(--color-error-subtle)] !text-[var(--color-error)]')}
+                  />
                 </div>
               </>
             )}
 
             {msg.role === 'user' && (
               <>
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={Pencil}
                   onClick={() => onEditStart(msg.id, msg.content)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
+                  className={actionClass}
                   title="Modifier et renvoyer"
                   aria-label="Modifier le message"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span className="text-xs">Modifier</span>
-                </button>
+                  Modifier
+                </NbButton>
 
                 {/* Save user message as Markdown */}
-                <button
-                  type="button"
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={Download}
                   onClick={() => onOpenFolderPicker(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
+                  className={actionClass}
                   title="Enregistrer ce message en fichier Markdown (.md)"
                   aria-label="Enregistrer en Markdown"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="text-xs">MD</span>
-                </button>
+                  MD
+                </NbButton>
               </>
             )}
           </div>
@@ -276,21 +251,22 @@ export const MessageItem = memo(function MessageItem({
 
         {/* Citations */}
         {msg.citations.length > 0 && (
-          <div className="mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--notebook-border)' }}>
-            <button
-              type="button"
+          <div className="mt-3 border-t border-[var(--notebook-border)] pt-2">
+            <NbButton
+              variant="ghost"
+              size="sm"
+              icon={Quote}
               onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
-              className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200 rounded-lg px-2 py-1.5 opacity-70 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
+              className="!min-h-0 !px-2 !py-1"
               aria-expanded={showCitations === msg.id}
               aria-controls={`citations-${msg.id}`}
               aria-label={`${msg.citations.length} citation${msg.citations.length > 1 ? 's' : ''} disponibles`}
             >
-              <Quote className="w-4 h-4" />
               <span>
                 {msg.citations.length} citation{msg.citations.length > 1 ? 's' : ''}
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showCitations === msg.id ? 'rotate-180' : ''}`} />
-            </button>
+              <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform duration-200', showCitations === msg.id && 'rotate-180')} aria-hidden />
+            </NbButton>
 
             <AnimatePresence>
               {showCitations === msg.id && (
@@ -304,7 +280,7 @@ export const MessageItem = memo(function MessageItem({
                 >
                   {/* Conteneur scrollable avec hauteur max */}
                   <div
-                    className="mt-3 space-y-3 max-h-96 overflow-y-auto custom-scrollbar"
+                    className="custom-scrollbar mt-3 max-h-96 space-y-2 overflow-y-auto"
                     onMouseLeave={() => {
                       // Ne pas fermer le tooltip si on quitte juste pour scroller
                       const relatedTarget = document.querySelector(`#citations-${msg.id} :hover`);
@@ -314,30 +290,21 @@ export const MessageItem = memo(function MessageItem({
                     {msg.citations.map((cit, i) => (
                       <div
                         key={cit.chunkId || i}
-                        className="p-3 rounded-lg transition-all duration-200 hover:shadow-sm hover:ring-1 hover:ring-[var(--notebook-accent)]/30"
-                        style={{
-                          backgroundColor: 'var(--notebook-canvas)',
-                          color: 'var(--text-muted)',
-                        }}
+                        className="notebook-card p-3 text-[var(--text-muted)]"
+                        data-interactive="true"
                       >
                         {/* Header avec titre + pertinence */}
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className="font-medium text-[var(--text-primary)] truncate">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-medium text-[var(--text-primary)]">
                             {cit.sourceTitle}
                           </span>
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                            style={{
-                              backgroundColor: 'var(--notebook-accent-surface)',
-                              color: 'var(--notebook-accent)',
-                            }}
-                          >
+                          <NbBadge tone="accent">
                             {(cit.relevance * 100).toFixed(0)}% pertinent
-                          </span>
+                          </NbBadge>
                         </div>
 
                         {/* Extrait avec affichage complet au clic */}
-                        <p className="text-sm opacity-80 leading-relaxed line-clamp-3 cursor-pointer">
+                        <p className="line-clamp-3 cursor-pointer text-sm leading-relaxed">
                           {cit.excerpt}
                         </p>
 
@@ -348,10 +315,9 @@ export const MessageItem = memo(function MessageItem({
                             e.stopPropagation();
                             onFetchCitation(cit, e.clientX, e.clientY);
                           }}
-                          className="text-xs opacity-60 hover:opacity-100 transition-opacity mt-1 flex items-center gap-1"
-                          style={{ color: 'var(--notebook-accent)' }}
+                          className="mt-1 flex items-center gap-1 rounded text-xs text-[var(--notebook-accent)] opacity-80 transition-opacity hover:opacity-100 hover:underline"
                         >
-                          Voir le détail <ExternalLink className="w-3 h-3" />
+                          Voir le détail <ExternalLink className="h-3 w-3" />
                         </button>
                       </div>
                     ))}

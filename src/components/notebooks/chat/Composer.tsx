@@ -5,10 +5,12 @@
  */
 
 import { motion, AnimatePresence } from 'motion/react';
+import { clsx } from 'clsx';
 import {
   X, Filter, Telescope, Zap, GitCompare, Lightbulb, Send, Loader2, Download, Trash2,
 } from 'lucide-react';
 import { SPRING_UI } from '../motion.js';
+import { NbButton, NbIconButton } from '../ui/primitives.js';
 import type { Personality } from './constants.js';
 import type { ChatMessage } from './types.js';
 
@@ -57,11 +59,10 @@ export function Composer(props: Props) {
     prefersReducedMotion, onInputChange, onKeyDown, onSubmit, onSend, onDeepDive, onInsights, onCompare, onExport, onClear,
   } = props;
 
+  const canSend = !!input.trim() && !loading;
+
   return (
-    <div
-      className="flex-shrink-0 px-5 pb-5 pt-3 lg:px-8"
-      style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
-    >
+    <div className="flex-shrink-0 px-5 pb-5 pt-3 lg:px-8">
       {/* Source filter bar */}
       {showSourceFilter && sources.length > 0 && (
         <motion.div
@@ -70,40 +71,35 @@ export function Composer(props: Props) {
           exit={{ height: 0, opacity: 0 }}
           className="mb-2 overflow-hidden"
         >
-          <div
-            className="flex items-center gap-2 p-2.5 rounded-xl flex-wrap"
-            style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
-          >
-            <span className="text-smfont-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+          <div className="notebook-card flex flex-wrap items-center gap-2 p-2">
+            <span className="flex-shrink-0 text-xs font-semibold text-[var(--text-dimmed)]">
               Sources actives :
             </span>
-            {sources.map(s => (
-              <button
-                key={s.id}
-                onClick={() => toggleSourceFilter(s.id)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95 ${
-                  selectedSources.includes(s.id) || selectedSources.length === 0
-                    ? 'ring-1 ring-[var(--notebook-accent)]'
-                    : 'opacity-40'
-                }`}
-                style={{
-                  backgroundColor: selectedSources.includes(s.id) ? 'var(--notebook-accent-surface)' : 'var(--notebook-surface)',
-                  color: selectedSources.includes(s.id) ? 'var(--notebook-accent)' : 'var(--text-muted)',
-                  border: '1px solid var(--notebook-border)',
-                }}
-              >
-                {s.title.length > 25 ? s.title.slice(0, 25) + '…' : s.title}
-              </button>
-            ))}
+            {sources.map(s => {
+              const isSelected = selectedSources.includes(s.id);
+              const isActive = isSelected || selectedSources.length === 0;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => toggleSourceFilter(s.id)}
+                  className={clsx(
+                    'rounded-full border border-[var(--notebook-border)] px-3 py-1 text-xs font-medium transition-all active:scale-95',
+                    isSelected
+                      ? 'bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+                      : 'bg-[var(--notebook-surface)] text-[var(--text-muted)]',
+                    isActive ? 'ring-1 ring-[var(--notebook-accent)]' : 'opacity-40',
+                  )}
+                >
+                  {s.title.length > 25 ? s.title.slice(0, 25) + '…' : s.title}
+                </button>
+              );
+            })}
             {selectedSources.length > 0 && (
-              <button
-                onClick={clearSourceFilter}
-                className="px-2 py-1 rounded-full text-xs font-medium transition-all hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <X className="w-3 h-3 inline mr-0.5" />
+              <NbButton variant="ghost" size="sm" icon={X} onClick={clearSourceFilter}>
                 Reset
-              </button>
+              </NbButton>
             )}
           </div>
         </motion.div>
@@ -116,19 +112,19 @@ export function Composer(props: Props) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="mb-2 rounded-xl overflow-hidden"
-            style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            className="mb-2 overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[var(--notebook-shadow-md)]"
           >
             {filteredSlashCommands.map((cmd) => (
               <button
                 key={cmd.cmd}
+                type="button"
                 onClick={() => { setInput(''); onSend(cmd.prompt); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
+                className="flex w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
               >
-                <code className="text-smfont-mono font-semibold" style={{ color: 'var(--notebook-accent)' }}>
+                <code className="font-mono text-sm font-semibold text-[var(--notebook-accent)]">
                   {cmd.cmd}
                 </code>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-xs text-[var(--text-muted)]">
                   {cmd.desc}
                 </span>
               </button>
@@ -139,33 +135,27 @@ export function Composer(props: Props) {
 
       {/* Main input container */}
       <div
-        className="relative mx-auto flex max-w-4xl items-end gap-0 rounded-xl transition-shadow duration-200 focus-within:ring-2"
-        style={{
-          backgroundColor: 'var(--notebook-surface)',
-          border: '1px solid var(--notebook-border)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-          ['--tw-ring-color' as never]: 'var(--notebook-accent)',
-        }}
+        className="relative mx-auto flex max-w-4xl items-end rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] shadow-[var(--notebook-shadow-sm)] transition-[border-color,box-shadow] duration-200 focus-within:border-[var(--notebook-accent)] focus-within:ring-2 focus-within:ring-[var(--notebook-glow)]"
       >
         {/* Left actions — filter */}
-        <div className="flex items-center gap-0.5 pl-2 py-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center py-3 pl-2">
           {sources.length > 1 && (
-            <button
-              onClick={() => setShowSourceFilter(!showSourceFilter)}
-              className={`p-2 rounded-lg transition-all active:scale-90 ${showSourceFilter || selectedSources.length > 0 ? '' : 'opacity-50 hover:opacity-100'}`}
-              style={{ color: selectedSources.length > 0 ? 'var(--notebook-accent)' : 'var(--text-dimmed)' }}
-              title="Filtrer les sources"
-            >
-              <Filter className="w-4 h-4" />
+            <span className="relative inline-flex">
+              <NbIconButton
+                icon={Filter}
+                label="Filtrer les sources"
+                active={showSourceFilter || selectedSources.length > 0}
+                onClick={() => setShowSourceFilter(!showSourceFilter)}
+              />
               {selectedSources.length > 0 && (
                 <span
-                  className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-smfont-bold flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
+                  className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--notebook-accent)] px-1 text-xs font-bold leading-none text-[var(--notebook-accent-text)]"
+                  aria-hidden
                 >
                   {selectedSources.length}
                 </span>
               )}
-            </button>
+            </span>
           )}
         </div>
 
@@ -177,66 +167,45 @@ export function Composer(props: Props) {
           onKeyDown={onKeyDown}
           placeholder={'Posez une question sur vos sources... (/ pour les commandes)'}
           rows={1}
-          className="flex-1 bg-transparent px-4 py-4 text-sm leading-6 outline-none resize-none placeholder:text-[var(--text-dimmed)]"
-          style={{
-            color: 'var(--text-primary)',
-            minHeight: '58px',
-            maxHeight: '120px',
-          }}
+          className="max-h-[120px] min-h-[56px] flex-1 resize-none bg-transparent px-4 py-4 text-sm leading-6 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
         />
 
         {/* Right action buttons */}
-        <div className="relative flex items-center gap-1 px-2 py-2 flex-shrink-0 context-menu-container">
-          <motion.button
+        <div className="context-menu-container relative flex flex-shrink-0 items-center gap-1 px-2 py-3">
+          <NbIconButton
+            icon={Telescope}
+            label="Deep Dive — exploration approfondie"
             onClick={onDeepDive}
             disabled={!input.trim() || loading}
-            whileTap={input.trim() && !loading ? { scale: 0.88 } : undefined}
-            transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--notebook-accent-surface)] transition-colors duration-150"
-            style={{ color: 'var(--notebook-accent)' }}
-            title="Deep Dive — exploration approfondie"
-          >
-            <Telescope className="w-4 h-4" />
-          </motion.button>
+            className="!text-[var(--notebook-accent)]"
+          />
 
-          <motion.button
+          <NbIconButton
+            icon={Zap}
+            label="Extraire les insights clés"
             onClick={onInsights}
             disabled={loading}
-            whileTap={!loading ? { scale: 0.88 } : undefined}
-            transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] transition-colors duration-150"
-            style={{ color: 'var(--color-warning)' }}
-            title="Extraire les insights clés"
-          >
-            <Zap className="w-4 h-4" />
-          </motion.button>
+            className="!text-[var(--color-warning)]"
+          />
 
           {sources.length >= 2 && (
-            <motion.button
+            <NbIconButton
+              icon={GitCompare}
+              label="Comparer les sources"
               onClick={onCompare}
               disabled={loading}
-              whileTap={!loading ? { scale: 0.88 } : undefined}
-              transition={{ duration: 0.1 }}
-              className="p-2 rounded-lg disabled:opacity-25 hover:bg-[color-mix(in_srgb,var(--color-accent-alt)_10%,transparent)] transition-colors duration-150"
-              style={{ color: 'var(--color-accent-alt)' }}
-              title="Comparer les sources"
-            >
-              <GitCompare className="w-4 h-4" />
-            </motion.button>
+              className="!text-[var(--color-accent-alt)]"
+            />
           )}
 
           {/* Context Menu Button */}
-          <motion.button
+          <NbIconButton
+            icon={Lightbulb}
+            label="Demandes avec contexte complet"
             onClick={() => setShowContextMenu(!showContextMenu)}
             disabled={loading}
-            whileTap={!loading ? { scale: 0.88 } : undefined}
-            transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--notebook-accent-surface)] transition-colors duration-150"
-            style={{ color: 'var(--notebook-accent)' }}
-            title="Demandes avec contexte complet"
-          >
-            <Lightbulb className="w-4 h-4" />
-          </motion.button>
+            className="!text-[var(--notebook-accent)]"
+          />
 
           {/* Context Menu Dropdown */}
           <AnimatePresence>
@@ -245,22 +214,22 @@ export function Composer(props: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-full right-0 mb-1 z-50 w-60 rounded-xl overflow-hidden shadow-xl"
-                style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
+                className="absolute bottom-full right-0 z-50 mb-1 w-60 overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[var(--notebook-shadow-lg)]"
               >
-                <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                <div className="border-b border-[var(--notebook-border)] px-3 py-2">
+                  <p className="text-xs font-semibold text-[var(--text-dimmed)]">
                     Demandes avec contexte complet
                   </p>
                 </div>
                 {contextSuggestions.map((s) => (
                   <button
                     key={s.label}
+                    type="button"
                     onClick={() => { setInput(''); onSend(s.prompt); setShowContextMenu(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
                   >
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
-                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
+                    <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />
+                    <span className="text-sm text-[var(--text-primary)]">{s.label}</span>
                   </button>
                 ))}
               </motion.div>
@@ -268,46 +237,45 @@ export function Composer(props: Props) {
           </AnimatePresence>
 
           {/* Separator */}
-          <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--notebook-border)' }} />
+          <div className="mx-1 h-5 w-px bg-[var(--notebook-border)]" />
 
           {/* Send button */}
-          <motion.button
+          <NbIconButton
+            icon={loading ? Loader2 : Send}
+            label="Envoyer"
             onClick={onSubmit}
-            disabled={!input.trim() || loading}
-            whileTap={input.trim() && !loading ? { scale: 0.88 } : undefined}
-            transition={{ duration: 0.1 }}
-            className="p-2.5 rounded-full disabled:opacity-30 transition-colors duration-150"
-            style={{
-              backgroundColor: input.trim() && !loading ? 'var(--notebook-accent)' : 'var(--notebook-surface-muted)',
-              color: input.trim() && !loading ? 'var(--text-primary)' : 'var(--text-dimmed)',
-            }}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </motion.button>
+            disabled={!canSend}
+            aria-busy={loading || undefined}
+            className={clsx(
+              loading && '[&>svg]:animate-spin',
+              canSend && '!bg-[var(--notebook-accent)] !text-[var(--notebook-accent-text)] hover:!opacity-90',
+            )}
+          />
         </div>
       </div>
 
       {/* Bottom bar — hints + personality + secondary actions */}
-      <div className="flex items-center justify-between mt-2 px-1">
+      <div className="mt-2 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          <p className="text-xs text-[var(--text-dimmed)]">
             Entrée pour envoyer • / commandes
             {queuedCount > 0 && (
-              <span style={{ color: 'var(--notebook-accent)' }}>
+              <span className="text-[var(--notebook-accent)]">
                 {' '}• {queuedCount} en attente
               </span>
             )}
             {selectedSources.length > 0 && (
-              <span style={{ color: 'var(--notebook-accent)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
+              <span className="text-[var(--notebook-accent)]"> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
             )}
           </p>
 
           {/* Personality selector */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setShowPersonalityMenu(!showPersonalityMenu)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-accent-surface)]"
-              style={{ color: 'var(--text-muted)', border: '1px solid var(--notebook-border)' }}
+              aria-expanded={showPersonalityMenu}
+              className="notebook-chip !px-2 !py-0.5 !text-xs"
             >
               {(() => { const PIcon = currentPersonality.icon; return <span className="inline-flex items-center"><PIcon size={13} /></span>; })()}
               <span>{currentPersonality.label}</span>
@@ -320,30 +288,36 @@ export function Composer(props: Props) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4, scale: 0.95 }}
                   transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
-                  className="absolute bottom-full left-0 mb-1 z-40 w-56 rounded-xl overflow-hidden shadow-xl"
-                  style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)', transformOrigin: 'bottom left' }}
+                  className="absolute bottom-full left-0 z-40 mb-1 w-56 origin-bottom-left overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[var(--notebook-shadow-lg)]"
                 >
-                  <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
-                    <p className="text-smfont-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
+                  <div className="border-b border-[var(--notebook-border)] px-3 py-2">
+                    <p className="text-xs font-semibold text-[var(--text-dimmed)]">Ton de l'assistant</p>
                   </div>
-                  {personalities.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => { setPersonality(p.id); setShowPersonalityMenu(false); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)] ${personality === p.id ? 'bg-[var(--notebook-accent-surface)]' : ''}`}
-                    >
-                      {(() => { const PIcon = p.icon; return <span className="inline-flex items-center"><PIcon size={14} style={{ color: 'var(--text-muted)' }} /></span>; })()}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium" style={{ color: personality === p.id ? 'var(--notebook-accent)' : 'var(--text-primary)' }}>
-                          {p.label}
-                        </p>
-                        <p className="text-smtruncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
-                      </div>
-                      {personality === p.id && (
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--notebook-accent)' }} />
-                      )}
-                    </button>
-                  ))}
+                  {personalities.map((p) => {
+                    const isCurrent = personality === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { setPersonality(p.id); setShowPersonalityMenu(false); }}
+                        className={clsx(
+                          'flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]',
+                          isCurrent && 'bg-[var(--notebook-accent-surface)]',
+                        )}
+                      >
+                        {(() => { const PIcon = p.icon; return <span className="inline-flex items-center text-[var(--text-muted)]"><PIcon size={14} /></span>; })()}
+                        <div className="min-w-0 flex-1">
+                          <p className={clsx('text-xs font-medium', isCurrent ? 'text-[var(--notebook-accent)]' : 'text-[var(--text-primary)]')}>
+                            {p.label}
+                          </p>
+                          <p className="truncate text-xs text-[var(--text-dimmed)]">{p.desc}</p>
+                        </div>
+                        {isCurrent && (
+                          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--notebook-accent)]" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -353,22 +327,19 @@ export function Composer(props: Props) {
         <div className="flex items-center gap-1">
           {messages.length > 0 && (
             <>
-              <button
+              <NbIconButton
+                icon={Download}
+                label="Exporter en Markdown"
+                size="sm"
                 onClick={onExport}
-                className="p-1.5 rounded-lg transition-all hover:bg-[var(--notebook-accent-surface)] active:scale-90"
-                style={{ color: 'var(--text-muted)' }}
-                title="Exporter en Markdown"
-              >
-                <Download className="w-3.5 h-3.5" />
-              </button>
-              <button
+              />
+              <NbIconButton
+                icon={Trash2}
+                label="Effacer l'historique"
+                size="sm"
+                tone="danger"
                 onClick={onClear}
-                className="p-1.5 rounded-lg transition-all hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] active:scale-90"
-                style={{ color: 'var(--text-muted)' }}
-                title="Effacer l'historique"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              />
             </>
           )}
         </div>

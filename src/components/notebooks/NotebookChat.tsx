@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
 import { BookOpen } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
+import { NbEmptyState } from './ui/primitives.js';
 import { api } from './api/client.js';
 import type { ChatMessage, SandboxFolder } from './chat/types.js';
 import { SLASH_COMMANDS, CONTEXT_SUGGESTIONS, PERSONALITIES } from './chat/constants.js';
@@ -205,25 +206,23 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
 
   if (!hasSources) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-5 p-8">
-        <div className="notebook-empty-state-icon">
-          <BookOpen className="w-6 h-6" />
-        </div>
-        <div className="text-center space-y-2">
-          <p className="text-base font-medium" style={{ color: 'var(--text-primary)' }}>
-            Ajoutez des sources pour commencer
-          </p>
-          <p className="text-sm max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Importez des documents dans le panneau Sources, puis posez des questions ici.
-            L'IA répondra en citant les passages pertinents.
-          </p>
-        </div>
+      <div className="flex h-full items-center justify-center p-8">
+        <NbEmptyState
+          icon={BookOpen}
+          title="Ajoutez des sources pour commencer"
+          description={
+            <>
+              Importez des documents dans le panneau Sources, puis posez des questions ici.
+              L'IA répondra en citant les passages pertinents.
+            </>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-transparent">
+    <div className="flex h-full flex-col">
       <ThreadBar
         threads={threads}
         activeThreadId={activeThreadId}

@@ -3,9 +3,9 @@
  * destination dans la sandbox (liste ou chemin personnalisé). Présentationnel.
  */
 
-import { motion, AnimatePresence } from 'motion/react';
-import { FileDown, X, FolderOpen, Folder, Check, Loader2 } from 'lucide-react';
-import { SPRING_UI } from '../motion.js';
+import { clsx } from 'clsx';
+import { FileDown, FolderOpen, Folder, Check } from 'lucide-react';
+import { NbButton, NbInput, NbModal } from '../ui/primitives.js';
 import type { ChatMessage, SandboxFolder } from './types.js';
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   customFolderName: string;
   setCustomFolderName: (v: string) => void;
   savingMd: boolean;
+  /** Conservé pour compatibilité : NbModal gère déjà prefers-reduced-motion. */
   prefersReducedMotion: boolean | null;
   onClose: () => void;
   onSave: () => void;
@@ -23,149 +24,104 @@ interface Props {
 
 export function FolderPickerModal({
   folderPickerMsg, sandboxFolders, selectedFolder, setSelectedFolder,
-  customFolderName, setCustomFolderName, savingMd, prefersReducedMotion, onClose, onSave,
+  customFolderName, setCustomFolderName, savingMd, onClose, onSave,
 }: Props) {
   return (
-    <AnimatePresence>
-      {folderPickerMsg && (
-        <motion.div
-          initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-          animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
-          exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={onClose}
+    <NbModal open={!!folderPickerMsg} onClose={onClose} size="md">
+      <NbModal.Header>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="rounded-lg bg-[var(--notebook-accent-surface)] p-2">
+            <FileDown className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              Enregistrer en Markdown
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Choisir le dossier de destination dans la sandbox
+            </p>
+          </div>
+        </div>
+      </NbModal.Header>
+
+      <NbModal.Body noPadding>
+        {/* Folder list */}
+        <div className="custom-scrollbar max-h-56 overflow-y-auto px-4 py-3">
+          {sandboxFolders.length === 0 ? (
+            <p className="py-4 text-center text-sm text-[var(--text-dimmed)]">
+              Chargement des dossiers…
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {sandboxFolders.map(f => {
+                const isSelected = selectedFolder === f.path && !customFolderName;
+                return (
+                  <button
+                    key={f.path}
+                    type="button"
+                    onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
+                    className={clsx(
+                      'flex w-full items-center gap-2 rounded-lg py-2 pr-3 text-left text-sm text-[var(--text-primary)] transition-colors',
+                      isSelected
+                        ? 'bg-[var(--notebook-accent-surface)] ring-1 ring-[var(--notebook-accent)]'
+                        : 'hover:bg-[var(--notebook-surface-muted)]',
+                    )}
+                    // Indentation selon la profondeur (valeur dynamique)
+                    style={{ paddingLeft: `${12 + f.depth * 16}px` }}
+                  >
+                    {isSelected
+                      ? <FolderOpen className="h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />
+                      : <Folder className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" />
+                    }
+                    <span className="truncate">{f.name || '/ (racine sandbox)'}</span>
+                    {isSelected && (
+                      <Check className="ml-auto h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Custom folder input */}
+        <div className="px-4 pb-3">
+          <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">
+            Ou saisir un chemin personnalisé
+          </p>
+          <NbInput
+            type="text"
+            value={customFolderName}
+            onChange={e => { setCustomFolderName(e.target.value); setSelectedFolder(''); }}
+            placeholder="ex: docs/notes"
+          />
+        </div>
+
+        {/* Destination preview */}
+        {(selectedFolder !== '' || customFolderName.trim()) && (
+          <div className="mx-4 mb-3 rounded-lg bg-[var(--notebook-accent-surface)] px-3 py-2 text-xs text-[var(--notebook-accent)]">
+            <span className="font-medium">Destination : </span>
+            <span className="font-mono">
+              {customFolderName.trim() || selectedFolder || '/'}/
+            </span>
+          </div>
+        )}
+      </NbModal.Body>
+
+      <NbModal.Footer>
+        <NbButton variant="secondary" onClick={onClose}>
+          Annuler
+        </NbButton>
+        <NbButton
+          variant="primary"
+          icon={FileDown}
+          loading={savingMd}
+          onClick={onSave}
+          disabled={selectedFolder === '' && !customFolderName.trim()}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
-            transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
-            className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
-            style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--notebook-border)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--notebook-accent-surface)' }}>
-                  <FileDown className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Enregistrer en Markdown
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Choisir le dossier de destination dans la sandbox
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg opacity-50 hover:opacity-100 transition-opacity"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Folder list */}
-            <div className="px-4 py-3 max-h-56 overflow-y-auto custom-scrollbar">
-              {sandboxFolders.length === 0 ? (
-                <p className="text-smtext-center py-4" style={{ color: 'var(--text-dimmed)' }}>
-                  Chargement des dossiers…
-                </p>
-              ) : (
-                <div className="space-y-0.5">
-                  {sandboxFolders.map(f => (
-                    <button
-                      key={f.path}
-                      onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-sm${
-                        selectedFolder === f.path && !customFolderName
-                          ? 'ring-1 ring-[var(--notebook-accent)]'
-                          : 'hover:bg-[var(--notebook-accent-surface)]'
-                      }`}
-                      style={{
-                        backgroundColor: selectedFolder === f.path && !customFolderName
-                          ? 'var(--notebook-accent-surface)'
-                          : 'transparent',
-                        color: 'var(--text-primary)',
-                        paddingLeft: `${12 + f.depth * 16}px`,
-                      }}
-                    >
-                      {selectedFolder === f.path && !customFolderName
-                        ? <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
-                        : <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
-                      }
-                      <span className="truncate">{f.name || '/ (racine sandbox)'}</span>
-                      {selectedFolder === f.path && !customFolderName && (
-                        <Check className="w-3 h-3 ml-auto flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Custom folder input */}
-            <div className="px-4 pb-3">
-              <p className="text-smmb-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
-                Ou saisir un chemin personnalisé
-              </p>
-              <input
-                type="text"
-                value={customFolderName}
-                onChange={e => { setCustomFolderName(e.target.value); setSelectedFolder(''); }}
-                placeholder="ex: docs/notes"
-                className="w-full px-3 py-2 rounded-full text-smoutline-none transition-all"
-                style={{
-                  backgroundColor: 'var(--notebook-canvas)',
-                  border: '1px solid var(--notebook-border)',
-                  color: 'var(--text-primary)',
-                }}
-                onFocus={e => (e.target.style.borderColor = 'var(--notebook-accent)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--notebook-border)')}
-              />
-            </div>
-
-            {/* Destination preview */}
-            {(selectedFolder !== '' || customFolderName.trim()) && (
-              <div className="mx-4 mb-3 px-3 py-2 rounded-full text-xs" style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}>
-                <span className="font-medium">Destination : </span>
-                <span className="font-mono">
-                  {customFolderName.trim() || selectedFolder || '/'}/
-                </span>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2 px-4 pb-4">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-full text-smfont-medium transition-all hover:opacity-80"
-                style={{ color: 'var(--text-muted)', backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={onSave}
-                disabled={savingMd || (selectedFolder === '' && !customFolderName.trim())}
-                className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
-                style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
-              >
-                {savingMd ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <FileDown className="w-3.5 h-3.5" />
-                )}
-                {savingMd ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {savingMd ? 'Enregistrement…' : 'Enregistrer'}
+        </NbButton>
+      </NbModal.Footer>
+    </NbModal>
   );
 }

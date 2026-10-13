@@ -1,7 +1,6 @@
 /**
- * Rendu markdown des messages de chat. Extrait verbatim de NotebookChat.
- * (Les classes Tailwind éventuellement « collées » sont conservées telles
- *  quelles pour ne pas altérer le rendu existant.)
+ * Rendu markdown des messages de chat. Extrait de NotebookChat ; styles
+ * alignés sur les tokens notebooks.
  */
 
 import { type JSX } from 'react';
@@ -26,23 +25,17 @@ export function renderMessageContent(content: string): JSX.Element {
           }
 
           return (
-            <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--notebook-border)' }}>
+            <div key={i} className="overflow-hidden rounded-xl border border-[var(--notebook-border)]">
               {/* Code block header with language tag */}
               {lang && (
-                <div
-                  className="flex items-center justify-between px-3 py-1.5"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)', borderBottom: '1px solid var(--notebook-border)' }}
-                >
-                  <span className="text-smfont-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                <div className="flex items-center justify-between border-b border-[var(--notebook-border)] bg-[var(--notebook-surface-muted)] px-3 py-1">
+                  <span className="font-mono text-xs font-medium uppercase tracking-wider text-[var(--text-dimmed)]">
                     {lang}
                   </span>
                 </div>
               )}
-              <pre
-                className="px-4 py-3 text-smoverflow-x-auto font-mono leading-relaxed"
-                style={{ backgroundColor: 'var(--notebook-canvas)', margin: 0 }}
-              >
-                <code style={{ color: 'var(--text-secondary)' }}>{code}</code>
+              <pre className="m-0 overflow-x-auto bg-[var(--notebook-canvas)] px-4 py-3 font-mono text-xs leading-relaxed">
+                <code className="text-[var(--text-secondary)]">{code}</code>
               </pre>
             </div>
           );
@@ -62,14 +55,10 @@ export function renderMessageContent(content: string): JSX.Element {
             blocks.push(
               <blockquote
                 key={`bq-${blockIdx++}`}
-                className="pl-3 py-1.5 my-1 rounded-r-lg"
-                style={{
-                  borderLeft: '3px solid var(--notebook-accent)',
-                  backgroundColor: 'var(--notebook-accent-surface)',
-                }}
+                className="my-1 rounded-r-lg border-l-[3px] border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] py-2 pl-3"
               >
                 {blockquoteLines.map((line, j) => (
-                  <p key={j} className="text-smleading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <p key={j} className="text-sm leading-relaxed text-[var(--text-secondary)]">
                     {renderInlineMarkdown(line)}
                   </p>
                 ))}
@@ -86,12 +75,12 @@ export function renderMessageContent(content: string): JSX.Element {
             const dataRows = tableRows.slice(2).map(row => row.split('|').filter(c => c.trim()));
 
             blocks.push(
-              <div key={`tbl-${blockIdx++}`} className="overflow-x-auto my-2 rounded-lg" style={{ border: '1px solid var(--notebook-border)' }}>
+              <div key={`tbl-${blockIdx++}`} className="my-2 overflow-x-auto rounded-lg border border-[var(--notebook-border)]">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr style={{ backgroundColor: 'var(--notebook-surface-muted)' }}>
+                    <tr className="bg-[var(--notebook-surface-muted)]">
                       {headerRow.map((cell, ci) => (
-                        <th key={ci} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--notebook-border)' }}>
+                        <th key={ci} className="border-b border-[var(--notebook-border)] px-3 py-2 text-left font-semibold text-[var(--text-primary)]">
                           {cell.trim()}
                         </th>
                       ))}
@@ -99,9 +88,9 @@ export function renderMessageContent(content: string): JSX.Element {
                   </thead>
                   <tbody>
                     {dataRows.map((row, ri) => (
-                      <tr key={ri} style={{ borderBottom: ri < dataRows.length - 1 ? '1px solid var(--notebook-border)' : 'none' }}>
+                      <tr key={ri} className="border-b border-[var(--notebook-border)] last:border-b-0">
                         {row.map((cell, ci) => (
-                          <td key={ci} className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>
+                          <td key={ci} className="px-3 py-2 text-[var(--text-secondary)]">
                             {renderInlineMarkdown(cell.trim())}
                           </td>
                         ))}
@@ -151,7 +140,7 @@ export function renderMessageContent(content: string): JSX.Element {
           // Horizontal rule
           if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
             blocks.push(
-              <hr key={`hr-${blockIdx++}`} className="my-3 border-none" style={{ height: '1px', backgroundColor: 'var(--notebook-border)' }} />
+              <hr key={`hr-${blockIdx++}`} className="my-3 h-px border-none bg-[var(--notebook-border)]" />
             );
             continue;
           }
@@ -159,7 +148,7 @@ export function renderMessageContent(content: string): JSX.Element {
           // Headers
           if (line.startsWith('#### ')) {
             blocks.push(
-              <h4 key={`h4-${blockIdx++}`} className="text-smfont-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h4 key={`h4-${blockIdx++}`} className="mb-1 mt-3 text-sm font-semibold text-[var(--text-primary)]">
                 {renderInlineMarkdown(line.slice(5))}
               </h4>
             );
@@ -167,7 +156,7 @@ export function renderMessageContent(content: string): JSX.Element {
           }
           if (line.startsWith('### ')) {
             blocks.push(
-              <h3 key={`h3-${blockIdx++}`} className="text-smfont-bold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h3 key={`h3-${blockIdx++}`} className="mb-1 mt-3 text-sm font-bold text-[var(--text-primary)]">
                 {renderInlineMarkdown(line.slice(4))}
               </h3>
             );
@@ -175,7 +164,7 @@ export function renderMessageContent(content: string): JSX.Element {
           }
           if (line.startsWith('## ')) {
             blocks.push(
-              <h2 key={`h2-${blockIdx++}`} className="text-sm font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+              <h2 key={`h2-${blockIdx++}`} className="mb-2 mt-4 text-base font-bold text-[var(--text-primary)]">
                 {renderInlineMarkdown(line.slice(3))}
               </h2>
             );
@@ -183,7 +172,7 @@ export function renderMessageContent(content: string): JSX.Element {
           }
           if (line.startsWith('# ')) {
             blocks.push(
-              <h1 key={`h1-${blockIdx++}`} className="text-sm font-bold mt-4 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+              <h1 key={`h1-${blockIdx++}`} className="mb-2 mt-4 text-base font-bold text-[var(--text-primary)]">
                 {renderInlineMarkdown(line.slice(2))}
               </h1>
             );
@@ -193,12 +182,9 @@ export function renderMessageContent(content: string): JSX.Element {
           // Unordered lists
           if (line.match(/^[-*]\s/)) {
             blocks.push(
-              <div key={`ul-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
-                <span
-                  className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: 'var(--notebook-accent)', opacity: 0.7 }}
-                />
-                <span className="text-smleading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+              <div key={`ul-${blockIdx++}`} className="my-0.5 flex gap-2 pl-2">
+                <span className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--notebook-accent)] opacity-70" />
+                <span className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
                   {renderInlineMarkdown(line.slice(2))}
                 </span>
               </div>
@@ -210,14 +196,11 @@ export function renderMessageContent(content: string): JSX.Element {
           if (line.match(/^\d+\.\s/)) {
             const num = line.match(/^(\d+)\./)?.[1];
             blocks.push(
-              <div key={`ol-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
-                <span
-                  className="text-smfont-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
-                  style={{ color: 'var(--notebook-accent)' }}
-                >
+              <div key={`ol-${blockIdx++}`} className="my-0.5 flex gap-2 pl-2">
+                <span className="min-w-4 flex-shrink-0 text-center text-sm font-bold leading-relaxed text-[var(--notebook-accent)]">
                   {num}
                 </span>
-                <span className="text-smleading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
+                <span className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
                   {renderInlineMarkdown(line.replace(/^\d+\.\s/, ''))}
                 </span>
               </div>
@@ -227,7 +210,7 @@ export function renderMessageContent(content: string): JSX.Element {
 
           // Regular paragraph
           blocks.push(
-            <p key={`p-${blockIdx++}`} className="text-smleading-[1.7]" style={{ color: 'var(--text-secondary)' }}>
+            <p key={`p-${blockIdx++}`} className="text-sm leading-[1.7] text-[var(--text-secondary)]">
               {renderInlineMarkdown(line)}
             </p>
           );
@@ -261,14 +244,14 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
     if (match[1]) {
       // **bold**
       tokens.push(
-        <strong key={`b-${keyIdx++}`} className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <strong key={`b-${keyIdx++}`} className="font-semibold text-[var(--text-primary)]">
           {match[2]}
         </strong>
       );
     } else if (match[3]) {
       // *italic*
       tokens.push(
-        <em key={`i-${keyIdx++}`} className="italic" style={{ color: 'var(--text-secondary)' }}>
+        <em key={`i-${keyIdx++}`} className="italic text-[var(--text-secondary)]">
           {match[4]}
         </em>
       );
@@ -277,8 +260,7 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
       tokens.push(
         <code
           key={`c-${keyIdx++}`}
-          className="px-1.5 py-0.5 rounded text-smfont-mono"
-          style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--notebook-border)' }}
+          className="rounded border border-[var(--notebook-border)] bg-[var(--notebook-surface-muted)] px-1.5 py-0.5 font-mono text-[0.85em]"
         >
           {match[6]}
         </code>
@@ -291,8 +273,7 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
           href={match[9]}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-          style={{ color: 'var(--notebook-accent)' }}
+          className="text-[var(--notebook-accent)] underline underline-offset-2 transition-opacity hover:opacity-80"
         >
           {match[8]}
         </a>
