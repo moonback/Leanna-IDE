@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getWorkflowsSnapshot } from '../skills/workflow.js';
+import { asyncRoute } from '../utils/asyncRoute.js';
 
 const router = Router();
 
@@ -9,10 +10,10 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 // GET /api/workflows/active-runs
-router.get('/active-runs', async (_req: Request, res: Response) => {
+router.get('/active-runs', asyncRoute(async (_req: Request, res: Response) => {
   const { getActiveRuns } = await import('../skills/workflow.js');
   res.json({ status: 'success', runs: getActiveRuns() });
-});
+}));
 
 // POST /api/workflows
 router.post('/', async (req: Request, res: Response) => {

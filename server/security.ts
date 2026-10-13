@@ -193,9 +193,13 @@ export function ensureApiToken(): string {
   // Generate a new secure token
   const newToken = generateSecureToken();
   
-  // Determine which .env file to update
-  const envPath = path.join(SELF_ROOT, '.env');
-  const envLocalPath = path.join(SELF_ROOT, '.env.local');
+  // Même dossier que celui relu au démarrage par server-bootstrap.ts (et que
+  // la master key dans crypto.ts). SELF_ROOT est le projet de l'utilisateur
+  // (vide au démarrage) : y écrire plaçait le jeton hors du .env relu, voire
+  // dans le .env du projet ouvert.
+  const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
+  const envPath = path.join(configRoot, '.env');
+  const envLocalPath = path.join(configRoot, '.env.local');
   
   let targetPath = envPath;
   if (!fs.existsSync(envPath) && fs.existsSync(envLocalPath)) {

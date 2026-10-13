@@ -5,8 +5,8 @@
  *  - Les valeurs des clés « sensibles » (tokens, clés API, secrets) sont
  *    masquées en lecture : le client ne reçoit jamais le secret en clair,
  *    seulement un indicateur `hasValue` + un aperçu tronqué.
- *  - En écriture, les clés sensibles sont chiffrées sur disque via `encrypt()`,
- *    exactement comme le fait `updateEnvFile()` dans server.ts.
+ *  - En écriture, les clés déchiffrées au démarrage (ENCRYPTED_AT_REST_ENV_KEYS)
+ *    sont chiffrées sur disque via `encrypt()`.
  *  - Une liste blanche de clés (dérivée de .env.example) borne ce qui peut être
  *    lu/écrit depuis l'UI, afin d'éviter l'injection de clés arbitraires.
  */
@@ -15,6 +15,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { encrypt, decrypt } from '../utils/crypto.js';
+import { isEncryptedAtRestEnvKey } from '../config/encryptedEnvKeys.js';
 
 // ── Clés sensibles : jamais renvoyées en clair, chiffrées sur disque ──────────
 const SENSITIVE_ENV_KEYS = new Set<string>([
@@ -227,7 +228,11 @@ function parseEnvFile(): EnvSection[] {
  */
 function writeEnvKey(key: string, value: string): void {
   const envPath = getEnvPath();
-  const fileValue = SENSITIVE_ENV_KEYS.has(key) ? (value ? encrypt(value) : '') : value;
+  // Seules les clés déchiffrées au démarrage sont chiffrées au repos. Les autres
+  // secrets (Leanna_MASTER_KEY, VITE_*) restent masqués en lecture mais sont
+  // écrits en clair : chiffrés, ils seraient relus tels quels (voir
+  // encryptedEnvKeys.ts).
+  const fileValue = isEncryptedAtRestEnvKey(key) && value ? encrypt(value) : value;
 
   let content = '';
   try {

@@ -1,6 +1,7 @@
 import path from "path";
 import dotenv from "dotenv";
 import { decrypt } from "./server/utils/crypto.js";
+import { ENCRYPTED_AT_REST_ENV_KEYS } from "./server/config/encryptedEnvKeys.js";
 import { validateEnvironment } from "./server/config/environment.js";
 import { loadEnv } from "./server/config/env.js";
 
@@ -8,17 +9,7 @@ const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PA
 dotenv.config({ path: path.join(configRoot, ".env") });
 dotenv.config({ path: path.join(configRoot, ".env.local"), override: true });
 
-for (const key of [
-  "Leanna_API_TOKEN",
-  "GEMINI_API_KEY",
-  "OPENROUTER_API_KEY",
-  "OPENROUTER_FREE_API_KEY",
-  "GITHUB_TOKEN",
-  "TELEGRAM_BOT_TOKEN",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_ANON_KEY",
-]) {
+for (const key of ENCRYPTED_AT_REST_ENV_KEYS) {
   // decrypt() renvoie la valeur telle quelle si elle n'est pas chiffrée (pas de
   // préfixe "gcm:"), donc l'ajout de clés en clair ou vides reste sans effet.
   if (process.env[key]) process.env[key] = decrypt(process.env[key]!);
