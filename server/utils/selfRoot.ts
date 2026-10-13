@@ -58,18 +58,26 @@ export { Leanna_APP_ROOT };
 // ── Persistance du projet sélectionné et Registre Multi-Workspace ────────────
 
 /**
+ * Dossier d'état interne de l'app (dernier projet, registre des workspaces).
+ * Surchargeable via LEANNA_STATE_DIR (tests) pour ne pas toucher l'état réel.
+ */
+function getAppStateDir(): string {
+  return process.env.LEANNA_STATE_DIR?.trim() || path.join(Leanna_APP_ROOT, ".Leanna");
+}
+
+/**
  * Fichier de config interne (dans le dossier Leanna) qui mémorise
  * le dernier projet sélectionné par l'utilisateur.
  */
 function getPersistedProjectPath(): string {
-  return path.join(Leanna_APP_ROOT, ".Leanna", "lastProject.json");
+  return path.join(getAppStateDir(), "lastProject.json");
 }
 
 /**
  * Fichier de config interne qui mémorise la liste de tous les workspaces connus.
  */
 function getPersistedWorkspacesPath(): string {
-  return path.join(Leanna_APP_ROOT, ".Leanna", "workspaces.json");
+  return path.join(getAppStateDir(), "workspaces.json");
 }
 
 export interface WorkspaceEntry {

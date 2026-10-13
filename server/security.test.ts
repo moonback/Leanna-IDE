@@ -137,3 +137,51 @@ test('SELF_ROOT can be changed via setSelfRoot', async () => {
   // setSelfRoot with nonexistent path should throw
   assert.throws(() => setSelfRoot('/nonexistent/path/that/does/not/exist'), /n'existe pas/);
 });
+
+test('ensureApiToken writes the generated token to the config root .env, not the project', async () => {
+  const fs = await import('fs');
+  const os = await import('os');
+  const { ensureApiToken } = await import('./security.js');
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-token-'));
+  const prevConfig = process.env.Leanna_CONFIG_PATH;
+  const prevToken = process.env.Leanna_API_TOKEN;
+  const projectEnv = path.join(SELF_ROOT, '.env');
+  const projectEnvBefore = fs.existsSync(projectEnv) ? fs.readFileSync(projectEnv, 'utf-8') : null;
+  process.env.Leanna_CONFIG_PATH = configDir;
+  delete process.env.Leanna_API_TOKEN;
+  try {
+    const token = ensureApiToken();
+    const written = fs.readFileSync(path.join(configDir, '.env'), 'utf-8');
+    assert.ok(written.includes(`Leanna_API_TOKEN="${token}"`));
+    const projectEnvAfter = fs.existsSync(projectEnv) ? fs.readFileSync(projectEnv, 'utf-8') : null;
+    assert.equal(projectEnvAfter, projectEnvBefore, 'le .env du projet ne doit pas être modifié');
+  } finally {
+    if (prevConfig === undefined) delete process.env.Leanna_CONFIG_PATH;
+    else process.env.Leanna_CONFIG_PATH = prevConfig;
+    if (prevToken === undefined) delete process.env.Leanna_API_TOKEN;
+    else process.env.Leanna_API_TOKEN = prevToken;
+    fs.rmSync(configDir, { recursive: true, force: true });
+  }
+});
+
+test('setSelfRoot persists the last project under LEANNA_STATE_DIR when set', async () => {
+  const fs = await import('fs');
+  const os = await import('os');
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-state-'));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-proj-'));
+  const prevState = process.env.LEANNA_STATE_DIR;
+  const previousRoot = SELF_ROOT;
+  process.env.LEANNA_STATE_DIR = stateDir;
+  try {
+    setSelfRoot(project);
+    const last = JSON.parse(fs.readFileSync(path.join(stateDir, 'lastProject.json'), 'utf-8'));
+    assert.equal(last.projectRoot, path.resolve(project));
+    assert.ok(fs.existsSync(path.join(stateDir, 'workspaces.json')));
+  } finally {
+    setSelfRoot(previousRoot);
+    if (prevState === undefined) delete process.env.LEANNA_STATE_DIR;
+    else process.env.LEANNA_STATE_DIR = prevState;
+    fs.rmSync(stateDir, { recursive: true, force: true });
+    fs.rmSync(project, { recursive: true, force: true });
+  }
+});
