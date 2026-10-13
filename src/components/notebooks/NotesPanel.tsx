@@ -16,6 +16,7 @@ import { apiVoid } from './api/client.js';
 import { NotesCanvas } from './NotesCanvas.js';
 import { TemplateSelectorModal } from '../templates/TemplateSelectorModal.js';
 import { Sparkles } from 'lucide-react';
+import { NbButton, NbEmptyState, NbIconButton, NbInput, NbModal, NbTextarea } from './ui/primitives.js';
 
 interface NoteItem {
   id: string;
@@ -253,14 +254,15 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
     return (
       <div className="h-full overflow-y-auto custom-scrollbar px-4 pb-4">
         {compactNotes.length === 0 ? (
-          <div className="rounded-xl bg-[var(--notebook-surface)] p-5 text-sm text-[var(--text-muted)]">
-Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtront ici.          </div>
+          <div className="rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-4 text-sm text-[var(--text-muted)]">
+            Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtront ici.
+          </div>
         ) : (
           <div className="space-y-3">
             {compactNotes.map(note => (
               <article key={note.id} className="notebook-note-card">
                 <div className="flex items-start gap-2">
-                  {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />}
+                  {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />}
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
                     <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">{note.title}</h3>
                     <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{note.content}</p>
@@ -276,11 +278,14 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
   }
 
   return (
-    <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-5 lg:p-7 space-y-5`}>
+    <div className={`h-full ${viewMode === 'canvas' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto custom-scrollbar'} p-4 lg:p-6 space-y-4`}>
       {/* Header with stats */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
+          <NbButton
+            variant="primary"
+            size="sm"
+            icon={Plus}
             onClick={() => {
               if (onOpenNoteEditor) {
                 onOpenNoteEditor({ title: '', content: '' });
@@ -288,57 +293,54 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 setShowForm(true); setEditingId(null); setTitle(''); setContent('');
               }
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
-            style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
             title="Nouvelle note"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+            aria-label="Nouvelle note"
+          />
 
-          <button
+          <NbIconButton
+            icon={Search}
+            size="sm"
+            label="Rechercher"
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-            style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
-            title="Rechercher"
-          >
-            <Search className="w-3.5 h-3.5" />
-          </button>
+          />
 
           {/* Templates dropdown */}
           <div className="relative">
-            <button
+            <NbIconButton
+              icon={Layout}
+              size="sm"
+              label="Modèles"
+              aria-expanded={showTemplates}
+              aria-haspopup="menu"
+              data-active={showTemplates ? 'true' : undefined}
               onClick={() => setShowTemplates(!showTemplates)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
-              title="Modèles"
-            >
-              <Layout className="w-3.5 h-3.5" />
-            </button>
+            />
             <AnimatePresence>
               {showTemplates && (
                 <motion.div
                   initial={{ opacity: 0, y: 4, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                  className="absolute top-full left-0 mt-1 z-30 w-48 rounded-xl overflow-hidden shadow-xl"
-                  style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
+                  className="absolute top-full left-0 mt-1 z-30 w-48 overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] py-1 shadow-xl"
                 >
                   {templates.map((tpl) => (
                     <button
                       key={tpl.id}
+                      type="button"
                       onClick={() => applyTemplate(tpl)}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--notebook-accent-surface)]"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--notebook-accent-surface)]"
                     >
-                      <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
-                      <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
+                      <tpl.icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: tpl.color }} aria-hidden />
+                      <span>{tpl.label}</span>
                     </button>
                   ))}
-                  <div className="border-t border-[var(--notebook-border)] my-1" />
+                  <div className="my-1 border-t border-[var(--notebook-border)]" />
                   <button
+                    type="button"
                     onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--notebook-accent)] transition-colors hover:bg-[var(--notebook-accent-surface)]"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-[var(--notebook-accent)] transition-colors hover:bg-[var(--notebook-accent-surface)]"
                   >
-                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
+                    <Sparkles className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                     <span>Bibliothèque complète...</span>
                   </button>
                 </motion.div>
@@ -346,148 +348,111 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             </AnimatePresence>
           </div>
 
-          <button
+          <NbButton
+            variant="secondary"
+            size="sm"
+            icon={ArrowUpDown}
             onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)]"
-            style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
             title="Tri"
           >
-            <ArrowUpDown className="w-3 h-3" />
             {sortOrder === 'newest' ? 'Récentes' : sortOrder === 'oldest' ? 'Anciennes' : 'A → Z'}
-          </button>
+          </NbButton>
 
           {notes.length > 0 && (
-            <button
+            <NbIconButton
+              icon={Download}
+              size="sm"
+              label="Exporter"
               onClick={handleExportAll}
-              className="p-1.5 rounded-full border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
-              title="Exporter"
-            >
-              <Download className="w-3 h-3" />
-            </button>
+            />
           )}
 
-          <div className="flex items-center rounded-lg overflow-hidden border ml-auto" style={{ borderColor: 'var(--notebook-border)' }}>
-            <button
+          <div className="notebook-segmented ml-auto flex items-center">
+            <NbIconButton
+              icon={List}
+              size="sm"
+              label="Liste"
+              active={viewMode === 'list'}
               onClick={() => setViewMode('list')}
-              className="p-1.5 transition-colors"
-              style={{
-                backgroundColor: viewMode === 'list' ? 'var(--notebook-accent-surface)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--notebook-accent)' : 'var(--text-dimmed)',
-              }}
-              title="Liste"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
+            />
+            <NbIconButton
+              icon={Grid3X3}
+              size="sm"
+              label="Canvas"
+              active={viewMode === 'canvas'}
               onClick={() => setViewMode('canvas')}
-              className="p-1.5 transition-colors"
-              style={{
-                backgroundColor: viewMode === 'canvas' ? 'var(--notebook-accent-surface)' : 'transparent',
-                color: viewMode === 'canvas' ? 'var(--notebook-accent)' : 'var(--text-dimmed)',
-              }}
-              title="Canvas"
-            >
-              <Grid3X3 className="w-3.5 h-3.5" />
-            </button>
+            />
           </div>
 
-          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          <span className="text-xs text-[var(--text-dimmed)]">
             {notes.length} note{notes.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
       {/* Search Modal */}
-      <AnimatePresence>
-        {showSearchModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowSearchModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              className="w-full max-w-md mx-4 rounded-2xl overflow-hidden"
-              style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <Search className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Rechercher dans les notes..."
-                    className="flex-1 text-sm outline-none"
-                    style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => setShowSearchModal(false)}
-                    className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
-                  >
-                    <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                  </button>
-                </div>
-              </div>
+      <NbModal open={showSearchModal} onClose={() => setShowSearchModal(false)} size="md">
+        <NbModal.Header>
+          <Search className="h-4 w-4 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
+          <NbInput
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Rechercher dans les notes..."
+            className="flex-1 text-sm"
+            autoFocus
+          />
+        </NbModal.Header>
 
-              {/* Search Results */}
-              <div className="max-h-96 overflow-y-auto custom-scrollbar px-5 pb-5">
-                {sorted.length === 0 ? (
-                  <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Aucune note trouvée
+        {/* Search Results */}
+        <NbModal.Body className="max-h-96">
+          {sorted.length === 0 ? (
+            <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+              Aucune note trouvée
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sorted.map((note) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={() => {
+                    setShowSearchModal(false);
+                    startEdit(note);
+                  }}
+                  className="notebook-card w-full p-3 text-left"
+                  data-interactive="true"
+                >
+                  <div className="flex items-center gap-2">
+                    {note.pinned && <Pin className="h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
+                        {note.title}
+                      </p>
+                      {note.content && (
+                        <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
+                          {note.content}
+                        </p>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-dimmed)]">
+                          <Clock className="h-3 w-3" aria-hidden />
+                          {timeAgo(note.updatedAt)}
+                        </span>
+                        {note.content && (
+                          <span className="text-xs text-[var(--text-dimmed)]">
+                            {note.content.length} car.
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {sorted.map((note) => (
-                      <button
-                        key={note.id}
-                        onClick={() => {
-                          setShowSearchModal(false);
-                          startEdit(note);
-                        }}
-                        className="w-full text-left p-3 rounded-xl hover:bg-[var(--notebook-surface-muted)] transition-colors border"
-                        style={{ borderColor: 'var(--notebook-border)' }}
-                      >
-                        <div className="flex items-center gap-2">
-                          {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                              {note.title}
-                            </p>
-                            {note.content && (
-                              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                                {note.content}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                                <Clock className="w-2.5 h-2.5" />
-                                {timeAgo(note.updatedAt)}
-                              </span>
-                              {note.content && (
-                                <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                                  {note.content.length} car.
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </button>
+              ))}
+            </div>
+          )}
+        </NbModal.Body>
+      </NbModal>
 
       {/* Inline fallback form (only when no onOpenNoteEditor prop provided) */}
       {!onOpenNoteEditor && (
@@ -500,61 +465,49 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div
-                className="p-5 rounded-2xl border space-y-3"
-                style={{ backgroundColor: 'var(--notebook-surface)', borderColor: 'var(--notebook-accent)', boxShadow: '0 0 0 1px var(--notebook-accent)' }}
-              >
+              <div className="notebook-card space-y-3 border-[var(--notebook-accent)] bg-[var(--notebook-surface)] p-4 shadow-[0_0_0_1px_var(--notebook-accent)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <StickyNote className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
-                    <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    <StickyNote className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
                       {editingId ? 'Modifier la note' : 'Nouvelle note'}
                     </p>
                   </div>
-                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors">
-                    <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-                  </button>
+                  <NbIconButton icon={X} size="sm" label="Annuler" onClick={cancelForm} />
                 </div>
-                <input
+                <NbInput
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Titre de la note..."
                   autoFocus
-                  className="w-full px-4 py-2.5 rounded-full text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--notebook-accent)]"
-                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                  className="text-sm font-medium"
                 />
                 <div className="relative">
-                  <textarea
+                  <NbTextarea
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     placeholder="Contenu de la note..."
                     rows={6}
-                    className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--notebook-accent)] leading-relaxed"
-                    style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
+                    className="pb-6 text-xs leading-relaxed"
                   />
-                  <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="absolute bottom-2 right-3 text-xs text-[var(--text-dimmed)]">
                     {content.length} car.
                   </span>
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <button
+                  <NbButton
+                    variant="primary"
+                    size="sm"
+                    icon={Save}
                     onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
                     disabled={!title.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
-                    style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
                   >
-                    <Save className="w-3.5 h-3.5" />
                     {editingId ? 'Mettre à jour' : 'Créer'}
-                  </button>
-                  <button
-                    onClick={cancelForm}
-                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-[var(--notebook-surface-muted)]"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    <X className="w-3.5 h-3.5" />
+                  </NbButton>
+                  <NbButton variant="ghost" size="sm" icon={X} onClick={cancelForm}>
                     Annuler
-                  </button>
+                  </NbButton>
                 </div>
               </div>
             </motion.div>
@@ -564,29 +517,19 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
 
       {/* Canvas View */}
       {viewMode === 'canvas' && notes.length > 0 ? (
-        <div className="flex-1 min-h-0 -mx-5 -mb-5 lg:-mx-7 lg:-mb-7">
+        <div className="flex-1 min-h-0 -mx-4 -mb-4 lg:-mx-6 lg:-mb-6">
           <NotesCanvas notes={notes} onSelectNote={(id) => { const note = notes.find(n => n.id === id); if (note) startEdit(note); }} />
         </div>
       ) : (
       <>
       {/* Notes List */}
       {sorted.length === 0 && !showForm ? (
-        <div className="flex flex-col items-center justify-center py-14 gap-4">
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
-          >
-            <StickyNote className="w-6 h-6" style={{ color: 'var(--notebook-accent)' }} />
-          </div>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              Aucune note
-            </p>
-            <p className="text-xs max-w-xs" style={{ color: 'var(--text-muted)' }}>
-              Créez des notes pour organiser vos idées, annotations et insights.
-            </p>
-          </div>
-        </div>
+        <NbEmptyState
+          icon={StickyNote}
+          title="Aucune note"
+          description="Créez des notes pour organiser vos idées, annotations et insights."
+          className="py-12"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <AnimatePresence initial={false}>
@@ -598,44 +541,40 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.1 }}
-                className="group p-4 rounded-2xl border transition-all hover:shadow-md hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'var(--notebook-surface)',
-                  borderColor: note.pinned ? 'var(--notebook-accent)' : 'var(--notebook-border)',
-                  borderWidth: note.pinned ? '1.5px' : '1px',
-                }}
+                className="notebook-note-card group p-4"
+                data-pinned={note.pinned ? 'true' : undefined}
+                style={note.pinned ? { borderColor: 'var(--notebook-accent)' } : undefined}
               >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
-                    <div className="flex items-center gap-1.5">
-                      {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
-                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <div className="flex items-center gap-1">
+                      {note.pinned && <Pin className="h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />}
+                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                         {note.title}
                       </p>
                     </div>
                     {note.content && (
-                      <p className="text-xs mt-1.5 whitespace-pre-wrap line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
                         {note.content}
                       </p>
                     )}
                     {/* Meta */}
-                    <div className="flex items-center gap-2 mt-2.5">
-                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                        <Clock className="w-2.5 h-2.5" />
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs text-[var(--text-dimmed)]">
+                        <Clock className="h-3 w-3" aria-hidden />
                         {timeAgo(note.updatedAt)}
                       </span>
                       {note.content && (
-                        <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                        <span className="text-xs text-[var(--text-dimmed)]">
                           {note.content.length} car.
                         </span>
                       )}
                       {backlinks[note.id]?.length > 0 && (
                         <span
-                          className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full"
-                          style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}
+                          className="notebook-count"
                           title={`Mentionné dans : ${backlinks[note.id].map(id => getNoteTitle(id)).join(', ')}`}
                         >
-                          <Link2 className="w-2.5 h-2.5" />
+                          <Link2 className="h-3 w-3" aria-hidden />
                           {backlinks[note.id].length}
                         </span>
                       )}
@@ -643,28 +582,27 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
+                  <div className="flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <NbIconButton
+                      icon={Pin}
+                      size="sm"
+                      label={note.pinned ? 'Désépingler' : 'Épingler'}
+                      data-active={note.pinned ? 'true' : undefined}
                       onClick={() => handleTogglePin(note.id, note.pinned)}
-                      className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors"
-                      title={note.pinned ? 'Désépingler' : 'Épingler'}
-                    >
-                      <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--notebook-accent)' : 'var(--text-dimmed)' }} />
-                    </button>
-                    <button
+                    />
+                    <NbIconButton
+                      icon={Edit3}
+                      size="sm"
+                      label="Modifier"
                       onClick={() => startEdit(note)}
-                      className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors"
-                      title="Modifier"
-                    >
-                      <Edit3 className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
-                    </button>
-                    <button
+                    />
+                    <NbIconButton
+                      icon={Trash2}
+                      size="sm"
+                      tone="danger"
+                      label="Supprimer"
                       onClick={() => handleDelete(note.id)}
-                      className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] transition-colors"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />
-                    </button>
+                    />
                   </div>
                 </div>
               </motion.div>

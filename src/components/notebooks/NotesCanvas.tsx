@@ -8,6 +8,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Pin, Move, Link2 } from 'lucide-react';
 import { timeAgo } from './utils.js';
+import { NbIconButton } from './ui/primitives.js';
 
 interface NoteItem {
   id: string;
@@ -148,8 +149,8 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden select-none"
-      style={{ backgroundColor: 'var(--notebook-canvas)', cursor: isPanning ? 'grabbing' : 'grab' }}
+      className="w-full h-full relative overflow-hidden select-none bg-[var(--notebook-canvas)]"
+      style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
       onMouseDown={startPan}
     >
       {/* Grid pattern background */}
@@ -164,40 +165,35 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
 
       {/* Toolbar */}
       <div
-        className="absolute top-3 right-3 z-30 flex items-center gap-1 px-2.5 py-2 rounded-full shadow-lg backdrop-blur-sm"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--notebook-surface) 90%, transparent)', border: '1px solid var(--notebook-border)' }}
+        className="absolute top-3 right-3 z-30 flex items-center gap-1 rounded-full border border-[var(--notebook-border)] bg-[color-mix(in_srgb,var(--notebook-surface)_90%,transparent)] p-1 shadow-lg backdrop-blur-sm"
       >
-        <button
+        <NbIconButton
+          icon={ZoomIn}
+          size="sm"
+          label="Zoom avant"
           onClick={() => setZoom(prev => Math.min(2.5, prev + 0.2))}
-          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <ZoomIn className="w-3.5 h-3.5" />
-        </button>
-        <span className="text-xs font-mono min-w-[36px] text-center" style={{ color: 'var(--text-dimmed)' }}>
+        />
+        <span className="min-w-[36px] text-center font-mono text-xs text-[var(--text-dimmed)]">
           {Math.round(zoom * 100)}%
         </span>
-        <button
+        <NbIconButton
+          icon={ZoomOut}
+          size="sm"
+          label="Zoom arrière"
           onClick={() => setZoom(prev => Math.max(0.3, prev - 0.2))}
-          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <ZoomOut className="w-3.5 h-3.5" />
-        </button>
-        <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--notebook-border)' }} />
-        <button
+        />
+        <div className="mx-1 h-4 w-px bg-[var(--notebook-border)]" />
+        <NbIconButton
+          icon={Maximize2}
+          size="sm"
+          label="Réinitialiser la vue"
           onClick={resetView}
-          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
+        />
       </div>
 
       {/* Info bar */}
       <div
-        className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-full text-xs backdrop-blur-sm"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--notebook-surface) 90%, transparent)', border: '1px solid var(--notebook-border)', color: 'var(--text-dimmed)' }}
+        className="absolute bottom-3 left-3 z-30 rounded-full border border-[var(--notebook-border)] bg-[color-mix(in_srgb,var(--notebook-surface)_90%,transparent)] px-3 py-1 text-xs text-[var(--text-dimmed)] backdrop-blur-sm"
       >
         {notes.length} notes • {connections.length} lien{connections.length !== 1 ? 's' : ''} • Glissez les cartes • Molette = zoom
       </div>
@@ -212,7 +208,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
         }}
       >
         {/* Connection lines */}
-        <svg className="absolute inset-0 pointer-events-none" style={{ width: '4000px', height: '4000px', overflow: 'visible' }}>
+        <svg className="pointer-events-none absolute inset-0 h-[4000px] w-[4000px] overflow-visible" aria-hidden>
           {connections.map(({ from, to }, i) => {
             const fromPos = positions[from];
             const toPos = positions[to];
@@ -262,29 +258,22 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
               }}
             >
               <div
-                className={`p-3.5 rounded-xl border transition-shadow ${isDragging ? 'shadow-2xl ring-2 ring-[var(--notebook-accent)]' : 'shadow-sm hover:shadow-md'}`}
-                style={{
-                  backgroundColor: 'var(--notebook-surface)',
-                  borderColor: isConnected ? 'var(--notebook-accent)' : 'var(--notebook-border)',
-                  borderWidth: isConnected ? '1.5px' : '1px',
-                  cursor: isDragging ? 'grabbing' : 'default',
-                }}
+                className={`rounded-xl border bg-[var(--notebook-card-bg)] p-3 transition-shadow ${isConnected ? 'border-[var(--notebook-accent)]' : 'border-[var(--notebook-border)]'} ${isDragging ? 'cursor-grabbing shadow-2xl ring-2 ring-[var(--notebook-accent)]' : 'cursor-default shadow-sm hover:shadow-md'}`}
               >
                 {/* Drag bar */}
                 <div
-                  className="flex items-center gap-1.5 mb-2 pb-2 cursor-grab active:cursor-grabbing"
-                  style={{ borderBottom: '1px solid var(--notebook-border)' }}
+                  className="mb-2 flex cursor-grab items-center gap-1 border-b border-[var(--notebook-border)] pb-2 active:cursor-grabbing"
                   onMouseDown={(e) => startDrag(e, note.id)}
                 >
-                  <Move className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
+                  <Move className="h-3 w-3 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
                   <div className="flex items-center gap-1 flex-1 min-w-0">
-                    {note.pinned && <Pin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
-                    <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {note.pinned && <Pin className="h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />}
+                    <span className="truncate text-xs font-semibold text-[var(--text-primary)]">
                       {note.title}
                     </span>
                   </div>
                   {isConnected && (
-                    <Link2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
+                    <Link2 className="h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
                   )}
                 </div>
 
@@ -293,17 +282,17 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                   className="cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => onSelectNote?.(note.id)}
                 >
-                  <p className="text-xs line-clamp-4 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <p className="line-clamp-4 text-xs leading-relaxed text-[var(--text-muted)]">
                     {note.content || 'Note vide — cliquez pour éditer'}
                   </p>
                 </div>
 
                 {/* Meta */}
-                <div className="flex items-center gap-2 mt-2 pt-1.5" style={{ borderTop: '1px solid var(--notebook-border)' }}>
-                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                <div className="mt-2 flex items-center gap-2 border-t border-[var(--notebook-border)] pt-2">
+                  <span className="text-xs text-[var(--text-dimmed)]">
                     {timeAgo(note.updatedAt)}
                   </span>
-                  <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                  <span className="text-xs text-[var(--text-dimmed)]">
                     {note.content.length} car.
                   </span>
                 </div>
