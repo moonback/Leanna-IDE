@@ -205,7 +205,8 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
 
         {/* Input container — overflow-hidden only here for border-radius */}
         <div
-          className="flex flex-col transition-[border-color,box-shadow] duration-200 rounded-xl overflow-hidden"
+          className="lea-chat-input flex flex-col transition-[border-color,box-shadow] duration-200 rounded-xl overflow-hidden"
+          data-focused={isFocused ? 'true' : undefined}
           style={{
             border: `1px solid ${isFocused ? 'var(--accent-primary)' : 'var(--border-base)'}`,
             boxShadow: isFocused
@@ -257,7 +258,7 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
                 onClick={handleSend}
                 disabled={!input.trim() || !canSend}
                 whileTap={input.trim() && canSend ? { scale: 0.88 } : undefined}
-                className="p-2 rounded-lg transition-all duration-150 disabled:opacity-30 focus:outline-none
+                className="lea-chat-send p-2 rounded-xl transition-all duration-150 disabled:opacity-30 focus:outline-none
                            focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
                 style={{
                   background: input.trim() && canSend

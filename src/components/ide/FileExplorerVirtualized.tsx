@@ -12,7 +12,7 @@ import React, {
 import {
   Folder, FolderOpen, Plus, RefreshCcw, ChevronRight, ChevronDown, ChevronUp,
   Shield, Search, X, ArrowDownAZ, ArrowUpZA, Layers, GripVertical,
-  Eye, EyeOff, FolderInput, ShieldOff, CheckCircle2,
+  Eye, EyeOff, FolderInput, ShieldOff, CheckCircle2, Crosshair, ChevronsDownUp,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
 import { LeannaIgnoreModal } from './LeannaIgnoreModal.js';
@@ -51,6 +51,8 @@ type FileExplorerProps = {
   onRefresh: () => void;
   onNavigate: (dir: string) => void;
   onMoveEntry?: (srcPath: string, destDir: string) => void;
+  /** Fichier ouvert dans l'éditeur : mis en évidence et suivi dans l'arbre. */
+  activePath?: string | null;
 };
 
 interface DataNode {
@@ -74,7 +76,10 @@ type TreeProps = {
   prefixCls: string;
 };
 
-const TreeComponent = Tree as unknown as React.ComponentType<TreeProps>;
+/** API impérative de react-window-tree (virtual) : scrollTo(décalage en px). */
+type TreeHandle = { scrollTo: (offset: number) => void };
+
+const TreeComponent = Tree as unknown as React.ComponentType<TreeProps & { ref?: React.Ref<TreeHandle> }>;
 
 type DragHandlers = {
   onDragStart: (e: React.DragEvent, entry: TreeEntry) => void;
@@ -140,6 +145,9 @@ const LABELS = {
   realFolders: 'Dossiers Réels',
   reviewHint: 'Cliquez sur un fichier pour examiner et valider les modifications',
   allValidated: 'Tous les fichiers sont validés et synchronisés sur le workspace réel',
+  reveal: 'Révéler le fichier actif',
+  collapseAll: 'Tout replier',
+  searchHint: 'Entrée : ouvrir le premier résultat · ↓ : parcourir',
 } as const;
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -325,6 +333,40 @@ function prepareTree(entries: TreeEntry[], opts: PrepareOptions): TreeEntry[] {
   };
 
   return visit(entries, false);
+}
+
+/** Dossiers parents d'un chemin (« a/b/c.ts » → [« a », « a/b »]). */
+function ancestorsOf(path: string): string[] {
+  const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  const out: string[] = [];
+  for (let i = 1; i < parts.length; i++) out.push(parts.slice(0, i).join('/'));
+  return out;
+}
+
+/** Index d'une ligne dans la liste aplatie affichée (−1 si non visible). */
+function flatIndexOf(entries: TreeEntry[], expanded: Set<string>, target: string): number {
+  let index = 0;
+  const walk = (list: TreeEntry[]): boolean => {
+    for (const e of list) {
+      if (e.path === target) return true;
+      index++;
+      if (e.type === 'directory' && expanded.has(e.path) && e.children && e.children.length > 0) {
+        if (walk(e.children)) return true;
+      }
+    }
+    return false;
+  };
+  return walk(entries) ? index : -1;
+}
+
+/** Premier fichier (ordre d'affichage) — pour « Entrée » dans la recherche. */
+function firstFile(entries: TreeEntry[]): TreeEntry | null {
+  for (const e of entries) {
+    if (e.type === 'file') return e;
+    const hit = e.children ? firstFile(e.children) : null;
+    if (hit) return hit;
+  }
+  return null;
 }
 
 function countFiles(entries: TreeEntry[]): number {
@@ -675,6 +717,7 @@ function ToolbarButton({
   onClick,
   active = false,
   pressed,
+  disabled = false,
   className = '',
   children,
 }: {
@@ -682,6 +725,7 @@ function ToolbarButton({
   onClick: () => void;
   active?: boolean;
   pressed?: boolean;
+  disabled?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -689,12 +733,12 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={label}
       aria-label={label}
       aria-pressed={pressed}
-      className={`rounded-md p-1.5 transition-all duration-200 hover:bg-[var(--bg-panel)] hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)] ${
-        active ? 'bg-[var(--bg-panel)]' : ''
-      } ${className}`}
+      className={`lea-fx-tool rounded-md p-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)] ${className}`}
+      data-active={active ? 'true' : undefined}
       style={{ color: active ? 'var(--accent-primary)' : 'var(--text-muted)' }}
     >
       {children}
@@ -773,11 +817,11 @@ function TreeSkeleton() {
       {SKELETON_WIDTHS.map((w, i) => (
         <div
           key={i}
-          className="flex items-center gap-2 animate-pulse"
-          style={{ paddingLeft: `${8 + (i % 5) * 14}px` }}
+          className="flex items-center gap-2"
+          style={{ paddingLeft: `${8 + (i % 5) * 14}px`, opacity: 1 - i * 0.06 }}
         >
-          <div className="w-4 h-4 rounded-md flex-shrink-0" style={{ background: 'var(--bg-input)' }} />
-          <div className="h-2.5 rounded-md flex-1" style={{ background: 'var(--bg-input)', maxWidth: `${w}px` }} />
+          <div className="skeleton-shimmer w-4 h-4 flex-shrink-0" style={{ borderRadius: 4 }} />
+          <div className="skeleton-shimmer h-2.5 flex-1" style={{ maxWidth: `${w}px`, borderRadius: 4 }} />
         </div>
       ))}
     </div>
@@ -797,6 +841,8 @@ type RowContextValue = {
   onActivateFile: (path: string) => void;
   onActivateDirectory: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, entry: TreeEntry) => void;
+  /** Fichier ouvert dans l'éditeur (comparaison insensible aux « \\ »). */
+  activePath?: string | null;
 };
 
 const RowContext = createContext<RowContextValue | null>(null);
@@ -880,6 +926,9 @@ const TreeRow = memo(function TreeRow({ entry, depth, isExpanded, diff, changedC
   const isDragging = ctx.draggingPath === entry.path;
   const status = diff?.status;
   const color = status ? STATUS_COLOR[status] : undefined;
+  const isActive = !isDir && !!ctx.activePath && ctx.activePath === entry.path;
+  // Dossier replié qui contient le fichier actif : on le signale discrètement.
+  const containsActive = isDir && !isExpanded && !!ctx.activePath && ctx.activePath.startsWith(`${entry.path}/`);
 
   const rowBg = isDragTarget
     ? mix('var(--accent-primary)', 20)
@@ -919,13 +968,19 @@ const TreeRow = memo(function TreeRow({ entry, depth, isExpanded, diff, changedC
       tabIndex={0}
       aria-level={depth + 1}
       aria-expanded={isDir ? isExpanded : undefined}
-      className="flex items-center gap-1.5 px-2 text-sm cursor-pointer select-none relative group rounded-md bg-[var(--row-bg)] hover:bg-[var(--bg-panel)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+      aria-selected={isActive || undefined}
+      aria-current={isActive ? 'true' : undefined}
+      data-path={entry.path}
+      data-active={isActive ? 'true' : undefined}
+      data-contains-active={containsActive ? 'true' : undefined}
+      data-status={status}
+      className="lea-fx-row flex items-center gap-1.5 px-2 text-sm cursor-pointer select-none relative group rounded-md bg-[var(--row-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
       style={
         {
           '--row-bg': rowBg, // variable CSS : l'état :hover reste possible (un style inline l'écraserait)
           height: ROW_HEIGHT,
           paddingLeft: `${12 + depth * INDENT}px`,
-          color: color ?? 'var(--text-primary)',
+          color: color ?? (isActive ? 'var(--text-primary)' : 'var(--text-secondary)'),
           opacity: isDragging ? 0.5 : 1,
           boxShadow: isDragTarget ? 'inset 0 0 0 2px var(--accent-primary)' : 'none',
           transition: 'background-color 0.15s, box-shadow 0.15s, opacity 0.15s',
@@ -941,6 +996,15 @@ const TreeRow = memo(function TreeRow({ entry, depth, isExpanded, diff, changedC
       onDragLeave={dnd?.onDragLeave}
       onDrop={dnd ? e => dnd.onDrop(e, entry) : undefined}
     >
+      {/* Guides d'indentation : un trait vertical par niveau (centré sur les chevrons) */}
+      {depth > 0 && (
+        <span
+          aria-hidden="true"
+          className="lea-fx-guides"
+          style={{ left: 19, width: depth * INDENT }}
+        />
+      )}
+
       {dnd && (
         <span
           aria-hidden="true"
@@ -974,16 +1038,16 @@ const TreeRow = memo(function TreeRow({ entry, depth, isExpanded, diff, changedC
 
         {isDir ? (
           isDragTarget || isExpanded ? (
-            <FolderOpen size={16} style={{ color: color ?? 'var(--accent-primary)' }} />
+            <FolderOpen size={16} className="lea-fx-icon shrink-0" style={{ color: color ?? 'var(--accent-primary)' }} />
           ) : (
-            <Folder size={16} style={{ color: color ?? 'var(--accent-primary)' }} />
+            <Folder size={16} className="lea-fx-icon shrink-0" style={{ color: color ?? 'var(--accent-primary)' }} />
           )
         ) : (
-          <FileIcon filePath={entry.path} size={16} />
+          <span className="lea-fx-icon inline-flex shrink-0"><FileIcon filePath={entry.path} size={16} /></span>
         )}
 
         <span
-          className={`truncate ${status ? 'font-medium' : 'font-normal'}`}
+          className={`truncate ${status || isActive ? 'font-medium' : 'font-normal'}`}
           title={entry.path}
         >
           {ctx.query ? <HighlightMatch text={entry.name} query={ctx.query} /> : entry.name}
@@ -1001,6 +1065,15 @@ const TreeRow = memo(function TreeRow({ entry, depth, isExpanded, diff, changedC
           >
             {changedCount}
           </span>
+        )}
+
+        {containsActive && changedCount === 0 && (
+          <span
+            aria-hidden="true"
+            className="ml-auto shrink-0 w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 6px var(--accent-primary)' }}
+            title="Contient le fichier ouvert"
+          />
         )}
 
         {diff && <DiffStats diff={diff} />}
@@ -1049,17 +1122,20 @@ const ExplorerTree = memo(function ExplorerTree({
   expandedKeys,
   onExpand,
   rowContext,
+  treeRef,
 }: {
   nodes: DataNode[];
   height: number;
   expandedKeys: React.Key[];
   onExpand: (keys: React.Key[]) => void;
   rowContext: RowContextValue;
+  treeRef?: React.Ref<TreeHandle>;
 }) {
   return (
     <RowContext.Provider value={rowContext}>
       <div data-explorer-tree>
         <TreeComponent
+          ref={treeRef}
           treeData={nodes}
           height={height}
           itemHeight={ROW_HEIGHT}
@@ -1098,8 +1174,10 @@ const FileExplorer = memo(function FileExplorer({
   onRefresh,
   onNavigate,
   onMoveEntry,
+  activePath = null,
 }: FileExplorerProps) {
   const reduceMotion = useReducedMotion();
+  const treeRef = useRef<TreeHandle>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1227,10 +1305,79 @@ const FileExplorer = memo(function FileExplorer({
     onActivateFile: onOpenFile,
     onActivateDirectory: mainExpansion.activate,
     onContextMenu,
+    activePath,
   }), [
     debouncedSearch, dnd.dragOverPath, dnd.draggingPath, dnd.handlers,
-    onOpenFile, mainExpansion.activate, onContextMenu,
+    onOpenFile, mainExpansion.activate, onContextMenu, activePath,
   ]);
+
+  // ── Fichier actif : suivi, révélation, tout replier ───────────────────────
+  const setMainElRef = useRef<HTMLDivElement | null>(null);
+  const mainHeightRef = useRef(0);
+
+  /** Fait défiler l'arbre virtualisé pour centrer `path` (s'il est affiché). */
+  const scrollToPath = useCallback((path: string, onlyIfHidden: boolean) => {
+    const container = setMainElRef.current;
+    if (onlyIfHidden && container) {
+      // Ligne déjà rendue par la liste virtualisée = visible (à l'overscan près)
+      const rendered = Array.from(container.querySelectorAll<HTMLElement>('[data-path]'))
+        .find(el => el.dataset.path === path);
+      if (rendered) {
+        const box = container.getBoundingClientRect();
+        const row = rendered.getBoundingClientRect();
+        if (row.top >= box.top && row.bottom <= box.bottom) return;
+      }
+    }
+    const index = flatIndexOf(processedTree, effectiveExpanded, path);
+    if (index < 0) return;
+    const h = mainHeightRef.current;
+    treeRef.current?.scrollTo(Math.max(0, index * ROW_HEIGHT - h / 2 + ROW_HEIGHT / 2));
+  }, [processedTree, effectiveExpanded, setMainElRef, mainHeightRef]);
+
+  // Suit le fichier actif quand il change (sans rien déplier : comme VS Code
+  // avec « autoReveal: focusNoScroll » désactivé, on ne défile que s'il est caché).
+  const lastFollowed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activePath || activePath === lastFollowed.current) return;
+    lastFollowed.current = activePath;
+    const id = requestAnimationFrame(() => scrollToPath(activePath, true));
+    return () => cancelAnimationFrame(id);
+  }, [activePath, scrollToPath]);
+
+  // « Révéler » : déplie les parents puis centre le fichier une fois l'arbre reconstruit.
+  const [pendingReveal, setPendingReveal] = useState<string | null>(null);
+  const revealActive = useCallback(() => {
+    if (!activePath) return;
+    for (const dir of ancestorsOf(activePath)) {
+      if (!expandedDirsRef.current.has(dir)) toggleMain(dir, true);
+    }
+    setPendingReveal(activePath);
+  }, [activePath, toggleMain]);
+  useEffect(() => {
+    if (!pendingReveal) return;
+    if (flatIndexOf(processedTree, effectiveExpanded, pendingReveal) < 0) {
+      // Attend le chargement des dossiers parents (abandon au bout de 3 s)
+      const giveUp = setTimeout(() => setPendingReveal(null), 3000);
+      return () => clearTimeout(giveUp);
+    }
+    const id = requestAnimationFrame(() => {
+      scrollToPath(pendingReveal, false);
+      const row = setMainElRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(pendingReveal)}"]`);
+      row?.focus({ preventScroll: true });
+      setPendingReveal(null);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pendingReveal, processedTree, effectiveExpanded, scrollToPath, setMainElRef]);
+
+  const collapseAll = useCallback(() => {
+    for (const dir of Array.from(expandedDirsRef.current)) {
+      if (dir !== '.') toggleMain(dir, false);
+    }
+  }, [toggleMain]);
+  const hasExpanded = useMemo(
+    () => Array.from(expandedDirs).some(d => d !== '.'),
+    [expandedDirs],
+  );
 
   // ── Arbre « Dossiers Réels » (workspace) ──────────────────────────────────
   const [wsExpandedDirs, setWsExpandedDirs] = useState<Set<string>>(() => new Set());
@@ -1291,10 +1438,16 @@ const FileExplorer = memo(function FileExplorer({
     onActivateFile: onOpenFileDiff ?? onOpenFile,
     onActivateDirectory: wsExpansion.activate,
     onContextMenu,
-  }), [debouncedSearch, onOpenFileDiff, onOpenFile, wsExpansion.activate, onContextMenu]);
+    activePath,
+  }), [debouncedSearch, onOpenFileDiff, onOpenFile, wsExpansion.activate, onContextMenu, activePath]);
 
   // ── Dimensions (remplacent les hauteurs codées en dur 320/600/280) ────────
   const [setMainEl, mainHeight] = useElementHeight();
+  mainHeightRef.current = mainHeight;
+  const attachMainEl = useCallback((el: HTMLDivElement | null) => {
+    setMainElRef.current = el;
+    setMainEl(el);
+  }, [setMainEl, setMainElRef]);
   const [setWsEl, wsHeight] = useElementHeight();
 
   // ── Dérivés d'affichage ───────────────────────────────────────────────────
@@ -1311,7 +1464,7 @@ const FileExplorer = memo(function FileExplorer({
   return (
     <div
       ref={rootRef}
-      className="flex flex-col border-r h-full select-none shrink-0"
+      className="lea-fx flex flex-col border-r h-full select-none shrink-0"
       style={{
         width,
         borderColor: 'var(--border-base)',
@@ -1320,7 +1473,7 @@ const FileExplorer = memo(function FileExplorer({
     >
       {/* En-tête */}
       <div
-        className="flex items-center justify-between border-b px-3 py-1.5"
+        className="lea-fx-header flex items-center justify-between border-b px-3 py-1.5"
         style={{ borderColor: 'var(--border-base)', minHeight: '44px' }}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -1331,13 +1484,36 @@ const FileExplorer = memo(function FileExplorer({
             >
               {LABELS.explorer}
             </span>
-            <div
-              className="text-xs truncate font-mono"
-              style={{ color: 'var(--text-muted)' }}
-              title={currentDir || LABELS.root}
-            >
-              {currentDir === '.' ? '~/projet' : currentDir}
-            </div>
+            {/* Fil d'Ariane cliquable : remonter d'un clic à n'importe quel niveau */}
+            <nav className="lea-fx-crumbs" aria-label="Chemin du dossier" title={currentDir || LABELS.root}>
+              <button
+                type="button"
+                className="lea-fx-crumb"
+                onClick={() => onNavigate('.')}
+                disabled={atRoot}
+                aria-current={atRoot ? 'location' : undefined}
+              >
+                ~
+              </button>
+              {!atRoot && currentDir.split('/').filter(Boolean).map((seg, i, all) => {
+                const target = all.slice(0, i + 1).join('/');
+                const last = i === all.length - 1;
+                return (
+                  <React.Fragment key={target}>
+                    <ChevronRight size={10} aria-hidden="true" style={{ opacity: 0.45, flexShrink: 0 }} />
+                    <button
+                      type="button"
+                      className="lea-fx-crumb"
+                      onClick={() => onNavigate(target)}
+                      disabled={last}
+                      aria-current={last ? 'location' : undefined}
+                    >
+                      {seg}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+            </nav>
           </div>
           {!loading && (
             <span
@@ -1379,8 +1555,10 @@ const FileExplorer = memo(function FileExplorer({
 
       {/* Barre d'outils */}
       <div
-        className="flex items-center gap-0.5 px-2 border-b"
-        style={{ height: '36px', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+        className="lea-fx-toolbar flex items-center gap-0.5 px-2 border-b"
+        role="toolbar"
+        aria-label="Actions de l'explorateur"
+        style={{ height: '36px', borderColor: 'var(--border-base)' }}
       >
         <ToolbarButton label={LABELS.search} onClick={toggleSearch} active={showSearch} pressed={showSearch}>
           <Search size={14} />
@@ -1401,11 +1579,18 @@ const FileExplorer = memo(function FileExplorer({
           <SortIcon mode={sortMode} />
         </ToolbarButton>
         <div className="flex-1" />
+        <ToolbarButton label={LABELS.reveal} onClick={revealActive} disabled={!activePath}>
+          <Crosshair size={14} />
+        </ToolbarButton>
+        <ToolbarButton label={LABELS.collapseAll} onClick={collapseAll} disabled={!hasExpanded}>
+          <ChevronsDownUp size={14} />
+        </ToolbarButton>
+        <span className="lea-fx-sep" aria-hidden="true" />
         <ToolbarButton label={LABELS.newFile} onClick={onCreateFile}>
           <Plus size={14} />
         </ToolbarButton>
-        <ToolbarButton label={LABELS.refresh} onClick={onRefresh} className="hover:rotate-90">
-          <RefreshCcw size={14} />
+        <ToolbarButton label={LABELS.refresh} onClick={onRefresh}>
+          <RefreshCcw size={14} className={loading ? 'lea-fx-spin' : 'lea-fx-refresh'} />
         </ToolbarButton>
       </div>
 
@@ -1431,8 +1616,20 @@ const FileExplorer = memo(function FileExplorer({
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={LABELS.searchPlaceholder}
                 aria-label={LABELS.searchPlaceholder}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:opacity-50"
-                style={{ color: 'var(--text-primary)' }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    // Ouvre le premier fichier correspondant
+                    const hit = isSearching ? firstFile(processedTree) : null;
+                    if (hit) { e.preventDefault(); onOpenFile(hit.path); }
+                  } else if (e.key === 'ArrowDown') {
+                    // Descend dans l'arbre (navigation ↑ ↓ existante sur les lignes)
+                    const row = setMainElRef.current?.querySelector<HTMLElement>('[role="treeitem"]');
+                    if (row) { e.preventDefault(); row.focus(); }
+                  }
+                }}
+                aria-describedby="lea-fx-search-hint"
+                className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:opacity-50"
+                style={{ color: 'var(--text-primary)', boxShadow: 'none' }}
                 autoFocus
               />
               {searchQuery && (
@@ -1478,6 +1675,7 @@ const FileExplorer = memo(function FileExplorer({
                 </span>
               </div>
             )}
+            <span id="lea-fx-search-hint" className="sr-only">{LABELS.searchHint}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1564,9 +1762,10 @@ const FileExplorer = memo(function FileExplorer({
               </div>
             )}
 
-            <div ref={setMainEl} className="flex-1 min-h-0 py-1">
+            <div ref={attachMainEl} className="flex-1 min-h-0 py-1">
               {mainHeight > 0 && (
                 <ExplorerTree
+                  treeRef={treeRef}
                   nodes={treeData}
                   height={Math.max(0, mainHeight - 8)}
                   expandedKeys={mainExpansion.expandedKeys}
@@ -1641,4 +1840,4 @@ const FileExplorer = memo(function FileExplorer({
   );
 });
 
-export { FileExplorer };
+export { FileExplorer };

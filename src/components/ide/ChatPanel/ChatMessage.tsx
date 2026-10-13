@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Bot, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
+import { User, Sparkles, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
 import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { BUBBLE_STYLES, TRANSITIONS } from './theme.js';
@@ -150,27 +150,28 @@ export const ChatMessage = memo(function ChatMessage({
       transition={reduceMotion ? { duration: 0.1 } : TRANSITIONS.spring}
       className={`flex gap-3 group relative ${isAssistant ? '' : 'flex-row-reverse'}`}
     >
-      {/* Avatar */}
-      <div
-        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 transition-transform group-hover:scale-105"
-        style={{
-          backgroundColor: isAssistant
-            ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)'
-            : 'rgba(255, 255, 255, 0.04)',
-          border: `1px solid ${isAssistant ? 'color-mix(in srgb, var(--accent-primary) 25%, transparent)' : 'var(--border-base)'}`,
-          boxShadow: isAssistant ? '0 0 12px color-mix(in srgb, var(--accent-primary) 15%, transparent)' : 'none',
-        }}
-      >
-        {isAssistant
-          ? <Bot size={14} style={{ color: 'var(--accent-primary)' }} />
-          : <User size={14} style={{ color: 'var(--text-muted)' }} />
-        }
-      </div>
+      {/* Avatar — orbe pour l'assistante, pastille neutre pour l'utilisateur */}
+      {isAssistant ? (
+        <span className="lea-orb mt-0.5" data-state="online" style={{ width: 32, height: 32 }} aria-hidden="true">
+          <Sparkles size={14} />
+        </span>
+      ) : (
+        <div
+          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
+            border: '1px solid var(--border-base)',
+          }}
+        >
+          <User size={14} style={{ color: 'var(--text-muted)' }} />
+        </div>
+      )}
 
       {/* Content */}
       <div className={`max-w-[86%] flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}>
         <div
-          className="px-4 py-3 text-sm leading-relaxed inline-block text-left transition-shadow duration-200 hover:shadow-lg relative"
+          className="lea-chat-bubble px-4 py-3 text-sm leading-relaxed inline-block text-left relative"
+          data-role={isAssistant ? 'assistant' : 'user'}
           style={{
             background: bubbleStyle.bg,
             border: `1px solid ${isPinned ? 'color-mix(in srgb, var(--accent-primary) 55%, transparent)' : bubbleStyle.border}`,
@@ -203,7 +204,7 @@ export const ChatMessage = memo(function ChatMessage({
 
         {/* Footer: timestamp + actions */}
         <div
-          className={`flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
+          className={`lea-chat-actions flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
         >
           <span className="text-xs font-mono tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
             {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}

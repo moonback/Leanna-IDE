@@ -38,6 +38,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, type HTMLMotionProps } from 'motion/react';
+import { dialogVariants, duration, ease } from '../../lib/motion.js';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useOverlay } from '../../hooks/useOverlay.js';
@@ -186,15 +187,14 @@ function ModalRoot({
           <motion.div
             key="modal-backdrop"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+            animate={{ opacity: 1, transition: { duration: duration.base, ease: ease.outQuart } }}
+            exit={{ opacity: 0, transition: { duration: duration.exit, ease: ease.inQuart } }}
             className="fixed inset-0 flex items-center justify-center p-4"
             style={{
               zIndex,
               backgroundColor: 'var(--overlay-veil)',
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
+              backdropFilter: 'blur(6px) saturate(120%)',
+              WebkitBackdropFilter: 'blur(6px) saturate(120%)',
             }}
             {...(backdropProps as unknown as HTMLMotionProps<'div'>)}
           >
@@ -202,16 +202,16 @@ function ModalRoot({
             <motion.div
               ref={containerRef}
               key="modal-box"
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              variants={dialogVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
               role="dialog"
               aria-modal="true"
               aria-labelledby={title ? titleId : undefined}
               aria-describedby={ariaDescribedBy ?? descId}
               className={clsx(
-                'relative flex flex-col w-full rounded-2xl shadow-2xl',
+                'relative flex flex-col w-full rounded-2xl shadow-2xl lea-dialog',
                 'outline-none',
                 className,
               )}

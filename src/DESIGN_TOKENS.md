@@ -964,3 +964,46 @@ La migration est terminée lorsque :
 * Ajout d'une checklist d'accessibilité.
 * Clarification des exceptions au système.
 * Harmonisation des exemples TypeScript/React.
+
+---
+
+## Motion Pro — couche d'animation (v2.1)
+
+Fichiers : `src/styles/motion-pro.css` (CSS) · `src/lib/motion.ts` (miroir JS pour motion/react).
+
+### Tokens
+
+| Token CSS | JS (`lib/motion.ts`) | Usage |
+|---|---|---|
+| `--ease-out-expo` | `ease.outExpo` | Entrées (pages, panneaux, cartes) |
+| `--ease-in-quart` | `ease.inQuart` | Sorties |
+| `--ease-spring` | `spring.snappy` | Micro-feedback |
+| `--dur-fast` 140 ms | `duration.fast` | Hover, press |
+| `--dur-base` 220 ms | `duration.base` | Popovers, voiles |
+| `--dur-slow` 360 ms | `duration.slow` | Pages, listes |
+| `--dur-exit` 150 ms | `duration.exit` | Toute sortie (≈ 65 % de l'entrée) |
+| `--accent-gradient` | — | Signature visuelle (barre de nav, texte héro) |
+
+### Règles
+
+1. Animer uniquement `transform` et `opacity`. Jamais de `filter` résiduel sur un wrapper (casse les `position: fixed` descendants).
+2. Sortie plus courte que l'entrée ; décélération à l'arrivée, accélération au départ.
+3. La transition universelle de thème vit dans `@layer base` et ne concerne que les couleurs/ombres : les utilitaires Tailwind `transition-*` et les springs motion/react ne sont plus écrasés.
+4. Tout effet décoratif est coupé en `prefers-reduced-motion` et dans le thème `high-contrast`.
+
+### Composants & utilitaires
+
+| Élément | Où | Effet |
+|---|---|---|
+| `<AmbientBackdrop />` | `main.tsx` (1er enfant de `.app-layout`) | Halos d'accent qui dérivent lentement |
+| `<RouteProgress />` | `main.tsx` | Barre d'accent 2 px à chaque changement de vue |
+| `usePointerSpotlight()` | `Layout` | Halo qui suit le curseur sur `.card-interactive`, `.notebook-*-card`, `[data-spotlight]` |
+| `pageVariants` | `AnimatedRoutes` | Montée + léger zoom à l'entrée, sortie vers le haut |
+| `dialogVariants` | `<Modal>` | Ressort doux + voile flouté |
+| `.lea-btn` / `.lea-btn--{variant}` | `<Button>` | Lift au survol, press, reflet balayant sur `primary` |
+| `.lea-enter`, `.lea-enter-scale` | opt-in | Entrée CSS pure |
+| `.lea-stagger` | opt-in (conteneur) | Cascade sur 12 enfants |
+| `.lea-gradient-text` | opt-in | Texte en dégradé animé |
+| `.lea-glow-border` | opt-in | Bordure conique lumineuse en rotation |
+| `.lea-live-dot` | opt-in | Point d'état avec onde |
+| `data-spotlight` | attribut opt-in | Active le spotlight sur n'importe quel élément |

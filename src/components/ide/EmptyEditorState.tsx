@@ -460,9 +460,84 @@ function GlobalStyles() {
         100% { transform: scale(2.2); opacity: 0; }
       }
 
+      /* ── Refonte « motion pro » ─────────────────────────────────────── */
+
+      /* Aurore : 3 halos qui dérivent (transform uniquement, GPU) */
+      .ee-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+      .ee-aurora > span {
+        position: absolute; border-radius: 50%; filter: blur(70px); will-change: transform;
+      }
+      .ee-aurora > span:nth-child(1) {
+        width: 60%; height: 55%; left: 20%; top: -28%;
+        background: radial-gradient(circle, var(--primary) 0%, transparent 65%);
+        opacity: 0.30; animation: ee-aurora-1 22s ease-in-out infinite alternate;
+      }
+      .ee-aurora > span:nth-child(2) {
+        width: 45%; height: 50%; right: -12%; bottom: -18%;
+        background: radial-gradient(circle, #60a5fa 0%, transparent 65%);
+        opacity: 0.20; animation: ee-aurora-2 28s ease-in-out infinite alternate;
+      }
+      .ee-aurora > span:nth-child(3) {
+        width: 38%; height: 42%; left: -10%; top: 35%;
+        background: radial-gradient(circle, var(--accent-secondary, #c792ea) 0%, transparent 65%);
+        opacity: 0.14; animation: ee-aurora-3 34s ease-in-out infinite alternate;
+      }
+      @keyframes ee-aurora-1 { to { transform: translate3d(8%, 12%, 0) scale(1.15); } }
+      @keyframes ee-aurora-2 { to { transform: translate3d(-14%, -10%, 0) scale(1.1); } }
+      @keyframes ee-aurora-3 { to { transform: translate3d(16%, -8%, 0) scale(0.9); } }
+
+      /* Trame de points, fondue vers les bords */
+      .ee-dots {
+        position: absolute; inset: 0; pointer-events: none; z-index: 0;
+        background-image: radial-gradient(color-mix(in srgb, var(--text) 14%, transparent) 1px, transparent 1px);
+        background-size: 22px 22px;
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 0%, transparent 75%);
+                mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 0%, transparent 75%);
+        opacity: 0.5;
+      }
+
+      /* Prénom : le dégradé glisse lentement */
+      .ee-name-accent {
+        background-image: linear-gradient(100deg,
+          var(--primary) 0%,
+          color-mix(in srgb, var(--primary) 55%, #fff) 35%,
+          color-mix(in srgb, var(--primary) 45%, #a78bfa) 65%,
+          var(--primary) 100%);
+        background-size: 250% 100%;
+        animation: ee-name-pan 9s ease-in-out infinite alternate;
+      }
+      @keyframes ee-name-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+
+      /* Carte principale : liseré lumineux en rotation (tant que l'IA n'est pas lancée) */
+      @property --ee-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+      .ee-card-glow::before {
+        content: '';
+        position: absolute; inset: 0; z-index: 2;
+        border-radius: inherit; padding: 1px; pointer-events: none;
+        background: conic-gradient(from var(--ee-angle),
+          transparent 0deg, transparent 220deg,
+          var(--primary) 290deg, color-mix(in srgb, var(--primary) 40%, #fff) 320deg,
+          var(--primary) 340deg, transparent 360deg);
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+                mask-composite: exclude;
+        animation: ee-spin 4.5s linear infinite;
+      }
+      @keyframes ee-spin { to { --ee-angle: 360deg; } }
+
+      /* Icônes des cartes : petit rebond au survol */
+      .ee-card-icon svg { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+      .ee-card:hover:not(:disabled) .ee-card-icon svg { transform: scale(1.14) rotate(-6deg); }
+
+      :root[data-theme="high-contrast"] .ee-aurora,
+      :root[data-theme="high-contrast"] .ee-dots,
+      :root[data-theme="high-contrast"] .ee-card-glow::before { display: none; }
+
       @media (prefers-reduced-motion: reduce) {
         .ee-dot-live { animation: none; }
         .ee-dot-busy::after { animation: none; display: none; }
+        .ee-aurora > span, .ee-name-accent, .ee-card-glow::before { animation: none; }
+        .ee-card-icon svg, .ee-card:hover:not(:disabled) .ee-card-icon svg { transition: none; transform: none; }
       }
     `}</style>
   );
@@ -489,7 +564,7 @@ const Kbd = React.memo(function Kbd({
 
 const ActionCard = React.memo(function ActionCard({
   icon: Icon, title, description, shortcut, onClick, disabled = false, reduceMotion = false,
-  accent = 'var(--primary)', comingSoon = false, primary = false, hero = false,
+  accent = 'var(--primary)', comingSoon = false, primary = false, hero = false, glow = false,
 }: {
   icon: IconType;
   title: string;
@@ -502,6 +577,8 @@ const ActionCard = React.memo(function ActionCard({
   comingSoon?: boolean;
   primary?: boolean;
   hero?: boolean;
+  /** Liseré lumineux animé (attire l'œil sur l'action principale). */
+  glow?: boolean;
 }) {
   const descId = useId();
 
@@ -522,7 +599,7 @@ const ActionCard = React.memo(function ActionCard({
       onMouseMove={hero ? handleMouseMove : undefined}
       disabled={disabled}
       aria-describedby={descId}
-      className={`ee-card ee-focus group flex items-start text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed${primary ? ' ee-card-primary' : ''}${hero ? ' ee-card-hero gap-4 p-5' : ' gap-3 p-4'}`}
+      className={`ee-card ee-focus group flex items-start text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed${primary ? ' ee-card-primary' : ''}${hero ? ' ee-card-hero gap-4 p-5' : ' gap-3 p-4'}${glow && !disabled && !reduceMotion ? ' ee-card-glow' : ''}`}
       style={{ ['--card-accent' as string]: accent }}
       whileHover={reduceMotion || disabled ? undefined : { y: -2 }}
       whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
@@ -565,6 +642,32 @@ const ActionCard = React.memo(function ActionCard({
           />
         )}
     </motion.button>
+  );
+});
+
+// ─── Titre révélé mot à mot ──────────────────────────────────────────────
+
+const RevealText = React.memo(function RevealText({
+  text, reduceMotion = false, delay = 0,
+}: { text: string; reduceMotion?: boolean; delay?: number }) {
+  const words = text.split(' ');
+  if (reduceMotion) return <>{text}</>;
+  return (
+    <>
+      {words.map((word, i) => (
+        <React.Fragment key={`${word}-${i}`}>
+          <motion.span
+            className="inline-block"
+            initial={{ opacity: 0, y: '0.35em', filter: 'blur(8px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: delay + i * 0.07 }}
+          >
+            {word}
+          </motion.span>
+          {i < words.length - 1 ? ' ' : null}
+        </React.Fragment>
+      ))}
+    </>
   );
 });
 
@@ -1057,24 +1160,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     <div className="flex flex-1 flex-col overflow-y-auto relative" style={{ backgroundColor: 'var(--bg)' }}>
       <GlobalStyles />
 
-      {/* Fond statique : halo primaire en haut */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 80% 55% at 50% -5%, var(--primary) 0%, transparent 55%)', opacity: 0.16 }}
-      />
-      {/* Second halo asymétrique en bas-droite, accent froid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse 60% 50% at 105% 105%, #60a5fa 0%, transparent 55%)',
-          opacity: 0.14,
-        }}
-      />
+      {/* Fond animé : aurore (3 halos qui dérivent) + trame de points fondue */}
+      <div className="ee-aurora" aria-hidden="true"><span /><span /><span /></div>
+      <div className="ee-dots" aria-hidden="true" />
       {/* Grain subtil pour casser l'aspect plat des dégradés */}
       <div className="ee-grain absolute inset-0 pointer-events-none" aria-hidden="true" />
 
       <div className="relative z-10 flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-14">
-        <main className="w-full max-w-[880px] my-auto">
+        <main className="w-full max-w-[1000px] my-auto">
 
           {/* ── En-tête ── */}
           <motion.header className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3" {...enter(0)}>
@@ -1084,8 +1177,22 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 {clock && (
                   <>
                     <span aria-hidden="true" style={{ opacity: 0.5 }}>·</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                      {clock}
+                    <span
+                      className="relative inline-flex overflow-hidden font-mono tabular-nums"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={clock}
+                          className="inline-block"
+                          initial={reduceMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={reduceMotion ? { opacity: 0 } : { y: '-100%', opacity: 0 }}
+                          transition={SPRING}
+                        >
+                          {clock}
+                        </motion.span>
+                      </AnimatePresence>
                     </span>
                   </>
                 )}
@@ -1094,7 +1201,15 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 className="text-3xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight mt-1"
                 style={{ color: 'var(--text)' }}
               >
-                {greeting}, <span className="ee-name-accent">{userName}</span>
+                <RevealText text={`${greeting},`} reduceMotion={reduceMotion} />{' '}
+                <motion.span
+                  className="ee-name-accent inline-block"
+                  initial={reduceMotion ? false : { opacity: 0, y: '0.35em', filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.14 }}
+                >
+                  {userName}
+                </motion.span>
               </h1>
               <p className="text-base sm:text-lg mt-2" style={{ color: 'var(--text-secondary)' }}>
                 Que souhaitez-vous faire aujourd'hui ?
@@ -1174,8 +1289,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               accent="var(--primary)"
               primary
               hero
+              glow={!connected}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="lea-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <ActionCard
                 icon={Bot} title="Agents" description="Flotte et activité"
                 onClick={handleOpenAgents} reduceMotion={reduceMotion}
@@ -1199,8 +1315,8 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             </div>
           </motion.section>
 
-          {/* ── Suggestions proactives (masquées sans clé valide : l'assistante ne pourrait pas répondre) ── */}
-          {onAskAssistant && !geminiProblem && (
+          {/* ── Suggestions proactives (visibles uniquement quand l'assistante est activée) ── */}
+          {onAskAssistant && !geminiProblem && connected && (
             <motion.div {...enter(0.15)}>
               <ProactiveInsightsSection
                 insights={insights}

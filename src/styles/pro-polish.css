@@ -83,9 +83,13 @@ html {
 
 /* Micro-feedback de pression pour les 728 <button> qui n'utilisent pas <Button> */
 :where(button:not(:disabled), [role="button"]):active { transform: scale(0.98); }
-:where(button, [role="button"]) {
-  transition: transform var(--transition-fast), background-color var(--transition-fast),
-              border-color var(--transition-fast), color var(--transition-fast);
+/* En @layer base : ne doit jamais écraser `transition-*` (Tailwind) ni
+   les transforms pilotés par motion/react. */
+@layer base {
+  :where(button, [role="button"]) {
+    transition: transform var(--transition-fast), background-color var(--transition-fast),
+                border-color var(--transition-fast), color var(--transition-fast);
+  }
 }
 
 /* ── 5. Touche clavier (kbd) uniforme ───────────────────────────────── */

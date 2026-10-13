@@ -85,16 +85,63 @@ function StatusDot({
   pulse?: boolean;
   glow?: boolean;
 }) {
+  // Animation en CSS (styles/motion-pro.css § Barre de statut) : une onde
+  // composée GPU au lieu d'une boucle motion/react par point.
   return (
-    <motion.span
-      className="w-2 h-2 rounded-full flex-shrink-0"
+    <span
+      aria-hidden="true"
+      className="lea-sb-dot"
+      data-pulse={pulse ? 'true' : undefined}
       style={{
         backgroundColor: color,
+        color,
         boxShadow: glow ? `0 0 6px ${color}` : undefined,
       }}
-          animate={pulse ? { scale: [1, 1.35, 1], opacity: [1, 0.6, 1] } : { scale: 1 }}
-          transition={pulse ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : { duration: 0 }}
     />
+  );
+}
+
+// Libellés FR du statut de connexion Gemini Live.
+const CONNECTION_LABEL: Record<string, string> = {
+  connected: 'Connectée',
+  connecting: 'Connexion…',
+  idle: 'Hors ligne',
+};
+
+// Valeur qui « roule » quand elle change (compteurs de tokens).
+function RollingValue({ value }: { value: string }) {
+  return (
+    <span className="relative inline-flex overflow-hidden">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={value}
+          className="inline-block"
+          initial={{ y: '90%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '-90%', opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+// Jauge de remplissage du contexte (vert → orange → rouge).
+function ContextMeter({ ratio }: { ratio: number }) {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const color = clamped > 0.85 ? 'var(--color-error)' : clamped > 0.6 ? 'var(--color-warning)' : 'var(--accent-primary)';
+  return (
+    <span className="lea-ctx-meter" aria-hidden="true">
+      <motion.span
+        className="lea-ctx-meter__fill"
+        style={{ backgroundColor: color, originX: 0 }}
+        initial={false}
+        animate={{ scaleX: clamped }}
+        transition={{ type: 'spring', stiffness: 160, damping: 24 }}
+      />
+    </span>
   );
 }
 
@@ -804,13 +851,13 @@ export const StatusBar = memo(function StatusBar({
       </AnimatePresence>
 
       <div
-        className="group/bar flex items-center gap-2 px-3 h-9 border-t select-none text-sm backdrop-blur"
-        style={{
-          borderColor: 'var(--border-base)',
-          background: 'linear-gradient(to top, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 92%, transparent))',
-          boxShadow: '0 -1px 8px rgba(0,0,0,0.12)',
-        }}
+        className="lea-statusbar group/bar relative flex items-center gap-2 px-3 h-9 border-t select-none text-sm"
+        data-busy={assistantBusy ? 'true' : undefined}
+        data-connected={status === 'connected' ? 'true' : undefined}
+        style={{ borderColor: 'var(--border-base)' }}
       >
+        {/* Liseré supérieur : lueur qui balaie la barre pendant que l'IA travaille */}
+        <span className="lea-statusbar__beam" aria-hidden="true" />
         {/* ─── Zone gauche : statuts en permanence visibles ──────────────── */}
         <div className="flex items-center gap-1">
           {/* Gemini Live Connection Status */}
@@ -818,7 +865,7 @@ export const StatusBar = memo(function StatusBar({
             type="button"
             className={PILL}
             style={{ color: 'var(--text-secondary)' }}
-            title={`Statut Gemini Live : ${status}`}
+            title={`Statut Gemini Live : ${CONNECTION_LABEL[status] ?? status}`}
           >
             {status === 'connected' ? (
               <Wifi size={13} style={{ color: 'var(--color-success)' }} />
@@ -827,8 +874,11 @@ export const StatusBar = memo(function StatusBar({
             ) : (
               <WifiOff size={13} style={{ color: 'var(--text-muted)' }} />
             )}
-            <span className="truncate max-w-[110px] capitalize">
-              {status}
+            <span
+              className="truncate max-w-[110px]"
+              style={{ color: status === 'connected' ? 'var(--color-success)' : undefined }}
+            >
+              <RollingValue value={CONNECTION_LABEL[status] ?? status} />
             </span>
           </button>
           {/* Sandbox — dot + label */}
@@ -959,7 +1009,7 @@ export const StatusBar = memo(function StatusBar({
                 style={{ color: 'var(--color-warning)', backgroundColor: 'var(--color-warning-subtle)' }}
               >
                 <LoaderCircle size={12} className="animate-spin" />
-                <span>Traitement…</span>
+                <span className="lea-shimmer-text">Traitement…</span>
               </motion.span>
             )}
           </AnimatePresence>
@@ -972,7 +1022,7 @@ export const StatusBar = memo(function StatusBar({
                 pulse={dirty}
               />
               <span style={{ color: dirty ? 'var(--color-warning)' : 'var(--color-success)' }}>
-                {dirty ? 'Modifié' : 'Sauvé'}
+                <RollingValue value={dirty ? 'Modifié' : 'Sauvé'} />
               </span>
             </span>
           )}
@@ -1006,11 +1056,12 @@ export const StatusBar = memo(function StatusBar({
           >
             <span className="flex items-center gap-1 tabular-nums font-semibold text-xs leading-none">
               <Hash size={11} className="opacity-50" />
-              {tokenUsage.totalTokens > 0 ? formatTokenCount(tokenUsage.totalTokens) : '—'}
+              <RollingValue value={tokenUsage.totalTokens > 0 ? formatTokenCount(tokenUsage.totalTokens) : '—'} />
             </span>
             <span className="flex items-center gap-1 tabular-nums font-semibold text-xs leading-none">
               <FileText size={11} className="opacity-50" />
-              {formatTokenCount(promptContext.currentSize)}/{formatTokenCount(promptContext.maxSize)}
+              <RollingValue value={formatTokenCount(promptContext.currentSize)} />/{formatTokenCount(promptContext.maxSize)}
+              <ContextMeter ratio={promptContext.maxSize > 0 ? promptContext.currentSize / promptContext.maxSize : 0} />
             </span>
             {suggestion && (
               <span

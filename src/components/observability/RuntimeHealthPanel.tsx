@@ -41,7 +41,7 @@ export function RuntimeHealthPanel({ snapshot, available }: { snapshot: RuntimeS
           <CheckCircle2 className="h-4 w-4" style={{ color: 'var(--accent-secondary)' }} />
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Fiabilité des tâches</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="lea-stagger grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Metric
             label="Taux de succès"
             value={successRate === null ? '—' : `${Math.round(successRate * 100)}%`}

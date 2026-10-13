@@ -11,6 +11,7 @@ release/
 .Leanna/
 .kiro/
 .vscode/
+.design-backup/
 .claude/
 .Leanna-audit.log
 .Leanna-profile.json

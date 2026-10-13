@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Box, CheckCircle2, Eye, X } from 'lucide-react';
+import { Box, Eye, X } from 'lucide-react';
 
 const SandboxPanel = lazy(() =>
   import('../panels/SandboxPanel.js').then((module) => ({ default: module.SandboxPanel })),
@@ -21,9 +21,9 @@ interface SandboxWorkspaceProps {
 function SandboxLoading() {
   return (
     <div className="flex flex-1 items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-      <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 text-xs" role="status">
         <Box size={14} className="animate-pulse" />
-        Chargement du sandbox...
+        Chargement du sandbox…
       </div>
     </div>
   );
@@ -43,7 +43,7 @@ export function SandboxWorkspace({
       style={{ backgroundColor: 'var(--bg-panel)' }}
     >
       <header
-        className="relative flex shrink-0 items-center justify-between border-b px-5 py-3.5"
+        className="lea-sbx-header relative flex shrink-0 items-center justify-between border-b px-5 py-3.5"
         style={{
           borderColor: 'var(--border-base)',
           background: 'linear-gradient(105deg, color-mix(in srgb, var(--bg-panel) 92%, var(--accent-primary)), var(--bg-panel))',
@@ -73,7 +73,7 @@ export function SandboxWorkspace({
                   backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)',
                 }}
               >
-                <CheckCircle2 size={10} />
+                <span className="lea-live-dot" style={{ width: 6, height: 6 }} aria-hidden="true" />
                 Isolé
               </span>
             </div>
@@ -93,7 +93,14 @@ export function SandboxWorkspace({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+      {/* En mode diff, le visualiseur gère lui-même ses zones défilantes
+          (colonnes synchronisées, navigation entre changements) : le conteneur
+          doit donc lui transmettre sa hauteur au lieu de défiler en bloc. */}
+      <div
+        className={view === 'diff'
+          ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+          : 'min-h-0 flex-1 overflow-y-auto custom-scrollbar'}
+      >
         <Suspense fallback={<SandboxLoading />}>
           {view === 'diff' ? (
             <SandboxDiffViewer
