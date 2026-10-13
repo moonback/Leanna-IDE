@@ -11,11 +11,22 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   BookText, Save, RotateCcw, RefreshCw, Search, Loader2,
-  PencilLine, Undo2, Braces,
+  PencilLine, Undo2, Braces, Code2, Eye, Hash,
 } from 'lucide-react';
 import { Section } from './SettingsPrimitives.js';
 import { useToast } from '../ui/Toast.js';
 import { useConfirm } from '../ui/ConfirmDialog.js';
+import { renderChatMarkdown } from '../../utils/chatMarkdown.js';
+import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
+import { formatTokenCount, formatExactTokenCount } from '../../utils/tokenFormatting.js';
+
+/**
+ * Estimation locale des tokens (~4 caractères/token), cohérente avec le reste
+ * de l'app. Suffisant pour un repère visuel pendant l'édition.
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil((text?.length ?? 0) / 4);
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,8 +73,30 @@ export function NotebookPromptsSection() {
   const [originalContent, setOriginalContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
   const dirty = content !== originalContent;
+
+  // Aperçu Markdown rendu (pipeline sûr identique au chat : marked + sanitize).
+  // Les placeholders {{var}} restent affichés tels quels — c'est volontaire,
+  // ils signalent où le contenu dynamique sera injecté.
+  const previewHtml = useMemo(() => {
+    if (viewMode !== 'preview') return '';
+    try {
+      return sanitizeMarkdownHtml(renderChatMarkdown(content));
+    } catch {
+      return '<p>Erreur lors du rendu Markdown.</p>';
+    }
+  }, [viewMode, content]);
+
+  // Tokens du prompt courant (estimation locale, live pendant la frappe).
+  const liveTokens = useMemo(() => estimateTokens(content), [content]);
+
+  // Total estimé de tous les prompts (badge de section).
+  const totalTokens = useMemo(
+    () => prompts.reduce((sum, p) => sum + estimateTokens(p.content), 0),
+    [prompts],
+  );
 
   // ── Chargement de la liste ─────────────────────────────────────────────────
   const loadPrompts = useCallback(async () => {
@@ -227,7 +260,7 @@ export function NotebookPromptsSection() {
       icon={BookText}
       title="Prompts Notebooks"
       description="Personnalisez tous les prompts système utilisés par les notebooks (chat, génération de documents, rapports, recherche RAG, assistant vocal)."
-      badge={`${prompts.length} prompts${overriddenCount > 0 ? ` · ${overriddenCount} modifié${overriddenCount > 1 ? 's' : ''}` : ''}`}
+      badge={`${prompts.length} prompts · ~${formatTokenCount(totalTokens)} tokens${overriddenCount > 0 ? ` · ${overriddenCount} modifié${overriddenCount > 1 ? 's' : ''}` : ''}`}
     >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,260px)_1fr]">
         {/* ── Liste ──────────────────────────────────────────────────────── */}
@@ -286,11 +319,17 @@ export function NotebookPromptsSection() {
                         border: `1px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}`,
                       }}
                     >
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium"
-                        style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
-                        title={p.label}
-                      >
-                        {p.label}
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-xs font-medium"
+                          style={{ color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                          title={p.label}
+                        >
+                          {p.label}
+                        </span>
+                        <span className="flex items-center gap-0.5 text-xs font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                          <Hash className="h-2.5 w-2.5 opacity-60" />
+                          {formatTokenCount(estimateTokens(p.content))} tokens
+                        </span>
                       </span>
                       {p.overridden && !isDirtyItem && (
                         <PencilLine className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
@@ -339,8 +378,41 @@ export function NotebookPromptsSection() {
                   <p className="mt-0.5 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {selected.description}
                   </p>
+                  <p className="mt-0.5 flex items-center gap-1 text-xs font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}
+                    title={`${formatExactTokenCount(liveTokens)} tokens estimés`}>
+                    <Hash className="h-2.5 w-2.5 opacity-60" />
+                    ~{formatTokenCount(liveTokens)} tokens
+                    {selected.overridden && (
+                      <span className="ml-1.5 flex items-center gap-0.5 rounded px-1 py-0.5 font-sans font-medium"
+                        style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                        <PencilLine className="h-2.5 w-2.5" /> personnalisé
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-1.5">
+                  {/* Bascule Éditer / Aperçu */}
+                  <div className="flex items-center rounded-lg p-0.5"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('edit')}
+                      title="Éditer"
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all"
+                      style={{ backgroundColor: viewMode === 'edit' ? 'var(--accent-primary)' : 'transparent', color: viewMode === 'edit' ? '#fff' : 'var(--text-muted)' }}
+                    >
+                      <Code2 className="h-3 w-3" /> Éditer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('preview')}
+                      title="Aperçu du Markdown rendu"
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all"
+                      style={{ backgroundColor: viewMode === 'preview' ? 'var(--accent-primary)' : 'transparent', color: viewMode === 'preview' ? '#fff' : 'var(--text-muted)' }}
+                    >
+                      <Eye className="h-3 w-3" /> Aperçu
+                    </button>
+                  </div>
                   {dirty && (
                     <motion.button
                       type="button"
@@ -378,13 +450,21 @@ export function NotebookPromptsSection() {
                 </div>
               </div>
 
-              <textarea
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                spellCheck={false}
-                className="min-h-[360px] w-full flex-1 resize-y rounded-xl border p-3 text-xs leading-relaxed outline-none font-mono custom-scrollbar"
-                style={{ backgroundColor: 'var(--bg-input)', borderColor: dirty ? 'var(--color-warning)' : 'var(--border-base)', color: 'var(--text-primary)' }}
-              />
+              {viewMode === 'edit' ? (
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  spellCheck={false}
+                  className="min-h-[360px] w-full flex-1 resize-y rounded-xl border p-3 text-xs leading-relaxed outline-none font-mono custom-scrollbar"
+                  style={{ backgroundColor: 'var(--bg-input)', borderColor: dirty ? 'var(--color-warning)' : 'var(--border-base)', color: 'var(--text-primary)' }}
+                />
+              ) : (
+                <div
+                  className="markdown-body min-h-[360px] w-full flex-1 overflow-auto rounded-xl border p-4 text-sm leading-relaxed custom-scrollbar"
+                  style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              )}
 
               {/* Placeholders disponibles */}
               {selected.placeholders.length > 0 && (
