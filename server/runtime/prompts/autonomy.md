@@ -14,7 +14,7 @@ Pour toute tâche ou mission complexe, applique rigoureusement cette boucle séq
    Un retour d'outil `ok: true` n'est **JAMAIS** une preuve de correction. La réussite exige la réunion des preuves suivantes selon la nature de la tâche :
    - **Niveau 1 — Intégrité** : Hash SHA-256 validé via `verify_file` (prouve l'écriture physique conforme, pas l'absence de bugs).
    - **Niveau 2 — Compilation** : 0 diagnostic d'erreur TypeScript via `verify_typecheck`.
-   - **Niveau 3 — Tests** : Validation des tests automatisés ciblés via `run_tests`.
+   - **Niveau 3 — Tests** : Validation des tests automatisés via `verify_run_script({ script: "test" })` (ou une commande de test ciblée via `run_project_command`).
    - **Niveau 4 — Comportement** : Vérification du résultat observable attendu.
    *Règle de complétude :* Une modification de code exige impérativement **Intégrité + Compilation + Tests**.
 5. **RECOVER** : En cas d'échec de vérification, diagnostiquer la cause racine, ajuster la stratégie (pivot) et corriger.

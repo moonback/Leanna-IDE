@@ -3,7 +3,12 @@
  * 
  * Extrait le résumé, les suggestions et normalise la sortie des agents.
  * Ce fichier existe uniquement pour que AgentExecutor.ts continue à fonctionner.
+ *
+ * Comprend le contrat XML `<result>` imposé par les prompts d'agents (prioritaire)
+ * et, en repli, les titres Markdown historiques (## Résumé / ## Recommandations).
  */
+
+import { parseFinalReport, noteItems } from "./FinalReportParser.js";
 
 export class ResultParser {
   /**
@@ -20,6 +25,8 @@ export class ResultParser {
    * Extrait un résumé court de la sortie de l'agent.
    */
   extractSummary(text: string): string {
+    const report = parseFinalReport(text);
+    if (report) return report.summary.slice(0, 500);
     // Chercher ## Résumé
     const summaryMatch = text.match(/## Résumé\n([\s\S]*?)(?=\n##|$)/);
     if (summaryMatch) {
@@ -34,6 +41,11 @@ export class ResultParser {
    * Extrait les suggestions/recommandations de la sortie.
    */
   extractSuggestions(text: string): string[] | undefined {
+    const report = parseFinalReport(text);
+    if (report) {
+      const items = noteItems(report.notes);
+      if (items.length > 0) return items;
+    }
     const sugMatch = text.match(/## Recommandations([\s\S]*?)(?=\n##|$)/);
     if (!sugMatch) return undefined;
 
@@ -141,6 +153,18 @@ export class ResultParser {
       };
       return map[v] ?? null;
     };
+
+    // Forme 0 : attribut du contrat XML <result status="...">
+    const report = parseFinalReport(text);
+    if (report?.status) {
+      const outcome = report.status === "needs_input" ? "blocked" : normalize(report.status);
+      if (outcome) {
+        const reason = outcome === "failed" || outcome === "blocked"
+          ? report.summary.slice(0, 300)
+          : undefined;
+        return { outcome, ...(reason ? { reason } : {}) };
+      }
+    }
 
     // Forme 1 : commentaire machine <!-- leanna:outcome=... reason=... -->
     const comment = text.match(

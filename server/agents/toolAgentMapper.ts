@@ -173,16 +173,22 @@ const SENSITIVE_TOOL_ATTRIBUTION: Record<
   security_audit: { preferred: 'security', allowed: ['security', 'reviewer'], risk: 'exec' },
   // Tests & vérification — pilotés par le testeur/débogueur.
   run_tests: { preferred: 'tester', allowed: ['tester', 'debugger', 'coder'], risk: 'exec' },
-  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger'], risk: 'exec' },
-  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect'], risk: 'exec' },
-  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder'], risk: 'exec' },
+  // Les outils verify_* n'altèrent pas le code : tout rôle qui les DÉCLARE dans
+  // ses capabilities doit pouvoir les appeler. Un rôle déclaré mais non autorisé
+  // était refusé en mode "enforce" — et comme le runtime appelle verify_file
+  // automatiquement après chaque écriture, CHAQUE livrable de writer/formatter/
+  // documentation… échouait sa vérification et partait en boucle de réparation.
+  verify_full: { preferred: 'tester', allowed: ['tester', 'reviewer', 'debugger', 'coder', 'refactor', 'performance'], risk: 'exec' },
+  verify_run_script: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'refactor'], risk: 'exec' },
+  verify_typecheck: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect', 'refactor', 'reviewer', 'security'], risk: 'exec' },
+  verify_lint: { preferred: 'tester', allowed: ['tester', 'reviewer', 'coder', 'refactor', 'debugger', 'security'], risk: 'exec' },
   // `architect` est autorisé : le runtime le force à vérifier le livrable qu'il
   // vient d'écrire (phase VERIFY). Sans cette autorisation, la relance forcée
   // vers verify_file échouait sur une exception de permission → outcome=partial,
   // 0 fichier (observé en prod sur l'agent Architecte Logiciel).
-  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect'], risk: 'exec' },
+  verify_file: { preferred: 'tester', allowed: ['tester', 'coder', 'debugger', 'architect', 'refactor', 'reviewer', 'writer', 'formatter', 'proofreader', 'planner', 'documentation', 'performance', 'ui_ux', 'seo', 'accessibility', 'translator', 'summarizer'], risk: 'exec' },
   // Exécution shell — attribuée au développeur (contexte d'exécution projet).
-  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger'], risk: 'exec' },
+  run_project_command: { preferred: 'coder', allowed: ['coder', 'tester', 'debugger', 'refactor', 'performance'], risk: 'exec' },
   system_execute_command: { preferred: 'coder', allowed: ['coder', 'tester'], risk: 'exec' },
   // Opérations destructrices — développeur, jamais deviné.
   delete_project_file: { preferred: 'coder', allowed: ['coder', 'refactor'], risk: 'dangerous' },

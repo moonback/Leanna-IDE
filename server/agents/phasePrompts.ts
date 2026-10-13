@@ -52,7 +52,7 @@ const PHASE_GUIDANCE: Record<AgentPhase, string[]> = {
   verify: [
     "PHASE ACTUELLE — VÉRIFICATION :",
     "- Objectif : prouver INDÉPENDAMMENT que le travail est correct (verify_file,",
-    "  verify_typecheck, run_tests). Ne te fie pas à ta propre certitude.",
+    "  verify_typecheck, verify_run_script test). Ne te fie pas à ta propre certitude.",
     "- Si la vérification passe : termine par la réponse finale + statut structuré.",
     "- Si elle échoue : décris l'écart précis — tu passeras en RÉCUPÉRATION.",
   ],

@@ -62,6 +62,16 @@ function serializeTaskDetail(task: any) {
     startedAt: task.startedAt,
     completedAt: task.completedAt,
     timeoutMs: task.timeoutMs,
+    execution: task.execution ? {
+      intent: clip(task.execution.intent, 500),
+      successCriteria: clipList(task.execution.successCriteria, 20),
+      steps: Array.isArray(task.execution.steps)
+        ? task.execution.steps.slice(0, 20).map((s: any) => ({ description: clip(s.description, 400), status: s.status }))
+        : [],
+      budget: task.execution.budget,
+      recoveries: task.execution.recoveries,
+      replans: task.execution.replans,
+    } : undefined,
     context: {
       files: clipList(task.context?.files),
       instructions: clip(task.context?.instructions, 4000),
@@ -80,6 +90,13 @@ function serializeTaskDetail(task: any) {
       error: clip(r.error, 4000),
       durationMs: r.durationMs,
       delegatedSubTasks: clipList(r.delegatedSubTasks, 50),
+      proposedDelegations: Array.isArray(r.proposedDelegations)
+        ? r.proposedDelegations.slice(0, 10).map((d: any) => ({
+          role: typeof d.role === 'string' ? d.role : undefined,
+          reason: clip(d.reason, 1000),
+          files: clipList(d.files, 50),
+        }))
+        : [],
       evidence: ev ? {
         filesRead: clipList(ev.filesRead),
         filesModified: clipList(ev.filesModified),
@@ -295,6 +312,37 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         tasks: plan.tasks.length,
         message: `Collaboration "${patternName}" démarrée`,
       });
+    } catch (e: any) {
+      return res.status(400).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/agents/delegate
+   * Lance une délégation PROPOSÉE par un agent (bouton « Lancer » du détail de
+   * mission). Avec un rôle : délégation directe via le runtime agentique ; sans
+   * rôle : mise aux enchères (contract-net) parmi les agents compétents.
+   * Body: { role?, title, description, files?, instructions?, priority? }
+   */
+  router.post('/delegate', async (req: Request, res: Response) => {
+    try {
+      const parsed = DelegateSchema.extend({ role: z.string().optional() }).safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'Corps de requête invalide.',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
+        });
+      }
+      const { role, ...rest } = parsed.data;
+      if (role) {
+        const task = await agentOrchestrator.delegateTask({ ...rest, role });
+        return res.status(202).json({ taskId: task.id, role: task.role, status: task.status });
+      }
+      const outcome = await agentOrchestrator.negotiateTask(rest);
+      if (!outcome.awarded) {
+        return res.status(409).json({ error: 'Aucun agent compétent disponible pour cette sous-tâche.' });
+      }
+      return res.status(202).json({ taskId: outcome.taskId, role: outcome.winner, status: 'pending' });
     } catch (e: any) {
       return res.status(400).json({ error: e.message });
     }

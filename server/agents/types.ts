@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ExecutionTrace, ProposedDelegation } from "../runtime/agentic/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types du système d'agents multi-rôles
@@ -242,6 +243,11 @@ export interface AgentTask {
   completedAt?: string;
   /** Timeout en ms (override du défaut) */
   timeoutMs?: number;
+  /**
+   * Trace d'exécution du runtime agentique (plan, statut par étape, budget),
+   * mise à jour EN DIRECT pendant la mission pour l'affichage UI.
+   */
+  execution?: ExecutionTrace;
 }
 
 /** Contexte fourni à un agent pour exécuter sa tâche */
@@ -297,6 +303,8 @@ export interface TaskResult {
   }>;
   /** Preuves collectées par l'exécuteur, distinctes de la narration du modèle. */
   evidence?: TaskEvidence;
+  /** Délégations proposées par l'agent, à lancer (ou non) par l'utilisateur. */
+  proposedDelegations?: ProposedDelegation[];
 }
 
 /** Éléments vérifiables nécessaires pour déclarer une tâche terminée. */
