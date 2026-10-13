@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import {
   AlertTriangle, Check, CheckCircle2, ChevronDown, ClipboardCopy, Clock, FileCode2,
-  FileSearch, Flag, Gauge, Lightbulb, ListChecks, Loader2, Play, Send, ShieldCheck, ShieldX,
+  FileSearch, Flag, Gauge, Lightbulb, ListChecks, Loader2, Play, RefreshCw, Send, ShieldCheck, ShieldX,
   Target, Terminal, Wrench, XCircle,
 } from 'lucide-react';
 
@@ -446,6 +446,7 @@ export function MissionDetail({
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [retry, setRetry] = useState<LaunchState>({ kind: 'idle' });
 
   // Horloge locale pour la chronologie d'une mission en cours
   useEffect(() => {
@@ -462,6 +463,31 @@ export function MissionDetail({
   const ev = r?.evidence;
   const modified = useMemo(() => [...new Set([...(r?.filesModified ?? []), ...(ev?.filesModified ?? [])])], [r, ev]);
   const tools = useMemo(() => countBy(ev?.toolsExecuted ?? []), [ev]);
+
+  /** Relance une mission échouée/annulée : même agent, même brief, nouvelle tâche. */
+  const retryMission = async () => {
+    if (!data) return;
+    setRetry({ kind: 'busy' });
+    try {
+      const res = await fetch('/api/agents/delegate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({
+          role: data.role,
+          title: data.title,
+          description: data.description || data.title,
+          files: data.context?.files ?? [],
+          instructions: data.context?.instructions,
+          ...(data.priority && ['low', 'medium', 'high', 'critical'].includes(data.priority) ? { priority: data.priority } : {}),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? `Erreur ${res.status}`);
+      setRetry({ kind: 'done', role: json.role ?? data.role });
+    } catch (e) {
+      setRetry({ kind: 'error', message: (e as Error).message });
+    }
+  };
 
   const copyReport = () => {
     if (!data) return;
@@ -528,11 +554,33 @@ export function MissionDetail({
         )}
         {live && <span className="lea-mission-tag" style={{ color: 'var(--text-muted)', background: 'var(--bg-hover)' }}><Loader2 size={10} className="animate-spin" /> Suivi en direct</span>}
         <div className="flex-1" />
+        {(data.status === 'failed' || data.status === 'cancelled') && (
+          retry.kind === 'done' ? (
+            <span className="lea-mission-action" style={{ color: 'var(--color-success)' }} role="status">
+              <Check size={11} /> Relancée
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={retryMission}
+              disabled={retry.kind === 'busy'}
+              className="lea-mission-action"
+              title="Relancer la mission avec le même agent et le même brief"
+            >
+              {retry.kind === 'busy' ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+              Relancer
+            </button>
+          )
+        )}
         <button type="button" onClick={copyReport} className="lea-mission-action" title="Copier le rapport en Markdown">
           {copied ? <Check size={11} style={{ color: 'var(--color-success)' }} /> : <ClipboardCopy size={11} />}
           {copied ? 'Copié' : 'Rapport'}
         </button>
       </div>
+
+      {retry.kind === 'error' && (
+        <p className="text-xs" style={{ color: 'var(--color-error)' }} role="alert">Relance impossible : {retry.message}</p>
+      )}
 
       {/* Erreur / blocage en premier : c'est ce que l'on cherche */}
       {(r?.error || r?.blockReason) && (

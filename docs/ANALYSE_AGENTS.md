@@ -132,6 +132,30 @@ Le design réutilise les primitives existantes (`lea-steps`, `lea-mission-*`) et
 
 ---
 
+## 4 bis. Système de missions (`/api/missions`, `MissionPanel`)
+
+Le système de missions (Executor : décomposition en objectifs, réflexion, replanification) est distinct des tâches d'agent. Défauts corrigés :
+
+| Défaut | Effet | Correctif |
+|---|---|---|
+| La pause n'était pas dans `status` (seulement un champ `paused`, ignoré par l'UI) | Le polling du panneau (toutes les 3 s) repassait une mission « En pause » à « En cours » | Statut `paused` exposé par la route et respecté par le panneau |
+| Statut `cancelled` inconnu du panneau | Une mission annulée s'affichait « En attente » et disparaissait des compteurs ; l'annulation optimiste la marquait « Échouée » | Statut « Annulée » géré partout (icône, libellé, filtres, historique) |
+| Plan uniquement transmis par l'événement `mission_plan` | Panneau ouvert après le lancement : plan jamais visible ; la fusion de sync l'effaçait (`undefined`) | `Executor.getMissionPlan()` + plan exposé par la route ; fusion qui conserve le plan reçu en live |
+| Barre « de progression » = succès / actions | Mesurait un taux de réussite, pas l'avancement | Avancement = objectifs atteints / objectifs planifiés (+ compteur `x/y`) |
+| `{durationMs && …}` | Affichait un « 0 » parasite | Condition explicite |
+| Données annexes jamais libérées | Plans / auto-évaluations conservés après suppression ou éviction | `forgetMissionArtifacts()` à la suppression et à l'éviction de l'historique |
+
+Ajouts :
+- **Route** : description, durée, `completedAt`, dernière erreur, nombre d'erreurs, cause d'échec par action, auto-évaluation, tri (missions vivantes puis plus récentes).
+- **Relance** : `POST /api/missions/:id/retry` relance le même brief (refusé tant que la mission est active).
+- **Panneau** :
+  - filtres toutes / actives / terminées ;
+  - choix de priorité et Ctrl+Entrée à la création ;
+  - bouton « Relancer » ;
+  - dans le détail d'une mission : description, encart de dernière erreur, auto-évaluation (score global, 5 sous-scores, « la prochaine fois »), durée, priorité, cause d'échec sous chaque action ;
+  - erreurs d'action remontées au lieu d'être avalées en console.
+- **`MissionDetail`** (tâches d'agent) : bouton « Relancer » pour une tâche échouée ou annulée (même agent, même brief, mêmes fichiers).
+
 ## 5. Recommandations (non implémentées)
 
 Classées par rapport impact / effort.

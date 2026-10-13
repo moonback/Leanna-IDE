@@ -160,6 +160,12 @@ export class Executor {
   private readonly learningResults = new Map<string, LearningResult>();
   /** Self-critique evaluations per mission (plan vs execution vs result). */
   private readonly selfEvaluations = new Map<string, import("./SelfEvaluation.js").SelfEvaluation>();
+  /**
+   * Plan initial (objectifs, outils, estimation coût/durée/risque) par mission.
+   * Auparavant transmis UNIQUEMENT via l'événement `mission_plan` : un panneau
+   * ouvert après le lancement (ou rechargé) ne le revoyait jamais.
+   */
+  private readonly missionPlans = new Map<string, MissionPlan>();
 
   /**
    * Missions mises en pause par l'utilisateur.
@@ -484,6 +490,7 @@ export class Executor {
     }
 
     const plan = await this.preparePlan(mission, params.availableSkills);
+    this.missionPlans.set(mission.id, plan);
 
     this.activeMissions.set(mission.id, mission);
     await this.persist(mission);
@@ -771,6 +778,18 @@ export class Executor {
     };
   }
 
+  /** Plan initial d'une mission (actif ou historique en mémoire), s'il est connu. */
+  getMissionPlan(missionId: string): MissionPlan | undefined {
+    return this.missionPlans.get(missionId);
+  }
+
+  /** Libère les données annexes (plan, auto-évaluation, apprentissage) d'une mission. */
+  private forgetMissionArtifacts(missionId: string): void {
+    this.missionPlans.delete(missionId);
+    this.selfEvaluations.delete(missionId);
+    this.learningResults.delete(missionId);
+  }
+
   /**
    * Récupère une mission active.
    */
@@ -930,6 +949,7 @@ export class Executor {
     const removedFromHistory = this.completedMissions.length < beforeLen;
 
     this.pausedMissions.delete(missionId);
+    this.forgetMissionArtifacts(missionId);
 
     // Retirer de la file des missions interrompues en attente de décision.
     // Sans ça, une mission « effacée » qui n'était présente QUE dans la file de
@@ -2485,7 +2505,8 @@ JSON:`;
     this.activeMissions.delete(mission.id);
     this.completedMissions.push(mission);
     if (this.completedMissions.length > Executor.MAX_COMPLETED) {
-      this.completedMissions.shift();
+      const evicted = this.completedMissions.shift();
+      if (evicted) this.forgetMissionArtifacts(evicted.id);
     }
     // Persistance finale (statut terminal).
     void this.persist(mission);

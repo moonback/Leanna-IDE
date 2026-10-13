@@ -15,6 +15,12 @@ import { projectDoctor } from "../knowledge/index.js";
  * L'Executor est fourni via un getter, car il est initialisé de façon
  * asynchrone dans le bootstrap (peut être null au tout début).
  */
+/** Borne une chaîne pour la réponse JSON (jamais de champ géant). */
+function clipText(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 export function createMissionsRouter(
   getExecutor: () => any | null,
   handleToolCall?: (name: string, args: any) => Promise<any>
@@ -132,10 +138,12 @@ export function createMissionsRouter(
   /** Sérialise une Mission (instance) vers la forme attendue par le frontend. */
   const serializeMission = (mission: any, executor?: any) => {
     const state = mission.getState();
-    // L'état de pause est suivi dans l'Executor (pas dans mission.status, qui
-    // reste "in_progress" pendant une pause). On l'expose explicitement pour que
-    // l'UI puisse proposer la bonne action (pause vs reprise).
+    // L'état de pause est suivi dans l'Executor (mission.status reste
+    // "in_progress" pendant une pause). On le reflète DANS le statut : sinon le
+    // rafraîchissement périodique du panneau écrasait le « En pause » optimiste
+    // par « En cours » toutes les 3 s. `paused` reste exposé pour compatibilité.
     const paused = typeof executor?.isPaused === "function" ? executor.isPaused(state.id) === true : false;
+    const status = paused && state.status === "in_progress" ? "paused" : state.status;
     const goalsRecord = state.goals ?? {};
     // Sous-objectifs = tous les goals ayant un parent (on exclut la racine).
     const goals = Object.values(goalsRecord)
@@ -151,13 +159,24 @@ export function createMissionsRouter(
           confidence: a.reflection?.confidence,
           decision: a.reflection?.decision,
           durationMs: a.durationMs,
+          // Cause lisible d'un échec (réflexion post-action), bornée.
+          failure: clipText(a.reflection?.failure, 300),
         })),
       }));
+
+    const errors: Array<{ action: string; error: string }> = state.context?.errors ?? [];
+    const lastError = errors.length > 0 ? errors[errors.length - 1] : undefined;
+    const end = state.completedAt ? Date.parse(state.completedAt) : Date.now();
+    const start = Date.parse(state.createdAt);
+    const evaluation = typeof executor?.getSelfEvaluation === "function"
+      ? executor.getSelfEvaluation(state.id)
+      : undefined;
 
     return {
       id: state.id,
       title: state.title,
-      status: state.status,
+      description: clipText(state.description, 2000),
+      status,
       paused,
       priority: state.priority,
       goals,
@@ -169,17 +188,37 @@ export function createMissionsRouter(
         failedActions: state.metrics?.failedActions ?? 0,
       },
       createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      completedAt: state.completedAt,
+      durationMs: Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : undefined,
+      lastError: lastError
+        ? { action: String(lastError.action), error: clipText(lastError.error, 500) }
+        : undefined,
+      errorCount: errors.length,
+      plan: typeof executor?.getMissionPlan === "function" ? executor.getMissionPlan(state.id) : undefined,
+      selfEvaluation: evaluation
+        ? {
+            overall: evaluation.overall,
+            scores: evaluation.scores,
+            summary: clipText(evaluation.summary, 600),
+            notes: (evaluation.notes ?? []).slice(0, 5),
+            nextTimeStartWith: clipText(evaluation.nextTimeStartWith, 300),
+          }
+        : undefined,
     };
   };
 
   // ── Lister les missions (actives + complétées) — état initial du panneau ──
+  // Tri : missions vivantes d'abord, puis les plus récentes.
   router.get("/missions", (_req: Request, res: Response) => {
     const executor = requireExecutor(res);
     if (!executor) return;
     try {
       const active = (executor.listActiveMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
       const completed = (executor.listCompletedMissions?.() ?? []).map((m: any) => serializeMission(m, executor));
-      return res.json({ missions: [...active, ...completed] });
+      const byRecency = (a: { createdAt: string }, b: { createdAt: string }) =>
+        Date.parse(b.createdAt) - Date.parse(a.createdAt);
+      return res.json({ missions: [...active.sort(byRecency), ...completed.sort(byRecency)] });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }
@@ -324,6 +363,39 @@ export function createMissionsRouter(
       });
     }
     return res.json({ ok: true, missionId, status: "cancelled" });
+  });
+
+  // ── Relancer une mission terminée (même brief, nouvelle mission) ─────────
+  // Uniquement depuis l'historique : relancer une mission encore vivante
+  // créerait un doublon concurrent sur les mêmes fichiers.
+  router.post("/missions/:id/retry", async (req: Request, res: Response) => {
+    const executor = requireExecutor(res);
+    if (!executor) return;
+    if (!handleToolCall) {
+      return res.status(503).json({ error: "Création de mission indisponible (handler non configuré)." });
+    }
+    const missionId = req.params.id;
+    if (executor.getMission?.(missionId)) {
+      return res.status(409).json({ error: "Mission encore active : annulez-la avant de la relancer.", missionId });
+    }
+    const mission = findMission(executor, missionId);
+    if (!mission) {
+      return res.status(404).json({ error: "Mission introuvable.", missionId });
+    }
+    const state = mission.getState();
+    try {
+      const result = await handleToolCall("mission_create", {
+        title: state.title,
+        description: state.description || state.title,
+        priority: state.priority ?? "medium",
+      });
+      if (result && typeof result === "object" && "error" in result) {
+        return res.status(400).json(result);
+      }
+      return res.json({ ...(result as object), retriedFrom: missionId });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
   });
 
   // ── Supprimer une mission (active → annulée puis retirée, ou historique) ──

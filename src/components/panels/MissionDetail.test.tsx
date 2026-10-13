@@ -73,4 +73,22 @@ describe('MissionDetail — plan et délégations', () => {
     expect(body).toMatchObject({ role: 'tester', files: ['src/List.tsx'] });
     expect(body.description).toContain('Ajouter la pagination');
   });
+
+  it('relance une mission échouée avec le même agent et le même brief', async () => {
+    const user = userEvent.setup();
+    const failed = { ...TASK, status: 'failed', description: 'Paginer la liste', context: { files: ['src/List.tsx'], instructions: 'garder l’API', successCriteria: [], previousResultsCount: 0 } };
+    const fetchMock = mockFetchRouter([
+      { match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: failed }) },
+      { match: '/api/agents/delegate', respond: () => jsonResponse({ taskId: 't3', role: 'coder' }) },
+    ]);
+    renderWithProviders(<MissionDetail taskId="task-1" status="failed" color="#4f8cff" />);
+
+    await user.click(await screen.findByRole('button', { name: /^Relancer$/ }));
+    await waitFor(() => expect(screen.getByText('Relancée')).toBeInTheDocument());
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/api/agents/delegate'));
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
+      role: 'coder', title: 'Ajouter la pagination', description: 'Paginer la liste',
+      files: ['src/List.tsx'], instructions: 'garder l’API',
+    });
+  });
 });

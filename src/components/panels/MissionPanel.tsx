@@ -4,7 +4,7 @@ import {
   Target, Loader2, CheckCircle2, XCircle, AlertTriangle,
   ChevronRight, Brain, Zap, RotateCcw, Pause, Play,
   TrendingUp, TrendingDown, Minus, Clock, Plus, Trash2, X,
-  DollarSign, Timer, Shield, Activity,
+  DollarSign, Timer, Shield, Activity, Ban, RefreshCw, Sparkles,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
 import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
@@ -62,10 +62,22 @@ interface MissionPlan {
   estimationConfidence?: number;
 }
 
+type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused' | 'cancelled';
+
+/** Auto-évaluation post-mission (plan vs exécution vs résultat), calculée côté serveur. */
+interface MissionSelfEvaluation {
+  overall: number;
+  scores: Record<string, number>;
+  summary?: string;
+  notes: string[];
+  nextTimeStartWith?: string;
+}
+
 interface MissionEntry {
   id: string;
   title: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused';
+  description?: string;
+  status: MissionStatus;
   priority: string;
   goals: GoalEntry[];
   activeGoalId: string | null;
@@ -76,23 +88,30 @@ interface MissionEntry {
     failedActions: number;
   };
   createdAt: Date;
+  completedAt?: Date;
+  durationMs?: number;
+  lastError?: { action: string; error?: string };
+  errorCount?: number;
+  selfEvaluation?: MissionSelfEvaluation;
   plan?: MissionPlan;
 }
 
 interface GoalEntry {
   id: string;
   title: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'cancelled';
   actions: ActionEntry[];
 }
 
 interface ActionEntry {
   id: string;
   skill: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   confidence?: number;
   decision?: string;
   durationMs?: number;
+  /** Cause lisible d'un échec (réflexion post-action). */
+  failure?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -120,6 +139,7 @@ function statusIcon(status: string, size = 10) {
     case 'failed': return <XCircle size={size} style={{ color: 'var(--color-error)' }} />;
     case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
     case 'paused': return <Pause size={size} style={{ color: 'var(--color-warning)' }} />;
+    case 'cancelled': return <Ban size={size} style={{ color: 'var(--text-dimmed)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
@@ -132,6 +152,7 @@ function statusLabel(status: string): { text: string; color: string } {
     case 'failed': return { text: 'Échouée', color: 'var(--color-error)' };
     case 'blocked': return { text: 'Bloquée', color: 'var(--color-warning)' };
     case 'paused': return { text: 'En pause', color: 'var(--color-warning)' };
+    case 'cancelled': return { text: 'Annulée', color: 'var(--text-dimmed)' };
     default: return { text: 'En attente', color: 'var(--text-dimmed)' };
   }
 }
@@ -186,7 +207,51 @@ function decisionBadge(decision: string) {
 function formatDuration(ms?: number): string {
   if (!ms) return '';
   if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const m = Math.floor(ms / 60_000);
+  const sec = Math.round((ms % 60_000) / 1000);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${m}min ${sec}s`;
+}
+
+/** Missions vivantes (en cours, en pause, bloquées ou pas encore démarrées). */
+const LIVE_STATUSES: ReadonlySet<MissionStatus> = new Set(['pending', 'in_progress', 'paused', 'blocked']);
+/** Missions terminées (historique). */
+const DONE_STATUSES: ReadonlySet<MissionStatus> = new Set(['completed', 'failed', 'cancelled']);
+
+type MissionFilter = 'all' | 'live' | 'done';
+
+/** Ordre d'affichage : missions vivantes d'abord, puis les plus récentes. */
+function sortMissions(list: MissionEntry[]): MissionEntry[] {
+  return [...list].sort((a, b) => {
+    const live = Number(LIVE_STATUSES.has(b.status)) - Number(LIVE_STATUSES.has(a.status));
+    return live !== 0 ? live : b.createdAt.getTime() - a.createdAt.getTime();
+  });
+}
+
+/** Normalise une mission renvoyée par GET /api/missions. */
+function fromServer(m: any): MissionEntry {
+  return {
+    id: m.id,
+    title: m.title ?? 'Mission',
+    description: typeof m.description === 'string' ? m.description : undefined,
+    status: m.paused && m.status === 'in_progress' ? 'paused' : (m.status ?? 'pending'),
+    priority: m.priority ?? 'medium',
+    goals: Array.isArray(m.goals) ? m.goals : [],
+    activeGoalId: m.activeGoalId ?? null,
+    confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
+    metrics: {
+      totalActions: m.metrics?.totalActions ?? 0,
+      successfulActions: m.metrics?.successfulActions ?? 0,
+      failedActions: m.metrics?.failedActions ?? 0,
+    },
+    createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+    completedAt: m.completedAt ? new Date(m.completedAt) : undefined,
+    durationMs: typeof m.durationMs === 'number' ? m.durationMs : undefined,
+    lastError: m.lastError ?? undefined,
+    errorCount: typeof m.errorCount === 'number' ? m.errorCount : undefined,
+    selfEvaluation: m.selfEvaluation ?? undefined,
+    plan: m.plan ?? undefined,
+  };
 }
 
 /**
@@ -238,6 +303,9 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   const [newDescription, setNewDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [filter, setFilter] = useState<MissionFilter>('all');
+  const [controlError, setControlError] = useState<string | null>(null);
 
   // Crée une mission via la route déterministe (indépendante du LLM).
   const createMission = useCallback(async () => {
@@ -251,7 +319,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
       const res = await fetch('/api/missions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle.trim(), description: newDescription.trim() }),
+        body: JSON.stringify({ title: newTitle.trim(), description: newDescription.trim(), priority: newPriority }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -261,13 +329,14 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
       // Réinitialiser le formulaire ; la carte apparaîtra via l'événement mission_plan/started.
       setNewTitle('');
       setNewDescription('');
+      setNewPriority('medium');
       setShowCreate(false);
     } catch (err) {
       setCreateError((err as Error).message);
     } finally {
       setCreating(false);
     }
-  }, [newTitle, newDescription]);
+  }, [newTitle, newDescription, newPriority]);
 
   // Résout une approbation (approuve ou refuse) via l'API.
   const resolveApproval = useCallback(async (missionId: string, actionId: string, approved: boolean) => {
@@ -309,21 +378,32 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
     }
   }, []);
 
-  // Met en pause / reprend / annule / supprime une mission via l'API.
-  // La liste locale est ensuite mise à jour par les événements WebSocket,
-  // mais on applique aussi une mise à jour optimiste pour la réactivité.
+  // Met en pause / reprend / annule / supprime / relance une mission via l'API.
+  // La liste locale est ensuite mise à jour par les événements WebSocket et le
+  // polling, mais on applique aussi une mise à jour optimiste pour la réactivité.
   const controlMission = useCallback(async (
     missionId: string,
-    action: 'pause' | 'resume' | 'cancel' | 'delete',
+    action: 'pause' | 'resume' | 'cancel' | 'delete' | 'retry',
   ) => {
     setBusyMission(missionId);
+    setControlError(null);
     try {
       const isDelete = action === 'delete';
       const res = await fetch(
         isDelete ? `/api/missions/${missionId}` : `/api/missions/${missionId}/${action}`,
         { method: isDelete ? 'DELETE' : 'POST' },
       );
-      if (!res.ok && res.status !== 404) return;
+      if (!res.ok && res.status !== 404) {
+        const data = await res.json().catch(() => ({}));
+        setControlError(data?.error ?? `Action impossible (${res.status}).`);
+        return;
+      }
+      if (action === 'retry') {
+        // La nouvelle mission arrive via mission_plan/started ; on resynchronise
+        // aussi pour les sessions sans WebSocket live.
+        syncMissionsFromServer();
+        return;
+      }
 
       // Mise à jour optimiste locale.
       setMissions(prev => {
@@ -332,15 +412,18 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
           if (m.id !== missionId) return m;
           if (action === 'pause') return { ...m, status: 'paused' as const };
           if (action === 'resume') return { ...m, status: 'in_progress' as const };
-          if (action === 'cancel') return { ...m, status: 'failed' as const };
+          if (action === 'cancel') {
+            return { ...m, status: 'cancelled' as const, activeGoalId: null, goals: finalizeGoals(m.goals, false) };
+          }
           return m;
         });
       });
     } catch (err) {
-      console.error(`[MissionPanel] Échec de l'action "${action}":`, err);
+      setControlError((err as Error).message);
     } finally {
       setBusyMission(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- syncMissionsFromServer est stable (useCallback sans dépendances)
   }, []);
 
   // Récupère l'état complet des missions depuis le serveur et fusionne dans le
@@ -353,21 +436,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
       .then(res => (res.ok ? res.json() : { missions: [] }))
       .then((data: { missions?: any[] }) => {
         if (cancelled || !Array.isArray(data.missions)) return;
-        const serverEntries = data.missions.map((m): MissionEntry => ({
-          id: m.id,
-          title: m.title ?? 'Mission',
-          status: m.status ?? 'pending',
-          priority: m.priority ?? 'medium',
-          goals: Array.isArray(m.goals) ? m.goals : [],
-          activeGoalId: m.activeGoalId ?? null,
-          confidence: typeof m.confidence === 'number' ? m.confidence : 0.5,
-          metrics: {
-            totalActions: m.metrics?.totalActions ?? 0,
-            successfulActions: m.metrics?.successfulActions ?? 0,
-            failedActions: m.metrics?.failedActions ?? 0,
-          },
-          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
-        }));
+        const serverEntries = data.missions.map(fromServer);
         setMissions(prev => {
           const byId = new Map(prev.map(m => [m.id, m]));
           for (const s of serverEntries) {
@@ -375,11 +444,19 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
             // Le serveur fait autorité sur status/goals/metrics. Pour une
             // mission déjà connue, on ne conserve que les goals détaillés reçus
             // en live si le serveur n'en renvoie pas encore.
+            // Le plan n'est connu du serveur que pour les missions lancées dans
+            // cette session : on garde celui reçu en live plutôt que de l'effacer.
             byId.set(s.id, existing
-              ? { ...existing, ...s, goals: s.goals.length > 0 ? s.goals : existing.goals }
+              ? {
+                  ...existing,
+                  ...s,
+                  goals: s.goals.length > 0 ? s.goals : existing.goals,
+                  plan: s.plan ?? existing.plan,
+                  selfEvaluation: s.selfEvaluation ?? existing.selfEvaluation,
+                }
               : s);
           }
-          return Array.from(byId.values());
+          return sortMissions(Array.from(byId.values()));
         });
       })
       .catch(() => { /* pas de mission system dispo — panneau vide, normal */ });
@@ -412,9 +489,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   // le polling via une ref, pour éviter de recréer l'intervalle à chaque
   // changement d'état des missions.
   const hasActiveRef = useRef(false);
-  hasActiveRef.current = missions.some(
-    m => m.status === 'in_progress' || m.status === 'paused' || m.status === 'blocked'
-  );
+  hasActiveRef.current = missions.some(m => LIVE_STATUSES.has(m.status));
 
   // Filet de rafraîchissement : les événements `mission_event` transitent
   // uniquement par le WebSocket `/live` (session de chat). Sans session Live
@@ -476,7 +551,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
             if (existing) {
               return prev.map(m => m.id === detail.missionId ? { ...m, plan: detail.plan } : m);
             }
-            return [...prev, {
+            return [{
               id: detail.missionId,
               title: detail.title ?? 'Mission',
               status: 'pending',
@@ -487,11 +562,11 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
               metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
               createdAt: new Date(detail.timestamp),
               plan: detail.plan,
-            }];
+            }, ...prev];
 
           case 'mission_started':
             if (existing) return prev.map(m => m.id === detail.missionId ? { ...m, status: 'in_progress' as const } : m);
-            return [...prev, {
+            return [{
               id: detail.missionId,
               title: detail.title ?? 'Mission',
               status: 'in_progress',
@@ -501,7 +576,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
               confidence: 0.5,
               metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
               createdAt: new Date(detail.timestamp),
-            }];
+            }, ...prev];
 
           case 'goal_started':
             return prev.map(m => {
@@ -626,6 +701,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
                 ...m,
                 status: detail.success ? 'completed' as const : 'failed' as const,
                 activeGoalId: null,
+                completedAt: new Date(detail.timestamp),
                 goals: finalizeGoals(m.goals, detail.success ?? true),
               };
             });
@@ -636,7 +712,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
               // Idem à l'annulation : on stoppe toutes les animations en cours.
               return {
                 ...m,
-                status: 'failed' as const,
+                status: 'cancelled' as const,
                 activeGoalId: null,
                 goals: finalizeGoals(m.goals, false),
               };
@@ -661,7 +737,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
             if (existing) {
               return prev.map(m => m.id === detail.missionId ? { ...m, status: 'in_progress' as const } : m);
             }
-            return [...prev, {
+            return [{
               id: detail.missionId,
               title: detail.title ?? 'Mission',
               status: 'in_progress',
@@ -671,10 +747,28 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
               confidence: 0.5,
               metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
               createdAt: new Date(detail.timestamp),
-            }];
+            }, ...prev];
 
           case 'mission_deleted':
             return prev.filter(m => m.id !== detail.missionId);
+
+          case 'mission_self_critique': {
+            // Auto-évaluation calculée à la finalisation : le résumé/notes
+            // complets arrivent au prochain sync ; on affiche le score tout de suite.
+            const ev = detail as unknown as { overall?: number; scores?: Record<string, number>; nextTimeStartWith?: string };
+            if (typeof ev.overall !== 'number') return prev;
+            return prev.map(m => m.id === detail.missionId
+              ? {
+                  ...m,
+                  selfEvaluation: {
+                    ...(m.selfEvaluation ?? { notes: [] }),
+                    overall: ev.overall!,
+                    scores: ev.scores ?? m.selfEvaluation?.scores ?? {},
+                    nextTimeStartWith: ev.nextTimeStartWith ?? m.selfEvaluation?.nextTimeStartWith,
+                  },
+                }
+              : m);
+          }
 
           default:
             return prev;
@@ -694,21 +788,31 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
     }
   }, [missions, expandedMission]);
 
-  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'blocked' || m.status === 'paused');
-  const completedMissions = missions.filter(m => m.status === 'completed' || m.status === 'failed');
+  const activeMissions = missions.filter(m => LIVE_STATUSES.has(m.status));
+  const completedMissions = missions.filter(m => DONE_STATUSES.has(m.status));
+  const visibleMissions = filter === 'live' ? activeMissions : filter === 'done' ? completedMissions : missions;
 
   const content = (
     <div className="flex flex-col h-full">
       {/* Header stats */}
       <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
-        <div className="flex items-center gap-1.5 flex-1">
-          <StatChip count={activeMissions.length} label="actives" color="var(--color-info)" />
-          <StatChip count={completedMissions.filter(m => m.status === 'completed').length} label="ok" color="var(--color-success)" />
-          <StatChip count={completedMissions.filter(m => m.status === 'failed').length} label="err" color="var(--color-error)" />
+        <div className="flex items-center gap-1 flex-1 min-w-0" role="tablist" aria-label="Filtrer les missions">
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} count={missions.length} label="toutes" color="var(--text-muted)" />
+          <FilterChip active={filter === 'live'} onClick={() => setFilter('live')} count={activeMissions.length} label="actives" color="var(--color-info)" />
+          <FilterChip
+            active={filter === 'done'}
+            onClick={() => setFilter('done')}
+            count={completedMissions.length}
+            label="terminées"
+            color={completedMissions.some(m => m.status === 'failed') ? 'var(--color-warning)' : 'var(--color-success)'}
+            title={`${completedMissions.filter(m => m.status === 'completed').length} réussie(s) · `
+              + `${completedMissions.filter(m => m.status === 'failed').length} échouée(s) · `
+              + `${completedMissions.filter(m => m.status === 'cancelled').length} annulée(s)`}
+          />
         </div>
         <button
           onClick={() => { setShowCreate(v => !v); setCreateError(null); }}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition cursor-pointer hover:opacity-80"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap flex-shrink-0 transition cursor-pointer hover:opacity-80"
           style={{ color: 'var(--color-info)', backgroundColor: 'color-mix(in srgb, var(--color-info) 10%, transparent)' }}
           title="Créer une mission"
         >
@@ -750,15 +854,37 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
               <textarea
                 value={newDescription}
                 onChange={e => setNewDescription(e.target.value)}
-                placeholder="Décris la tâche complexe à accomplir…"
+                placeholder="Décris la tâche complexe à accomplir… (Ctrl+Entrée pour lancer)"
                 disabled={creating}
-                rows={2}
+                rows={3}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void createMission(); } }}
                 className="w-full px-2 py-1.5 rounded-md text-xs outline-none resize-none"
                 style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-base)' }}
               />
               {createError && (
                 <p className="text-xs" style={{ color: 'var(--color-error)' }}>{createError}</p>
               )}
+              <div className="flex items-center gap-1" role="radiogroup" aria-label="Priorité">
+                <span className="text-xs mr-1" style={{ color: 'var(--text-dimmed)' }}>Priorité</span>
+                {(['low', 'medium', 'high', 'critical'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={newPriority === p}
+                    onClick={() => setNewPriority(p)}
+                    disabled={creating}
+                    className="px-1.5 py-0.5 rounded text-xs font-medium transition cursor-pointer"
+                    style={{
+                      color: newPriority === p ? PRIORITY_META[p].color : 'var(--text-dimmed)',
+                      backgroundColor: newPriority === p ? `color-mix(in srgb, ${PRIORITY_META[p].color} 12%, transparent)` : 'transparent',
+                      border: `1px solid ${newPriority === p ? `color-mix(in srgb, ${PRIORITY_META[p].color} 30%, transparent)` : 'var(--border-base)'}`,
+                    }}
+                  >
+                    {PRIORITY_META[p].label}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={createMission}
@@ -819,11 +945,28 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
 
       {/* Mission list */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2 custom-scrollbar">
-        {missions.length === 0 ? (
-          <EmptyMissionState />
+        {controlError && (
+          <div
+            className="flex items-start gap-1.5 px-2 py-1.5 rounded-md text-xs"
+            role="alert"
+            style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)' }}
+          >
+            <AlertTriangle size={11} className="flex-shrink-0 mt-0.5" />
+            <span className="flex-1">{controlError}</span>
+            <button type="button" onClick={() => setControlError(null)} aria-label="Masquer l'erreur" className="cursor-pointer">
+              <X size={11} />
+            </button>
+          </div>
+        )}
+        {visibleMissions.length === 0 ? (
+          missions.length === 0 ? <EmptyMissionState /> : (
+            <p className="text-xs text-center py-6" style={{ color: 'var(--text-dimmed)' }}>
+              {filter === 'live' ? 'Aucune mission en cours.' : 'Aucune mission terminée.'}
+            </p>
+          )
         ) : (
           <AnimatePresence initial={false}>
-            {missions.map(mission => (
+            {visibleMissions.map(mission => (
               <MissionCard
                 key={mission.id}
                 mission={mission}
@@ -836,6 +979,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
                 onResume={() => controlMission(mission.id, 'resume')}
                 onCancel={() => controlMission(mission.id, 'cancel')}
                 onDelete={() => controlMission(mission.id, 'delete')}
+                onRetry={() => controlMission(mission.id, 'retry')}
               />
             ))}
           </AnimatePresence>
@@ -865,15 +1009,34 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function StatChip({ count, label, color }: { count: number; label: string; color: string }) {
+const PRIORITY_META: Record<'low' | 'medium' | 'high' | 'critical', { label: string; color: string }> = {
+  low: { label: 'Basse', color: 'var(--text-muted)' },
+  medium: { label: 'Normale', color: 'var(--color-info)' },
+  high: { label: 'Haute', color: 'var(--color-warning)' },
+  critical: { label: 'Critique', color: 'var(--color-error)' },
+};
+
+/** Compteur cliquable servant de filtre de liste. */
+function FilterChip({ count, label, color, active, onClick, title }: {
+  count: number; label: string; color: string; active: boolean; onClick: () => void; title?: string;
+}) {
   return (
-    <div
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono"
-      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 4.7%, transparent)` }}
+    <button
+      type="button"
+      role="tab"
+      title={title}
+      aria-selected={active}
+      onClick={onClick}
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono whitespace-nowrap flex-shrink-0 transition cursor-pointer"
+      style={{
+        color,
+        backgroundColor: active ? `color-mix(in srgb, ${color} 14%, transparent)` : 'transparent',
+        border: `1px solid ${active ? `color-mix(in srgb, ${color} 30%, transparent)` : 'transparent'}`,
+      }}
     >
       <span className="font-bold">{count}</span>
       <span className="opacity-70">{label}</span>
-    </div>
+    </button>
   );
 }
 
@@ -1088,6 +1251,7 @@ function MissionCard({
   onResume,
   onCancel,
   onDelete,
+  onRetry,
 }: {
   mission: MissionEntry;
   expanded: boolean;
@@ -1099,19 +1263,28 @@ function MissionCard({
   onResume: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onRetry: () => void;
 }) {
   const isActive = mission.status === 'in_progress';
   const isPaused = mission.status === 'paused';
   const isRunning = isActive || isPaused || mission.status === 'blocked';
-  const isTerminal = mission.status === 'completed' || mission.status === 'failed';
+  const isTerminal = DONE_STATUSES.has(mission.status);
   const isCompleted = mission.status === 'completed';
   const isFailed = mission.status === 'failed';
+  const canRetry = isFailed || mission.status === 'cancelled';
   const [confirmDelete, setConfirmDelete] = useState(false);
   const confColor = confidenceColor(mission.confidence);
   const prefersReducedMotion = useReducedMotion();
-  const progress = mission.metrics.totalActions > 0
-    ? Math.round((mission.metrics.successfulActions / mission.metrics.totalActions) * 100)
-    : 0;
+  // Progression = objectifs résolus / objectifs planifiés (l'ancien calcul,
+  // succès / actions, mesurait un taux de réussite, pas l'avancement).
+  const resolvedGoals = mission.goals.filter(g => g.status === 'completed').length;
+  const progress = isCompleted
+    ? 100
+    : mission.goals.length > 0
+      ? Math.round((resolvedGoals / mission.goals.length) * 100)
+      : 0;
+  const progressColor = isFailed ? 'var(--color-error)' : isCompleted ? 'var(--color-success)' : 'var(--color-info)';
+  const priority = PRIORITY_META[mission.priority as keyof typeof PRIORITY_META];
 
   return (
     <motion.div
@@ -1174,17 +1347,31 @@ function MissionCard({
             })()}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            {/* Progress bar */}
-            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            {/* Barre d'avancement (objectifs résolus) */}
+            <div
+              className="flex-1 h-1 rounded-full overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-secondary)' }}
+              role="progressbar"
+              aria-label="Avancement des objectifs"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              title={mission.goals.length > 0 ? `${resolvedGoals}/${mission.goals.length} objectifs atteints` : 'Planification…'}
+            >
               <motion.div
                 className="h-full rounded-full"
-                style={{ backgroundColor: confColor }}
+                style={{ backgroundColor: progressColor }}
                 animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
               />
             </div>
-            {/* Confidence */}
-            <div className="flex items-center gap-0.5" style={{ color: confColor }}>
+            {mission.goals.length > 0 && (
+              <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+                {resolvedGoals}/{mission.goals.length}
+              </span>
+            )}
+            {/* Confiance */}
+            <div className="flex items-center gap-0.5" style={{ color: confColor }} title="Confiance moyenne de l'agent">
               {confidenceIcon(mission.confidence)}
               <span className="text-xs font-mono font-bold">
                 {Math.round(mission.confidence * 100)}%
@@ -1222,6 +1409,16 @@ function MissionCard({
               disabled={busy}
               color="var(--color-error)"
               icon={<XCircle size={12} />}
+            />
+          )}
+
+          {canRetry && (
+            <MissionControlButton
+              title="Relancer la mission (même brief)"
+              onClick={onRetry}
+              disabled={busy}
+              color="var(--color-info)"
+              icon={busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             />
           )}
 
@@ -1271,21 +1468,55 @@ function MissionCard({
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 space-y-1.5" style={{ borderTop: '1px solid var(--border-base)' }}>
+              {mission.description && mission.description !== mission.title && (
+                <p className="pt-2 text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--text-muted)' }}>
+                  {mission.description}
+                </p>
+              )}
+
+              {mission.lastError && !isCompleted && (
+                <div
+                  className="flex items-start gap-1.5 mt-2 px-2 py-1.5 rounded-md text-xs"
+                  role="status"
+                  style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 7%, transparent)' }}
+                >
+                  <AlertTriangle size={11} className="flex-shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">
+                    <span className="font-semibold">{skillLabel(mission.lastError.action)} : </span>
+                    {mission.lastError.error ?? 'échec'}
+                    {mission.errorCount && mission.errorCount > 1 ? ` (+${mission.errorCount - 1} autre${mission.errorCount > 2 ? 's' : ''})` : ''}
+                  </span>
+                </div>
+              )}
+
+              {mission.selfEvaluation && <SelfEvaluationSummary evaluation={mission.selfEvaluation} />}
+
               {mission.plan && <MissionPlanSummary plan={mission.plan} />}
 
               {/* Metrics row */}
-              <div className="flex items-center gap-3 pt-2 pb-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 pb-1">
                 <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
                   Actions: <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-success)' }}>{mission.metrics.successfulActions}<CheckCircle2 size={11} /></span>
                   {' '}<span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-error)' }}>{mission.metrics.failedActions}<XCircle size={11} /></span>
                   {' '}/ {mission.metrics.totalActions}
+                </span>
+                {priority && (
+                  <span className="text-xs" style={{ color: priority.color }}>Priorité {priority.label.toLowerCase()}</span>
+                )}
+                {(mission.durationMs ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-mono" style={{ color: 'var(--text-dimmed)' }} title={isTerminal ? 'Durée totale' : 'Temps écoulé'}>
+                    <Timer size={10} /> {formatDuration(mission.durationMs)}
+                  </span>
+                )}
+                <span className="text-xs font-mono ml-auto" style={{ color: 'var(--text-dimmed)' }} title={mission.createdAt.toLocaleString('fr-FR')}>
+                  {mission.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
 
               {/* Goals */}
               {mission.goals.length === 0 ? (
                 <div className="text-xs italic py-2" style={{ color: 'var(--text-dimmed)' }}>
-                  Planification en cours...
+                  {isTerminal ? 'Aucun objectif enregistré.' : 'Planification en cours…'}
                 </div>
               ) : (
                 mission.goals.map(goal => (
@@ -1303,6 +1534,60 @@ function MissionCard({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+const SCORE_LABELS: Record<string, string> = {
+  planAccuracy: 'Plan',
+  toolEfficiency: 'Outils',
+  recoveryQuality: 'Récupération',
+  verification: 'Vérification',
+  costEfficiency: 'Coût',
+};
+
+function scoreColor(score: number): string {
+  if (score >= 70) return 'var(--color-success)';
+  if (score >= 40) return 'var(--color-warning)';
+  return 'var(--color-error)';
+}
+
+/** Auto-évaluation post-mission : score global, sous-scores et leçon retenue. */
+function SelfEvaluationSummary({ evaluation }: { evaluation: MissionSelfEvaluation }) {
+  const color = scoreColor(evaluation.overall);
+  const scores = Object.entries(evaluation.scores ?? {});
+  return (
+    <div
+      className="mt-2 rounded-lg p-2 space-y-1.5"
+      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}
+    >
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} style={{ color: 'var(--color-accent-alt)' }} />
+        <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: 'var(--color-accent-alt)' }}>
+          Auto-évaluation
+        </span>
+        <span className="text-xs font-mono font-bold" style={{ color }}>{Math.round(evaluation.overall)}/100</span>
+      </div>
+      {scores.length > 0 && (
+        <div className="grid grid-cols-5 gap-1">
+          {scores.map(([key, value]) => (
+            <div key={key} className="flex flex-col gap-0.5" title={`${SCORE_LABELS[key] ?? key} : ${Math.round(value)}/100`}>
+              <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
+                <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: scoreColor(value) }} />
+              </div>
+              <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{SCORE_LABELS[key] ?? key}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {evaluation.summary && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{evaluation.summary}</p>
+      )}
+      {evaluation.nextTimeStartWith && (
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <span className="font-semibold">La prochaine fois : </span>{evaluation.nextTimeStartWith}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -1445,18 +1730,26 @@ function GoalCard({
     <div
       className="rounded-lg overflow-hidden"
       style={{
-        backgroundColor: isActive ? 'rgba(56,189,248,0.06)' : 'transparent',
-        border: `1px solid ${isActive ? 'rgba(56,189,248,0.15)' : 'var(--border-base)'}`,
+        backgroundColor: isActive ? 'color-mix(in srgb, var(--color-info) 6%, transparent)' : 'transparent',
+        border: `1px solid ${isActive ? 'color-mix(in srgb, var(--color-info) 18%, transparent)' : 'var(--border-base)'}`,
       }}
     >
       <button
+        type="button"
         className="w-full flex items-center gap-2 px-2 py-1.5 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}
+        aria-expanded={expanded}
+        disabled={goal.actions.length === 0}
       >
         <div className="flex-shrink-0">{statusIcon(goal.status, 10)}</div>
         <span className="text-xs flex-1 truncate font-medium" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {goal.title}
         </span>
+        {goal.actions.length > 0 && (
+          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            {goal.actions.length}
+          </span>
+        )}
         {isActive && (
           <span className="text-xs px-1 py-0.5 rounded font-bold uppercase"
             style={{ color: 'var(--color-info)', backgroundColor: 'color-mix(in srgb, var(--color-info) 10%, transparent)' }}>
@@ -1490,22 +1783,30 @@ function GoalCard({
 
 function ActionRow({ action }: { action: ActionEntry }) {
   return (
-    <div className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)]">
-      <div className="flex-shrink-0">{statusIcon(action.status, 9)}</div>
-      <Zap size={9} style={{ color: 'var(--accent-primary)' }} className="flex-shrink-0" />
-      <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-muted)' }} title={action.skill}>
-        {skillLabel(action.skill)}
-      </span>
-      {action.durationMs && (
-        <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
-          {formatDuration(action.durationMs)}
+    <div className="px-1.5 py-1 rounded hover:bg-[var(--bg-hover)]">
+      <div className="flex items-center gap-1.5">
+        <div className="flex-shrink-0">{statusIcon(action.status, 9)}</div>
+        <Zap size={9} style={{ color: 'var(--accent-primary)' }} className="flex-shrink-0" />
+        <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-muted)' }} title={action.skill}>
+          {skillLabel(action.skill)}
         </span>
-      )}
-      {action.decision && decisionBadge(action.decision)}
-      {action.confidence !== undefined && (
-        <span className="text-xs font-mono" style={{ color: confidenceColor(action.confidence) }}>
-          {Math.round(action.confidence * 100)}%
-        </span>
+        {/* `durationMs` peut valoir 0 : un `&&` nu afficherait « 0 ». */}
+        {(action.durationMs ?? 0) > 0 && (
+          <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+            {formatDuration(action.durationMs)}
+          </span>
+        )}
+        {action.decision && decisionBadge(action.decision)}
+        {action.confidence !== undefined && action.confidence !== null && (
+          <span className="text-xs font-mono" style={{ color: confidenceColor(action.confidence) }}>
+            {Math.round(action.confidence * 100)}%
+          </span>
+        )}
+      </div>
+      {action.failure && action.status === 'failed' && (
+        <p className="mt-0.5 pl-6 text-xs leading-snug break-words" style={{ color: 'var(--color-error)' }}>
+          {action.failure}
+        </p>
       )}
     </div>
   );
