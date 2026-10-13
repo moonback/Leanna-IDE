@@ -1,0 +1,378 @@
+/**
+ * motion-pro.css — Couche « interface animée pro » pour Leanna.
+ *
+ * Importée EN DERNIER dans src/index.css (après pro-polish.css).
+ *
+ * Principes :
+ *  - 100 % additive : aucune règle de layout, aucun display/position modifié
+ *    sur des composants existants (sauf `.lea-btn`, classe opt-in).
+ *  - Basée sur les tokens existants → fonctionne avec les 5 thèmes.
+ *  - N'anime que transform / opacity / filter (composité GPU, pas de reflow).
+ *  - Sortie plus rapide que l'entrée (≈ 65 %), décélération à l'arrivée.
+ *  - prefers-reduced-motion et high-contrast désactivent tout le décoratif.
+ */
+
+/* ═══════════════════════════════════════════════
+   1. TOKENS DE MOUVEMENT
+   Une seule source de vérité pour le rythme de l'app.
+   Les équivalents JS vivent dans src/lib/motion.ts.
+═══════════════════════════════════════════════ */
+:root {
+  /* Courbes */
+  --ease-out-expo:   cubic-bezier(0.16, 1, 0.3, 1);     /* arrivée : décélération franche */
+  --ease-out-quart:  cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-quart:   cubic-bezier(0.5, 0, 0.75, 0);     /* départ : accélération */
+  --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1); /* léger dépassement (micro-feedback) */
+  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Durées — entrée / sortie (sortie ≈ 65 % de l'entrée) */
+  --dur-instant:  90ms;
+  --dur-fast:    140ms;
+  --dur-base:    220ms;
+  --dur-slow:    360ms;
+  --dur-exit:    150ms;
+  --dur-ambient:  28s;
+
+  /* Signature visuelle : dégradé d'accent dérivé du thème courant */
+  --accent-gradient: linear-gradient(
+    135deg,
+    var(--accent-primary) 0%,
+    color-mix(in srgb, var(--accent-primary) 55%, var(--accent-secondary, #c792ea)) 55%,
+    var(--accent-secondary, #c792ea) 100%
+  );
+  --accent-ring-soft: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  --spotlight-color: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  --ambient-opacity: 0.55;
+}
+
+:root[data-theme="light"],
+:root[data-theme="sepia"] {
+  --spotlight-color: color-mix(in srgb, var(--accent-primary) 9%, transparent);
+  --ambient-opacity: 0.35;
+}
+
+:root[data-theme="cyberpunk"] {
+  --spotlight-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  --ambient-opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-base:    0ms;
+    --dur-slow:    0ms;
+    --dur-exit:    0ms;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   2. CORRECTIF DE FLUIDITÉ → voir index.css (§ BASE)
+   La transition universelle a été déplacée dans @layer base et ne
+   touche plus transform/opacity : les springs de motion/react et
+   les utilitaires Tailwind `transition-*` ne sont plus écrasés.
+═══════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════
+   3. FOND AMBIANT (AmbientBackdrop.tsx)
+   Trois halos flous qui dérivent très lentement derrière l'app.
+   Calque fixe, sans pointeur, animé uniquement en transform.
+═══════════════════════════════════════════════ */
+.lea-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--ambient-opacity);
+  contain: strict;
+}
+
+.lea-ambient__blob {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.22;
+  will-change: transform;
+}
+
+.lea-ambient__blob--a {
+  top: -22vmax;
+  left: -12vmax;
+  background: radial-gradient(circle at center, var(--accent-primary), transparent 65%);
+  animation: lea-drift-a var(--dur-ambient) ease-in-out infinite alternate;
+}
+
+.lea-ambient__blob--b {
+  right: -16vmax;
+  top: 18vh;
+  background: radial-gradient(circle at center, var(--accent-secondary, #c792ea), transparent 65%);
+  opacity: 0.14;
+  animation: lea-drift-b calc(var(--dur-ambient) * 1.25) ease-in-out infinite alternate;
+}
+
+.lea-ambient__blob--c {
+  bottom: -26vmax;
+  left: 30vw;
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--accent-primary) 60%, var(--color-success, #3ecf8e)), transparent 65%);
+  opacity: 0.12;
+  animation: lea-drift-c calc(var(--dur-ambient) * 1.5) ease-in-out infinite alternate;
+}
+
+@keyframes lea-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(14vw, 10vh, 0) scale(1.15); }
+}
+@keyframes lea-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-12vw, 14vh, 0) scale(0.9); }
+}
+@keyframes lea-drift-c {
+  from { transform: translate3d(0, 0, 0) scale(0.95); }
+  to   { transform: translate3d(-10vw, -12vh, 0) scale(1.1); }
+}
+
+/* Le calque ambiant passe SOUS le contenu sans toucher au positionnement
+   des enfants : .app-layout devient un contexte d'empilement isolé et le
+   halo (fixe) y prend un z-index négatif. */
+.app-layout { isolation: isolate; }
+.app-layout > .lea-ambient { z-index: -1; }
+
+/* Laisse transparaître le halo dans les interstices du shell IDE
+   (le fond reste à 92 % opaque — lisibilité intacte). */
+.Leanna-shell {
+  background-color: color-mix(in srgb, var(--ide-shell-bg) 92%, transparent) !important;
+}
+
+/* ═══════════════════════════════════════════════
+   4. BARRE DE PROGRESSION DE NAVIGATION (RouteProgress.tsx)
+═══════════════════════════════════════════════ */
+.lea-route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  transform-origin: 0 50%;
+  background: var(--accent-gradient);
+  box-shadow: 0 0 10px var(--accent-glow, var(--accent-primary)),
+              0 0 2px var(--accent-primary);
+}
+
+/* ═══════════════════════════════════════════════
+   5. SPOTLIGHT AU SURVOL (usePointerSpotlight.ts)
+   Un halo d'accent suit le curseur sur les cartes interactives.
+   --mx / --my sont posés par un unique listener délégué.
+═══════════════════════════════════════════════ */
+/* Uniquement au survol (c'est là que --mx/--my existent). La spécificité
+   (0,3,0) passe devant les `background:` raccourcis des cartes (.surface,
+   .notebook-studio-card:hover…) qui sinon effaceraient le halo. */
+:is(.card-interactive, .notebook-studio-card, .notebook-note-card, [data-spotlight]):hover:not(:disabled) {
+  background-image: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    var(--spotlight-color),
+    transparent 70%
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   6. BOUTONS — classe opt-in `.lea-btn` (posée par <Button>)
+═══════════════════════════════════════════════ */
+.lea-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-base) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.lea-btn:not(:disabled):hover { transform: translateY(-1px); }
+.lea-btn:not(:disabled):active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: var(--dur-instant);
+}
+
+/* Bouton principal : reflet lumineux qui balaie au survol + halo */
+.lea-btn--primary {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset,
+              0 1px 2px rgba(0, 0, 0, 0.25),
+              0 4px 14px -4px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+.lea-btn--primary:not(:disabled):hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset,
+              0 2px 4px rgba(0, 0, 0, 0.25),
+              0 10px 24px -6px color-mix(in srgb, var(--accent-primary) 65%, transparent);
+}
+.lea-btn--primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.28) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0s;
+  pointer-events: none;
+}
+.lea-btn--primary:not(:disabled):hover::after {
+  transform: translateX(120%);
+  transition: transform 700ms var(--ease-out-quart);
+}
+
+.lea-btn:focus-visible {
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+.lea-btn--danger:not(:disabled):hover {
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--color-error) 60%, transparent);
+}
+
+/* Modales (<Modal>) : liseré lumineux supérieur + ombre profonde */
+.lea-dialog {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 7%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-primary) 6%, transparent),
+    var(--shadow-xl, 0 26px 60px rgba(0, 0, 0, 0.6));
+}
+
+/* ═══════════════════════════════════════════════
+   7. CHAMPS DE SAISIE — focus « qui respire »
+═══════════════════════════════════════════════ */
+@layer base {
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+    transition: border-color var(--dur-fast) ease, box-shadow var(--dur-base) var(--ease-out-quart),
+                background-color var(--dur-fast) ease;
+  }
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
+    box-shadow: var(--accent-ring-soft);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   8. UTILITAIRES D'ENTRÉE (CSS pur, sans JS)
+   .lea-enter        — fondu + montée
+   .lea-enter-scale  — popovers / menus
+   .lea-stagger      — enfants en cascade (12 max)
+═══════════════════════════════════════════════ */
+@keyframes lea-enter {
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes lea-enter-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.lea-enter       { animation: lea-enter var(--dur-slow) var(--ease-out-expo) backwards; }
+.lea-enter-scale { animation: lea-enter-scale var(--dur-base) var(--ease-out-expo) backwards; transform-origin: top center; }
+
+/* `backwards` (et non `both`) : rien ne persiste après l'animation, les
+   transforms inline / motion des enfants restent maîtres. */
+.lea-stagger > * { animation: lea-enter var(--dur-slow) var(--ease-out-expo) backwards; }
+.lea-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.lea-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.lea-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.lea-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.lea-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+.lea-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+.lea-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.lea-stagger > *:nth-child(9)  { animation-delay: 310ms; }
+.lea-stagger > *:nth-child(10) { animation-delay: 340ms; }
+.lea-stagger > *:nth-child(11) { animation-delay: 360ms; }
+.lea-stagger > *:nth-child(n+12) { animation-delay: 380ms; }
+
+/* Texte dégradé animé (titres héros, marque) */
+.lea-gradient-text {
+  background: var(--accent-gradient);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lea-gradient-pan 8s ease-in-out infinite alternate;
+}
+@keyframes lea-gradient-pan {
+  from { background-position: 0% 50%; }
+  to   { background-position: 100% 50%; }
+}
+
+/* Bordure lumineuse animée (carte mise en avant, agent actif) */
+.lea-glow-border {
+  position: relative;
+  isolation: isolate;
+}
+.lea-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--lea-angle, 0deg),
+    transparent 0deg, var(--accent-primary) 60deg, var(--accent-secondary, #c792ea) 120deg, transparent 180deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: lea-spin-angle 4s linear infinite;
+}
+@property --lea-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes lea-spin-angle { to { --lea-angle: 360deg; } }
+
+/* Point d'état vivant (en ligne / en cours) */
+.lea-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.lea-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: lea-ping 1.8s var(--ease-out-quart) infinite;
+}
+@keyframes lea-ping {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════
+   9. ACCESSIBILITÉ
+═══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .lea-ambient { display: none; }
+  :is(.card-interactive, .notebook-studio-card, .notebook-note-card, [data-spotlight]):hover:not(:disabled) { background-image: none; }
+  .lea-btn:not(:disabled):hover,
+  .lea-btn:not(:disabled):active { transform: none; }
+  .lea-btn--primary::after { display: none; }
+  .lea-enter, .lea-enter-scale, .lea-stagger > *,
+  .lea-gradient-text, .lea-glow-border::before, .lea-live-dot::after { animation: none !important; }
+}
+
+:root[data-theme="high-contrast"] .lea-ambient,
+:root[data-theme="high-contrast"] .lea-btn--primary::after,
+:root[data-theme="high-contrast"] .lea-glow-border::before { display: none; }
+:root[data-theme="high-contrast"] :is(.card-interactive, .notebook-studio-card, .notebook-note-card, [data-spotlight]):hover:not(:disabled) {
+  background-image: none;
+}
+:root[data-theme="high-contrast"] .Leanna-shell {
+  background-color: var(--ide-shell-bg) !important;
+}
+:root[data-theme="high-contrast"] .lea-gradient-text {
+  background: none;
+  color: var(--accent-primary);
+}

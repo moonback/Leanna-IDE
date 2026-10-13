@@ -1,10 +1,11 @@
 import React, {
-  useState, useEffect, useMemo, useCallback, useId,
+  useState, useEffect, useMemo, useCallback, useId, useRef,
 } from 'react';
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
   Bot, Target, Globe, X, GitPullRequest, History, CalendarClock, ClipboardCheck, Stethoscope,
+  ArrowUp, MessageSquareText,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { FileIcon } from './FileIcon.js';
@@ -460,9 +461,124 @@ function GlobalStyles() {
         100% { transform: scale(2.2); opacity: 0; }
       }
 
+      /* ── Refonte « motion pro » ─────────────────────────────────────── */
+
+      /* Aurore : 3 halos qui dérivent (transform uniquement, GPU) */
+      .ee-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+      .ee-aurora > span {
+        position: absolute; border-radius: 50%; filter: blur(70px); will-change: transform;
+      }
+      .ee-aurora > span:nth-child(1) {
+        width: 60%; height: 55%; left: 20%; top: -28%;
+        background: radial-gradient(circle, var(--primary) 0%, transparent 65%);
+        opacity: 0.30; animation: ee-aurora-1 22s ease-in-out infinite alternate;
+      }
+      .ee-aurora > span:nth-child(2) {
+        width: 45%; height: 50%; right: -12%; bottom: -18%;
+        background: radial-gradient(circle, #60a5fa 0%, transparent 65%);
+        opacity: 0.20; animation: ee-aurora-2 28s ease-in-out infinite alternate;
+      }
+      .ee-aurora > span:nth-child(3) {
+        width: 38%; height: 42%; left: -10%; top: 35%;
+        background: radial-gradient(circle, var(--accent-secondary, #c792ea) 0%, transparent 65%);
+        opacity: 0.14; animation: ee-aurora-3 34s ease-in-out infinite alternate;
+      }
+      @keyframes ee-aurora-1 { to { transform: translate3d(8%, 12%, 0) scale(1.15); } }
+      @keyframes ee-aurora-2 { to { transform: translate3d(-14%, -10%, 0) scale(1.1); } }
+      @keyframes ee-aurora-3 { to { transform: translate3d(16%, -8%, 0) scale(0.9); } }
+
+      /* Trame de points, fondue vers les bords */
+      .ee-dots {
+        position: absolute; inset: 0; pointer-events: none; z-index: 0;
+        background-image: radial-gradient(color-mix(in srgb, var(--text) 14%, transparent) 1px, transparent 1px);
+        background-size: 22px 22px;
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 0%, transparent 75%);
+                mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 0%, transparent 75%);
+        opacity: 0.5;
+      }
+
+      /* Prénom : le dégradé glisse lentement */
+      .ee-name-accent {
+        background-image: linear-gradient(100deg,
+          var(--primary) 0%,
+          color-mix(in srgb, var(--primary) 55%, #fff) 35%,
+          color-mix(in srgb, var(--primary) 45%, #a78bfa) 65%,
+          var(--primary) 100%);
+        background-size: 250% 100%;
+        animation: ee-name-pan 9s ease-in-out infinite alternate;
+      }
+      @keyframes ee-name-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+
+      /* Carte principale : liseré lumineux en rotation (tant que l'IA n'est pas lancée) */
+      @property --ee-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+      .ee-card-glow::before {
+        content: '';
+        position: absolute; inset: 0; z-index: 2;
+        border-radius: inherit; padding: 1px; pointer-events: none;
+        background: conic-gradient(from var(--ee-angle),
+          transparent 0deg, transparent 220deg,
+          var(--primary) 290deg, color-mix(in srgb, var(--primary) 40%, #fff) 320deg,
+          var(--primary) 340deg, transparent 360deg);
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+                mask-composite: exclude;
+        animation: ee-spin 4.5s linear infinite;
+      }
+      @keyframes ee-spin { to { --ee-angle: 360deg; } }
+
+      /* Icônes des cartes : petit rebond au survol */
+      .ee-card-icon svg { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+      .ee-card:hover:not(:disabled) .ee-card-icon svg { transform: scale(1.14) rotate(-6deg); }
+
+      /* Barre « Demander à … » */
+      .ee-ask {
+        position: relative;
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 8px 8px 16px; border-radius: 16px;
+        background-color: color-mix(in srgb, var(--surface) 62%, transparent);
+        border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
+                    0 10px 30px color-mix(in srgb, #000 14%, transparent);
+        transition: border-color 200ms ease-out, box-shadow 260ms ease-out;
+      }
+      .ee-ask:focus-within {
+        border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+                    0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent),
+                    0 14px 40px color-mix(in srgb, var(--primary) 18%, transparent);
+      }
+      .ee-ask input {
+        flex: 1; min-width: 0; height: 36px;
+        background: transparent; border: 0; outline: none; box-shadow: none !important;
+        font-size: 0.9375rem; color: var(--text);
+      }
+      .ee-ask-placeholder {
+        position: absolute; left: 44px; right: 96px; top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none; overflow: hidden; height: 1.5em;
+        font-size: 0.9375rem; color: var(--text-muted);
+      }
+      .ee-ask-send {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0;
+        color: #fff; background-color: var(--primary);
+        box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--primary) 70%, transparent);
+        transition: transform 160ms cubic-bezier(0.25, 1, 0.5, 1), opacity 160ms, box-shadow 200ms;
+      }
+      .ee-ask-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--primary) 80%, transparent); }
+      .ee-ask-send:active:not(:disabled) { transform: scale(0.94); }
+      .ee-ask-send:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+      :root[data-theme="high-contrast"] .ee-aurora,
+      :root[data-theme="high-contrast"] .ee-dots,
+      :root[data-theme="high-contrast"] .ee-card-glow::before { display: none; }
+
       @media (prefers-reduced-motion: reduce) {
         .ee-dot-live { animation: none; }
         .ee-dot-busy::after { animation: none; display: none; }
+        .ee-aurora > span, .ee-name-accent, .ee-card-glow::before { animation: none; }
+        .ee-card-icon svg, .ee-card:hover:not(:disabled) .ee-card-icon svg { transition: none; transform: none; }
       }
     `}</style>
   );
@@ -489,7 +605,7 @@ const Kbd = React.memo(function Kbd({
 
 const ActionCard = React.memo(function ActionCard({
   icon: Icon, title, description, shortcut, onClick, disabled = false, reduceMotion = false,
-  accent = 'var(--primary)', comingSoon = false, primary = false, hero = false,
+  accent = 'var(--primary)', comingSoon = false, primary = false, hero = false, glow = false,
 }: {
   icon: IconType;
   title: string;
@@ -502,6 +618,8 @@ const ActionCard = React.memo(function ActionCard({
   comingSoon?: boolean;
   primary?: boolean;
   hero?: boolean;
+  /** Liseré lumineux animé (attire l'œil sur l'action principale). */
+  glow?: boolean;
 }) {
   const descId = useId();
 
@@ -522,7 +640,7 @@ const ActionCard = React.memo(function ActionCard({
       onMouseMove={hero ? handleMouseMove : undefined}
       disabled={disabled}
       aria-describedby={descId}
-      className={`ee-card ee-focus group flex items-start text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed${primary ? ' ee-card-primary' : ''}${hero ? ' ee-card-hero gap-4 p-5' : ' gap-3 p-4'}`}
+      className={`ee-card ee-focus group flex items-start text-left rounded-xl disabled:opacity-45 disabled:cursor-not-allowed${primary ? ' ee-card-primary' : ''}${hero ? ' ee-card-hero gap-4 p-5' : ' gap-3 p-4'}${glow && !disabled && !reduceMotion ? ' ee-card-glow' : ''}`}
       style={{ ['--card-accent' as string]: accent }}
       whileHover={reduceMotion || disabled ? undefined : { y: -2 }}
       whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
@@ -565,6 +683,130 @@ const ActionCard = React.memo(function ActionCard({
           />
         )}
     </motion.button>
+  );
+});
+
+// ─── Titre révélé mot à mot ──────────────────────────────────────────────
+
+const RevealText = React.memo(function RevealText({
+  text, reduceMotion = false, delay = 0,
+}: { text: string; reduceMotion?: boolean; delay?: number }) {
+  const words = text.split(' ');
+  if (reduceMotion) return <>{text}</>;
+  return (
+    <>
+      {words.map((word, i) => (
+        <React.Fragment key={`${word}-${i}`}>
+          <motion.span
+            className="inline-block"
+            initial={{ opacity: 0, y: '0.35em', filter: 'blur(8px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: delay + i * 0.07 }}
+          >
+            {word}
+          </motion.span>
+          {i < words.length - 1 ? ' ' : null}
+        </React.Fragment>
+      ))}
+    </>
+  );
+});
+
+// ─── Barre « Demander à … » ──────────────────────────────────────────────
+// Envoie l'invite à l'assistante via onAskAssistant (qui ouvre le chat et
+// connecte si besoin). « / » place le focus dans la barre depuis l'accueil.
+
+const ASK_SUGGESTIONS = [
+  'Explique-moi l’architecture de ce projet',
+  'Trouve les bugs potentiels dans les fichiers modifiés',
+  'Écris les tests du dernier fichier ouvert',
+  'Résume l’activité Git du jour',
+  'Propose un plan pour la prochaine fonctionnalité',
+];
+
+const AskBar = React.memo(function AskBar({
+  aiName, onAsk, reduceMotion = false,
+}: { aiName: string; onAsk: (prompt: string) => void; reduceMotion?: boolean }) {
+  const [value, setValue] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [hint, setHint] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+
+  // Suggestions qui défilent dans le placeholder (en pause pendant la saisie).
+  useEffect(() => {
+    if (reduceMotion || focused || value) return;
+    const id = setInterval(() => setHint(h => (h + 1) % ASK_SUGGESTIONS.length), 3600);
+    return () => clearInterval(id);
+  }, [reduceMotion, focused, value]);
+
+  // « / » : focus rapide depuis l'écran d'accueil
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const prompt = value.trim();
+    if (!prompt) return;
+    onAsk(prompt);
+    setValue('');
+  };
+
+  // Tab sur la barre vide : reprend la suggestion affichée.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab' && !value && !e.shiftKey) {
+      e.preventDefault();
+      setValue(ASK_SUGGESTIONS[hint]);
+    }
+    if (e.key === 'Escape') inputRef.current?.blur();
+  };
+
+  return (
+    <form className="ee-ask" onSubmit={submit} role="search" aria-label={`Demander à ${aiName}`}>
+      <MessageSquareText size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} aria-hidden="true" />
+      <label htmlFor={inputId} className="sr-only">{`Demander à ${aiName}`}</label>
+      <input
+        ref={inputRef}
+        id={inputId}
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={onKeyDown}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {!value && (
+        <span className="ee-ask-placeholder" aria-hidden="true">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={hint}
+              className="block truncate"
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: '70%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: '-70%' }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {`Demander à ${aiName} : ${ASK_SUGGESTIONS[hint]}…`}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      )}
+      {!value && !focused && <Kbd className="hidden sm:inline-flex">/</Kbd>}
+      {!value && focused && <Kbd className="hidden sm:inline-flex">Tab</Kbd>}
+      <button type="submit" className="ee-ask-send ee-focus" disabled={!value.trim()} aria-label="Envoyer">
+        <ArrowUp size={16} strokeWidth={2.4} />
+      </button>
+    </form>
   );
 });
 
@@ -1057,19 +1299,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
     <div className="flex flex-1 flex-col overflow-y-auto relative" style={{ backgroundColor: 'var(--bg)' }}>
       <GlobalStyles />
 
-      {/* Fond statique : halo primaire en haut */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 80% 55% at 50% -5%, var(--primary) 0%, transparent 55%)', opacity: 0.16 }}
-      />
-      {/* Second halo asymétrique en bas-droite, accent froid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse 60% 50% at 105% 105%, #60a5fa 0%, transparent 55%)',
-          opacity: 0.14,
-        }}
-      />
+      {/* Fond animé : aurore (3 halos qui dérivent) + trame de points fondue */}
+      <div className="ee-aurora" aria-hidden="true"><span /><span /><span /></div>
+      <div className="ee-dots" aria-hidden="true" />
       {/* Grain subtil pour casser l'aspect plat des dégradés */}
       <div className="ee-grain absolute inset-0 pointer-events-none" aria-hidden="true" />
 
@@ -1084,8 +1316,22 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 {clock && (
                   <>
                     <span aria-hidden="true" style={{ opacity: 0.5 }}>·</span>
-                    <span className="font-mono tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                      {clock}
+                    <span
+                      className="relative inline-flex overflow-hidden font-mono tabular-nums"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={clock}
+                          className="inline-block"
+                          initial={reduceMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={reduceMotion ? { opacity: 0 } : { y: '-100%', opacity: 0 }}
+                          transition={SPRING}
+                        >
+                          {clock}
+                        </motion.span>
+                      </AnimatePresence>
                     </span>
                   </>
                 )}
@@ -1094,7 +1340,15 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 className="text-3xl sm:text-5xl font-semibold tracking-[-0.02em] leading-tight mt-1"
                 style={{ color: 'var(--text)' }}
               >
-                {greeting}, <span className="ee-name-accent">{userName}</span>
+                <RevealText text={`${greeting},`} reduceMotion={reduceMotion} />{' '}
+                <motion.span
+                  className="ee-name-accent inline-block"
+                  initial={reduceMotion ? false : { opacity: 0, y: '0.35em', filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.14 }}
+                >
+                  {userName}
+                </motion.span>
               </h1>
               <p className="text-base sm:text-lg mt-2" style={{ color: 'var(--text-secondary)' }}>
                 Que souhaitez-vous faire aujourd'hui ?
@@ -1113,6 +1367,13 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               <span>{statusLabel}</span>
             </div>
           </motion.header>
+
+          {/* ── Barre « Demander à … » (masquée sans clé valide) ── */}
+          {onAskAssistant && !geminiProblem && (
+            <motion.div className="mb-6" {...enter(0.08)}>
+              <AskBar aiName={aiName} onAsk={onAskAssistant} reduceMotion={reduceMotion} />
+            </motion.div>
+          )}
 
           {/* ── Alerte clé Gemini (visible seulement si nécessaire) ── */}
           <AnimatePresence initial={false}>
@@ -1174,8 +1435,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               accent="var(--primary)"
               primary
               hero
+              glow={!connected}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="lea-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <ActionCard
                 icon={Bot} title="Agents" description="Flotte et activité"
                 onClick={handleOpenAgents} reduceMotion={reduceMotion}
@@ -1273,4 +1535,4 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       </AnimatePresence>
     </div>
   );
-});
+});

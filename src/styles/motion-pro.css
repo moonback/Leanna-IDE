@@ -376,3 +376,126 @@
   background: none;
   color: var(--accent-primary);
 }
+
+/* ═══════════════════════════════════════════════
+   10. BARRE DE STATUT (components/ide/StatusBar.tsx)
+═══════════════════════════════════════════════ */
+.lea-statusbar {
+  background:
+    linear-gradient(to top,
+      var(--bg-secondary),
+      color-mix(in srgb, var(--bg-secondary) 88%, transparent));
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent),
+    0 -6px 18px -8px rgba(0, 0, 0, 0.28);
+}
+
+/* Liseré supérieur : hairline teintée d'accent, + lueur qui balaie pendant le travail de l'IA */
+.lea-statusbar__beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb, var(--accent-primary) 28%, transparent) 30%,
+    color-mix(in srgb, var(--accent-primary) 28%, transparent) 70%,
+    transparent);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.lea-statusbar[data-connected] .lea-statusbar__beam { opacity: 0.8; }
+.lea-statusbar[data-busy] .lea-statusbar__beam { opacity: 1; }
+.lea-statusbar__beam::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary, #c792ea), transparent);
+  box-shadow: 0 0 12px var(--accent-primary);
+  transform: translateX(-110%);
+  opacity: 0;
+}
+.lea-statusbar[data-busy] .lea-statusbar__beam::after {
+  opacity: 1;
+  animation: lea-beam-sweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes lea-beam-sweep {
+  from { transform: translateX(-110%); }
+  to   { transform: translateX(440%); }
+}
+
+/* Points d'état : onde CSS (remplace la boucle JS par point) */
+.lea-sb-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 300ms ease, box-shadow 300ms ease;
+}
+.lea-sb-dot[data-pulse]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: lea-ping 2s var(--ease-out-quart) infinite;
+}
+
+/* Jauge de contexte */
+.lea-ctx-meter {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 4px;
+  margin-left: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+.lea-ctx-meter__fill {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  transform-origin: 0 50%;
+}
+
+/* Texte « Traitement… » chatoyant */
+.lea-shimmer-text {
+  background: linear-gradient(90deg,
+    currentColor 0%, currentColor 35%,
+    color-mix(in srgb, currentColor 35%, #fff) 50%,
+    currentColor 65%, currentColor 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: lea-shimmer-text 1.6s linear infinite;
+}
+@keyframes lea-shimmer-text {
+  from { background-position: 100% 0; }
+  to   { background-position: -120% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lea-statusbar[data-busy] .lea-statusbar__beam::after,
+  .lea-sb-dot[data-pulse]::after,
+  .lea-shimmer-text { animation: none; }
+  .lea-shimmer-text { -webkit-text-fill-color: currentColor; background: none; }
+}
+:root[data-theme="high-contrast"] .lea-statusbar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-secondary);
+  box-shadow: none;
+}
+:root[data-theme="high-contrast"] .lea-statusbar__beam { display: none; }
