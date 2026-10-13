@@ -83,6 +83,9 @@ export class TelegramService {
    * Chemin du fichier de persistance de la config Telegram
    */
   private getConfigPath(): string {
+    // Surcharge (tests, installations multiples) : évite d'écraser la config réelle.
+    const override = process.env.LEANNA_TELEGRAM_CONFIG_PATH?.trim();
+    if (override) return override;
     return path.join(Leanna_APP_ROOT, ".Leanna-telegram.json");
   }
 

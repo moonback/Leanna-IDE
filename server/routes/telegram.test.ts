@@ -2,8 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import http from "http";
-import { telegramService } from "../telegram/TelegramService.js";
-import { createTelegramRouter } from "./telegram.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// Isole la config Telegram dans un dossier temporaire AVANT de charger le
+// service (le singleton lit sa config à l'import) : sans cela, les tests
+// écrasaient le .Leanna-telegram.json réel (token, utilisateurs autorisés).
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-telegram-"));
+process.env.LEANNA_TELEGRAM_CONFIG_PATH = path.join(tmpDir, ".Leanna-telegram.json");
+test.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+const { telegramService } = await import("../telegram/TelegramService.js");
+const { createTelegramRouter } = await import("./telegram.js");
 
 test("TelegramService: initial status and config", () => {
   const status = telegramService.getStatus();
