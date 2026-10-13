@@ -1038,6 +1038,7 @@ export default function IdeView() {
               onRefresh={() => { fileSystem.loadTree(); fileSystem.loadWorkspaceTree(); fileSystem.loadDiff(); }}
               onNavigate={fileSystem.setCurrentDir}
               onMoveEntry={fileSystem.moveEntry}
+              activePath={fileSystem.activePath}
             />
           )}
         </ExplorerDock>

@@ -507,3 +507,123 @@ html:root[data-theme="light"] {
   background: var(--bg-active);
   box-shadow: inset 0 0 0 2px var(--accent-primary);
 }
+
+/* ═══════════════════════════════════════════════
+   5. EXPLORATEUR DE FICHIERS (components/ide/FileExplorerVirtualized.tsx)
+═══════════════════════════════════════════════ */
+.lea-fx {
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 4%, transparent), transparent 140px);
+}
+.lea-fx-header {
+  background: color-mix(in srgb, var(--bg-sidebar) 80%, transparent);
+}
+.lea-fx-toolbar {
+  background: color-mix(in srgb, var(--bg-base) 60%, transparent);
+}
+
+/* Fil d'Ariane */
+.lea-fx-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.lea-fx-crumb {
+  flex: 0 1 auto;
+  min-width: 14px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: inherit;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.lea-fx-crumb:not(:disabled):hover { color: var(--accent-primary); background: var(--bg-hover); }
+.lea-fx-crumb:disabled { cursor: default; }
+.lea-fx-crumb[aria-current="location"] {
+  /* Le dossier courant reste lisible : ce sont les parents qui se tassent */
+  flex-shrink: 0;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Barre d'outils */
+.lea-fx-tool {
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms var(--ease-out-quart, ease);
+}
+.lea-fx-tool:not(:disabled):hover { background: var(--bg-hover); color: var(--text-primary) !important; }
+.lea-fx-tool:not(:disabled):active { transform: scale(0.92); }
+.lea-fx-tool[data-active="true"] {
+  background: color-mix(in srgb, var(--accent-primary) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+.lea-fx-tool:disabled { opacity: 0.35; cursor: not-allowed; }
+.lea-fx-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--border-base); }
+.lea-fx-refresh { transition: transform 400ms var(--ease-out-quart, ease); }
+.lea-fx-tool:hover .lea-fx-refresh { transform: rotate(120deg); }
+.lea-fx-spin { animation: lea-fx-spin 0.9s linear infinite; }
+@keyframes lea-fx-spin { to { transform: rotate(360deg); } }
+
+/* Lignes */
+.lea-fx-row {
+  transition: background-color 120ms ease, box-shadow 150ms ease, opacity 150ms ease, color 120ms ease;
+}
+.lea-fx-row:hover { background-color: var(--bg-hover); }
+/* Les fichiers modifiés gardent leur couleur de statut au survol */
+.lea-fx-row:not([data-status]):hover { color: var(--text-primary) !important; }
+.lea-fx-row .lea-fx-icon { transition: transform 200ms var(--ease-spring, ease); }
+.lea-fx-row:hover .lea-fx-icon { transform: scale(1.1); }
+
+/* Fichier actif : fond d'accent + barre lumineuse */
+.lea-fx-row[data-active="true"] {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent-primary) 18%, transparent),
+    color-mix(in srgb, var(--accent-primary) 6%, transparent)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+.lea-fx-row[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 8px var(--accent-primary);
+}
+.lea-fx-row[data-contains-active="true"] > div > span.truncate { color: var(--text-primary); font-weight: 500; }
+
+/* Guides d'indentation (un trait par niveau) */
+.lea-fx-guides {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(90deg,
+    color-mix(in srgb, var(--text-primary) 9%, transparent) 0 1px,
+    transparent 1px 16px);
+}
+[data-explorer-tree]:hover .lea-fx-guides {
+  background-image: repeating-linear-gradient(90deg,
+    color-mix(in srgb, var(--text-primary) 15%, transparent) 0 1px,
+    transparent 1px 16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lea-fx-spin { animation: none; }
+  .lea-fx-row:hover .lea-fx-icon,
+  .lea-fx-tool:hover .lea-fx-refresh { transform: none; }
+}
+:root[data-theme="high-contrast"] .lea-fx { background-image: none; }
+:root[data-theme="high-contrast"] .lea-fx-row[data-active="true"] {
+  background: var(--bg-active) !important;
+  box-shadow: inset 0 0 0 2px var(--accent-primary);
+}
