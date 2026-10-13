@@ -4,6 +4,7 @@ import path from 'path';
 import { isSandboxActive, getSandboxRoot, getRealSandboxRoot, markFileModified, assertSafeSandboxPath, SandboxGuardError } from '../utils/sandbox.js';
 import { resolveWorkspacePath, getDefaultWorkspaceRoot, isExcludedWorkspaceEntry } from '../security.js';
 import { appendAuditEvent } from '../audit.js';
+import { asyncRoute } from '../utils/asyncRoute.js';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ async function countFilesRecursively(directory: string): Promise<number> {
 }
 
 // GET /api/ide/file-count
-router.get('/file-count', async (req: Request, res: Response) => {
+router.get('/file-count', asyncRoute(async (req: Request, res: Response) => {
   try {
     const root = getWorkspaceRoot(req);
     if (!root) return res.status(200).json({ count: 0 });
@@ -35,10 +36,10 @@ router.get('/file-count', async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // GET /api/ide/tree
-router.get('/tree', async (req: Request, res: Response) => {
+router.get('/tree', asyncRoute(async (req: Request, res: Response) => {
   try {
     const root = getWorkspaceRoot(req);
     if (!root) return res.status(200).json({ path: '', entries: [] });
@@ -148,10 +149,10 @@ router.get('/tree', async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // GET /api/ide/tree-workspace — Returns the real workspace tree with server-side pagination (ignores sandbox)
-router.get('/tree-workspace', async (req: Request, res: Response) => {
+router.get('/tree-workspace', asyncRoute(async (req: Request, res: Response) => {
   try {
     const root = getDefaultWorkspaceRoot();
     if (!root) return res.status(200).json({ path: '', entries: [] });
@@ -264,10 +265,10 @@ router.get('/tree-workspace', async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // GET /api/ide/file
-router.get('/file', async (req: Request, res: Response) => {
+router.get('/file', asyncRoute(async (req: Request, res: Response) => {
   const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
 
@@ -286,10 +287,10 @@ router.get('/file', async (req: Request, res: Response) => {
   }
 
   return res.json({ path: requestedPath, content: await fs.promises.readFile(absolutePath, 'utf-8') });
-});
+}));
 
 // GET /api/ide/file-raw — Servir un fichier binaire brut (images, etc.)
-router.get('/file-raw', async (req: Request, res: Response) => {
+router.get('/file-raw', asyncRoute(async (req: Request, res: Response) => {
   const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
 
@@ -326,10 +327,10 @@ router.get('/file-raw', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   const buffer = await fs.promises.readFile(absolutePath);
   return res.send(buffer);
-});
+}));
 
 // POST /api/ide/file (save)
-router.post('/file', async (req: Request, res: Response) => {
+router.post('/file', asyncRoute(async (req: Request, res: Response) => {
   const { path: requestedPath, content } = req.body as { path?: string; content?: string };
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
 
@@ -349,10 +350,10 @@ router.post('/file', async (req: Request, res: Response) => {
   }
   await appendAuditEvent({ action: 'write_file', target: requestedPath, details: 'updated via IDE', actor: 'user' });
   return res.json({ status: 'success', path: requestedPath, sandbox: isSandboxActive() });
-});
+}));
 
 // POST /api/ide/create-file
-router.post('/create-file', async (req: Request, res: Response) => {
+router.post('/create-file', asyncRoute(async (req: Request, res: Response) => {
   const { path: requestedPath } = req.body as { path?: string };
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
 
@@ -368,10 +369,10 @@ router.post('/create-file', async (req: Request, res: Response) => {
   markFileModified(requestedPath);
   await appendAuditEvent({ action: 'create_file', target: requestedPath, details: 'created via IDE', actor: 'user' });
   return res.json({ status: 'success', path: requestedPath });
-});
+}));
 
 // POST /api/ide/create-directory
-router.post('/create-directory', async (req: Request, res: Response) => {
+router.post('/create-directory', asyncRoute(async (req: Request, res: Response) => {
   const { path: requestedPath } = req.body as { path?: string };
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du dossier est requis.' });
 
@@ -385,10 +386,10 @@ router.post('/create-directory', async (req: Request, res: Response) => {
   await fs.promises.mkdir(absolutePath, { recursive: true });
   await appendAuditEvent({ action: 'create_directory', target: requestedPath, details: 'created via IDE', actor: 'user' });
   return res.json({ status: 'success', path: requestedPath });
-});
+}));
 
 // POST /api/ide/rename (move/rename)
-router.post('/rename', async (req: Request, res: Response) => {
+router.post('/rename', asyncRoute(async (req: Request, res: Response) => {
   const { oldPath, newPath } = req.body as { oldPath?: string; newPath?: string };
   if (!oldPath || !newPath) return res.status(400).json({ error: 'oldPath et newPath sont requis.' });
 
@@ -407,10 +408,10 @@ router.post('/rename', async (req: Request, res: Response) => {
   markFileModified(newPath);
   await appendAuditEvent({ action: 'rename', target: oldPath, details: `→ ${newPath}`, actor: 'user' });
   return res.json({ status: 'success', oldPath, newPath });
-});
+}));
 
 // POST /api/ide/copy
-router.post('/copy', async (req: Request, res: Response) => {
+router.post('/copy', asyncRoute(async (req: Request, res: Response) => {
   const { srcPath, destPath } = req.body as { srcPath?: string; destPath?: string };
   if (!srcPath || !destPath) return res.status(400).json({ error: 'srcPath et destPath sont requis.' });
 
@@ -471,10 +472,10 @@ router.post('/copy', async (req: Request, res: Response) => {
   markFileModified(finalRelative);
   await appendAuditEvent({ action: 'copy', target: srcPath, details: `→ ${destPath}`, actor: 'user' });
   return res.json({ status: 'success', srcPath, destPath: finalRelative });
-});
+}));
 
 // POST /api/ide/search
-router.post('/search', async (req: Request, res: Response) => {
+router.post('/search', asyncRoute(async (req: Request, res: Response) => {
   const { query, caseSensitive, regex, filePattern } = req.body as {
     query?: string;
     caseSensitive?: boolean;
@@ -586,10 +587,10 @@ router.post('/search', async (req: Request, res: Response) => {
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
-});
+}));
 
 // DELETE /api/ide/file
-router.delete('/file', async (req: Request, res: Response) => {
+router.delete('/file', asyncRoute(async (req: Request, res: Response) => {
   const requestedPath = typeof req.query.path === 'string' ? req.query.path : '';
   if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
 
@@ -613,7 +614,7 @@ router.delete('/file', async (req: Request, res: Response) => {
   } catch {
     return res.status(404).json({ error: 'Fichier introuvable.' });
   }
-});
+}));
 
 // Helper functions
 function getWorkspaceRoot(_req: Request): string {

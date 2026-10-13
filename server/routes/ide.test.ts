@@ -72,3 +72,37 @@ test('ide routes: GET /file returns 403 on path traversal attempt', async () => 
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('ide routes: POST /file answers with an error instead of hanging when the write fails', async () => {
+  const fs = await import('fs');
+  const os = await import('os');
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-ide-'));
+  fs.mkdirSync(path.join(root, 'adir'));
+  setSelfRoot(root);
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/ide', ideRouter);
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+
+  try {
+    // Écrire sur un dossier → EISDIR : la promesse rejetée doit produire une
+    // réponse d'erreur, pas une requête suspendue indéfiniment.
+    const res = await fetch(`http://127.0.0.1:${port}/api/ide/file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'adir', content: 'x' }),
+      signal: AbortSignal.timeout(3000),
+    });
+    assert.equal(res.status, 500);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    setSelfRoot(repoRoot);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

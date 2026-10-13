@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getScheduledTasksSnapshot, pauseScheduledTask, resumeScheduledTask, runScheduledTaskNow, cancelScheduledTask, getScheduledTask } from '../skills/automation.js';
+import { asyncRoute } from '../utils/asyncRoute.js';
 
 const router = Router();
 
@@ -18,10 +19,10 @@ router.post('/scheduled-tasks/:id/toggle', (req: Request, res: Response) => {
 });
 
 // POST /api/automation/scheduled-tasks/:id/run
-router.post('/scheduled-tasks/:id/run', async (req: Request, res: Response) => {
+router.post('/scheduled-tasks/:id/run', asyncRoute(async (req: Request, res: Response) => {
   const result = await runScheduledTaskNow(req.params.id);
   res.json(result);
-});
+}));
 
 // DELETE /api/automation/scheduled-tasks/:id
 router.delete('/scheduled-tasks/:id', (req: Request, res: Response) => {
