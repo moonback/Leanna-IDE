@@ -21,6 +21,7 @@ export function StatCard({
 }) {
   return (
     <div
+      data-spotlight
       className="flex flex-col gap-1 rounded-xl border p-4"
       style={{
         backgroundColor: 'var(--bg-panel)',

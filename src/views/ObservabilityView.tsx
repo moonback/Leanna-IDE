@@ -166,7 +166,7 @@ export default function ObservabilityView() {
         {!loading && tab === 'overview' && (
           <>
             {/* Overview cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="lea-stagger grid grid-cols-2 sm:grid-cols-3 gap-3">
               <StatCard
                 icon={Zap}
                 label="Tokens totaux"

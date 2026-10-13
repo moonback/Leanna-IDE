@@ -417,6 +417,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                       delay: i < 12 ? i * 0.03 : 0,
                     }}
                     onClick={() => onSelectNotebook(nb.id)}
+                    data-spotlight
                     className="group cursor-pointer rounded-xl border border-transparent overflow-hidden flex flex-col relative transition-all duration-200"
                     style={{
                       backgroundColor: 'var(--notebook-card-bg)',

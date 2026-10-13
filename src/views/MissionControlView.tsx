@@ -132,7 +132,7 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
           )}
 
           {/* Row 1 — Agent state + health global */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="lea-stagger grid grid-cols-1 gap-4 md:grid-cols-2">
             <AgentStateCard status={state?.status} health={state?.health} activeTasks={state?.activeTasks} />
             <HealthGlobalCard report={health} loading={loading} />
           </div>
@@ -251,7 +251,7 @@ function Card({ icon: Icon, title, action, children }: {
   title: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border p-4 shadow-sm" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+    <section data-spotlight className="rounded-lg border p-4 shadow-sm" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Icon size={14} style={{ color: 'var(--accent-primary)' }} />

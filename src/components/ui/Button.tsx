@@ -218,6 +218,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const commonProps = {
       className: clsx(
         BASE,
+        // Couche « motion pro » (styles/motion-pro.css §6) : lift, reflet, halo
+        'lea-btn',
+        `lea-btn--${variant}`,
         VARIANT_STYLES[variant],
         sizeConfig.cls,
         fullWidth && 'w-full',

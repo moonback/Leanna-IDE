@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-// import '@fontsource-variable/inter';
+import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -28,6 +28,10 @@ import { ROUTES } from './config/navigation.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
 import { GlobalCommandPalette } from './components/GlobalCommandPalette.js';
 import { ConnectionBanner } from './components/ui/ConnectionBanner.js';
+import { AmbientBackdrop } from './components/ui/AmbientBackdrop.js';
+import { RouteProgress } from './components/ui/RouteProgress.js';
+import { usePointerSpotlight } from './hooks/usePointerSpotlight.js';
+import { pageVariants } from './lib/motion.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -478,16 +482,10 @@ function GlobalAgentStatusBar() {
 function AnimatedRoutes() {
   const location = useLocation();
 
-  // The IDE and Hub manage their own full-height layout; a fade is enough.
-  const pageMotion = {
-    initial: { opacity: 0, y: 6 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -4 },
-    transition: { duration: 0.18, ease: 'easeOut' as const },
-  };
-
+  // Entrée : montée + défloutage (360 ms, décélération) ; sortie plus courte
+  // vers le haut (150 ms, accélération). Voir src/lib/motion.ts.
   const wrap = (node: React.ReactNode) => (
-    <motion.div className="h-full" {...pageMotion}>
+    <motion.div className="h-full" variants={pageVariants} initial="initial" animate="animate" exit="exit">
       <Suspense fallback={<LoadingFallback />}>{node}</Suspense>
     </motion.div>
   );
@@ -529,6 +527,7 @@ function Layout() {
   const liveAPI = useLiveAPI();
   const { profile } = useProfile();
   useAgentEventStream();
+  usePointerSpotlight();
 
   // Reçoit les actions relayées depuis la fenêtre « Présence vocale » (orb) et
   // les rejoue localement, pour que l'orb pilote cet IDE.
@@ -701,6 +700,8 @@ function Layout() {
         onScreenShareChange={handleScreenShareChange}
       >
         <div className="app-layout">
+          <AmbientBackdrop />
+          <RouteProgress />
           <a className="skip-navigation-link" href="#main-content">Passer la navigation</a>
           <NavSidebar />
           <main id="main-content" className="app-content" tabIndex={-1}>

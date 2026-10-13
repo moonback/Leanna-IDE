@@ -149,6 +149,7 @@ export default function MemoriesView() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{    opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.18, delay: i < 12 ? i * 0.03 : 0 }}
+                  data-spotlight
                   className="group relative p-4 rounded-2xl flex flex-col gap-2"
                   style={{
                     backgroundColor: 'var(--bg-panel)',

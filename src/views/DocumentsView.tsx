@@ -598,6 +598,7 @@ function DocumentsTab() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.18, delay: i < 12 ? i * 0.02 : 0 }}
+                  data-spotlight
                   className="group p-4 rounded-2xl border flex flex-col gap-2 transition-all hover:border-[var(--border-focus)]"
                   style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
                 >
@@ -676,10 +677,11 @@ function DocumentsTab() {
                   </span>
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="lea-stagger grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {workspaceDocuments.map((doc: any) => (
                     <div
                       key={doc.id}
+                      data-spotlight
                       className="group p-4 rounded-2xl border flex flex-col gap-2 transition-all hover:border-cyan-500/30"
                       style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
                     >
