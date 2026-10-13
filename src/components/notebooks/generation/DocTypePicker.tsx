@@ -5,8 +5,10 @@
  */
 
 import { motion, AnimatePresence } from 'motion/react';
+import { clsx } from 'clsx';
 import { Filter, PenLine, FileBarChart, ArrowRight, Loader2 } from 'lucide-react';
 import type { SpringTransition } from '../motionTypes.js';
+import { NbButton, NbTextarea, NbSectionLabel, NbBadge } from '../ui/primitives.js';
 import { DOC_TYPES } from './constants.js';
 import type { SourceItem } from './types.js';
 
@@ -55,32 +57,40 @@ export function DocTypePicker({
   reduceMotion,
   modalSpring,
 }: Props) {
+  const sourceFilterOn = showSourceFilter || selectedSourceIds.length > 0;
+  const promptOn = showCustomPrompt || !!customInstructions.trim();
   return (
     <>
       {/* Quick config bar */}
       <div className="flex items-center gap-2">
         {sources.length > 1 && (
           <button
+            type="button"
             onClick={() => setShowSourceFilter(!showSourceFilter)}
-            className="notebook-chip"
-            style={showSourceFilter || selectedSourceIds.length > 0 ? { borderColor: 'var(--notebook-accent)', color: 'var(--notebook-accent)', background: 'var(--notebook-accent-surface)' } : {}}
+            className={clsx(
+              'notebook-chip text-xs',
+              sourceFilterOn && 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]',
+            )}
           >
-            <Filter className="w-3 h-3" />
+            <Filter className="h-3 w-3" aria-hidden />
             {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
           </button>
         )}
 
         <button
+          type="button"
           onClick={() => setShowCustomPrompt(!showCustomPrompt)}
-          className="notebook-chip"
-          style={showCustomPrompt || customInstructions.trim() ? { borderColor: 'var(--color-warning)', color: 'var(--color-warning)', background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)' } : {}}
+          className={clsx(
+            'notebook-chip text-xs',
+            promptOn && 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
+          )}
         >
-          <PenLine className="w-3 h-3" />
+          <PenLine className="h-3 w-3" aria-hidden />
           Prompt
-          {customInstructions.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
+          {customInstructions.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
         </button>
 
-        <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
+        <span className="ml-auto text-xs text-[var(--text-muted)]">
           {sources.length} source{sources.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -95,34 +105,32 @@ export function DocTypePicker({
             transition={modalSpring}
             className="overflow-hidden"
           >
-            <div
-              className="p-2.5 rounded-xl space-y-1"
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
-            >
+            <div className="notebook-card space-y-1 rounded-xl p-2">
               {sources.map(src => (
                 <label
                   key={src.id}
                   htmlFor={`doctype-src-${src.id}`}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--notebook-surface-muted)]"
                 >
                   <input
                     id={`doctype-src-${src.id}`}
                     type="checkbox"
                     checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
                     onChange={() => toggleSourceSelection(src.id)}
-                    className="w-3 h-3 rounded accent-[var(--accent-primary)]"
+                    className="h-3 w-3 rounded accent-[var(--notebook-accent)]"
                   />
-                  <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
+                  <span className="truncate text-xs text-[var(--text-primary)]">{src.title}</span>
                 </label>
               ))}
               {selectedSourceIds.length > 0 && (
-                <button
+                <NbButton
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setSelectedSourceIds([])}
-                  className="text-xs px-2 py-1 w-full text-left hover:underline"
-                  style={{ color: 'var(--accent-primary)' }}
+                  className="w-full justify-start text-[var(--notebook-accent)]"
                 >
                   Réinitialiser (toutes)
-                </button>
+                </NbButton>
               )}
             </div>
           </motion.div>
@@ -139,17 +147,12 @@ export function DocTypePicker({
             transition={modalSpring}
             className="overflow-hidden"
           >
-            <textarea
+            <NbTextarea
               value={customInstructions}
               onChange={e => setCustomInstructions(e.target.value)}
               placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
               rows={2}
-              className="w-full px-3 py-2.5 rounded-full text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--color-warning)]"
-              style={{
-                backgroundColor: 'var(--bg-panel)',
-                border: '1px solid var(--border-base)',
-                color: 'var(--text-primary)',
-              }}
+              className="text-xs"
             />
           </motion.div>
         )}
@@ -158,48 +161,39 @@ export function DocTypePicker({
       {/* Generate buttons — redesigned grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-            Générer
-          </p>
+          <NbSectionLabel>Générer</NbSectionLabel>
           {activeGenerationIds.size > 0 && (
-            <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-              <Loader2 className="w-3 h-3 animate-spin" />
+            <NbBadge tone="accent" icon={Loader2} className="[&>svg]:animate-spin">
               {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
-            </span>
+            </NbBadge>
           )}
         </div>
 
         {/* Bouton principal — Rapport complet (ouvre le modal) */}
         <button
           ref={reportModalTriggerRef}
+          type="button"
           onClick={onOpenReportModal}
           disabled={sources.length === 0}
-          className="w-full flex items-center gap-2.5 p-2.5 rounded-lg border transition-all disabled:opacity-40 active:scale-[0.98] hover:shadow-sm"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--color-error) 25%, transparent)',
-            backgroundColor: 'color-mix(in srgb, var(--color-error) 8%, transparent)',
-          }}
+          className="notebook-studio-card flex w-full items-center gap-3 rounded-xl p-3 text-left active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
           title="Choisir un type de rapport • Suggestions IA incluses"
         >
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)' }}
-          >
-            <FileBarChart className="w-4 h-4" style={{ color: 'var(--color-error)' }} />
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--color-error)_25%,transparent)] bg-[var(--color-error-subtle)]">
+            <FileBarChart className="h-4 w-4 text-[var(--color-error)]" aria-hidden />
           </div>
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
               Rapport complet
             </p>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               Types avancés
             </p>
           </div>
-          <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
+          <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)]" aria-hidden />
         </button>
 
         {/* Types rapides — 3 par ligne */}
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-3 gap-2">
           {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
             const isActive = [...activeGenerationIds].some(taskId => {
               const task = generationQueue.find(t => t.id === taskId);
@@ -208,42 +202,38 @@ export function DocTypePicker({
             return (
               <motion.button
                 key={key}
+                type="button"
                 ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
                 onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
                 disabled={sources.length === 0}
-                whileHover={sources.length > 0 ? { y: -1, scale: 1.01 } : {}}
-                whileTap={sources.length > 0 ? { scale: 0.98 } : {}}
-                transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
-                className={`group relative w-full flex flex-col items-center gap-1 p-1.5 rounded-lg text-center disabled:opacity-40 transition-all duration-200 ${
-                  isActive ? 'ring-1' : 'hover:bg-[var(--bg-hover)]'
-                }`}
-                style={{
-                  border: '1px solid',
-                  borderColor: isActive ? color : 'var(--notebook-border)',
-                  backgroundColor: isActive ? `${color}08` : 'var(--notebook-card-bg)',
-                }}
+                whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
+                className="notebook-studio-card group relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2 text-center disabled:pointer-events-none disabled:opacity-40"
+                style={isActive ? {
+                  borderColor: color,
+                  backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))`,
+                } : undefined}
                 title={desc}
               >
                 <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
-                  style={{ backgroundColor: `${color}10`, border: `1px solid ${color}20` }}
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}
                 >
                   {isActive ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color }} />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color }} aria-hidden />
                   ) : (
-                    <Icon className="w-4 h-4" style={{ color }} />
+                    <Icon className="h-4 w-4" style={{ color }} aria-hidden />
                   )}
                 </div>
 
-                <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                <span className="w-full text-[11px] font-medium leading-tight text-[var(--text-primary)]">
                   {label}
                 </span>
 
                 {isActive && (
                   <motion.div
                     layoutId="activeGenType"
-                    className="absolute inset-0 rounded-lg pointer-events-none"
-                    style={{ border: `1.5px solid ${color}`, opacity: 0.6 }}
+                    className="pointer-events-none absolute inset-0 rounded-xl opacity-60"
+                    style={{ border: `1.5px solid ${color}` }}
                   />
                 )}
               </motion.button>
@@ -254,7 +244,7 @@ export function DocTypePicker({
 
       {/* Source count info */}
       {sources.length === 0 && (
-        <p className="text-xs text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+        <p className="rounded-lg bg-[var(--notebook-surface-muted)] px-3 py-2 text-center text-xs text-[var(--text-dimmed)]">
           Ajoutez des sources pour activer la génération
         </p>
       )}

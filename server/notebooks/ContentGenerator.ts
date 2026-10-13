@@ -14,6 +14,7 @@ import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { notebookManager } from "./NotebookManager.js";
 import { notebookPromptStore } from "./PromptStore.js";
+import { buildSourcesContext, DEFAULT_CONTEXT_BUDGET, REPORT_CONTEXT_BUDGET } from "./generationContext.js";
 import type { GeneratedDocument, GeneratedDocType, AudioOverview, ReportSuggestion } from "./types.js";
 
 /** Instruction de langue standard, injectée en tête des prompts de génération. */
@@ -33,7 +34,7 @@ export class ContentGenerator {
   async generate(
     notebookId: string,
     type: GeneratedDocType,
-    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string; notebookModel?: string } = {}
+    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string; notebookModel?: string; signal?: AbortSignal } = {}
   ): Promise<GeneratedDocument> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
@@ -46,10 +47,12 @@ export class ContentGenerator {
 
     if (sources.length === 0) throw new Error("Aucune source sélectionnée.");
 
-    // Construire le contexte des sources
-    const sourcesContext = sources.map(s =>
-      `## ${s.title}\n${s.summary}\n\nExtraits clés :\n${s.chunks.slice(0, 5).map(c => c.content).join("\n\n")}`
-    ).join("\n\n---\n\n");
+    // Construire le contexte des sources : passages répartis sur tout chaque
+    // document, dans un budget plus large pour les rapports longs.
+    const isLongReport = type === "full-report" || type.startsWith("report-") || type === "synthesis-report";
+    const sourcesContext = buildSourcesContext(sources, {
+      budgetChars: isLongReport ? REPORT_CONTEXT_BUDGET : DEFAULT_CONTEXT_BUDGET,
+    });
 
     const lang = options.language || sources[0]?.language || "fr";
     let prompt = "";
@@ -139,7 +142,7 @@ export class ContentGenerator {
       case "infographic":
         title = "Infographie";
         // Cas spécial : génération d'image
-        return this.generateInfographic(notebookId, sourcesContext, sources, lang, options);
+        return this.generateInfographic(notebookId, buildSourcesContext(sources, { budgetChars: 4_000 }), sources, lang, options);
       case "roadmap":
         title = `🗺️ Roadmap — ${notebook.title}`;
         prompt = this.buildRoadmapPrompt(notebook.title, notebook.description, sourcesContext, lang);
@@ -192,6 +195,7 @@ export class ContentGenerator {
         maxOutputTokens: maxTokens,
         ...modelOverride,
         onChunk: options.onChunk,
+        signal: options.signal,
       });
     } else {
       // Mode classique
@@ -202,6 +206,11 @@ export class ContentGenerator {
         ...modelOverride,
       });
       generatedText = result.text;
+    }
+
+    // Génération interrompue par le client : ne pas enregistrer un document tronqué.
+    if (options.signal?.aborted) {
+      throw new Error("Génération annulée.");
     }
 
     const doc: GeneratedDocument = {
@@ -375,9 +384,13 @@ export class ContentGenerator {
     };
 
     // Contexte condensé des sources
-    const sourcesContext = sources.map(s =>
-      `## ${s.title}\n${s.summary}\n\nPoints clés :\n${s.keywords.join(", ")}`
-    ).join("\n\n---\n\n");
+    // Résumé, mots-clés ET passages réels : le script doit pouvoir citer des
+    // faits précis, pas seulement paraphraser les résumés.
+    const sourcesContext = buildSourcesContext(sources, {
+      budgetChars: DEFAULT_CONTEXT_BUDGET,
+      includeKeywords: true,
+      excerptsLabel: "Passages :",
+    });
 
     const customPart = options.customInstructions
       ? `\n- Instructions supplémentaires de l'utilisateur : ${options.customInstructions}`
@@ -1017,10 +1030,8 @@ RÈGLE SPÉCIALE : Ce document doit être CONCIS (max 2 pages). Chaque mot compt
     const vizType = options.visualizationType || "auto";
     const langInstr = lang === "fr" ? "Réponds en français." : "Reply in English.";
 
-    // Construire le contexte des sources
-    const sourcesContext = sources.map(s =>
-      `## ${s.title}\n${s.summary}\n\nExtraits clés :\n${s.chunks.slice(0, 5).map(c => c.content).join("\n\n")}`
-    ).join("\n\n---\n\n");
+    // Construire le contexte des sources (passages répartis sur tout le document)
+    const sourcesContext = buildSourcesContext(sources, { budgetChars: 6_000 });
 
     // Étape 1 : Demander au LLM d'extraire les données et de suggérer une visualisation
     const extractionPrompt = notebookPromptStore.render("content.visual.extraction", {

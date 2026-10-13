@@ -28,6 +28,7 @@ import { GeneratePanel } from './GeneratePanel.js';
 import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
+import { NbButton, NbIconButton } from './ui/primitives.js';
 
 interface NotebookData {
   id: string;
@@ -129,74 +130,60 @@ function NoteEditorCenter({
     <motion.div
       {...motionProps}
       transition={spring}
-      className="h-full flex flex-col"
-      style={{ backgroundColor: 'var(--notebook-canvas)' }}
+      className="flex h-full flex-col bg-[var(--notebook-canvas)]"
     >
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
-          >
-            <StickyNote className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
+      <div className="notebook-panel-header bg-[var(--notebook-surface-elevated)] px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
+            <StickyNote className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
           </div>
-          <div>
-            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div className="min-w-0">
+            <h2 className="notebook-panel-title truncate">
               {data.id ? 'Modifier la note' : 'Nouvelle note'}
             </h2>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[var(--text-muted)]">
               {content.length} caractères
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-transform active:scale-95 hover:bg-[var(--notebook-surface-muted)]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <X className="w-3.5 h-3.5" />
+        <div className="notebook-actions gap-2">
+          <NbButton variant="ghost" size="sm" icon={X} onClick={onClose}>
             Annuler
-          </button>
-          <button
+          </NbButton>
+          <NbButton
+            variant="primary"
+            size="sm"
+            icon={Save}
             onClick={handleSave}
             disabled={!title.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 transition-transform active:scale-95"
-            style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
           >
-            <Save className="w-3.5 h-3.5" />
             {saving ? 'Sauvegarde...' : data.id ? 'Mettre à jour' : 'Enregistrer'}
-          </button>
+          </NbButton>
         </div>
       </div>
 
       {/* Title */}
-      <div className="px-6 pt-6 pb-3 flex-shrink-0">
+      <div className="flex-shrink-0 px-6 pb-3 pt-6">
         <input
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="Titre de la note..."
           autoFocus
-          className="w-full text-xl font-bold bg-transparent outline-none placeholder:opacity-30 notebook-heading"
-          style={{ color: 'var(--text-primary)' }}
+          className="notebook-heading w-full bg-transparent text-xl font-bold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
         />
-        <div className="h-px mt-3" style={{ backgroundColor: 'var(--notebook-border)' }} />
+        <div className="mt-3 h-px bg-[var(--notebook-border)]" />
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 px-6 pb-6">
+      <div className="min-h-0 flex-1 px-6 pb-6">
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
           placeholder="Écrivez votre note ici... (Markdown supporté)"
-          className="w-full h-full bg-transparent outline-none resize-none text-sm leading-7 placeholder:opacity-30"
-          style={{ color: 'var(--text-secondary)' }}
+          className="notebook-body h-full w-full resize-none bg-transparent text-sm leading-7 text-[var(--text-secondary)] outline-none placeholder:text-[var(--text-dimmed)]"
         />
       </div>
     </motion.div>
@@ -307,12 +294,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     return (
       <div className="notebook-workspace h-full flex flex-col">
         {/* Skeleton header */}
-        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}>
-          <div className="w-8 h-8 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-          <div className="w-10 h-10 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+        <div className="notebook-header flex-shrink-0 justify-start gap-3 bg-[var(--notebook-surface-elevated)]" aria-hidden="true">
+          <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
+          <div className="h-10 w-10 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-48 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
-            <div className="h-3 w-64 rounded-full animate-pulse" style={{ backgroundColor: 'var(--notebook-surface-muted)' }} />
+            <div className="h-4 w-48 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
+            <div className="h-3 w-64 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
           </div>
         </div>
         {/* Skeleton content */}
@@ -514,16 +501,15 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             className="flex-shrink-0 overflow-hidden border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-6 py-2"
           >
             <div className="mx-auto flex max-w-5xl items-center gap-3 text-sm text-[var(--text-secondary)]">
-              <Loader2 className="h-4 w-4 animate-spin text-[var(--notebook-accent)]" />
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--notebook-accent)]" aria-hidden />
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--notebook-surface-muted)]">
                 <motion.div
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: 'var(--notebook-accent)' }}
+                  className="h-full rounded-full bg-[var(--notebook-accent)]"
                   animate={{ width: `${(indexingProgress.done / indexingProgress.total) * 100}%` }}
                   transition={spring}
                 />
               </div>
-              <span className="text-xs font-medium">{indexingProgress.done}/{indexingProgress.total}</span>
+              <span className="text-xs font-medium tabular-nums text-[var(--text-muted)]">{indexingProgress.done}/{indexingProgress.total}</span>
             </div>
           </motion.div>
         )}
@@ -548,43 +534,31 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             />
           ) : (
             /* Collapsed rail — just the toggle button */
-            <div className="flex flex-col items-center pt-4 gap-3 w-full">
-              <button
+            <div className="flex w-full flex-col items-center gap-3 pt-4">
+              <NbIconButton
+                icon={PanelLeftOpen}
+                label="Afficher les sources"
                 onClick={() => setSourceRailOpen(true)}
-                className="p-2 rounded-lg transition-colors hover:bg-[var(--notebook-surface-muted)]"
-                title="Afficher les sources"
-                aria-label="Afficher les sources"
-              >
-                <PanelLeftOpen className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
-              </button>
-              <span
-                className="text-xs font-semibold"
-                style={{
-                  writingMode: 'vertical-rl',
-                  textOrientation: 'mixed',
-                  color: 'var(--text-dimmed)',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  transform: 'rotate(180deg)',
-                }}
-              >
+              />
+              <span className="rotate-180 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-dimmed)] [text-orientation:mixed] [writing-mode:vertical-rl]">
                 Sources {notebook.sources.length > 0 ? `(${notebook.sources.length})` : ''}
               </span>
             </div>
           )}
           {/* Toggle button at bottom when open */}
           {sourceRailOpen && (
-            <div className="flex-shrink-0 px-3 py-2 border-t border-[var(--notebook-border)]">
-              <button
+            <div className="flex-shrink-0 border-t border-[var(--notebook-border)] px-3 py-2">
+              <NbButton
+                variant="ghost"
+                size="sm"
+                icon={PanelLeftClose}
                 onClick={() => setSourceRailOpen(false)}
-                className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-[var(--notebook-surface-muted)]"
+                className="w-full justify-start"
                 title="Réduire le panneau sources"
                 aria-label="Réduire le panneau sources"
-                style={{ color: 'var(--text-dimmed)' }}
               >
-                <PanelLeftClose className="h-3.5 w-3.5 flex-shrink-0" />
                 <span>Réduire</span>
-              </button>
+              </NbButton>
             </div>
           )}
         </aside>
@@ -629,13 +603,13 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                   </button>
                 );
               })}
-              <button
+              <NbIconButton
+                icon={X}
+                size="sm"
+                label="Fermer le studio"
                 onClick={() => setStudioOpen(false)}
-                className="notebook-icon-button ml-auto transition-transform active:scale-90 flex-shrink-0"
-                aria-label="Fermer le studio"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                className="ml-auto flex-shrink-0"
+              />
             </div>
 
             {/* Studio content — all panels always mounted, inactive ones hidden via display:none */}

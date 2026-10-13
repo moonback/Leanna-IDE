@@ -10,6 +10,7 @@ import {
   Loader2, MessageCircle, Lightbulb, RefreshCw, StopCircle, Telescope, ArrowDown, Quote,
 } from 'lucide-react';
 import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from '../motion.js';
+import { NbBadge, NbButton, NbEmptyState, NbIconButton } from '../ui/primitives.js';
 import { renderMessageContent } from './renderHelpers.js';
 import { MessageItem } from './MessageItem.js';
 import type { Citation, ChatMessage } from './types.js';
@@ -66,6 +67,9 @@ export function MessageList(props: Props) {
     prefersReducedMotion, onSend, onStopStreaming, scrollToBottom,
   } = props;
 
+  const suggestionChipClass =
+    'notebook-chip !whitespace-normal !rounded-xl !px-3 !py-2 text-left !text-sm leading-snug !text-[var(--text-primary)]';
+
   return (
     <>
       <div
@@ -75,57 +79,46 @@ export function MessageList(props: Props) {
       >
         {loadingHistory ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--notebook-accent)]" />
           </div>
         ) : messages.length === 0 ? (
           /* Welcome state */
-          <div className="flex flex-col items-center justify-center py-16 gap-6 max-w-lg mx-auto">
-            <div className="notebook-empty-state-icon" style={{ width: 64, height: 64 }}>
-              <MessageCircle className="w-7 h-7" />
-            </div>
-            <div className="text-center space-y-2">
-              <p className="text-lg font-medium notebook-heading" style={{ color: 'var(--text-primary)' }}>
-                Interrogez vos sources
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Posez une question et l'IA répondra en citant les passages pertinents de vos documents.
-              </p>
-            </div>
+          <div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-4 py-12">
+            <NbEmptyState
+              icon={MessageCircle}
+              title="Interrogez vos sources"
+              description="Posez une question et l'IA répondra en citant les passages pertinents de vos documents."
+            />
 
             {/* Suggestions — 2 visibles + bouton pour en voir d'autres */}
             {suggestions.length > 0 && (
-              <div className="w-full mt-4 space-y-3">
-                <p className="text-smfont-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-                  <Lightbulb className="w-3.5 h-3.5" />
+              <div className="w-full space-y-3">
+                <p className="flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
+                  <Lightbulb className="h-3.5 w-3.5" />
                   Suggestions
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {suggestions.slice(suggestionOffset, suggestionOffset + 2).map((s, i) => (
                     <button
                       key={`${suggestionOffset}-${i}`}
+                      type="button"
                       onClick={() => onSend(s)}
-                      className="notebook-chip text-left px-3 py-2.5 rounded-full text-sm leading-snug transition-all hover:scale-[1.02] hover:shadow-sm"
-                      style={{
-                        whiteSpace: 'normal',
-                        textAlign: 'left',
-                        backgroundColor: 'var(--notebook-chat-ai)',
-                        border: '1px solid var(--notebook-border)',
-                        color: 'var(--text-primary)',
-                      }}
+                      className={suggestionChipClass}
                     >
                       <span className="line-clamp-2">{s}</span>
                     </button>
                   ))}
                 </div>
                 {suggestions.length > 2 && (
-                  <button
+                  <NbButton
+                    variant="ghost"
+                    size="sm"
+                    icon={RefreshCw}
                     onClick={() => setSuggestionOffset((prev) => (prev + 2) >= suggestions.length ? 0 : prev + 2)}
-                    className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
-                    style={{ color: 'var(--accent-primary)' }}
+                    className="!text-[var(--notebook-accent)]"
                   >
-                    <RefreshCw className="w-3 h-3" />
                     Autres suggestions
-                  </button>
+                  </NbButton>
                 )}
               </div>
             )}
@@ -167,15 +160,14 @@ export function MessageList(props: Props) {
                 initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
-                className="flex justify-start max-w-4xl mx-auto"
+                className="mx-auto flex max-w-4xl justify-start"
               >
                 <div
-                  className="notebook-chat-message w-full"
+                  className="notebook-chat-message w-full border border-[var(--notebook-border)]"
                   data-role="assistant"
-                  style={{ border: '1px solid var(--notebook-border)' }}
                 >
                   {renderMessageContent(streamingText)}
-                  <span className="inline-block w-1.5 h-4 ml-0.5 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--notebook-accent)' }} />
+                  <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-[var(--notebook-accent)]" />
                 </div>
               </motion.div>
             )}
@@ -187,19 +179,15 @@ export function MessageList(props: Props) {
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex justify-center"
               >
-                <button
+                <NbButton
+                  variant="secondary"
+                  size="sm"
+                  icon={StopCircle}
                   onClick={onStopStreaming}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: 'var(--bg-panel)',
-                    border: '1px solid var(--border-base)',
-                    color: 'var(--text-secondary)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  }}
+                  className="[&>svg]:text-[var(--color-error)]"
                 >
-                  <StopCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
                   Arrêter la génération
-                </button>
+                </NbButton>
               </motion.div>
             )}
 
@@ -210,11 +198,8 @@ export function MessageList(props: Props) {
                 animate={{ opacity: 1 }}
                 className="flex justify-start"
               >
-                <div
-                  className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs"
-                  style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
-                >
-                  <Telescope className="w-4 h-4 animate-pulse" />
+                <div className="flex items-center gap-2 rounded-xl border border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] px-4 py-3 text-xs text-[var(--notebook-accent)]">
+                  <Telescope className="h-4 w-4 animate-pulse" />
                   <span className="font-medium">{deepDiveProgress}</span>
                 </div>
               </motion.div>
@@ -225,17 +210,16 @@ export function MessageList(props: Props) {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex justify-start max-w-4xl mx-auto"
+                className="mx-auto flex max-w-4xl justify-start"
               >
                 <div
-                  className="notebook-chat-message"
+                  className="notebook-chat-message border border-[var(--notebook-border)] !px-5 !py-4"
                   data-role="assistant"
-                  style={{ border: '1px solid var(--notebook-border)', padding: '16px 20px' }}
                 >
                   <div className="flex gap-1.5">
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'var(--notebook-accent)', animationDelay: '300ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--notebook-accent)] [animation-delay:0ms]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--notebook-accent)] [animation-delay:150ms]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--notebook-accent)] [animation-delay:300ms]" />
                   </div>
                 </div>
               </motion.div>
@@ -247,39 +231,34 @@ export function MessageList(props: Props) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="space-y-3 pt-4 max-w-4xl mx-auto"
+                className="mx-auto max-w-4xl space-y-3 pt-4"
               >
-                <p className="text-smfont-medium flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-                  <Lightbulb className="w-3.5 h-3.5" />
+                <p className="flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
+                  <Lightbulb className="h-3.5 w-3.5" />
                   Questions de suivi
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {followUps.slice(followUpOffset, followUpOffset + 2).map((q, i) => (
                     <button
                       key={`${followUpOffset}-${i}`}
+                      type="button"
                       onClick={() => onSend(q)}
-                      className="notebook-chip text-left px-3 py-2.5 rounded-full text-sm leading-snug transition-all hover:scale-[1.02] hover:shadow-sm"
-                      style={{
-                        whiteSpace: 'normal',
-                        textAlign: 'left',
-                        backgroundColor: 'var(--notebook-chat-ai)',
-                        border: '1px solid var(--notebook-border)',
-                        color: 'var(--text-primary)',
-                      }}
+                      className={suggestionChipClass}
                     >
                       <span className="line-clamp-2">{q}</span>
                     </button>
                   ))}
                 </div>
                 {followUps.length > 2 && (
-                  <button
+                  <NbButton
+                    variant="ghost"
+                    size="sm"
+                    icon={RefreshCw}
                     onClick={() => setFollowUpOffset((prev) => (prev + 2) >= followUps.length ? 0 : prev + 2)}
-                    className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
-                    style={{ color: 'var(--accent-primary)' }}
+                    className="!text-[var(--notebook-accent)]"
                   >
-                    <RefreshCw className="w-3 h-3" />
                     Autres suggestions
-                  </button>
+                  </NbButton>
                 )}
               </motion.div>
             )}
@@ -291,18 +270,20 @@ export function MessageList(props: Props) {
         {/* Scroll to bottom button */}
         <AnimatePresence>
           {showScrollBtn && (
-            <motion.button
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM}
-              whileTap={{ scale: 0.88 }}
-              onClick={scrollToBottom}
-              className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 hover:opacity-90 transition-opacity duration-150"
-              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+              className="fixed bottom-28 right-8 z-30"
             >
-              <ArrowDown className="w-4 h-4" />
-            </motion.button>
+              <NbIconButton
+                icon={ArrowDown}
+                label="Aller en bas de la conversation"
+                onClick={scrollToBottom}
+                className="!h-10 !w-10 !bg-[var(--notebook-accent)] !text-[var(--notebook-accent-text)] shadow-[var(--notebook-shadow-md)] hover:!opacity-90"
+              />
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -315,26 +296,21 @@ export function MessageList(props: Props) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             transition={{ duration: 0.1 }}
-            className="fixed z-50 max-w-md p-4 rounded-xl shadow-2xl pointer-events-none"
+            className="pointer-events-none fixed z-50 max-w-md rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] p-4 text-[var(--text-primary)] shadow-[var(--notebook-shadow-lg)]"
+            // Position dynamique (suit la citation survolée)
             style={{
               left: Math.min(hoveredCitation.x, window.innerWidth - 420),
               top: Math.max(hoveredCitation.y - 200, 8),
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-focus)',
-              color: 'var(--text-primary)',
             }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-smfont-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
-              <span
-                className="text-smpx-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-              >
+            <div className="mb-2 flex items-center gap-2">
+              <Quote className="h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />
+              <span className="truncate text-sm font-semibold">{hoveredCitation.citation.sourceTitle}</span>
+              <NbBadge tone="accent" className="flex-shrink-0">
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
-              </span>
+              </NbBadge>
             </div>
-            <p className="text-smleading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto custom-scrollbar" style={{ color: 'var(--text-muted)' }}>
+            <p className="custom-scrollbar max-h-44 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
               {hoveredCitation.fullContent}
             </p>
           </motion.div>

@@ -11,6 +11,7 @@
 import { type JSX } from 'react';
 import { Copy } from 'lucide-react';
 import { MermaidDiagram } from '../MermaidDiagram.js';
+import { NbIconButton } from '../ui/primitives.js';
 import { CODE_THEMES } from './constants.js';
 // Styles premium NotebookLM
 import '../../../styles/notebooklm.css';
@@ -56,10 +57,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                     backgroundColor: `color-mix(in srgb, ${theme.bg} 95%, black)`,
                   }}
                 >
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                  />
+                  <span className="h-2 w-2 rounded-full bg-[var(--notebook-accent)]" />
                   <span className="text-xs font-medium text-[var(--text-dimmed)]">
                     {lang}
                   </span>
@@ -75,14 +73,13 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 <code>{codeContent}</code>
               </pre>
 
-              <button
+              <NbIconButton
+                icon={Copy}
+                label="Copier"
+                size="sm"
                 onClick={() => navigator.clipboard.writeText(codeContent)}
-                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-[var(--bg-active)]"
-                style={{ color: 'var(--text-muted)' }}
-                title="Copier"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
+                className="absolute right-2 top-2 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/code:opacity-100"
+              />
             </div>
           );
         }
@@ -99,25 +96,15 @@ export function renderGeneratedContent(content: string): JSX.Element {
               if (imgMatch) {
                 return (
                   <figure key={j} className="notebooklm-figure my-6">
-                    <div
-                      className="rounded-2xl overflow-hidden border shadow-lg"
-                      style={{
-                        borderColor: 'var(--border-base)',
-                        backgroundColor: 'var(--bg-base)',
-                      }}
-                    >
+                    <div className="overflow-hidden rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] shadow-lg">
                       <img
                         src={imgMatch[2]}
                         alt={imgMatch[1] || 'Image'}
-                        className="w-full h-auto"
-                        style={{ maxHeight: '700px', objectFit: 'contain' }}
+                        className="h-auto max-h-[700px] w-full object-contain"
                       />
                     </div>
                     {imgMatch[1] && (
-                      <figcaption
-                        className="mt-3 text-center text-xs"
-                        style={{ color: 'var(--text-dimmed)' }}
-                      >
+                      <figcaption className="mt-3 text-center text-xs text-[var(--text-dimmed)]">
                         {imgMatch[1]}
                       </figcaption>
                     )}
@@ -168,10 +155,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 return (
                   <hr
                     key={j}
-                    className="my-6 border-0 h-px"
-                    style={{
-                      background: 'linear-gradient(to right, transparent, var(--border-base), transparent)',
-                    }}
+                    className="my-6 h-px border-0 bg-[linear-gradient(to_right,transparent,var(--notebook-border),transparent)]"
                   />
                 );
 
@@ -180,13 +164,9 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 return (
                   <blockquote
                     key={j}
-                    className="notebooklm-blockquote pl-5 pr-4 py-3 rounded-xl my-4"
-                    style={{
-                      borderLeft: '3px solid var(--accent-primary)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)',
-                    }}
+                    className="notebooklm-blockquote my-4 rounded-xl border-l-[3px] border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] py-3 pl-5 pr-4"
                   >
-                    <p className="text-sm italic leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-sm italic leading-relaxed text-[var(--text-muted)]">
                       {renderInlineMarkdown(line.slice(2).trim())}
                     </p>
                   </blockquote>
@@ -197,10 +177,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 const bullet = line.match(/^([-*+])\s/)![1];
                 return (
                   <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
-                    <span
-                      className="mt-1.5 flex-shrink-0"
-                      style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
-                    >
+                    <span className="mt-1.5 flex-shrink-0 text-[var(--notebook-accent)] opacity-70">
                       {bullet === '*' ? '•' : bullet === '+' ? '›' : '○'}
                     </span>
                     <div className="text-sm leading-relaxed flex-1">
@@ -216,10 +193,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 if (numMatch)
                   return (
                     <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
-                      <span
-                        className="mt-1.5 flex-shrink-0 w-6 text-right font-semibold"
-                        style={{ color: 'var(--accent-primary)' }}
-                      >
+                      <span className="mt-1.5 w-6 flex-shrink-0 text-right font-semibold text-[var(--notebook-accent)]">
                         {numMatch[1]}.
                       </span>
                       <div className="text-sm leading-relaxed flex-1">
@@ -238,7 +212,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                       type="checkbox"
                       checked={taskMatch[1].toLowerCase() === 'x'}
                       readOnly
-                      className="mt-1.5 w-4 h-4 rounded border-2 accent-[var(--accent-primary)]"
+                      className="mt-1.5 w-4 h-4 rounded border-2 accent-[var(--notebook-accent)]"
                     />
                     <span className="text-sm leading-relaxed pt-0.5">
                       {renderInlineMarkdown(taskMatch[2])}
@@ -298,8 +272,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
         render: (content) => (
           <code
             key={`${content}-code-${depth}`}
-            className="notebooklm-inline-code px-1.5 py-0.5 rounded text-sm font-mono"
-            style={{ backgroundColor: 'var(--bg-base)', color: 'var(--accent-primary)' }}
+            className="notebooklm-inline-code rounded bg-[var(--notebook-surface-muted)] px-1.5 py-0.5 font-mono text-sm text-[var(--notebook-accent)]"
           >
             {content}
           </code>
@@ -317,8 +290,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="notebooklm-link inline-flex items-center gap-1 font-medium"
-              style={{ color: 'var(--accent-primary)' }}
+              className="notebooklm-link inline-flex items-center gap-1 font-medium text-[var(--notebook-accent)]"
             >
               {parseMarkdown(linkText, depth + 1)}
               <span className="opacity-50">↗</span>
