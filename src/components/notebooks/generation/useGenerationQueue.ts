@@ -25,6 +25,8 @@ interface UseGenerationQueueOptions {
   sources: SourceItem[];
   onRefresh: () => void;
   imageModel?: string;
+  /** Modèle OpenRouter forcé pour la génération de documents ('' / undefined = provider texte actif). */
+  notebookModel?: string;
   onSuccess: (message: string) => void;
   onError: (message: string) => void;
   fullView: boolean;
@@ -38,6 +40,7 @@ export function useGenerationQueue({
   sources,
   onRefresh,
   imageModel,
+  notebookModel,
   onSuccess,
   onError,
   fullView,
@@ -141,6 +144,7 @@ export function useGenerationQueue({
           sourceIds: task.sourceIds,
           customInstructions: task.customInstructions,
           imageModel: imageModel || undefined,
+          notebookModel: notebookModel || undefined,
         },
         onFrame: ({ data }) => {
           const parsed = data as GenerateStreamData;
@@ -190,7 +194,7 @@ export function useGenerationQueue({
         setGenerationQueue(prev => prev.filter(t => t.id !== task.id));
       }, 1000);
     }
-  }, [notebookId, imageModel, onSuccess, onError, onRefresh, selectedDoc]);
+  }, [notebookId, imageModel, notebookModel, onSuccess, onError, onRefresh, selectedDoc]);
 
   // ── Générations déclenchées par l'assistant vocal ───────────────────────
   // L'assistant vocal du notebook lance des générations côté serveur (hors de

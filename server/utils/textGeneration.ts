@@ -262,7 +262,8 @@ export interface GenerateTextStreamOptions extends GenerateTextOptions {
  */
 export async function generateTextStream(options: GenerateTextStreamOptions): Promise<string> {
   options = guardOptionsPrompt(options);
-  const provider = _profile.textProvider || 'gemini';
+  // `forceProvider` (ex: override de modèle Notebook) prime sur le profil actif.
+  const provider = options.forceProvider || _profile.textProvider || 'gemini';
 
   if (provider === 'openrouter') {
     return streamWithOpenRouter(options);

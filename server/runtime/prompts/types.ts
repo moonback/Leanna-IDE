@@ -136,6 +136,8 @@ export interface ProfileConfig {
   openrouterModel?: string;
   /** Modèle OpenRouter utilisé pour la génération d'images (outil generate_image). */
   openrouterImageModel?: string;
+  /** Modèle OpenRouter forcé pour la génération de documents de notebook ('' = provider texte actif). */
+  notebookModel?: string;
   openrouterApiKey?: string;
   /** Enable compact system prompt to save tokens */
   compactPrompt?: boolean;

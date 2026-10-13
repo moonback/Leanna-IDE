@@ -180,6 +180,7 @@ export default function SettingsView() {
           temperature: profile.temperature, topP: profile.topP,
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
           openrouterImageModel: profile.openrouterImageModel,
+          notebookModel: profile.notebookModel,
           agents: profile.agents,
           reasoningEnabled: profile.reasoningEnabled,
           customSystemPrompt: profile.customSystemPrompt,

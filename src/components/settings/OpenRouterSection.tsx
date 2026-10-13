@@ -587,6 +587,87 @@ export function OpenRouterSection() {
           onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
         />
       </Field>
+
+      {/* Modèle de génération des documents de notebook */}
+      <Field
+        label="📓 Modèle de génération (Notebooks)"
+        hint="Modèle utilisé pour générer les documents dans les notebooks (résumés, FAQ, rapports…). « Auto » réutilise le provider/modèle de texte actif ci-dessus."
+      >
+        {/* Option Auto — réutilise le provider de texte actif */}
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setField('notebookModel', '')}
+          className="mb-1.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+          style={{
+            backgroundColor: !profile.notebookModel ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+            border: `1.5px solid ${!profile.notebookModel ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+            boxShadow: !profile.notebookModel ? '0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)' : 'none',
+          }}
+        >
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold truncate block" style={{ color: !profile.notebookModel ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+              Auto (provider de texte actif)
+            </span>
+            <span className="text-xs mt-0.5 block" style={{ color: 'var(--text-dimmed)' }}>
+              Utilise le modèle configuré pour le texte/chat.
+            </span>
+          </div>
+          {!profile.notebookModel && <Check size={14} style={{ color: 'var(--accent-primary)' }} />}
+        </motion.button>
+
+        <div className="grid grid-cols-1 gap-1.5 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+          {OPENROUTER_MODELS.map(model => {
+            const active = profile.notebookModel === model.id;
+            return (
+              <motion.button
+                key={model.id}
+                type="button"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setField('notebookModel', model.id)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200"
+                style={{
+                  backgroundColor: active ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+                  border: `1.5px solid ${active ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                  boxShadow: active ? '0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)' : 'none',
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold truncate" style={{ color: active ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                      {model.name}
+                    </span>
+                    {model.free && (
+                      <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold"
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)', color: 'var(--color-success)' }}>
+                        <Zap size={8} /> GRATUIT
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>{model.provider}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>{model.desc}</span>
+                  </div>
+                </div>
+                {active && <Check size={14} style={{ color: 'var(--accent-primary)' }} />}
+              </motion.button>
+            );
+          })}
+        </div>
+        <input
+          type="text"
+          value={profile.notebookModel}
+          onChange={e => setField('notebookModel', e.target.value)}
+          placeholder="Auto — ou un ID de modèle OpenRouter (ex: minimax/minimax-m3)"
+          className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
+          style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+        />
+      </Field>
     </Section>
   );
 }

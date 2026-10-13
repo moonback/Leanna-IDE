@@ -26,7 +26,7 @@ export function createContentRouter(): Router {
 
   router.post("/:id/generate", async (req: Request, res: Response): Promise<void> => {
     try {
-      const { type, sourceIds, language, customInstructions, imageModel } = req.body;
+      const { type, sourceIds, language, customInstructions, imageModel, notebookModel } = req.body;
       const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
       if (!type || !validTypes.includes(type)) {
@@ -36,7 +36,7 @@ export function createContentRouter(): Router {
         return;
       }
 
-      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language, customInstructions, imageModel });
+      const doc = await contentGenerator.generate(req.params.id, type, { sourceIds, language, customInstructions, imageModel, notebookModel });
       res.json({ status: "success", document: doc });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -45,7 +45,7 @@ export function createContentRouter(): Router {
 
   router.post("/:id/generate/stream", async (req: Request, res: Response): Promise<void> => {
     try {
-      const { type, sourceIds, language, customInstructions, imageModel } = req.body;
+      const { type, sourceIds, language, customInstructions, imageModel, notebookModel } = req.body;
       const validTypes: GeneratedDocType[] = ["summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary", "infographic", "full-report", "report-business", "report-market", "report-technical", "report-competitive", "report-financial", "report-marketing", "report-product", "report-risk", "report-executive", "report-project", "roadmap"];
 
       if (!type || !validTypes.includes(type)) {
@@ -68,6 +68,7 @@ export function createContentRouter(): Router {
         language,
         customInstructions,
         imageModel,
+        notebookModel,
         onChunk: (chunk: string) => {
           res.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
         },

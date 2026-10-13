@@ -27,7 +27,7 @@ export class ContentGenerator {
   async generate(
     notebookId: string,
     type: GeneratedDocType,
-    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string } = {}
+    options: { sourceIds?: string[]; language?: string; customInstructions?: string; onChunk?: (chunk: string) => void; imageModel?: string; notebookModel?: string } = {}
   ): Promise<GeneratedDocument> {
     const notebook = notebookManager.getNotebook(notebookId);
     if (!notebook) throw new Error("Notebook introuvable.");
@@ -170,6 +170,13 @@ export class ContentGenerator {
     // Plus de tokens pour les rapports
     const maxTokens = (type === "full-report" || type.startsWith("report-")) ? 16384 : 8192;
 
+    // Override de modèle choisi dans les Settings (Notebooks). Vide = provider
+    // de texte actif (comportement par défaut). Un ID non vide force OpenRouter
+    // avec ce modèle précis.
+    const modelOverride = options.notebookModel?.trim()
+      ? { forceProvider: 'openrouter' as const, openrouterModel: options.notebookModel.trim() }
+      : {};
+
     if (options.onChunk) {
       // Mode streaming
       const { generateTextStream } = await import("../utils/textGeneration.js");
@@ -177,6 +184,7 @@ export class ContentGenerator {
         prompt,
         temperature: 0.5,
         maxOutputTokens: maxTokens,
+        ...modelOverride,
         onChunk: options.onChunk,
       });
     } else {
@@ -185,6 +193,7 @@ export class ContentGenerator {
         prompt,
         temperature: 0.5,
         maxOutputTokens: maxTokens,
+        ...modelOverride,
       });
       generatedText = result.text;
     }

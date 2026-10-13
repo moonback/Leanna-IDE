@@ -287,8 +287,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
-        if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); setSourceRailOpen(true); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSourceRailOpen(false); }
+        if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(true); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(false); }
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
@@ -448,9 +448,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         {/* Center navigation */}
         <nav className="notebook-segmented hidden md:flex" aria-label="Notebook navigation">
           <button
-            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); setSourceRailOpen(true); }}
+            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(true); }}
             className="notebook-segment transition-transform active:scale-95"
-            data-active={activeTab === 'sources'}
+            data-active={activeTab === 'sources' && !viewingGeneratedDoc && !noteEditorData && !selectedSourceId}
             title="Sources (Ctrl+1 / ⌘1)"
           >
             <FileText className="h-4 w-4" />
@@ -458,9 +458,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             <span className="notebook-count">{notebook.sources.length}</span>
           </button>
           <button
-            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); setSourceRailOpen(false); }}
+            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(false); }}
             className="notebook-segment transition-transform active:scale-95"
-            data-active={activeTab === 'chat'}
+            data-active={activeTab === 'chat' && !viewingGeneratedDoc && !noteEditorData && !selectedSourceId}
             title="Chat (Ctrl+2 / ⌘2)"
           >
             <MessageSquare className="h-4 w-4" />

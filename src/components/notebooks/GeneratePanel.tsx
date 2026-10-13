@@ -84,6 +84,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   const queue = useGenerationQueue({
     notebookId, sources, onRefresh,
     imageModel: profile.openrouterImageModel,
+    notebookModel: profile.notebookModel,
     onSuccess: success, onError: toastError,
     fullView, initialDoc, selectedSourceIds, customInstructions,
   });

@@ -89,6 +89,7 @@ export interface UserProfile {
   openrouterModel:  string;       // Modèle OpenRouter sélectionné
   openrouterApiKey: string;       // Clé API OpenRouter (stockée localement)
   openrouterImageModel: string;   // Modèle OpenRouter pour la génération d'images/infographies
+  notebookModel:    string;       // Modèle OpenRouter pour la génération de documents notebook ('' = utiliser le modèle de texte actif)
   // Appearance (kept here so Settings is the single source of truth)
   theme:         'dark' | 'light' | 'cyberpunk' | 'sepia' | 'high-contrast';
   accentColor:   string;
@@ -139,6 +140,7 @@ const DEFAULT_PROFILE: UserProfile = {
   openrouterModel:  'minimax/minimax-m3',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-3.6-flash-image',
+  notebookModel:    '',
   theme:         'dark',
   accentColor:   '#0ea5e9',
   fontFamily:    NEW_DEFAULT_FONT,
@@ -179,10 +181,39 @@ function load(): UserProfile {
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
+// Champs du profil synchronisés vers le serveur (/api/profile). Le serveur est
+// la source de vérité pour l'application réelle des modèles (texte, image,
+// notebook) ; localStorage ne sert qu'au rendu de l'UI.
+const SERVER_SYNCED_KEYS: (keyof UserProfile)[] = [
+  'aiName', 'aiVoice', 'userName', 'userRole', 'language', 'responseStyle',
+  'autoMuteEnabled', 'autoMuteTimeout', 'vadEnabled', 'vadThreshold',
+  'vadSilenceDuration', 'temperature', 'topP',
+  'textProvider', 'openrouterModel', 'openrouterImageModel', 'notebookModel',
+  'agents', 'reasoningEnabled', 'customSystemPrompt',
+];
+
+function syncProfileToServer(profile: UserProfile): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  for (const key of SERVER_SYNCED_KEYS) payload[key] = profile[key];
+  return fetch('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(() => undefined).catch(() => undefined);
+}
+
 interface ProfileContextValue {
   profile: UserProfile;
   setField: <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => void;
   save: () => void;
+  /**
+   * Applique un lot de champs puis persiste immédiatement (localStorage +
+   * serveur) à partir des valeurs à jour — sans dépendre du timing de React.
+   * À utiliser quand plusieurs champs changent et doivent prendre effet tout
+   * de suite (ex: ModelPickerModal). Retourne une promesse résolue après la
+   * synchro serveur.
+   */
+  applyAndSave: (patch: Partial<UserProfile>) => Promise<void>;
   reset: () => void;
 }
 
@@ -190,6 +221,7 @@ const ProfileContext = createContext<ProfileContextValue>({
   profile: DEFAULT_PROFILE,
   setField: () => {},
   save: () => {},
+  applyAndSave: () => Promise.resolve(),
   reset: () => {},
 });
 
@@ -220,6 +252,20 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     // No need to call setProfile here as we're just saving to localStorage
   }, [profile]);
 
+  const applyAndSave = useCallback((patch: Partial<UserProfile>): Promise<void> => {
+    // On calcule le profil final de façon synchrone à partir de l'état courant
+    // via le updater fonctionnel : garantit qu'on persiste bien les NOUVELLES
+    // valeurs, sans attendre un re-render.
+    let next: UserProfile | null = null;
+    setProfile(prev => {
+      next = { ...prev, ...patch };
+      return next;
+    });
+    const resolved = next ?? { ...profile, ...patch };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved));
+    return syncProfileToServer(resolved);
+  }, [profile]);
+
   const reset = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setProfile({ ...DEFAULT_PROFILE });
@@ -229,8 +275,9 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     profile, 
     setField, 
     save, 
+    applyAndSave,
     reset 
-  }), [profile, setField, save, reset]);
+  }), [profile, setField, save, applyAndSave, reset]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
