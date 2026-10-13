@@ -33,7 +33,7 @@ export function GenerationProgress({
   return (
     <div
       className="p-3 rounded-xl border"
-      style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+      style={{ backgroundColor: 'var(--notebook-surface)', borderColor: 'var(--notebook-border)' }}
     >
       {/* Barre de progression pour la génération en cours */}
       {activeGenerationIds.size > 0 ? (
@@ -58,7 +58,7 @@ export function GenerationProgress({
                     {getDocTypeLabel(task.type)}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+                    <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--notebook-canvas)' }}>
                       <motion.div
                         className="h-full rounded-full"
                         style={{ backgroundColor: color }}
@@ -88,7 +88,7 @@ export function GenerationProgress({
 
       {/* File d'attente */}
       {generationQueue.length > 0 && (
-        <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: 'var(--border-base)' }}>
+        <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: 'var(--notebook-border)' }}>
           <button
             onClick={() => setShowQueue(!showQueue)}
             className="flex items-center justify-between w-full text-left"
@@ -127,8 +127,8 @@ export function GenerationProgress({
                         task.status === 'generating' ? 'ring-1' : ''
                       }`}
                       style={{
-                        borderColor: 'var(--border-base)',
-                        backgroundColor: task.status === 'generating' ? `${color}08` : 'var(--bg-base)',
+                        borderColor: 'var(--notebook-border)',
+                        backgroundColor: task.status === 'generating' ? `${color}08` : 'var(--notebook-canvas)',
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export function GenerationProgress({
                         {task.status === 'error' && (
                           <button
                             onClick={() => onRetryTask(task.id)}
-                            className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                            className="p-1 rounded hover:bg-[var(--notebook-surface-muted)] transition-colors"
                             title="Réessayer"
                           >
                             <RefreshCw className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} />
@@ -176,7 +176,7 @@ export function GenerationProgress({
                         {index > 0 && task.status === 'pending' && (
                           <button
                             onClick={() => onCancelTask(task.id)}
-                            className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                            className="p-1 rounded hover:bg-[var(--notebook-surface-muted)] transition-colors"
                             title="Annuler"
                           >
                             <X className="w-2.5 h-2.5" style={{ color: 'var(--color-error)' }} />

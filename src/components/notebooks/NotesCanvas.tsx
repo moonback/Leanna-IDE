@@ -149,7 +149,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
     <div
       ref={containerRef}
       className="w-full h-full relative overflow-hidden select-none"
-      style={{ backgroundColor: 'var(--bg-base)', cursor: isPanning ? 'grabbing' : 'grab' }}
+      style={{ backgroundColor: 'var(--notebook-canvas)', cursor: isPanning ? 'grabbing' : 'grab' }}
       onMouseDown={startPan}
     >
       {/* Grid pattern background */}
@@ -165,11 +165,11 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
       {/* Toolbar */}
       <div
         className="absolute top-3 right-3 z-30 flex items-center gap-1 px-2.5 py-2 rounded-full shadow-lg backdrop-blur-sm"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)' }}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--notebook-surface) 90%, transparent)', border: '1px solid var(--notebook-border)' }}
       >
         <button
           onClick={() => setZoom(prev => Math.min(2.5, prev + 0.2))}
-          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <ZoomIn className="w-3.5 h-3.5" />
@@ -179,15 +179,15 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
         </span>
         <button
           onClick={() => setZoom(prev => Math.max(0.3, prev - 0.2))}
-          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
-        <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
+        <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--notebook-border)' }} />
         <button
           onClick={resetView}
-          className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
           style={{ color: 'var(--text-muted)' }}
         >
           <Maximize2 className="w-3.5 h-3.5" />
@@ -197,7 +197,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
       {/* Info bar */}
       <div
         className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-full text-xs backdrop-blur-sm"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)', color: 'var(--text-dimmed)' }}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--notebook-surface) 90%, transparent)', border: '1px solid var(--notebook-border)', color: 'var(--text-dimmed)' }}
       >
         {notes.length} notes • {connections.length} lien{connections.length !== 1 ? 's' : ''} • Glissez les cartes • Molette = zoom
       </div>
@@ -229,14 +229,14 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                 <path
                   d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
                   fill="none"
-                  stroke="var(--accent-primary)"
+                  stroke="var(--notebook-accent)"
                   strokeWidth="1.5"
                   strokeDasharray="6 4"
                   opacity={0.35}
                 />
                 {/* Dot at connection point */}
-                <circle cx={x1} cy={y1} r="3" fill="var(--accent-primary)" opacity={0.5} />
-                <circle cx={x2} cy={y2} r="3" fill="var(--accent-primary)" opacity={0.5} />
+                <circle cx={x1} cy={y1} r="3" fill="var(--notebook-accent)" opacity={0.5} />
+                <circle cx={x2} cy={y2} r="3" fill="var(--notebook-accent)" opacity={0.5} />
               </g>
             );
           })}
@@ -262,10 +262,10 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
               }}
             >
               <div
-                className={`p-3.5 rounded-xl border transition-shadow ${isDragging ? 'shadow-2xl ring-2 ring-[var(--accent-primary)]' : 'shadow-sm hover:shadow-md'}`}
+                className={`p-3.5 rounded-xl border transition-shadow ${isDragging ? 'shadow-2xl ring-2 ring-[var(--notebook-accent)]' : 'shadow-sm hover:shadow-md'}`}
                 style={{
-                  backgroundColor: 'var(--bg-panel)',
-                  borderColor: isConnected ? 'var(--accent-primary)' : 'var(--border-base)',
+                  backgroundColor: 'var(--notebook-surface)',
+                  borderColor: isConnected ? 'var(--notebook-accent)' : 'var(--notebook-border)',
                   borderWidth: isConnected ? '1.5px' : '1px',
                   cursor: isDragging ? 'grabbing' : 'default',
                 }}
@@ -273,18 +273,18 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                 {/* Drag bar */}
                 <div
                   className="flex items-center gap-1.5 mb-2 pb-2 cursor-grab active:cursor-grabbing"
-                  style={{ borderBottom: '1px solid var(--border-base)' }}
+                  style={{ borderBottom: '1px solid var(--notebook-border)' }}
                   onMouseDown={(e) => startDrag(e, note.id)}
                 >
                   <Move className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
                   <div className="flex items-center gap-1 flex-1 min-w-0">
-                    {note.pinned && <Pin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                    {note.pinned && <Pin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
                     <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {note.title}
                     </span>
                   </div>
                   {isConnected && (
-                    <Link2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                    <Link2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
                   )}
                 </div>
 
@@ -299,7 +299,7 @@ export function NotesCanvas({ notes, onSelectNote }: Props) {
                 </div>
 
                 {/* Meta */}
-                <div className="flex items-center gap-2 mt-2 pt-1.5" style={{ borderTop: '1px solid var(--border-base)' }}>
+                <div className="flex items-center gap-2 mt-2 pt-1.5" style={{ borderTop: '1px solid var(--notebook-border)' }}>
                   <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {timeAgo(note.updatedAt)}
                   </span>

@@ -150,7 +150,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       {/* ── Sticky header + actions ─────────────────────────── */}
       <div
         className="flex-shrink-0 px-4 pt-3 pb-2 space-y-2"
-        style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))', borderBottom: '1px solid var(--notebook-border)' }}
+        style={{ backgroundColor: 'var(--notebook-canvas, var(--notebook-canvas))', borderBottom: '1px solid var(--notebook-border)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -182,7 +182,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
               aria-label="Rechercher dans les sources"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-[var(--bg-active)]">
+              <button onClick={() => setSearchQuery('')} aria-label="Effacer la recherche" className="p-0.5 rounded hover:bg-[var(--notebook-accent-surface)]">
                 <X className="h-3.5 w-3.5" style={{ color: 'var(--text-dimmed)' }} />
               </button>
             )}

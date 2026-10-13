@@ -77,7 +77,7 @@ export function DocTypePicker({
         >
           <PenLine className="w-3 h-3" />
           Prompt
-          {customInstructions.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
+          {customInstructions.trim() && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />}
         </button>
 
         <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -97,20 +97,20 @@ export function DocTypePicker({
           >
             <div
               className="p-2.5 rounded-xl space-y-1"
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
             >
               {sources.map(src => (
                 <label
                   key={src.id}
                   htmlFor={`doctype-src-${src.id}`}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer hover:bg-[var(--notebook-surface-muted)] transition-colors"
                 >
                   <input
                     id={`doctype-src-${src.id}`}
                     type="checkbox"
                     checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
                     onChange={() => toggleSourceSelection(src.id)}
-                    className="w-3 h-3 rounded accent-[var(--accent-primary)]"
+                    className="w-3 h-3 rounded accent-[var(--notebook-accent)]"
                   />
                   <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>{src.title}</span>
                 </label>
@@ -119,7 +119,7 @@ export function DocTypePicker({
                 <button
                   onClick={() => setSelectedSourceIds([])}
                   className="text-xs px-2 py-1 w-full text-left hover:underline"
-                  style={{ color: 'var(--accent-primary)' }}
+                  style={{ color: 'var(--notebook-accent)' }}
                 >
                   Réinitialiser (toutes)
                 </button>
@@ -146,8 +146,8 @@ export function DocTypePicker({
               rows={2}
               className="w-full px-3 py-2.5 rounded-full text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--color-warning)]"
               style={{
-                backgroundColor: 'var(--bg-panel)',
-                border: '1px solid var(--border-base)',
+                backgroundColor: 'var(--notebook-surface)',
+                border: '1px solid var(--notebook-border)',
                 color: 'var(--text-primary)',
               }}
             />
@@ -162,7 +162,7 @@ export function DocTypePicker({
             Générer
           </p>
           {activeGenerationIds.size > 0 && (
-            <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
+            <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--notebook-accent)' }}>
               <Loader2 className="w-3 h-3 animate-spin" />
               {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
             </span>
@@ -215,7 +215,7 @@ export function DocTypePicker({
                 whileTap={sources.length > 0 ? { scale: 0.98 } : {}}
                 transition={reduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 400, damping: 25 }}
                 className={`group relative w-full flex flex-col items-center gap-1 p-1.5 rounded-lg text-center disabled:opacity-40 transition-all duration-200 ${
-                  isActive ? 'ring-1' : 'hover:bg-[var(--bg-hover)]'
+                  isActive ? 'ring-1' : 'hover:bg-[var(--notebook-surface-muted)]'
                 }`}
                 style={{
                   border: '1px solid',
@@ -254,7 +254,7 @@ export function DocTypePicker({
 
       {/* Source count info */}
       {sources.length === 0 && (
-        <p className="text-xs text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-dimmed)' }}>
+        <p className="text-xs text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--notebook-canvas)', color: 'var(--text-dimmed)' }}>
           Ajoutez des sources pour activer la génération
         </p>
       )}

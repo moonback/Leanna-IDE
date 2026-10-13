@@ -180,7 +180,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
     window.open(blobUrl, '_blank');
   }, [blobUrl]);
 
-  const accentColor = 'var(--accent-primary)';
+  const accentColor = 'var(--notebook-accent)';
 
   return (
     <AnimatePresence>
@@ -201,8 +201,8 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             className="w-full rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
             style={{
-              backgroundColor: 'var(--bg-panel)',
-              borderColor: 'var(--border-base)',
+              backgroundColor: 'var(--notebook-surface)',
+              borderColor: 'var(--notebook-border)',
               maxWidth: showPreview ? '92vw' : '540px',
               maxHeight: '90vh',
               transition: 'max-width 0.3s ease',
@@ -211,7 +211,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
             {/* ── Header ─────────────────────────────────────────────────── */}
             <div
               className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0"
-              style={{ borderColor: 'var(--border-base)' }}
+              style={{ borderColor: 'var(--notebook-border)' }}
             >
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
@@ -237,7 +237,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0"
+                className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors flex-shrink-0"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X className="w-4 h-4" />
@@ -252,7 +252,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                 className="flex-shrink-0 overflow-y-auto custom-scrollbar"
                 style={{
                   width: showPreview ? '280px' : '100%',
-                  borderRight: showPreview ? '1px solid var(--border-base)' : 'none',
+                  borderRight: showPreview ? '1px solid var(--notebook-border)' : 'none',
                   padding: '20px 24px',
                 }}
               >
@@ -271,9 +271,9 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           title={t.desc}
                           className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-full text-xs font-medium transition-all"
                           style={{
-                            backgroundColor: theme === t.key ? `${accentColor}12` : 'var(--bg-base)',
+                            backgroundColor: theme === t.key ? `${accentColor}12` : 'var(--notebook-canvas)',
                             color: theme === t.key ? accentColor : 'var(--text-muted)',
-                            border: `1.5px solid ${theme === t.key ? accentColor : 'var(--border-base)'}`,
+                            border: `1.5px solid ${theme === t.key ? accentColor : 'var(--notebook-border)'}`,
                           }}
                         >
                           <span className="text-base leading-none">{t.emoji}</span>
@@ -295,9 +295,9 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           onClick={() => setTransition(t.key)}
                           className="px-2 py-2 rounded-full text-xs font-medium transition-all text-center"
                           style={{
-                            backgroundColor: transition === t.key ? `${accentColor}12` : 'var(--bg-base)',
+                            backgroundColor: transition === t.key ? `${accentColor}12` : 'var(--notebook-canvas)',
                             color: transition === t.key ? accentColor : 'var(--text-muted)',
-                            border: `1.5px solid ${transition === t.key ? accentColor : 'var(--border-base)'}`,
+                            border: `1.5px solid ${transition === t.key ? accentColor : 'var(--notebook-border)'}`,
                           }}
                         >
                           {t.label}
@@ -318,9 +318,9 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           onClick={() => setRatio(r.key)}
                           className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                           style={{
-                            backgroundColor: ratio === r.key ? `${accentColor}12` : 'var(--bg-base)',
+                            backgroundColor: ratio === r.key ? `${accentColor}12` : 'var(--notebook-canvas)',
                             color: ratio === r.key ? accentColor : 'var(--text-muted)',
-                            border: `1.5px solid ${ratio === r.key ? accentColor : 'var(--border-base)'}`,
+                            border: `1.5px solid ${ratio === r.key ? accentColor : 'var(--notebook-border)'}`,
                           }}
                         >
                           <Monitor className="w-3.5 h-3.5 mb-0.5" />
@@ -344,9 +344,9 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                           title={d.hint}
                           className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-full text-xs font-medium transition-all"
                           style={{
-                            backgroundColor: density === d.key ? `${accentColor}12` : 'var(--bg-base)',
+                            backgroundColor: density === d.key ? `${accentColor}12` : 'var(--notebook-canvas)',
                             color: density === d.key ? accentColor : 'var(--text-muted)',
-                            border: `1.5px solid ${density === d.key ? accentColor : 'var(--border-base)'}`,
+                            border: `1.5px solid ${density === d.key ? accentColor : 'var(--notebook-border)'}`,
                           }}
                         >
                           <span className="text-base leading-none">{d.emoji}</span>
@@ -389,7 +389,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                     {/* Preview toolbar */}
                     <div
                       className="flex items-center justify-between px-4 py-2 border-b flex-shrink-0"
-                      style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+                      style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas)' }}
                     >
                       <span className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                         APERÇU
@@ -397,8 +397,8 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={handleOpenTab}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                          style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                          style={{ border: '1px solid var(--notebook-border)', color: 'var(--text-muted)' }}
                           title="Ouvrir en plein écran dans un nouvel onglet"
                         >
                           <Maximize2 className="w-3 h-3" />
@@ -425,7 +425,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
             {/* ── Footer ─────────────────────────────────────────────────── */}
             <div
               className="flex items-center justify-between gap-3 px-6 py-4 border-t flex-shrink-0"
-              style={{ borderColor: 'var(--border-base)' }}
+              style={{ borderColor: 'var(--notebook-border)' }}
             >
               {/* Left — secondary actions (visible once generated) */}
               <div className="flex items-center gap-2">
@@ -433,8 +433,8 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                   <>
                     <button
                       onClick={handleDownload}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                      style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                      style={{ border: '1px solid var(--notebook-border)', color: 'var(--text-muted)' }}
                       title="Télécharger le fichier HTML"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -442,8 +442,8 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
                     </button>
                     <button
                       onClick={handleOpenTab}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                      style={{ border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                      style={{ border: '1px solid var(--notebook-border)', color: 'var(--text-muted)' }}
                       title="Ouvrir dans un nouvel onglet"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -457,7 +457,7 @@ export function SlidePreviewModal({ open, onClose, notebookId, doc }: Props) {
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
+                  className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)]"
                   style={{ color: 'var(--text-muted)' }}
                 >
                   Fermer

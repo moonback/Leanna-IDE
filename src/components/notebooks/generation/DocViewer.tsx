@@ -49,8 +49,8 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
       {/* Streaming view */}
       {Object.keys(streamingTexts).length > 0 && !selectedDoc && (
         <div className="space-y-5 max-w-3xl">
-          <div className="flex items-center gap-2 pb-3 border-b" style={{ borderColor: 'var(--border-base)' }}>
-            <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+          <div className="flex items-center gap-2 pb-3 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
+            <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
             <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
               {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} générations en cours...` : 'Génération en cours...'}
             </span>
@@ -73,7 +73,7 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
               Plusieurs générations en cours. Voir la file d'attente pour les détails.
             </div>
           )}
-          <span className="inline-block w-2 h-4 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-primary)' }} />
+          <span className="inline-block w-2 h-4 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--notebook-accent)' }} />
         </div>
       )}
 
@@ -81,7 +81,7 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
       {selectedDoc && Object.keys(streamingTexts).length === 0 ? (
         <div className={`space-y-5 ${selectedDoc.type === 'mindmap' ? 'max-w-none' : 'max-w-6xl mx-auto'}`}>
           {/* Document header — sticky */}
-          <div className="flex items-start gap-3 pb-6 border-b sticky top-0 z-10 pt-2 notebooklm-doc-header" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--bg-base))', backdropFilter: 'blur(12px)' }}>
+          <div className="flex items-start gap-3 pb-6 border-b sticky top-0 z-10 pt-2 notebooklm-doc-header" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas, var(--notebook-canvas))', backdropFilter: 'blur(12px)' }}>
             {onClose && (
               <Tooltip content="Retour" as="button" onClick={onClose} className="notebook-icon-button flex-shrink-0 mt-0.5">
                 <ArrowLeft className="h-4 w-4" />
@@ -120,8 +120,8 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => onImportToWorkspace(selectedDoc)}
-                className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--accent-primary)' }}
+                className="p-2 rounded-lg border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                style={{ borderColor: 'var(--notebook-border)', color: 'var(--notebook-accent)' }}
                 title="Importer dans le workspace"
               >
                 <FolderInput className="w-3.5 h-3.5" />
@@ -129,33 +129,33 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
               <button
                 onClick={onRegenerate}
                 disabled={sources.length === 0}
-                className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95 disabled:opacity-30"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                className="p-2 rounded-lg border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95 disabled:opacity-30"
+                style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
                 title="Régénérer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => onExportMd(selectedDoc)}
-                className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                className="p-2 rounded-lg border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
                 title="Exporter en Markdown"
               >
                 <Download className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => onCopy(selectedDoc.content)}
-                className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+                className="p-2 rounded-lg border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
                 title="Copier"
               >
-                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
               {!SLIDE_EXCLUDED_TYPES.has(selectedDoc.type) && (
                 <button
                   onClick={onOpenSlides}
-                  className="p-2 rounded-lg border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-                  style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, transparent)', color: 'var(--accent-primary)' }}
+                  className="p-2 rounded-lg border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+                  style={{ borderColor: 'color-mix(in srgb, var(--notebook-accent) 25%, transparent)', color: 'var(--notebook-accent)' }}
                   title="Générer une présentation Reveal.js"
                 >
                   <Presentation className="w-3.5 h-3.5" />
@@ -177,15 +177,15 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
           <div className="relative">
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: 'var(--accent-subtle)' }}
+              style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
             >
-              <Sparkles className="w-8 h-8" style={{ color: 'var(--accent-primary)' }} />
+              <Sparkles className="w-8 h-8" style={{ color: 'var(--notebook-accent)' }} />
             </div>
             <div
               className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-md"
-              style={{ backgroundColor: 'var(--bg-panel)', border: '2px solid var(--accent-primary)' }}
+              style={{ backgroundColor: 'var(--notebook-surface)', border: '2px solid var(--notebook-accent)' }}
             >
-              <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>AI</span>
+              <span className="text-xs font-bold" style={{ color: 'var(--notebook-accent)' }}>AI</span>
             </div>
           </div>
 
@@ -210,7 +210,7 @@ export const DocViewer = forwardRef<HTMLDivElement, Props>(function DocViewer({
                 <div
                   key={f.label}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl"
-                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                  style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
                 >
                   <span className="inline-flex items-center"><FIcon size={16} style={{ color: 'var(--text-muted)' }} /></span>
                   <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</span>

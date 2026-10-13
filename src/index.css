@@ -2551,6 +2551,153 @@ button {
   line-height: 1.5;
 }
 
+/* ── Notebook primitives (see src/components/notebooks/ui/) ──────────────
+   Règles partagées par tous les composants notebooks :
+   - contrôles (boutons, champs) : pilule ou --notebook-radius-sm
+   - cartes : --notebook-radius-md · modales : rounded-2xl (ui/Modal)
+   - couleurs : --notebook-accent* pour l'accent, --color-* pour les états */
+.notebook-secondary-button,
+.notebook-danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  min-height: var(--premium-control-height-touch, 36px);
+  border-radius: var(--notebook-radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.notebook-secondary-button {
+  background: var(--notebook-surface-muted);
+  border: 1px solid var(--notebook-border);
+  color: var(--text-secondary);
+}
+.notebook-secondary-button:hover {
+  background: var(--notebook-accent-surface);
+  border-color: color-mix(in srgb, var(--notebook-accent) 40%, transparent);
+  color: var(--text-primary);
+}
+.notebook-danger-button {
+  background: var(--color-error);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+}
+.notebook-danger-button:hover {
+  background: color-mix(in srgb, var(--color-error) 85%, black);
+}
+.notebook-secondary-button:focus-visible,
+.notebook-danger-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
+}
+.notebook-btn-sm {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+  gap: 5px;
+}
+.notebook-icon-button.notebook-icon-button--sm {
+  width: 26px;
+  height: 26px;
+}
+.notebook-icon-button.notebook-icon-button--danger:hover {
+  background: var(--color-error-subtle);
+  color: var(--color-error);
+}
+.notebook-primary-small:disabled,
+.notebook-ghost-button:disabled,
+.notebook-secondary-button:disabled,
+.notebook-danger-button:disabled,
+.notebook-icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Champs de saisie */
+.notebook-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: var(--notebook-radius-sm);
+  background: var(--notebook-surface-muted);
+  border: 1px solid var(--notebook-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.notebook-input::placeholder {
+  color: var(--text-dimmed);
+}
+.notebook-input:focus {
+  border-color: var(--notebook-accent);
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(168, 199, 250, 0.15));
+}
+
+/* En-tête de panneau (Sources, Chat, Studio, Notes…) */
+.notebook-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--notebook-border);
+  flex-shrink: 0;
+}
+.notebook-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+/* Carte générique de liste */
+.notebook-card {
+  border-radius: var(--notebook-radius-md);
+  background: var(--notebook-card-bg);
+  border: 1px solid var(--notebook-border);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.notebook-card[data-interactive="true"]:hover {
+  background: var(--notebook-card-hover);
+  border-color: color-mix(in srgb, var(--notebook-accent) 30%, var(--notebook-border));
+}
+
+/* Badges d'état */
+.notebook-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--notebook-radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--notebook-surface-muted);
+  color: var(--text-muted);
+}
+.notebook-badge[data-tone="accent"]  { background: var(--notebook-accent-surface); color: var(--notebook-accent); }
+.notebook-badge[data-tone="success"] { background: var(--color-success-subtle); color: var(--color-success); }
+.notebook-badge[data-tone="warning"] { background: var(--color-warning-subtle); color: var(--color-warning); }
+.notebook-badge[data-tone="error"]   { background: var(--color-error-subtle); color: var(--color-error); }
+.notebook-badge[data-tone="info"]    { background: var(--color-info-subtle); color: var(--color-info); }
+
+/* Boîte de dialogue notebooks (posée sur ui/Modal) */
+.notebook-dialog {
+  background-color: var(--notebook-surface-elevated) !important;
+  border-color: var(--notebook-border) !important;
+}
+.notebook-dialog > div {
+  border-color: var(--notebook-border) !important;
+}
+
 /* Custom scrollbar (used inside the notebook panels) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 3px;

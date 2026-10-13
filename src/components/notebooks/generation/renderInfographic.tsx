@@ -57,8 +57,8 @@ export function renderInfographicContent(content: string): JSX.Element {
       <div
         className="flex flex-col items-center gap-4 p-8 rounded-2xl"
         style={{
-          backgroundColor: 'var(--bg-panel)',
-          border: '1px dashed var(--border-base)',
+          backgroundColor: 'var(--notebook-surface)',
+          border: '1px dashed var(--notebook-border)',
         }}
       >
         <Lightbulb className="w-8 h-8 opacity-50" style={{ color: 'var(--color-warning)' }} />
@@ -81,10 +81,10 @@ export function renderInfographicContent(content: string): JSX.Element {
   return (
     <div className="notebooklm-infographic space-y-6">
       <div
-        className="rounded-3xl overflow-hidden shadow-2xl border"
+        className="rounded-2xl overflow-hidden shadow-2xl border"
         style={{
-          borderColor: 'var(--border-base)',
-          backgroundColor: 'var(--bg-base)',
+          borderColor: 'var(--notebook-border)',
+          backgroundColor: 'var(--notebook-canvas)',
         }}
       >
         <img
@@ -113,7 +113,7 @@ export function renderInfographicContent(content: string): JSX.Element {
           <span
             className="text-xs px-3 py-1.5 rounded-xl"
             style={{
-              backgroundColor: 'var(--bg-base)',
+              backgroundColor: 'var(--notebook-canvas)',
               color: 'var(--text-dimmed)',
             }}
           >
@@ -124,7 +124,7 @@ export function renderInfographicContent(content: string): JSX.Element {
           <span
             className="text-xs px-2 py-1 rounded-full"
             style={{
-              backgroundColor: 'var(--bg-panel)',
+              backgroundColor: 'var(--notebook-surface)',
               color: 'var(--text-dimmed)',
             }}
           >
@@ -137,15 +137,15 @@ export function renderInfographicContent(content: string): JSX.Element {
         <div
           className="p-4 rounded-xl border space-y-3"
           style={{
-            borderColor: 'var(--border-base)',
-            backgroundColor: 'var(--bg-panel)',
+            borderColor: 'var(--notebook-border)',
+            backgroundColor: 'var(--notebook-surface)',
           }}
         >
           {model && (
             <p className="text-sm flex items-center gap-2">
               <Brain
                 className="w-4 h-4"
-                style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
+                style={{ color: 'var(--notebook-accent)', opacity: 0.7 }}
               />
               <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                 Modèle:

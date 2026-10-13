@@ -86,7 +86,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
     ? 'var(--color-warning, #fbbf24)'
     : isSpeaking
       ? 'var(--color-accent-alt, #a78bfa)'
-      : 'var(--accent-primary)';
+      : 'var(--notebook-accent)';
   // Amplitude lissée vers une échelle visible (le niveau brut est souvent faible).
   const ampScale = Math.min(1, amplitude * 2.2);
 
@@ -156,8 +156,8 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
           className="relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-smfont-medium transition-colors disabled:opacity-60"
           style={{
             backgroundColor: connected ? ampColor : 'transparent',
-            color: connected ? '#fff' : 'var(--accent-primary)',
-            border: '1px solid var(--border-base)',
+            color: connected ? '#fff' : 'var(--notebook-accent)',
+            border: '1px solid var(--notebook-border)',
           }}
           title={connected ? "Arrêter l'assistant vocal" : "Interroger vos sources à la voix"}
           aria-label={connected ? "Arrêter l'assistant vocal" : "Démarrer l'assistant vocal"}
@@ -210,7 +210,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
           style={{
             backgroundColor: muted ? 'var(--color-warning)' : 'transparent',
             color: muted ? '#fff' : 'var(--text-muted)',
-            border: '1px solid var(--border-base)',
+            border: '1px solid var(--notebook-border)',
           }}
           title={muted ? 'Réactiver le micro' : 'Couper le micro'}
           aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
@@ -229,22 +229,22 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={spring}
             className="absolute top-full right-0 mt-2 z-50 w-80 max-w-[92vw] rounded-xl overflow-hidden shadow-xl"
-            style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'top right' }}
+            style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)', transformOrigin: 'top right' }}
           >
             <div
               className="flex items-center justify-between px-3 py-2 border-b"
-              style={{ borderColor: 'var(--border-base)' }}
+              style={{ borderColor: 'var(--notebook-border)' }}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-error)] opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--color-error)]" />
                 </span>
                 <span className="text-smfont-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                   Interrogez vos sources
                 </span>
                 {busy && (
-                  <span className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: 'var(--accent-primary)' }}>
+                  <span className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: 'var(--notebook-accent)' }}>
                     <Loader2 className="w-3 h-3 animate-spin" />
                     recherche…
                   </span>
@@ -252,7 +252,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
               </div>
               <button
                 onClick={toggle}
-                className="p-1 rounded-md transition-colors hover:bg-red-500/10 flex-shrink-0"
+                className="p-1 rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] flex-shrink-0"
                 style={{ color: 'var(--text-muted)' }}
                 title="Arrêter l'assistant vocal"
                 aria-label="Arrêter l'assistant vocal"
@@ -271,7 +271,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
                   <div key={e.id} className="flex gap-2">
                     <span
                       className="flex-shrink-0 text-smfont-semibold mt-0.5"
-                      style={{ color: e.role === 'user' ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+                      style={{ color: e.role === 'user' ? 'var(--notebook-accent)' : 'var(--text-muted)' }}
                     >
                       {e.role === 'user' ? 'Vous' : 'IA'}
                     </span>
@@ -285,7 +285,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
             </div>
 
             {lastCitations.length > 0 && (
-              <div className="px-3 py-2 border-t flex flex-wrap gap-1.5" style={{ borderColor: 'var(--border-base)' }}>
+              <div className="px-3 py-2 border-t flex flex-wrap gap-1.5" style={{ borderColor: 'var(--notebook-border)' }}>
                 <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                   <BookOpen className="w-3 h-3" /> Sources :
                 </span>
@@ -293,7 +293,7 @@ export function NotebookVoicePanel({ notebookId, selectedSources, prefersReduced
                   <span
                     key={`${c.chunkId}-${i}`}
                     className="px-2 py-0.5 rounded-full text-xs"
-                    style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                    style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}
                     title={c.excerpt}
                   >
                     {c.sourceTitle.length > 28 ? c.sourceTitle.slice(0, 28) + '…' : c.sourceTitle}

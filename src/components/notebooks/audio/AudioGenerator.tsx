@@ -101,9 +101,9 @@ export function AudioGenerator({
                 onClick={() => setDuration(opt.key)}
                 className="flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: duration === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
-                  color: duration === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                  border: `1.5px solid ${duration === opt.key ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                  backgroundColor: duration === opt.key ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
+                  color: duration === opt.key ? 'var(--notebook-accent)' : 'var(--text-muted)',
+                  border: `1.5px solid ${duration === opt.key ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
                 }}
               >
                 <span className="text-sm">{opt.icon}</span>
@@ -118,9 +118,9 @@ export function AudioGenerator({
           onClick={() => setShowOptions(!showOptions)}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium transition-all"
           style={{
-            backgroundColor: showOptions ? 'var(--accent-subtle)' : 'var(--bg-base)',
-            color: showOptions ? 'var(--accent-primary)' : 'var(--text-muted)',
-            border: `1px solid ${showOptions ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+            backgroundColor: showOptions ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
+            color: showOptions ? 'var(--notebook-accent)' : 'var(--text-muted)',
+            border: `1px solid ${showOptions ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
           }}
         >
           <Settings2 className="w-3.5 h-3.5" />
@@ -151,9 +151,9 @@ export function AudioGenerator({
                       onClick={() => setTone(opt.key)}
                       className="px-2 py-1.5 rounded-full text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: tone === opt.key ? 'var(--accent-subtle)' : 'var(--bg-base)',
-                        color: tone === opt.key ? 'var(--accent-primary)' : 'var(--text-muted)',
-                        border: `1px solid ${tone === opt.key ? 'var(--accent-primary)' : 'var(--border-base)'}`,
+                        backgroundColor: tone === opt.key ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
+                        color: tone === opt.key ? 'var(--notebook-accent)' : 'var(--text-muted)',
+                        border: `1px solid ${tone === opt.key ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
                       }}
                     >
                       {opt.label}
@@ -172,7 +172,7 @@ export function AudioGenerator({
                     <button
                       onClick={selectedSourceIds.length === sources.length ? deselectAllSources : selectAllSources}
                       className="text-xs font-medium"
-                      style={{ color: 'var(--accent-primary)' }}
+                      style={{ color: 'var(--notebook-accent)' }}
                     >
                       {selectedSourceIds.length === sources.length ? 'Aucune' : 'Toutes'}
                     </button>
@@ -184,8 +184,8 @@ export function AudioGenerator({
                         onClick={() => toggleSource(src.id)}
                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left text-xs transition-all"
                         style={{
-                          backgroundColor: selectedSourceIds.includes(src.id) ? 'var(--accent-subtle)' : 'transparent',
-                          color: selectedSourceIds.includes(src.id) ? 'var(--accent-primary)' : 'var(--text-muted)',
+                          backgroundColor: selectedSourceIds.includes(src.id) ? 'var(--notebook-accent-surface)' : 'transparent',
+                          color: selectedSourceIds.includes(src.id) ? 'var(--notebook-accent)' : 'var(--text-muted)',
                         }}
                       >
                         <CheckSquare
@@ -210,9 +210,9 @@ export function AudioGenerator({
                   placeholder="Ex: Insiste sur les aspects pratiques, ajoute des exemples concrets..."
                   className="w-full px-3 py-2 rounded-full text-xs resize-none leading-relaxed"
                   style={{
-                    backgroundColor: 'var(--bg-base)',
+                    backgroundColor: 'var(--notebook-canvas)',
                     color: 'var(--text-primary)',
-                    border: '1px solid var(--border-base)',
+                    border: '1px solid var(--notebook-border)',
                   }}
                   rows={2}
                 />
@@ -225,7 +225,7 @@ export function AudioGenerator({
           onClick={onGenerate}
           disabled={generating || selectedSourceIds.length === 0}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-          style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+          style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
         >
           {generating ? (
             <>
@@ -259,15 +259,15 @@ export function AudioGenerator({
                 <button
                   onClick={() => onSelectOverview(ov)}
                   aria-label={`Sélectionner l'aperçu audio : ${ov.title}`}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--accent-primary)]' : ''}`}
-                  style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--accent-primary)' : 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+                  className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--notebook-accent)]' : ''}`}
+                  style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--notebook-accent)' : 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}
                 >
                   <div className="flex items-center gap-2.5">
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'var(--accent-subtle)' }}
+                      style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
                     >
-                      <Play className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                      <Play className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
@@ -278,7 +278,7 @@ export function AudioGenerator({
                           <Clock className="w-2.5 h-2.5" />
                           {formatDuration(ov.estimatedDuration)}
                         </span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-green-500/10 text-green-400' : ov.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)] text-[var(--color-success)]' : ov.status === 'error' ? 'bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] text-[var(--color-error)]' : 'bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] text-[var(--color-warning)]'}`}>
                           {ov.status === 'ready' ? '● Prêt' : ov.status === 'error' ? '● Erreur' : '● En cours'}
                         </span>
                       </div>
@@ -287,7 +287,7 @@ export function AudioGenerator({
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete(ov.id); }}
-                  className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10"
+                  className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]"
                   style={{ color: 'var(--color-error)' }}
                   title="Supprimer"
                 >

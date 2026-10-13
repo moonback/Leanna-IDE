@@ -118,11 +118,11 @@ export function SourcesSummaryCard({
       className="group relative overflow-hidden rounded-2xl border"
       style={{
         background:
-          'linear-gradient(145deg, color-mix(in srgb, var(--bg-panel) 94%, var(--accent-primary) 6%), var(--bg-panel))',
+          'linear-gradient(145deg, color-mix(in srgb, var(--notebook-surface) 94%, var(--notebook-accent) 6%), var(--notebook-surface))',
         borderColor:
-          'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
+          'color-mix(in srgb, var(--notebook-accent) 16%, transparent)',
         boxShadow:
-          '0 8px 30px color-mix(in srgb, var(--accent-primary) 5%, transparent)',
+          '0 8px 30px color-mix(in srgb, var(--notebook-accent) 5%, transparent)',
       }}
     >
       {/* Accent lumineux supérieur */}
@@ -130,7 +130,7 @@ export function SourcesSummaryCard({
         className="absolute inset-x-0 top-0 h-px opacity-60"
         style={{
           background:
-            'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
+            'linear-gradient(90deg, transparent, var(--notebook-accent), transparent)',
         }}
       />
 
@@ -153,14 +153,14 @@ export function SourcesSummaryCard({
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
           style={{
             background:
-              'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              'color-mix(in srgb, var(--notebook-accent) 12%, transparent)',
             border:
-              '1px solid color-mix(in srgb, var(--accent-primary) 16%, transparent)',
+              '1px solid color-mix(in srgb, var(--notebook-accent) 16%, transparent)',
           }}
         >
           <Sparkles
             className="h-3.5 w-3.5"
-            style={{ color: 'var(--accent-primary)' }}
+            style={{ color: 'var(--notebook-accent)' }}
           />
         </div>
 
@@ -204,12 +204,12 @@ export function SourcesSummaryCard({
               className="mr-1 flex items-center gap-1.5 rounded-full px-2 py-1"
               style={{
                 background:
-                  'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+                  'color-mix(in srgb, var(--notebook-accent) 8%, transparent)',
               }}
             >
               <Loader2
                 className="h-3 w-3 animate-spin"
-                style={{ color: 'var(--accent-primary)' }}
+                style={{ color: 'var(--notebook-accent)' }}
               />
               <span
                 className="text-xs"
@@ -284,19 +284,19 @@ export function SourcesSummaryCard({
                   className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-xl"
                   style={{
                     background:
-                      'color-mix(in srgb, var(--accent-primary) 4%, transparent)',
+                      'color-mix(in srgb, var(--notebook-accent) 4%, transparent)',
                   }}
                 >
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-full"
                     style={{
                       background:
-                        'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                        'color-mix(in srgb, var(--notebook-accent) 10%, transparent)',
                     }}
                   >
                     <Sparkles
                       className="h-3.5 w-3.5 animate-pulse"
-                      style={{ color: 'var(--accent-primary)' }}
+                      style={{ color: 'var(--notebook-accent)' }}
                     />
                   </div>
 
@@ -381,7 +381,7 @@ export function SourcesSummaryCard({
                 >
                   <Loader2
                     className="h-2.5 w-2.5 animate-spin"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--notebook-accent)' }}
                   />
 
                   <span
@@ -490,11 +490,11 @@ export function SourcesSummaryCard({
         .sources-summary-content blockquote {
           margin: 0.7rem 0;
           padding: 0.55rem 0.75rem;
-          border-left: 2px solid var(--accent-primary);
+          border-left: 2px solid var(--notebook-accent);
           border-radius: 0 0.5rem 0.5rem 0;
           background: color-mix(
             in srgb,
-            var(--accent-primary) 5%,
+            var(--notebook-accent) 5%,
             transparent
           );
           color: var(--text-muted);
@@ -519,8 +519,8 @@ export function SourcesSummaryCard({
           border-radius: 0.65rem;
           background: color-mix(
             in srgb,
-            var(--bg-base) 70%,
-            var(--bg-panel) 30%
+            var(--notebook-canvas) 70%,
+            var(--notebook-surface) 30%
           );
         }
 
@@ -530,7 +530,7 @@ export function SourcesSummaryCard({
         }
 
         .sources-summary-content a {
-          color: var(--accent-primary);
+          color: var(--notebook-accent);
           text-decoration: none;
         }
 

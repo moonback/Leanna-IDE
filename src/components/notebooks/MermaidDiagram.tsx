@@ -145,7 +145,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
     return (
       <div
         className="flex items-center justify-center py-8 rounded-xl"
-        style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+        style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
       >
         <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-dimmed)' }}>
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -167,7 +167,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
         {/* Afficher le code source en fallback */}
         <pre
           className="px-4 py-3 rounded-xl text-xs overflow-x-auto font-mono"
-          style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', color: 'var(--text-muted)' }}
+          style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)', color: 'var(--text-muted)' }}
         >
           <code>{code}</code>
         </pre>
@@ -180,7 +180,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
       <div
         ref={containerRef}
         className="w-full overflow-x-auto rounded-xl p-4"
-        style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+        style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
         dangerouslySetInnerHTML={{ __html: svg }}
       />
     );
@@ -194,26 +194,26 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
     <div
       ref={containerRef}
       className={expanded ? 'fixed inset-4 z-50 flex flex-col rounded-2xl shadow-2xl' : 'w-full rounded-xl'}
-      style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+      style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
     >
-      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}>
+      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}>
         <div className="min-w-0">
           <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
           <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] disabled:opacity-30">
+          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30">
             <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
           <span className="w-10 text-center text-xs font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
-          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] disabled:opacity-30">
+          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30">
             <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
-          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
+          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)]">
             <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
           </Tooltip>
-          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)]">
-            {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />}
+          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)]">
+            {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />}
           </Tooltip>
         </div>
       </div>

@@ -28,13 +28,13 @@ export function UploadQueue({ uploadQueue, uploadDone, uploadErrors, spring }: P
         >
           <div
             className="p-4 rounded-xl border space-y-2"
-            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)' }}
+            style={{ backgroundColor: 'var(--notebook-surface)', borderColor: 'var(--notebook-accent)' }}
           >
             <div className="flex items-center gap-2">
               {uploadDone === uploadQueue.length ? (
                 <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
               ) : (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
               )}
               <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Upload {uploadDone}/{uploadQueue.length}
@@ -42,10 +42,10 @@ export function UploadQueue({ uploadQueue, uploadDone, uploadErrors, spring }: P
               </p>
             </div>
             {/* Progress bar */}
-            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--notebook-canvas)' }}>
               <motion.div
                 className="h-full rounded-full"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                style={{ backgroundColor: 'var(--notebook-accent)' }}
                 initial={{ width: '0%' }}
                 animate={{ width: `${(uploadDone / uploadQueue.length) * 100}%` }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -55,7 +55,7 @@ export function UploadQueue({ uploadQueue, uploadDone, uploadErrors, spring }: P
               {uploadQueue.map((f, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   {f.status === 'pending' && <Loader2 className="w-3 h-3 opacity-30 flex-shrink-0" />}
-                  {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                  {f.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
                   {f.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-success)' }} />}
                   {f.status === 'error' && <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-error)' }} />}
                   <span className="truncate flex-1" style={{ color: f.status === 'error' ? 'var(--color-error)' : 'var(--text-primary)' }}>

@@ -31,7 +31,7 @@ export function renderMessageContent(content: string): JSX.Element {
               {lang && (
                 <div
                   className="flex items-center justify-between px-3 py-1.5"
-                  style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-base)' }}
+                  style={{ backgroundColor: 'var(--notebook-surface-muted)', borderBottom: '1px solid var(--notebook-border)' }}
                 >
                   <span className="text-smfont-mono font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                     {lang}
@@ -40,7 +40,7 @@ export function renderMessageContent(content: string): JSX.Element {
               )}
               <pre
                 className="px-4 py-3 text-smoverflow-x-auto font-mono leading-relaxed"
-                style={{ backgroundColor: 'var(--bg-base)', margin: 0 }}
+                style={{ backgroundColor: 'var(--notebook-canvas)', margin: 0 }}
               >
                 <code style={{ color: 'var(--text-secondary)' }}>{code}</code>
               </pre>
@@ -64,8 +64,8 @@ export function renderMessageContent(content: string): JSX.Element {
                 key={`bq-${blockIdx++}`}
                 className="pl-3 py-1.5 my-1 rounded-r-lg"
                 style={{
-                  borderLeft: '3px solid var(--accent-primary)',
-                  backgroundColor: 'var(--accent-subtle)',
+                  borderLeft: '3px solid var(--notebook-accent)',
+                  backgroundColor: 'var(--notebook-accent-surface)',
                 }}
               >
                 {blockquoteLines.map((line, j) => (
@@ -86,12 +86,12 @@ export function renderMessageContent(content: string): JSX.Element {
             const dataRows = tableRows.slice(2).map(row => row.split('|').filter(c => c.trim()));
 
             blocks.push(
-              <div key={`tbl-${blockIdx++}`} className="overflow-x-auto my-2 rounded-lg" style={{ border: '1px solid var(--border-base)' }}>
+              <div key={`tbl-${blockIdx++}`} className="overflow-x-auto my-2 rounded-lg" style={{ border: '1px solid var(--notebook-border)' }}>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                    <tr style={{ backgroundColor: 'var(--notebook-surface-muted)' }}>
                       {headerRow.map((cell, ci) => (
-                        <th key={ci} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--border-base)' }}>
+                        <th key={ci} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--notebook-border)' }}>
                           {cell.trim()}
                         </th>
                       ))}
@@ -99,7 +99,7 @@ export function renderMessageContent(content: string): JSX.Element {
                   </thead>
                   <tbody>
                     {dataRows.map((row, ri) => (
-                      <tr key={ri} style={{ borderBottom: ri < dataRows.length - 1 ? '1px solid var(--border-base)' : 'none' }}>
+                      <tr key={ri} style={{ borderBottom: ri < dataRows.length - 1 ? '1px solid var(--notebook-border)' : 'none' }}>
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>
                             {renderInlineMarkdown(cell.trim())}
@@ -151,7 +151,7 @@ export function renderMessageContent(content: string): JSX.Element {
           // Horizontal rule
           if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
             blocks.push(
-              <hr key={`hr-${blockIdx++}`} className="my-3 border-none" style={{ height: '1px', backgroundColor: 'var(--border-base)' }} />
+              <hr key={`hr-${blockIdx++}`} className="my-3 border-none" style={{ height: '1px', backgroundColor: 'var(--notebook-border)' }} />
             );
             continue;
           }
@@ -196,7 +196,7 @@ export function renderMessageContent(content: string): JSX.Element {
               <div key={`ul-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
                 <span
                   className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: 'var(--accent-primary)', opacity: 0.7 }}
+                  style={{ backgroundColor: 'var(--notebook-accent)', opacity: 0.7 }}
                 />
                 <span className="text-smleading-relaxed flex-1" style={{ color: 'var(--text-secondary)' }}>
                   {renderInlineMarkdown(line.slice(2))}
@@ -213,7 +213,7 @@ export function renderMessageContent(content: string): JSX.Element {
               <div key={`ol-${blockIdx++}`} className="flex gap-2.5 pl-2 my-0.5">
                 <span
                   className="text-smfont-bold min-w-[16px] mt-[2px] flex-shrink-0 text-center rounded"
-                  style={{ color: 'var(--accent-primary)' }}
+                  style={{ color: 'var(--notebook-accent)' }}
                 >
                   {num}
                 </span>
@@ -278,7 +278,7 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
         <code
           key={`c-${keyIdx++}`}
           className="px-1.5 py-0.5 rounded text-smfont-mono"
-          style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-base)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.15)', border: '1px solid var(--notebook-border)' }}
         >
           {match[6]}
         </code>
@@ -292,7 +292,7 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
           target="_blank"
           rel="noopener noreferrer"
           className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-          style={{ color: 'var(--accent-primary)' }}
+          style={{ color: 'var(--notebook-accent)' }}
         >
           {match[8]}
         </a>

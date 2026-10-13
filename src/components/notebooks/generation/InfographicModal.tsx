@@ -60,10 +60,10 @@ export function InfographicModal({
             exit={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
             transition={modalSpring}
             className="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
+            style={{ backgroundColor: 'var(--notebook-surface)', borderColor: 'var(--notebook-border)' }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
                   <Lightbulb className="w-4.5 h-4.5" style={{ color: 'var(--color-warning)' }} />
@@ -75,7 +75,7 @@ export function InfographicModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors"
                 style={{ color: 'var(--text-muted)' }}
                 // autoFocus justifié : point d'entrée du focus-trap à l'ouverture
                 // de la modale (bouton de fermeture), focus attendu.
@@ -104,9 +104,9 @@ export function InfographicModal({
                       onClick={() => setInfraOrientation(opt.key)}
                       className="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: infraOrientation === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                        backgroundColor: infraOrientation === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--notebook-canvas)',
                         color: infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
-                        border: `1.5px solid ${infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
+                        border: `1.5px solid ${infraOrientation === opt.key ? 'var(--color-warning)' : 'var(--notebook-border)'}`,
                       }}
                     >
                       <span className="inline-flex items-center"><OIcon size={18} /></span>
@@ -137,9 +137,9 @@ export function InfographicModal({
                       onClick={() => setInfraLang(opt.key)}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: infraLang === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                        backgroundColor: infraLang === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--notebook-canvas)',
                         color: infraLang === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
-                        border: `1px solid ${infraLang === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
+                        border: `1px solid ${infraLang === opt.key ? 'var(--color-warning)' : 'var(--notebook-border)'}`,
                       }}
                     >
                       <span>{opt.flag}</span>
@@ -171,9 +171,9 @@ export function InfographicModal({
                       onClick={() => setInfraStyle(opt.key)}
                       className="flex items-center gap-2 px-2.5 py-2 rounded-full text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: infraStyle === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                        backgroundColor: infraStyle === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--notebook-canvas)',
                         color: infraStyle === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
-                        border: `1px solid ${infraStyle === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
+                        border: `1px solid ${infraStyle === opt.key ? 'var(--color-warning)' : 'var(--notebook-border)'}`,
                       }}
                     >
                       <span>{opt.emoji}</span>
@@ -197,9 +197,9 @@ export function InfographicModal({
                       onClick={() => setInfraDetail(opt.key)}
                       className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: infraDetail === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--bg-base)',
+                        backgroundColor: infraDetail === opt.key ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'var(--notebook-canvas)',
                         color: infraDetail === opt.key ? 'var(--color-warning)' : 'var(--text-muted)',
-                        border: `1.5px solid ${infraDetail === opt.key ? 'var(--color-warning)' : 'var(--border-base)'}`,
+                        border: `1.5px solid ${infraDetail === opt.key ? 'var(--color-warning)' : 'var(--notebook-border)'}`,
                       }}
                     >
                       <span className="font-semibold">{opt.label}</span>
@@ -232,9 +232,9 @@ export function InfographicModal({
                   placeholder="Ex: Une infographie sur les tendances du marché avec des statistiques clés, un comparatif visuel des acteurs principaux..."
                   className="w-full px-3 py-2.5 rounded-full text-xs resize-none leading-relaxed"
                   style={{
-                    backgroundColor: 'var(--bg-base)',
+                    backgroundColor: 'var(--notebook-canvas)',
                     color: 'var(--text-primary)',
-                    border: '1px solid var(--border-base)',
+                    border: '1px solid var(--notebook-border)',
                   }}
                   rows={3}
                 />
@@ -242,10 +242,10 @@ export function InfographicModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="px-6 py-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--notebook-border)' }}>
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
+                className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)]"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Annuler

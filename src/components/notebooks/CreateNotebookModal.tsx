@@ -131,7 +131,7 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
                 color: 'var(--text-primary)',
-                ['--tw-ring-color' as any]: 'var(--accent-primary)',
+                ['--tw-ring-color' as any]: 'var(--notebook-accent)',
               }}
             />
           </div>
@@ -150,7 +150,7 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
                 color: 'var(--text-primary)',
-                ['--tw-ring-color' as any]: 'var(--accent-primary)',
+                ['--tw-ring-color' as any]: 'var(--notebook-accent)',
               }}
             />
           </div>

@@ -91,7 +91,7 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
           onClick={onOpenGitHub}
           className="notebook-chip"
           title="Importer un dépôt GitHub"
-          style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-primary)' }}
         >
           <Github className="w-3.5 h-3.5" />
           GitHub

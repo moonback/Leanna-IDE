@@ -79,7 +79,7 @@ export function SourceListCompact(props: Props) {
                   title={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
                   aria-label={allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
                 >
-                  <CheckSquare className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+                  <CheckSquare className="h-4 w-4" style={{ color: 'var(--notebook-accent)' }} />
                 </motion.button>
                 <motion.button
                   {...tapScale}
@@ -124,7 +124,7 @@ export function SourceListCompact(props: Props) {
                   onClick={openFilePicker}
                   disabled={uploading}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-70"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+                  style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
                 >
                   {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   <span>Ajouter</span>
@@ -144,7 +144,7 @@ export function SourceListCompact(props: Props) {
             style={{
               backgroundColor: 'var(--notebook-surface-muted)',
               border: '1px solid var(--notebook-border)',
-              ...({ '--tw-ring-color': 'var(--accent-primary)' } as React.CSSProperties),
+              ...({ '--tw-ring-color': 'var(--notebook-accent)' } as React.CSSProperties),
             }}
           >
             <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
@@ -157,7 +157,7 @@ export function SourceListCompact(props: Props) {
               style={{ color: 'var(--text-primary)' }}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-[var(--bg-active)] flex-shrink-0" aria-label="Effacer la recherche">
+              <button onClick={() => setSearchQuery('')} className="p-0.5 rounded hover:bg-[var(--notebook-accent-surface)] flex-shrink-0" aria-label="Effacer la recherche">
                 <X className="h-3 w-3" style={{ color: 'var(--text-dimmed)' }} />
               </button>
             )}
@@ -184,7 +184,7 @@ export function SourceListCompact(props: Props) {
               type="button"
               onClick={openFilePicker}
               className="flex items-center gap-1.5 mt-1 px-3.5 py-2 rounded-full text-xs font-medium"
-              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+              style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
             >
               <Plus className="h-3.5 w-3.5" />
               Ajouter une source
@@ -215,11 +215,11 @@ export function SourceListCompact(props: Props) {
                     data-active={isSingleSelected || isSelected}
                     style={{
                       backgroundColor: isSingleSelected
-                        ? 'var(--accent-subtle, rgba(59,130,246,0.08))'
+                        ? 'var(--notebook-accent-surface)'
                         : isSelected
                           ? 'rgba(59,130,246,0.15)'
                           : 'transparent',
-                      border: (isSingleSelected || isSelected) ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                      border: (isSingleSelected || isSelected) ? '1px solid var(--notebook-accent)' : '1px solid transparent',
                       transition: 'background-color 120ms ease, border-color 120ms ease',
                     }}
                     onClick={() => {
@@ -244,11 +244,11 @@ export function SourceListCompact(props: Props) {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onToggleSelect(source.id); }}
-                      className={`flex-shrink-0 p-0.5 rounded-lg hover:bg-[var(--bg-active)] transition-opacity ${hasSelection || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                      className={`flex-shrink-0 p-0.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-opacity ${hasSelection || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       aria-label={isSelected ? 'Désélectionner' : 'Sélectionner'}
                     >
                       {isSelected ? (
-                        <CheckSquare className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
+                        <CheckSquare className="h-4 w-4" style={{ color: 'var(--notebook-accent)' }} />
                       ) : (
                         <Square className="h-4 w-4" style={{ color: 'var(--text-dimmed)' }} />
                       )}
@@ -276,11 +276,11 @@ export function SourceListCompact(props: Props) {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDelete(source.id); }}
-                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 flex-shrink-0"
+                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] flex-shrink-0"
                       title="Supprimer"
                       aria-label={`Supprimer ${source.title}`}
                     >
-                      <Trash2 className="h-3 w-3 text-red-400" />
+                      <Trash2 className="h-3 w-3 text-[var(--color-error)]" />
                     </button>
                   </motion.div>
                 );

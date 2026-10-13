@@ -36,7 +36,7 @@ interface Props {
 // Types de documents
 const DOC_TYPES = [
   { key: 'full-report', label: 'Rapport complet', icon: FileText, color: 'var(--color-error)' },
-  { key: 'summary', label: 'Résumé', icon: FileText, color: 'var(--accent-primary)' },
+  { key: 'summary', label: 'Résumé', icon: FileText, color: 'var(--notebook-accent)' },
   { key: 'faq', label: 'FAQ', icon: HelpCircle, color: 'var(--color-accent-alt)' },
   { key: 'study-guide', label: 'Guide d\'étude', icon: GraduationCap, color: 'var(--color-success)' },
   { key: 'briefing', label: 'Briefing', icon: Briefcase, color: 'var(--color-warning)' },
@@ -52,7 +52,7 @@ const DOC_TYPES = [
 const REPORT_TYPES = [
   { key: 'report-business', label: 'Business Plan', icon: Briefcase, color: 'var(--color-warning)' },
   { key: 'report-market', label: 'Étude de marché', icon: Target, color: 'var(--color-info)' },
-  { key: 'report-technical', label: 'Rapport technique', icon: FileText, color: 'var(--accent-primary)' },
+  { key: 'report-technical', label: 'Rapport technique', icon: FileText, color: 'var(--notebook-accent)' },
   { key: 'report-competitive', label: 'Analyse concurrentielle', icon: Target, color: 'var(--color-accent-alt)' },
   { key: 'report-financial', label: 'Rapport financier', icon: FileText, color: 'var(--color-success)' },
   { key: 'report-marketing', label: 'Plan marketing', icon: Sparkles, color: 'var(--color-error)' },
@@ -180,7 +180,7 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
   if (generatedDocs.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-6">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: 'var(--bg-base)' }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: 'var(--notebook-canvas)' }}>
           <Sparkles className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
         </div>
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -198,12 +198,12 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
       {/* Header avec compteur */}
       <div className="flex items-center justify-between border-b px-4 py-3 flex-shrink-0" style={{ borderColor: 'var(--notebook-border)' }}>
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+          <Sparkles className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
           <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
             Historique des générations
           </h3>
         </div>
-        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}>
           {generatedDocs.length}
         </span>
       </div>
@@ -306,16 +306,16 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                                 if (!state) handleAddToSources(doc);
                               }}
                               disabled={isAdding || isAdded}
-                              className={`p-1.5 rounded transition-all ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:bg-[var(--accent-subtle)] disabled:cursor-default`}
+                              className={`p-1.5 rounded transition-all ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:bg-[var(--notebook-accent-surface)] disabled:cursor-default`}
                               title={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources (interrogeable par l\u2019assistant)'}
                               aria-label={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources'}
                             >
                               {isAdding ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
                               ) : isAdded ? (
                                 <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
                               ) : (
-                                <FilePlus className="w-3.5 h-3.5" style={{ color: 'var(--accent-primary)' }} />
+                                <FilePlus className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />
                               )}
                             </button>
                           );
@@ -325,7 +325,7 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                             e.stopPropagation();
                             handleDelete(doc.id);
                           }}
-                          className="p-1.5 opacity-0 group-hover:opacity-100 rounded hover:bg-red-500/10 transition-all"
+                          className="p-1.5 opacity-0 group-hover:opacity-100 rounded hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] transition-all"
                           title="Supprimer"
                         >
                           <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
@@ -352,7 +352,7 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedDoc(null)}
-                className="text-xs px-3 py-1.5 rounded-full hover:bg-[var(--bg-hover)] transition-colors"
+                className="text-xs px-3 py-1.5 rounded-full hover:bg-[var(--notebook-surface-muted)] transition-colors"
                 style={{ color: 'var(--text-muted)' }}
               >
                 ← Retour

@@ -43,14 +43,14 @@ export function FolderPickerModal({
             exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.92, y: prefersReducedMotion ? 0 : 16 }}
             transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
             className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
-            style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+            style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-base)' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--notebook-border)' }}>
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                  <FileDown className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--notebook-accent-surface)' }}>
+                  <FileDown className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -84,24 +84,24 @@ export function FolderPickerModal({
                       onClick={() => { setSelectedFolder(f.path); setCustomFolderName(''); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-left transition-all text-sm${
                         selectedFolder === f.path && !customFolderName
-                          ? 'ring-1 ring-[var(--accent-primary)]'
-                          : 'hover:bg-[var(--accent-subtle)]'
+                          ? 'ring-1 ring-[var(--notebook-accent)]'
+                          : 'hover:bg-[var(--notebook-accent-surface)]'
                       }`}
                       style={{
                         backgroundColor: selectedFolder === f.path && !customFolderName
-                          ? 'var(--accent-subtle)'
+                          ? 'var(--notebook-accent-surface)'
                           : 'transparent',
                         color: 'var(--text-primary)',
                         paddingLeft: `${12 + f.depth * 16}px`,
                       }}
                     >
                       {selectedFolder === f.path && !customFolderName
-                        ? <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                        ? <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
                         : <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
                       }
                       <span className="truncate">{f.name || '/ (racine sandbox)'}</span>
                       {selectedFolder === f.path && !customFolderName && (
-                        <Check className="w-3 h-3 ml-auto flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                        <Check className="w-3 h-3 ml-auto flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
                       )}
                     </button>
                   ))}
@@ -121,18 +121,18 @@ export function FolderPickerModal({
                 placeholder="ex: docs/notes"
                 className="w-full px-3 py-2 rounded-full text-smoutline-none transition-all"
                 style={{
-                  backgroundColor: 'var(--bg-base)',
-                  border: '1px solid var(--border-base)',
+                  backgroundColor: 'var(--notebook-canvas)',
+                  border: '1px solid var(--notebook-border)',
                   color: 'var(--text-primary)',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'var(--accent-primary)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border-base)')}
+                onFocus={e => (e.target.style.borderColor = 'var(--notebook-accent)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--notebook-border)')}
               />
             </div>
 
             {/* Destination preview */}
             {(selectedFolder !== '' || customFolderName.trim()) && (
-              <div className="mx-4 mb-3 px-3 py-2 rounded-full text-xs" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+              <div className="mx-4 mb-3 px-3 py-2 rounded-full text-xs" style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}>
                 <span className="font-medium">Destination : </span>
                 <span className="font-mono">
                   {customFolderName.trim() || selectedFolder || '/'}/
@@ -145,7 +145,7 @@ export function FolderPickerModal({
               <button
                 onClick={onClose}
                 className="px-4 py-2 rounded-full text-smfont-medium transition-all hover:opacity-80"
-                style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+                style={{ color: 'var(--text-muted)', backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
               >
                 Annuler
               </button>
@@ -153,7 +153,7 @@ export function FolderPickerModal({
                 onClick={onSave}
                 disabled={savingMd || (selectedFolder === '' && !customFolderName.trim())}
                 className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
-                style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+                style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
               >
                 {savingMd ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -57,10 +57,10 @@ export function ReportModal({
             exit={reduceMotion ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 10 }}
             transition={modalSpring}
             className="w-full max-w-7xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+            style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
           >
             {/* Modal header */}
-            <div className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="flex items-center gap-3 px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--notebook-border)' }}>
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 25%, transparent)' }}
@@ -77,7 +77,7 @@ export function ReportModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg transition-all hover:bg-[var(--bg-hover)] active:scale-95"
+                className="p-2 rounded-lg transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
                 style={{ color: 'var(--text-muted)' }}
                 // autoFocus justifié : point d'entrée du focus-trap à l'ouverture
                 // de la modale (bouton de fermeture), focus attendu.
@@ -94,7 +94,7 @@ export function ReportModal({
               <div
                 className="rounded-2xl p-4 space-y-4"
                 style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-warning) 7%, transparent), color-mix(in srgb, var(--accent-primary) 5%, transparent))',
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-warning) 7%, transparent), color-mix(in srgb, var(--notebook-accent) 5%, transparent))',
                   border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)',
                 }}
               >
@@ -147,7 +147,7 @@ export function ReportModal({
                       <div
                         key={i}
                         className="flex items-start gap-3 p-3.5 rounded-xl animate-pulse"
-                        style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+                        style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
                       >
                         <div
                           className="w-9 h-9 rounded-xl flex-shrink-0"
@@ -175,7 +175,7 @@ export function ReportModal({
                           key={idx}
                           onClick={() => onSelectSuggestion(suggestion)}
                           className="relative w-full flex flex-col gap-2.5 p-3.5 rounded-xl border transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] text-left group overflow-hidden"
-                          style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+                          style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas)' }}
                         >
                           <span
                             className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
@@ -219,7 +219,7 @@ export function ReportModal({
                           </div>
 
                           <div className="flex items-center justify-center gap-1.5 pl-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>Générer ce rapport</span>
+                            <span className="text-xs font-semibold" style={{ color: 'var(--notebook-accent)' }}>Générer ce rapport</span>
                             <Zap className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
                           </div>
                         </button>
@@ -231,7 +231,7 @@ export function ReportModal({
                 {!loadingSuggestions && suggestions.length === 0 && (
                   <div
                     className="flex flex-col items-center gap-3 py-6 px-4 rounded-xl text-center"
-                    style={{ backgroundColor: 'var(--bg-base)', border: '1px dashed color-mix(in srgb, var(--color-warning) 30%, transparent)' }}
+                    style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px dashed color-mix(in srgb, var(--color-warning) 30%, transparent)' }}
                   >
                     <div
                       className="w-11 h-11 rounded-full flex items-center justify-center"
@@ -265,11 +265,11 @@ export function ReportModal({
 
               {/* Séparateur */}
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border)' }} />
                 <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
                   ou choisir un type de rapport
                 </span>
-                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-base)' }} />
+                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--notebook-border)' }} />
               </div>
 
               {/* Grille de tous les types */}
@@ -279,7 +279,7 @@ export function ReportModal({
                     key={key}
                     onClick={() => onSelectType(key)}
                     className="relative flex items-start gap-3 p-3.5 pl-4 rounded-xl border transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.97] text-left group overflow-hidden"
-                    style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+                    style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas)' }}
                   >
                     <span
                       className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
@@ -309,13 +309,13 @@ export function ReportModal({
             </div>
 
             {/* Modal footer */}
-            <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center justify-between px-6 py-3 border-t flex-shrink-0" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-muted)' }}>
               <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
                 {sources.length} source{sources.length > 1 ? 's' : ''} disponible{sources.length > 1 ? 's' : ''} • Le rapport sera généré en streaming
               </p>
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--bg-hover)]"
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-surface-muted)]"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Annuler

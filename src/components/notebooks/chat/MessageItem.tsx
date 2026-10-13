@@ -82,7 +82,7 @@ export const MessageItem = memo(function MessageItem({
                 onClick={() => onEditSubmit(msg.id)}
                 disabled={!editingContent.trim()}
                 className="px-3 py-1.5 rounded-full text-smfont-medium transition-colors disabled:opacity-40"
-                style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--text-primary)' }}
+                style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
               >
                 Renvoyer
               </button>
@@ -116,10 +116,10 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onCopy(msg.id, msg.content)}
-                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 ${
+                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 ${
                     copiedMsgId === msg.id
                       ? 'opacity-100 bg-[var(--color-success)]/10'
-                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]'
+                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
                   }`}
                   style={{ color: copiedMsgId === msg.id ? 'var(--color-success)' : undefined }}
                   title="Copier la réponse"
@@ -138,7 +138,7 @@ export const MessageItem = memo(function MessageItem({
                   type="button"
                   onClick={() => onRetry(msg.id)}
                   disabled={loading}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30 disabled:cursor-not-allowed"
                   title="Régénérer la réponse"
                   aria-label="Régénérer la réponse"
                 >
@@ -150,12 +150,12 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onTTS(msg.id, msg.content)}
-                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 ${
+                  className={`flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 ${
                     speakingMsgId === msg.id
-                      ? 'opacity-100 bg-[var(--accent-primary)]/10'
-                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]'
+                      ? 'opacity-100 bg-[var(--notebook-accent)]/10'
+                      : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
                   }`}
-                  style={{ color: speakingMsgId === msg.id ? 'var(--accent-primary)' : undefined }}
+                  style={{ color: speakingMsgId === msg.id ? 'var(--notebook-accent)' : undefined }}
                   title={speakingMsgId === msg.id ? 'Arrêter la lecture' : 'Lire à voix haute (TTS IA)'}
                   aria-label={speakingMsgId === msg.id ? "Arrêter la lecture" : "Lire à voix haute"}
                 >
@@ -188,7 +188,7 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onSaveToNote(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
                   title="Sauvegarder dans les notes"
                   aria-label="Sauvegarder dans les notes"
                 >
@@ -200,7 +200,7 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onOpenFolderPicker(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
                   title="Enregistrer ce message en fichier Markdown (.md)"
                   aria-label="Enregistrer en Markdown"
                 >
@@ -216,10 +216,10 @@ export const MessageItem = memo(function MessageItem({
                   <button
                     type="button"
                     onClick={() => onFeedback(msg.id, 'up')}
-                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${
                       feedbackMap[msg.id] === 'up'
                         ? 'opacity-100 bg-[var(--color-success)]/10'
-                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]'
+                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
                     }`}
                     style={{ color: feedbackMap[msg.id] === 'up' ? 'var(--color-success)' : undefined }}
                     title="Bonne réponse"
@@ -230,10 +230,10 @@ export const MessageItem = memo(function MessageItem({
                   <button
                     type="button"
                     onClick={() => onFeedback(msg.id, 'down')}
-                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${
                       feedbackMap[msg.id] === 'down'
                         ? 'opacity-100 bg-[var(--color-error)]/10'
-                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]'
+                        : 'opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]'
                     }`}
                     style={{ color: feedbackMap[msg.id] === 'down' ? 'var(--color-error)' : undefined }}
                     title="Mauvaise réponse"
@@ -250,7 +250,7 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onEditStart(msg.id, msg.content)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
                   title="Modifier et renvoyer"
                   aria-label="Modifier le message"
                 >
@@ -262,7 +262,7 @@ export const MessageItem = memo(function MessageItem({
                 <button
                   type="button"
                   onClick={() => onOpenFolderPicker(msg)}
-                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-md px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+                  className="flex items-center gap-1.5 text-sm transition-all duration-200 rounded-lg px-2 py-1 opacity-60 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
                   title="Enregistrer ce message en fichier Markdown (.md)"
                   aria-label="Enregistrer en Markdown"
                 >
@@ -280,7 +280,7 @@ export const MessageItem = memo(function MessageItem({
             <button
               type="button"
               onClick={() => setShowCitations(showCitations === msg.id ? null : msg.id)}
-              className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200 rounded-md px-2 py-1.5 opacity-70 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+              className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200 rounded-lg px-2 py-1.5 opacity-70 hover:opacity-100 hover:bg-[var(--notebook-surface-muted)]"
               aria-expanded={showCitations === msg.id}
               aria-controls={`citations-${msg.id}`}
               aria-label={`${msg.citations.length} citation${msg.citations.length > 1 ? 's' : ''} disponibles`}
@@ -314,9 +314,9 @@ export const MessageItem = memo(function MessageItem({
                     {msg.citations.map((cit, i) => (
                       <div
                         key={cit.chunkId || i}
-                        className="p-3 rounded-lg transition-all duration-200 hover:shadow-sm hover:ring-1 hover:ring-[var(--accent-primary)]/30"
+                        className="p-3 rounded-lg transition-all duration-200 hover:shadow-sm hover:ring-1 hover:ring-[var(--notebook-accent)]/30"
                         style={{
-                          backgroundColor: 'var(--bg-base)',
+                          backgroundColor: 'var(--notebook-canvas)',
                           color: 'var(--text-muted)',
                         }}
                       >
@@ -328,8 +328,8 @@ export const MessageItem = memo(function MessageItem({
                           <span
                             className="px-2 py-0.5 rounded-full text-xs font-semibold"
                             style={{
-                              backgroundColor: 'var(--accent-subtle)',
-                              color: 'var(--accent-primary)',
+                              backgroundColor: 'var(--notebook-accent-surface)',
+                              color: 'var(--notebook-accent)',
                             }}
                           >
                             {(cit.relevance * 100).toFixed(0)}% pertinent
@@ -349,7 +349,7 @@ export const MessageItem = memo(function MessageItem({
                             onFetchCitation(cit, e.clientX, e.clientY);
                           }}
                           className="text-xs opacity-60 hover:opacity-100 transition-opacity mt-1 flex items-center gap-1"
-                          style={{ color: 'var(--accent-primary)' }}
+                          style={{ color: 'var(--notebook-accent)' }}
                         >
                           Voir le détail <ExternalLink className="w-3 h-3" />
                         </button>

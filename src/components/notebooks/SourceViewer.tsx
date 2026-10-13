@@ -44,8 +44,8 @@ function TypeIcon({ type, size = 20 }: { type: string; size?: number }) {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
-  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
+  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--notebook-accent)',
+  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--notebook-accent)', image: 'var(--color-success)',
 };
 
 export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
@@ -101,7 +101,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
       {/* Header */}
       <div
         className="flex items-center gap-3 px-5 py-4 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}
       >
         <span className="flex-shrink-0 inline-flex items-center">
           <TypeIcon type={source?.type || ''} size={20} />
@@ -144,12 +144,12 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* Toggle view mode for HTML sources */}
           {htmlData && (
-            <div className="flex items-center rounded-lg overflow-hidden border mr-2" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="flex items-center rounded-lg overflow-hidden border mr-2" style={{ borderColor: 'var(--notebook-border)' }}>
               <button
                 onClick={() => setViewMode('visual')}
                 className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
-                  backgroundColor: viewMode === 'visual' ? 'var(--accent-primary)' : 'transparent',
+                  backgroundColor: viewMode === 'visual' ? 'var(--notebook-accent)' : 'transparent',
                   color: viewMode === 'visual' ? 'white' : 'var(--text-muted)',
                 }}
               >
@@ -159,7 +159,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                 onClick={() => setViewMode('text')}
                 className="px-2.5 py-1.5 text-xs font-semibold transition-colors"
                 style={{
-                  backgroundColor: viewMode === 'text' ? 'var(--accent-primary)' : 'transparent',
+                  backgroundColor: viewMode === 'text' ? 'var(--notebook-accent)' : 'transparent',
                   color: viewMode === 'text' ? 'white' : 'var(--text-muted)',
                 }}
               >
@@ -169,14 +169,14 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           )}
           <button
             onClick={fetchContent}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--notebook-surface-muted)]"
             title="Recharger le contenu"
           >
             <RefreshCw className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--notebook-surface-muted)]"
             title="Fermer"
           >
             <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -186,13 +186,13 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
 
       {/* Keywords */}
       {source?.keywords && source.keywords.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-base)' }}>
+        <div className="flex flex-wrap gap-1.5 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--notebook-border)' }}>
           <Tag className="w-3 h-3 mt-0.5" style={{ color: 'var(--text-dimmed)' }} />
           {source.keywords.map((kw) => (
             <span
               key={kw}
               className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
+              style={{ backgroundColor: 'var(--notebook-canvas)', color: 'var(--text-muted)', border: '1px solid var(--notebook-border)' }}
             >
               {kw}
             </span>
@@ -204,7 +204,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 lg:p-7">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement du contenu...</p>
           </div>
         ) : error ? (
@@ -214,7 +214,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             <button
               onClick={fetchContent}
               className="px-4 py-2 rounded-full text-xs font-semibold transition active:scale-95"
-              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+              style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
             >
               Réessayer
             </button>
@@ -224,7 +224,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
             {/* Image display */}
             <div
               className="rounded-2xl overflow-hidden border shadow-sm"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+              style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-canvas)' }}
             >
               <img
                 src={`data:${imageData.mimeType};base64,${imageData.base64}`}
@@ -264,7 +264,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
                 </p>
                 <div
                   className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-xl border"
-                  style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}
+                  style={{ color: 'var(--text-primary)', backgroundColor: 'var(--notebook-canvas)', borderColor: 'var(--notebook-border)' }}
                 >
                   {content}
                 </div>
@@ -275,7 +275,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
           <div className="h-full flex flex-col gap-3">
             <div
               className="flex-1 rounded-2xl overflow-hidden border shadow-sm"
-              style={{ borderColor: 'var(--border-base)', backgroundColor: 'white' }}
+              style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'white' }}
             >
               <iframe
                 srcDoc={htmlData}

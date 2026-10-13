@@ -58,7 +58,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                 >
                   <span
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    style={{ backgroundColor: 'var(--notebook-accent)' }}
                   />
                   <span className="text-xs font-medium text-[var(--text-dimmed)]">
                     {lang}
@@ -77,7 +77,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
 
               <button
                 onClick={() => navigator.clipboard.writeText(codeContent)}
-                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-[var(--bg-active)]"
+                className="absolute top-2 right-2 p-2 rounded-lg opacity-0 group-hover/code:opacity-100 transition-opacity hover:bg-[var(--notebook-accent-surface)]"
                 style={{ color: 'var(--text-muted)' }}
                 title="Copier"
               >
@@ -102,8 +102,8 @@ export function renderGeneratedContent(content: string): JSX.Element {
                     <div
                       className="rounded-2xl overflow-hidden border shadow-lg"
                       style={{
-                        borderColor: 'var(--border-base)',
-                        backgroundColor: 'var(--bg-base)',
+                        borderColor: 'var(--notebook-border)',
+                        backgroundColor: 'var(--notebook-canvas)',
                       }}
                     >
                       <img
@@ -170,7 +170,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                     key={j}
                     className="my-6 border-0 h-px"
                     style={{
-                      background: 'linear-gradient(to right, transparent, var(--border-base), transparent)',
+                      background: 'linear-gradient(to right, transparent, var(--notebook-border), transparent)',
                     }}
                   />
                 );
@@ -182,8 +182,8 @@ export function renderGeneratedContent(content: string): JSX.Element {
                     key={j}
                     className="notebooklm-blockquote pl-5 pr-4 py-3 rounded-xl my-4"
                     style={{
-                      borderLeft: '3px solid var(--accent-primary)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, transparent)',
+                      borderLeft: '3px solid var(--notebook-accent)',
+                      backgroundColor: 'color-mix(in srgb, var(--notebook-accent) 5%, transparent)',
                     }}
                   >
                     <p className="text-sm italic leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -199,7 +199,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                   <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
                     <span
                       className="mt-1.5 flex-shrink-0"
-                      style={{ color: 'var(--accent-primary)', opacity: 0.7 }}
+                      style={{ color: 'var(--notebook-accent)', opacity: 0.7 }}
                     >
                       {bullet === '*' ? '•' : bullet === '+' ? '›' : '○'}
                     </span>
@@ -218,7 +218,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                     <div key={j} className="flex gap-3 py-1.5 notebooklm-list-item">
                       <span
                         className="mt-1.5 flex-shrink-0 w-6 text-right font-semibold"
-                        style={{ color: 'var(--accent-primary)' }}
+                        style={{ color: 'var(--notebook-accent)' }}
                       >
                         {numMatch[1]}.
                       </span>
@@ -238,7 +238,7 @@ export function renderGeneratedContent(content: string): JSX.Element {
                       type="checkbox"
                       checked={taskMatch[1].toLowerCase() === 'x'}
                       readOnly
-                      className="mt-1.5 w-4 h-4 rounded border-2 accent-[var(--accent-primary)]"
+                      className="mt-1.5 w-4 h-4 rounded border-2 accent-[var(--notebook-accent)]"
                     />
                     <span className="text-sm leading-relaxed pt-0.5">
                       {renderInlineMarkdown(taskMatch[2])}
@@ -299,7 +299,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
           <code
             key={`${content}-code-${depth}`}
             className="notebooklm-inline-code px-1.5 py-0.5 rounded text-sm font-mono"
-            style={{ backgroundColor: 'var(--bg-base)', color: 'var(--accent-primary)' }}
+            style={{ backgroundColor: 'var(--notebook-canvas)', color: 'var(--notebook-accent)' }}
           >
             {content}
           </code>
@@ -318,7 +318,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
               target="_blank"
               rel="noopener noreferrer"
               className="notebooklm-link inline-flex items-center gap-1 font-medium"
-              style={{ color: 'var(--accent-primary)' }}
+              style={{ color: 'var(--notebook-accent)' }}
             >
               {parseMarkdown(linkText, depth + 1)}
               <span className="opacity-50">↗</span>

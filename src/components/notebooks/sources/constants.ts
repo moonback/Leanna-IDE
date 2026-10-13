@@ -30,9 +30,9 @@ export const TYPE_ICONS: Record<string, string> = {
 };
 
 export const TYPE_COLORS: Record<string, string> = {
-  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--accent-primary)',
-  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--accent-primary)', image: 'var(--color-success)',
-  'github-repo': 'var(--accent-primary)',
+  pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--notebook-accent)',
+  html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--notebook-accent)', image: 'var(--color-success)',
+  'github-repo': 'var(--notebook-accent)',
 };
 
 export const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';

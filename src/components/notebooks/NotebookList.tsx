@@ -145,7 +145,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   }, [deleteTarget, success, toastError]);
 
   return (
-    <div className="notebook-workspace h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
+    <div className="notebook-workspace h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--notebook-bg)' }}>
 
       {/* ─── Header ─────────────────────────────────────────── */}
       <header className="flex-shrink-0 px-6 lg:px-12 pt-8 pb-6">
@@ -194,7 +194,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="notebook-icon-button rounded-lg"
-              style={{ borderColor: 'var(--border-base)' }}
+              style={{ borderColor: 'var(--notebook-border)' }}
               title="Importer depuis GitHub"
             >
               <Github className="w-4 h-4" />
@@ -232,7 +232,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               style={{
                 backgroundColor: 'var(--notebook-surface-muted)',
                 border: '1px solid var(--notebook-border)',
-                ['--tw-ring-color' as any]: 'var(--accent-primary)',
+                ['--tw-ring-color' as any]: 'var(--notebook-accent)',
               }}
             >
               <Search className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-dimmed)' }} />
@@ -391,7 +391,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               onClick={() => setSearchQuery('')}
               className="text-xs font-semibold mt-1 px-3 py-1.5 rounded-full transition-colors duration-150"
               style={{
-                color: 'var(--accent-primary)',
+                color: 'var(--notebook-accent)',
                 backgroundColor: 'var(--notebook-accent-surface)',
               }}
             >
@@ -425,7 +425,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                       boxShadow: 'var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.04))',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = nb.color || 'var(--accent-primary)';
+                      e.currentTarget.style.borderColor = nb.color || 'var(--notebook-accent)';
                       e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), 0 0 0 1px var(--notebook-border)';
                     }}
                     onMouseLeave={(e) => {
@@ -435,7 +435,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   >
                   <div
                     className="h-1 w-full flex-shrink-0"
-                    style={{ backgroundColor: nb.color || 'var(--accent-primary)' }}
+                    style={{ backgroundColor: nb.color || 'var(--notebook-accent)' }}
                   />
 
                   <div className="p-4 flex flex-col gap-4 flex-1">
@@ -468,7 +468,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                         onClick={(e) => handleDeleteClick(nb.id, e)}
                         whileTap={{ scale: 0.82 }}
                         className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 flex-shrink-0"
-                        style={{ color: 'var(--color-error, #ef4444)' }}
+                        style={{ color: 'var(--color-error)' }}
                         title="Supprimer"
                         aria-label="Supprimer"
                       >
@@ -556,7 +556,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
                 >
-                  <Trash2 className="w-4.5 h-4.5 text-red-400" />
+                  <Trash2 className="w-4.5 h-4.5 text-[var(--color-error)]" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -592,7 +592,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                   transition={SPRING_MOMENTUM}
                   className="px-5 py-2 rounded-full text-xs font-semibold"
                   style={{
-                    backgroundColor: '#ef4444',
+                    backgroundColor: 'var(--color-error)',
                     color: 'white',
                     boxShadow: '0 2px 8px rgba(239,68,68,0.35)',
                   }}

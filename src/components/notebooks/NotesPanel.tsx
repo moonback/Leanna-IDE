@@ -61,7 +61,7 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       id: 'cornell',
       label: 'Méthode Cornell',
       icon: Layout,
-      color: 'var(--accent-primary)',
+      color: 'var(--notebook-accent)',
       title: 'Notes Cornell — ',
       content: `## Questions / Indices\n\n- \n- \n\n## Notes principales\n\n\n\n## Résumé\n\n`,
     },
@@ -260,7 +260,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             {compactNotes.map(note => (
               <article key={note.id} className="notebook-note-card">
                 <div className="flex items-start gap-2">
-                  {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--accent-primary)]" />}
+                  {note.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />}
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
                     <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">{note.title}</h3>
                     <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{note.content}</p>
@@ -289,7 +289,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               }
             }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 shadow-sm"
-            style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+            style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
             title="Nouvelle note"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -297,8 +297,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
 
           <button
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+            style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
             title="Rechercher"
           >
             <Search className="w-3.5 h-3.5" />
@@ -308,8 +308,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
           <div className="relative">
             <button
               onClick={() => setShowTemplates(!showTemplates)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
               title="Modèles"
             >
               <Layout className="w-3.5 h-3.5" />
@@ -321,24 +321,24 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4, scale: 0.95 }}
                   className="absolute top-full left-0 mt-1 z-30 w-48 rounded-xl overflow-hidden shadow-xl"
-                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                  style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
                 >
                   {templates.map((tpl) => (
                     <button
                       key={tpl.id}
                       onClick={() => applyTemplate(tpl)}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs transition-colors hover:bg-[var(--notebook-accent-surface)]"
                     >
                       <tpl.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tpl.color }} />
                       <span style={{ color: 'var(--text-primary)' }}>{tpl.label}</span>
                     </button>
                   ))}
-                  <div className="border-t border-[var(--border-base)] my-1" />
+                  <div className="border-t border-[var(--notebook-border)] my-1" />
                   <button
                     onClick={() => { setShowTemplates(false); setShowTemplateModal(true); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-subtle)]"
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-[var(--notebook-accent)] transition-colors hover:bg-[var(--notebook-accent-surface)]"
                   >
-                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
                     <span>Bibliothèque complète...</span>
                   </button>
                 </motion.div>
@@ -348,8 +348,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
 
           <button
             onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : prev === 'oldest' ? 'alpha' : 'newest')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--bg-hover)]"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)]"
+            style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
             title="Tri"
           >
             <ArrowUpDown className="w-3 h-3" />
@@ -359,21 +359,21 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
           {notes.length > 0 && (
             <button
               onClick={handleExportAll}
-              className="p-1.5 rounded-full border transition-all hover:bg-[var(--bg-hover)] active:scale-95"
-              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}
+              className="p-1.5 rounded-full border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
+              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
               title="Exporter"
             >
               <Download className="w-3 h-3" />
             </button>
           )}
 
-          <div className="flex items-center rounded-lg overflow-hidden border ml-auto" style={{ borderColor: 'var(--border-base)' }}>
+          <div className="flex items-center rounded-lg overflow-hidden border ml-auto" style={{ borderColor: 'var(--notebook-border)' }}>
             <button
               onClick={() => setViewMode('list')}
               className="p-1.5 transition-colors"
               style={{
-                backgroundColor: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+                backgroundColor: viewMode === 'list' ? 'var(--notebook-accent-surface)' : 'transparent',
+                color: viewMode === 'list' ? 'var(--notebook-accent)' : 'var(--text-dimmed)',
               }}
               title="Liste"
             >
@@ -383,8 +383,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               onClick={() => setViewMode('canvas')}
               className="p-1.5 transition-colors"
               style={{
-                backgroundColor: viewMode === 'canvas' ? 'var(--accent-subtle)' : 'transparent',
-                color: viewMode === 'canvas' ? 'var(--accent-primary)' : 'var(--text-dimmed)',
+                backgroundColor: viewMode === 'canvas' ? 'var(--notebook-accent-surface)' : 'transparent',
+                color: viewMode === 'canvas' ? 'var(--notebook-accent)' : 'var(--text-dimmed)',
               }}
               title="Canvas"
             >
@@ -413,24 +413,24 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               className="w-full max-w-md mx-4 rounded-2xl overflow-hidden"
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+              style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
               onClick={e => e.stopPropagation()}
             >
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <Search className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                  <Search className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Rechercher dans les notes..."
                     className="flex-1 text-sm outline-none"
-                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                    style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                     autoFocus
                   />
                   <button
                     onClick={() => setShowSearchModal(false)}
-                    className="p-1.5 rounded-lg hover:bg-[var(--bg-active)] transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors"
                   >
                     <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                   </button>
@@ -452,11 +452,11 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                           setShowSearchModal(false);
                           startEdit(note);
                         }}
-                        className="w-full text-left p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-colors border"
-                        style={{ borderColor: 'var(--border-base)' }}
+                        className="w-full text-left p-3 rounded-xl hover:bg-[var(--notebook-surface-muted)] transition-colors border"
+                        style={{ borderColor: 'var(--notebook-border)' }}
                       >
                         <div className="flex items-center gap-2">
-                          {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                          {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                               {note.title}
@@ -502,16 +502,16 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
             >
               <div
                 className="p-5 rounded-2xl border space-y-3"
-                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--accent-primary)', boxShadow: '0 0 0 1px var(--accent-primary)' }}
+                style={{ backgroundColor: 'var(--notebook-surface)', borderColor: 'var(--notebook-accent)', boxShadow: '0 0 0 1px var(--notebook-accent)' }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <StickyNote className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+                    <StickyNote className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
                     <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {editingId ? 'Modifier la note' : 'Nouvelle note'}
                     </p>
                   </div>
-                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-[var(--bg-active)] transition-colors">
+                  <button onClick={cancelForm} className="p-1 rounded-lg hover:bg-[var(--notebook-accent-surface)] transition-colors">
                     <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                   </button>
                 </div>
@@ -521,8 +521,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Titre de la note..."
                   autoFocus
-                  className="w-full px-4 py-2.5 rounded-full text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)]"
-                  style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                  className="w-full px-4 py-2.5 rounded-full text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-[var(--notebook-accent)]"
+                  style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                 />
                 <div className="relative">
                   <textarea
@@ -530,8 +530,8 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     onChange={e => setContent(e.target.value)}
                     placeholder="Contenu de la note..."
                     rows={6}
-                    className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--accent-primary)] leading-relaxed"
-                    style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                    className="w-full px-4 py-3 rounded-xl text-xs outline-none resize-none transition-all focus:ring-1 focus:ring-[var(--notebook-accent)] leading-relaxed"
+                    style={{ backgroundColor: 'var(--notebook-surface-muted)', border: '1px solid var(--notebook-border)', color: 'var(--text-primary)' }}
                   />
                   <span className="absolute bottom-2 right-3 text-xs" style={{ color: 'var(--text-dimmed)' }}>
                     {content.length} car.
@@ -542,14 +542,14 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                     onClick={() => editingId ? handleUpdate(editingId) : handleCreate()}
                     disabled={!title.trim()}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-all active:scale-95"
-                    style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+                    style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
                   >
                     <Save className="w-3.5 h-3.5" />
                     {editingId ? 'Mettre à jour' : 'Créer'}
                   </button>
                   <button
                     onClick={cancelForm}
-                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-[var(--bg-hover)]"
+                    className="flex items-center gap-1 px-3 py-2.5 rounded-full text-xs transition-colors hover:bg-[var(--notebook-surface-muted)]"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -574,9 +574,9 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
         <div className="flex flex-col items-center justify-center py-14 gap-4">
           <div
             className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--accent-subtle)' }}
+            style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
           >
-            <StickyNote className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />
+            <StickyNote className="w-6 h-6" style={{ color: 'var(--notebook-accent)' }} />
           </div>
           <div className="text-center space-y-1">
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -600,15 +600,15 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                 transition={{ duration: 0.1 }}
                 className="group p-4 rounded-2xl border transition-all hover:shadow-md hover:-translate-y-0.5"
                 style={{
-                  backgroundColor: 'var(--bg-panel)',
-                  borderColor: note.pinned ? 'var(--accent-primary)' : 'var(--border-base)',
+                  backgroundColor: 'var(--notebook-surface)',
+                  borderColor: note.pinned ? 'var(--notebook-accent)' : 'var(--notebook-border)',
                   borderWidth: note.pinned ? '1.5px' : '1px',
                 }}
               >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => startEdit(note)}>
                     <div className="flex items-center gap-1.5">
-                      {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />}
+                      {note.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />}
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                         {note.title}
                       </p>
@@ -632,7 +632,7 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                       {backlinks[note.id]?.length > 0 && (
                         <span
                           className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full"
-                          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                          style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}
                           title={`Mentionné dans : ${backlinks[note.id].map(id => getNoteTitle(id)).join(', ')}`}
                         >
                           <Link2 className="w-2.5 h-2.5" />
@@ -646,21 +646,21 @@ Enregistrez les réponses utiles de l'IA sous forme de notes et elles apparaîtr
                   <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => handleTogglePin(note.id, note.pinned)}
-                      className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors"
                       title={note.pinned ? 'Désépingler' : 'Épingler'}
                     >
-                      <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+                      <Pin className="w-3 h-3" style={{ color: note.pinned ? 'var(--notebook-accent)' : 'var(--text-dimmed)' }} />
                     </button>
                     <button
                       onClick={() => startEdit(note)}
-                      className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] transition-colors"
                       title="Modifier"
                     >
                       <Edit3 className="w-3 h-3" style={{ color: 'var(--text-dimmed)' }} />
                     </button>
                     <button
                       onClick={() => handleDelete(note.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] transition-colors"
                       title="Supprimer"
                     >
                       <Trash2 className="w-3 h-3" style={{ color: 'var(--color-error)' }} />

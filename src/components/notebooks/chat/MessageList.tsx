@@ -75,7 +75,7 @@ export function MessageList(props: Props) {
       >
         {loadingHistory ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
           </div>
         ) : messages.length === 0 ? (
           /* Welcome state */
@@ -121,7 +121,7 @@ export function MessageList(props: Props) {
                   <button
                     onClick={() => setSuggestionOffset((prev) => (prev + 2) >= suggestions.length ? 0 : prev + 2)}
                     className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--notebook-accent)' }}
                   >
                     <RefreshCw className="w-3 h-3" />
                     Autres suggestions
@@ -191,8 +191,8 @@ export function MessageList(props: Props) {
                   onClick={onStopStreaming}
                   className="flex items-center gap-2 px-4 py-2 rounded-full text-smfont-medium transition-all hover:scale-105 active:scale-95"
                   style={{
-                    backgroundColor: 'var(--bg-panel)',
-                    border: '1px solid var(--border-base)',
+                    backgroundColor: 'var(--notebook-surface)',
+                    border: '1px solid var(--notebook-border)',
                     color: 'var(--text-secondary)',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                   }}
@@ -212,7 +212,7 @@ export function MessageList(props: Props) {
               >
                 <div
                   className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs"
-                  style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
+                  style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)', border: '1px solid var(--notebook-accent)' }}
                 >
                   <Telescope className="w-4 h-4 animate-pulse" />
                   <span className="font-medium">{deepDiveProgress}</span>
@@ -275,7 +275,7 @@ export function MessageList(props: Props) {
                   <button
                     onClick={() => setFollowUpOffset((prev) => (prev + 2) >= followUps.length ? 0 : prev + 2)}
                     className="flex items-center gap-1.5 text-smfont-medium px-3 py-1.5 rounded-full transition-colors hover:opacity-80"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--notebook-accent)' }}
                   >
                     <RefreshCw className="w-3 h-3" />
                     Autres suggestions
@@ -299,7 +299,7 @@ export function MessageList(props: Props) {
               whileTap={{ scale: 0.88 }}
               onClick={scrollToBottom}
               className="fixed bottom-28 right-8 p-2.5 rounded-full shadow-lg z-30 hover:opacity-90 transition-opacity duration-150"
-              style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+              style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
             >
               <ArrowDown className="w-4 h-4" />
             </motion.button>
@@ -319,17 +319,17 @@ export function MessageList(props: Props) {
             style={{
               left: Math.min(hoveredCitation.x, window.innerWidth - 420),
               top: Math.max(hoveredCitation.y - 200, 8),
-              backgroundColor: 'var(--bg-panel)',
+              backgroundColor: 'var(--notebook-surface)',
               border: '1px solid var(--border-focus)',
               color: 'var(--text-primary)',
             }}
           >
             <div className="flex items-center gap-2 mb-2">
-              <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+              <Quote className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
               <span className="text-smfont-semibold truncate">{hoveredCitation.citation.sourceTitle}</span>
               <span
                 className="text-smpx-1.5 py-0.5 rounded-full font-bold flex-shrink-0"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}
               >
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
               </span>

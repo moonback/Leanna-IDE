@@ -102,7 +102,7 @@ function SourceCard({
         aria-label={isSelected ? 'Désélectionner' : 'Sélectionner'}
       >
         {isSelected ? (
-          <CheckSquare className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} />
+          <CheckSquare className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
         ) : (
           <Square className="w-4 h-4" style={{ color: 'var(--text-dimmed)' }} />
         )}
@@ -219,7 +219,7 @@ function SourceCard({
               type="button"
               onClick={() => setTagInput({ sourceId: source.id, value: '' })}
               className="inline-flex items-center gap-0.5 text-xs pl-1.5 pr-2 py-0.5 rounded-full font-medium transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--notebook-accent-surface)] hover:border-[var(--notebook-accent)] hover:text-[var(--notebook-accent)]"
-              style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--border-base)' }}
+              style={{ color: 'var(--text-dimmed)', border: '1px dashed var(--notebook-border)' }}
               title="Ajouter un mot-clé"
             >
               <Plus className="w-3 h-3" />
@@ -241,7 +241,7 @@ function SourceCard({
           title={isExpanded ? 'Masquer le contenu' : 'Voir le contenu'}
           aria-label={isExpanded ? 'Masquer le contenu' : 'Voir le contenu'}
         >
-          <Eye className="w-3.5 h-3.5" style={{ color: isExpanded ? 'var(--accent-primary)' : 'var(--text-dimmed)' }} />
+          <Eye className="w-3.5 h-3.5" style={{ color: isExpanded ? 'var(--notebook-accent)' : 'var(--text-dimmed)' }} />
         </motion.button>
         <motion.button
           {...tapScale}
@@ -252,7 +252,7 @@ function SourceCard({
           title="Re-indexer la source"
           aria-label="Re-indexer la source"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isReindexing ? 'animate-spin' : ''}`} style={{ color: 'var(--accent-primary)' }} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isReindexing ? 'animate-spin' : ''}`} style={{ color: 'var(--notebook-accent)' }} />
         </motion.button>
         <motion.button
           {...tapScale}
@@ -273,8 +273,8 @@ function SourceCard({
 function cardWrapperStyle(isSelected: boolean): React.CSSProperties {
   return {
     backgroundColor: 'var(--notebook-card-bg)',
-    borderColor: isSelected ? 'var(--accent-primary)' : 'var(--notebook-border)',
-    boxShadow: isSelected ? '0 0 0 1px var(--accent-primary)' : 'none',
+    borderColor: isSelected ? 'var(--notebook-accent)' : 'var(--notebook-border)',
+    boxShadow: isSelected ? '0 0 0 1px var(--notebook-accent)' : 'none',
     transition: 'border-color 150ms ease, box-shadow 150ms ease',
   };
 }

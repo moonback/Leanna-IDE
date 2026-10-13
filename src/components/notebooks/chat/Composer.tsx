@@ -72,7 +72,7 @@ export function Composer(props: Props) {
         >
           <div
             className="flex items-center gap-2 p-2.5 rounded-xl flex-wrap"
-            style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)' }}
+            style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
           >
             <span className="text-smfont-semibold flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
               Sources actives :
@@ -81,15 +81,15 @@ export function Composer(props: Props) {
               <button
                 key={s.id}
                 onClick={() => toggleSourceFilter(s.id)}
-                className={`px-2.5 py-1 rounded-full text-smfont-medium transition-all active:scale-95 ${
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95 ${
                   selectedSources.includes(s.id) || selectedSources.length === 0
-                    ? 'ring-1 ring-[var(--accent-primary)]'
+                    ? 'ring-1 ring-[var(--notebook-accent)]'
                     : 'opacity-40'
                 }`}
                 style={{
-                  backgroundColor: selectedSources.includes(s.id) ? 'var(--accent-subtle)' : 'var(--bg-panel)',
-                  color: selectedSources.includes(s.id) ? 'var(--accent-primary)' : 'var(--text-muted)',
-                  border: '1px solid var(--border-base)',
+                  backgroundColor: selectedSources.includes(s.id) ? 'var(--notebook-accent-surface)' : 'var(--notebook-surface)',
+                  color: selectedSources.includes(s.id) ? 'var(--notebook-accent)' : 'var(--text-muted)',
+                  border: '1px solid var(--notebook-border)',
                 }}
               >
                 {s.title.length > 25 ? s.title.slice(0, 25) + '…' : s.title}
@@ -98,7 +98,7 @@ export function Composer(props: Props) {
             {selectedSources.length > 0 && (
               <button
                 onClick={clearSourceFilter}
-                className="px-2 py-1 rounded-full text-smfont-medium transition-all hover:bg-red-500/10"
+                className="px-2 py-1 rounded-full text-xs font-medium transition-all hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X className="w-3 h-3 inline mr-0.5" />
@@ -117,15 +117,15 @@ export function Composer(props: Props) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             className="mb-2 rounded-xl overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-base)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
           >
             {filteredSlashCommands.map((cmd) => (
               <button
                 key={cmd.cmd}
                 onClick={() => { setInput(''); onSend(cmd.prompt); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-subtle)]"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
               >
-                <code className="text-smfont-mono font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                <code className="text-smfont-mono font-semibold" style={{ color: 'var(--notebook-accent)' }}>
                   {cmd.cmd}
                 </code>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -144,7 +144,7 @@ export function Composer(props: Props) {
           backgroundColor: 'var(--notebook-surface)',
           border: '1px solid var(--notebook-border)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-          ['--tw-ring-color' as never]: 'var(--accent-primary)',
+          ['--tw-ring-color' as never]: 'var(--notebook-accent)',
         }}
       >
         {/* Left actions — filter */}
@@ -153,14 +153,14 @@ export function Composer(props: Props) {
             <button
               onClick={() => setShowSourceFilter(!showSourceFilter)}
               className={`p-2 rounded-lg transition-all active:scale-90 ${showSourceFilter || selectedSources.length > 0 ? '' : 'opacity-50 hover:opacity-100'}`}
-              style={{ color: selectedSources.length > 0 ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}
+              style={{ color: selectedSources.length > 0 ? 'var(--notebook-accent)' : 'var(--text-dimmed)' }}
               title="Filtrer les sources"
             >
               <Filter className="w-4 h-4" />
               {selectedSources.length > 0 && (
                 <span
                   className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-smfont-bold flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+                  style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
                 >
                   {selectedSources.length}
                 </span>
@@ -192,8 +192,8 @@ export function Composer(props: Props) {
             disabled={!input.trim() || loading}
             whileTap={input.trim() && !loading ? { scale: 0.88 } : undefined}
             transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--accent-subtle)] transition-colors duration-150"
-            style={{ color: 'var(--accent-primary)' }}
+            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--notebook-accent-surface)] transition-colors duration-150"
+            style={{ color: 'var(--notebook-accent)' }}
             title="Deep Dive — exploration approfondie"
           >
             <Telescope className="w-4 h-4" />
@@ -204,7 +204,7 @@ export function Composer(props: Props) {
             disabled={loading}
             whileTap={!loading ? { scale: 0.88 } : undefined}
             transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-amber-500/10 transition-colors duration-150"
+            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] transition-colors duration-150"
             style={{ color: 'var(--color-warning)' }}
             title="Extraire les insights clés"
           >
@@ -217,7 +217,7 @@ export function Composer(props: Props) {
               disabled={loading}
               whileTap={!loading ? { scale: 0.88 } : undefined}
               transition={{ duration: 0.1 }}
-              className="p-2 rounded-lg disabled:opacity-25 hover:bg-violet-500/10 transition-colors duration-150"
+              className="p-2 rounded-lg disabled:opacity-25 hover:bg-[color-mix(in_srgb,var(--color-accent-alt)_10%,transparent)] transition-colors duration-150"
               style={{ color: 'var(--color-accent-alt)' }}
               title="Comparer les sources"
             >
@@ -231,8 +231,8 @@ export function Composer(props: Props) {
             disabled={loading}
             whileTap={!loading ? { scale: 0.88 } : undefined}
             transition={{ duration: 0.1 }}
-            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--accent-subtle)] transition-colors duration-150"
-            style={{ color: 'var(--accent-primary)' }}
+            className="p-2 rounded-lg disabled:opacity-25 hover:bg-[var(--notebook-accent-surface)] transition-colors duration-150"
+            style={{ color: 'var(--notebook-accent)' }}
             title="Demandes avec contexte complet"
           >
             <Lightbulb className="w-4 h-4" />
@@ -246,9 +246,9 @@ export function Composer(props: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 className="absolute bottom-full right-0 mb-1 z-50 w-60 rounded-xl overflow-hidden shadow-xl"
-                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)' }}
+                style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)' }}
               >
-                <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-dimmed)' }}>
                     Demandes avec contexte complet
                   </p>
@@ -257,9 +257,9 @@ export function Composer(props: Props) {
                   <button
                     key={s.label}
                     onClick={() => { setInput(''); onSend(s.prompt); setShowContextMenu(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--accent-subtle)]"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)]"
                   >
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--notebook-accent)' }} />
                     <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
                   </button>
                 ))}
@@ -268,7 +268,7 @@ export function Composer(props: Props) {
           </AnimatePresence>
 
           {/* Separator */}
-          <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border-base)' }} />
+          <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--notebook-border)' }} />
 
           {/* Send button */}
           <motion.button
@@ -293,12 +293,12 @@ export function Composer(props: Props) {
           <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
             Entrée pour envoyer • / commandes
             {queuedCount > 0 && (
-              <span style={{ color: 'var(--accent-primary)' }}>
+              <span style={{ color: 'var(--notebook-accent)' }}>
                 {' '}• {queuedCount} en attente
               </span>
             )}
             {selectedSources.length > 0 && (
-              <span style={{ color: 'var(--accent-primary)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
+              <span style={{ color: 'var(--notebook-accent)' }}> • {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}</span>
             )}
           </p>
 
@@ -306,8 +306,8 @@ export function Composer(props: Props) {
           <div className="relative">
             <button
               onClick={() => setShowPersonalityMenu(!showPersonalityMenu)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-smfont-medium transition-all hover:bg-[var(--accent-subtle)]"
-              style={{ color: 'var(--text-muted)', border: '1px solid var(--border-base)' }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:bg-[var(--notebook-accent-surface)]"
+              style={{ color: 'var(--text-muted)', border: '1px solid var(--notebook-border)' }}
             >
               {(() => { const PIcon = currentPersonality.icon; return <span className="inline-flex items-center"><PIcon size={13} /></span>; })()}
               <span>{currentPersonality.label}</span>
@@ -321,26 +321,26 @@ export function Composer(props: Props) {
                   exit={{ opacity: 0, y: 4, scale: 0.95 }}
                   transition={prefersReducedMotion ? { duration: 0.1 } : SPRING_UI}
                   className="absolute bottom-full left-0 mb-1 z-40 w-56 rounded-xl overflow-hidden shadow-xl"
-                  style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-base)', transformOrigin: 'bottom left' }}
+                  style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)', transformOrigin: 'bottom left' }}
                 >
-                  <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border-base)' }}>
+                  <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
                     <p className="text-smfont-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton de l'assistant</p>
                   </div>
                   {personalities.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => { setPersonality(p.id); setShowPersonalityMenu(false); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--accent-subtle)] ${personality === p.id ? 'bg-[var(--accent-subtle)]' : ''}`}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-accent-surface)] ${personality === p.id ? 'bg-[var(--notebook-accent-surface)]' : ''}`}
                     >
                       {(() => { const PIcon = p.icon; return <span className="inline-flex items-center"><PIcon size={14} style={{ color: 'var(--text-muted)' }} /></span>; })()}
                       <div className="min-w-0 flex-1">
-                        <p className="text-smfont-medium" style={{ color: personality === p.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                        <p className="text-xs font-medium" style={{ color: personality === p.id ? 'var(--notebook-accent)' : 'var(--text-primary)' }}>
                           {p.label}
                         </p>
                         <p className="text-smtruncate" style={{ color: 'var(--text-dimmed)' }}>{p.desc}</p>
                       </div>
                       {personality === p.id && (
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-primary)' }} />
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--notebook-accent)' }} />
                       )}
                     </button>
                   ))}
@@ -355,7 +355,7 @@ export function Composer(props: Props) {
             <>
               <button
                 onClick={onExport}
-                className="p-1.5 rounded-md transition-all hover:bg-[var(--accent-subtle)] active:scale-90"
+                className="p-1.5 rounded-lg transition-all hover:bg-[var(--notebook-accent-surface)] active:scale-90"
                 style={{ color: 'var(--text-muted)' }}
                 title="Exporter en Markdown"
               >
@@ -363,7 +363,7 @@ export function Composer(props: Props) {
               </button>
               <button
                 onClick={onClear}
-                className="p-1.5 rounded-md transition-all hover:bg-red-500/10 active:scale-90"
+                className="p-1.5 rounded-lg transition-all hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] active:scale-90"
                 style={{ color: 'var(--text-muted)' }}
                 title="Effacer l'historique"
               >
