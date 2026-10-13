@@ -80,6 +80,10 @@ export function ChatHeader({
         borderBottom: '1px solid var(--border-base)',
         cursor: docked || fullscreen ? 'default' : 'grab',
         touchAction: docked || fullscreen ? undefined : 'none',
+        // Le menu déroulant (z-50) vit dans l'en-tête : sans contexte d'empilement
+        // ici, le corps du chat (soeur `relative` suivante) le recouvrait et
+        // interceptait les clics. On élève l'en-tête au-dessus du corps.
+        zIndex: 20,
       }}
     >
       {!docked && !fullscreen && (
