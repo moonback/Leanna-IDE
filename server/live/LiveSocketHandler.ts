@@ -225,6 +225,23 @@ export function attachLiveWebSocket(
       unsubscribeValidation();
     });
 
+    // ── Tampon des messages reçus avant que la session soit prête ─────────
+    // Le client considère la connexion établie dès ws.onopen et peut envoyer
+    // un message aussitôt (accueil IDE : « Demander à … », suggestions,
+    // « envoyer à l'IA »). Le vrai handler `message` n'est branché qu'après le
+    // chargement des skills et live.connect() : sans ce tampon, ces premiers
+    // messages étaient perdus silencieusement (affichés côté client, jamais
+    // transmis à Gemini). On les rejoue dans l'ordre une fois le handler prêt.
+    const earlyClientMessages: Array<{ data: unknown; isBinary: boolean }> = [];
+    const EARLY_CLIENT_MESSAGES_MAX = 50;
+    const collectEarlyClientMessage = (data: unknown, isBinary: boolean) => {
+      if (isBinary) return; // audio antérieur à la session : obsolète, ignoré
+      if (earlyClientMessages.length < EARLY_CLIENT_MESSAGES_MAX) {
+        earlyClientMessages.push({ data, isBinary });
+      }
+    };
+    clientWs.on('message', collectEarlyClientMessage);
+
     const urlParams = new URLSearchParams(req.url?.split('?')[1] || '');
     const clientConvId = urlParams.get('conversation_id');
 
@@ -1481,6 +1498,14 @@ export function attachLiveWebSocket(
           console.error('Error parsing message from client:', e);
         }
       });
+
+      // Rejoue les messages arrivés pendant l'initialisation (voir tampon en
+      // début de connexion). Synchrone : aucun message ne peut s'intercaler.
+      clientWs.off('message', collectEarlyClientMessage);
+      if (earlyClientMessages.length > 0) {
+        console.log(`[Live] Rejeu de ${earlyClientMessages.length} message(s) reçu(s) avant l'ouverture de la session`);
+        for (const m of earlyClientMessages.splice(0)) clientWs.emit('message', m.data, m.isBinary);
+      }
 
       // ── Lifecycle ──────────────────────────────────────────────────
       activeGeminiSessions.add(session);
