@@ -1,8 +1,10 @@
 # Roadmap — Leanna AI Operating System
 
-> **Dernière refonte : Octobre 2026** · Version courante : **2.0.0** · Licence BUSL 1.1
+> **Dernière refonte : 13 octobre 2026** · Version courante : **2.0.0** · Licence BUSL 1.1
 >
-> Cette roadmap a été **re-auditée contre le code réel** (audit **2026-10-11**) après l'itération **Noyau P0** (`server/core/`), l'extension des rôles d'agents (**20 rôles statiques**) et le **câblage de la boucle humaine** (human-in-the-loop). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
+> Cette roadmap a été **re-auditée contre le code réel** (audit **2026-10-13**) après l'itération **Noyau P0** (`server/core/`), l'extension des rôles d'agents (**20 rôles statiques**) et le **câblage de la boucle humaine** (human-in-the-loop). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
+>
+> **Nouveauté de cette refonte (13 oct. 2026) :** une **Phase R8 — 20 fonctionnalités innovantes** entièrement nouvelle, qui projette Leanna au-delà de l'« OS agentique durci » vers un **système cognitif qui se simule, se rejoue, s'auto-améliore et collabore**. Chaque item cite le(s) composant(s) réel(s) sur lequel il capitalise — **zéro vaporware**. Les comptes de tests ont été recalés sur le code (**~1326 cas backend / 171 fichiers**, **~45 cas UI / 14 fichiers**).
 
 Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonomes et une mémoire long-terme réunis dans une seule application desktop. La vision reste : passer d'un « IDE qui délègue à des agents » à un **système d'exploitation cognitif qui comprend une intention, planifie un vrai graphe d'exécution parallèle, agit de façon autonome sous garde-fous transactionnels, et apprend de chaque mission**.
 
@@ -12,6 +14,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 
 | Version | Date | Changements majeurs |
 |---|---|---|
+| **1.8.0** | 2026-10-13 | **Refonte stratégique + nouvelle Phase R8 (20 fonctionnalités innovantes).** Vision portée au niveau supérieur : time-travel debugging, dry-run global de mission, harness d'évaluation scoré, auto-amélioration (Leanna code Leanna), inférence locale Ollama, voix comme interface principale, agent de revue de PR, mémoire épisodique sémantique, graphe causal de mission, et 11 autres chantiers — chacun ancré sur un composant **déjà présent** (`MissionTimeTravel`, `MissionSimulator`, `MissionEvolution`, `LearningEngine`, `PredictionEngine`, `textGeneration`, `/orb-live`, `EvidenceEngine`…). **Recalage factuel** : comptes de tests réels (~1326 backend / 171 fichiers · ~45 UI / 14 fichiers) répercutés dans le README. Découverte d'audit : `MissionTimeTravel.ts`, `MissionSimulator.ts`, `MissionEvolution.ts`, `LearningEngine.ts`, `PredictionEngine.ts`, `ReasoningPipeline.ts` existent déjà en scaffolding → plusieurs items R8 sont donc du *câblage*, pas du *greenfield*. |
 | **1.7.0** | 2026-10-11 | **Boucle humaine (HITL) câblée bout-en-bout** : file d'approbation interactive côté UI (`AutonomyView` → `PendingApprovalsCard`, `usePendingApprovals`, `MissionPanel.resolveApproval`, pastille `StatusBar`) adossée au backend `Executor.requestApproval/resolveApproval` + routes REST `POST /missions/:id/approve|pause|resume|cancel`, `DELETE /missions/:id`. **Centre de propositions** `AnticipationProposal` dans `MissionControlView` (lancer une mission depuis une proposition). **Compression de contexte automatique** réellement déclenchée au seuil de tokens (`LiveSocketHandler.autoSummarizeContext`). **Contract-net en production** (`AgentOrchestrator` + `DelegationDispatcher` appellent `contractNetNegotiator.negotiate`). **Reconnexion WebSocket `/live`** avec backoff exponentiel borné (`useWebSocket`). **Marketplace** (backend local + UI) et **Workflow builder** (éditeur par étapes). **Correctif** : le rôle `planner` n'a plus `delete_project_file` (contradiction P1 soldée). |
 | **1.6.0** | 2026-10-09 | **Noyau P0 transactionnel** livré (`server/core/` : machine à états durable 13 états, `ExecutionLedger` idempotent, `CheckpointManager` snapshot/rollback, `EvidenceEngine`, `LeannaSupervisor`, `LedgerGuard`, `JevSafetyGate`, `kernel.createCoreKernel`). **20 rôles statiques** (ajout du groupe Web & Qualité : `ui_ux`, `seo`, `documentation`, `accessibility`, `performance`) = **20 plugins runtime**. Autonomie proactive (`AnticipationEngine`, `ComputerUseAgent`, `SmartSkills`). Nouvelle **Phase R7 — 20 fonctionnalités & optimisations**. |
 | **1.4.0** | 2026-10-04 | Sandbox d'exécution des skills tiers : `SkillWorker`, `agentDefinitionSchema` (Zod + HMAC-SHA256), `AgentLoader` hardened, `DynamicAgentRegistry.registerAgent()`, `McpBridge.sanitizePathArgs()`. 32 nouveaux tests. |
@@ -44,9 +47,10 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 10. [Phase R4 — Mémoire cumulative & apprentissage](#phase-r4--mémoire-cumulative--apprentissage)
 11. [Phase R5 — Innovation & différenciation](#phase-r5--innovation--différenciation)
 12. [Phase R6 — Ouverture & portabilité](#phase-r6--ouverture--portabilité)
-13. [**Phase R7 — 20 fonctionnalités & optimisations (nouveau)**](#phase-r7--20-fonctionnalités--optimisations-nouveau)
-14. [Registre des risques](#registre-des-risques)
-15. [Dette technique prioritaire](#dette-technique-prioritaire)
+13. [Phase R7 — 20 fonctionnalités & optimisations](#phase-r7--20-fonctionnalités--optimisations-nouveau)
+14. [**Phase R8 — 20 fonctionnalités innovantes (refonte 2026-10-13)**](#phase-r8--20-fonctionnalités-innovantes-refonte-2026-10-13)
+15. [Registre des risques](#registre-des-risques)
+16. [Dette technique prioritaire](#dette-technique-prioritaire)
 
 ---
 
@@ -116,7 +120,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 2. **Une autonomie qui agit sous garde-fous.** ✅ **Atteint, durci & supervisable** — dispatcher autonome + **Noyau P0 transactionnel** (snapshot/rollback/preuve) + **Safety Gate Jev** + **boucle humaine interactive** (approuver/refuser/pause/reprise/annuler depuis l'UI). Reste : confirmation UI du `ComputerUseAgent`.
 3. **Un moteur de modèles universel.** 🚧 **En cours** — failover Gemini↔OpenRouter solide. Manque Ollama local + routeur intelligent.
 4. **Une mémoire qui apprend.** ✅ **Atteint** — `StrategyMemory` influence la planification dès la première itération. Restent playbooks et profils par projet.
-5. **De l'inédit, mesurable.** 📋 **À construire** — harness d'évaluation, time-travel, simulation globale, voix comme interface principale.
+5. **De l'inédit, mesurable.** 🚧 **Planifié & câblable (Phase R8)** — harness d'évaluation scoré (R8 #5), time-travel debugging (R8 #1), simulation globale de mission (R8 #2), voix comme interface principale (R8 #13), agent de revue de PR (R8 #14), mémoire épisodique sémantique (R8 #17). L'audit du 13 oct. confirme que **9 de ces 20 chantiers reposent sur du scaffolding déjà présent** — l'inédit devient buildable, pas spéculatif.
 
 ---
 
@@ -315,6 +319,71 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 ---
 
+## Phase R8 — 20 fonctionnalités innovantes (refonte 2026-10-13)
+
+**Thème** : passer de l'« OS agentique durci » à un **système cognitif qui se simule avant d'agir, se rejoue pour s'expliquer, s'auto-évalue pour s'améliorer, et collabore comme un collègue**. Là où la Phase R7 rendait *visible* le socle livré, la Phase R8 vise la **différenciation produit** : les capacités qu'aucun assistant conversationnel ne peut imiter parce qu'elles exigent le Noyau P0, la mémoire durable et la preuve.
+
+**Règle d'honnêteté maintenue :** chaque item cite le(s) composant(s) **réel(s)** sur lequel il s'appuie. L'audit du 13 oct. a révélé que plusieurs briques « innovation » existent **déjà en scaffolding** (`MissionTimeTravel.ts`, `MissionSimulator.ts`, `MissionEvolution.ts`, `LearningEngine.ts`, `PredictionEngine.ts`, `ReasoningPipeline.ts`, `SelfEvaluation.ts`, `VoiceCommandInterpreter.ts`) — ces items sont donc du **câblage de valeur**, pas du greenfield, ce qui les rend immédiatement buildables.
+
+### Catégorie F — Rejouabilité, simulation & explicabilité
+
+| # | Fonctionnalité innovante | S'appuie sur | Prio | Effort | Statut |
+|---|---|---|---|---|---|
+| 1 | **Time-travel debugging de mission** : rejouer une mission étape par étape avec les réponses modèles enregistrées, naviguer avant/arrière dans l'historique des décisions/outils/diffs, « forker » depuis n'importe quel point | `MissionTimeTravel.ts` (scaffolding), `ExecutionLedger` (journal append-only), `EvidenceEngine`, `src/views/MissionTimelineView.tsx` | P1 | XL | 🟡 scaffolding présent, enregistrement + replay UI à câbler |
+| 2 | **Dry-run global de mission (simulation complète)** : exécuter tout le DAG en simulation — diffs prévus, coûts estimés, risques détectés — **zéro effet de bord**, avant d'engager la mission réelle | `MissionSimulator.ts` (scaffolding), `src/views/MissionSimulationView.tsx`, `DryRunController`, `CheckpointManager`, `PlanEstimator` | P1 | L | 🟡 vue + simulateur présents, orchestration bout-en-bout à finaliser |
+| 3 | **Graphe causal de mission** : visualiser *pourquoi* chaque action a eu lieu (objectif → décision → preuve → action suivante), surligner la chaîne causale d'un échec | `EvidenceEngine` (bundles), `BrainPlanValidator` (Mermaid), `AgentEventStream`, `src/views/ExplainabilityView.tsx` | P2 | L | 📋 faits disponibles, moteur causal + rendu à construire |
+| 4 | **Rapport post-mission narratif + partageable** : artefact Markdown/HTML unifié (objectif, plan, fichiers, tests, coût, échecs, corrections, preuve) promu en source notebook et exportable PDF | `EvidenceEngine`, `TelemetryService`, `DocumentStore`, `server/export/{pdfExporter,htmlExporter}.ts` | P1 | M | 🟡 faits prêts, agrégateur à écrire (recoupe R7 #20) |
+
+### Catégorie G — Auto-amélioration & apprentissage
+
+| # | Fonctionnalité innovante | S'appuie sur | Prio | Effort | Statut |
+|---|---|---|---|---|---|
+| 5 | **Harness d'évaluation d'agents scoré** : dossier `eval/`, suite de tâches de référence, fixtures de réponses modèles figées, score reproductible, **régression bloquante en CI** | `mission-harness.test.ts`, `AgentTaskRunnerContract.test.ts`, `SelfEvaluation.ts` | P0 | XL | 📋 fondations de test présentes, suite scorée à bâtir |
+| 6 | **Playbooks appris auto-réutilisés** : persister la séquence d'agents gagnante d'une mission réussie et la **re-proposer** automatiquement sur une mission similaire | `PlaybookStore.ts`, `OpportunityEngine`, `StrategyMemory`, `MissionEvolution.ts` | P1 | L | 🟡 `PlaybookStore` existe, réutilisation auto à câbler (recoupe R4) |
+| 7 | **Évolution dirigée de stratégie** : analyser l'historique des missions pour détecter les patterns gagnants/perdants et ajuster automatiquement la planification | `MissionEvolution.ts`, `LearningEngine.ts`, `StrategyMemory`, `Planner.replan` | P2 | L | 🟡 moteurs présents en scaffolding, boucle d'ajustement à fermer |
+| 8 | **Profils d'agent par projet** : apprendre les conventions/style d'un repo (nommage, structure de tests, patterns) et les appliquer automatiquement aux générations | `ProjectProfile.ts`, `KnowledgeGraph`, `ASTParser` | P1 | M | 🟡 `ProjectProfile` existe (stack/stats), application auto à étendre |
+
+### Catégorie H — Moteur de modèles universel & local-first
+
+| # | Fonctionnalité innovante | S'appuie sur | Prio | Effort | Statut |
+|---|---|---|---|---|---|
+| 9 | **Inférence locale Ollama (100 % hors-ligne)** : provider local first-class (`'gemini' \| 'openrouter' \| 'ollama'`), fallback en cascade sur 3 niveaux, confidentialité totale | `server/utils/textGeneration.ts` (routeur actuel 2 providers), `getActiveProvider` | P0 | L | 📋 abstraction provider à compléter (débloque le vrai local-first) |
+| 10 | **Routeur de modèles intelligent** : choix automatique du modèle par complexité de la tâche, coût, latence et niveau de confidentialité requis | `textGeneration.ts`, `PlanEstimator` (score risque/coût), `TelemetryService` (pricing réel) | P1 | L | 📋 signaux disponibles, politique de routage à écrire |
+| 11 | **Cache sémantique de prompts** : réponse réutilisée si un prompt **équivalent** (similarité d'embedding ≥ seuil) a déjà été payé — économie tokens/latence | `EmbeddingStore.ts`, `notebooks/RAGEngine` (RRF/similarité), `TelemetryService` | P1 | M | 📋 (⚠️ l'ancien `promptCache.ts` exact a disparu ; repartir d'un cache **par embedding**) |
+| 12 | **Budget adaptatif par type de mission** : dériver le budget `8/3/9/6/4` de l'historique réel (`StrategyMemory`) au lieu de constantes fixes, par catégorie de mission | `AgentBudget` (`DEFAULT_AGENT_BUDGET`), `StrategyMemory`, `MissionEvolution.ts` | P2 | M | 📋 (recoupe R7 #16, étendu avec l'évolution de stratégie) |
+
+### Catégorie I — Interface, voix & collaboration
+
+| # | Fonctionnalité innovante | S'appuie sur | Prio | Effort | Statut |
+|---|---|---|---|---|---|
+| 13 | **Voix comme interface principale** : mot d'activation mains libres, compréhension d'écran temps réel, exécution de missions dictées, confirmation vocale des actions à risque | `/orb-live` (`OrbLiveView.tsx`), `VoiceCommandInterpreter.ts`, `ScreenShareProvider`, Gemini Live | P1 | L | 🟡 socle vocal + interpréteur présents, pipeline « voix→mission » à relier |
+| 14 | **Agent de revue de PR** : commente un diff ligne par ligne, suggère des correctifs, lance les tests impactés — **ne pousse jamais sans accord** | `server/skills/github.ts`, `reviewer`/`security` agents, `ImpactAnalyzer`, HITL (`requestApproval`) | P1 | L | 📋 briques présentes, orchestration PR→revue à assembler |
+| 15 | **Pair-programming temps réel** : Leanna suit l'édition active dans Monaco, propose des diffs contextuels inline et explique son raisonnement (`ReasoningPipeline`) à la demande | `src/components/ide/`, `useEditorActions`, `SmartSkills` (`plan_code_change`), `ReasoningPipeline.ts` | P2 | L | 📋 hooks éditeur présents, boucle de suggestion live à construire |
+| 16 | **Dashboard du Noyau P0 en temps réel** : vue UI de la machine à états (13 états), checkpoints ouverts, entrées ledger `unknown`, avec reprise/rollback interactive en un clic | `MissionStateMachine`, `CheckpointManager`, `ExecutionLedger.listUnknown`, `DurableMissionStore.listResumable` | P1 | M | 📋 (fusionne R7 #1 et #2 en une surface opérateur unique) |
+
+### Catégorie J — Mémoire, connaissance & observabilité avancées
+
+| # | Fonctionnalité innovante | S'appuie sur | Prio | Effort | Statut |
+|---|---|---|---|---|---|
+| 17 | **Mémoire épisodique sémantique** : indexer chaque mission passée (objectif, décisions, résultat) en embeddings pour un rappel « as-tu déjà fait quelque chose comme ça ? » au démarrage d'une mission | `HierarchicalMemoryService`, `EmbeddingStore`, `StrategyMemory`, `MissionEvolution.ts` | P1 | L | 📋 mémoire durable présente, couche épisodique vectorisée à ajouter |
+| 18 | **Prédiction d'impact avant écriture** : avant toute modification, estimer les fichiers/tests impactés et le risque de régression via le call-graph, affiché dans le diff | `PredictionEngine.ts`, `ImpactAnalyzer`, `ASTCallGraph`, `DependencyGraph` | P1 | M | 🟡 `PredictionEngine` + call-graph présents, affichage pré-écriture à câbler |
+| 19 | **Exporter OpenTelemetry réel + traces navigables** : OTLP → Jaeger/Tempo local (Docker), spans mission→task→tool déjà corrélés rendus explorables dans l'UI Observabilité | `TelemetryService` (spans corrélés), `src/views/ObservabilityView.tsx` | P0 | S | 📋 (promu depuis R7 #17 — débloque le débogage de perf réel) |
+| 20 | **Ré-indexation incrémentale des embeddings + Knowledge Graph live** : étendre le debounce du `FileWatcher` au ré-embedding ciblé des seuls fichiers modifiés, KG toujours frais sans rescan complet | `FileWatcher`, `ProjectIndexer.scanFile`, `EmbeddingStore`, `KnowledgeGraph` | P2 | M | 🟡 KG incrémental ✅, ré-embedding ciblé à confirmer (recoupe R7 #18) |
+
+> Récapitulatif R8 : **20 items innovants** — 🟡 **9 partiels** (scaffolding réel déjà en place : #1, #2, #4, #6, #7, #8, #13, #18, #20) · 📋 **11 planifiés** (#3, #5, #9, #10, #11, #12, #14, #15, #16, #17, #19). Priorités : **4 items P0** (#5 harness d'éval, #9 Ollama, #19 OTLP) ancrent la différenciation et la fiabilité ; **10 items P1** livrent la valeur produit visible (time-travel, dry-run global, revue de PR, voix, mémoire épisodique). **Point clé :** 9 des 20 chantiers sont du *câblage* d'un composant existant, pas de la création from scratch — la roadmap reste buildable et honnête.
+
+### Dépendances inter-phases
+
+```text
+R8 #9 (Ollama)  ──requiert──▶  dette P0 « couplage skills ↔ Gemini »  +  R3 (abstraction provider)
+R8 #5 (harness) ──débloque──▶  R8 #7 (évolution de stratégie) + CI bloquante (R0)
+R8 #1 (time-travel) ──fondé sur──▶  ExecutionLedger (✅) + EvidenceEngine (✅)
+R8 #16 (dashboard P0) ──fusionne──▶  R7 #1 + R7 #2
+R8 #19 (OTLP) ──promeut──▶  R7 #17  (même brique, priorité relevée à P0)
+```
+
+---
+
 ## Registre des risques
 
 | Risque | Impact | Mitigation |
@@ -348,7 +417,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 
 ---
 
-*Cette roadmap est un document vivant, mais elle refuse le vaporware : une fonctionnalité marquée ✅ est prouvée par le code source (fichier + symbole) et couverte par un test. Un 🟡 est du scaffolding honnête, avec le gap précisément identifié. Tout le reste est planifié avec priorité, effort et critère de succès. Depuis la 1.4.0, le **Noyau P0 transactionnel** et le **Safety Gate Jev** ont fait passer le pari « autonomie sous garde-fous » de « mécanique prouvée » à « transactionnel durable » ; la **1.7.0** y ajoute la **boucle humaine interactive** (approbation + contrôle de mission depuis l'UI), la **compression de contexte automatique** et le **contract-net en production**, soldant 3 des 20 chantiers de la Phase R7.*
+*Cette roadmap est un document vivant, mais elle refuse le vaporware : une fonctionnalité marquée ✅ est prouvée par le code source (fichier + symbole) et couverte par un test. Un 🟡 est du scaffolding honnête, avec le gap précisément identifié. Tout le reste est planifié avec priorité, effort et critère de succès. Depuis la 1.4.0, le **Noyau P0 transactionnel** et le **Safety Gate Jev** ont fait passer le pari « autonomie sous garde-fous » de « mécanique prouvée » à « transactionnel durable » ; la **1.7.0** y ajoute la **boucle humaine interactive** (approbation + contrôle de mission depuis l'UI), la **compression de contexte automatique** et le **contract-net en production**, soldant 3 des 20 chantiers de la Phase R7. La **1.8.0** (13 oct. 2026) ouvre la **Phase R8 — 20 fonctionnalités innovantes** : l'audit a révélé que **9 des 20 briques « innovation » existent déjà en scaffolding** (`MissionTimeTravel`, `MissionSimulator`, `MissionEvolution`, `LearningEngine`, `PredictionEngine`, `ReasoningPipeline`, `SelfEvaluation`, `VoiceCommandInterpreter`, `ProjectProfile`) — l'avenir de Leanna n'est donc pas à inventer de zéro, mais à **câbler et prouver**.*
 
 ---
 
@@ -405,9 +474,19 @@ node --import tsx --test server/agents/capabilityAudit.test.ts
 # Contract-net (négociation en production)
 node --import tsx --test server/agents/ContractNetNegotiator.test.ts
 node --import tsx --test server/agents/DelegationNegotiation.test.ts
+
+# Phase R8 — scaffolding « innovation » déjà couvert par des tests
+# (prouve que ces chantiers sont du câblage, pas du greenfield)
+node --import tsx --test server/mission/MissionTimeTravel.test.ts    # R8 #1 time-travel
+node --import tsx --test server/mission/MissionSimulator.test.ts     # R8 #2 dry-run global
+node --import tsx --test server/mission/SelfEvaluation.test.ts       # R8 #5 harness d'éval
+node --import tsx --test server/knowledge/MissionEvolution.test.ts   # R8 #6/#7 évolution stratégie
+node --import tsx --test server/knowledge/PredictionEngine.test.ts   # R8 #18 prédiction d'impact
+node --import tsx --test server/knowledge/PlaybookStore.test.ts      # R8 #6 playbooks appris
+node --import tsx --test server/knowledge/ProjectProfile.test.ts     # R8 #8 profils par projet
 ```
 
-Un item ✅ **sans** test exécutable associé est un bug de cette roadmap — signalez-le.
+Un item ✅ **sans** test exécutable associé est un bug de cette roadmap — signalez-le. Les tests R8 listés ci-dessus couvrent le **scaffolding** (le composant existe et est testé) ; l'item reste 🟡 tant que le **câblage de bout en bout** (émission, UI, orchestration) n'est pas livré ni couvert.
 
 **Gaps de couverture identifiés (1.7.0, à combler) :** la boucle d'approbation HITL (`Executor.requestApproval → resolveApproval`) est livrée et vérifiée manuellement, mais **sans test d'intégration dédié** ciblant explicitement le cycle `ask → approve/reject → unblock` ; la suppression de `delete_project_file` chez le `planner` est garantie **indirectement** par l'audit de cohérence du registre (`capabilityAudit.test.ts`) plutôt que par une assertion littérale. Deux tests de garde à ajouter pour une clôture formelle.
 

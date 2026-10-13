@@ -31,9 +31,9 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-~1306%20passing-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-~1326%20passing%20(171%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
-<img src="https://img.shields.io/badge/Tests%20front-27%20passing-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
+<img src="https://img.shields.io/badge/Tests%20front-~45%20passing%20(14%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
 <img src="https://img.shields.io/badge/skills%20intégrées-28%20skills-818CF8?style=for-the-badge" alt="28 Skills" />
 &nbsp;
@@ -2061,8 +2061,8 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test`, ~1193 tests) |
-| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, 27 tests) |
+| `npm test` | Suite backend (`node --test`, ~1326 tests répartis sur 171 fichiers `*.test.ts`) |
+| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, ~45 tests sur 14 fichiers) |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |
 | `npm run typecheck:test` | Typage des fichiers de test |
