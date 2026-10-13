@@ -8,11 +8,11 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus, Pin, Trash2, Edit3, Save, X, StickyNote, Clock, Search, ArrowUpDown,
-  Download, FileText, Layout, ListChecks, BookOpen, Grid3X3, List, Link2,
+  Download, FileText, Layout, ListChecks, BookOpen, Grid3X3, List, Link2, FilePlus2,
 } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { timeAgo } from './utils.js';
-import { apiVoid } from './api/client.js';
+import { apiVoid, ApiError } from './api/client.js';
 import { NotesCanvas } from './NotesCanvas.js';
 import { TemplateSelectorModal } from '../templates/TemplateSelectorModal.js';
 import { Sparkles } from 'lucide-react';
@@ -177,6 +177,27 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
       onRefresh();
     } catch { /* ignore */ }
   }, [notebookId, onRefresh]);
+
+  // Convertir une note en source : elle devient interrogeable par le chat
+  // et utilisable par la génération de documents.
+  const [addingToSources, setAddingToSources] = useState<string | null>(null);
+  const handleAddToSources = useCallback(async (note: NoteItem) => {
+    setAddingToSources(note.id);
+    try {
+      await apiVoid(`/api/notebooks/${notebookId}/notes/${note.id}/add-to-sources`, { method: 'POST' });
+      success('Note ajoutée aux sources');
+      onRefresh();
+    } catch (e) {
+      const msg = e instanceof ApiError && e.status === 409
+        ? 'Cette note est déjà dans les sources'
+        : e instanceof ApiError && e.status === 400
+          ? 'La note est vide'
+          : 'Erreur lors de l\'ajout aux sources';
+      toastError(msg);
+    } finally {
+      setAddingToSources(null);
+    }
+  }, [notebookId, onRefresh, success, toastError]);
 
   const startEdit = (note: NoteItem) => {
     if (onOpenNoteEditor) {
@@ -589,6 +610,13 @@ export function NotesPanel({ notebookId, notes, onRefresh, compact = false, onOp
                       label={note.pinned ? 'Désépingler' : 'Épingler'}
                       data-active={note.pinned ? 'true' : undefined}
                       onClick={() => handleTogglePin(note.id, note.pinned)}
+                    />
+                    <NbIconButton
+                      icon={FilePlus2}
+                      size="sm"
+                      label="Ajouter aux sources"
+                      disabled={addingToSources === note.id}
+                      onClick={() => handleAddToSources(note)}
                     />
                     <NbIconButton
                       icon={Edit3}
