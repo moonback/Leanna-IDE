@@ -207,7 +207,7 @@ export function DocTypePicker({
                 onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
                 disabled={sources.length === 0}
                 whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
-                className="notebook-studio-card group relative flex w-full flex-col items-center gap-1 rounded-xl p-2 text-center disabled:pointer-events-none disabled:opacity-40"
+                className="notebook-studio-card group relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2 text-center disabled:pointer-events-none disabled:opacity-40"
                 style={isActive ? {
                   borderColor: color,
                   backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))`,
@@ -225,7 +225,7 @@ export function DocTypePicker({
                   )}
                 </div>
 
-                <span className="w-full truncate text-xs font-medium text-[var(--text-primary)]">
+                <span className="w-full text-[11px] font-medium leading-tight text-[var(--text-primary)]">
                   {label}
                 </span>
 
