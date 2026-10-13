@@ -4,7 +4,7 @@ import React, {
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
-  Bot, Target, Globe, X,
+  Bot, Target, Globe, X, GitPullRequest, History, CalendarClock, ClipboardCheck, Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { FileIcon } from './FileIcon.js';
@@ -19,6 +19,7 @@ import {
 } from '../../hooks/useResumeConfirmations.js';
 import { ShortcutsModal } from './ShortcutsModal.js';
 import { SystemModal } from './SystemModal.js';
+import { buildHomeInsights, type HomeInsight, type InsightKind } from './homeInsights.js';
 
 // ─── Constantes ──────────────────────────────────────────────────────────
 
@@ -849,6 +850,88 @@ const RecentFilesSection = React.memo(function RecentFilesSection({
   );
 });
 
+// ─── Section : suggestions proactives ────────────────────────────────────
+
+const INSIGHT_STYLE: Record<InsightKind, { icon: IconType; accent: string }> = {
+  review: { icon: GitPullRequest, accent: '#f59e0b' },
+  resume: { icon: History, accent: 'var(--primary)' },
+  plan: { icon: CalendarClock, accent: '#6ee7b7' },
+  recap: { icon: ClipboardCheck, accent: '#a78bfa' },
+  audit: { icon: Stethoscope, accent: '#60a5fa' },
+};
+
+/** Classes statiques (Tailwind ne génère pas de classes dynamiques). */
+const INSIGHT_COLS: Record<number, string> = { 1: '', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' };
+
+const ProactiveInsightsSection = React.memo(function ProactiveInsightsSection({
+  insights, aiName, onAsk, reduceMotion = false,
+}: {
+  insights: HomeInsight[];
+  aiName: string;
+  onAsk: (insight: HomeInsight) => void;
+  reduceMotion?: boolean;
+}) {
+  if (insights.length === 0) return null;
+
+  return (
+    <section className="mt-6" aria-labelledby="ee-insights-title">
+      <div className="flex items-center gap-2 mb-2">
+        <Sparkles size={13} style={{ color: 'var(--primary)' }} aria-hidden="true" />
+        <h2 id="ee-insights-title" className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+          {aiName} suggère
+        </h2>
+      </div>
+      <ul className={`grid grid-cols-1 ${INSIGHT_COLS[insights.length] ?? 'md:grid-cols-3'} gap-2 p-0 m-0 list-none`}>
+        {insights.map((insight, i) => {
+          const { icon: Icon, accent } = INSIGHT_STYLE[insight.kind];
+          return (
+            <motion.li
+              key={insight.id}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0.15 : 0.22, delay: reduceMotion ? 0 : 0.05 * i }}
+            >
+              <button
+                type="button"
+                onClick={() => onAsk(insight)}
+                className="ee-card ee-focus group flex items-start gap-3 w-full h-full p-3.5 text-left rounded-xl"
+                style={{ ['--card-accent' as string]: accent }}
+                title={insight.prompt}
+              >
+                <span
+                  className="ee-card-icon flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${accent} 22%, transparent)`,
+                  }}
+                  aria-hidden="true"
+                >
+                  <Icon size={15} style={{ color: accent }} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium leading-snug truncate" style={{ color: 'var(--text)' }}>
+                    {insight.title}
+                  </span>
+                  <span className="block text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                    {insight.reason}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 text-xs font-semibold mt-2"
+                    style={{ color: accent }}
+                  >
+                    Confier à {aiName}
+                    <ArrowRight size={11} className="ee-card-arrow" aria-hidden="true" />
+                  </span>
+                </span>
+              </button>
+            </motion.li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+});
+
 // ─── Composant principal ─────────────────────────────────────────────────
 
 interface EmptyEditorStateProps {
@@ -860,6 +943,8 @@ interface EmptyEditorStateProps {
   onOpenSearch?: () => void;
   onOpenChat?: () => void;
   onOpenNotebooks?: () => void;
+  /** Confie une invite à l'assistante (ouvre le chat et connecte si besoin). */
+  onAskAssistant?: (prompt: string, displayText?: string) => void;
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
@@ -869,6 +954,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenSearch,
   onOpenChat,
   onOpenNotebooks,
+  onAskAssistant,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
   const { connected, isBusy, connect, clearTranscript, clearActivity } = useLiveAPIContext();
@@ -953,6 +1039,19 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const changedFiles = Array.isArray(gitInfo?.files) ? gitInfo!.files.length : null;
 
   const geminiProblem = geminiStatus === 'invalid' || geminiStatus === 'unconfigured';
+
+  const { files: recentFiles } = useRecentFiles();
+  const insights = useMemo(() => buildHomeInsights({
+    now: new Date(),
+    changedFiles,
+    branch: gitInfo?.branch ?? null,
+    recentFiles,
+    workspaceName,
+  }), [changedFiles, gitInfo?.branch, recentFiles, workspaceName]);
+
+  const handleAskInsight = useCallback((insight: HomeInsight) => {
+    onAskAssistant?.(insight.prompt);
+  }, [onAskAssistant]);
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto relative" style={{ backgroundColor: 'var(--bg)' }}>
@@ -1099,6 +1198,18 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               />
             </div>
           </motion.section>
+
+          {/* ── Suggestions proactives (masquées sans clé valide : l'assistante ne pourrait pas répondre) ── */}
+          {onAskAssistant && !geminiProblem && (
+            <motion.div {...enter(0.15)}>
+              <ProactiveInsightsSection
+                insights={insights}
+                aiName={aiName}
+                onAsk={handleAskInsight}
+                reduceMotion={reduceMotion}
+              />
+            </motion.div>
+          )}
 
           {/* ── Fichiers récents ── */}
           <motion.div {...enter(0.18)} className="mt-6">

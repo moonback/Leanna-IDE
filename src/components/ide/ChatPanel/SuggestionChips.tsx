@@ -1,83 +1,90 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, FileText, Terminal, FlaskConical } from 'lucide-react';
+import { Sparkles, Wrench, ShieldCheck, CornerDownRight, ArrowRight, type LucideIcon } from 'lucide-react';
+import type { SuggestionKind, SuggestionSet } from './proactiveSuggestions.js';
 
-// Suggestions de départ — chips contextuelles affichées au-dessus du champ
-// quand le chat est connecté et vide. Envoient directement une invite ;
-// l'assistant reçoit déjà le contexte éditeur (fichier ouvert, sélection).
-export const SUGGESTION_CHIPS: { label: string; prompt: string; icon: typeof FileText }[] = [
-  { label: 'Expliquer ce fichier', prompt: 'Explique le fichier actuellement ouvert.', icon: FileText },
-  { label: "Corriger l'erreur du terminal", prompt: 'Analyse la dernière erreur du terminal et propose un correctif.', icon: Terminal },
-  { label: 'Résumer le projet', prompt: 'Donne-moi un résumé de la structure et du rôle de ce projet.', icon: Sparkles },
-  { label: 'Écrire des tests', prompt: 'Propose des tests pour le fichier actuellement ouvert.', icon: FlaskConical },
-];
+const KIND_ICON: Record<SuggestionKind, LucideIcon> = {
+  start: Sparkles,
+  fix: Wrench,
+  verify: ShieldCheck,
+  reply: CornerDownRight,
+  followup: ArrowRight,
+};
+
+/** Couleur d'accent par nature de suggestion (une erreur doit se voir). */
+const KIND_ACCENT: Record<SuggestionKind, string> = {
+  start: 'var(--accent-primary)',
+  fix: 'var(--color-error)',
+  verify: 'var(--color-success)',
+  reply: 'var(--accent-primary)',
+  followup: 'var(--accent-primary)',
+};
 
 export interface SuggestionChipsProps {
   visible: boolean;
+  suggestions: SuggestionSet;
   onSend: (prompt: string) => void;
 }
 
-/** Grille 2×2 de suggestions contextuelles affichée quand le chat est vide. */
-export function SuggestionChips({ visible, onSend }: SuggestionChipsProps) {
+/**
+ * Suggestions proactives affichées au-dessus du champ : amorces quand le chat
+ * est vide, puis prochaines étapes déduites du contexte (erreurs, fichiers
+ * modifiés, question en attente).
+ */
+export function SuggestionChips({ visible, suggestions, onSend }: SuggestionChipsProps) {
+  const { title, items } = suggestions;
+  const isStart = items.every(i => i.kind === 'start');
+
   return (
     <AnimatePresence>
-      {visible && (
+      {visible && items.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.22, ease: 'easeOut' }}
           className="mb-2.5"
+          role="group"
+          aria-label={title}
         >
           <div
             className="flex items-center gap-1.5 mb-2 px-0.5 text-xs font-semibold uppercase tracking-widest"
-            style={{ color: 'var(--accent-primary)', opacity: 0.75 }}
+            style={{ color: 'var(--accent-primary)', opacity: 0.8 }}
           >
-            <Sparkles size={9} />
-            Suggestions
+            <Sparkles size={10} aria-hidden="true" />
+            {title}
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            {SUGGESTION_CHIPS.map((chip, i) => (
-              <motion.button
-                key={chip.label}
-                type="button"
-                onClick={() => onSend(chip.prompt)}
-                title={chip.prompt}
-                aria-label={chip.label}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.16, delay: i * 0.05, ease: 'easeOut' }}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.97 }}
-                className="group/chip flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-left
-                           transition-[background-color,border-color,box-shadow] duration-200
-                           hover:shadow-[0_2px_12px_var(--accent-glow)]"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface))',
-                  border: '1px solid var(--border-base)',
-                  color: 'var(--text-secondary)',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-subtle)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--accent-primary) 40%, transparent)';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'color-mix(in srgb, var(--accent-primary) 5%, var(--bg-surface))';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-base)';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
-                }}
-              >
-                <span
-                  className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-200
-                             group-hover/chip:bg-[color-mix(in_srgb,var(--accent-primary)_22%,transparent)]"
-                  style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 13%, transparent)' }}
+          <div className={isStart ? 'grid grid-cols-2 gap-1.5' : 'flex flex-wrap gap-1.5'}>
+            {items.map((chip, i) => {
+              const Icon = KIND_ICON[chip.kind];
+              const accent = KIND_ACCENT[chip.kind];
+              return (
+                <motion.button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => onSend(chip.prompt)}
+                  title={chip.prompt}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.16, delay: i * 0.05, ease: 'easeOut' }}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className={`lea-chip group/chip flex items-center gap-2 text-xs font-medium text-left
+                              focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50
+                              ${isStart ? 'px-2.5 py-1.5 rounded-lg' : 'pl-1.5 pr-3 py-1 rounded-full max-w-full'}`}
+                  style={{ '--chip-accent': accent } as React.CSSProperties}
                 >
-                  <chip.icon size={11} style={{ color: 'var(--accent-primary)' }} />
-                </span>
-                <span className="truncate leading-tight">{chip.label}</span>
-              </motion.button>
-            ))}
+                  <span
+                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md"
+                    style={{ backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)` }}
+                    aria-hidden="true"
+                  >
+                    <Icon size={11} style={{ color: accent }} />
+                  </span>
+                  <span className="truncate leading-tight">{chip.label}</span>
+                </motion.button>
+              );
+            })}
           </div>
         </motion.div>
       )}

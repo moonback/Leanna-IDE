@@ -136,3 +136,21 @@ html {
 /* ── 9. Contraste renforcé : bordures nettes en high-contrast ───────── */
 :root[data-theme="high-contrast"] .surface,
 :root[data-theme="high-contrast"] .surface-raised { border-width: 2px; }
+
+/* ── 10. Suggestions proactives (chat + accueil) ────────────────────── */
+/* `--chip-accent` est posé en inline par le composant selon la nature
+   de la suggestion (réparer / vérifier / répondre / approfondir).       */
+.lea-chip {
+  --chip-accent: var(--accent-primary);
+  color: var(--text-secondary);
+  background-color: color-mix(in srgb, var(--chip-accent) 5%, var(--bg-surface, var(--bg-secondary)));
+  border: 1px solid var(--border-base);
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.lea-chip:hover {
+  color: var(--text-primary);
+  background-color: color-mix(in srgb, var(--chip-accent) 12%, var(--bg-surface, var(--bg-secondary)));
+  border-color: color-mix(in srgb, var(--chip-accent) 40%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--chip-accent) 18%, transparent);
+}
+:root[data-theme="high-contrast"] .lea-chip { border-color: var(--border-strong); }

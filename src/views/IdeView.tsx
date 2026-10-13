@@ -1225,6 +1225,10 @@ export default function IdeView() {
                                                     setChatDocked(true);
                                                     setShowChat(true);
                                                   }}
+                                                  onAskAssistant={(prompt, displayText) => {
+                                                    setChatDocked(true);
+                                                    void queueMessageToAI(prompt, displayText);
+                                                  }}
                                                   onOpenNotebooks={() => {
                                                     setShowNotebooks(true);
                                                     setShowExplorer(false);

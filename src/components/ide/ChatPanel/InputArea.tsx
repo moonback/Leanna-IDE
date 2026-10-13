@@ -10,6 +10,7 @@ import { SkillPicker } from '../SkillPicker.js';
 import type { CustomSkill } from '../../../hooks/useCustomSkills.js';
 import { BreathingDots } from './BreathingDots.js';
 import { SuggestionChips } from './SuggestionChips.js';
+import type { SuggestionSet } from './proactiveSuggestions.js';
 import { CHAR_LIMIT } from './theme.js';
 import { setCursorPosition } from './utils.js';
 
@@ -29,11 +30,13 @@ export interface InputAreaProps {
   onDocumentAnalyzed: (result: DocumentResult) => void;
   onToast: (msg: string, icon?: React.ReactNode) => void;
   showChips?: boolean;
+  /** Suggestions proactives calculées par le parent à partir du contexte. */
+  proactiveSuggestions: SuggestionSet;
 }
 
 /** Zone de saisie : textarea auto-redimensionnée, @mentions, /commandes, skills. */
 export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function InputArea(
-  { connected, onConnect: _onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true },
+  { connected, onConnect: _onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true, proactiveSuggestions },
   ref,
 ) {
   const [input, setInput] = useState('');
@@ -193,9 +196,10 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
           />
         )}
 
-        {/* Chips de suggestions contextuelles — au-dessus du champ, si connecté et vide. */}
+        {/* Suggestions proactives — au-dessus du champ, si connecté, au repos et champ vide. */}
         <SuggestionChips
           visible={connected && !isBusy && input.length === 0 && showChips}
+          suggestions={proactiveSuggestions}
           onSend={onSend}
         />
 

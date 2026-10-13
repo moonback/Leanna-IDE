@@ -124,7 +124,7 @@ const runtimeRules: PromptRule[] = [
     priority: RulePriority.RUNTIME,
     scope: ["full"],
     content:
-      "Après une tâche, si un problème de structure, de cohérence ou de clarté existe dans les documents touchés, le signaler en une phrase. Ne pas ajouter de suggestions génériques non sollicitées.",
+      "Après une tâche, si un problème de structure, de cohérence ou de clarté existe dans les documents touchés, le signaler en une phrase, puis proposer au plus une prochaine étape concrète tirée du contexte. Ne pas ajouter de suggestions génériques non sollicitées.",
     source: "safety.md",
   },
   {
