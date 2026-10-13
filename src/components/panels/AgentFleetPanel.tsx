@@ -6,15 +6,17 @@
  * - Bus      : messages inter-agents
  * - Métriques: taux de succès, dead-letter, subscriptions
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Users, Radio, BarChart3, RefreshCw, Loader2, X,
   AlertTriangle, ArrowRight, Zap, FlaskConical, FileText,
   Shield, Eye, Building2, Mail, Inbox, Bell, BellOff, Clock,
-  CheckCircle2,
+  CheckCircle2, ChevronRight, Hourglass,
 } from 'lucide-react';
 import { useAgentNotifications } from '../../hooks/useAgentNotifications.js';
+import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
+import { MissionDetail, formatMs } from './MissionDetail.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +86,19 @@ const ROLE_META: Record<string, { icon: any; color: string; label: string }> = {
   security:  { icon: Shield,       color: 'var(--color-error)', label: 'Sécurité' },
   review:    { icon: Eye,          color: 'var(--color-accent-alt)', label: 'Review' },
   architect: { icon: Building2,    color: 'var(--color-warning)', label: 'Architect' },
+};
+
+const STATUS_LABEL: Record<AgentStat['status'], string> = {
+  idle: 'Libre', busy: 'Occupé', overloaded: 'Surchargé', offline: 'Hors ligne',
+};
+
+const STATUS_COLOR: Record<AgentStat['status'], string> = {
+  idle: 'var(--color-success)', busy: 'var(--color-warning)', overloaded: 'var(--color-error)', offline: 'var(--text-dimmed)',
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  task_request: 'Demande', task_response: 'Réponse', collaboration_request: 'Collaboration',
+  status_query: 'État', status_response: 'État', broadcast: 'Diffusion', event: 'Événement',
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -267,6 +282,22 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
     }
   }, [messages, tab]);
 
+  // Missions connues localement (temps réel) : rattachées à chaque agent
+  const tasks = useSyncExternalStore(subscribe, getAgentTasks);
+  const missionsByRole = useMemo(() => {
+    const m = new Map<string, AgentTaskEntry[]>();
+    for (const t of tasks) {
+      if (t.status !== 'running' && t.status !== 'pending') continue;
+      const list = m.get(t.role) ?? [];
+      list.push(t);
+      m.set(t.role, list);
+    }
+    for (const list of m.values()) list.sort((a, b) => (a.status === b.status ? a.timestamp - b.timestamp : a.status === 'running' ? -1 : 1));
+    return m;
+  }, [tasks]);
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [busFilter, setBusFilter] = useState<string>('all');
+
   const totalActive = (fleet?.summary?.busy ?? 0) + (fleet?.summary?.overloaded ?? 0);
   const deadLetterCount = Object.values(metrics?.deadLetterQueue ?? {}).reduce((a, b) => a + b, 0);
   const isFirstLoad = loading && fleet === null;
@@ -285,17 +316,24 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
           <button
             key={id}
             onClick={() => setTab(id)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={{
-              color: tab === id ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-              backgroundColor: tab === id ? 'var(--accent-subtle)' : 'transparent',
-            }}
+            role="tab"
+            aria-selected={tab === id}
+            className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:text-[var(--text-primary)]"
+            style={{ color: tab === id ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}
           >
-            <Icon size={11} />
-            {label}
+            {tab === id && (
+              <motion.span
+                layoutId="fleet-tab"
+                className="absolute inset-0 rounded-lg"
+                style={{ backgroundColor: 'var(--accent-subtle)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 25%, transparent)' }}
+                transition={prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 40 }}
+              />
+            )}
+            <Icon size={11} className="relative" />
+            <span className="relative">{label}</span>
             {badge !== undefined && badge > 0 && (
               <span
-                className="min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-xs font-bold"
+                className="relative min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-xs font-bold tabular-nums"
                 style={{ backgroundColor: tab === id ? 'var(--accent-primary)' : 'var(--border-base)', color: tab === id ? 'white' : 'var(--text-muted)' }}
               >
                 {badge > 99 ? '99+' : badge}
@@ -342,7 +380,15 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
                 <>
                   <FleetSummary summary={fleet.summary} recommendation={fleet.recommendation} />
                   <div className="grid grid-cols-1 gap-1.5">
-                    {(fleet.agents ?? []).map(a => <AgentCard key={a.role} agent={a} />)}
+                    {(fleet.agents ?? []).map(a => (
+                      <AgentCard
+                        key={a.role}
+                        agent={a}
+                        missions={missionsByRole.get(a.role) ?? []}
+                        expanded={expandedRole === a.role}
+                        onToggle={() => setExpandedRole(r => (r === a.role ? null : a.role))}
+                      />
+                    ))}
                   </div>
                 </>
               )}
@@ -353,7 +399,13 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
               {isFirstLoad ? <LoadingState /> : messages.length === 0 ? (
                 <EmptyState icon={Radio} title="Aucun message" sub="Les communications inter-agents apparaîtront ici." />
               ) : (
-                messages.slice(-30).map(m => <BusMessageRow key={m.id} msg={m} />)
+                <>
+                  <BusFilters messages={messages} value={busFilter} onChange={setBusFilter} />
+                  {messages
+                    .filter(m => busFilter === 'all' || m.type === busFilter)
+                    .slice(-40)
+                    .map(m => <BusMessageRow key={m.id} msg={m} />)}
+                </>
               )}
             </motion.div>
           )}
@@ -478,6 +530,25 @@ function FleetSummary({ summary, recommendation }: {
           {summary.overloaded > 0 && <Pill label={`${summary.overloaded} surchargés`} color="var(--color-error)" />}
         </div>
       </div>
+      {/* Répartition de la flotte */}
+      {summary.totalAgents > 0 && (
+        <div className="mb-2 flex h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--bg-input)' }} aria-hidden="true">
+          {([
+            [summary.busy, STATUS_COLOR.busy],
+            [summary.overloaded, STATUS_COLOR.overloaded],
+            [summary.idle, STATUS_COLOR.idle],
+          ] as const).map(([n, c], i) => n > 0 && (
+            <motion.span
+              key={i}
+              className="h-full"
+              style={{ backgroundColor: c }}
+              initial={false}
+              animate={{ width: `${(n / summary.totalAgents) * 100}%` }}
+              transition={{ type: 'spring', stiffness: 180, damping: 26 }}
+            />
+          ))}
+        </div>
+      )}
       {recommendation && (
         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{recommendation}</p>
       )}
@@ -485,47 +556,171 @@ function FleetSummary({ summary, recommendation }: {
   );
 }
 
-function AgentCard({ agent }: { agent: AgentStat }) {
+/** Chrono d'une mission en cours (mise à jour chaque seconde). */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="font-mono tabular-nums">{formatMs(now - since)}</span>;
+}
+
+function AgentCard({ agent, missions, expanded, onToggle }: {
+  agent: AgentStat;
+  missions: AgentTaskEntry[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const meta = ROLE_META[agent.role] ?? { icon: Users, color: 'var(--text-muted)', label: agent.role };
   const Icon = meta.icon;
   const isActive = agent.status === 'busy' || agent.status === 'overloaded';
+  const current = missions.find(m => m.status === 'running');
+  const queued = missions.filter(m => m.status === 'pending');
+  const load = agent.runningTasks + agent.queuedTasks;
+  const progressPct = current?.progress && current.progress.total > 0
+    ? Math.min(100, (current.progress.current / current.progress.total) * 100)
+    : null;
+  const hasMission = !!current || queued.length > 0;
 
   return (
     <div
-      className="rounded-xl px-3 py-2.5 flex items-center gap-3 transition-all"
+      className={`lea-fleet-card overflow-hidden rounded-xl transition-colors${current ? ' lea-glow-border' : ''}`}
       style={{
-        backgroundColor: isActive ? `color-mix(in srgb, ${meta.color} 6%, transparent)` : 'var(--bg-input)',
+        ['--mission-color' as string]: meta.color,
+        backgroundColor: isActive ? `color-mix(in srgb, ${meta.color} 6%, var(--bg-input))` : 'var(--bg-input)',
         border: `1px solid ${isActive ? `color-mix(in srgb, ${meta.color} 25%, transparent)` : 'var(--border-base)'}`,
+        opacity: agent.status === 'offline' ? 0.55 : 1,
       }}
     >
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 15%, transparent)` }}>
-        {isActive
-          ? <Loader2 size={14} className="animate-spin" style={{ color: meta.color }} />
-          : <Icon size={14} style={{ color: meta.color }} />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
-          <StatusDot status={agent.status} />
-          <span className="text-xs capitalize" style={{ color: 'var(--text-dimmed)' }}>{agent.status}</span>
+      <div
+        role={hasMission ? 'button' : undefined}
+        tabIndex={hasMission ? 0 : undefined}
+        aria-expanded={hasMission ? expanded : undefined}
+        onClick={hasMission ? onToggle : undefined}
+        onKeyDown={hasMission ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
+        className={`flex items-center gap-3 px-3 py-2.5${hasMission ? ' cursor-pointer hover:bg-[var(--bg-hover)]' : ''}`}
+      >
+        <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
+          style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 15%, transparent)` }}>
+          {isActive
+            ? <Loader2 size={15} className="animate-spin" style={{ color: meta.color }} />
+            : <Icon size={15} style={{ color: meta.color }} />}
+          <span className="absolute -bottom-0.5 -right-0.5"><StatusDot status={agent.status} /></span>
         </div>
-        <div className="text-xs mt-0.5 flex gap-3" style={{ color: 'var(--text-muted)' }}>
-          {agent.runningTasks > 0 && <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" />{agent.runningTasks} en cours</span>}
-          {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={8} />{agent.queuedTasks} en queue</span>}
-          {agent.delegationSuccess > 0 && <span className="flex items-center gap-1" style={{ color: 'var(--color-success)' }}><CheckCircle2 size={8} /> {agent.delegationSuccess}</span>}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{meta.label}</span>
+            <span className="rounded-full px-1.5 text-xs font-medium" style={{ color: STATUS_COLOR[agent.status], backgroundColor: `color-mix(in srgb, ${STATUS_COLOR[agent.status]} 12%, transparent)` }}>
+              {STATUS_LABEL[agent.status] ?? agent.status}
+            </span>
+          </div>
+
+          {/* Mission en cours : titre + chrono */}
+          {current ? (
+            <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs" style={{ color: meta.color }} title={current.title}>
+              <span className="truncate">▸ {current.title}</span>
+              <span className="flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}><Elapsed since={current.timestamp} /></span>
+            </p>
+          ) : (
+            <div className="mt-0.5 flex gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              {agent.queuedTasks > 0 && <span className="flex items-center gap-1"><Clock size={9} />{agent.queuedTasks} en file</span>}
+              {agent.delegationSuccess > 0 && <span className="flex items-center gap-1" style={{ color: 'var(--color-success)' }}><CheckCircle2 size={9} />{agent.delegationSuccess} réussie{agent.delegationSuccess > 1 ? 's' : ''}</span>}
+              {agent.delegatedSubTasks > 0 && <span className="flex items-center gap-1"><ArrowRight size={9} />{agent.delegatedSubTasks} déléguée{agent.delegatedSubTasks > 1 ? 's' : ''}</span>}
+              {agent.queuedTasks === 0 && agent.delegationSuccess === 0 && agent.delegatedSubTasks === 0 && <span style={{ color: 'var(--text-dimmed)' }}>Disponible</span>}
+            </div>
+          )}
+
+          {/* Progression chiffrée de la mission, si l'agent la publie */}
+          {current?.progress && progressPct !== null && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="h-1 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--border-base)' }}>
+                <motion.div className="h-full rounded-full" style={{ backgroundColor: meta.color }} initial={false} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.3 }} />
+              </div>
+              <span className="text-xs font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                {current.progress.current}/{current.progress.total}
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Charge : missions en cours + en file */}
+        <div className="flex flex-shrink-0 flex-col items-end gap-1" title={`${agent.runningTasks} en cours · ${agent.queuedTasks} en file`}>
+          <span className="text-xs font-mono tabular-nums" style={{ color: load > 0 ? 'var(--text-secondary)' : 'var(--text-dimmed)' }}>
+            {agent.runningTasks}<span style={{ color: 'var(--text-dimmed)' }}>+{agent.queuedTasks}</span>
+          </span>
+          <span className="flex gap-0.5" aria-hidden="true">
+            {Array.from({ length: 4 }, (_, i) => (
+              <span key={i} className="h-1 w-2 rounded-sm" style={{
+                backgroundColor: i < Math.min(4, load)
+                  ? (agent.status === 'overloaded' ? 'var(--color-error)' : meta.color)
+                  : 'var(--border-base)',
+              }} />
+            ))}
+          </span>
+        </div>
+
+        {hasMission && (
+          <ChevronRight size={12} className="flex-shrink-0 transition-transform" style={{ color: 'var(--text-dimmed)', transform: expanded ? 'rotate(90deg)' : 'none' }} />
+        )}
       </div>
+
+      {/* Détail de la mission en cours + file d'attente */}
+      <AnimatePresence initial={false}>
+        {expanded && hasMission && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2.5 px-3 pb-3 pt-2" style={{ borderTop: '1px solid var(--border-base)' }}>
+              {current && (
+                <>
+                  {current.steps.length > 0 && (
+                    <ol className="lea-steps m-0 list-none p-0" aria-label="Étapes">
+                      {current.steps.slice(-6).map((step, i, arr) => (
+                        <li key={i} className="lea-step" data-live={i === arr.length - 1 ? 'true' : undefined}>
+                          <span className="lea-step__dot" aria-hidden="true" />
+                          <span className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <MissionDetail taskId={current.id} status={current.status} color={meta.color} fallbackSummary={current.detail} />
+                </>
+              )}
+              {queued.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                    File d'attente ({queued.length})
+                  </p>
+                  <ol className="m-0 list-none space-y-1 p-0">
+                    {queued.map((q, i) => (
+                      <li key={q.id} className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-xs font-mono" style={{ backgroundColor: 'var(--bg-hover)' }}>{i + 1}</span>
+                        <Hourglass size={10} style={{ flexShrink: 0 }} />
+                        <span className="truncate" title={q.title}>{q.title}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 function StatusDot({ status }: { status: AgentStat['status'] }) {
-  const colors: Record<string, string> = { idle: 'var(--color-success)', busy: 'var(--color-warning)', overloaded: 'var(--color-error)', offline: 'var(--text-dimmed)' };
   return (
     <span
-      className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'busy' || status === 'overloaded' ? 'animate-pulse' : ''}`}
-      style={{ backgroundColor: colors[status] ?? 'var(--text-dimmed)' }}
+      className={`block w-2.5 h-2.5 rounded-full flex-shrink-0 ${status === 'busy' || status === 'overloaded' ? 'animate-pulse' : ''}`}
+      style={{ backgroundColor: STATUS_COLOR[status] ?? 'var(--text-dimmed)', boxShadow: '0 0 0 2px var(--bg-panel)' }}
     />
   );
 }
@@ -542,7 +737,7 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-bold" style={{ color }}>{msg.type.replace(/_/g, ' ')}</span>
+          <span className="text-xs font-bold" style={{ color }}>{TYPE_LABEL[msg.type] ?? msg.type.replace(/_/g, ' ')}</span>
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.from}</span>
           <ArrowRight size={8} style={{ color: 'var(--text-dimmed)' }} />
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{msg.to}</span>
@@ -554,6 +749,34 @@ function BusMessageRow({ msg }: { msg: BusMessage }) {
         <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{msg.summary}</p>
       </div>
       <span className="text-xs font-mono flex-shrink-0 mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{time}</span>
+    </div>
+  );
+}
+
+/** Filtres par type de message (avec compteurs). */
+function BusFilters({ messages, value, onChange }: { messages: BusMessage[]; value: string; onChange: (v: string) => void }) {
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const msg of messages) m.set(msg.type, (m.get(msg.type) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [messages]);
+  if (counts.length < 2) return null;
+  return (
+    <div className="flex flex-wrap gap-1 px-1 pb-2" role="group" aria-label="Filtrer les messages">
+      {[['all', messages.length] as [string, number], ...counts].map(([type, n]) => (
+        <button
+          key={type}
+          type="button"
+          onClick={() => onChange(type)}
+          aria-pressed={value === type}
+          className="lea-agent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+          data-active={value === type ? 'true' : undefined}
+          style={{ ['--chip' as string]: type === 'all' ? 'var(--text-secondary)' : TYPE_COLOR[type] ?? 'var(--text-muted)' }}
+        >
+          {type === 'all' ? 'Tous' : TYPE_LABEL[type] ?? type.replace(/_/g, ' ')}
+          <span className="tabular-nums opacity-70">{n}</span>
+        </button>
+      ))}
     </div>
   );
 }

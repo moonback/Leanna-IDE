@@ -8,9 +8,10 @@ import {
   Code2, Sparkles, Bug, CheckCheck, FlaskConical, ShieldAlert, Network,
   PenTool, AlignLeft, Search, SpellCheck, Languages, ListTree,
   Palette, TrendingUp, BookOpen, Accessibility, Gauge,
-  Ban, Power, Hourglass, ListChecks, CheckSquare, Square, X,
+  Ban, Power, Hourglass, ListChecks, CheckSquare, Square, X, Timer, Percent,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
+import { MissionDetail, formatMs } from './MissionDetail.js';
 import { IconButton } from '../ui/IconButton.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
@@ -215,8 +216,8 @@ function VoiceLatencyBadge({
     <div
       className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-mono cursor-help"
       style={{
-        backgroundColor: `${color}10`,
-        border: `1px solid ${color}30`,
+        backgroundColor: `color-mix(in srgb, ${color} 6%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${color} 19%, transparent)`,
       }}
       title={tooltipText}
     >
@@ -306,6 +307,18 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
   const delegatedFailed = delegatedTasks.filter(t => t.status === 'failed').length;
   const totalDone = toolActivities.filter(a => a.status === 'done').length;
 
+  // Bilan des missions terminées : taux de réussite et durée moyenne
+  const missionStats = useMemo(() => {
+    const finished = delegatedTasks.filter(t => t.status === 'completed' || t.status === 'failed');
+    const ok = finished.filter(t => t.status === 'completed').length;
+    const durations = finished.map(t => t.durationMs).filter((d): d is number => typeof d === 'number' && d > 0);
+    return {
+      finished: finished.length,
+      successRate: finished.length ? Math.round((ok / finished.length) * 100) : null,
+      avgMs: durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null,
+    };
+  }, [delegatedTasks]);
+
   const allowedCount = profile.agents.allowedRoles.length;
   const totalAgents = AGENT_ROSTER.length;
 
@@ -318,7 +331,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
     <div className="flex flex-col min-h-0 flex-1">
       {/* Tab switcher + stats bar */}
       <div className="flex flex-col flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
-        <div className="flex items-center gap-1 px-3 py-2">
+        <div className="flex items-center gap-1 px-3 py-2" role="tablist" aria-label="Vues du panneau Agents">
           <TabBtn active={tab === 'roster'} onClick={() => setTab('roster')} count={allowedCount}>
             <Users size={10} /> Roster
           </TabBtn>
@@ -341,7 +354,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
           )}
         </div>
         {/* Quick stats */}
-        <div className="flex items-center gap-3 px-3 pb-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 pb-2">
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs"
             style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)', color: 'var(--accent-primary)' }}>
             <Users size={8} />
@@ -351,6 +364,23 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
           <StatPill icon={<Loader2 size={8} className="animate-spin" />} value={liveRunning + delegatedRunning} label="actifs" color="var(--accent-secondary)" />
           <StatPill icon={<CheckCircle2 size={8} />} value={totalDone + delegatedDone} label="terminés" color="var(--color-success)" />
           {delegatedFailed > 0 && <StatPill icon={<XCircle size={8} />} value={delegatedFailed} label="erreurs" color="var(--color-error)" />}
+          {missionStats.successRate !== null && (
+            <span
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs tabular-nums"
+              title={`${missionStats.finished} mission(s) terminée(s)`}
+              style={{
+                color: missionStats.successRate >= 80 ? 'var(--color-success)' : missionStats.successRate >= 50 ? 'var(--color-warning)' : 'var(--color-error)',
+                backgroundColor: 'var(--bg-input)',
+              }}
+            >
+              <Percent size={9} /><span className="font-bold">{missionStats.successRate}</span><span className="opacity-70">réussite</span>
+            </span>
+          )}
+          {missionStats.avgMs !== null && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs tabular-nums" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-input)' }} title="Durée moyenne d'une mission terminée">
+              <Timer size={9} /><span className="font-bold">{formatMs(missionStats.avgMs)}</span><span className="opacity-70">moy.</span>
+            </span>
+          )}
           {/* Badge de latence vocale */}
           {connected && <VoiceLatencyBadge getLatencyStats={getLatencyStats} lastLatencyMs={lastLatencyMs} lastProbeReport={lastProbeReport} />}
         </div>
@@ -360,6 +390,7 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar" style={scrollAreaStyle}>
         {tab === 'roster' ? (
           <RosterTab
+            tasks={delegatedTasks}
             allowedRoles={profile.agents.allowedRoles}
             activeRoles={activeRoles}
             agentsEnabled={profile.agents.enabled}
@@ -493,14 +524,21 @@ function StatPill({ icon, value, label, color }: { icon: React.ReactNode; value:
 function TabBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
-      style={{
-        color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)',
-        backgroundColor: active ? 'var(--accent-subtle)' : 'transparent',
-      }}>
-      {children}
+      role="tab"
+      aria-selected={active}
+      className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors hover:text-[var(--text-primary)]"
+      style={{ color: active ? 'var(--accent-primary)' : 'var(--text-dimmed)' }}>
+      {active && (
+        <motion.span
+          layoutId="agent-panel-tab"
+          className="absolute inset-0 rounded-md"
+          style={{ backgroundColor: 'var(--accent-subtle)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 25%, transparent)' }}
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        />
+      )}
+      <span className="relative flex items-center gap-1.5">{children}</span>
       {count > 0 && (
-        <span className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+        <span className="relative min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-xs font-bold tabular-nums"
           style={{ backgroundColor: active ? 'var(--accent-primary)' : 'var(--text-dimmed)', color: 'var(--bg-panel)' }}>
           {count}
         </span>
@@ -511,13 +549,28 @@ function TabBtn({ active, onClick, count, children }: { active: boolean; onClick
 
 // ── Roster Tab: Available agents and their status ────────────────────────
 
-function RosterTab({ allowedRoles, activeRoles, agentsEnabled, onToggleRole }: {
+function RosterTab({ tasks, allowedRoles, activeRoles, agentsEnabled, onToggleRole }: {
+  tasks: AgentTaskEntry[];
   allowedRoles: AgentRole[];
   activeRoles: Set<string>;
   agentsEnabled: boolean;
   onToggleRole: (role: AgentRole) => void;
 }) {
   const enabledCount = AGENT_ROSTER.filter(a => allowedRoles.includes(a.id)).length;
+
+  // Bilan par agent : missions réussies / échouées et mission en cours
+  const byRole = useMemo(() => {
+    const m = new Map<string, { done: number; failed: number; current?: AgentTaskEntry; queued: number }>();
+    for (const t of tasks) {
+      const e = m.get(t.role) ?? { done: 0, failed: 0, queued: 0 };
+      if (t.status === 'completed') e.done++;
+      else if (t.status === 'failed') e.failed++;
+      else if (t.status === 'pending') e.queued++;
+      else if (t.status === 'running' && !e.current) e.current = t;
+      m.set(t.role, e);
+    }
+    return m;
+  }, [tasks]);
 
   return (
     <div className="space-y-1.5">
@@ -557,15 +610,15 @@ function RosterTab({ allowedRoles, activeRoles, agentsEnabled, onToggleRole }: {
             aria-pressed={isAllowed}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-left cursor-pointer hover:bg-[var(--bg-hover)]"
             style={{
-              backgroundColor: isActive ? `${agent.color}10` : 'var(--bg-input)',
-              border: `1px solid ${isActive ? `${agent.color}40` : isAllowed ? 'var(--border-base)' : 'transparent'}`,
+              backgroundColor: isActive ? `color-mix(in srgb, ${agent.color} 6%, transparent)` : 'var(--bg-input)',
+              border: `1px solid ${isActive ? `color-mix(in srgb, ${agent.color} 25%, transparent)` : isAllowed ? 'var(--border-base)' : 'transparent'}`,
               opacity: isAllowed ? 1 : 0.5,
             }}
           >
             {/* Icon */}
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 relative"
-              style={{ backgroundColor: `${agent.color}18` }}
+              style={{ backgroundColor: `color-mix(in srgb, ${agent.color} 9%, transparent)` }}
             >
               <Icon size={14} style={{ color: agent.color }} />
               {isActive && (
@@ -587,9 +640,31 @@ function RosterTab({ allowedRoles, activeRoles, agentsEnabled, onToggleRole }: {
                   </span>
                 )}
               </div>
-              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
-                {agent.desc}
-              </p>
+              {(() => {
+                const st = byRole.get(agent.id);
+                if (st?.current) {
+                  return (
+                    <p className="text-xs mt-0.5 truncate" style={{ color: agent.color }} title={st.current.title}>
+                      ▸ {st.current.title}{st.queued > 0 ? ` (+${st.queued} en file)` : ''}
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dimmed)' }}>
+                    {agent.desc}
+                  </p>
+                );
+              })()}
+              {(() => {
+                const st = byRole.get(agent.id);
+                if (!st || (st.done === 0 && st.failed === 0)) return null;
+                return (
+                  <p className="mt-1 flex items-center gap-2 text-xs tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                    {st.done > 0 && <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-success)' }}><CheckCircle2 size={9} />{st.done} réussie{st.done > 1 ? 's' : ''}</span>}
+                    {st.failed > 0 && <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-error)' }}><XCircle size={9} />{st.failed} échec{st.failed > 1 ? 's' : ''}</span>}
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Toggle switch visuel */}
@@ -667,14 +742,14 @@ function AgentGroupCard({ agentId, activities, expanded, onToggle }: {
       exit={{ opacity: 0, height: 0 }}
       className="rounded-lg overflow-hidden"
       style={{
-        backgroundColor: isActive ? `${meta.color}08` : 'var(--bg-input)',
-        border: `1px solid ${isActive ? `${meta.color}30` : 'var(--border-base)'}`,
+        backgroundColor: isActive ? `color-mix(in srgb, ${meta.color} 3%, transparent)` : 'var(--bg-input)',
+        border: `1px solid ${isActive ? `color-mix(in srgb, ${meta.color} 19%, transparent)` : 'var(--border-base)'}`,
       }}>
       {/* Header */}
       <button className="w-full flex items-center gap-2 px-2.5 py-2 text-left cursor-pointer hover:bg-[var(--bg-hover)] transition"
         onClick={onToggle}>
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 relative"
-          style={{ backgroundColor: `${meta.color}18` }}>
+          style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 9%, transparent)` }}>
           {isActive ? (
             <Loader2 size={13} className="animate-spin" style={{ color: meta.color }} />
           ) : (
@@ -804,6 +879,9 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  // Recherche + filtre par statut
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all');
 
   // Purge les ids sélectionnés qui n'existent plus (tâches supprimées/nettoyées).
   useEffect(() => {
@@ -822,8 +900,23 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
   const running = tasks.filter(t => t.status === 'running');
   const pending = tasks.filter(t => t.status === 'pending');
 
+  const counts = {
+    all: tasks.length,
+    active: running.length + pending.length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    failed: tasks.filter(t => t.status === 'failed' || t.status === 'cancelled').length,
+  };
+  const q = query.trim().toLowerCase();
+  const visible = tasks.filter(t => {
+    if (filter === 'active' && t.status !== 'running' && t.status !== 'pending') return false;
+    if (filter === 'completed' && t.status !== 'completed') return false;
+    if (filter === 'failed' && t.status !== 'failed' && t.status !== 'cancelled') return false;
+    if (!q) return true;
+    return [t.title, t.agentName, t.role, t.summary ?? '', t.detail ?? ''].some(v => v.toLowerCase().includes(q));
+  });
+
   // Tri stable : en cours → en attente → terminées, en gardant l'ordre d'arrivée au sein d'un même statut.
-  const sorted = [...tasks].sort((a, b) => {
+  const sorted = [...visible].sort((a, b) => {
     const d = TASK_STATUS_ORDER[a.status] - TASK_STATUS_ORDER[b.status];
     return d !== 0 ? d : a.timestamp - b.timestamp;
   });
@@ -931,6 +1024,52 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
         )}
       </div>
 
+      {/* Recherche + filtres */}
+      <div className="space-y-1.5">
+        <label className="lea-agent-search flex items-center gap-2 rounded-lg px-2.5" style={{ height: 30 }}>
+          <Search size={12} style={{ color: 'var(--text-dimmed)', flexShrink: 0 }} aria-hidden="true" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Rechercher une mission, un agent…"
+            aria-label="Rechercher une mission"
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+            style={{ color: 'var(--text-primary)', boxShadow: 'none' }}
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery('')} aria-label="Effacer la recherche" className="rounded p-0.5 hover:bg-[var(--bg-hover)]">
+              <X size={11} style={{ color: 'var(--text-muted)' }} />
+            </button>
+          )}
+        </label>
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer les missions">
+          {([
+            ['all', 'Toutes', 'var(--text-secondary)'],
+            ['active', 'Actives', 'var(--accent-secondary)'],
+            ['completed', 'Réussies', 'var(--color-success)'],
+            ['failed', 'Échecs', 'var(--color-error)'],
+          ] as const).map(([id, label, color]) => (
+            (id === 'all' || counts[id] > 0) && (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFilter(id)}
+                aria-pressed={filter === id}
+                className="lea-agent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                data-active={filter === id ? 'true' : undefined}
+                style={{ ['--chip' as string]: color }}
+              >
+                {label}<span className="tabular-nums opacity-70">{counts[id]}</span>
+              </button>
+            )
+          ))}
+        </div>
+      </div>
+
+      {sorted.length === 0 && (
+        <p className="py-6 text-center text-xs" style={{ color: 'var(--text-dimmed)' }}>Aucune mission ne correspond.</p>
+      )}
+
       <AnimatePresence initial={false}>
         {sorted.map(task => {
           // Position dans la file d'attente pour les tâches en attente.
@@ -992,10 +1131,12 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.15 }}
-      className="rounded-lg overflow-hidden"
+      className={`lea-mission-card rounded-xl overflow-hidden${isRunning ? ' lea-glow-border' : ''}`}
+      data-status={task.status}
       style={{
-        backgroundColor: selected ? 'var(--accent-subtle)' : isRunning ? `${meta.color}08` : 'var(--bg-input)',
-        border: `1px solid ${selected ? 'var(--accent-primary)' : isRunning ? `${meta.color}30` : isPending ? `${meta.color}20` : 'var(--border-base)'}`,
+        ['--mission-color' as string]: meta.color,
+        backgroundColor: selected ? 'var(--accent-subtle)' : isRunning ? `color-mix(in srgb, ${meta.color} 6%, var(--bg-input))` : 'var(--bg-input)',
+        border: `1px solid ${selected ? 'var(--accent-primary)' : isRunning ? `color-mix(in srgb, ${meta.color} 30%, transparent)` : isPending ? `color-mix(in srgb, ${meta.color} 18%, transparent)` : 'var(--border-base)'}`,
         opacity: task.status === 'cancelled' ? 0.6 : 1,
       }}>
       {/* Rangée cliquable : un <div role="button"> et non un <button>, car elle
@@ -1019,7 +1160,7 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
           </span>
         )}
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${meta.color}18` }}>
+          style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 9%, transparent)` }}>
           {isRunning ? <Loader2 size={13} className="animate-spin" style={{ color: meta.color }} /> :
             isPending ? <Hourglass size={13} style={{ color: meta.color }} /> :
             <Icon size={13} style={{ color: meta.color }} />}
@@ -1112,50 +1253,36 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
             exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="px-3 py-2.5 space-y-2"
               style={{ borderTop: '1px solid var(--border-base)' }}>
-              {/* Role description */}
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{ backgroundColor: `${meta.color}08` }}>
-                <Icon size={10} style={{ color: meta.color }} />
-                <span className="text-xs" style={{ color: meta.color }}>{meta.description}</span>
-              </div>
+              {/* Role description (masquée si le rôle n'en a pas) */}
+              {meta.description && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${meta.color} 3%, transparent)` }}>
+                  <Icon size={10} style={{ color: meta.color }} />
+                  <span className="text-xs" style={{ color: meta.color }}>{meta.description}</span>
+                </div>
+              )}
 
-              {/* Steps timeline */}
+              {/* Frise des étapes reçues en direct (la dernière pulse tant que la mission tourne) */}
               {task.steps.length > 0 && (
-                <div className="space-y-0.5 ml-1">
-                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Étapes :</p>
-                  {task.steps.map((step, i) => (
-                    <div key={i} className="flex items-start gap-1.5 pl-2" style={{ borderLeft: `2px solid ${meta.color}30` }}>
-                      <span className="text-xs font-mono flex-shrink-0 mt-0.5" style={{ color: meta.color }}>{i + 1}.</span>
-                      <span className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{step}</span>
-                    </div>
-                  ))}
-                </div>
+                <ol className="lea-steps m-0 list-none p-0" aria-label="Étapes de la mission">
+                  {task.steps.map((step, i) => {
+                    const last = i === task.steps.length - 1;
+                    return (
+                      <li key={i} className="lea-step" data-live={last && isRunning ? 'true' : undefined}>
+                        <span className="lea-step__dot" aria-hidden="true" />
+                        <span className="text-xs leading-relaxed" style={{ color: last ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{step}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
               )}
 
-              {/* Detail */}
-              {task.detail && task.steps.length === 0 && (
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{task.detail}</p>
-              )}
-
-              {/* Summary */}
-              {task.summary && (
-                <div className="px-2 py-1.5 rounded-md" style={{ backgroundColor: 'var(--color-success-subtle)', border: '1px solid var(--border-success-subtle)' }}>
-                  <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-success)' }}>Résumé</p>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{task.summary}</p>
-                </div>
-              )}
-
-              {/* Empty state */}
-              {!task.detail && !task.summary && task.steps.length === 0 && (
-                <p className="text-xs italic" style={{ color: 'var(--text-dimmed)' }}>
-                  {isRunning
-                    ? 'Exécution en cours… Les étapes apparaîtront au fur et à mesure.'
-                    : isPending
-                      ? 'En attente de démarrage… Cette tâche est dans la file d’exécution.'
-                      : task.status === 'cancelled'
-                        ? 'Tâche annulée par l’utilisateur.'
-                        : 'Aucun détail disponible.'}
-                </p>
-              )}
+              {/* Détail serveur : brief, chronologie, résultat, preuves */}
+              <MissionDetail
+                taskId={task.id}
+                status={task.status}
+                color={meta.color}
+                fallbackSummary={task.summary ?? task.detail}
+              />
             </div>
           </motion.div>
         )}

@@ -40,6 +40,62 @@ const DelegateSchema = z.object({
   timeoutMs: z.number().int().min(0).optional(),
 });
 
+// ── Sérialisation du détail d'une tâche (bornée : jamais de réponse géante) ──
+
+const clip = (v: unknown, max: number): string | undefined =>
+  typeof v === 'string' ? (v.length > max ? `${v.slice(0, max)}…` : v) : undefined;
+const clipList = (v: unknown, max = 200): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, max) : [];
+
+function serializeTaskDetail(task: any) {
+  const r = task.result;
+  const ev = r?.evidence;
+  return {
+    id: task.id,
+    orchestrationId: task.orchestrationId,
+    role: task.role,
+    title: task.title,
+    description: clip(task.description, 8000),
+    priority: task.priority,
+    status: task.status,
+    createdAt: task.createdAt,
+    startedAt: task.startedAt,
+    completedAt: task.completedAt,
+    timeoutMs: task.timeoutMs,
+    context: {
+      files: clipList(task.context?.files),
+      instructions: clip(task.context?.instructions, 4000),
+      successCriteria: clipList(task.context?.successCriteria, 50),
+      previousResultsCount: Array.isArray(task.context?.previousResults) ? task.context.previousResults.length : 0,
+    },
+    result: r ? {
+      success: Boolean(r.success),
+      outcome: r.outcome,
+      blockReason: r.blockReason,
+      summary: clip(r.summary, 4000),
+      details: clip(r.details, 20000),
+      filesModified: clipList(r.filesModified),
+      fileValidationErrors: Array.isArray(r.fileValidationErrors) ? r.fileValidationErrors.slice(0, 50) : [],
+      suggestions: clipList(r.suggestions, 30),
+      error: clip(r.error, 4000),
+      durationMs: r.durationMs,
+      delegatedSubTasks: clipList(r.delegatedSubTasks, 50),
+      evidence: ev ? {
+        filesRead: clipList(ev.filesRead),
+        filesModified: clipList(ev.filesModified),
+        toolsExecuted: clipList(ev.toolsExecuted),
+        commandsExecuted: clipList(ev.commandsExecuted, 100),
+        verification: {
+          passed: Boolean(ev.verification?.passed),
+          checks: clipList(ev.verification?.checks, 100),
+          errors: clipList(ev.verification?.errors, 100),
+        },
+        regressions: clipList(ev.globalValidation?.regressions, 50),
+      } : undefined,
+    } : undefined,
+  };
+}
+
 // Type compatible avec l'ancien SkillManager pour une migration progressive
 type SkillManager = SkillManagerV2;
 
@@ -93,6 +149,25 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/agents/tasks/:taskId — Détail complet d'une mission (lecture seule) :
+  // brief, contexte, horodatages, résultat et preuves d'exécution. Utilisé par
+  // le panneau Agents pour afficher ce qu'a réellement fait un agent.
+  router.get('/tasks/:taskId', (req: Request, res: Response) => {
+    const taskId = String(req.params.taskId || '').trim();
+    if (!taskId) {
+      return res.status(400).json({ error: "Paramètre 'taskId' requis." });
+    }
+    try {
+      const task = agentOrchestrator.getTask(taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Tâche introuvable (purgée ou issue d’une session précédente).' });
+      }
+      return res.json({ task: serializeTaskDetail(task) });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
     }
   });
 
