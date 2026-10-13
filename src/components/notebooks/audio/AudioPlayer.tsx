@@ -11,6 +11,7 @@ import { motion } from 'motion/react';
 import {
   Loader2, Clock, Users, Square, Trash2, RefreshCw, Volume2, FileText,
 } from 'lucide-react';
+import { NbButton, NbIconButton } from '../ui/primitives.js';
 import type { AudioOverview } from './types.js';
 
 interface Props {
@@ -57,106 +58,73 @@ export function AudioPlayer({
   formatDuration,
 }: Props) {
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar p-5 lg:p-7" style={{ borderColor: 'var(--notebook-border)' }}>
-      <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-8">
+      <div className="mx-auto max-w-2xl space-y-5">
         {/* Header */}
-        <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--notebook-border)' }}>
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
-          >
-            <Users className="w-5 h-5" style={{ color: 'var(--notebook-accent)' }} />
+        <div className="flex items-center gap-3 border-b border-[var(--notebook-border)] pb-4">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
+            <Users className="h-5 w-5 text-[var(--notebook-accent)]" aria-hidden />
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div className="min-w-0 flex-1">
+            <h2 className="notebook-heading text-sm font-semibold text-[var(--text-primary)]">
               {selectedOverview.title}
             </h2>
-            <p className="text-xs flex items-center gap-2" style={{ color: 'var(--text-dimmed)' }}>
+            <p className="flex items-center gap-2 text-xs text-[var(--text-dimmed)]">
               <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <Clock className="h-3 w-3" aria-hidden />
                 {formatDuration(selectedOverview.estimatedDuration)}
               </span>
               <span>•</span>
               <span>{new Date(selectedOverview.createdAt).toLocaleDateString('fr-FR')}</span>
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="notebook-actions">
             {/* Play TTS */}
             {playing ? (
-              <button
+              <NbButton
+                variant="danger"
+                size="sm"
+                icon={Square}
                 onClick={onStop}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all active:scale-95"
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  color: 'var(--color-error)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                }}
                 title="Arrêter la lecture"
               >
-                <Square className="w-3.5 h-3.5" />
                 Stop
-              </button>
+              </NbButton>
             ) : (
-              <button
+              <NbButton
+                variant="primary"
+                size="sm"
+                icon={Volume2}
+                loading={ttsLoading}
                 onClick={onPlay}
-                disabled={ttsLoading}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: 'var(--color-success)20',
-                  color: 'var(--color-success)',
-                  border: '1px solid var(--color-success)40',
-                }}
                 title="Écouter le podcast (TTS)"
               >
-                {ttsLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Volume2 className="w-3.5 h-3.5" />
-                )}
                 Écouter
-              </button>
+              </NbButton>
             )}
             {/* Save to Sandbox */}
-            <button
+            <NbIconButton
+              icon={downloading ? Loader2 : FileText}
+              label="Enregistrer dans la sandbox"
               onClick={onSaveToSandbox}
               disabled={downloading}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--color-warning)10',
-                color: 'var(--color-warning)',
-                border: '1px solid var(--color-warning)40',
-              }}
-              title="Enregistrer dans la sandbox"
-            >
-              {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-            </button>
+              className={downloading ? '[&>svg]:animate-spin' : undefined}
+            />
             {/* Regenerate */}
-            <button
+            <NbIconButton
+              icon={generating ? Loader2 : RefreshCw}
+              label="Régénérer"
               onClick={onRegenerate}
               disabled={generating}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95 disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--notebook-canvas)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--notebook-border)',
-              }}
-              title="Régénérer"
-            >
-              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            </button>
+              className={generating ? '[&>svg]:animate-spin' : undefined}
+            />
             {/* Delete */}
-            <button
+            <NbIconButton
+              icon={Trash2}
+              label="Supprimer"
+              tone="danger"
               onClick={() => onDelete(selectedOverview.id)}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-full text-xs font-semibold transition-all hover:shadow-sm active:scale-95"
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                color: 'var(--color-error)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-              }}
-              title="Supprimer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            />
           </div>
         </div>
 
@@ -165,18 +133,16 @@ export function AudioPlayer({
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-2 px-4 py-3 rounded-xl"
-            style={{ backgroundColor: 'var(--color-success)08', border: '1px solid var(--color-success)25' }}
+            className="flex flex-col gap-2 rounded-xl border border-[color-mix(in_srgb,var(--color-success)_25%,transparent)] bg-[var(--color-success-subtle)] px-4 py-3"
           >
             {/* Top row: waveform + progress */}
             <div className="flex items-center gap-3">
               {/* Mini waveform animation */}
-              <div className="flex items-center gap-[2px] h-5 flex-shrink-0">
+              <div className="flex h-5 flex-shrink-0 items-center gap-[2px]" aria-hidden>
                 {[0, 1, 2, 3, 4].map((i) => (
                   <motion.div
                     key={i}
-                    className="w-[3px] rounded-full"
-                    style={{ backgroundColor: 'var(--color-success)' }}
+                    className="w-[3px] rounded-full bg-[var(--color-success)]"
                     animate={{ height: ['8px', '16px', '10px', '18px', '8px'] }}
                     transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
                   />
@@ -185,10 +151,9 @@ export function AudioPlayer({
 
               {/* Progress bar */}
               <div className="flex-1">
-                <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--notebook-canvas)' }}>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--notebook-surface-muted)]">
                   <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg, var(--color-success), var(--color-success))' }}
+                    className="h-full rounded-full bg-[var(--color-success)]"
                     animate={{ width: `${(ttsProgress / ttsTotalLines) * 100}%` }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                   />
@@ -196,7 +161,7 @@ export function AudioPlayer({
               </div>
 
               {/* Progress count */}
-              <span className="text-xs font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--color-success)' }}>
+              <span className="flex-shrink-0 text-xs font-semibold tabular-nums text-[var(--color-success)]">
                 {ttsProgress}/{ttsTotalLines}
               </span>
             </div>
@@ -205,32 +170,23 @@ export function AudioPlayer({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {/* Stop button */}
-                <button
-                  onClick={onStop}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
-                  style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    color: 'var(--color-error)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                  }}
-                >
-                  <Square className="w-3 h-3" />
+                <NbButton variant="ghost" size="sm" icon={Square} onClick={onStop} className="text-[var(--color-error)]">
                   Arrêter
-                </button>
+                </NbButton>
 
                 {/* Speed button */}
-                <button
+                <NbButton
+                  size="sm"
                   onClick={onCycleSpeed}
-                  className="px-2.5 py-1.5 rounded-full text-xs font-bold transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-                  style={{ color: 'var(--color-success)', border: '1px solid var(--color-success)30' }}
                   title="Changer la vitesse"
+                  className="font-semibold tabular-nums"
                 >
                   {playbackSpeed}×
-                </button>
+                </NbButton>
               </div>
 
               {/* Estimated remaining */}
-              <span className="text-xs font-medium" style={{ color: 'var(--text-dimmed)' }}>
+              <span className="text-xs font-medium text-[var(--text-dimmed)]">
                 {ttsTotalLines - ttsProgress > 0
                   ? `~${Math.ceil((ttsTotalLines - ttsProgress) * 3)}s restants`
                   : 'Terminé'}
@@ -241,24 +197,14 @@ export function AudioPlayer({
 
         {/* Controls bar (when not playing) */}
         {!playing && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={onCycleSpeed}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
-              title="Vitesse de lecture"
-            >
+          <div className="flex flex-wrap items-center gap-2">
+            <NbButton size="sm" onClick={onCycleSpeed} title="Vitesse de lecture">
               ⚡ {playbackSpeed}×
-            </button>
-            <button
-              onClick={onDownloadScript}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium border transition-all hover:bg-[var(--notebook-surface-muted)] active:scale-95"
-              style={{ borderColor: 'var(--notebook-border)', color: 'var(--text-muted)' }}
-              title="Télécharger le script"
-            >
+            </NbButton>
+            <NbButton size="sm" onClick={onDownloadScript} title="Télécharger le script">
               📥 Script .md
-            </button>
-            <span className="text-xs ml-auto font-medium" style={{ color: 'var(--text-dimmed)' }}>
+            </NbButton>
+            <span className="ml-auto text-xs font-medium text-[var(--text-dimmed)]">
               ~{Math.ceil(selectedOverview.script.split('\n').filter((l: string) => l.trim()).length * 3 / playbackSpeed)}s à {playbackSpeed}×
             </span>
           </div>
@@ -274,6 +220,8 @@ export function AudioPlayer({
               const speaker = isAlex ? 'Alex' : 'Sam';
               const text = line.replace(/^(Alex|Sam)\s*:\s*/i, '');
               const isCurrentLine = playing && currentLineIndex === i;
+              // Couleur de l'interlocuteur : accent pour Alex, succès pour Sam.
+              const speakerColor = isAlex ? 'var(--notebook-accent)' : 'var(--color-success)';
               return (
                 <motion.div
                   key={i}
@@ -283,25 +231,24 @@ export function AudioPlayer({
                   className={`flex gap-3 ${isSam ? 'flex-row-reverse' : ''}`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
+                    className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
                     style={{
-                      backgroundColor: isAlex ? 'var(--notebook-accent)20' : 'var(--color-success)20',
-                      color: isAlex ? 'var(--notebook-accent)' : 'var(--color-success)',
-                      border: `1.5px solid ${isCurrentLine ? (isAlex ? 'var(--notebook-accent)' : 'var(--color-success)') : (isAlex ? 'var(--notebook-accent)40' : 'var(--color-success)40')}`,
+                      backgroundColor: `color-mix(in srgb, ${speakerColor} 12%, transparent)`,
+                      color: speakerColor,
+                      border: `1.5px solid ${isCurrentLine ? speakerColor : `color-mix(in srgb, ${speakerColor} 25%, transparent)`}`,
                     }}
                   >
                     {speaker[0]}
                   </div>
                   <div className="max-w-[80%]">
-                    <p className="text-xs font-semibold mb-1 px-1" style={{ color: isAlex ? 'var(--notebook-accent)' : 'var(--color-success)' }}>
+                    <p className="mb-1 px-1 text-xs font-semibold" style={{ color: speakerColor }}>
                       {speaker}
                     </p>
                     <div
-                      className={`p-3.5 rounded-2xl text-xs leading-relaxed ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'} transition-all`}
+                      className={`rounded-2xl p-3 text-sm leading-relaxed text-[var(--text-primary)] transition-colors ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'}`}
                       style={{
-                        backgroundColor: isCurrentLine ? (isAlex ? 'var(--notebook-accent)10' : 'var(--color-success)10') : 'var(--notebook-surface)',
-                        border: `1px solid ${isCurrentLine ? (isAlex ? 'var(--notebook-accent)40' : 'var(--color-success)40') : 'var(--notebook-border)'}`,
-                        color: 'var(--text-primary)',
+                        backgroundColor: isCurrentLine ? `color-mix(in srgb, ${speakerColor} 6%, transparent)` : 'var(--notebook-surface)',
+                        border: `1px solid ${isCurrentLine ? `color-mix(in srgb, ${speakerColor} 25%, transparent)` : 'var(--notebook-border)'}`,
                       }}
                     >
                       {text}
@@ -313,8 +260,7 @@ export function AudioPlayer({
 
             if (!line.trim()) return null;
             return (
-              <p key={i} className="text-xs italic text-center py-2 px-4 rounded-lg"
-                style={{ color: 'var(--text-dimmed)', backgroundColor: 'var(--notebook-canvas)' }}>
+              <p key={i} className="rounded-lg bg-[var(--notebook-surface-muted)] px-4 py-2 text-center text-xs italic text-[var(--text-dimmed)]">
                 {line}
               </p>
             );

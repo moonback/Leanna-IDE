@@ -7,7 +7,8 @@
 
 import { useEffect, useRef, useState, memo } from 'react';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import { Tooltip } from '../ui/Tooltip.js';
+import { clsx } from 'clsx';
+import { NbIconButton } from './ui/primitives.js';
 import { errorMessage } from './utils.js';
 
 // `mermaid` est une dépendance lourde (plusieurs centaines de Ko). On la charge
@@ -143,12 +144,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
 
   if (rendering) {
     return (
-      <div
-        className="flex items-center justify-center py-8 rounded-xl"
-        style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
-      >
-        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] py-8">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-dimmed)]">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           Rendu du diagramme...
         </div>
       </div>
@@ -158,17 +156,11 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
   if (error) {
     return (
       <div className="space-y-2">
-        <div
-          className="px-4 py-3 rounded-xl text-xs"
-          style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)' }}
-        >
+        <div className="rounded-xl border border-[color-mix(in_srgb,var(--color-error)_30%,transparent)] bg-[var(--color-error-subtle)] px-4 py-3 text-xs text-[var(--color-error)]">
           ⚠️ Impossible de rendre le diagramme : {error}
         </div>
         {/* Afficher le code source en fallback */}
-        <pre
-          className="px-4 py-3 rounded-xl text-xs overflow-x-auto font-mono"
-          style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)', color: 'var(--text-muted)' }}
-        >
+        <pre className="overflow-x-auto rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] px-4 py-3 font-mono text-xs text-[var(--text-muted)]">
           <code>{code}</code>
         </pre>
       </div>
@@ -179,8 +171,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
     return (
       <div
         ref={containerRef}
-        className="w-full overflow-x-auto rounded-xl p-4"
-        style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
+        className="w-full overflow-x-auto rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] p-4"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
     );
@@ -193,31 +184,32 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Props) 
   return (
     <div
       ref={containerRef}
-      className={expanded ? 'fixed inset-4 z-50 flex flex-col rounded-2xl shadow-2xl' : 'w-full rounded-xl'}
-      style={{ backgroundColor: 'var(--notebook-canvas)', border: '1px solid var(--notebook-border)' }}
+      className={clsx(
+        'border border-[var(--notebook-border)] bg-[var(--notebook-canvas)]',
+        // Mode agrandi : panneau fixe plein écran (pas une modale : pas de voile ni de piège de focus).
+        expanded ? 'fixed inset-4 z-50 flex flex-col rounded-2xl shadow-2xl' : 'w-full rounded-xl',
+      )}
     >
-      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}>
+      <div className="flex items-center justify-between gap-3 rounded-t-[inherit] border-b border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-3 py-2">
         <div className="min-w-0">
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Carte mentale interactive</p>
-          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Utilisez le zoom et faites défiler pour explorer les branches.</p>
+          <p className="text-xs font-semibold text-[var(--text-primary)]">Carte mentale interactive</p>
+          <p className="text-xs text-[var(--text-dimmed)]">Utilisez le zoom et faites défiler pour explorer les branches.</p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Tooltip content="Réduire le zoom" as="button" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30">
-            <ZoomOut className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </Tooltip>
-          <span className="w-10 text-center text-xs font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{Math.round(zoom * 100)}%</span>
-          <Tooltip content="Agrandir le zoom" as="button" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)] disabled:opacity-30">
-            <ZoomIn className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </Tooltip>
-          <Tooltip content="Réinitialiser le zoom" as="button" onClick={() => setZoom(0.85)} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)]">
-            <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </Tooltip>
-          <Tooltip content={expanded ? 'Réduire la carte' : 'Agrandir la carte'} as="button" onClick={() => setExpanded((current) => !current)} className="p-1.5 rounded-lg hover:bg-[var(--notebook-surface-muted)]">
-            {expanded ? <Minimize2 className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} /> : <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />}
-          </Tooltip>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <NbIconButton icon={ZoomOut} label="Réduire le zoom" size="sm" onClick={() => updateZoom(-0.1)} disabled={zoom <= 0.55} />
+          <span className="w-10 text-center font-mono text-xs tabular-nums text-[var(--text-muted)]">{Math.round(zoom * 100)}%</span>
+          <NbIconButton icon={ZoomIn} label="Agrandir le zoom" size="sm" onClick={() => updateZoom(0.1)} disabled={zoom >= 1.5} />
+          <NbIconButton icon={RotateCcw} label="Réinitialiser le zoom" size="sm" onClick={() => setZoom(0.85)} />
+          <NbIconButton
+            icon={expanded ? Minimize2 : Maximize2}
+            label={expanded ? 'Réduire la carte' : 'Agrandir la carte'}
+            size="sm"
+            onClick={() => setExpanded((current) => !current)}
+            className="text-[var(--notebook-accent)]"
+          />
         </div>
       </div>
-      <div className={`overflow-auto custom-scrollbar p-4 ${expanded ? 'flex-1' : 'max-h-[65vh]'}`}>
+      <div className={`custom-scrollbar overflow-auto p-4 ${expanded ? 'flex-1' : 'max-h-[65vh]'}`}>
         <div
           className="w-max min-w-full origin-top-left"
           style={{ zoom }}

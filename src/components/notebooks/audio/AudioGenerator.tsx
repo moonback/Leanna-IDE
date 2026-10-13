@@ -8,9 +8,11 @@
  */
 
 import { motion, AnimatePresence } from 'motion/react';
+import { clsx } from 'clsx';
 import {
-  Mic, Play, Loader2, Clock, Radio, Settings2, CheckSquare, Trash2,
+  Mic, Play, Clock, Radio, Settings2, CheckSquare, Trash2,
 } from 'lucide-react';
+import { NbButton, NbIconButton, NbBadge, NbSectionLabel, NbTextarea } from '../ui/primitives.js';
 import type { AudioOverview, AudioSource, Tone } from './types.js';
 
 interface Props {
@@ -40,6 +42,17 @@ interface Props {
   formatDuration: (seconds: number) => string;
 }
 
+/** Option sélectionnable (durée, ton). */
+function optionClass(selected: boolean, shape: string) {
+  return clsx(
+    'border text-xs font-medium transition-colors',
+    shape,
+    selected
+      ? 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+      : 'border-[var(--notebook-border)] bg-[var(--notebook-canvas)] text-[var(--text-muted)] hover:bg-[var(--notebook-surface-muted)] hover:text-[var(--text-primary)]',
+  );
+}
+
 export function AudioGenerator({
   fullView,
   sources,
@@ -65,23 +78,22 @@ export function AudioGenerator({
 }: Props) {
   return (
     <div
-      className={`${fullView ? 'w-full lg:w-80 flex-shrink-0 border-b lg:border-b-0 lg:border-r' : 'flex-1'} overflow-y-auto custom-scrollbar p-5 space-y-5`}
-      style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-studio-bg)' }}
+      className={clsx(
+        fullView ? 'w-full flex-shrink-0 border-b border-[var(--notebook-border)] lg:w-80 lg:border-b-0 lg:border-r' : 'flex-1',
+        'custom-scrollbar space-y-5 overflow-y-auto bg-[var(--notebook-studio-bg)] p-4',
+      )}
     >
       {/* Generator card */}
-      <div
-        className="p-5 rounded-2xl border space-y-4"
-        style={{ backgroundColor: 'var(--notebook-card-bg)', borderColor: 'var(--notebook-border)' }}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="notebook-empty-state-icon" style={{ width: 36, height: 36 }}>
-            <Mic className="w-4 h-4" />
+      <div className="notebook-card space-y-4 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <div className="notebook-empty-state-icon !mb-0 !h-9 !w-9">
+            <Mic className="h-4 w-4" aria-hidden />
           </div>
           <div>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
               Audio Overview
             </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs text-[var(--text-muted)]">
               Podcast IA conversationnel
             </p>
           </div>
@@ -89,7 +101,7 @@ export function AudioGenerator({
 
         {/* Duration selector */}
         <div className="space-y-2">
-          <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Durée cible</p>
+          <NbSectionLabel>Durée cible</NbSectionLabel>
           <div className="flex gap-2">
             {([
               { key: 'short' as const, label: '~5 min', icon: '⚡' },
@@ -98,13 +110,9 @@ export function AudioGenerator({
             ]).map(opt => (
               <button
                 key={opt.key}
+                type="button"
                 onClick={() => setDuration(opt.key)}
-                className="flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-full text-xs font-medium transition-all"
-                style={{
-                  backgroundColor: duration === opt.key ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
-                  color: duration === opt.key ? 'var(--notebook-accent)' : 'var(--text-muted)',
-                  border: `1.5px solid ${duration === opt.key ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
-                }}
+                className={optionClass(duration === opt.key, 'flex flex-1 flex-col items-center gap-1 rounded-xl px-3 py-2')}
               >
                 <span className="text-sm">{opt.icon}</span>
                 {opt.label}
@@ -114,18 +122,17 @@ export function AudioGenerator({
         </div>
 
         {/* Options toggle */}
-        <button
+        <NbButton
+          variant="ghost"
+          size="sm"
+          icon={Settings2}
           onClick={() => setShowOptions(!showOptions)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium transition-all"
-          style={{
-            backgroundColor: showOptions ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
-            color: showOptions ? 'var(--notebook-accent)' : 'var(--text-muted)',
-            border: `1px solid ${showOptions ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
-          }}
+          data-active={showOptions ? 'true' : undefined}
+          aria-expanded={showOptions}
+          className="w-full justify-start"
         >
-          <Settings2 className="w-3.5 h-3.5" />
           Options avancées
-        </button>
+        </NbButton>
 
         {/* Advanced options */}
         <AnimatePresence>
@@ -137,9 +144,9 @@ export function AudioGenerator({
               className="space-y-3 overflow-hidden"
             >
               {/* Tone selector */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>Ton</p>
-                <div className="grid grid-cols-2 gap-1.5">
+              <div className="space-y-2">
+                <NbSectionLabel>Ton</NbSectionLabel>
+                <div className="grid grid-cols-2 gap-2">
                   {([
                     { key: 'casual' as Tone, label: '😊 Décontracté' },
                     { key: 'academic' as Tone, label: '🎓 Académique' },
@@ -148,13 +155,9 @@ export function AudioGenerator({
                   ]).map(opt => (
                     <button
                       key={opt.key}
+                      type="button"
                       onClick={() => setTone(opt.key)}
-                      className="px-2 py-1.5 rounded-full text-xs font-medium transition-all"
-                      style={{
-                        backgroundColor: tone === opt.key ? 'var(--notebook-accent-surface)' : 'var(--notebook-canvas)',
-                        color: tone === opt.key ? 'var(--notebook-accent)' : 'var(--text-muted)',
-                        border: `1px solid ${tone === opt.key ? 'var(--notebook-accent)' : 'var(--notebook-border)'}`,
-                      }}
+                      className={optionClass(tone === opt.key, 'rounded-full px-2 py-1')}
                     >
                       {opt.label}
                     </button>
@@ -164,56 +167,57 @@ export function AudioGenerator({
 
               {/* Source selector */}
               {sources.length > 1 && (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+                    <NbSectionLabel>
                       Sources ({selectedSourceIds.length}/{sources.length})
-                    </p>
-                    <button
+                    </NbSectionLabel>
+                    <NbButton
+                      variant="ghost"
+                      size="sm"
                       onClick={selectedSourceIds.length === sources.length ? deselectAllSources : selectAllSources}
-                      className="text-xs font-medium"
-                      style={{ color: 'var(--notebook-accent)' }}
+                      className="text-[var(--notebook-accent)]"
                     >
                       {selectedSourceIds.length === sources.length ? 'Aucune' : 'Toutes'}
-                    </button>
+                    </NbButton>
                   </div>
-                  <div className="max-h-28 overflow-y-auto custom-scrollbar space-y-1">
-                    {sources.map(src => (
-                      <button
-                        key={src.id}
-                        onClick={() => toggleSource(src.id)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left text-xs transition-all"
-                        style={{
-                          backgroundColor: selectedSourceIds.includes(src.id) ? 'var(--notebook-accent-surface)' : 'transparent',
-                          color: selectedSourceIds.includes(src.id) ? 'var(--notebook-accent)' : 'var(--text-muted)',
-                        }}
-                      >
-                        <CheckSquare
-                          className="w-3 h-3 flex-shrink-0"
-                          style={{ opacity: selectedSourceIds.includes(src.id) ? 1 : 0.3 }}
-                        />
-                        <span className="truncate">{src.title}</span>
-                      </button>
-                    ))}
+                  <div className="custom-scrollbar max-h-28 space-y-1 overflow-y-auto">
+                    {sources.map(src => {
+                      const checked = selectedSourceIds.includes(src.id);
+                      return (
+                        <button
+                          key={src.id}
+                          type="button"
+                          onClick={() => toggleSource(src.id)}
+                          className={clsx(
+                            'flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs transition-colors',
+                            checked
+                              ? 'bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+                              : 'text-[var(--text-muted)] hover:bg-[var(--notebook-surface-muted)]',
+                          )}
+                        >
+                          <CheckSquare
+                            className={clsx('h-3 w-3 flex-shrink-0', !checked && 'opacity-30')}
+                            aria-hidden
+                          />
+                          <span className="truncate">{src.title}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               {/* Custom instructions */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-dimmed)' }}>
+              <div className="space-y-2">
+                <NbSectionLabel>
                   Instructions personnalisées
-                </p>
-                <textarea
+                </NbSectionLabel>
+                <NbTextarea
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
                   placeholder="Ex: Insiste sur les aspects pratiques, ajoute des exemples concrets..."
-                  className="w-full px-3 py-2 rounded-full text-xs resize-none leading-relaxed"
-                  style={{
-                    backgroundColor: 'var(--notebook-canvas)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--notebook-border)',
-                  }}
+                  className="text-xs leading-relaxed"
                   rows={2}
                 />
               </div>
@@ -221,80 +225,76 @@ export function AudioGenerator({
           )}
         </AnimatePresence>
 
-        <button
+        <NbButton
+          variant="primary"
+          icon={Radio}
+          loading={generating}
           onClick={onGenerate}
-          disabled={generating || selectedSourceIds.length === 0}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-          style={{ backgroundColor: 'var(--notebook-accent)', color: 'var(--notebook-accent-text)' }}
+          disabled={selectedSourceIds.length === 0}
+          className="w-full"
         >
-          {generating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Génération en cours...
-            </>
-          ) : (
-            <>
-              <Radio className="w-4 h-4" />
-              Générer le podcast
-            </>
-          )}
-        </button>
+          {generating ? 'Génération en cours...' : 'Générer le podcast'}
+        </NbButton>
       </div>
 
       {/* Previous overviews */}
       {overviews.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+          <NbSectionLabel>
             Podcasts ({overviews.length})
-          </p>
+          </NbSectionLabel>
           <AnimatePresence initial={false}>
-            {overviews.map(ov => (
+            {overviews.map(ov => {
+              const isSelected = selectedOverview?.id === ov.id;
+              return (
               <motion.div
                 key={ov.id}
                 layout
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative group"
+                className="group relative"
               >
                 <button
+                  type="button"
+                  data-interactive="true"
                   onClick={() => onSelectOverview(ov)}
                   aria-label={`Sélectionner l'aperçu audio : ${ov.title}`}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all hover:shadow-sm ${selectedOverview?.id === ov.id ? 'ring-1 ring-[var(--notebook-accent)]' : ''}`}
-                  style={{ borderColor: selectedOverview?.id === ov.id ? 'var(--notebook-accent)' : 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface)' }}
+                  className={clsx(
+                    'notebook-card w-full rounded-xl p-3 text-left',
+                    isSelected && '!border-[var(--notebook-accent)] ring-1 ring-[var(--notebook-accent)]',
+                  )}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'var(--notebook-accent-surface)' }}
-                    >
-                      <Play className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
+                      <Play className="h-3.5 w-3.5 text-[var(--notebook-accent)]" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                      <p className="truncate pr-6 text-sm font-semibold text-[var(--text-primary)]">
                         {ov.title}
                       </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-dimmed)' }}>
-                          <Clock className="w-2.5 h-2.5" />
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-dimmed)]">
+                          <Clock className="h-2.5 w-2.5" aria-hidden />
                           {formatDuration(ov.estimatedDuration)}
                         </span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ov.status === 'ready' ? 'bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)] text-[var(--color-success)]' : ov.status === 'error' ? 'bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] text-[var(--color-error)]' : 'bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] text-[var(--color-warning)]'}`}>
+                        <NbBadge tone={ov.status === 'ready' ? 'success' : ov.status === 'error' ? 'error' : 'warning'}>
                           {ov.status === 'ready' ? '● Prêt' : ov.status === 'error' ? '● Erreur' : '● En cours'}
-                        </span>
+                        </NbBadge>
                       </div>
                     </div>
                   </div>
                 </button>
-                <button
+                <NbIconButton
+                  icon={Trash2}
+                  label="Supprimer"
+                  size="sm"
+                  tone="danger"
                   onClick={(e) => { e.stopPropagation(); onDelete(ov.id); }}
-                  className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]"
-                  style={{ color: 'var(--color-error)' }}
-                  title="Supprimer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                  className="absolute right-2 top-2 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                />
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </div>
       )}

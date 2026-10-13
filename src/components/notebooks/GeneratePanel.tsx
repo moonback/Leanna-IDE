@@ -20,7 +20,6 @@ const SlidePreviewModal = lazy(() =>
 );
 import { api } from './api/client.js';
 import { useGenerationQueue } from './generation/useGenerationQueue.js';
-import { useReducedTransparency } from './generation/renderInfographic.js';
 import { GenerationProgress } from './generation/GenerationProgress.js';
 import { DocTypePicker } from './generation/DocTypePicker.js';
 import { DocViewer } from './generation/DocViewer.js';
@@ -95,29 +94,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   const modalSpring = reduceMotion
     ? { duration: 0.1, ease: 'easeOut' as const }
     : { type: 'spring' as const, bounce: 0, duration: 0.3 };
-  const scrimSpring = { duration: 0.1 };
-  const reducedTransparency = useReducedTransparency();
-  const scrimStyle = reducedTransparency
-    ? { backgroundColor: 'rgba(0,0,0,0.92)' }
-    : { backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' };
-
-  // Fermeture au clavier (Escape) + restitution du focus au déclencheur
-  useEffect(() => {
-    if (!showReportModal && !showInfographicModal) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (showReportModal) {
-        setShowReportModal(false);
-        reportModalTriggerRef.current?.focus();
-      }
-      if (showInfographicModal) {
-        setShowInfographicModal(false);
-        infographicModalTriggerRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [showReportModal, showInfographicModal]);
+  // Échap, clic voile et focus des modales Report / Infographic : gérés par
+  // NbModal (ui/Modal) ; onClose rend en plus le focus au déclencheur.
 
   // ─── Suggestions ──────────────────────────────────────────────────────────
   const loadSuggestions = useCallback(async () => {
@@ -218,10 +196,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     <div className="h-full flex flex-col">
       {/* Controls panel — hidden in fullView (doc viewer only) */}
       {!fullView && (
-        <div
-          className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-5 space-y-4"
-          style={{ backgroundColor: 'var(--notebook-studio-bg)' }}
-        >
+        <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto bg-[var(--notebook-studio-bg)] p-4">
           <DocTypePicker
             sources={sources}
             showSourceFilter={showSourceFilter}
@@ -286,10 +261,6 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         onLoadSuggestions={loadSuggestions}
         onSelectSuggestion={handleSelectSuggestion}
         onSelectType={handleModalGenerate}
-        scrimSpring={scrimSpring}
-        scrimStyle={scrimStyle}
-        modalSpring={modalSpring}
-        reduceMotion={reduceMotion}
       />
 
       <InfographicModal
@@ -308,10 +279,6 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         setInfraDescription={setInfraDescription}
         onClose={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
         onGenerate={handleInfographicGenerate}
-        scrimSpring={scrimSpring}
-        scrimStyle={scrimStyle}
-        modalSpring={modalSpring}
-        reduceMotion={reduceMotion}
       />
 
       {showSlideModal && selectedDoc && (

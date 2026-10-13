@@ -8,7 +8,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap, FilePlus, Loader2, Check } from 'lucide-react';
+import { clsx } from 'clsx';
 import { useToast } from '../ui/Toast.js';
+import { NbButton, NbIconButton, NbPanelHeader, NbEmptyState } from './ui/primitives.js';
 import { api, apiVoid, ApiError } from './api/client.js';
 
 interface SourceItem {
@@ -168,9 +170,9 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <Sparkles className="w-4 h-4 animate-pulse" />
+      <div className="flex h-full items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <Sparkles className="h-4 w-4 animate-pulse" aria-hidden />
           <span>Chargement de l'historique...</span>
         </div>
       </div>
@@ -179,37 +181,26 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
 
   if (generatedDocs.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-6">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: 'var(--notebook-canvas)' }}>
-          <Sparkles className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
-        </div>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Aucun document généré pour le moment
-        </p>
-        <p className="text-xs mt-1" style={{ color: 'var(--text-dimmed)' }}>
-          Les documents générés s'afficheront ici
-        </p>
-      </div>
+      <NbEmptyState
+        icon={Sparkles}
+        title="Aucun document généré pour le moment"
+        description="Les documents générés s'afficheront ici"
+        className="h-full"
+      />
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header avec compteur */}
-      <div className="flex items-center justify-between border-b px-4 py-3 flex-shrink-0" style={{ borderColor: 'var(--notebook-border)' }}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4" style={{ color: 'var(--notebook-accent)' }} />
-          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
-            Historique des générations
-          </h3>
-        </div>
-        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}>
-          {generatedDocs.length}
-        </span>
-      </div>
+      <NbPanelHeader
+        icon={Sparkles}
+        title="Historique des générations"
+        count={generatedDocs.length}
+      />
 
       {/* Liste des documents */}
-      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-3">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
         <AnimatePresence mode="wait">
           <motion.div
             key="history-list"
@@ -224,11 +215,13 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                 const DocIcon = docType?.icon || Sparkles;
                 const color = docType?.color || 'var(--text-muted)';
                 const label = docType?.label || doc.type;
-                
+                const isSelected = selectedDoc?.id === doc.id;
+
                 return (
                   <motion.div
                     key={doc.id}
                     layout
+                    data-interactive="true"
                     onClick={() => {
                       setSelectedDoc(doc);
                       if (onViewDoc) {
@@ -241,41 +234,43 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                         });
                       }
                     }}
-                    className="group cursor-pointer p-3 rounded-xl border transition-all hover:shadow-sm"
-                    style={{
-                      borderColor: selectedDoc?.id === doc.id ? color : 'var(--notebook-border)',
-                      backgroundColor: selectedDoc?.id === doc.id ? `${color}08` : 'var(--notebook-card-bg)',
-                    }}
-                    whileHover={{ scale: 1.01 }}
+                    className="notebook-card group cursor-pointer rounded-xl p-3"
+                    style={isSelected ? {
+                      borderColor: color,
+                      backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))`,
+                    } : undefined}
                   >
                     <div className="flex items-center gap-3">
                       {/* Icône */}
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${color}15` }}
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` }}
                       >
-                        <DocIcon className="w-4 h-4" style={{ color }} />
+                        <DocIcon className="h-4 w-4" style={{ color }} aria-hidden />
                       </div>
-                      
+
                       {/* Contenu */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        <div className="mb-0.5 flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                             {doc.title}
                           </p>
                           {doc.sourceIds.length > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${color}15`, color }}>
+                            <span
+                              className="notebook-badge px-1.5 py-0"
+                              style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+                            >
                               {doc.sourceIds.length}
                             </span>
                           )}
                         </div>
-                        
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-medium" style={{ color }}>
+
+                        <div className="flex flex-wrap items-center gap-1 text-xs text-[var(--text-dimmed)]">
+                          <span className="font-medium" style={{ color }}>
                             {label}
                           </span>
-                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                          <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
+                          <span>•</span>
+                          <span>
                             {new Date(doc.createdAt).toLocaleDateString('fr-FR', {
                               day: 'numeric',
                               month: 'short',
@@ -284,52 +279,50 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
                           </span>
                           {doc.sourceIds.length > 0 && (
                             <>
-                              <span className="text-xs" style={{ color: 'var(--text-dimmed)' }}>•</span>
-                              <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>
+                              <span>•</span>
+                              <span className="truncate">
                                 {getSourceTitles(doc.sourceIds)}
                               </span>
                             </>
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex flex-shrink-0 items-center gap-1">
                         {!NON_PROSE_TYPES.includes(doc.type) && (() => {
                           const state = addingToSources[doc.id];
                           const isAdded = state === 'added';
                           const isAdding = state === 'adding';
                           return (
-                            <button
+                            <NbIconButton
+                              icon={isAdding ? Loader2 : isAdded ? Check : FilePlus}
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (!state) handleAddToSources(doc);
                               }}
                               disabled={isAdding || isAdded}
-                              className={`p-1.5 rounded transition-all ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:bg-[var(--notebook-accent-surface)] disabled:cursor-default`}
-                              title={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources (interrogeable par l\u2019assistant)'}
-                              aria-label={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources'}
-                            >
-                              {isAdding ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--notebook-accent)' }} />
-                              ) : isAdded ? (
-                                <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
-                              ) : (
-                                <FilePlus className="w-3.5 h-3.5" style={{ color: 'var(--notebook-accent)' }} />
+                              className={clsx(
+                                isAdded ? 'text-[var(--color-success)] disabled:opacity-100' : 'text-[var(--notebook-accent)] opacity-0 focus-visible:opacity-100 group-hover:opacity-100',
+                                isAdding && '[&>svg]:animate-spin',
                               )}
-                            </button>
+                              title={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources (interrogeable par l\u2019assistant)'}
+                              label={isAdded ? 'Ajouté aux sources' : 'Ajouter aux sources'}
+                            />
                           );
                         })()}
-                        <button
+                        <NbIconButton
+                          icon={Trash2}
+                          label="Supprimer"
+                          size="sm"
+                          tone="danger"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDelete(doc.id);
                           }}
-                          className="p-1.5 opacity-0 group-hover:opacity-100 rounded hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] transition-all"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
-                        </button>
+                          className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                        />
                       </div>
                     </div>
                   </motion.div>
@@ -345,23 +338,18 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          className="flex-1 overflow-y-auto p-4 border-t"
-          style={{ borderColor: 'var(--notebook-border)' }}
+          className="flex-1 overflow-y-auto border-t border-[var(--notebook-border)] p-4"
         >
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="text-xs px-3 py-1.5 rounded-full hover:bg-[var(--notebook-surface-muted)] transition-colors"
-                style={{ color: 'var(--text-muted)' }}
-              >
+              <NbButton variant="ghost" size="sm" onClick={() => setSelectedDoc(null)}>
                 ← Retour
-              </button>
-              <h4 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              </NbButton>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                 {selectedDoc.title}
               </h4>
             </div>
-            <pre className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+            <pre className="whitespace-pre-wrap text-xs text-[var(--text-secondary)]">
               {selectedDoc.content.slice(0, 2000)}
               {selectedDoc.content.length > 2000 && '...'}
             </pre>
