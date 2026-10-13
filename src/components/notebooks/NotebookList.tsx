@@ -212,7 +212,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
             {/* Sort controls */}
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-[var(--text-muted)]">Trier par</span>
+              <span className="whitespace-nowrap text-xs text-[var(--text-muted)]">Trier par</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortBy)}
