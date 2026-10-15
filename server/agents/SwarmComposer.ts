@@ -83,6 +83,11 @@ const ROLE_STAGE: Record<string, SwarmStage> = {
   summarizer: "document",
 };
 
+/** Stade pipeline d'un rôle connu ; undefined pour un rôle non cartographié. */
+export function stageOfRole(role: AgentRole): SwarmStage | undefined {
+  return Object.prototype.hasOwnProperty.call(ROLE_STAGE, role) ? ROLE_STAGE[role] : undefined;
+}
+
 /** Keyword → role triggers (objective text drives dynamic composition). */
 const KEYWORD_ROLES: Array<{ re: RegExp; role: AgentRole; why: string }> = [
   { re: /perf|performance|optimi|latency|lenteur|rapide|vitesse|memory|mémoire/i, role: "performance", why: "objectif de performance" },

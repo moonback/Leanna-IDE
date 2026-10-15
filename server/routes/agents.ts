@@ -17,6 +17,7 @@ import {
 } from '../agents/index.js';
 import { AgentPersistence } from '../agents/AgentPersistence.js';
 import { agentEventStream } from '../agents/AgentEventStream.js';
+import { leadOptionsShape } from '../agents/lead/types.js';
 
 // ── Schémas de validation ────────────────────────────────────────────────────
 
@@ -384,6 +385,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
 
   const BrainExecuteSchema = BrainPlanSchema.extend({
     maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
+    ...leadOptionsShape,
     preferences: z.object({
       visualValidation: z.boolean().optional(),
       skipTests: z.boolean().optional(),
@@ -458,6 +460,8 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
         correctionsApplied: result.corrections.length,
         totalDurationMs: result.totalDurationMs,
         deliverables: result.deliverables,
+        stopReason: result.stopReason,
+        leadDecisions: result.leadDecisions,
       });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });

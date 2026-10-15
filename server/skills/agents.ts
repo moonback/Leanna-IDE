@@ -16,6 +16,7 @@ import { SkillValidationError } from "./base.js";
 import type { AgentRole } from "../agents/index.js";
 import { createLogger, getLogEntries } from "../utils/logger.js";
 import { createCustomAgent, AgentRoleConflictError } from "../routes/custom-agents.js";
+import { leadOptionsShape } from "../agents/lead/types.js";
 
 const log = createLogger("Assistant");
 
@@ -458,6 +459,7 @@ export const agentsSkill: Skill = {
       mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
       maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
       maxReplans: z.number().int().min(0).max(5).optional().default(2),
+      ...leadOptionsShape,
     }),
     agent_compose_swarm:              z.object({
       objective: z.string().min(1, "L'objectif est requis").trim(),
@@ -508,6 +510,8 @@ export const agentsSkill: Skill = {
             mode: "auto",
             maxCorrectionAttempts: v.maxCorrectionAttempts,
             maxReplans: v.maxReplans,
+            lead: v.lead,
+            leadBudget: v.leadBudget,
           });
           return {
             success: result.success,
@@ -522,6 +526,8 @@ export const agentsSkill: Skill = {
             filesModified: result.filesModified,
             deliverables: result.deliverables,
             totalDurationMs: result.totalDurationMs,
+            stopReason: result.stopReason,
+            leadDecisions: result.leadDecisions?.map((d) => `${d.kind}: ${d.summary} — ${d.rationale}`),
           };
         }
       }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentRole, TaskPriority, TaskResult } from "../types.js";
+import { leadOptionsShape, type LeadBudget, type LeadDecision, type StopReason } from "../lead/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Agent Brain Types — Architecture Cognitive Supérieure
@@ -26,6 +27,10 @@ export interface BrainGoalInput {
   maxCorrectionAttempts?: number;
   /** Budget global de réplanifications à chaud du sous-graphe restant (défaut 2). */
   maxReplans?: number;
+  /** Agent Lead (choix d'agents, arbitrage, arrêt). Actif par défaut ; false = comportement historique. */
+  lead?: boolean;
+  /** Budget de mission de l'Agent Lead (valeurs absentes = défauts). */
+  leadBudget?: Partial<LeadBudget>;
   preferences?: {
     visualValidation?: boolean;
     skipTests?: boolean;
@@ -132,6 +137,12 @@ export interface BrainExecutionResult {
   totalDurationMs: number;
   summary: string;
   deliverables: string[];
+  /** Raison de l'arrêt décidé par l'Agent Lead, s'il a stoppé la mission. */
+  stopReason?: StopReason;
+  /** Journal des décisions de l'Agent Lead (absent si `lead: false`). */
+  leadDecisions?: LeadDecision[];
+  /** Consommation du budget de l'Agent Lead. */
+  budgetUsage?: { delegations: number; wallTimeMs: number };
 }
 
 // ─── Schémas Zod pour validation des entrées API et Outils ───────────────────
@@ -143,6 +154,7 @@ export const brainExecuteSchema = z.object({
   mode: z.enum(["auto", "plan_first"]).optional().default("auto"),
   maxCorrectionAttempts: z.number().int().min(0).max(5).optional().default(3),
   maxReplans: z.number().int().min(0).max(5).optional().default(2),
+  ...leadOptionsShape,
   preferences: z
     .object({
       visualValidation: z.boolean().optional(),

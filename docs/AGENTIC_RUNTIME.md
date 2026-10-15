@@ -179,6 +179,27 @@ consommation de budget.
 
 ---
 
+## 6 bis. Agent Lead — chef d'orchestre de l'AgentBrain
+
+L'Agent Lead (`server/agents/lead/`) est une **couche de décision** branchée sur
+`AgentBrain.executeGoal`. Il ne crée aucune boucle : l'exécution reste
+`BrainScheduler → delegateTask → BrainVerifier → BrainCorrectionLoop → replanSubgraph`.
+
+| Point de décision | Module | Effet |
+|---|---|---|
+| Après la planification / un replan | `AgentSelector` | Réaffecte le rôle d'une étape si un candidat (SwarmComposer + score contract-net) dépasse le rôle du planner de 0,15, ou si ce rôle est saturé |
+| Après chaque vérification | `StageArbiter` | `accept` / `correct` / `reassign` (1×/étape) / `abandon` |
+| Avant chaque délégation et replan | `StopController` | Arrêt sur `wall_time`, `delegation_budget`, `consecutive_failures`, `no_progress` |
+
+- Actif par défaut. `lead: false` restaure le comportement historique.
+- Budget par défaut : 20 min, 25 délégations, 3 échecs consécutifs (`leadBudget` pour surcharger).
+- Le résultat expose `stopReason`, `leadDecisions` et `budgetUsage`. Chaque décision est publiée sur
+  `agentEventStream` (`agentName: "Agent Lead"`).
+- Un hook du Lead qui lève une exception est neutralisé (`safeLead`) : la mission poursuit avec les règles historiques.
+- `maxCorrectionAttempts` / `maxReplans` restent des plafonds absolus.
+
+---
+
 ## 7. Migration (phases)
 
 | Phase | Contenu | Statut |
@@ -192,6 +213,7 @@ consommation de budget.
 | 6 | Contrat `AgentTaskRunner` (10 invariants) + suite commune contre les deux moteurs | ✅ |
 | 6.4 | Vérification d'étape du Brain routée sur `WorkspaceState` (verify_file hashé) | ✅ |
 | 6.5 | Supervisor Harness (bout en bout) : `AgentBrain.executeGoal` sur DAG + vérification hashée + correction | ✅ |
+| 7 | Agent Lead : choix d'agents, arbitrage par étape, décision d'arrêt (`server/agents/lead/`) | ✅ |
 
 Point de bascule : `AgentOrchestrator.enableAgenticRuntime(agentic)` (appelé au bootstrap)
 remplace le moteur d'exécution par `AgentRuntimeExecutor` pour :

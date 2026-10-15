@@ -31,7 +31,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-~1326%20passing%20(171%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-~1441%20passing%20(171%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
 <img src="https://img.shields.io/badge/Tests%20front-~45%20passing%20(14%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
@@ -292,6 +292,29 @@ structurée (intention, domaine, complexité, technologies, fichiers pertinents,
 exigences, critères de succès, risques, justification). Le `DynamicPlanner`
 génère des étapes d'exécution ordonnées et dépendantes, validées par schéma
 (graphe + invariants) avant toute exécution.
+
+### Agent Lead — chef d'orchestre du Brain
+
+L'**Agent Lead** (`server/agents/lead/`) est la couche de décision qui pilote
+l'exécution du Brain. Il ne crée aucun moteur parallèle : l'exécution reste
+`BrainScheduler → delegateTask → BrainVerifier → BrainCorrectionLoop → replanSubgraph`,
+et le Lead intervient à trois moments.
+
+| Décision | Module | Ce qu'il fait |
+|---|---|---|
+| **Choisir les agents** | `AgentSelector` | Après la planification (et chaque replan), confronte le rôle proposé par le planner à `SwarmComposer` et au score contract-net ; ne le remplace que si un candidat le dépasse de 0,15 ou si le rôle est à capacité maximale |
+| **Arbitrer chaque étape** | `StageArbiter` | Après la vérification : `accept`, `correct`, `reassign` (une fois par étape, si l'agent n'a rien produit) ou `abandon` (issue critique répétée, tentatives épuisées) |
+| **Décider d'arrêter** | `StopController` | Avant chaque délégation et replan : arrêt sur durée, budget de délégations, échecs consécutifs ou absence de progrès |
+
+- **Actif par défaut** sur `brainExecute` (outil `agent_brain`, route `/api/agents/brain/execute`, Telegram).
+  `lead: false` restaure le comportement historique.
+- **Budget par défaut** : 20 min, 25 délégations, 3 échecs consécutifs — surchargeable via `leadBudget`.
+- **Traçable** : le résultat expose `stopReason` et `leadDecisions` ; chaque décision est publiée
+  sur le flux d'événements (`agentName: "Agent Lead"`).
+- **Sûr** : un hook du Lead qui lève une exception est neutralisé, la mission poursuit avec les
+  règles historiques. `maxCorrectionAttempts` et `maxReplans` restent des plafonds absolus.
+
+Détails : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md) §6 bis.
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 ## ⚙️ Noyau P0 — le noyau transactionnel
@@ -789,7 +812,7 @@ protocole de négociation et une composition dynamique d'équipe.
                         │
                         ▼
                  ┌─────────────┐
-                 │ Agent Brain │
+                 │ Agent Brain │◀─────── Agent Lead : choisit · arbitre · arrête
                  └──────┬──────┘
                         ▼
                  ┌─────────────┐        ┌──────────────────┐
@@ -2061,7 +2084,7 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test`, ~1326 tests répartis sur 171 fichiers `*.test.ts`) |
+| `npm test` | Suite backend (`node --test`, ~1441 tests répartis sur 183 fichiers `*.test.ts`) |
 | `npm run test:ui` | Tests frontend (Vitest + React Testing Library, ~45 tests sur 14 fichiers) |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |

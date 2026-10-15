@@ -557,9 +557,34 @@ describe("AgentBrain.executeGoal (scheduler DAG)", () => {
       return makePlanFrom([{ ...makeStage("coder", "regen"), status: "pending" }]);
     };
 
-    const result = await brain.executeGoal(makeInput("Réplanification", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 2 }));
+    // lead: false — ce test vérifie la mécanique historique de réplanification ;
+    // avec l'Agent Lead, l'absence de progrès stoppe plus tôt (test suivant).
+    const result = await brain.executeGoal(makeInput("Réplanification", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 2, lead: false }));
     assert.equal(result.success, false, "Doit échouer proprement après épuisement du budget");
     assert.equal(replanObserved, 2, `maxReplans=2 doit produire exactement 2 réplanifications, observé: ${replanObserved}`);
+  });
+
+  it("avec l'Agent Lead, stoppe la réplanification quand elle n'apporte aucun progrès", async () => {
+    const understanding = makeUnderstanding("frontend");
+    const plan = makePlanFrom([{ ...makeStage("coder", "stage-1"), status: "pending" }]);
+    // Toutes les délégations échouent : aucune étape validée, aucun fichier modifié.
+    const brain = makeBrainWithPlan(
+      new MockOrchestrator(() => ({ success: false, error: "échec persistant" })),
+      understanding,
+      plan
+    );
+    const anyBrain = brain as any;
+    let planCalls = 0;
+    anyBrain.planner.plan = async () => {
+      planCalls++;
+      if (planCalls === 1) return JSON.parse(JSON.stringify(plan));
+      return makePlanFrom([{ ...makeStage("coder", "regen"), status: "pending" }]);
+    };
+
+    const result = await brain.executeGoal(makeInput("Sans progrès", { mode: "auto", maxCorrectionAttempts: 0, maxReplans: 3 }));
+    assert.equal(result.success, false);
+    assert.equal(planCalls - 1, 1, "le premier replan est autorisé, le suivant est stoppé faute de progrès");
+    assert.equal(result.stopReason, "no_progress");
   });
 
   it("ne réexécute pas les étapes déjà complétées lors d'une réplanification", async () => {
@@ -634,7 +659,9 @@ describe("AgentBrain.executeGoal (intégration bout-en-bout)", () => {
     };
 
     const result = await brain.executeGoal(
-      makeInput("Mission combinée", { mode: "auto", maxCorrectionAttempts: 2, maxReplans: 2 })
+      // lead: false — vérifie la correction historique de b ; avec l'Agent Lead,
+      // une étape qui n'a rien produit est réattribuée plutôt que corrigée.
+      makeInput("Mission combinée", { mode: "auto", maxCorrectionAttempts: 2, maxReplans: 2, lead: false })
     );
 
     // b doit avoir été corrigé avec succès
