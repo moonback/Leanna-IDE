@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { User, Sparkles, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
@@ -6,6 +6,8 @@ import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { BUBBLE_STYLES, TRANSITIONS } from './theme.js';
 import { ChatMarkdown } from './ChatMarkdown.js';
 import { BreathingDots } from './BreathingDots.js';
+import { InlineDiffEditor } from './InlineDiffEditor.js';
+import { parseMessageSegments } from './inlineEdits.js';
 
 export interface ChatMessageProps {
   entry: TranscriptEntry;
@@ -135,6 +137,15 @@ export const ChatMessage = memo(function ChatMessage({
   const [copied, setCopied] = useState(false);
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
 
+  // Découpe le message de l'assistante en prose + éditeurs diff inline. Les
+  // directives ```edit path=… deviennent des cartes de modification de code.
+  const isPlainBubble = !isAssistant || entry.pending === 'image' || entry.pending === 'image-error';
+  const segments = useMemo(
+    () => (isPlainBubble ? [] : parseMessageSegments(entry.text)),
+    [isPlainBubble, entry.text],
+  );
+  const hasEdits = segments.some(s => s.kind === 'edit');
+
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(entry.text).then(() => {
       setCopied(true);
@@ -168,9 +179,9 @@ export const ChatMessage = memo(function ChatMessage({
       )}
 
       {/* Content */}
-      <div className={`max-w-[86%] flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}>
+      <div className={`${hasEdits ? 'w-full max-w-full' : 'max-w-[86%]'} flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}>
         <div
-          className="lea-chat-bubble px-4 py-3 text-sm leading-relaxed inline-block text-left relative"
+          className={`lea-chat-bubble px-4 py-3 text-sm leading-relaxed text-left relative ${hasEdits ? 'block w-full' : 'inline-block'}`}
           data-role={isAssistant ? 'assistant' : 'user'}
           style={{
             background: bubbleStyle.bg,
@@ -195,7 +206,20 @@ export const ChatMessage = memo(function ChatMessage({
             <GeneratingImage reduceMotion={reduceMotion} />
           ) : entry.pending === 'image-error' ? (
             <FailedImage message={entry.imageError} />
-          ) : isAssistant ? <ChatMarkdown text={entry.text} /> : (
+          ) : isAssistant ? (
+            segments.map((seg, i) => (
+              seg.kind === 'edit' ? (
+                <InlineDiffEditor
+                  key={seg.id}
+                  path={seg.path}
+                  proposed={seg.content}
+                  language={seg.language}
+                />
+              ) : (
+                <ChatMarkdown key={`prose-${i}`} text={seg.text} />
+              )
+            ))
+          ) : (
             <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {highlight ? highlightText(entry.text, highlight) : entry.text}
             </span>
