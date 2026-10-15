@@ -127,6 +127,8 @@ export interface Citation {
   excerpt: string;
   /** Score de pertinence */
   relevance: number;
+  /** Numéro N du marqueur [SOURCE N] dans la réponse (absent si citation implicite) */
+  ref?: number;
 }
 
 export interface ChatMessage {

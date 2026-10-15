@@ -32,9 +32,11 @@ interface Props {
   intro?: React.ReactNode;
   /** Action « Ajouter des sources » proposée dans l'état vide */
   onAddSources?: () => void;
+  /** Ouvre une source dans la visionneuse (depuis une citation [SOURCE N]) */
+  onOpenSource?: (sourceId: string) => void;
 }
 
-export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, intro, onAddSources }: Props) {
+export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, intro, onAddSources, onOpenSource }: Props) {
   const { error: toastError, success: toastSuccess } = useToast();
   const prefersReducedMotion = useReducedMotion();
 
@@ -306,6 +308,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, 
         onEditCancel={handleEditCancel}
         onEditSubmit={handleEditSubmit}
         onFetchCitation={fetchCitationChunk}
+        onOpenSource={onOpenSource}
         intro={intro}
       />
 

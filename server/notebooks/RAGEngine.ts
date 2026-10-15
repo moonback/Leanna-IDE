@@ -484,8 +484,8 @@ export class RAGEngine {
   extractCitations(
     response: string,
     ragResults: RAGSearchResult[]
-  ): { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number }[] {
-    const citations: { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number }[] = [];
+  ): { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number; ref?: number }[] {
+    const citations: { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number; ref?: number }[] = [];
     const cited = new Set<string>();
 
     // Chercher les références explicites [SOURCE N] ou [N]
@@ -504,6 +504,7 @@ export class RAGEngine {
             chunkId: result.chunk.id,
             excerpt: result.chunk.content.slice(0, 200),
             relevance: result.relevance,
+            ref: index + 1,
           });
         }
       }

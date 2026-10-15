@@ -5,9 +5,38 @@
 
 import { type JSX } from 'react';
 import { MermaidDiagram } from '../MermaidDiagram.js';
+import type { Citation } from './types.js';
+
+/** Rend les marqueurs [SOURCE N] cliquables lorsqu'une citation leur correspond. */
+export interface CitationLinks {
+  byRef: Map<number, Citation>;
+  onClick: (citation: Citation, e: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+/**
+ * Associe chaque numéro N des marqueurs [SOURCE N] à sa citation. Utilise
+ * `ref` si le serveur l'a fourni ; sinon reproduit l'ordre d'extraction du
+ * serveur (numéros uniques dans l'ordre de première apparition).
+ */
+export function buildCitationRefMap(content: string, citations: Citation[]): Map<number, Citation> {
+  const map = new Map<number, Citation>();
+  if (citations.length === 0) return map;
+  if (citations.some(c => typeof c.ref === 'number')) {
+    for (const c of citations) if (typeof c.ref === 'number') map.set(c.ref, c);
+    return map;
+  }
+  const refPattern = /\[(?:SOURCE\s*)?(\d+)\]/gi;
+  let match: RegExpExecArray | null;
+  let next = 0;
+  while ((match = refPattern.exec(content)) !== null && next < citations.length) {
+    const n = parseInt(match[1], 10);
+    if (!map.has(n)) map.set(n, citations[next++]);
+  }
+  return map;
+}
 
 /** Rich markdown rendering for chat messages */
-export function renderMessageContent(content: string): JSX.Element {
+export function renderMessageContent(content: string, citationLinks?: CitationLinks): JSX.Element {
   // Split by code blocks first
   const parts = content.split(/(```[\s\S]*?```)/g);
 
@@ -59,7 +88,7 @@ export function renderMessageContent(content: string): JSX.Element {
               >
                 {blockquoteLines.map((line, j) => (
                   <p key={j} className="text-sm leading-relaxed text-[var(--text-secondary)]">
-                    {renderInlineMarkdown(line)}
+                    {renderInlineMarkdown(line, citationLinks)}
                   </p>
                 ))}
               </blockquote>
@@ -91,7 +120,7 @@ export function renderMessageContent(content: string): JSX.Element {
                       <tr key={ri} className="border-b border-[var(--notebook-border)] last:border-b-0">
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2 text-[var(--text-secondary)]">
-                            {renderInlineMarkdown(cell.trim())}
+                            {renderInlineMarkdown(cell.trim(), citationLinks)}
                           </td>
                         ))}
                       </tr>
@@ -149,7 +178,7 @@ export function renderMessageContent(content: string): JSX.Element {
           if (line.startsWith('#### ')) {
             blocks.push(
               <h4 key={`h4-${blockIdx++}`} className="mb-1 mt-3 text-sm font-semibold text-[var(--text-primary)]">
-                {renderInlineMarkdown(line.slice(5))}
+                {renderInlineMarkdown(line.slice(5), citationLinks)}
               </h4>
             );
             continue;
@@ -157,7 +186,7 @@ export function renderMessageContent(content: string): JSX.Element {
           if (line.startsWith('### ')) {
             blocks.push(
               <h3 key={`h3-${blockIdx++}`} className="mb-1 mt-3 text-sm font-bold text-[var(--text-primary)]">
-                {renderInlineMarkdown(line.slice(4))}
+                {renderInlineMarkdown(line.slice(4), citationLinks)}
               </h3>
             );
             continue;
@@ -165,7 +194,7 @@ export function renderMessageContent(content: string): JSX.Element {
           if (line.startsWith('## ')) {
             blocks.push(
               <h2 key={`h2-${blockIdx++}`} className="mb-2 mt-4 text-base font-bold text-[var(--text-primary)]">
-                {renderInlineMarkdown(line.slice(3))}
+                {renderInlineMarkdown(line.slice(3), citationLinks)}
               </h2>
             );
             continue;
@@ -173,7 +202,7 @@ export function renderMessageContent(content: string): JSX.Element {
           if (line.startsWith('# ')) {
             blocks.push(
               <h1 key={`h1-${blockIdx++}`} className="mb-2 mt-4 text-base font-bold text-[var(--text-primary)]">
-                {renderInlineMarkdown(line.slice(2))}
+                {renderInlineMarkdown(line.slice(2), citationLinks)}
               </h1>
             );
             continue;
@@ -185,7 +214,7 @@ export function renderMessageContent(content: string): JSX.Element {
               <div key={`ul-${blockIdx++}`} className="my-0.5 flex gap-2 pl-2">
                 <span className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--notebook-accent)] opacity-70" />
                 <span className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
-                  {renderInlineMarkdown(line.slice(2))}
+                  {renderInlineMarkdown(line.slice(2), citationLinks)}
                 </span>
               </div>
             );
@@ -201,7 +230,7 @@ export function renderMessageContent(content: string): JSX.Element {
                   {num}
                 </span>
                 <span className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
-                  {renderInlineMarkdown(line.replace(/^\d+\.\s/, ''))}
+                  {renderInlineMarkdown(line.replace(/^\d+\.\s/, ''), citationLinks)}
                 </span>
               </div>
             );
@@ -211,7 +240,7 @@ export function renderMessageContent(content: string): JSX.Element {
           // Regular paragraph
           blocks.push(
             <p key={`p-${blockIdx++}`} className="text-sm leading-[1.7] text-[var(--text-secondary)]">
-              {renderInlineMarkdown(line)}
+              {renderInlineMarkdown(line, citationLinks)}
             </p>
           );
         }
@@ -226,11 +255,11 @@ export function renderMessageContent(content: string): JSX.Element {
   );
 }
 
-/** Render inline markdown: **bold**, *italic*, `code`, [links](url) */
-export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
+/** Render inline markdown: **bold**, *italic*, `code`, [links](url), [SOURCE N] */
+export function renderInlineMarkdown(text: string, citationLinks?: CitationLinks): (string | JSX.Element)[] {
   const tokens: (string | JSX.Element)[] = [];
   // Regex to match inline elements
-  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))/g;
+  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[SOURCE\s*(\d+)\])|(\[(.+?)\]\((.+?)\))/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let keyIdx = 0;
@@ -266,16 +295,36 @@ export function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
         </code>
       );
     } else if (match[7]) {
+      // [SOURCE N] — cliquable si une citation correspond
+      const n = parseInt(match[8], 10);
+      const citation = citationLinks?.byRef.get(n);
+      if (citation && citationLinks) {
+        tokens.push(
+          <button
+            key={`s-${keyIdx++}`}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); citationLinks.onClick(citation, e); }}
+            className="mx-0.5 inline-flex items-center rounded-md border border-[var(--notebook-border)] bg-[var(--notebook-accent-surface)] px-1.5 py-px align-baseline text-[0.8em] font-medium text-[var(--notebook-accent)] transition-colors hover:border-[var(--notebook-accent)]"
+            title={`Afficher la source : ${citation.sourceTitle}`}
+            aria-label={`Afficher la source ${n} : ${citation.sourceTitle}`}
+          >
+            SOURCE {n}
+          </button>
+        );
+      } else {
+        tokens.push(match[0]);
+      }
+    } else if (match[9]) {
       // [text](url)
       tokens.push(
         <a
           key={`a-${keyIdx++}`}
-          href={match[9]}
+          href={match[11]}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[var(--notebook-accent)] underline underline-offset-2 transition-opacity hover:opacity-80"
         >
-          {match[8]}
+          {match[10]}
         </a>
       );
     }

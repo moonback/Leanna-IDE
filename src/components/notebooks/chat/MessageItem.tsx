@@ -3,7 +3,7 @@
  * édition, sa barre d'actions et ses citations. Mémoïsé. Présentationnel.
  */
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { SpringTransition } from '../motionTypes.js';
 import {
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { NbBadge, NbButton, NbIconButton, NbTextarea } from '../ui/primitives.js';
-import { renderMessageContent } from './renderHelpers.js';
+import { buildCitationRefMap, renderMessageContent, type CitationLinks } from './renderHelpers.js';
 import type { Citation, ChatMessage } from './types.js';
 
 interface Props {
@@ -28,7 +28,6 @@ interface Props {
   feedbackMap: Record<string, 'up' | 'down'>;
   showCitations: string | null;
   setShowCitations: (v: string | null) => void;
-  setHoveredCitation: (v: null) => void;
   onCopy: (msgId: string, content: string) => void;
   onRetry: (msgId: string) => void;
   onTTS: (msgId: string, content: string) => void;
@@ -44,7 +43,7 @@ interface Props {
 export const MessageItem = memo(function MessageItem({
   msg, prefersReducedMotion, spring, loading,
   editingMsgId, editingContent, setEditingContent,
-  copiedMsgId, speakingMsgId, feedbackMap, showCitations, setShowCitations, setHoveredCitation,
+  copiedMsgId, speakingMsgId, feedbackMap, showCitations, setShowCitations,
   onCopy, onRetry, onTTS, onSaveToNote, onOpenFolderPicker, onFeedback,
   onEditStart, onEditCancel, onEditSubmit, onFetchCitation,
 }: Props) {
@@ -53,6 +52,18 @@ export const MessageItem = memo(function MessageItem({
   const feedback = feedbackMap[msg.id];
   /** Boutons texte de la barre d'actions : discrets, plus marqués au survol. */
   const actionClass = '!min-h-0 !px-2 !py-1 !text-xs';
+
+  /** Marqueurs [SOURCE N] cliquables → aperçu du passage cité. */
+  const citationLinks = useMemo<CitationLinks | undefined>(() => {
+    if (msg.role !== 'assistant' || msg.citations.length === 0) return undefined;
+    return {
+      byRef: buildCitationRefMap(msg.content, msg.citations),
+      onClick: (cit, e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        onFetchCitation(cit, rect.left, rect.top);
+      },
+    };
+  }, [msg.role, msg.content, msg.citations, onFetchCitation]);
 
   return (
     <motion.div
@@ -96,7 +107,7 @@ export const MessageItem = memo(function MessageItem({
             </div>
           </div>
         ) : msg.role === 'assistant' ? (
-          renderMessageContent(msg.content)
+          renderMessageContent(msg.content, citationLinks)
         ) : (
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
         )}
@@ -279,14 +290,7 @@ export const MessageItem = memo(function MessageItem({
                   className="overflow-hidden"
                 >
                   {/* Conteneur scrollable avec hauteur max */}
-                  <div
-                    className="custom-scrollbar mt-3 max-h-96 space-y-2 overflow-y-auto"
-                    onMouseLeave={() => {
-                      // Ne pas fermer le tooltip si on quitte juste pour scroller
-                      const relatedTarget = document.querySelector(`#citations-${msg.id} :hover`);
-                      if (!relatedTarget) setHoveredCitation(null);
-                    }}
-                  >
+                  <div className="custom-scrollbar mt-3 max-h-96 space-y-2 overflow-y-auto">
                     {msg.citations.map((cit, i) => (
                       <div
                         key={cit.chunkId || i}
@@ -313,7 +317,8 @@ export const MessageItem = memo(function MessageItem({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onFetchCitation(cit, e.clientX, e.clientY);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            onFetchCitation(cit, rect.left, rect.top);
                           }}
                           className="mt-1 flex items-center gap-1 rounded text-xs text-[var(--notebook-accent)] opacity-80 transition-opacity hover:opacity-100 hover:underline"
                         >

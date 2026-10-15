@@ -8,6 +8,8 @@ export interface Citation {
   chunkId: string;
   excerpt: string;
   relevance: number;
+  /** Numéro N du marqueur [SOURCE N] dans la réponse (citations récentes uniquement) */
+  ref?: number;
 }
 
 export interface ChatMessage {

@@ -400,6 +400,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))}
         onRefresh={loadNotebook}
         onAddSources={openSourceManager}
+        onOpenSource={(id) => setSelectedSourceId(id)}
         intro={
           <div className="space-y-4">
             <div className="flex items-center gap-4">

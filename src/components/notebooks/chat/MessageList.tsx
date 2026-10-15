@@ -5,9 +5,10 @@
  * tooltip de citation survolée. Composant présentationnel.
  */
 
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Loader2, MessageCircle, Lightbulb, RefreshCw, StopCircle, Telescope, ArrowDown, Quote,
+  Loader2, MessageCircle, Lightbulb, RefreshCw, StopCircle, Telescope, ArrowDown, Quote, X, FileText,
 } from 'lucide-react';
 import { SPRING_UI, SPRING_MOMENTUM_CHAT as SPRING_MOMENTUM } from '../motion.js';
 import { NbBadge, NbButton, NbEmptyState, NbIconButton } from '../ui/primitives.js';
@@ -56,6 +57,8 @@ interface Props {
   onEditCancel: () => void;
   onEditSubmit: (msgId: string) => void;
   onFetchCitation: (citation: Citation, x: number, y: number) => void;
+  /** Ouvre la source complète (visionneuse) — bouton de l'aperçu de citation */
+  onOpenSource?: (sourceId: string) => void;
   /** En-tête d'accueil (titre + résumé du notebook) affiché tant qu'il n'y a aucun message */
   intro?: React.ReactNode;
 }
@@ -67,7 +70,29 @@ export function MessageList(props: Props) {
     followUps, followUpOffset, setFollowUpOffset,
     streamingText, deepDiveProgress, loading, showScrollBtn, hoveredCitation,
     prefersReducedMotion, onSend, onStopStreaming, scrollToBottom, intro,
+    setHoveredCitation, onOpenSource,
   } = props;
+
+  // Aperçu de citation : fermeture au clic extérieur, à Échap ou au scroll.
+  const citationPopoverRef = useRef<HTMLDivElement>(null);
+  const isCitationOpen = hoveredCitation !== null;
+  useEffect(() => {
+    if (!isCitationOpen) return;
+    const close = () => setHoveredCitation(null);
+    const onPointerDown = (e: PointerEvent) => {
+      if (!citationPopoverRef.current?.contains(e.target as Node)) close();
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const scroller = scrollContainerRef.current;
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    scroller?.addEventListener('scroll', close, { passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+      scroller?.removeEventListener('scroll', close);
+    };
+  }, [isCitationOpen, setHoveredCitation, scrollContainerRef]);
 
   const suggestionChipClass =
     'notebook-chip !whitespace-normal !rounded-xl !px-3 !py-2 text-left !text-sm leading-snug !text-[var(--text-primary)]';
@@ -147,7 +172,6 @@ export function MessageList(props: Props) {
                 feedbackMap={props.feedbackMap}
                 showCitations={props.showCitations}
                 setShowCitations={props.setShowCitations}
-                setHoveredCitation={props.setHoveredCitation}
                 onCopy={props.onCopy}
                 onRetry={props.onRetry}
                 onTTS={props.onTTS}
@@ -295,31 +319,54 @@ export function MessageList(props: Props) {
         </AnimatePresence>
       </div>
 
-      {/* Citation hover tooltip */}
+      {/* Aperçu de citation (clic sur [SOURCE N] ou « Voir le détail ») */}
       <AnimatePresence>
         {hoveredCitation && (
           <motion.div
+            ref={citationPopoverRef}
+            role="dialog"
+            aria-label={`Source : ${hoveredCitation.citation.sourceTitle}`}
             initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
             transition={{ duration: 0.1 }}
-            className="pointer-events-none fixed z-50 max-w-md rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] p-4 text-[var(--text-primary)] shadow-[var(--notebook-shadow-lg)]"
-            // Position dynamique (suit la citation survolée)
+            className="fixed z-50 w-[min(28rem,calc(100vw-16px))] rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] p-4 text-[var(--text-primary)] shadow-[var(--notebook-shadow-lg)]"
+            // Au-dessus du marqueur cliqué s'il y a la place, sinon en dessous
             style={{
-              left: Math.min(hoveredCitation.x, window.innerWidth - 420),
-              top: Math.max(hoveredCitation.y - 200, 8),
+              left: Math.max(8, Math.min(hoveredCitation.x, window.innerWidth - 456)),
+              ...(hoveredCitation.y > 300
+                ? { bottom: window.innerHeight - hoveredCitation.y + 8 }
+                : { top: hoveredCitation.y + 28 }),
             }}
           >
             <div className="mb-2 flex items-center gap-2">
               <Quote className="h-3.5 w-3.5 flex-shrink-0 text-[var(--notebook-accent)]" />
-              <span className="truncate text-sm font-semibold">{hoveredCitation.citation.sourceTitle}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{hoveredCitation.citation.sourceTitle}</span>
               <NbBadge tone="accent" className="flex-shrink-0">
                 {(hoveredCitation.citation.relevance * 100).toFixed(0)}%
               </NbBadge>
+              <NbIconButton icon={X} label="Fermer" size="sm" onClick={() => setHoveredCitation(null)} />
             </div>
-            <p className="custom-scrollbar max-h-44 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
+            <p className="custom-scrollbar max-h-56 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
               {hoveredCitation.fullContent}
             </p>
+            {onOpenSource && (
+              <div className="mt-3 flex justify-end border-t border-[var(--notebook-border)] pt-2">
+                <NbButton
+                  variant="ghost"
+                  size="sm"
+                  icon={FileText}
+                  onClick={() => {
+                    const { sourceId } = hoveredCitation.citation;
+                    setHoveredCitation(null);
+                    onOpenSource(sourceId);
+                  }}
+                  className="!min-h-0 !px-2 !py-1 !text-xs !text-[var(--notebook-accent)]"
+                >
+                  Ouvrir la source
+                </NbButton>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
