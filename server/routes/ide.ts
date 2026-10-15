@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { isSandboxActive, getSandboxRoot, getRealSandboxRoot, markFileModified, assertSafeSandboxPath, SandboxGuardError } from '../utils/sandbox.js';
 import { resolveWorkspacePath, getDefaultWorkspaceRoot, isExcludedWorkspaceEntry } from '../security.js';
 import { appendAuditEvent } from '../audit.js';
@@ -616,6 +618,87 @@ router.delete('/file', asyncRoute(async (req: Request, res: Response) => {
   }
 }));
 
+// POST /api/ide/run-tests — Exécute les tests unitaires d'un fichier précis.
+//
+// Sécurité : le chemin est résolu et borné au workspace actif (resolveRequestedPath),
+// doit être un fichier de test existant, et l'exécution passe par execFile (jamais
+// de shell → pas d'injection), avec timeout et maxBuffer stricts. Le runner est
+// déduit du package.json du projet (vitest / jest / node:test), scindé par fichier.
+router.post('/run-tests', asyncRoute(async (req: Request, res: Response) => {
+  const { path: requestedPath } = req.body as { path?: string };
+  if (!requestedPath) return res.status(400).json({ error: 'Le chemin du fichier est requis.' });
+
+  if (!TEST_FILE_RE.test(requestedPath)) {
+    return res.status(400).json({ error: 'Ce fichier ne ressemble pas à un fichier de test (.test / .spec).' });
+  }
+
+  const resolved = resolveRequestedPath(req, requestedPath);
+  if (!resolved || !resolved.ok) {
+    const err = resolved as { status?: number; error?: string } | null;
+    return res.status(err?.status || 403).json({ error: err?.error || 'Chemin hors du workspace.' });
+  }
+  const absolutePath = resolved.absolutePath;
+
+  try {
+    const stat = await fs.promises.stat(absolutePath);
+    if (!stat.isFile()) return res.status(400).json({ error: 'Le chemin ne désigne pas un fichier.' });
+  } catch {
+    return res.status(404).json({ error: 'Fichier introuvable.' });
+  }
+
+  const root = getWorkspaceRoot(req);
+  const relForCmd = path.relative(root, absolutePath).replace(/\\/g, '/');
+  const plan = await resolveTestRunner(root, relForCmd);
+  if (!plan) {
+    return res.status(422).json({
+      error: "Aucun lanceur de tests détecté (vitest, jest ou node:test) dans ce projet.",
+    });
+  }
+
+  await appendAuditEvent({ action: 'run_tests', target: requestedPath, details: plan.label, actor: 'user' });
+
+  const startedAt = Date.now();
+  const isWin = process.platform === 'win32';
+  const bin = isWin && !plan.bin.endsWith('.cmd') && plan.bin === 'npx' ? 'npx.cmd' : plan.bin;
+
+  try {
+    const { stdout, stderr } = await execFileAsync(bin, plan.args, {
+      cwd: root,
+      timeout: TEST_TIMEOUT_MS,
+      maxBuffer: TEST_MAX_BUFFER,
+      env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
+      windowsHide: true,
+    });
+    return res.json({
+      status: 'success',
+      ok: true,
+      exitCode: 0,
+      command: `${plan.bin} ${plan.args.join(' ')}`,
+      runner: plan.runner,
+      stdout: truncateOutput(stdout),
+      stderr: truncateOutput(stderr),
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (e: unknown) {
+    const err = e as { code?: number | string; killed?: boolean; signal?: string; stdout?: string; stderr?: string; message?: string };
+    const timedOut = err.killed === true || err.signal === 'SIGTERM';
+    if (err.code === 'ENOENT') {
+      return res.status(422).json({ error: `Lanceur introuvable dans le PATH : ${plan.bin}.` });
+    }
+    return res.json({
+      status: 'success',
+      ok: false,
+      exitCode: typeof err.code === 'number' ? err.code : null,
+      timedOut,
+      command: `${plan.bin} ${plan.args.join(' ')}`,
+      runner: plan.runner,
+      stdout: truncateOutput(err.stdout ?? ''),
+      stderr: truncateOutput(err.stderr ?? err.message ?? ''),
+      durationMs: Date.now() - startedAt,
+    });
+  }
+}));
+
 // Helper functions
 function getWorkspaceRoot(_req: Request): string {
   if (isSandboxActive()) {
@@ -658,6 +741,91 @@ function resolveRequestedPath(_req: Request, requestedPath: string): { ok: boole
     return { ok: false, absolutePath: '', status: result.status, error: result.error };
   }
   return result;
+}
+
+// ─── Exécution de tests unitaires (POST /run-tests) ──────────────────────────
+
+const execFileAsync = promisify(execFile);
+
+/** Reconnaît un fichier de test par convention de nommage. */
+const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+
+/** Garde-fous d'exécution : un test ne doit ni bloquer ni inonder la mémoire. */
+const TEST_TIMEOUT_MS = 120_000;
+const TEST_MAX_BUFFER = 4 * 1024 * 1024;
+/** Sortie renvoyée au client, bornée pour rester lisible dans le chat. */
+const TEST_OUTPUT_LIMIT = 24_000;
+
+interface TestRunPlan {
+  runner: 'vitest' | 'jest' | 'node-test';
+  bin: string;
+  args: string[];
+  label: string;
+}
+
+/** Tronque une sortie volumineuse en conservant la fin (où vivent les échecs). */
+function truncateOutput(text: string): string {
+  const t = text ?? '';
+  if (t.length <= TEST_OUTPUT_LIMIT) return t;
+  return `… [sortie tronquée]\n${t.slice(t.length - TEST_OUTPUT_LIMIT)}`;
+}
+
+/** Lit et parse le package.json du projet (ou null si absent/illisible). */
+async function readPackageJson(root: string): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await fs.promises.readFile(path.join(root, 'package.json'), 'utf-8');
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Détermine comment lancer les tests d'un fichier donné à partir du projet.
+ *
+ * Priorité : vitest > jest (deux runners qui acceptent un chemin de fichier en
+ * argument) ; repli sur `node --test` pour les projets qui utilisent le runner
+ * natif. On s'appuie sur les dépendances déclarées plutôt que sur le script
+ * `test` (souvent générique et non ciblable par fichier).
+ */
+async function resolveTestRunner(root: string, relFile: string): Promise<TestRunPlan | null> {
+  const pkg = await readPackageJson(root);
+  const deps = {
+    ...(pkg?.devDependencies as Record<string, string> | undefined),
+    ...(pkg?.dependencies as Record<string, string> | undefined),
+  };
+  const isWin = process.platform === 'win32';
+  const npx = isWin ? 'npx.cmd' : 'npx';
+
+  if (deps?.vitest) {
+    return {
+      runner: 'vitest',
+      bin: npx,
+      args: ['vitest', 'run', relFile, '--reporter=basic'],
+      label: `vitest run ${relFile}`,
+    };
+  }
+  if (deps?.jest) {
+    return {
+      runner: 'jest',
+      bin: npx,
+      // --runTestsByPath : traite l'argument comme un chemin exact de fichier.
+      args: ['jest', '--runTestsByPath', relFile, '--ci', '--colors=false'],
+      label: `jest ${relFile}`,
+    };
+  }
+  // Repli : runner natif de Node (utilisé côté serveur du projet).
+  // Nécessite tsx pour les fichiers TypeScript ; on ne l'active que si présent.
+  if (/\.[cm]?tsx?$/i.test(relFile) ? !!deps?.tsx : true) {
+    const tsFlags = /\.[cm]?tsx?$/i.test(relFile) ? ['--import', 'tsx'] : [];
+    return {
+      runner: 'node-test',
+      bin: process.execPath, // chemin absolu du binaire node courant
+      args: [...tsFlags, '--test', relFile],
+      label: `node --test ${relFile}`,
+    };
+  }
+  return null;
 }
 
 export default router;

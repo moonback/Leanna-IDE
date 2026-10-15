@@ -17,6 +17,8 @@ import { SearchBar } from './SearchBar.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { InputArea, type InputAreaHandle } from './InputArea.js';
 import { exportConversation, deriveModifiedFiles, type ExportFormat } from './exportConversation.js';
+import { useChangeLog } from './useChangeLog.js';
+import { ChangeLogPanel } from './ChangeLogPanel.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { useDraggablePanel } from './useDraggablePanel.js';
 import { useResizablePanel } from './useResizablePanel.js';
@@ -58,6 +60,13 @@ export function ChatPanel({
   const [showInput, setShowInput] = useState<boolean>(() => readJSON(STORAGE_KEYS.showInput, false));
   const [showMenu, setShowMenu] = useState(false);
   const [showPromptInspector, setShowPromptInspector] = useState(false);
+  const [showChangeLog, setShowChangeLog] = useState(false);
+
+  // Journal des modifications appliquées depuis le chat (feature #9).
+  const { entries: changeLog, clear: clearChangeLog, remove: removeChangeLogEntry } = useChangeLog();
+  // Referme le panneau quand il n'y a plus rien à afficher (le bouton d'en-tête
+  // disparaît alors aussi : on évite un panneau vide orphelin).
+  useEffect(() => { if (changeLog.length === 0) setShowChangeLog(false); }, [changeLog.length]);
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; icon?: React.ReactNode } | null>(null);
@@ -384,6 +393,9 @@ export function ChatPanel({
           onToggleInput={() => setShowInput(s => !s)}
           onToggleMenu={() => setShowMenu(v => !v)}
           onToggleSearch={() => { toggleSearch(); setShowMenu(false); }}
+          changeLogCount={changeLog.length}
+          showChangeLog={showChangeLog}
+          onToggleChangeLog={() => setShowChangeLog(v => !v)}
           onExport={(format) => { handleExport(format); setShowMenu(false); }}
           onClear={() => { handleClear(); setShowMenu(false); }}
           onVoiceTest={() => { void handleVoiceTest(); setShowMenu(false); }}
@@ -397,6 +409,18 @@ export function ChatPanel({
           onToggleConnect={handleToggleConnect}
           onClose={onClose}
         />
+
+        {/* Journal des modifications appliquées (feature #9) */}
+        {!minimized && (
+          <ChangeLogPanel
+            entries={changeLog}
+            open={showChangeLog}
+            reduceMotion={reduceMotion}
+            onClose={() => setShowChangeLog(false)}
+            onClear={clearChangeLog}
+            onRemove={removeChangeLogEntry}
+          />
+        )}
 
         {/* Barre de recherche */}
         <AnimatePresence>

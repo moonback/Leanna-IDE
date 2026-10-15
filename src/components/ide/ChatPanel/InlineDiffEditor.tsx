@@ -4,9 +4,15 @@ import {
 import type { editor } from 'monaco-editor';
 import {
   Check, X, FileCode, Loader2, RotateCcw, AlertCircle, SplitSquareHorizontal, ExternalLink,
+  FlaskConical, ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { ideApi } from '../../../services/ideApi.js';
+import { ideApi, type TestRunResult } from '../../../services/ideApi.js';
 import { languageFromPath } from './inlineEdits.js';
+
+/** Reconnaît un fichier de test (miroir côté serveur de TEST_FILE_RE). */
+function isTestFile(p: string): boolean {
+  return /\.(test|spec)\.[cm]?[jt]sx?$/i.test(p);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // InlineDiffEditor — éditeur diff embarqué dans une bulle de chat.
@@ -74,9 +80,16 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
   const [sideBySide, setSideBySide] = useState(true);
   const [isNewFile, setIsNewFile] = useState(false);
 
+  // ── État d'exécution des tests (feature #8) ──────────────────────────────
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState<TestRunResult | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testOutputOpen, setTestOutputOpen] = useState(false);
+
   const diffRef = useRef<editor.IStandaloneDiffEditor | null>(null);
   const lang = language || languageFromPath(path);
   const dark = !isLightTheme();
+  const testable = isTestFile(path);
 
   // ── Chargement de la version actuelle du fichier ─────────────────────────
   useEffect(() => {
@@ -141,14 +154,36 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
       setOriginal(current); // la version disque devient la version appliquée
       setIsNewFile(false);
       onApplied?.(path);
-      // Rafraîchit un éventuel onglet ouvert sur ce fichier.
-      window.dispatchEvent(new CustomEvent('Leanna-file-written', { detail: { path } }));
+      // Rafraîchit un éventuel onglet ouvert sur ce fichier + alimente le
+      // journal des modifications (feature #9) avec le détail du changement.
+      const delta = countLineDelta(original, current);
+      window.dispatchEvent(new CustomEvent('Leanna-file-written', {
+        detail: { path, added: delta.added, removed: delta.removed, at: Date.now() },
+      }));
     } catch (err) {
       console.error('[InlineDiffEditor] saveFile failed:', err);
       setError(err instanceof Error ? err.message : 'Échec de l\'écriture du fichier.');
       setStatus('error');
     }
-  }, [path, current, onApplied]);
+  }, [path, current, original, onApplied]);
+
+  // ── Exécution des tests du fichier (feature #8) ──────────────────────────
+  const runTests = useCallback(async () => {
+    setTestRunning(true);
+    setTestError(null);
+    setTestResult(null);
+    try {
+      const result = await ideApi.runTests(path);
+      setTestResult(result);
+      // Ouvre la sortie automatiquement en cas d'échec (c'est là qu'elle sert).
+      setTestOutputOpen(!result.ok);
+    } catch (err) {
+      console.error('[InlineDiffEditor] runTests failed:', err);
+      setTestError(err instanceof Error ? err.message : "Impossible de lancer les tests.");
+    } finally {
+      setTestRunning(false);
+    }
+  }, [path]);
 
   const reset = useCallback(() => {
     setCurrent(proposed);
@@ -311,12 +346,85 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
                 <RotateCcw size={13} /> Réinitialiser
               </button>
             )}
-            <span className="ml-auto flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-              <X size={12} /> Non appliquée tant que vous n'avez pas validé
-            </span>
           </>
         )}
+
+        {/* Lancer les tests — fichiers de test uniquement. Disponible une fois
+            la proposition appliquée (ou si le fichier existait déjà). */}
+        {testable && (applied || !isNewFile) && (
+          <button
+            type="button"
+            onClick={runTests}
+            disabled={testRunning}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)', color: 'var(--accent-primary)' }}
+            title="Exécuter les tests unitaires de ce fichier"
+          >
+            {testRunning
+              ? <><Loader2 size={13} className="animate-spin" /> Tests en cours…</>
+              : <><FlaskConical size={13} /> Lancer les tests</>}
+          </button>
+        )}
+
+        {!applied && !(testable && (applied || !isNewFile)) && (
+          <span className="ml-auto flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
+            <X size={12} /> Non appliquée tant que vous n'avez pas validé
+          </span>
+        )}
       </div>
+
+      {/* Résultats des tests (feature #8) */}
+      {testError && (
+        <div className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: 'var(--color-error)', borderTop: '1px solid var(--border-base)' }}>
+          <AlertCircle size={13} /> {testError}
+        </div>
+      )}
+      {testResult && (
+        <div style={{ borderTop: '1px solid var(--border-base)' }}>
+          <div className="flex items-center gap-2 px-3 py-2">
+            <span
+              className="flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                color: testResult.ok ? 'var(--color-success)' : 'var(--color-error)',
+                backgroundColor: `color-mix(in srgb, ${testResult.ok ? 'var(--color-success)' : 'var(--color-error)'} 14%, transparent)`,
+              }}
+            >
+              {testResult.ok ? <Check size={12} /> : <X size={12} />}
+              {testResult.ok ? 'Tests réussis' : (testResult.timedOut ? 'Délai dépassé' : 'Tests en échec')}
+            </span>
+            <span className="text-xs font-mono" style={{ color: 'var(--text-dimmed)' }}>
+              {testResult.runner} · {(testResult.durationMs / 1000).toFixed(1)}s
+              {testResult.exitCode != null ? ` · code ${testResult.exitCode}` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setTestOutputOpen(v => !v)}
+              className="ml-auto flex items-center gap-1 text-xs transition-colors hover:text-[var(--text-primary)]"
+              style={{ color: 'var(--text-muted)' }}
+              aria-expanded={testOutputOpen}
+            >
+              {testOutputOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              {testOutputOpen ? 'Masquer la sortie' : 'Voir la sortie'}
+            </button>
+          </div>
+          {testOutputOpen && (
+            <pre
+              className="mx-3 mb-3 p-2.5 rounded-lg text-xs overflow-auto custom-scrollbar"
+              style={{
+                maxHeight: '220px',
+                color: 'var(--text-secondary)',
+                backgroundColor: 'var(--bg-base, #0a1628)',
+                border: '1px solid var(--border-base)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontFamily: 'var(--font-mono, monospace)',
+              }}
+            >
+              {[testResult.stdout, testResult.stderr].filter(Boolean).join('\n').trim() || '(aucune sortie)'}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }
