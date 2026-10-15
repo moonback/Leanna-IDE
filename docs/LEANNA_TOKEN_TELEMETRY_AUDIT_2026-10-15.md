@@ -20,11 +20,16 @@
   - variantes de modèle tarifées au défaut.
 - Un 10ᵉ défaut a été trouvé par lecture : `agent_execute` rejouait jusqu'à 4 appels facturables pour un seul rappel.
 
-**Corrections.** Les 10 défauts sont corrigés et couverts par 38 nouveaux tests (tous verts).
+**Corrections.**
+- Passe 1 : les 10 défauts sont corrigés et couverts par 38 nouveaux tests (tous verts).
+- Passe 2 :
+  - les chemins de génération de texte qui contournaient le wrapper (`documentLinker`, `upload-document`, proxy `/chat`) sont maintenant comptés et soumis au budget ;
+  - les résumés de contexte ne perdent plus les décisions et contraintes anciennes (benchmark §F.2) ;
+  - 6 tests supplémentaires.
 
 **Principaux risques restants (§I).**
-- ~20 chemins facturables restent hors télémétrie centrale : embeddings, TTS, images, sessions Live, `documentLinker`, `upload-document`, proxy `/api/openrouter/chat`.
-- Le résumé local de `TokenOptimizer` perd des décisions critiques anciennes (mesuré).
+- Restent hors télémétrie centrale : embeddings, TTS, images, sessions Live, `/test-image`. Leur unité de facturation n'est pas modélisée ; la sémantique de l'usage Live n'est pas vérifiée.
+- La préservation des faits critiques dans les résumés repose sur des marqueurs lexicaux (FR/EN).
 - Les tarifs configurés (`MODEL_PRICING`) ne sont pas certifiés par rapport aux grilles publiques.
 - Les budgets ne couvrent que les appels passant par `generateText` / `generateTextStream`.
 
@@ -54,7 +59,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | ID | Contrôle | Statut | Preuve / défaut / correction / test |
 |---|---|---|---|
 | A1 | Cartographie des points d'entrée | PASS (couverture documentée) | Voir §C. Obtenue par recherche exhaustive : `generateContent`, `generateContentStream`, `embedContent`, `live.connect`, `openrouter.ai`, `withGeminiRetry`, appelants de `generateText` et `generateTextStream`. |
-| A2 | Chemins qui échappent à la télémétrie | FAIL (non corrigé) | §C.3 liste ~20 sites. Les corriger toucherait de nombreux sous-systèmes : hors du périmètre sûr de cette passe. |
+| A2 | Chemins qui échappent à la télémétrie | PARTIAL (passe 2) | **Corrigés en passe 2 :** les chemins de **génération de texte** (`documentLinker`, `upload-document`, proxy `/chat`, `/test`). **Restent hors suivi (§C.3) :** embeddings, TTS, images, sessions Live, `/test-image`. Leur unité de facturation (image, caractère audio, embedding) n'est pas modélisée et la sémantique de l'usage Live n'est pas vérifiée. |
 
 ### B — Télémétrie
 
@@ -97,7 +102,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | D1 | Ce qu'il réduit et où | PASS (documenté) | Il agit uniquement sur l'historique conversationnel : `optimizeMessages*` (route `/api/openrouter/chat`), `summarizeWithLLM` (Live, `/summarize-context`), mémoires (`optimizeMemories`). Il **n'agit pas** sur les descriptions d'outils, les prompts d'`AgentExecutor` ni les observations d'outils. |
 | D2 | Les éléments supprimés sont absents de la requête envoyée | PASS | `routes/openrouter.ts` envoie `optimizedMessages`. Le benchmark mesure 81 → 10 messages. |
 | D3 | Économies estimées et économies réelles | PARTIAL | Les économies annoncées (`tokensSaved`) sont **estimées** avec l'heuristique (tiktoken ne se charge pas en ESM, `require` est indéfini). `summarizeWithLLM` renvoie maintenant les tokens fournisseur réels quand ils sont disponibles. Il n'y a aucune mesure des tokens facturés ni du coût par mission réussie. |
-| D4 | Qualité préservée | **FAIL** (non corrigé) | Benchmark : la décision critique d'un ancien message est **perdue** à 40 et 120 tours. Le résumé local tronque à 100 caractères par question et ne garde que la première phrase. `summarizeWithLLM` tronque à 300 caractères par message et **ignore au-delà des 30 premiers messages**. Les messages suivants sont pourtant retirés du contexte. |
+| D4 | Qualité préservée | PASS (corrigé en passe 2, sur le benchmark) | **Avant :** la décision critique d'un ancien message était **perdue** à 40 et 120 tours, et `summarizeWithLLM` ignorait tout au-delà des 30 premiers messages. **Correction :** `extractCriticalStatements` extrait, sur **tous** les messages, les énoncés de décision, contrainte, interdiction ou sécurité, avec un extrait centré sur le marqueur et dédoublonné. Ces énoncés sont ajoutés de façon déterministe au résumé local comme au résumé LLM. L'entrée du LLM couvre les messages les plus récents dans un budget de 12 000 caractères, et indique combien de messages ne sont pas détaillés. **Tests :** `tokenOptimizer.test.ts` (4). **Limite :** la détection reste lexicale (FR/EN). Un fait critique formulé sans marqueur peut encore être perdu. |
 | D5 | Modèle de résumé | FAIL (documenté) | L'option `model:'openai/gpt-4o-mini'` est ignorée : le modèle par défaut est utilisé. Ce n'est pas corrigé, car le modèle « prévu » est **plus cher** selon les tarifs configurés (0,15/0,60 contre 0,075/0,30). |
 
 ### E — Contexte
@@ -108,7 +113,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | E2 | Fenêtre de contexte et budget financier distincts | PASS | `TokenBudget` (`tokenOptimizer`) et `BudgetConfig` (`TelemetryService`) sont des types séparés. |
 | E3 | ContextMonitor (Live) | NOT VERIFIED (défaut suspecté) | `LiveSocketHandler.ts:325` additionne `promptTokenCount` à chaque tour. Si ce compteur couvre déjà tout le contexte (sémantique Gemini usuelle), l'occupation est surestimée et les résumés se déclenchent trop tôt (appels LLM supplémentaires). Cela n'a pas pu être vérifié sans session Live réelle. |
 | E4 | Compression sans perte de règles de sécurité | PASS (mesuré) | Les messages `system` sont toujours conservés (benchmark : `systemRulePreserved: true`). |
-| E5 | Résumés préservent décisions et preuves | FAIL | Voir D4. |
+| E5 | Résumés préservent décisions et preuves | PARTIAL | Les décisions et contraintes sont maintenant préservées (D4). Les preuves sans marqueur lexical ne sont pas garanties. |
 
 ### F — Retries, fallbacks, fournisseurs
 
@@ -131,7 +136,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | G1 | Prévention avant génération | PASS (corrigé) | **Avant :** contrôle seulement entre les actions de mission ; la 2ᵉ génération partait malgré un budget dépassé (D3). **Après :** `BudgetExceededError` est levée avant tout envoi. **Test :** `budget exceeded: the next call is refused BEFORE reaching any provider` |
 | G2 | Appels parallèles (réservation) | PASS (corrigé) | `reserveBudget` compte les réservations en vol. **Tests :** `parallel calls in one mission…` (1 appel sur 3), `budget: in-flight reservations…` |
 | G3 | Budget de coût | PASS | **Test :** `budget: cost budget is enforced before the call` |
-| G4 | Appels hors wrapper (embeddings, TTS, images, Live, Jev) | FAIL (non corrigé) | Ces appels ne sont pas soumis au budget. |
+| G4 | Appels hors wrapper | PARTIAL (passe 2) | **Désormais soumis au budget :** `documentLinker` (via `generateText`), `upload-document` et le proxy `/chat`, via `reserveModelCallBudget`. Le proxy répond 429 sans appel amont quand le budget est épuisé (test `/chat proxy is refused before the upstream call…`). **Restent hors budget :** embeddings, TTS, images, Live, Jev. |
 | G5 | Missions sans budget | PASS | **Test :** `budget: missions … are never blocked` |
 | G6 | Télémétrie indisponible | PASS | Les budgets reposent sur les compteurs en mémoire, indépendants de Supabase. Le mode reste fail-open pour la génération (choix documenté en §E). |
 
@@ -200,18 +205,27 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 
 **Attribution.** Les appels hors mission ou tâche (Telegram, notebooks, routes) sont enregistrés **sans** identifiant. Ils sont comptés dans `unattributedCalls`.
 
-### C.3 Chemins facturables qui **contournent** la télémétrie et les budgets (non corrigés)
+### C.3 Chemins facturables qui **contournent** la télémétrie et les budgets
+
+**Instrumentés en passe 2 :**
+
+| Site | Changement |
+|---|---|
+| `skills/documentLinker.ts` (`callLLMForAnalysis`) | Passe par `generateText` avec `forceProvider` = fournisseur du profil (pas de fallback, comme avant). |
+| `routes/upload-document.ts` | Branche Gemini : `generateText` avec `geminiParts`. Branche OpenRouter (multimodal `image_url`) : `reserveModelCallBudget`, puis `recordModelCallUsage` ou `recordModelCallFailure`. |
+| `routes/openrouter.ts` `/chat` | Budget vérifié avant l'appel amont (429 sinon), usage et échecs enregistrés (`toolName:'openrouter_chat_proxy'`). |
+| `routes/openrouter.ts` `/test` | Usage enregistré (`openrouter_key_test`). |
+
+**Toujours hors télémétrie et hors budget :**
 
 | Site | Fournisseur | Usage |
 |---|---|---|
-| `skills/documentLinker.ts:591, 620` | OpenRouter fetch / Gemini SDK | `document_link`, `document_synthesize` |
-| `routes/upload-document.ts:132, 155` | OpenRouter / Gemini (multimodal) | Analyse d'upload |
 | `utils/geminiTTS.ts:424, 472` | OpenRouter `/audio/speech`, Gemini TTS | TTS |
 | `utils/imageGeneration.ts:79` | OpenRouter `/images/generations` | Génération d'images |
 | `utils/openrouterEmbeddings.ts:81` | OpenRouter `/embeddings` | Notebooks, sélection de skills |
 | `skills/memory.ts:199, 309`, `runtime/HierarchicalMemoryService.ts:202, 441` | Gemini `embedContent` | Mémoire |
 | `live/LiveSocketHandler.ts:908`, `live/NotebookLiveSocketHandler.ts:233`, `live/VoicePresence.ts:112` | Gemini Live | Voix (l'usage est seulement transmis au client) |
-| `routes/openrouter.ts:46, 93, 159` | OpenRouter | Test de clé, test d'image, **proxy `/chat`** |
+| `routes/openrouter.ts` `/test-image` | OpenRouter | Test d'image (facturé à l'image) |
 | `utils/jevDecisions.ts:134` | OpenRouter decisions | Télémétrie propre, mais **pas de budget** |
 
 **Interface (`src/`).** Aucun appel modèle depuis le navigateur. `useLiveAPI` passe par le WebSocket du serveur.
@@ -279,6 +293,16 @@ Commande : `node --import tsx scripts/token-optimizer-bench.mts`. Le benchmark e
 | 40 | 81 → 10 | 31949 → 3685 | 88 % | conservée | **perdue** |
 | 120 | 241 → 10 | 72269 → 2901 | 96 % | conservée | **perdue** |
 
+Après la correction de la passe 2, avec la même commande et les mêmes entrées :
+
+| Tours | Messages | Tokens estimés | Réduction | Règle système | Décision critique ancienne |
+|---|---|---|---|---|---|
+| 10 | 21 → 21 | 8009 → 8009 | 0 % | conservée | conservée |
+| 40 | 81 → 10 | 31949 → 3720 | 88 % | conservée | **conservée** |
+| 120 | 241 → 10 | 72269 → 2936 | 96 % | conservée | **conservée** |
+
+La qualité est rétablie pour un surcoût de ~35 tokens estimés par résumé.
+
 **Limites de comparabilité.**
 - Les réductions portent sur des tokens **estimés** et **envoyés**, pas sur des tokens facturés.
 - Le coût d'une mission réussie n'est pas mesuré.
@@ -298,6 +322,11 @@ Commande : `node --import tsx scripts/token-optimizer-bench.mts`. Le benchmark e
 | `server/routes/observability.ts` | Caractère non durable invisible | Ajout de `dataQuality` dans `/dashboard` et de `persistence`, `durable` et `recentFailures` dans `/health`. | tsc |
 | `supabase/migrations/20261015000000_token_usage_v2_columns.sql`, `supabase/token_usage_schema.sql` | Colonnes manquantes | 8 colonnes v2, migration idempotente. | Test de repli v1 |
 | `scripts/token-optimizer-bench.mts` | Pas de benchmark | Benchmark déterministe. | Exécuté (§F.2) |
+| **Passe 2 :** `server/utils/textGeneration.ts` | Pas de mécanisme commun pour les appels directs | Helpers exportés `reserveModelCallBudget`, `recordModelCallUsage`, `recordModelCallFailure`. `recordUsage` prend désormais un nombre de caractères. | `openrouter.telemetry.test.ts` |
+| **Passe 2 :** `server/skills/documentLinker.ts` | Appels OpenRouter et Gemini hors télémétrie et hors budget | Passe par `generateText` (fournisseur du profil forcé). Changement de comportement mineur : Gemini utilise désormais température 0.3, auparavant valeur par défaut du modèle. | tsc, suite complète |
+| **Passe 2 :** `server/routes/upload-document.ts` | idem | Gemini via `generateText`. OpenRouter multimodal via les helpers. Gemini utilise désormais la température du profil (défaut 0.7) au lieu de celle du modèle. | tsc, suite complète |
+| **Passe 2 :** `server/routes/openrouter.ts` | Proxy `/chat` et `/test` hors télémétrie et budget | Budget avant l'appel amont (429), usage et échecs enregistrés. | `openrouter.telemetry.test.ts` (2) |
+| **Passe 2 :** `server/utils/tokenOptimizer.ts` | Perte des décisions critiques ; `summarizeWithLLM` limité aux 30 premiers messages | `extractCriticalStatements`, section « Points critiques préservés », entrée LLM bornée par caractères en partant des messages les plus récents. | `tokenOptimizer.test.ts` (4), benchmark |
 
 ## H. Tests et validations
 
@@ -306,8 +335,8 @@ Commande : `node --import tsx scripts/token-optimizer-bench.mts`. Le benchmark e
 | `npm run typecheck` | exit 0 | exit 0 |
 | `npm run typecheck:test` | 1 erreur préexistante (`src/lib/fetchDedup.test.ts` TS2835) | même erreur unique, aucune nouvelle |
 | `npm run lint` | — | exit 0 (0 erreur ; avertissements de style préexistants) |
-| `npm test` | 1345 tests, 1336 pass, 9 fail | 1383 tests, 1374 pass, **mêmes 9 fail** |
-| Tests ciblés (`TelemetryService.test.ts`, `textGeneration.telemetry.test.ts`) | n/a | 38/38 pass |
+| `npm test` | 1345 tests, 1336 pass, 9 fail | Passe 1 : 1383 tests, 1374 pass. Passe 2 : 1389 tests, 1380 pass. **Mêmes 9 fail** dans les deux cas. |
+| Tests ciblés (`TelemetryService.test.ts`, `textGeneration.telemetry.test.ts`, `tokenOptimizer.test.ts`, `openrouter.telemetry.test.ts`) | n/a | 44/44 pass |
 | `scripts/token-optimizer-bench.mts` | n/a | exécuté (§F.2) |
 | `docs/audit-evidence/baseline-repro-2026-10-15.mts` | 9/9 défauts reproduits | n/a (API supprimée) |
 
@@ -327,8 +356,8 @@ Commande : `node --import tsx scripts/token-optimizer-bench.mts`. Le benchmark e
 
 | Priorité | Problème | Preuve | Action suivante |
 |---|---|---|---|
-| Haute | ~20 chemins facturables hors télémétrie et hors budget (§C.3), dont le proxy `/api/openrouter/chat` et les sessions Live | Recherche de code (§C.3) | Faire passer `documentLinker` et `upload-document` par `generateText`. Ajouter un `recordTokenUsage` pour les embeddings, le TTS, les images et les `usageMetadata` Live. Appeler `reserveBudget` sur chacun. |
-| Haute | Le résumé (local ou LLM) perd des décisions et contraintes anciennes | Benchmark §F.2 ; `summarizeWithLLM` : `slice(0,30)`, 300 caractères par message | Conserver explicitement les messages marqués décision, contrainte ou sécurité. Résumer par lots plutôt que tronquer. Ajouter un test de qualité. |
+| Haute | Embeddings, TTS, images et sessions Live restent hors télémétrie et hors budget (§C.3) | Recherche de code | Modéliser leurs unités de facturation (par image, par caractère, par token d'embedding, audio Live) dans `MODEL_PRICING`. Ensuite, appliquer `reserveModelCallBudget` et `recordModelCallUsage` à chacun. Pour Live, vérifier d'abord la sémantique de `usageMetadata` (cumulatif ou par tour). |
+| Moyenne | La préservation des faits critiques est lexicale (FR/EN) | `CRITICAL_STATEMENT_PATTERN` | Élargir les marqueurs ou laisser l'utilisateur épingler des messages. |
 | Haute | Tarifs `MODEL_PRICING` non vérifiés | Aucune source officielle consultée pour ces identifiants | Synchroniser avec les grilles fournisseurs (ou avec `usage.cost` d'OpenRouter) et dater les tarifs. |
 | Moyenne | ContextMonitor Live : cumul de `promptTokenCount` probablement surestimé | `LiveSocketHandler.ts:325` | Vérifier la sémantique sur une session réelle. Si elle est confirmée, utiliser le dernier `promptTokenCount` plutôt que la somme. |
 | Moyenne | `generateText` n'accepte pas d'`AbortSignal` | Lecture du code | Propager le signal de la tâche jusqu'à `fetch` et au SDK. |
@@ -340,10 +369,10 @@ Commande : `node --import tsx scripts/token-optimizer-bench.mts`. Le benchmark e
 ## J. Plan de suite
 
 L'audit sera terminé quand :
-1. Les chemins de §C.3 seront instrumentés et soumis à `reserveBudget`, avec un test par chemin qui vérifie à la fois l'enregistrement et le refus sur budget épuisé.
+1. Les chemins restants de §C.3 (embeddings, TTS, images, Live) seront instrumentés avec `reserveModelCallBudget` et `recordModelCallUsage`, après modélisation de leurs unités de facturation. Chaque chemin aura un test qui vérifie l'enregistrement et le refus sur budget épuisé. Les chemins de génération de texte sont faits (passe 2).
 2. Une mission dry-run représentative aura été mesurée de bout en bout par agent, avec des données exportées depuis `/api/observability/usage`. Cela demande un environnement avec clés et Supabase, ainsi que l'autorisation de l'utilisateur.
 3. `MODEL_PRICING` aura été rapproché d'une facture fournisseur sur une période donnée (écart documenté).
-4. Le test de qualité du résumé (fait critique préservé) passera.
+4. ~~Le test de qualité du résumé (fait critique préservé) passera.~~ Fait en passe 2 (`tokenOptimizer.test.ts`, benchmark §F.2).
 5. La sémantique du ContextMonitor Live aura été vérifiée sur une session réelle.
 
 Dépendances : les points 2, 3 et 5 nécessitent des accès réels (clés, Supabase, facture), indisponibles dans cet environnement.

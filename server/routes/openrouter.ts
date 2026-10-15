@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { guardUntrustedContent } from '../utils/promptInjectionGuard.js';
+import { reserveModelCallBudget, recordModelCallUsage, recordModelCallFailure } from '../utils/textGeneration.js';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
@@ -64,7 +65,12 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
         return;
       }
       const data: any = await response.json();
-      res.json({ status: 'success', reply: data?.choices?.[0]?.message?.content || '', model: data?.model });
+      const reply = data?.choices?.[0]?.message?.content || '';
+      recordModelCallUsage({
+        provider: 'openrouter', model: data?.model || model || 'google/gemini-3.6-flash',
+        rawUsage: data?.usage, promptCharCount: 18, outputText: reply, toolName: 'openrouter_key_test',
+      });
+      res.json({ status: 'success', reply, model: data?.model });
     } catch (e: any) {
       if (e.name === 'AbortError') res.json({ status: 'error', error: 'Connexion échouée (timeout 10s)' });
       else res.json({ status: 'error', error: e.message || 'Connexion échouée' });
@@ -153,6 +159,19 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
     const { messages: optimizedMessages, trimmed, summarized, summaryMethod, summaryTokensCost } =
       await optimizeMessagesWithLLM(guardedMessages, budget, { apiKey: key, model: 'openai/gpt-4o-mini' });
 
+    const chatModel = model || 'google/gemini-3.6-flash';
+    const promptCharCount = optimizedMessages.reduce(
+      (sum: number, m: any) => sum + (typeof m?.content === 'string' ? m.content.length : JSON.stringify(m?.content ?? '').length),
+      0,
+    );
+    let releaseBudget: () => void;
+    try {
+      releaseBudget = reserveModelCallBudget(chatModel, promptCharCount);
+    } catch (e: any) {
+      res.status(429).json({ status: 'error', error: e.message });
+      return;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -165,7 +184,7 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
           'X-Title': process.env.OPENROUTER_TITLE || 'Leanna',
         },
         body: JSON.stringify({
-          model: model || 'google/gemini-3.6-flash',
+          model: chatModel,
           messages: optimizedMessages,
           temperature: temperature ?? 0.9,
           top_p: topP ?? 0.95,
@@ -176,16 +195,29 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
       clearTimeout(timeoutId);
       if (!response.ok) {
         const errText = await response.text();
+        recordModelCallFailure('openrouter', chatModel, new Error(`OpenRouter ${response.status}`));
         res.status(response.status).json({ status: 'error', error: `OpenRouter ${response.status}: ${errText.slice(0, 500)}` });
         return;
       }
       const data = await response.json();
+      // Proxy de chat : auparavant hors télémétrie. Usage fournisseur (ou estimé) enregistré.
+      recordModelCallUsage({
+        provider: 'openrouter',
+        model: data?.model || chatModel,
+        rawUsage: data?.usage,
+        promptCharCount,
+        outputText: data?.choices?.[0]?.message?.content || '',
+        toolName: 'openrouter_chat_proxy',
+      });
       const optimization = trimmed > 0 ? { trimmedMessages: trimmed, summarized, summaryMethod, summaryTokensCost } : undefined;
       const promptInjection = injectionFlagged ? { flagged: true, maxRisk: injectionRisk } : undefined;
       res.json({ status: 'success', data, optimization, promptInjection });
     } catch (e: any) {
+      recordModelCallFailure('openrouter', chatModel, e);
       if (e.name === 'AbortError') res.status(504).json({ status: 'error', error: 'Délai d\'attente OpenRouter dépassé (30s)' });
       else res.status(500).json({ status: 'error', error: e.message || 'Erreur réseau OpenRouter' });
+    } finally {
+      releaseBudget();
     }
   });
 

@@ -383,7 +383,7 @@ function recordUsage(
   provider: Provider,
   model: string,
   usage: NormalizedUsage | undefined,
-  options: GenerateTextOptions,
+  inputChars: number,
   outputText: string,
   meta: AttemptMeta,
   streamed: boolean,
@@ -398,7 +398,7 @@ function recordUsage(
     }
   }
   const normalized: NormalizedUsage = usage ?? {
-    inputTokens: estimateTokensFromChars(promptChars(options)),
+    inputTokens: estimateTokensFromChars(inputChars),
     outputTokens: estimateTokensFromChars(outputText.length),
   };
   const costUsd = telemetryService.recordTokenUsage({
@@ -429,6 +429,63 @@ function recordUsage(
     },
     costUsd,
   };
+}
+
+// ── Helpers publics pour les appels hors wrapper ────────────────────────────
+//
+// Certains appels ne peuvent pas passer par generateText (messages multimodaux
+// OpenRouter, proxy de chat multi-messages, sessions Live). Ces helpers leur
+// appliquent les MÊMES règles : budget réservé avant l'envoi, usage enregistré
+// avec le contexte de télémétrie courant.
+
+/**
+ * Réserve le budget de la mission courante pour un appel direct. Lève
+ * BudgetExceededError si l'appel ne peut plus être autorisé. Appeler la
+ * fonction retournée une fois la réponse comptabilisée (ou en échec).
+ */
+export function reserveModelCallBudget(model: string, promptCharCount: number): () => void {
+  const { missionId } = getTelemetryContext();
+  const reservation = telemetryService.reserveBudget(missionId, {
+    model,
+    inputTokens: estimateTokensFromChars(promptCharCount),
+  });
+  if (!reservation.allowed) throw new BudgetExceededError(missionId!, reservation.reason);
+  return reservation.release;
+}
+
+/**
+ * Enregistre l'usage d'un appel direct. `rawUsage` est l'objet d'usage brut du
+ * fournisseur (`usage` OpenRouter ou `usageMetadata` Gemini) ; absent, l'usage
+ * est estimé à partir de `promptCharCount` et `outputText`. Retourne le coût.
+ */
+export function recordModelCallUsage(params: {
+  provider: Provider;
+  model: string;
+  rawUsage: unknown;
+  promptCharCount: number;
+  outputText: string;
+  toolName?: string;
+  streamed?: boolean;
+}): number {
+  const normalized = params.provider === 'gemini'
+    ? normalizeGeminiUsage(params.rawUsage)
+    : normalizeOpenRouterUsage(params.rawUsage);
+  const ctx = getTelemetryContext();
+  const run = () => recordUsage(
+    params.provider,
+    params.model,
+    normalized,
+    params.promptCharCount,
+    params.outputText,
+    {},
+    params.streamed === true,
+  ).costUsd;
+  return params.toolName && !ctx.toolName ? runWithTelemetryContext({ toolName: params.toolName }, run) : run();
+}
+
+/** Enregistre l'échec d'un appel direct (aucun token ajouté, coût inconnu). */
+export function recordModelCallFailure(provider: Provider, model: string, error: unknown): void {
+  recordFailure(provider, model, error, {});
 }
 
 function recordFailure(provider: Provider, model: string, error: unknown, meta: AttemptMeta): void {
@@ -570,11 +627,11 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
     }
   } catch (error) {
     // Flux interrompu : la partie déjà générée est facturée — on la comptabilise.
-    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), options, fullText, {}, true);
+    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true);
     throw error;
   }
 
-  recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), options, fullText, {}, true);
+  recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true);
   options.onDone?.(fullText);
   return fullText;
 }
@@ -668,14 +725,14 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       }
     }
 
-    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), options, fullText, {}, true);
+    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
     options.onDone?.(fullText);
     return fullText;
   } catch (e: any) {
     clearTimeout(timeoutId);
     if (requestSent) {
       // Réponse acceptée puis flux coupé/annulé : la génération partielle est facturée.
-      recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), options, fullText, {}, true);
+      recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
     } else {
       recordFailure('openrouter', model, e, {});
     }
@@ -748,7 +805,7 @@ async function generateWithGemini(options: GenerateTextOptions, meta: AttemptMet
     }
 
     const { tokenUsage, costUsd } = recordUsage(
-      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), options, text, meta, false,
+      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), promptChars(options), text, meta, false,
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);
@@ -846,7 +903,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     const text = data.choices?.[0]?.message?.content || '';
 
     const { tokenUsage, costUsd } = recordUsage(
-      'openrouter', model, normalizeOpenRouterUsage(data.usage), options, text, meta, false,
+      'openrouter', model, normalizeOpenRouterUsage(data.usage), promptChars(options), text, meta, false,
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);

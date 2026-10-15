@@ -571,60 +571,21 @@ export const documentLinkerSkill: Skill = {
 async function callLLMForAnalysis(prompt: string, context?: any): Promise<string> {
   // Tenter d'utiliser le provider du profil via le context
   const profile = context?.profile || context?.getProfile?.() || null;
-  const provider = profile?.textProvider || "gemini";
+  const provider: "gemini" | "openrouter" = profile?.textProvider || "gemini";
 
-  if (provider === "openrouter") {
-    const orKey =
-      profile?.openrouterApiKey?.trim() ||
-      process.env.OPENROUTER_API_KEY ||
-      process.env.OPENROUTER_FREE_API_KEY;
-
-    if (!orKey) {
-      throw new Error("Aucune clé API OpenRouter disponible.");
-    }
-
-    const orModel = profile?.openrouterModel || "google/gemini-3.6-flash";
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90_000);
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${orKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://Leanna.local",
-        "X-Title": "Leanna DocumentLinker",
-      },
-      body: JSON.stringify({
-        model: orModel,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenRouter ${response.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || "";
-  } else {
-    // Gemini
-    const { withGeminiRetry } = await import("../utils/geminiKeyPool.js");
-    const response = await withGeminiRetry((ai) =>
-      ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      })
-    );
-    return response.text || "";
-  }
+  // Passe par le wrapper central : télémétrie (tokens, coût, tâche/mission) et
+  // budget de mission appliqués avant l'envoi. forceProvider conserve le
+  // comportement d'origine (provider du profil, sans fallback inter-provider).
+  const { generateText } = await import("../utils/textGeneration.js");
+  const response = await generateText({
+    prompt,
+    temperature: 0.3,
+    forceProvider: provider,
+    ...(provider === "openrouter"
+      ? { openrouterModel: profile?.openrouterModel || "google/gemini-3.6-flash", maxTokens: 2048 }
+      : { geminiModel: "gemini-3.8-flash" }),
+  });
+  return response.text || "";
 }
 
 /**

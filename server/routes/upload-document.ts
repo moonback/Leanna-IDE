@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { createRateLimiter } from '../security.js';
-import { withGeminiRetry } from '../utils/geminiKeyPool.js';
+import { generateText, runWithTelemetryContext, reserveModelCallBudget, recordModelCallUsage, recordModelCallFailure } from '../utils/textGeneration.js';
 import { ProfileConfig } from '../prompts/systemInstruction.js';
 import { scanPromptInjection } from '../utils/promptInjectionGuard.js';
 import { createLogger } from '../utils/logger.js';
@@ -127,21 +127,41 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
           messages = [{ role: 'user', content: analysisPrompt }];
         }
 
+        // Appel direct (messages multimodaux image_url non gérés par generateText) :
+        // mêmes règles que le wrapper — budget avant envoi, usage enregistré.
+        // L'estimation d'entrée ne compte que le texte (l'image n'est pas estimable localement).
+        const releaseBudget = reserveModelCallBudget(orModel, analysisPrompt.length);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60_000);
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${orKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://Leanna.local', 'X-Title': 'Leanna' },
-          body: JSON.stringify({ model: orModel, messages, temperature: 0.3, max_tokens: 1024 }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`OpenRouter ${response.status}: ${errText.slice(0, 300)}`);
+        try {
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${orKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://Leanna.local', 'X-Title': 'Leanna' },
+            body: JSON.stringify({ model: orModel, messages, temperature: 0.3, max_tokens: 1024 }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenRouter ${response.status}: ${errText.slice(0, 300)}`);
+          }
+          const data = await response.json();
+          summary = data.choices?.[0]?.message?.content || '';
+          recordModelCallUsage({
+            provider: 'openrouter',
+            model: data.model || orModel,
+            rawUsage: data.usage,
+            promptCharCount: analysisPrompt.length,
+            outputText: summary,
+            toolName: 'upload_document',
+          });
+        } catch (err) {
+          clearTimeout(timeoutId);
+          recordModelCallFailure('openrouter', orModel, err);
+          throw err;
+        } finally {
+          releaseBudget();
         }
-        const data = await response.json();
-        summary = data.choices?.[0]?.message?.content || '';
       } else {
         let geminiParts: any[];
         if (file.mimetype.startsWith('image/')) {
@@ -152,10 +172,14 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
         } else {
           geminiParts = [{ text: analysisPrompt }];
         }
-        const response = await withGeminiRetry((ai) => ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: [{ role: 'user', parts: geminiParts }],
-        }));
+        // Wrapper central : télémétrie + budget (geminiParts multimodales supportées).
+        const response = await runWithTelemetryContext({ toolName: 'upload_document' }, () =>
+          generateText({
+            prompt: analysisPrompt,
+            geminiParts,
+            geminiModel: 'gemini-3.8-flash',
+            forceProvider: 'gemini',
+          }));
         summary = response.text || '';
       }
 
