@@ -123,6 +123,12 @@ export function createOpenRouterRouter(_getProfile: () => any): Router {
         res.json({ status: 'error', error: 'Réponse sans données image (b64_json absent).' });
         return;
       }
+      recordModelCallUsage({
+        provider: 'openrouter', model: data?.model || model.trim(),
+        rawUsage: data?.usage ? { ...data.usage, cost: data.usage.cost ?? data.usage.total_cost } : undefined,
+        promptCharCount: 0, outputText: '', toolName: 'openrouter_image_test',
+        kind: 'image', units: 1, unit: 'images',
+      });
       const sizeKB = Math.round((b64.length * 3 / 4) / 1024);
       res.json({ status: 'success', model: data?.model || model.trim(), sizeKB });
     } catch (e: any) {

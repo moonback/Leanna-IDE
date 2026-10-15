@@ -4,7 +4,8 @@
 -- Ajoute les colonnes permettant de distinguer :
 --   * tokens mis en cache / de raisonnement (inclus dans input/output_tokens) ;
 --   * usage mesuré (fournisseur) vs estimé (réponse sans métadonnées) ;
---   * tarif exact / normalisé / gratuit / par défaut (modèle inconnu) ;
+--   * tarif exact / normalisé / gratuit / par défaut (modèle inconnu) / non tarifé ;
+--   * nature de l'appel (texte, embedding, TTS, image, Live) et unités facturées ;
 --   * appel de secours (fallback) et fournisseur initial ;
 --   * appels streamés ;
 --   * coût renvoyé par le fournisseur (OpenRouter usage.cost) pour comparaison.
@@ -20,5 +21,9 @@ alter table public.token_usage add column if not exists is_fallback         bool
 alter table public.token_usage add column if not exists fallback_from       text;
 alter table public.token_usage add column if not exists streamed            boolean not null default false;
 alter table public.token_usage add column if not exists provider_cost_usd   double precision;
+-- Appels non textuels (embedding, tts, image, live) et unités hors tokens.
+alter table public.token_usage add column if not exists call_kind           text    not null default 'text';
+alter table public.token_usage add column if not exists billed_units        double precision;
+alter table public.token_usage add column if not exists billed_unit         text;
 
 create index if not exists token_usage_provider_idx on public.token_usage (provider);

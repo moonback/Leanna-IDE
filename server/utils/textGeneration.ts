@@ -12,7 +12,7 @@
 import { withGeminiRetry } from "./geminiKeyPool.js";
 import { getNextGeminiKey } from "./geminiKeyPool.js";
 import { GoogleGenAI } from "@google/genai";
-import { telemetryService } from "../observability/TelemetryService.js";
+import { telemetryService, type CallKind, type BillingUnit } from "../observability/TelemetryService.js";
 import { guardUntrustedContent } from "./promptInjectionGuard.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 
@@ -342,7 +342,8 @@ export function normalizeGeminiUsage(u: any): NormalizedUsage | undefined {
   if (!u || typeof u !== 'object') return undefined;
   const prompt = num(u.promptTokenCount);
   const toolUse = num(u.toolUsePromptTokenCount);
-  const candidates = num(u.candidatesTokenCount);
+  // Les sessions Live renvoient la sortie dans `responseTokenCount`.
+  const candidates = num(u.candidatesTokenCount) || num(u.responseTokenCount);
   const thoughts = num(u.thoughtsTokenCount);
   if (prompt + toolUse + candidates + thoughts === 0 && !num(u.totalTokenCount)) return undefined;
   return {
@@ -387,6 +388,7 @@ function recordUsage(
   outputText: string,
   meta: AttemptMeta,
   streamed: boolean,
+  extra: { kind?: CallKind; units?: number; unit?: BillingUnit } = {},
 ): { tokenUsage: NonNullable<GenerateTextResult['tokenUsage']>; costUsd: number } {
   const ctx = getTelemetryContext();
   const estimated = !usage;
@@ -417,6 +419,7 @@ function recordUsage(
     fallbackFrom: meta.fallbackFrom,
     streamed,
     providerCostUsd: normalized.providerCostUsd,
+    ...extra,
   });
   return {
     tokenUsage: {
@@ -440,14 +443,18 @@ function recordUsage(
 
 /**
  * Réserve le budget de la mission courante pour un appel direct. Lève
- * BudgetExceededError si l'appel ne peut plus être autorisé. Appeler la
- * fonction retournée une fois la réponse comptabilisée (ou en échec).
+ * BudgetExceededError si l'appel ne peut plus être autorisé (budget déjà
+ * dépassé, ou estimation d'entrée qui le ferait dépasser). Appeler la fonction
+ * retournée une fois la réponse comptabilisée (ou en échec).
  */
-export function reserveModelCallBudget(model: string, promptCharCount: number): () => void {
+export function reserveModelCallBudget(model: string, promptCharCount: number, kind: CallKind = 'text'): () => void {
   const { missionId } = getTelemetryContext();
   const reservation = telemetryService.reserveBudget(missionId, {
     model,
-    inputTokens: estimateTokensFromChars(promptCharCount),
+    // TTS/images ne sont pas facturés en tokens : seule la règle « budget déjà
+    // dépassé » s'applique à eux.
+    inputTokens: kind === 'tts' || kind === 'image' ? 0 : estimateTokensFromChars(promptCharCount),
+    kind,
   });
   if (!reservation.allowed) throw new BudgetExceededError(missionId!, reservation.reason);
   return reservation.release;
@@ -456,7 +463,9 @@ export function reserveModelCallBudget(model: string, promptCharCount: number): 
 /**
  * Enregistre l'usage d'un appel direct. `rawUsage` est l'objet d'usage brut du
  * fournisseur (`usage` OpenRouter ou `usageMetadata` Gemini) ; absent, l'usage
- * est estimé à partir de `promptCharCount` et `outputText`. Retourne le coût.
+ * est estimé à partir de `promptCharCount` et `outputText` (texte, embedding,
+ * Live). Pour TTS / images, `units` + `unit` décrivent la quantité facturée.
+ * Retourne le coût calculé (0 si l'appel n'est pas tarifé : `unpriced`).
  */
 export function recordModelCallUsage(params: {
   provider: Provider;
@@ -466,10 +475,21 @@ export function recordModelCallUsage(params: {
   outputText: string;
   toolName?: string;
   streamed?: boolean;
+  kind?: CallKind;
+  units?: number;
+  unit?: BillingUnit;
 }): number {
-  const normalized = params.provider === 'gemini'
+  const kind = params.kind ?? 'text';
+  let normalized = params.provider === 'gemini'
     ? normalizeGeminiUsage(params.rawUsage)
     : normalizeOpenRouterUsage(params.rawUsage);
+  // Live : un message sans usage ne correspond à aucune requête facturée.
+  if (!normalized && kind === 'live') return 0;
+  // TTS / images : la quantité facturée est `units`, pas une estimation de tokens.
+  if (!normalized && (kind === 'tts' || kind === 'image')) {
+    const cost = (params.rawUsage as { cost?: unknown } | undefined)?.cost;
+    normalized = { inputTokens: 0, outputTokens: 0, ...(typeof cost === 'number' ? { providerCostUsd: cost } : {}) };
+  }
   const ctx = getTelemetryContext();
   const run = () => recordUsage(
     params.provider,
@@ -479,8 +499,44 @@ export function recordModelCallUsage(params: {
     params.outputText,
     {},
     params.streamed === true,
+    { kind, units: params.units, unit: params.unit },
   ).costUsd;
   return params.toolName && !ctx.toolName ? runWithTelemetryContext({ toolName: params.toolName }, run) : run();
+}
+
+/**
+ * `ai.models.embedContent` avec budget de mission et télémétrie. L'API Gemini
+ * ne renvoie pas d'usage pour les embeddings : les tokens d'entrée sont estimés
+ * (~4 car./token, `usageSource:'estimated'`) et l'appel est `unpriced` tant
+ * qu'aucun tarif d'embedding n'est configuré.
+ */
+export async function trackedGeminiEmbed(
+  ai: GoogleGenAI,
+  params: Parameters<GoogleGenAI['models']['embedContent']>[0],
+): Promise<Awaited<ReturnType<GoogleGenAI['models']['embedContent']>>> {
+  const contents = params.contents as unknown;
+  const promptCharCount = typeof contents === 'string'
+    ? contents.length
+    : JSON.stringify(contents ?? '').length;
+  const release = reserveModelCallBudget(params.model, promptCharCount, 'embedding');
+  try {
+    const response = await ai.models.embedContent(params);
+    recordModelCallUsage({
+      provider: 'gemini',
+      model: params.model,
+      rawUsage: undefined,
+      promptCharCount,
+      outputText: '',
+      toolName: 'embeddings',
+      kind: 'embedding',
+    });
+    return response;
+  } catch (error) {
+    recordFailure('gemini', params.model, error, {});
+    throw error;
+  } finally {
+    release();
+  }
 }
 
 /** Enregistre l'échec d'un appel direct (aucun token ajouté, coût inconnu). */

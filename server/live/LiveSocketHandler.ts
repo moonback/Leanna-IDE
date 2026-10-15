@@ -23,6 +23,7 @@ import { isSandboxActive, getSandboxState } from '../utils/sandbox.js';
 import { getNextGeminiKey, describeKey } from '../utils/geminiKeyPool.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
 import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
+import { recordModelCallUsage } from '../utils/textGeneration.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { Supervisor } from '../autonomy/index.js';
 import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
@@ -1028,6 +1029,12 @@ export function attachLiveWebSocket(
               const completionTokens = usageMetadata.candidatesTokenCount ?? usageMetadata.responseTokenCount ?? 0;
               const totalTokens = usageMetadata.totalTokenCount ?? 0;
               monitorConversationContext(promptTokens, completionTokens);
+              // Télémétrie centrale : chaque usageMetadata Live décrit UNE requête
+              // (doc SDK : « for this request »), facturée comme telle.
+              recordModelCallUsage({
+                provider: 'gemini', model: 'gemini-3.8-live', rawUsage: usageMetadata,
+                promptCharCount: 0, outputText: '', toolName: 'gemini_live', kind: 'live',
+              });
               const cumulative = conversationCtx.totalPromptTokens + conversationCtx.totalCompletionTokens;
               clientWs.send(JSON.stringify({
                 token_usage: {

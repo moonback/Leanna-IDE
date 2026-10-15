@@ -115,6 +115,9 @@ router.get('/dashboard', (req: Request, res: Response) => {
         reasoningTokens: stats.reasoningTokens,
         estimatedCalls: stats.estimatedCalls,
         defaultPricedCalls: stats.defaultPricedCalls,
+        // Appels non textuels sans tarif configuré : coût inconnu (non inclus dans totalCost).
+        unpricedCalls: stats.unpricedCalls,
+        byKind: stats.byKind,
         fallbackCalls: stats.fallbackCalls,
         unattributedCalls: stats.unattributedCalls,
         coverage: stats.coverage,

@@ -18,6 +18,7 @@
  */
 
 import { createLogger } from "./logger.js";
+import { reserveModelCallBudget, recordModelCallUsage, recordModelCallFailure } from "./textGeneration.js";
 
 const log = createLogger("TTS");
 
@@ -409,6 +410,9 @@ async function callOpenRouter(
 
   const providerKey = "openrouter_kokoro";
   const start = Date.now();
+  // Budget de mission (TTS facturé au caractère : seule la règle « budget déjà
+  // dépassé » s'applique) puis télémétrie centrale en fin d'appel.
+  const releaseBudget = reserveModelCallBudget(model, text.length, "tts");
 
   try {
     const body: Record<string, any> = {
@@ -447,12 +451,19 @@ async function callOpenRouter(
     const buffer = Buffer.from(arrayBuffer);
     const base64Audio = buffer.toString("base64");
 
+    recordModelCallUsage({
+      provider: "openrouter", model, rawUsage: undefined, promptCharCount: text.length,
+      outputText: "", toolName: "tts", kind: "tts", units: text.length, unit: "characters",
+    });
     recordMetric(providerKey, Date.now() - start, false);
     log.debug(`[${providerKey}] Audio (${voice}, speed=${speed}): "${text.slice(0, 40)}..." → ${Math.round(buffer.length / 1024)}KB en ${Date.now() - start}ms`);
     return base64Audio;
   } catch (err) {
     recordMetric(providerKey, Date.now() - start, true);
+    recordModelCallFailure("openrouter", model, err);
     throw err;
+  } finally {
+    releaseBudget();
   }
 }
 
@@ -461,11 +472,11 @@ async function callOpenRouter(
  */
 async function callGemini(text: string, voiceName: string): Promise<string | null> {
   const start = Date.now();
+  const model = "gemini-3.8-flash-preview-tts";
+  const releaseBudget = reserveModelCallBudget(model, text.length, "tts");
 
   try {
     const { withGeminiRetry } = await import("./geminiKeyPool.js");
-
-    const model = "gemini-3.8-flash-preview-tts";
 
     const response = await withGeminiRetry(
       (ai) =>
@@ -487,6 +498,13 @@ async function callGemini(text: string, voiceName: string): Promise<string | nul
       30_000 // timeout 30s pour TTS
     );
 
+    // Requête traitée (facturée) même si aucun audio n'est exploitable.
+    recordModelCallUsage({
+      provider: "gemini", model, rawUsage: (response as { usageMetadata?: unknown }).usageMetadata,
+      promptCharCount: text.length, outputText: "", toolName: "tts", kind: "tts",
+      units: text.length, unit: "characters",
+    });
+
     const audioData = getInlineAudioData(response);
     if (!audioData) {
       recordMetric("gemini", Date.now() - start, true);
@@ -498,7 +516,10 @@ async function callGemini(text: string, voiceName: string): Promise<string | nul
     return audioData;
   } catch (err) {
     recordMetric("gemini", Date.now() - start, true);
+    recordModelCallFailure("gemini", model, err);
     throw err;
+  } finally {
+    releaseBudget();
   }
 }
 

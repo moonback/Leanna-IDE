@@ -19,6 +19,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Memory } from "./Memory.js";
 import { projectMemory, ProjectMemory } from "../knowledge/ProjectMemory.js";
 import { createGeminiClient } from "../utils/geminiKeyPool.js";
+import { trackedGeminiEmbed } from "../utils/textGeneration.js";
 import { getActiveProjectId } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import type { ProjectFact, ProjectKnowledgeCategory } from "../knowledge/types.js";
@@ -199,7 +200,7 @@ export class HierarchicalMemoryService {
           const ai = createGeminiClient();
           if (query && ai) {
             try {
-              const embedResponse = await ai.models.embedContent({
+              const embedResponse = await trackedGeminiEmbed(ai, {
                 model: "gemini-embedding-2",
                 contents: query,
                 config: { outputDimensionality: 768 },
@@ -438,7 +439,7 @@ export class HierarchicalMemoryService {
         try {
           const ai = createGeminiClient();
           if (ai) {
-            const embedResponse = await ai.models.embedContent({
+            const embedResponse = await trackedGeminiEmbed(ai, {
               model: "gemini-embedding-2",
               contents: input.content,
               config: { outputDimensionality: 768 },

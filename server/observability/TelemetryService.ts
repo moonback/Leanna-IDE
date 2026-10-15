@@ -35,9 +35,18 @@ export type UsageSource = 'provider' | 'estimated';
  *  - `normalized` : trouvée après normalisation (préfixe `models/`, suffixe
  *    `-preview-…`, `-latest`, `-001`…) ;
  *  - `free`       : variante OpenRouter `:free` (tarif nul) ;
- *  - `default`    : modèle inconnu → DEFAULT_PRICING (coût NON fiable).
+ *  - `default`    : modèle inconnu → DEFAULT_PRICING (coût NON fiable) ;
+ *  - `unpriced`   : appel non textuel (embedding, TTS, image, Live) sans tarif
+ *    configuré : coût INCONNU, compté 0 $ et signalé — jamais extrapolé depuis
+ *    un tarif de génération de texte.
  */
-export type PricingSource = 'exact' | 'normalized' | 'free' | 'default';
+export type PricingSource = 'exact' | 'normalized' | 'free' | 'default' | 'unpriced';
+
+/** Nature de l'appel facturable. */
+export type CallKind = 'text' | 'embedding' | 'tts' | 'image' | 'live';
+
+/** Unité facturée pour les appels non mesurés en tokens. */
+export type BillingUnit = 'characters' | 'images';
 
 export interface TokenUsage {
   id: string;
@@ -67,6 +76,11 @@ export interface TokenUsage {
   streamed?: boolean;
   /** Coût renvoyé par le fournisseur (OpenRouter `usage.cost`), pour comparaison. */
   providerCostUsd?: number;
+  /** Nature de l'appel (absent = 'text'). */
+  kind?: CallKind;
+  /** Quantité facturée hors tokens (caractères TTS, images générées). */
+  units?: number;
+  unit?: BillingUnit;
 }
 
 /** Tentative d'appel modèle en échec (aucun token facturé connu). */
@@ -97,6 +111,9 @@ export interface RecordTokenUsageParams {
   fallbackFrom?: 'gemini' | 'openrouter';
   streamed?: boolean;
   providerCostUsd?: number;
+  kind?: CallKind;
+  units?: number;
+  unit?: BillingUnit;
 }
 
 export interface PersistenceStatus {
@@ -174,11 +191,18 @@ const warnedUnknownModels = new Set<string>();
  * préversion : une variante distincte (ex. `-lite`) n'hérite jamais du tarif
  * du modèle de base et tombe sur DEFAULT_PRICING (source `default`).
  */
-export function resolvePricing(model: string): { pricing: ModelPricing; source: PricingSource; key: string } {
+export function resolvePricing(
+  model: string,
+  kind: CallKind = 'text',
+): { pricing: ModelPricing; source: PricingSource; key: string } {
   if (MODEL_PRICING[model]) return { pricing: MODEL_PRICING[model], source: 'exact', key: model };
 
   const lower = (model || '').trim().toLowerCase();
   if (lower.endsWith(':free')) return { pricing: FREE_PRICING, source: 'free', key: lower };
+
+  // Appels non textuels : aucune normalisation ni tarif par défaut (un modèle
+  // TTS « …-flash-preview-tts » n'a PAS le tarif du modèle texte « …-flash »).
+  if (kind !== 'text') return { pricing: FREE_PRICING, source: 'unpriced', key: 'unpriced' };
 
   const base = lower.replace(/^models\//, '').replace(/:[a-z0-9._-]+$/, '');
   const candidates = [
@@ -430,8 +454,14 @@ export class TelemetryService {
   recordTokenUsage(params: RecordTokenUsageParams): number {
     const inputTokens = nonNegative(params.inputTokens);
     const outputTokens = nonNegative(params.outputTokens);
-    const { pricing, source: pricingSource } = resolvePricing(params.model);
-    const costUsd = computeCost(pricing, inputTokens, outputTokens);
+    const kind: CallKind = params.kind ?? 'text';
+    const resolved = resolvePricing(params.model, kind);
+    const pricingSource = resolved.source;
+    // Appel non tarifé : le coût fourni par le fournisseur (s'il existe) est le
+    // seul chiffre fiable ; sinon 0 $ marqué `unpriced` (coût inconnu).
+    const costUsd = pricingSource === 'unpriced'
+      ? (typeof params.providerCostUsd === 'number' ? Math.max(0, params.providerCostUsd) : 0)
+      : computeCost(resolved.pricing, inputTokens, outputTokens);
     const usageSource: UsageSource = params.usageSource ?? 'provider';
 
     const usage: TokenUsage = {
@@ -454,6 +484,8 @@ export class TelemetryService {
       ...(params.isFallback ? { isFallback: true, fallbackFrom: params.fallbackFrom } : {}),
       ...(params.streamed ? { streamed: true } : {}),
       ...(typeof params.providerCostUsd === 'number' ? { providerCostUsd: params.providerCostUsd } : {}),
+      ...(kind !== 'text' ? { kind } : {}),
+      ...(params.units !== undefined ? { units: nonNegative(params.units), unit: params.unit } : {}),
     };
 
     this.counters.recorded++;
@@ -505,8 +537,8 @@ export class TelemetryService {
   /**
    * Calculate cost for given token counts (utility method).
    */
-  calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-    return computeCost(resolvePricing(model).pricing, nonNegative(inputTokens), nonNegative(outputTokens));
+  calculateCost(model: string, inputTokens: number, outputTokens: number, kind: CallKind = 'text'): number {
+    return computeCost(resolvePricing(model, kind).pricing, nonNegative(inputTokens), nonNegative(outputTokens));
   }
 
   // ─── Budget Guardrails ─────────────────────────────────────────────────────
@@ -546,7 +578,7 @@ export class TelemetryService {
    */
   reserveBudget(
     missionId: string | undefined,
-    estimate: { model: string; inputTokens: number },
+    estimate: { model: string; inputTokens: number; kind?: CallKind },
   ): BudgetReservation {
     const noop: BudgetReservation = { allowed: true, release: () => {} };
     if (!missionId) return noop;
@@ -561,7 +593,7 @@ export class TelemetryService {
     if (status.exceeded) return deny(status.reason || 'Budget de mission dépassé');
 
     const tokens = nonNegative(estimate.inputTokens);
-    const costUsd = this.calculateCost(estimate.model, tokens, 0);
+    const costUsd = this.calculateCost(estimate.model, tokens, 0, estimate.kind);
     const reserved = this.inFlight.get(missionId) ?? { tokens: 0, costUsd: 0 };
 
     if (budget.maxTokens && status.tokensUsed + reserved.tokens + tokens > budget.maxTokens) {
@@ -677,6 +709,9 @@ export class TelemetryService {
     reasoningTokens: number;
     estimatedCalls: number;
     defaultPricedCalls: number;
+    /** Appels non textuels sans tarif configuré : coût inconnu (compté 0 $). */
+    unpricedCalls: number;
+    byKind: Record<string, { tokens: number; cost: number; calls: number; units: number }>;
     fallbackCalls: number;
     unattributedCalls: number;
     coverage: {
@@ -709,6 +744,8 @@ export class TelemetryService {
       reasoningTokens: 0,
       estimatedCalls: 0,
       defaultPricedCalls: 0,
+      unpricedCalls: 0,
+      byKind: {} as Record<string, { tokens: number; cost: number; calls: number; units: number }>,
       fallbackCalls: 0,
       unattributedCalls: 0,
       coverage: {
@@ -739,6 +776,12 @@ export class TelemetryService {
       stats.reasoningTokens += record.reasoningTokens ?? 0;
       if (record.usageSource === 'estimated') stats.estimatedCalls++;
       if (record.pricingSource === 'default') stats.defaultPricedCalls++;
+      if (record.pricingSource === 'unpriced') stats.unpricedCalls++;
+      const k = (stats.byKind[record.kind ?? 'text'] ??= { tokens: 0, cost: 0, calls: 0, units: 0 });
+      k.tokens += record.totalTokens;
+      k.cost += record.costUsd;
+      k.calls += 1;
+      k.units += record.units ?? 0;
       if (record.isFallback) stats.fallbackCalls++;
       if (!record.missionId && !record.taskId && !record.agentRole) stats.unattributedCalls++;
 
@@ -805,6 +848,9 @@ export class TelemetryService {
       cached_input_tokens: u.cachedInputTokens ?? 0,
       reasoning_tokens: u.reasoningTokens ?? 0,
       usage_source: u.usageSource,
+      call_kind: u.kind ?? 'text',
+      billed_units: u.units ?? null,
+      billed_unit: u.unit ?? null,
       pricing_source: u.pricingSource,
       is_fallback: u.isFallback ?? false,
       fallback_from: u.fallbackFrom ?? null,

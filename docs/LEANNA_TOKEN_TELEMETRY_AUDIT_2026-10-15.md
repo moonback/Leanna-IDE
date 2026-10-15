@@ -26,9 +26,16 @@
   - les chemins de génération de texte qui contournaient le wrapper (`documentLinker`, `upload-document`, proxy `/chat`) sont maintenant comptés et soumis au budget ;
   - les résumés de contexte ne perdent plus les décisions et contraintes anciennes (benchmark §F.2) ;
   - 6 tests supplémentaires.
+- Passe 3 :
+  - embeddings (OpenRouter et Gemini), TTS, génération d'images et sessions Live (principale, Notebook, présence vocale) sont maintenant comptés ;
+  - ces appels sont aussi soumis au budget de mission, sauf les sessions Live ouvertes ;
+  - les appels non textuels sans tarif configuré sont marqués `unpriced` (coût inconnu), jamais extrapolés ;
+  - garde-fou automatique contre tout futur appel fournisseur non instrumenté ;
+  - 10 tests supplémentaires.
 
 **Principaux risques restants (§I).**
-- Restent hors télémétrie centrale : embeddings, TTS, images, sessions Live, `/test-image`. Leur unité de facturation n'est pas modélisée ; la sémantique de l'usage Live n'est pas vérifiée.
+- Les coûts des appels non textuels (embeddings, TTS, images, Live) sont **inconnus** quand le fournisseur ne les renvoie pas. Aucun tarif n'est configuré pour ces unités ; les appels sont comptés et signalés (`unpricedCalls`), sans être chiffrés.
+- Jev (porte de sécurité) est compté mais volontairement **non** soumis au budget.
 - La préservation des faits critiques dans les résumés repose sur des marqueurs lexicaux (FR/EN).
 - Les tarifs configurés (`MODEL_PRICING`) ne sont pas certifiés par rapport aux grilles publiques.
 - Les budgets ne couvrent que les appels passant par `generateText` / `generateTextStream`.
@@ -59,7 +66,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | ID | Contrôle | Statut | Preuve / défaut / correction / test |
 |---|---|---|---|
 | A1 | Cartographie des points d'entrée | PASS (couverture documentée) | Voir §C. Obtenue par recherche exhaustive : `generateContent`, `generateContentStream`, `embedContent`, `live.connect`, `openrouter.ai`, `withGeminiRetry`, appelants de `generateText` et `generateTextStream`. |
-| A2 | Chemins qui échappent à la télémétrie | PARTIAL (passe 2) | **Corrigés en passe 2 :** les chemins de **génération de texte** (`documentLinker`, `upload-document`, proxy `/chat`, `/test`). **Restent hors suivi (§C.3) :** embeddings, TTS, images, sessions Live, `/test-image`. Leur unité de facturation (image, caractère audio, embedding) n'est pas modélisée et la sémantique de l'usage Live n'est pas vérifiée. |
+| A2 | Chemins qui échappent à la télémétrie | PASS (passes 2 et 3), couverture documentée | Tous les chemins facturables recensés en §C enregistrent maintenant leur usage. Passe 2 : génération de texte. Passe 3 : embeddings, TTS, images, Live. **Limite :** la couverture est démontrée par la recherche de code de §C (à la date de l'audit) et par des tests par chemin. Un nouveau point d'appel brut hors des modules instrumentés fait désormais échouer `telemetryCoverage.test.ts`. On a vérifié que le test détecte un fichier sonde contenant `ai.models.generateContent`. Le garde-fou est lexical : il repère les motifs `models.generate*/embedContent`, `live.connect` et les URL OpenRouter, pas un appel construit dynamiquement. |
 
 ### B — Télémétrie
 
@@ -70,7 +77,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | B3 | Usage fournisseur exploité | PASS (corrigé) | **Avant :** Gemini ignorait `thoughtsTokenCount` et `toolUsePromptTokenCount` (D9 : 150 comptés pour 550). **Correction :** `normalizeGeminiUsage`. **Tests :** `normalizeGeminiUsage counts thoughts…`, `Gemini call: thoughts tokens are billed…` |
 | B4 | Réponses sans usage traitées explicitement | PASS (corrigé) | Estimation à ~4 caractères par token, drapeau `estimated`, avertissement unique par modèle. Test de B1. |
 | B5 | Tokens en cache représentés | PASS (corrigé) | Champ `cachedInputTokens` (Gemini `cachedContentTokenCount`, OpenRouter `prompt_tokens_details.cached_tokens`). **Tests :** `normalizeOpenRouterUsage keeps cached…`, `recordTokenUsage: cached and reasoning…` |
-| B6 | Raisonnement et multimodal | PARTIAL | Le raisonnement est maintenant pris en compte. Pour le multimodal (`geminiParts` image) : les tokens fournisseur incluent l'image, mais l'**estimation** de repli ne compte que le texte. Les tarifs audio/image (TTS, images) ne sont pas modélisés. |
+| B6 | Raisonnement et multimodal | PARTIAL | Le raisonnement est pris en compte. Les sorties Live (`responseTokenCount`) sont lues depuis la passe 3. TTS et images sont comptés en unités facturées (`units`/`unit` : caractères, images). **Limites :** aucun tarif n'est configuré pour ces unités (`unpriced`, sauf coût renvoyé par OpenRouter), et l'estimation de repli des entrées multimodales ne compte que le texte. |
 | B7 | Échecs et retries enregistrés sans double comptage | PASS (corrigé) | `recordFailedCall` incrémente un compteur sans ajouter de tokens. **Tests :** `failed calls are counted without adding tokens`, `all providers failing…`. Les retries internes à `withGeminiRetry` (429/503) ne sont pas journalisés individuellement. |
 | B8 | Fallback distingué de l'appel initial | PASS (corrigé) | Champs `isFallback` et `fallbackFrom`, attribut de span `model.fallback_from`. **Test :** `primary failure then fallback success…` |
 | B9 | Fournisseur et modèle réels conservés après fallback | PASS | Même test : `provider:'openrouter'`, `model:'google/gemini-3.6-flash'`. |
@@ -111,7 +118,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 |---|---|---|---|
 | E1 | Limites d'`AgentExecutor` (code actuel) | PASS (valeurs confirmées) | `MAX_TOOL_TURNS = 10`, `MAX_OBSERVATION_CHARS = 80 000`, `MAX_FILE_CONTEXT_CHARS = 50 000`, `MAX_FILES_IN_CONTEXT = 10`. `EXECUTION_BUDGET` : `maxToolCalls = 60`, `maxFilesRead = 20`, `maxContextChars = 240 000` (`AgentExecutor.ts:584-600`). |
 | E2 | Fenêtre de contexte et budget financier distincts | PASS | `TokenBudget` (`tokenOptimizer`) et `BudgetConfig` (`TelemetryService`) sont des types séparés. |
-| E3 | ContextMonitor (Live) | NOT VERIFIED (défaut suspecté) | `LiveSocketHandler.ts:325` additionne `promptTokenCount` à chaque tour. Si ce compteur couvre déjà tout le contexte (sémantique Gemini usuelle), l'occupation est surestimée et les résumés se déclenchent trop tôt (appels LLM supplémentaires). Cela n'a pas pu être vérifié sans session Live réelle. |
+| E3 | ContextMonitor (Live) | PARTIAL (défaut probable, non corrigé) | `LiveSocketHandler.ts` additionne `promptTokenCount` à chaque tour. Le SDK installé (`@google/genai` 2.11.0, `UsageMetadata`) décrit ce champ comme le prompt **de la requête** (« for this request »). La somme sur plusieurs tours surestime donc très probablement l'occupation du contexte et déclenche les résumés trop tôt. C'est une preuve documentaire, pas une reproduction. Le seuil n'a pas été modifié : le changer retarderait les résumés, avec un risque de dépassement de fenêtre s'il était mal fondé. À valider sur une session réelle. Pour la **facturation**, l'enregistrement par requête (passe 3) suit cette même sémantique. |
 | E4 | Compression sans perte de règles de sécurité | PASS (mesuré) | Les messages `system` sont toujours conservés (benchmark : `systemRulePreserved: true`). |
 | E5 | Résumés préservent décisions et preuves | PARTIAL | Les décisions et contraintes sont maintenant préservées (D4). Les preuves sans marqueur lexical ne sont pas garanties. |
 
@@ -136,7 +143,7 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | G1 | Prévention avant génération | PASS (corrigé) | **Avant :** contrôle seulement entre les actions de mission ; la 2ᵉ génération partait malgré un budget dépassé (D3). **Après :** `BudgetExceededError` est levée avant tout envoi. **Test :** `budget exceeded: the next call is refused BEFORE reaching any provider` |
 | G2 | Appels parallèles (réservation) | PASS (corrigé) | `reserveBudget` compte les réservations en vol. **Tests :** `parallel calls in one mission…` (1 appel sur 3), `budget: in-flight reservations…` |
 | G3 | Budget de coût | PASS | **Test :** `budget: cost budget is enforced before the call` |
-| G4 | Appels hors wrapper | PARTIAL (passe 2) | **Désormais soumis au budget :** `documentLinker` (via `generateText`), `upload-document` et le proxy `/chat`, via `reserveModelCallBudget`. Le proxy répond 429 sans appel amont quand le budget est épuisé (test `/chat proxy is refused before the upstream call…`). **Restent hors budget :** embeddings, TTS, images, Live, Jev. |
+| G4 | Appels hors wrapper | PASS (passes 2 et 3), avec exceptions documentées | **Soumis au budget avant envoi :** `documentLinker`, `upload-document`, proxy `/chat`, embeddings OpenRouter et Gemini (tokens d'entrée estimés), TTS et images. Pour ces deux derniers, seule la règle « budget déjà dépassé » s'applique, faute de tarif. **Tests :** `nonTextTelemetry.test.ts`. **Exceptions :** (1) les sessions Live déjà ouvertes, que le budget ne peut pas interrompre tour par tour (§E) ; (2) Jev, porte de sécurité exclue volontairement, car un budget épuisé ne doit jamais désactiver un contrôle de sécurité (règle 2.3). |
 | G5 | Missions sans budget | PASS | **Test :** `budget: missions … are never blocked` |
 | G6 | Télémétrie indisponible | PASS | Les budgets reposent sur les compteurs en mémoire, indépendants de Supabase. Le mode reste fail-open pour la génération (choix documenté en §E). |
 
@@ -216,17 +223,18 @@ Statuts : PASS / FAIL (défaut constaté, non corrigé) / PARTIAL / NOT VERIFIED
 | `routes/openrouter.ts` `/chat` | Budget vérifié avant l'appel amont (429 sinon), usage et échecs enregistrés (`toolName:'openrouter_chat_proxy'`). |
 | `routes/openrouter.ts` `/test` | Usage enregistré (`openrouter_key_test`). |
 
-**Toujours hors télémétrie et hors budget :**
+**Instrumentés en passe 3 :**
 
-| Site | Fournisseur | Usage |
-|---|---|---|
-| `utils/geminiTTS.ts:424, 472` | OpenRouter `/audio/speech`, Gemini TTS | TTS |
-| `utils/imageGeneration.ts:79` | OpenRouter `/images/generations` | Génération d'images |
-| `utils/openrouterEmbeddings.ts:81` | OpenRouter `/embeddings` | Notebooks, sélection de skills |
-| `skills/memory.ts:199, 309`, `runtime/HierarchicalMemoryService.ts:202, 441` | Gemini `embedContent` | Mémoire |
-| `live/LiveSocketHandler.ts:908`, `live/NotebookLiveSocketHandler.ts:233`, `live/VoicePresence.ts:112` | Gemini Live | Voix (l'usage est seulement transmis au client) |
-| `routes/openrouter.ts` `/test-image` | OpenRouter | Test d'image (facturé à l'image) |
-| `utils/jevDecisions.ts:134` | OpenRouter decisions | Télémétrie propre, mais **pas de budget** |
+| Site | Type | Ce qui est enregistré | Budget avant envoi |
+|---|---|---|---|
+| `utils/openrouterEmbeddings.ts` | embedding | `usage` fournisseur et coût fournisseur ; un seul enregistrement même après retries | oui (tokens estimés) |
+| `skills/memory.ts` (×2), `runtime/HierarchicalMemoryService.ts` (×2), via `trackedGeminiEmbed` | embedding | tokens **estimés** (l'API Gemini ne renvoie pas d'usage) | oui |
+| `utils/geminiTTS.ts` (OpenRouter et Gemini) | tts | caractères facturés (`units`) ; usage Gemini si présent | règle « déjà dépassé » |
+| `utils/imageGeneration.ts`, `routes/openrouter.ts` `/test-image` | image | nombre d'images, coût fournisseur (`usage.total_cost`) | règle « déjà dépassé » (`/test-image` : non, test manuel de réglage) |
+| `live/LiveSocketHandler.ts`, `live/NotebookLiveSocketHandler.ts`, `live/VoicePresence.ts` | live | `usageMetadata` de chaque requête (`responseTokenCount` lu) | non (session déjà ouverte) |
+| `utils/jevDecisions.ts` | text | télémétrie propre (passe 1) | **non, volontairement** (porte de sécurité) |
+
+Tous ces appels sont `unpriced` (coût 0 $ signalé) sauf si le fournisseur renvoie un coût ou si un tarif exact est configuré.
 
 **Interface (`src/`).** Aucun appel modèle depuis le navigateur. `useLiveAPI` passe par le WebSocket du serveur.
 
@@ -326,6 +334,10 @@ La qualité est rétablie pour un surcoût de ~35 tokens estimés par résumé.
 | **Passe 2 :** `server/skills/documentLinker.ts` | Appels OpenRouter et Gemini hors télémétrie et hors budget | Passe par `generateText` (fournisseur du profil forcé). Changement de comportement mineur : Gemini utilise désormais température 0.3, auparavant valeur par défaut du modèle. | tsc, suite complète |
 | **Passe 2 :** `server/routes/upload-document.ts` | idem | Gemini via `generateText`. OpenRouter multimodal via les helpers. Gemini utilise désormais la température du profil (défaut 0.7) au lieu de celle du modèle. | tsc, suite complète |
 | **Passe 2 :** `server/routes/openrouter.ts` | Proxy `/chat` et `/test` hors télémétrie et budget | Budget avant l'appel amont (429), usage et échecs enregistrés. | `openrouter.telemetry.test.ts` (2) |
+| **Passe 3 :** `server/observability/TelemetryService.ts` | Appels non textuels tarifés au défaut texte ou ignorés | `CallKind` et `kind`, `units`/`unit`, source de tarif `unpriced` (coût fournisseur, sinon 0 $ signalé ; jamais de normalisation vers un tarif texte), agrégats `byKind` et `unpricedCalls`, colonnes `call_kind`, `billed_units` et `billed_unit` (migration). | `nonTextTelemetry.test.ts` |
+| **Passe 3 :** `server/utils/textGeneration.ts` | idem | `normalizeGeminiUsage` lit `responseTokenCount` (Live). Helpers avec `kind`/`units`. `trackedGeminiEmbed`. | `nonTextTelemetry.test.ts` |
+| **Passe 3 :** `server/observability/telemetryCoverage.test.ts` | Couverture établie seulement par recherche manuelle | Test qui échoue si un appel fournisseur brut apparaît hors d'un module instrumenté (liste justifiée, et contrôle des entrées obsolètes). | 2 tests, plus une vérification par sonde |
+| **Passe 3 :** embeddings, TTS, images, Live (6 fichiers) | Hors télémétrie et hors budget | Voir le tableau de passe 3 en §C.3. | `nonTextTelemetry.test.ts` (8) |
 | **Passe 2 :** `server/utils/tokenOptimizer.ts` | Perte des décisions critiques ; `summarizeWithLLM` limité aux 30 premiers messages | `extractCriticalStatements`, section « Points critiques préservés », entrée LLM bornée par caractères en partant des messages les plus récents. | `tokenOptimizer.test.ts` (4), benchmark |
 
 ## H. Tests et validations
@@ -335,8 +347,8 @@ La qualité est rétablie pour un surcoût de ~35 tokens estimés par résumé.
 | `npm run typecheck` | exit 0 | exit 0 |
 | `npm run typecheck:test` | 1 erreur préexistante (`src/lib/fetchDedup.test.ts` TS2835) | même erreur unique, aucune nouvelle |
 | `npm run lint` | — | exit 0 (0 erreur ; avertissements de style préexistants) |
-| `npm test` | 1345 tests, 1336 pass, 9 fail | Passe 1 : 1383 tests, 1374 pass. Passe 2 : 1389 tests, 1380 pass. **Mêmes 9 fail** dans les deux cas. |
-| Tests ciblés (`TelemetryService.test.ts`, `textGeneration.telemetry.test.ts`, `tokenOptimizer.test.ts`, `openrouter.telemetry.test.ts`) | n/a | 44/44 pass |
+| `npm test` | 1345 tests, 1336 pass, 9 fail | Passe 1 : 1383 tests, 1374 pass. Passe 2 : 1389 tests, 1380 pass. Passe 3 : 1399 tests, 1390 pass. **Mêmes 9 fail** à chaque passe. |
+| Tests ciblés (`TelemetryService.test.ts`, `textGeneration.telemetry.test.ts`, `tokenOptimizer.test.ts`, `openrouter.telemetry.test.ts`, `nonTextTelemetry.test.ts`, `telemetryCoverage.test.ts`) | n/a | 54/54 pass |
 | `scripts/token-optimizer-bench.mts` | n/a | exécuté (§F.2) |
 | `docs/audit-evidence/baseline-repro-2026-10-15.mts` | 9/9 défauts reproduits | n/a (API supprimée) |
 
@@ -356,7 +368,7 @@ La qualité est rétablie pour un surcoût de ~35 tokens estimés par résumé.
 
 | Priorité | Problème | Preuve | Action suivante |
 |---|---|---|---|
-| Haute | Embeddings, TTS, images et sessions Live restent hors télémétrie et hors budget (§C.3) | Recherche de code | Modéliser leurs unités de facturation (par image, par caractère, par token d'embedding, audio Live) dans `MODEL_PRICING`. Ensuite, appliquer `reserveModelCallBudget` et `recordModelCallUsage` à chacun. Pour Live, vérifier d'abord la sémantique de `usageMetadata` (cumulatif ou par tour). |
+| Haute | Coûts inconnus des appels non textuels (`unpriced`) | §C.3, `getAggregatedStats().unpricedCalls` | Configurer des tarifs **vérifiés** par unité (embedding/1M tokens, TTS/caractère, image, audio Live), via une table dédiée plutôt que `MODEL_PRICING` (unités différentes). |
 | Moyenne | La préservation des faits critiques est lexicale (FR/EN) | `CRITICAL_STATEMENT_PATTERN` | Élargir les marqueurs ou laisser l'utilisateur épingler des messages. |
 | Haute | Tarifs `MODEL_PRICING` non vérifiés | Aucune source officielle consultée pour ces identifiants | Synchroniser avec les grilles fournisseurs (ou avec `usage.cost` d'OpenRouter) et dater les tarifs. |
 | Moyenne | ContextMonitor Live : cumul de `promptTokenCount` probablement surestimé | `LiveSocketHandler.ts:325` | Vérifier la sémantique sur une session réelle. Si elle est confirmée, utiliser le dernier `promptTokenCount` plutôt que la somme. |
@@ -369,7 +381,7 @@ La qualité est rétablie pour un surcoût de ~35 tokens estimés par résumé.
 ## J. Plan de suite
 
 L'audit sera terminé quand :
-1. Les chemins restants de §C.3 (embeddings, TTS, images, Live) seront instrumentés avec `reserveModelCallBudget` et `recordModelCallUsage`, après modélisation de leurs unités de facturation. Chaque chemin aura un test qui vérifie l'enregistrement et le refus sur budget épuisé. Les chemins de génération de texte sont faits (passe 2).
+1. ~~Instrumenter les chemins restants de §C.3.~~ Fait (passes 2 et 3). Garde-fou automatique ajouté (`server/observability/telemetryCoverage.test.ts`). Reste : configurer des tarifs vérifiés par unité pour les appels `unpriced`.
 2. Une mission dry-run représentative aura été mesurée de bout en bout par agent, avec des données exportées depuis `/api/observability/usage`. Cela demande un environnement avec clés et Supabase, ainsi que l'autorisation de l'utilisateur.
 3. `MODEL_PRICING` aura été rapproché d'une facture fournisseur sur une période donnée (écart documenté).
 4. ~~Le test de qualité du résumé (fait critique préservé) passera.~~ Fait en passe 2 (`tokenOptimizer.test.ts`, benchmark §F.2).

@@ -6,6 +6,7 @@
  */
 
 import { createLogger } from "./logger.js";
+import { reserveModelCallBudget, recordModelCallUsage, recordModelCallFailure } from "./textGeneration.js";
 
 const log = createLogger("imageGeneration");
 
@@ -75,6 +76,16 @@ export async function generateImage(
     return null;
   }
 
+  // Budget de mission : une image n'est pas facturée en tokens, seule la règle
+  // « budget déjà dépassé » s'applique. Cette fonction ne lève jamais : refus → null.
+  let releaseBudget: () => void;
+  try {
+    releaseBudget = reserveModelCallBudget(model, fullPrompt.length, "image");
+  } catch (e: any) {
+    log.warn(`generateImage: ${e.message}`);
+    return null;
+  }
+
   try {
     const response = await fetch(`${OPENROUTER_BASE_URL}/images/generations`, {
       method: "POST",
@@ -98,10 +109,23 @@ export async function generateImage(
     if (!response.ok) {
       const errText = await response.text();
       log.error(`generateImage: OpenRouter HTTP ${response.status} — ${errText.slice(0, 300)}`);
+      recordModelCallFailure("openrouter", model, new Error(`OpenRouter HTTP ${response.status}`));
       return null;
     }
 
     const data: any = await response.json();
+    // Requête traitée : comptabilisée même si la réponse est inexploitable.
+    recordModelCallUsage({
+      provider: "openrouter",
+      model: data?.model || model,
+      rawUsage: data?.usage ? { ...data.usage, cost: data.usage.cost ?? data.usage.total_cost } : undefined,
+      promptCharCount: fullPrompt.length,
+      outputText: "",
+      toolName: "generate_image",
+      kind: "image",
+      units: Array.isArray(data?.data) ? data.data.length : 0,
+      unit: "images",
+    });
     const b64 = data?.data?.[0]?.b64_json as string | undefined;
     if (!b64) {
       log.error("generateImage: réponse OpenRouter sans b64_json.");
@@ -120,6 +144,9 @@ export async function generateImage(
       return null;
     }
     log.error(`generateImage: erreur réseau — ${e.message}`);
+    recordModelCallFailure("openrouter", model, e);
     return null;
+  } finally {
+    releaseBudget();
   }
 }

@@ -2,6 +2,7 @@ import { Skill, validateArgs } from "./base.js";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createGeminiClient } from "../utils/geminiKeyPool.js";
+import { trackedGeminiEmbed } from "../utils/textGeneration.js";
 import { getActiveProjectId } from "../utils/selfRoot.js";
 
 // Cache simple en mémoire pour les embeddings et les résultats de recherche
@@ -196,7 +197,7 @@ export const memorySkill: Skill = {
         const validated = validateArgs(memorySkill.inputSchemas!.save_memory, args);
         console.log(`[Memory] save: '${validated.content}' tags=${JSON.stringify(validated.tags)}`);
 
-        const embedResponse = await ai.models.embedContent({
+        const embedResponse = await trackedGeminiEmbed(ai, {
           model: "gemini-embedding-2",
           contents: validated.content,
           config: { outputDimensionality: 768 },
@@ -306,7 +307,7 @@ export const memorySkill: Skill = {
         const ai = createGeminiClient();
         if (!ai) return { error: "Aucune clé Gemini API disponible." };
 
-        const embedResponse = await ai.models.embedContent({
+        const embedResponse = await trackedGeminiEmbed(ai, {
           model: "gemini-embedding-2",
           contents: trimmedQuery,
           config: { outputDimensionality: 768 },
