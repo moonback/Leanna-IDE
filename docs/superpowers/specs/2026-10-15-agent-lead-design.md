@@ -28,7 +28,7 @@ créer de moteur d'exécution parallèle.
 - Budget en tokens / coût (le `missionId` n'est pas propagé aux tâches déléguées).
 - Mise en concurrence de plusieurs agents sur une même étape.
 - Interface utilisateur dédiée (les décisions passent par `agentEventStream`, déjà affiché).
-- `brainPlan` (mode `plan_first`) : seule la réaffectation des rôles s'y applique.
+- `brainPlan` (mode `plan_first`) : inchangé ; la réaffectation des rôles a lieu au début de `executeGoal`.
 
 ## 2. État existant (référence)
 
@@ -65,6 +65,8 @@ interface LeadPolicy {
   arbitrate(input: ArbitrationInput, state: LeadRunState): ArbitrationVerdict;
   /** Faut-il lancer une nouvelle délégation / réplanification ? */
   shouldContinue(state: LeadRunState, point: "delegation" | "replan"): StopDecision;
+  /** Meilleur rôle alternatif pour une étape (réaffectation, repli de capacité). */
+  nextBestRole(stage: BrainStage, state: LeadRunState, exclude: AgentRole[]): AgentRole | null;
   /** Enregistre une délégation effectuée (budget). */
   recordDelegation(state: LeadRunState, kind: "stage" | "correction" | "reassign"): void;
   /** Enregistre l'issue d'une étape (progrès / échecs consécutifs). */
