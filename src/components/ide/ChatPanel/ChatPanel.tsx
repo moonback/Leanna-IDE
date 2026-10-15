@@ -19,6 +19,7 @@ import { InputArea, type InputAreaHandle } from './InputArea.js';
 import { exportConversation, deriveModifiedFiles, type ExportFormat } from './exportConversation.js';
 import { useChangeLog } from './useChangeLog.js';
 import { ChangeLogPanel } from './ChangeLogPanel.js';
+import { getProfile, DEFAULT_PROFILE_ID } from './behaviorProfiles.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { useDraggablePanel } from './useDraggablePanel.js';
 import { useResizablePanel } from './useResizablePanel.js';
@@ -67,6 +68,13 @@ export function ChatPanel({
   // Referme le panneau quand il n'y a plus rien à afficher (le bouton d'en-tête
   // disparaît alors aussi : on évite un panneau vide orphelin).
   useEffect(() => { if (changeLog.length === 0) setShowChangeLog(false); }, [changeLog.length]);
+
+  // ── Profil de comportement (feature #7) ─────────────────────────────────────
+  // Identifiant persisté ; l'application réelle (surcouche de prompt) se fait
+  // via sendSystemPromptOverride à la connexion et à chaque changement.
+  const [activeProfileId, setActiveProfileId] = useState<string>(
+    () => readJSON<string>(STORAGE_KEYS.profile, DEFAULT_PROFILE_ID),
+  );
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; icon?: React.ReactNode } | null>(null);
@@ -208,6 +216,29 @@ export function ChatPanel({
   const handleToggleConnect = useCallback(() => {
     if (connected) disconnect(); else connect([], 'full');
   }, [connected, disconnect, connect]);
+
+  // Applique un profil : « default » réinitialise la surcouche, les autres
+  // injectent leur directive. Non destructif (les garde-fous serveur restent).
+  const applyProfile = useCallback((text: string) => {
+    if (!text) sendSystemPromptOverride('', { reset: true });
+    else sendSystemPromptOverride(text);
+  }, [sendSystemPromptOverride]);
+
+  const handleSelectProfile = useCallback((id: string) => {
+    setActiveProfileId(id);
+    writeJSON(STORAGE_KEYS.profile, id);
+    if (connected) applyProfile(getProfile(id).directive);
+  }, [connected, applyProfile]);
+
+  // Ré-applique le profil choisi à chaque (re)connexion : l'override agit sur la
+  // session Gemini, qui est recréée à la connexion. Sans cela, un profil
+  // persisté serait silencieusement « oublié » après reconnexion.
+  useEffect(() => {
+    if (!connected) return;
+    const directive = getProfile(activeProfileId).directive;
+    if (directive) applyProfile(directive);
+    // On ne ré-applique qu'au passage à l'état connecté (et si le profil change).
+  }, [connected, activeProfileId, applyProfile]);
 
   const handleExport = useCallback((format: ExportFormat = 'markdown') => {
     if (transcript.length === 0) {
@@ -396,6 +427,8 @@ export function ChatPanel({
           changeLogCount={changeLog.length}
           showChangeLog={showChangeLog}
           onToggleChangeLog={() => setShowChangeLog(v => !v)}
+          activeProfileId={activeProfileId}
+          onSelectProfile={handleSelectProfile}
           onExport={(format) => { handleExport(format); setShowMenu(false); }}
           onClear={() => { handleClear(); setShowMenu(false); }}
           onVoiceTest={() => { void handleVoiceTest(); setShowMenu(false); }}
