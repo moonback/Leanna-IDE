@@ -177,7 +177,10 @@ describe("AgenticRuntime — cache de lecture invalidé après écriture", () =>
     const reread = res.observations[2]?.toolOutcomes[0];
     assert.equal(reread?.invocation.name, "read_project_file");
     assert.notEqual(reread?.cached, true, "la relecture après écriture ne doit pas venir du cache");
-    assert.equal(readLog.filter((p) => p === "c.ts").length, 2, "les deux lectures atteignent le handler");
+    // Lecture du modèle, relecture post-écriture du WorkspaceState, relecture du
+    // modèle : aucune n'est servie par un cache périmé (ToolRegistry compris).
+    assert.equal(readLog.filter((p) => p === "c.ts").length, 3, "toutes les lectures atteignent le handler");
+    assert.match(JSON.stringify(reread?.result), /NOUVEAU/, "la relecture renvoie le contenu écrit");
     assert.match(secondRead, /NOUVEAU/);
     assert.match(secondRead, /PLAN \(étape 4\/4\)/);
   });

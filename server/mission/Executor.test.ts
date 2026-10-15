@@ -285,3 +285,28 @@ test('evidence verification fails an artifact-expecting goal when nothing was wr
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('Executor scopes each skill call to its mission action for the idempotency guard', async () => {
+  const scopes: Array<{ missionId: string; stepId: string } | undefined> = [];
+  const executor = new Executor();
+  executor.setSkillHandler(async (_name, _args, opts) => {
+    scopes.push(opts?.idempotencyScope);
+    return { ok: true };
+  });
+
+  const mission = await executor.startMission({
+    title: 'Vérifier la compilation',
+    description: 'Lancer verify_typecheck.',
+    availableSkills: ['verify_typecheck'],
+  });
+  await executor.waitForMission(mission.id);
+
+  assert.ok(scopes.length > 0, 'au moins un skill exécuté');
+  const actionIds = new Set(
+    Object.values(mission.toJSON().goals).flatMap((g) => g.plannedActions.map((a) => a.id))
+  );
+  for (const scope of scopes) {
+    assert.equal(scope?.missionId, mission.id);
+    assert.ok(scope && actionIds.has(scope.stepId), `stepId = id d'une action planifiée (${scope?.stepId})`);
+  }
+});

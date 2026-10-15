@@ -65,6 +65,18 @@ export interface ToolCallOptions {
    * l'annulation de la tâche.
    */
   signal?: AbortSignal;
+  /**
+   * Étape de mission à laquelle rattacher l'appel pour la garde d'idempotence.
+   * Sans `missionId` ET `stepId`, un outil à effet de bord s'exécute sans
+   * déduplication (voir `LedgerGuard`).
+   */
+  idempotencyScope?: IdempotencyScope;
+}
+
+/** Identifie l'étape de mission d'un appel d'outil (clé d'idempotence). */
+export interface IdempotencyScope {
+  missionId?: string;
+  stepId?: string;
 }
 
 export interface ToolRegistryConfig {
@@ -118,7 +130,8 @@ export interface IdempotencyGuard {
     tool: string,
     args: Record<string, unknown>,
     permissions: ToolPermission[] | undefined,
-    agentId: string | undefined
+    agentId: string | undefined,
+    scope?: IdempotencyScope
   ):
     | { decision: "execute"; commit: (result: unknown) => void; fail: (error: string) => void }
     | { decision: "skip"; result: unknown }
@@ -434,7 +447,13 @@ export class ToolRegistry {
     let ledgerCommit: ((result: unknown) => void) | undefined;
     let ledgerFail: ((error: string) => void) | undefined;
     if (this.idempotency) {
-      const g = this.idempotency.guard(name, args, entry.definition.permissions, options.agentId);
+      const g = this.idempotency.guard(
+        name,
+        args,
+        entry.definition.permissions,
+        options.agentId,
+        options.idempotencyScope
+      );
       if (g.decision === "skip") {
         // Résultat déjà connu : on le ressert sans réexécuter le handler.
         this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs: 0, success: true });
@@ -454,6 +473,10 @@ export class ToolRegistry {
 
     let lastError: Error | undefined;
     const startTime = Date.now();
+    // Un outil à effet de bord (écriture, commande…) peut changer ce que décrit
+    // le cache de lecture : on le vide après l'appel, réussi ou non, pour qu'une
+    // relecture post-écriture observe le contenu réel et non une copie périmée.
+    const invalidatesReads = this.getDryRun().hasSideEffect(entry.definition.permissions);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -475,6 +498,7 @@ export class ToolRegistry {
         this.recordMetrics(entry, name, durationMs, true, options.agentId);
         this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: true });
         ledgerCommit?.(result);
+        if (invalidatesReads) this.readCache.clear();
 
         return result;
       } catch (err) {
@@ -496,6 +520,7 @@ export class ToolRegistry {
     this.recordMetrics(entry, name, durationMs, false, options.agentId, lastError?.message);
     this.eventBus?.emit({ type: "tool:completed", toolName: name, durationMs, success: false });
     ledgerFail?.(lastError?.message ?? "unknown error");
+    if (invalidatesReads) this.readCache.clear();
 
     throw lastError!;
   }

@@ -18,12 +18,17 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "crypto";
+import nodeFs from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
 
 import { ToolRegistry } from "../ToolRegistry.js";
 import { PermissionPolicy } from "../PermissionPolicy.js";
 import { EventBus } from "../EventBus.js";
 import { dynamicAgentRegistry } from "../../agents/DynamicAgentRegistry.js";
 import type { VerificationRecord } from "../../agents/WorkspaceState.js";
+import { ExecutionLedger } from "../../core/ExecutionLedger.js";
+import { LedgerGuard } from "../../core/LedgerGuard.js";
 import { AgenticRuntime, type GenerateTextFn } from "./index.js";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -35,9 +40,10 @@ interface FakeFs {
   isFixed: (content: string) => boolean;
 }
 
-function makeRegistry(fs: FakeFs) {
-  const registry = new ToolRegistry({ permissionPolicy: new PermissionPolicy({ mode: "off" }) });
+function makeRegistry(fs: FakeFs, idempotency?: LedgerGuard) {
+  const registry = new ToolRegistry({ permissionPolicy: new PermissionPolicy({ mode: "off" }), idempotency });
   const writes: Array<{ path: string; content: string }> = [];
+  let verifyCount = 0;
 
   registry.register({
     declaration: { name: "read_project_file", description: "lit", parameters: { path: "string" } },
@@ -58,6 +64,7 @@ function makeRegistry(fs: FakeFs) {
   registry.register({
     declaration: { name: "verify_file", description: "vérifie", parameters: { path: "string" } },
     handler: async (a) => {
+      verifyCount++;
       const path = String(a.path);
       const content = fs.content.get(path) ?? "";
       const h = sha(content);
@@ -71,7 +78,7 @@ function makeRegistry(fs: FakeFs) {
     },
     permissions: ["read"],
   });
-  return { registry, writes };
+  return { registry, writes, verifyRuns: () => verifyCount };
 }
 
 function registerAgent(role: string): void {
@@ -174,6 +181,87 @@ describe("Mission Harness — chaîne agentique de bout en bout (fake LLM)", () 
     assert.ok(result.filesModified.includes("src/example.ts"));
     assert.ok(result.budgetUsage.writeCalls >= 2, "deux écritures : le patch initial puis la correction");
     assert.equal(fs.content.get("src/example.ts")?.includes("GOOD"), true, "le fichier final contient le bon fix");
+    assert.equal(
+      result.outcome,
+      "success",
+      `une réparation vérifiée est un succès (vérifications: ${JSON.stringify(result.verifications.map((v) => [v.passed, v.checks, v.issues]))})`
+    );
+    assert.equal(result.success, true);
+  });
+
+  it("E. REPAIR avec garde d'idempotence : la re-vérification observe le nouveau contenu", async () => {
+    const ledgerFile = nodePath.join(nodeFs.mkdtempSync(nodePath.join(os.tmpdir(), "leanna-harness-")), "actions.jsonl");
+    const fs: FakeFs = {
+      content: new Map([["src/example.ts", "const value: string = 123;"]]),
+      isFixed: (c) => c.includes("GOOD"),
+    };
+    const { registry, verifyRuns } = makeRegistry(fs, new LedgerGuard(new ExecutionLedger(ledgerFile)));
+    const model = scriptedModel([
+      toolCall("modify_project_file", { path: "src/example.ts", content: "const value = 123; // BAD" }),
+      toolCall("modify_project_file", { path: "src/example.ts", content: "const value: number = 123; // GOOD" }),
+      "Terminé.",
+    ]);
+    const runtime = new AgenticRuntime({ registry, events: new EventBus(), model });
+
+    const result = await runtime.run({ role: "harness_fixer", goal: "Corrige src/example.ts", id: "mE" });
+
+    assert.ok(result.recoveries.length >= 1, "le premier patch a déclenché une réparation");
+    assert.equal(fs.content.get("src/example.ts")?.includes("GOOD"), true);
+    assert.ok(verifyRuns() >= 2, `chaque verify_file est réellement exécuté (observé: ${verifyRuns()})`);
+    assert.equal(result.verifications.at(-1)?.passed, true, "la dernière vérification hashée valide le fichier réparé");
+    assert.equal(result.outcome, "success", "la réparation vérifiée est un succès, garde activée");
+    const keys = nodeFs.existsSync(ledgerFile)
+      ? nodeFs.readFileSync(ledgerFile, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l).idempotencyKey as string)
+      : [];
+    assert.ok(keys.length > 0, "les écritures sont journalisées");
+    assert.ok(keys.every((k) => k.startsWith("mE:") && k.includes(":modify_project_file:")), `clés limitées aux écritures de la mission (${keys.join(", ")})`);
+  });
+
+  it("F. PARTIAL : fichier corrigé et vérifié mais étape de typecheck en échec → pas un succès", async () => {
+    dynamicAgentRegistry.registerAgent(
+      {
+        role: "harness_tester", name: "Test harness_tester", description: "test",
+        capabilities: ["read_project_file", "modify_project_file", "verify_file", "verify_typecheck"],
+        systemPrompt: "Agent de test.", maxConcurrency: 1, defaultTimeoutMs: 30_000,
+      },
+      true
+    );
+    const fs: FakeFs = {
+      content: new Map([["src/example.ts", "const value: string = 123;"]]),
+      isFixed: (c) => c.includes("GOOD"),
+    };
+    const { registry } = makeRegistry(fs);
+    registry.register({
+      declaration: { name: "verify_typecheck", description: "typecheck", parameters: {} },
+      handler: async () => ({ ok: false, status: "failed", error: "TS2322 dans src/other.ts" }),
+      permissions: ["read"],
+    });
+    const plan = JSON.stringify({
+      intent: "Corriger puis typechecker",
+      successCriteria: ["verify_file passe", "le typecheck passe"],
+      rationale: "fix + typecheck",
+      steps: [
+        { description: "Corriger src/example.ts", suggestedTools: ["modify_project_file", "verify_file"], verification: "verify_file OK" },
+        { description: "Lancer les tests", suggestedTools: ["verify_typecheck"], verification: "tests verts" },
+      ],
+    });
+    let i = 0;
+    const execSteps = [
+      toolCall("modify_project_file", { path: "src/example.ts", content: "const value: number = 123; // GOOD" }),
+      ...Array(12).fill(toolCall("verify_typecheck", {})),
+    ];
+    const model = (async (opts: { prompt: string }) => {
+      if (isPlanPrompt(opts.prompt)) return reply(plan);
+      if (isFinalPrompt(opts.prompt)) return reply(FINAL_JSON);
+      return reply(i < execSteps.length ? execSteps[i++] : "");
+    }) as GenerateTextFn;
+    const runtime = new AgenticRuntime({ registry, events: new EventBus(), model });
+
+    const result = await runtime.run({ role: "harness_tester", goal: "Corrige src/example.ts et fais passer le typecheck", id: "mF" });
+
+    assert.equal(fs.content.get("src/example.ts")?.includes("GOOD"), true, "le correctif a été écrit");
+    assert.notEqual(result.outcome, "success", "une étape de typecheck en échec interdit le succès");
+    assert.equal(result.success, false, `outcome=${result.outcome} ne doit pas être compté comme un succès`);
   });
 
   it("C. NO_PROGRESS : même patch répété → stop, pas de boucle infinie", async () => {

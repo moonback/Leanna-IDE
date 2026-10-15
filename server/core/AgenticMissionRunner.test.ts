@@ -141,32 +141,32 @@ test("blocked outcome escalates immediately (no wasted retries)", async () => {
 
 test("guard context is set during the mission and cleared afterwards", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-amr-"));
-  const kernel = createCoreKernel({ ledgerFile: path.join(dir, "l.jsonl"), missionStoreDir: path.join(dir, "missions") });
+  const ledgerFile = path.join(dir, "l.jsonl");
+  const kernel = createCoreKernel({ ledgerFile, missionStoreDir: path.join(dir, "missions") });
+  const lines = () => (fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile, "utf8").trim().split("\n").filter(Boolean) : []);
 
   // Observe the guard context AT THE MOMENT the runtime runs (mid-mission) by
-  // inspecting the deterministic idempotency key the guard would produce.
+  // inspecting the deterministic idempotency key the guard produces for an
+  // effectful call carrying a step id.
   let midMissionKey: string | undefined;
   const rt: AgenticLike = {
     async run() {
-      const g = kernel.guard.guard("probe_tool", { x: 1 }, ["read"], undefined);
-      // The guard returns an "execute" decision; the ledger entry it just wrote
-      // carries the mission id in its key, proving the context was active.
+      const g = kernel.guard.guard("probe_tool", { x: 1 }, ["write"], undefined, { stepId: "s1" });
       if (g.decision === "execute") g.commit(null);
-      const entry = fs.readFileSync(path.join(dir, "l.jsonl"), "utf8").trim().split("\n").pop()!;
-      midMissionKey = JSON.parse(entry).idempotencyKey as string;
+      midMissionKey = JSON.parse(lines().pop()!).idempotencyKey as string;
       return result({ success: true, verifications: [{ passed: true, checks: ["ok"], issues: [] }] });
     },
   };
 
   await kernel.runSupervisedAgenticMission(rt, { goal: "x", missionId: "fixed-id" });
-  assert.ok(midMissionKey?.startsWith("fixed-id:"), "mission id was active in the idempotency key mid-mission");
+  assert.ok(midMissionKey?.startsWith("fixed-id:s1:"), "mission id was active in the idempotency key mid-mission");
 
-  // After the mission, a fresh guard call must NOT carry the mission id.
-  const after = kernel.guard.guard("probe_tool_2", { y: 2 }, ["read"], undefined);
+  // After the mission, no mission id => the guard is a pass-through (no global key).
+  const before = lines().length;
+  const after = kernel.guard.guard("probe_tool_2", { y: 2 }, ["write"], undefined, { stepId: "s1" });
+  assert.equal(after.decision, "execute");
   if (after.decision === "execute") after.commit(null);
-  const lastEntry = fs.readFileSync(path.join(dir, "l.jsonl"), "utf8").trim().split("\n").pop()!;
-  const afterKey = JSON.parse(lastEntry).idempotencyKey as string;
-  assert.ok(afterKey.startsWith("-:"), "context cleared: no mission id in later keys");
+  assert.equal(lines().length, before, "context cleared: nothing journaled without a mission id");
 
   fs.rmSync(dir, { recursive: true, force: true });
 });

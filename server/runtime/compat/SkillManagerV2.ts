@@ -15,7 +15,7 @@
  *   - Plus de 5 systèmes d'initialisation chaînés
  */
 
-import { ToolRegistry } from "../ToolRegistry.js";
+import { ToolRegistry, type IdempotencyScope } from "../ToolRegistry.js";
 import { EventBus } from "../EventBus.js";
 import { adaptSkill, adaptAllSkills, createToolCallProxy } from "./SkillAdapter.js";
 import type { LegacySkill } from "./SkillAdapter.js";
@@ -94,7 +94,7 @@ export class SkillManagerV2 {
     name: string,
     args: any,
     context?: any,
-    options?: { dryRun?: boolean; signal?: AbortSignal }
+    options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope }
   ): Promise<any> {
     // Normalisation du nom (compatibilité Gemini qui préfixe)
     let normalizedName = name;
@@ -142,6 +142,7 @@ export class SkillManagerV2 {
       context,
       dryRun: options?.dryRun,
       signal: options?.signal,
+      idempotencyScope: options?.idempotencyScope,
     });
   }
 
