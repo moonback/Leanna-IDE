@@ -36,6 +36,16 @@ describe("StageArbiter", () => {
     );
     assert.equal(v.action, "correct");
     assert.match(v.rationale, /contradiction/);
+    assert.equal(v.action === "correct" && v.targetRole, "coder", "la correction revient au rôle de l'étape");
+  });
+
+  it("règle 1 ne s'applique pas à une tâche d'analyse", () => {
+    const analysis = { ...stage("debugger"), title: "Identifier la cause racine", description: "" };
+    const v = arbiter.arbitrate(
+      input({ stage: analysis, result: result({ filesModified: [], summary: "Je vais proposer un correctif." }) }),
+      state(), none
+    );
+    assert.equal(v.action, "accept");
   });
 
   it("règle 1 sans tentative restante → abandon", () => {

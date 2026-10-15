@@ -328,7 +328,7 @@ export class AgentBrain {
       if (verdict.action === "reassign") {
         verification = await this.reassignStage(stage, ctx, verdict.toRole, verdict.rationale);
       } else {
-        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole);
+        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole, verdict.rationale);
         if (!corrected) break;
         verification = corrected;
       }
@@ -358,10 +358,16 @@ export class AgentBrain {
     ctx: BrainRunContext,
     verification: StageVerification,
     attempt: number,
-    targetRole?: string
+    targetRole?: string,
+    rationale?: string
   ): Promise<StageVerification | null> {
     log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
-    const correction = ctx.correctionLoop.createCorrection(stage, verification, attempt, ctx.understanding);
+    // Vérification passée mais rejetée par le Lead : sans issue, le diagnostic
+    // de correction serait vide. On y injecte la raison du rejet.
+    const diagnosed: StageVerification = verification.passed && rationale
+      ? { ...verification, issues: [...verification.issues, { severity: "error", message: rationale, rule: "agent_lead_reject" }] }
+      : verification;
+    const correction = ctx.correctionLoop.createCorrection(stage, diagnosed, attempt, ctx.understanding);
     if (!correction) return null;
     if (targetRole) correction.targetRole = targetRole;
     ctx.corrections.push(correction);

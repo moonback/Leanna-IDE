@@ -61,20 +61,20 @@ function scriptedVerifier(critical = false) {
   };
 }
 
-type Reply = { content: string | null; outcome?: TaskOutcome } | Error;
+type Reply = { content: string | null; outcome?: TaskOutcome; summary?: string } | Error;
 
-function makeOrchestrator(reply: (params: { role: string; title: string }) => Reply) {
+function makeOrchestrator(reply: (params: { role: string; title: string; description?: string }) => Reply) {
   let counter = 0;
   const tasks = new Map<string, unknown>();
-  const delegated: Array<{ role: string; title: string }> = [];
+  const delegated: Array<{ role: string; title: string; description?: string }> = [];
   return {
     delegated,
     canRunTool: false,
     async runTool() { return null; },
-    async delegateTask(params: { role: string; title: string }) {
+    async delegateTask(params: { role: string; title: string; description?: string }) {
       const r = reply(params);
       if (r instanceof Error) throw r;
-      delegated.push({ role: params.role, title: params.title });
+      delegated.push({ role: params.role, title: params.title, description: params.description });
       const id = `task-${counter++}`;
       const filesModified: string[] = [];
       if (r.content !== null) {
@@ -84,7 +84,7 @@ function makeOrchestrator(reply: (params: { role: string; title: string }) => Re
       const outcome = r.outcome ?? "success";
       const task = {
         id, role: params.role, title: params.title, status: "completed",
-        result: { success: outcome === "success", outcome, summary: "Fichier modifié.", filesModified, durationMs: 1 },
+        result: { success: outcome === "success", outcome, summary: r.summary ?? "Fichier modifié.", filesModified, durationMs: 1 },
       };
       tasks.set(id, task);
       return task;
@@ -168,6 +168,21 @@ describe("Agent Lead intégré à l'AgentBrain", () => {
     const result = await makeBrain(orch, makePlan([makeStage("s1", "debugger")]), brokenLead).executeGoal(input());
     assert.equal(result.success, true, result.summary);
     assert.equal(result.corrections.length, 1);
+  });
+
+  it("rejette une étape passée sans écriture et transmet la contradiction à la correction", async () => {
+    fs.writeFileSync(targetFile, GOOD, "utf-8"); // la vérification passerait sans aucune écriture
+    const orch = makeOrchestrator(({ title }) =>
+      title.includes("Auto-Correction")
+        ? { content: GOOD }
+        : { content: null, summary: "Je vais modifier le fichier ensuite." }
+    );
+    const result = await makeBrain(orch, makePlan([makeStage("s1", "debugger")]), stubLead()).executeGoal(input());
+    assert.equal(result.success, true, result.summary);
+    const fix = orch.delegated.find((d) => d.title.includes("Auto-Correction"));
+    assert.ok(fix, "une correction a été déléguée");
+    assert.equal(fix.role, "debugger", "la correction revient au rôle de l'étape");
+    assert.match(fix.description ?? "", /sans aucune écriture/);
   });
 
   it("lead: false restaure le comportement sans Agent Lead", async () => {

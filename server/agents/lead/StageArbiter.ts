@@ -1,11 +1,14 @@
 import { AgentEvidenceEvaluator } from "../AgentEvidenceEvaluator.js";
 import { stageOfRole, type SwarmStage } from "../SwarmComposer.js";
-import type { AgentRole } from "../types.js";
+import type { AgentRole, AgentTask } from "../types.js";
+import type { BrainStage } from "../brain/types.js";
 import type { ArbitrationInput, ArbitrationVerdict, LeadRunState } from "./types.js";
 
 export interface StageArbiterDeps {
   isPlanningOnly?: (text: string) => boolean;
   stageOf?: (role: AgentRole) => SwarmStage | undefined;
+  /** Étape d'analyse pure (aucune écriture attendue) : exemptée de la règle 1. */
+  isAnalysisOnly?: (stage: BrainStage) => boolean;
 }
 
 /**
@@ -16,11 +19,18 @@ export interface StageArbiterDeps {
 export class StageArbiter {
   private readonly isPlanningOnly: (text: string) => boolean;
   private readonly stageOf: (role: AgentRole) => SwarmStage | undefined;
+  private readonly isAnalysisOnly: (stage: BrainStage) => boolean;
 
   constructor(deps: StageArbiterDeps = {}) {
     const evaluator = new AgentEvidenceEvaluator();
     this.isPlanningOnly = deps.isPlanningOnly ?? ((text) => evaluator.isPlanningOnly(text));
     this.stageOf = deps.stageOf ?? stageOfRole;
+    this.isAnalysisOnly = deps.isAnalysisOnly ?? ((stage) =>
+      evaluator.isAnalysisOnlyTask({
+        title: stage.title,
+        description: stage.description,
+        context: { instructions: stage.instructions },
+      } as AgentTask));
   }
 
   arbitrate(input: ArbitrationInput, state: LeadRunState, nextBest: () => AgentRole | null): ArbitrationVerdict {
@@ -29,10 +39,14 @@ export class StageArbiter {
     const filesModified = result?.filesModified ?? [];
 
     if (verification.passed) {
-      const writes = this.stageOf(stage.agentRole) === "build";
+      const writes = this.stageOf(stage.agentRole) === "build" && !this.isAnalysisOnly(stage);
       if (writes && filesModified.length === 0 && this.isPlanningOnly(result?.summary ?? "")) {
         return attemptsLeft
-          ? { action: "correct", rationale: "contradiction : vérification passée sans aucune écriture (plan seulement)" }
+          ? {
+              action: "correct",
+              rationale: "contradiction : vérification passée sans aucune écriture (plan seulement)",
+              targetRole: stage.agentRole,
+            }
           : { action: "abandon", rationale: "aucune écriture produite malgré les corrections" };
       }
       return { action: "accept", rationale: "vérification réussie" };
