@@ -917,21 +917,6 @@ export default function IdeView() {
     [fileSystem.openFiles, fileSystem.activePath]
   );
 
-  // ── Track recent files in localStorage ─────────────────────────────────────
-  useEffect(() => {
-    if (!fileSystem.activePath) return;
-    const active = fileSystem.openFiles.find(f => f.path === fileSystem.activePath);
-    if (!active) return;
-    try {
-      const STORAGE_KEY = 'Leanna_recent_files';
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const recent: { path: string; language: string; openedAt: number }[] = stored ? JSON.parse(stored) : [];
-      const filtered = recent.filter(r => r.path !== active.path);
-      filtered.unshift({ path: active.path, language: active.language || '', openedAt: Date.now() });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered.slice(0, 10)));
-    } catch { /* silent */ }
-  }, [fileSystem.activePath, fileSystem.openFiles]);
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -1244,7 +1229,6 @@ export default function IdeView() {
                                               )
                       ) : (
                         <EmptyEditorState
-                                                  onOpenFile={openFileAt}
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
                                                   onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={openSettings}

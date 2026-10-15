@@ -4,10 +4,9 @@ import React, {
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
-  Bot, Target, Globe, X, GitPullRequest, History, CalendarClock, ClipboardCheck, Stethoscope,
+  Bot, Target, Globe, GitPullRequest, CalendarClock, ClipboardCheck, Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { FileIcon } from './FileIcon.js';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -68,34 +67,6 @@ function useClock() {
   return time;
 }
 
-// ─── Hook : tick périodique pour rafraîchir les durées relatives ─────────
-// Renvoie un timestamp qui se met à jour toutes les `intervalMs`.
-// Suspendu quand l'onglet est caché pour éviter les rendus inutiles.
-
-function useNow(intervalMs = 30_000): number {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    const start = () => {
-      if (timer) return;
-      setNow(Date.now());
-      timer = setInterval(() => setNow(Date.now()), intervalMs);
-    };
-    const stop = () => {
-      if (timer) { clearInterval(timer); timer = undefined; }
-    };
-    const onVisibility = () => (document.hidden ? stop() : start());
-
-    if (!document.hidden) start();
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
-  }, [intervalMs]);
-
-  return now;
-}
-
 function useGitInfo() {
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
 
@@ -117,60 +88,6 @@ function useGitInfo() {
   }, []);
 
   return gitInfo;
-}
-
-// ─── Hook : fichiers récents (localStorage) ──────────────────────────────
-
-const RECENT_FILES_KEY = 'Leanna_recent_files';
-
-interface RecentFile { path: string; language?: string; openedAt: number }
-
-function readRecentFiles(): RecentFile[] {
-  try {
-    const raw = localStorage.getItem(RECENT_FILES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((r): r is RecentFile => !!r && typeof r.path === 'string')
-      .sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
-  } catch {
-    return [];
-  }
-}
-
-function useRecentFiles() {
-  const [files, setFiles] = useState<RecentFile[]>(() => (
-    typeof window !== 'undefined' ? readRecentFiles() : []
-  ));
-
-  useEffect(() => {
-    const refresh = () => setFiles(readRecentFiles());
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === RECENT_FILES_KEY) refresh();
-    };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', refresh);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', refresh);
-    };
-  }, []);
-
-  const remove = useCallback((path: string) => {
-    setFiles((prev) => {
-      const next = prev.filter((r) => r.path !== path);
-      try { localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
-
-  const clear = useCallback(() => {
-    setFiles([]);
-    try { localStorage.removeItem(RECENT_FILES_KEY); } catch { /* ignore */ }
-  }, []);
-
-  return { files, remove, clear };
 }
 
 // ─── Hook : statut de la clé Gemini ──────────────────────────────────────
@@ -378,23 +295,6 @@ function GlobalStyles() {
         .ee-card-arrow { transition: opacity 150ms ease-out; transform: none; }
         .ee-card:hover:not(:disabled) .ee-card-arrow { transform: none; }
       }
-
-      /* Fichiers récents : bouton de suppression révélé au survol */
-      .ee-recent-remove {
-        opacity: 0;
-        background-color: color-mix(in srgb, var(--surface-soft) 70%, transparent);
-        transition: opacity 150ms ease-out, color 150ms ease-out, background-color 150ms ease-out;
-      }
-      .ee-recent:hover .ee-recent-remove,
-      .ee-recent-remove:focus-visible {
-        opacity: 1;
-      }
-      .ee-recent-remove:hover {
-        color: var(--color-error);
-        background-color: color-mix(in srgb, var(--color-error) 14%, transparent);
-      }
-      /* Laisse la place au bouton de suppression dans la carte récente */
-      .ee-recent:hover .ee-card { padding-right: 1.75rem; }
 
       .ee-chip {
         display: inline-flex; align-items: center; gap: 6px;
@@ -835,129 +735,10 @@ const InterruptedMissionsSection = React.memo(function InterruptedMissionsSectio
   );
 });
 
-// ─── Fichiers récents ────────────────────────────────────────────────────
-
-function basename(p: string): string {
-  return p.split(/[/\\]/).pop() || p;
-}
-
-function dirname(p: string): string {
-  const parts = p.split(/[/\\]/);
-  parts.pop();
-  return parts.join('/');
-}
-
-/** Heure relative compacte : « à l'instant », « 5 min », « 3 h », « 2 j ». */
-function relativeTime(ts?: number, now: number = Date.now()): string {
-  if (!ts || !Number.isFinite(ts)) return '';
-  const diff = now - ts;
-  if (diff < 0) return '';
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "à l'instant";
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} h`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d} j`;
-  return `${Math.floor(d / 7)} sem`;
-}
-
-const RecentFilesSection = React.memo(function RecentFilesSection({
-  onOpenFile, reduceMotion = false,
-}: { onOpenFile: (path: string) => void; reduceMotion?: boolean }) {
-  const { files, remove, clear } = useRecentFiles();
-  const visible = useMemo(() => files.slice(0, 6), [files]);
-  const now = useNow(30_000); // rafraîchit les durées relatives
-
-  if (visible.length === 0) return null;
-
-  return (
-    <section className="mb-6" aria-label="Fichiers récents">
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-            Récents
-          </h2>
-          <span
-            className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)', color: 'var(--primary)' }}
-          >
-            {files.length}
-          </span>
-        </div>
-        <button type="button" onClick={clear} className="ee-link ee-focus text-xs">
-          Tout effacer
-        </button>
-      </div>
-      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 p-0 m-0 list-none">
-        <AnimatePresence initial={false}>
-          {visible.map((f) => {
-            const name = basename(f.path);
-            const dir = dirname(f.path);
-            const when = relativeTime(f.openedAt, now);
-            return (
-              <motion.li
-                key={f.path}
-                layout={!reduceMotion}
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, marginTop: 0 }}
-                transition={{ duration: reduceMotion ? 0.15 : 0.2 }}
-                className="ee-recent group relative"
-              >
-                <button
-                  type="button"
-                  onClick={() => onOpenFile(f.path)}
-                  className="ee-card ee-focus flex items-center gap-2 w-full py-1.5 px-2.5 text-left rounded-lg"
-                  style={{ ['--card-accent' as string]: 'var(--primary)' }}
-                  title={f.path}
-                >
-                  <span className="flex items-center justify-center flex-shrink-0">
-                    <FileIcon filePath={f.path} size={14} />
-                  </span>
-                  <span className="text-sm font-medium leading-tight truncate" style={{ color: 'var(--text)' }}>
-                    {name}
-                  </span>
-                  <span className="hidden lg:flex items-center gap-2 ml-auto flex-shrink-0 min-w-0">
-                    {dir && (
-                      <span className="text-xs leading-tight truncate font-mono max-w-[140px]" style={{ color: 'var(--text-muted)' }}>
-                        {dir}
-                      </span>
-                    )}
-                    {when && (
-                      <span
-                        className="text-xs leading-tight whitespace-nowrap tabular-nums"
-                        style={{ color: 'var(--text-dimmed, var(--text-muted))' }}
-                        title={new Date(f.openedAt).toLocaleString('fr-FR')}
-                      >
-                        {when}
-                      </span>
-                    )}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(f.path)}
-                  aria-label={`Retirer ${name} des récents`}
-                  className="ee-recent-remove ee-focus absolute top-1/2 right-1.5 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  <X size={12} />
-                </button>
-              </motion.li>
-            );
-          })}
-        </AnimatePresence>
-      </ul>
-    </section>
-  );
-});
-
 // ─── Section : suggestions proactives ────────────────────────────────────
 
 const INSIGHT_STYLE: Record<InsightKind, { icon: IconType; accent: string }> = {
   review: { icon: GitPullRequest, accent: '#f59e0b' },
-  resume: { icon: History, accent: 'var(--primary)' },
   plan: { icon: CalendarClock, accent: '#6ee7b7' },
   recap: { icon: ClipboardCheck, accent: '#a78bfa' },
   audit: { icon: Stethoscope, accent: '#60a5fa' },
@@ -1038,7 +819,6 @@ const ProactiveInsightsSection = React.memo(function ProactiveInsightsSection({
 // ─── Composant principal ─────────────────────────────────────────────────
 
 interface EmptyEditorStateProps {
-  onOpenFile: (path: string) => void;
   onCreateFile: () => void;
   /** Réservé : conservé dans le contrat pour l'appelant, non utilisé par cet écran. */
   onCreateFolder: () => void;
@@ -1051,7 +831,6 @@ interface EmptyEditorStateProps {
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
-  onOpenFile,
   onCreateFile,
   onShowSettings,
   onOpenSearch,
@@ -1143,14 +922,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const geminiProblem = geminiStatus === 'invalid' || geminiStatus === 'unconfigured';
 
-  const { files: recentFiles } = useRecentFiles();
   const insights = useMemo(() => buildHomeInsights({
     now: new Date(),
     changedFiles,
     branch: gitInfo?.branch ?? null,
-    recentFiles,
     workspaceName,
-  }), [changedFiles, gitInfo?.branch, recentFiles, workspaceName]);
+  }), [changedFiles, gitInfo?.branch, workspaceName]);
 
   const handleAskInsight = useCallback((insight: HomeInsight) => {
     onAskAssistant?.(insight.prompt);
@@ -1326,11 +1103,6 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               />
             </motion.div>
           )}
-
-          {/* ── Fichiers récents ── */}
-          <motion.div {...enter(0.18)} className="mt-6">
-            <RecentFilesSection onOpenFile={onOpenFile} reduceMotion={reduceMotion} />
-          </motion.div>
 
           {/* ── Pied de page ── */}
           <motion.footer

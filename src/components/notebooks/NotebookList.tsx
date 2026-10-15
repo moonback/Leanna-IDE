@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   BookOpen, Plus, Trash2, Clock, FileText, MessageSquare,
-  Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid, X,
+  Search, SortAsc, SortDesc, ArrowRight, Github, LayoutGrid, List, X,
 } from 'lucide-react';
 import { CreateNotebookModal } from './CreateNotebookModal.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModalLazy.js';
@@ -37,6 +37,7 @@ interface Props {
 }
 
 type SortBy = 'updatedAt' | 'title' | 'sourcesCount';
+type ViewMode = 'list' | 'grid';
 
 export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const { success, error: toastError } = useToast();
@@ -48,6 +49,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
   const [sortDesc, setSortDesc] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
 
@@ -227,6 +229,20 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 label={sortDesc ? 'Décroissant' : 'Croissant'}
                 onClick={() => setSortDesc(!sortDesc)}
               />
+              <div className="ml-1 flex items-center gap-1 border-l border-[var(--notebook-border)] pl-2">
+                <NbIconButton
+                  icon={List}
+                  label="Vue liste"
+                  active={viewMode === 'list'}
+                  onClick={() => setViewMode('list')}
+                />
+                <NbIconButton
+                  icon={LayoutGrid}
+                  label="Vue grille"
+                  active={viewMode === 'grid'}
+                  onClick={() => setViewMode('grid')}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -235,7 +251,20 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
       {/* ─── Notebook Cards ─────────────────────────────────── */}
       <div className="custom-scrollbar flex-1 overflow-y-auto px-6 pb-10 pt-2 lg:px-12">
         <div className="mx-auto max-w-8xl">
-        {loading ? (
+        {loading && viewMode === 'list' ? (
+          /* ─── Skeleton (liste) ─── */
+          <div className="flex flex-col gap-2" aria-hidden>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`skeleton-row-${i}`} className="notebook-card flex items-center gap-4 rounded-xl px-5 py-3">
+                <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-1/3 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
+                  <div className="h-3 w-1/2 animate-pulse rounded-lg bg-[var(--notebook-surface-muted)]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : loading ? (
           /* ─── Skeleton ─── */
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden>
             {Array.from({ length: 6 }).map((_, i) => (
@@ -303,6 +332,79 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
             />
           </motion.div>
 
+        ) : viewMode === 'list' ? (
+          /* ─── List View ─── */
+          <div className="flex flex-col gap-2">
+            <AnimatePresence initial={false}>
+              {filteredNotebooks.map((nb, i) => (
+                <motion.div
+                  key={nb.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  whileTap={{ scale: 0.995 }}
+                  transition={{
+                    ...(prefersReducedMotion ? { duration: 0.1 } : SPRING_MOMENTUM),
+                    delay: i < 12 ? i * 0.02 : 0,
+                  }}
+                  onClick={() => onSelectNotebook(nb.id)}
+                  data-spotlight
+                  data-interactive="true"
+                  className="notebook-card group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-xl py-3 pl-5 pr-3 hover:shadow-md"
+                >
+                  {/* Couleur du notebook (donnée) */}
+                  <div
+                    className="absolute inset-y-0 left-0 w-1"
+                    style={{ backgroundColor: nb.color || 'var(--notebook-accent)' }}
+                  />
+
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-surface-muted)] text-base leading-none">
+                    {nb.icon || '📓'}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="notebook-body truncate text-sm font-semibold text-[var(--text-primary)] transition-colors duration-200 group-hover:text-[var(--notebook-accent)]">
+                      {nb.title}
+                    </h3>
+                    {nb.description && (
+                      <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
+                        {nb.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="hidden flex-shrink-0 items-center gap-4 sm:flex">
+                    <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                      <FileText className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
+                      {nb.sourcesCount}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                      <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
+                      {nb.notesCount}
+                    </span>
+                    <span className="flex w-28 items-center justify-end gap-1 text-xs text-[var(--text-muted)]">
+                      <Clock className="h-3 w-3 flex-shrink-0" aria-hidden />
+                      <span className="truncate">{timeAgo(nb.updatedAt)}</span>
+                    </span>
+                  </div>
+
+                  <NbIconButton
+                    icon={Trash2}
+                    label="Supprimer"
+                    size="sm"
+                    tone="danger"
+                    onClick={(e) => handleDeleteClick(nb.id, e)}
+                    className="flex-shrink-0 opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100"
+                  />
+                  <ArrowRight
+                    className="h-4 w-4 flex-shrink-0 -translate-x-1 text-[var(--notebook-accent)] opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100"
+                    aria-hidden
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         ) : (
           /* ─── Grid View ─── */
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">

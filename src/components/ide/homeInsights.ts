@@ -3,7 +3,7 @@
 // heure locale), propose 1 à 3 actions que Leanna peut prendre en charge.
 // Fonction pure : testable sans DOM ni réseau.
 
-export type InsightKind = 'review' | 'resume' | 'plan' | 'recap' | 'audit';
+export type InsightKind = 'review' | 'plan' | 'recap' | 'audit';
 
 export interface HomeInsight {
   id: string;
@@ -20,16 +20,10 @@ export interface HomeInsightInput {
   /** Nombre de fichiers modifiés dans le dépôt (null si inconnu / pas de git). */
   changedFiles: number | null;
   branch?: string | null;
-  recentFiles: readonly { path: string; openedAt: number }[];
   workspaceName?: string | null;
 }
 
 const MAX_INSIGHTS = 3;
-const RECENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
-
-function basename(path: string): string {
-  return path.split(/[/\\]/).filter(Boolean).pop() ?? path;
-}
 
 /** « 1 fichier modifié » / « 3 fichiers modifiés ». */
 function modifiedFiles(n: number): string {
@@ -37,7 +31,7 @@ function modifiedFiles(n: number): string {
 }
 
 export function buildHomeInsights(input: HomeInsightInput): HomeInsight[] {
-  const { now, changedFiles, branch, recentFiles, workspaceName } = input;
+  const { now, changedFiles, branch, workspaceName } = input;
   const insights: HomeInsight[] = [];
   const hour = now.getHours();
 
@@ -55,20 +49,7 @@ export function buildHomeInsights(input: HomeInsightInput): HomeInsight[] {
     });
   }
 
-  // 2. Reprendre là où on s'était arrêté.
-  const last = recentFiles.find(f => now.getTime() - f.openedAt < RECENT_WINDOW_MS);
-  if (last) {
-    const name = basename(last.path);
-    insights.push({
-      id: 'resume-file',
-      kind: 'resume',
-      title: `Reprendre sur ${name}`,
-      reason: 'Dernier fichier ouvert',
-      prompt: `Je reprends le travail sur ${last.path}. Résume son rôle en deux phrases, puis propose l'amélioration la plus utile à faire maintenant.`,
-    });
-  }
-
-  // 3. Rituel selon le moment de la journée.
+  // 2. Rituel selon le moment de la journée.
   if (hour >= 5 && hour < 11) {
     insights.push({
       id: 'plan-day',
