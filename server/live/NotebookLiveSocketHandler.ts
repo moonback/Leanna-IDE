@@ -28,6 +28,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, LiveServerMessage, Modality, type FunctionDeclaration } from '@google/genai';
 import { notebookManager, ragEngine, contentGenerator } from '../notebooks/index.js';
 import { notebookPromptStore } from '../notebooks/PromptStore.js';
+import { recordModelCallUsage } from '../utils/textGeneration.js';
 import type { GeneratedDocType } from '../notebooks/types.js';
 import type { ProfileConfig } from '../prompts/systemInstruction.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
@@ -243,6 +244,13 @@ export function attachNotebookLiveWebSocket(
         },
         callbacks: {
           onmessage: (message: LiveServerMessage) => {
+            // Télémétrie centrale : usage de chaque requête Live (auparavant ignoré).
+            if (message.usageMetadata) {
+              recordModelCallUsage({
+                provider: 'gemini', model: 'gemini-3.8-live', rawUsage: message.usageMetadata,
+                promptCharCount: 0, outputText: '', toolName: 'notebook_live', kind: 'live',
+              });
+            }
             // Audio du modèle → client (binaire)
             const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audio && clientWs.readyState === WebSocket.OPEN) {

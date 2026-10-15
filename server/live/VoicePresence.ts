@@ -23,6 +23,7 @@
 
 import { GoogleGenAI, Modality } from "@google/genai";
 import { createLogger } from "../utils/logger.js";
+import { recordModelCallUsage } from "../utils/textGeneration.js";
 
 const log = createLogger("VoicePresence");
 
@@ -126,9 +127,17 @@ export class VoicePresence {
           },
         },
         callbacks: {
-          // Les annonces sont one-shot ; on ignore le flux retour (audio géré
-          // ailleurs). On garde des callbacks vides pour satisfaire le SDK.
-          onmessage: () => {},
+          // Les annonces sont one-shot ; le flux audio retour est ignoré, mais
+          // l'usage facturé de chaque requête est enregistré.
+          onmessage: (message: unknown) => {
+            const usage = (message as { usageMetadata?: unknown } | null)?.usageMetadata;
+            if (usage) {
+              recordModelCallUsage({
+                provider: "gemini", model: this.model, rawUsage: usage,
+                promptCharCount: 0, outputText: "", toolName: "voice_presence", kind: "live",
+              });
+            }
+          },
           onerror: (e: unknown) => log.warn(`Session vocale: ${(e as Error)?.message ?? e}`),
           onclose: () => { this.session = null; },
         },

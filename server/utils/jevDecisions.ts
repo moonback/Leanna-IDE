@@ -15,6 +15,7 @@
  */
 
 import { telemetryService } from '../observability/TelemetryService.js';
+import { getTelemetryContext } from './textGeneration.js';
 
 const DECISIONS_URL = 'https://openrouter.ai/api/alpha/decisions';
 
@@ -159,9 +160,13 @@ export async function decide(options: JevDecideOptions): Promise<JevDecisionResu
 
     // Télémétrie : Jev facture par tokens comme les autres appels OpenRouter.
     if (data.usage) {
+      const ctx = getTelemetryContext();
       telemetryService.recordTokenUsage({
-        missionId: options.missionId,
-        taskId: options.taskId,
+        missionId: options.missionId ?? ctx.missionId,
+        taskId: options.taskId ?? ctx.taskId,
+        agentRole: ctx.agentRole,
+        toolName: 'jev_decisions',
+        ...(typeof data.usage.cost === 'number' ? { providerCostUsd: data.usage.cost } : {}),
         provider: 'openrouter',
         model: data.model || model,
         inputTokens: data.usage.input_tokens || 0,

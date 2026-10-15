@@ -15,7 +15,7 @@ import type {  PlannedAction,  ReflectionResult,
 } from "./types.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
 import { telemetryService } from "../observability/TelemetryService.js";
-import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
+import { runWithTelemetryContext } from "../utils/textGeneration.js";
 import { learningEngine } from "../knowledge/LearningEngine.js";
 import type { LearningResult } from "../knowledge/types.js";
 import { strategyMemory } from "../knowledge/StrategyMemory.js";
@@ -477,8 +477,6 @@ export class Executor {
       telemetryService.setMissionBudget(mission.id, params.budget);
     }
 
-    // Set telemetry context for all model calls in this mission
-    setTelemetryContext({ missionId: mission.id });
 
     // Ferme la boucle d'apprentissage inter-missions (GAP-1) : amorcer le
     // SkillScorer avec la fiabilité durable des skills AVANT la planification,
@@ -489,7 +487,11 @@ export class Executor {
       console.warn(`[Executor] Amorçage de fiabilité ignoré: ${(err as Error).message}`);
     }
 
-    const plan = await this.preparePlan(mission, params.availableSkills);
+    // Planification sous le contexte de télémétrie de la mission : ses appels
+    // LLM sont attribués à la mission et soumis à son budget.
+    const plan = await runWithTelemetryContext({ missionId: mission.id }, () =>
+      this.preparePlan(mission, params.availableSkills)
+    );
     this.missionPlans.set(mission.id, plan);
 
     this.activeMissions.set(mission.id, mission);
@@ -526,10 +528,13 @@ export class Executor {
     // Unification (audit, point 5) : en mode supervisé, l'exécution transite
     // DANS la boucle du Supervisor (état durable, snapshots, preuve, récupération).
     // Sinon, exécution directe (chemin par défaut inchangé).
-    const body =
+    // Contexte de télémétrie isolé par mission (AsyncLocalStorage) : deux
+    // missions concurrentes ne partagent plus un missionId global.
+    const body = runWithTelemetryContext({ missionId: mission.id }, () =>
       this.supervisor && this.supervisedMode
         ? this.runSupervised(mission, availableSkills)
-        : this.executeMission(mission, availableSkills);
+        : this.executeMission(mission, availableSkills)
+    );
 
     const run = body.catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
@@ -843,7 +848,6 @@ export class Executor {
     // End trace and clear telemetry
     telemetryService.endMissionTrace(missionId, false);
     telemetryService.clearMissionBudget(missionId);
-    clearTelemetryContext();
     
     this.pausedMissions.delete(missionId);
     this.emit("mission_cancelled", { missionId });
@@ -1061,7 +1065,6 @@ export class Executor {
     const success = mission.status === "completed";
     telemetryService.endMissionTrace(mission.id, success);
     telemetryService.clearMissionBudget(mission.id);
-    clearTelemetryContext();
 
     console.log(`[Executor] ✓ Mission terminée: ${mission.status}`);
     this.emit("mission_completed", {
@@ -2830,7 +2833,6 @@ JSON:`;
 
     // Rétablir l'infrastructure d'observabilité comme pour un démarrage normal.
     telemetryService.startMissionTrace(mission.id, pending.title);
-    setTelemetryContext({ missionId: mission.id });
 
     this.emit("mission_resumed", { missionId: mission.id, title: pending.title });
 

@@ -1,6 +1,6 @@
 import { Skill } from "./base.js";
 import fs from "fs";
-import { generateText, generateTextStream, getActiveProvider, type GenerateTextResult } from "../utils/textGeneration.js";
+import { generateText, generateTextStream, getActiveProvider, BudgetExceededError, type GenerateTextResult } from "../utils/textGeneration.js";
 import { ChainOfThoughtExecutor, assessComplexity, type ComplexityLevel } from "./chainOfThought.js";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -813,6 +813,7 @@ export const reasoningSkill: Skill = {
 
       // Utilise le provider actif (Gemini ou OpenRouter selon le profil utilisateur)
       // avec thinkingBudget: 0 pour forcer une sortie visible immédiate.
+      let firstProvider: 'gemini' | 'openrouter' = getActiveProvider();
       try {
         const response = await generateText({
           prompt,
@@ -828,22 +829,34 @@ export const reasoningSkill: Skill = {
             metadata: { model: response.model, provider: response.provider, mode: "agent_execute" },
           };
         }
+        firstProvider = response.provider;
         console.warn(`[agent_execute] ${response.provider}/${response.model} n'a produit aucun texte, tentative avec fallback...`);
       } catch (error) {
+        // Budget épuisé : aucune nouvelle tentative ne doit être lancée.
+        if (error instanceof BudgetExceededError) {
+          return { error: error.message };
+        }
+        // generateText a déjà tenté le fallback inter-provider : relancer
+        // rejouerait les mêmes appels facturables sans nouvelle information.
+        if (/^Tous les providers ont échoué/.test((error as Error).message)) {
+          return { error: `Erreur d'exécution agent: ${(error as Error).message}` };
+        }
         console.warn(`[agent_execute] Erreur provider actif: ${(error as Error).message}, tentative avec fallback...`);
       }
 
-      // Fallback : tente l'autre provider (si Gemini actif → OpenRouter, et vice versa)
+      // Fallback : tente RÉELLEMENT l'autre provider (forceProvider). Avant, seul
+      // le modèle de l'autre provider était renseigné, donc le même provider
+      // était rappelé (jusqu'à 4 appels facturables par agent_execute).
       try {
-        const activeProvider = getActiveProvider();
+        const otherProvider: 'gemini' | 'openrouter' = firstProvider === 'gemini' ? 'openrouter' : 'gemini';
         const fallbackOptions: any = {
           prompt: `${systemPrompt}\n\n${prompt}`,
           temperature: 0.3,
           thinkingBudget: 0,
           maxOutputTokens: 16_384,
+          forceProvider: otherProvider,
         };
-        // Force l'autre provider comme fallback
-        if (activeProvider === 'gemini') {
+        if (otherProvider === 'openrouter') {
           fallbackOptions.openrouterModel = 'google/gemini-3.6-flash';
         } else {
           fallbackOptions.geminiModel = 'gemini-3.8-flash';

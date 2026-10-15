@@ -102,6 +102,28 @@ router.get('/dashboard', (req: Request, res: Response) => {
         }))
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 20), // Top 20 missions
+
+      byProvider: Object.entries(stats.byProvider)
+        .map(([provider, data]) => ({ provider, ...data }))
+        .sort((a, b) => b.cost - a.cost),
+
+      // Fiabilité des chiffres : ce qui est mesuré, estimé, ou non durable.
+      dataQuality: {
+        inputTokens: stats.inputTokens,
+        outputTokens: stats.outputTokens,
+        cachedInputTokens: stats.cachedInputTokens,
+        reasoningTokens: stats.reasoningTokens,
+        estimatedCalls: stats.estimatedCalls,
+        defaultPricedCalls: stats.defaultPricedCalls,
+        // Appels non textuels sans tarif configuré : coût inconnu (non inclus dans totalCost).
+        unpricedCalls: stats.unpricedCalls,
+        byKind: stats.byKind,
+        fallbackCalls: stats.fallbackCalls,
+        unattributedCalls: stats.unattributedCalls,
+        coverage: stats.coverage,
+        persistence: telemetryService.getPersistenceStatus(),
+        pricingNote: 'Coûts calculés à partir des tarifs configurés (MODEL_PRICING), non certifiés par rapport à la facture fournisseur.',
+      },
     };
     
     res.json({ success: true, dashboard });
@@ -353,13 +375,18 @@ router.get('/stats/hour', (_req: Request, res: Response) => {
 router.get('/health', (_req: Request, res: Response) => {
   try {
     const stats = telemetryService.getAggregatedStats();
-    
+    const persistence = telemetryService.getPersistenceStatus();
+
     res.json({
       success: true,
       status: 'healthy',
       telemetry: {
         totalRecordsInMemory: stats.totalTokens > 0 ? 'active' : 'idle',
-        supabaseConnected: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? true : false,
+        supabaseConnected: persistence.configured,
+        // Explicite : sans persistance active, les métriques ne sont PAS un historique durable.
+        durable: persistence.configured && !persistence.disabled,
+        persistence,
+        recentFailures: telemetryService.getRecentFailures(10),
       },
     });
   } catch (error) {

@@ -363,6 +363,69 @@ Résume la conversation ci-dessous en préservant impérativement :
 2. Les décisions techniques et d'architecture.
 3. Les prochaines actions à mener (TODOs).
 Sois concis et factuel.`;
+// ─── Préservation des énoncés critiques ─────────────────────────────────────
+
+/**
+ * Marqueurs d'énoncés à ne jamais perdre lors d'une compression : décisions,
+ * contraintes, interdits, exigences de sécurité. Heuristique lexicale (FR/EN) :
+ * elle réduit le risque de perte, elle ne le supprime pas.
+ */
+const CRITICAL_STATEMENT_PATTERN =
+  /(d[ée]cision|d[ée]cid[ée]|contrainte|constraint|must|doi(t|vent)|ne jamais|never|interdit|forbidden|s[ée]curit[ée]|security|obligatoire|required|critique|critical|important)/i;
+
+const MAX_CRITICAL_STATEMENT_CHARS = 300;
+const DEFAULT_CRITICAL_BUDGET_CHARS = 2_000;
+
+/**
+ * Extrait les phrases critiques de TOUS les messages (pas seulement d'une
+ * fenêtre tronquée), dédoublonnées. Si le budget est dépassé, les plus récentes
+ * sont conservées (une décision récente peut remplacer une plus ancienne).
+ */
+export function extractCriticalStatements(
+  messages: ChatMessage[],
+  budgetChars: number = DEFAULT_CRITICAL_BUDGET_CHARS,
+): string[] {
+  const seen = new Set<string>();
+  const found: string[] = [];
+  for (const msg of messages) {
+    const sentences = msg.content.split(/(?<=[.!?])\s+|\n+/);
+    for (const raw of sentences) {
+      const sentence = raw.replace(/\s+/g, ' ').trim();
+      if (sentence.length < 8) continue;
+      const match = CRITICAL_STATEMENT_PATTERN.exec(sentence);
+      if (!match) continue;
+      // Phrase longue : extrait CENTRÉ sur le marqueur (un découpage depuis le
+      // début perdait la décision quand elle figurait en fin de phrase).
+      let clipped = sentence;
+      if (sentence.length > MAX_CRITICAL_STATEMENT_CHARS) {
+        const start = Math.max(0, match.index - 60);
+        const end = Math.min(sentence.length, start + MAX_CRITICAL_STATEMENT_CHARS);
+        clipped = `${start > 0 ? '…' : ''}${sentence.slice(start, end)}${end < sentence.length ? '…' : ''}`;
+      }
+      const key = clipped.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push(clipped);
+    }
+  }
+  const kept: string[] = [];
+  let used = 0;
+  for (let i = found.length - 1; i >= 0; i--) {
+    if (used + found[i].length > budgetChars) break;
+    kept.unshift(found[i]);
+    used += found[i].length;
+  }
+  return kept;
+}
+
+function appendCriticalSection(summary: string, critical: string[]): string {
+  if (critical.length === 0) return summary;
+  return `${summary}\n\n[Points critiques préservés]\n${critical.map((c) => `- ${c}`).join('\n')}`;
+}
+
+/** Budget de caractères de conversation envoyé au LLM de résumé. */
+const SUMMARY_INPUT_BUDGET_CHARS = 12_000;
+
 /**
  * Résumé intelligent via LLM (appel à un modèle rapide/pas cher).
  * Fallback sur le résumé local si l'appel échoue.
@@ -383,11 +446,22 @@ export async function summarizeWithLLM(
 
   logInfo('summarizeWithLLM: début', { messageCount: messages.length, model, hasApiKey: !!apiKey });
 
-  // Construire le texte de conversation à résumer
-  const conversationText = messages
-    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`)
-    .slice(0, 30)
-    .join('\n');
+  // Construire le texte de conversation à résumer. Avant : seuls les 30 PREMIERS
+  // messages étaient envoyés (les suivants, pourtant retirés du contexte, étaient
+  // perdus). Désormais : budget de caractères, messages les plus récents d'abord,
+  // et mention explicite des messages non détaillés.
+  const lines: string[] = [];
+  let usedChars = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    const line = `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`;
+    if (usedChars + line.length > SUMMARY_INPUT_BUDGET_CHARS) break;
+    lines.unshift(line);
+    usedChars += line.length;
+  }
+  const omitted = messages.length - lines.length;
+  const conversationText = (omitted > 0 ? `[${omitted} message(s) plus ancien(s) non détaillé(s)]\n` : '') + lines.join('\n');
+  const criticalStatements = extractCriticalStatements(messages);
 
   const inputTokens = estimateTokens(conversationText + SUMMARIZE_SYSTEM_PROMPT);
   logInfo('summarizeWithLLM: input préparé', { inputTokens, conversationChars: conversationText.length });
@@ -421,14 +495,20 @@ export async function summarizeWithLLM(
     });
 
     const elapsed = Date.now() - startTime;
-    const summary = response.text.trim();
+    const llmSummary = response.text.trim();
 
-    if (!summary) {
+    if (!llmSummary) {
       logWarn('summarizeWithLLM: réponse vide du LLM, fallback local');
       return { summary: summarizeLocal(messages), method: 'local', tokensUsed: 0 };
     }
+    // Les énoncés critiques sont ajoutés de façon déterministe : le LLM ne peut
+    // pas les faire disparaître du contexte résumé.
+    const summary = appendCriticalSection(llmSummary, criticalStatements);
 
-    const tokensUsed = estimateTokens(summary) + inputTokens;
+    // Tokens réellement facturés quand le fournisseur les renvoie (sinon estimation).
+    const tokensUsed = response.tokenUsage && !response.tokenUsage.estimated
+      ? response.tokenUsage.totalTokens
+      : estimateTokens(summary) + inputTokens;
 
     logSuccess('summarizeWithLLM: résumé LLM réussi', {
       elapsed: `${elapsed}ms`,
@@ -489,11 +569,15 @@ function summarizeLocal(messages: ChatMessage[]): string {
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 80).replace(/\n/g, ' ')}...`)
       .join('\n');
     
-    return fallbackSummary || `Conversation de ${messages.length} message(s) sans contenu exploitable.`;
+    return appendCriticalSection(
+      fallbackSummary || `Conversation de ${messages.length} message(s) sans contenu exploitable.`,
+      extractCriticalStatements(messages),
+    );
   }
 
-  // Max 10 paires Q/R (20 lignes)
-  return points.slice(0, 20).join('\n');
+  // Max 10 paires Q/R (20 lignes), complétées par les énoncés critiques de TOUS
+  // les messages (sinon une décision ancienne disparaissait du contexte).
+  return appendCriticalSection(points.slice(0, 20).join('\n'), extractCriticalStatements(messages));
 }
 
 // ─── Optimisation des messages OpenRouter (sliding window + LLM résumé) ──────

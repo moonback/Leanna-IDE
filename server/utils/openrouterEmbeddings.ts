@@ -14,6 +14,7 @@
  */
 
 import { createLogger } from "./logger.js";
+import { reserveModelCallBudget, recordModelCallUsage, recordModelCallFailure } from "./textGeneration.js";
 
 const log = createLogger("openrouterEmbeddings");
 
@@ -73,71 +74,90 @@ export async function embedTextsOpenRouter(
 
   let lastError: unknown = null;
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Budget de mission vérifié avant l'envoi (embeddings facturés en tokens
+  // d'entrée) ; la réservation couvre aussi les nouvelles tentatives.
+  const promptCharCount = inputs.reduce((sum, text) => sum + text.length, 0);
+  const releaseBudget = reserveModelCallBudget(model, promptCharCount, "embedding");
 
-    try {
-      const response = await fetch(`${OPENROUTER_BASE_URL}/embeddings`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://Leanna.local",
-          "X-Title": process.env.OPENROUTER_TITLE || "Leanna",
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+  try {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        const status = response.status;
+      try {
+        const response = await fetch(`${OPENROUTER_BASE_URL}/embeddings`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://Leanna.local",
+            "X-Title": process.env.OPENROUTER_TITLE || "Leanna",
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
 
-        // 429 (rate limit) / 5xx (provider overloaded) → retry avec backoff.
-        if ((status === 429 || status >= 500) && attempt < maxRetries - 1) {
-          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s…
-          log.warn(
-            `OpenRouter embeddings HTTP ${status}, nouvelle tentative dans ${delay}ms ` +
-              `(${attempt + 1}/${maxRetries})`
-          );
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "");
+          const status = response.status;
+
+          // 429 (rate limit) / 5xx (provider overloaded) → retry avec backoff.
+          if ((status === 429 || status >= 500) && attempt < maxRetries - 1) {
+            const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s…
+            log.warn(
+              `OpenRouter embeddings HTTP ${status}, nouvelle tentative dans ${delay}ms ` +
+                `(${attempt + 1}/${maxRetries})`
+            );
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+
+          throw new Error(`OpenRouter embeddings HTTP ${status} — ${errText.slice(0, 300)}`);
+        }
+
+        const data = (await response.json()) as EmbeddingResponse;
+        const rows = data.data ?? [];
+
+        // Réordonner par `index` pour garantir l'alignement avec `inputs`.
+        const vectors: number[][] = new Array(inputs.length).fill(null).map(() => [] as number[]);
+        for (const row of rows) {
+          const idx = typeof row.index === "number" ? row.index : rows.indexOf(row);
+          if (idx >= 0 && idx < vectors.length) {
+            vectors[idx] = row.embedding || [];
+          }
+        }
+
+        recordModelCallUsage({
+          provider: "openrouter",
+          model: data.model || model,
+          rawUsage: data.usage,
+          promptCharCount,
+          outputText: "",
+          toolName: "embeddings",
+          kind: "embedding",
+        });
+        return vectors;
+      } catch (e: unknown) {
+        lastError = e;
+        const message = e instanceof Error ? e.message : String(e);
+
+        // Abort (timeout) ou erreur réseau → retry si des tentatives restent.
+        if (attempt < maxRetries - 1) {
+          const delay = 1000 * Math.pow(2, attempt);
+          log.warn(`OpenRouter embeddings erreur réseau (${message}), retry dans ${delay}ms`);
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-
-        throw new Error(`OpenRouter embeddings HTTP ${status} — ${errText.slice(0, 300)}`);
+      } finally {
+        clearTimeout(timer);
       }
-
-      const data = (await response.json()) as EmbeddingResponse;
-      const rows = data.data ?? [];
-
-      // Réordonner par `index` pour garantir l'alignement avec `inputs`.
-      const vectors: number[][] = new Array(inputs.length).fill(null).map(() => [] as number[]);
-      for (const row of rows) {
-        const idx = typeof row.index === "number" ? row.index : rows.indexOf(row);
-        if (idx >= 0 && idx < vectors.length) {
-          vectors[idx] = row.embedding || [];
-        }
-      }
-
-      return vectors;
-    } catch (e: unknown) {
-      lastError = e;
-      const message = e instanceof Error ? e.message : String(e);
-
-      // Abort (timeout) ou erreur réseau → retry si des tentatives restent.
-      if (attempt < maxRetries - 1) {
-        const delay = 1000 * Math.pow(2, attempt);
-        log.warn(`OpenRouter embeddings erreur réseau (${message}), retry dans ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-    } finally {
-      clearTimeout(timer);
     }
-  }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("OpenRouter embeddings : échec après plusieurs tentatives.");
+    recordModelCallFailure("openrouter", model, lastError);
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("OpenRouter embeddings : échec après plusieurs tentatives.");
+  } finally {
+    releaseBudget();
+  }
 }
