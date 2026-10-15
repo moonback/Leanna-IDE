@@ -23,6 +23,7 @@ import path from "path";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import { knowledgeGraphCache } from "./KnowledgeGraphCache.js";
+import { resolveImportSpecifier } from "./importResolution.js";
 import type {
   FileNode,
   CodeEntity,
@@ -621,8 +622,9 @@ export class KnowledgeGraph {
       projectRoot: parsed.projectRoot || SELF_ROOT,
       files: parsed.files || {},
       entities: parsed.entities || {},
-      dependencies: parsed.dependencies || {},
-      dependents: parsed.dependents || {},
+      // Recalculés à partir des fichiers : les index persistés par l'ancien
+      // résolveur contiennent des spécificateurs bruts et aucun dépendant.
+      ...computeDependencyGraph(parsed.files || {}),
       relations: parsed.relations || [],
       lastIndexed: parsed.lastIndexed || "",
       stats: {
@@ -654,65 +656,9 @@ export class KnowledgeGraph {
   }
 
   private rebuildDependencyGraph(): void {
-    const deps: Record<string, string[]> = {};
-    const dependents: Record<string, string[]> = {};
-
-    // Initialiser les ensembles vides
-    for (const filePath of Object.keys(this.state.files)) {
-      deps[filePath] = [];
-    }
-
-    // Remplir les dépendances
-    for (const file of Object.values(this.state.files)) {
-      deps[file.path] = file.imports;
-
-      // Remplir les dépendants (graphe inverse)
-      for (const imp of file.imports) {
-        // Résoudre les imports relatifs en chemins absolus si possible
-        const resolved = this.resolveImportPath(file.path, imp);
-        if (resolved) {
-          if (!dependents[resolved]) {
-            dependents[resolved] = [];
-          }
-          if (!dependents[resolved].includes(file.path)) {
-            dependents[resolved].push(file.path);
-          }
-        }
-      }
-    }
-
-    this.state.dependencies = deps;
+    const { dependencies, dependents } = computeDependencyGraph(this.state.files);
+    this.state.dependencies = dependencies;
     this.state.dependents = dependents;
-  }
-
-  /**
-   * Résout un chemin d'import relatif en chemin de fichier connu.
-   * Exemple: "./types" → "server/knowledge/types.ts"
-   */
-  private resolveImportPath(sourceFile: string, importPath: string): string | null {
-    // Ignorer les imports de packages node_modules
-    if (!importPath.startsWith(".") && !importPath.startsWith("/")) {
-      return null;
-    }
-
-    const sourceDir = path.dirname(sourceFile);
-    const resolved = path.normalize(path.join(sourceDir, importPath));
-
-    // Chercher le fichier avec différentes extensions
-    const extensions = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", "/index.ts", "/index.tsx", "/index.js"];
-    for (const ext of extensions) {
-      const candidate = resolved + ext;
-      if (this.state.files[candidate]) {
-        return candidate;
-      }
-    }
-
-    // Essayer le chemin tel quel (déjà résolu)
-    if (this.state.files[resolved]) {
-      return resolved;
-    }
-
-    return null;
   }
 
   private computeStats(): KnowledgeStats {
@@ -758,6 +704,32 @@ export class KnowledgeGraph {
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────
+
+/**
+ * Construit le graphe de dépendances entre fichiers connus.
+ * `dependencies[f]` = fichiers internes importés par f (chemins résolus,
+ * dédupliqués) ; les spécificateurs bruts restent dans `FileNode.imports`.
+ * `dependents[f]` = graphe inverse.
+ */
+export function computeDependencyGraph(files: Record<string, FileNode>): Pick<KnowledgeGraphState, "dependencies" | "dependents"> {
+  const known = new Set(Object.keys(files));
+  const dependencies: Record<string, string[]> = {};
+  const dependents: Record<string, string[]> = {};
+
+  for (const file of Object.values(files)) {
+    const resolvedDeps = new Set<string>();
+    for (const imp of file.imports ?? []) {
+      const resolved = resolveImportSpecifier(file.path, imp, known);
+      if (resolved && resolved !== file.path) resolvedDeps.add(resolved);
+    }
+    dependencies[file.path] = [...resolvedDeps];
+    for (const target of resolvedDeps) {
+      (dependents[target] ??= []).push(file.path);
+    }
+  }
+
+  return { dependencies, dependents };
+}
 
 /** Instance singleton partagée du KnowledgeGraph */
 export const knowledgeGraph = new KnowledgeGraph();

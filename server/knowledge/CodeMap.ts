@@ -33,7 +33,10 @@ import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import { knowledgeGraph } from "./KnowledgeGraph.js";
+import { normalizeCodePath, resolveImportSpecifier, RESOLVE_EXTS } from "./importResolution.js";
 import type { ASTFileResult, CodeEntity, EntityRelation, FileNode } from "./types.js";
+
+export { normalizeCodePath, resolveImportSpecifier };
 
 const log = createLogger("CodeMap");
 
@@ -203,53 +206,10 @@ const IMPACT_EDGE_KINDS: ReadonlySet<CodeMapEdgeKind> = new Set([
 const TYPE_LIKE: ReadonlySet<CodeMapNodeKind> = new Set(["interface", "type", "enum"]);
 const CALLABLE: ReadonlySet<CodeMapNodeKind> = new Set(["function", "method", "component", "class"]);
 
-const JS_TO_TS_EXT: Record<string, string[]> = {
-  ".js": [".ts", ".tsx"],
-  ".jsx": [".tsx"],
-  ".mjs": [".mts"],
-  ".cjs": [".cts"],
-};
-const RESOLVE_EXTS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".json"];
-
-export function normalizeCodePath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/^\/+/, "");
-}
-
 export function isTestFile(filePath: string): boolean {
   return TEST_FILE_RE.test(filePath);
 }
 
-/**
- * Résout un spécificateur d'import vers un fichier connu.
- * Gère : chemins relatifs, extensions ESM `.js` pointant vers `.ts`,
- * fichiers `index.*`, alias `@/` et `~/` (→ `src/`). Retourne `null`
- * pour les paquets externes ou les cibles inconnues.
- */
-export function resolveImportSpecifier(fromFile: string, spec: string, known: ReadonlySet<string>): string | null {
-  let base: string;
-  if (spec.startsWith(".")) {
-    base = path.posix.normalize(path.posix.join(path.posix.dirname(normalizeCodePath(fromFile)), spec));
-  } else if (spec.startsWith("@/") || spec.startsWith("~/")) {
-    base = `src/${spec.slice(2)}`;
-  } else if (spec.startsWith("/")) {
-    base = spec.slice(1);
-  } else {
-    return null;
-  }
-  base = normalizeCodePath(base);
-
-  const candidates: string[] = [base];
-  const ext = path.posix.extname(base);
-  if (JS_TO_TS_EXT[ext]) {
-    const stem = base.slice(0, -ext.length);
-    for (const alt of JS_TO_TS_EXT[ext]) candidates.push(stem + alt);
-  }
-  for (const e of RESOLVE_EXTS) candidates.push(base + e);
-  for (const e of RESOLVE_EXTS) candidates.push(`${base}/index${e}`);
-
-  for (const c of candidates) if (known.has(c)) return c;
-  return null;
-}
 
 /**
  * Remplace commentaires et contenu des chaînes par des espaces en conservant
