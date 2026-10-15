@@ -6,6 +6,7 @@ import { InlineApproval } from '../InlineApproval.js';
 import { BreathingDots } from './BreathingDots.js';
 import { EmptyState } from './EmptyState.js';
 import { ChatMessage } from './ChatMessage.js';
+import { ChatMinimap } from './ChatMinimap.js';
 import type { PendingChatMessage } from './types.js';
 
 export interface ChatMessageListProps {
@@ -60,6 +61,7 @@ export function ChatMessageList({
   return (
     <div className="relative flex-1 min-h-0 flex flex-col">
       <div
+        id="chat-messages"
         ref={messagesRef}
         onScroll={onScroll}
         className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar"
@@ -189,6 +191,11 @@ export function ChatMessageList({
           <div />
         </div>
       </div>
+
+      {/* Mini-carte de la conversation (masquée pendant une recherche) */}
+      {!hasSearch && (
+        <ChatMinimap transcript={transcript} scrollRef={messagesRef} reduceMotion={reduceMotion} />
+      )}
 
       {/* Scroll to bottom button */}
       <AnimatePresence>
