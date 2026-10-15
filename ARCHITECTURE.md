@@ -39,8 +39,9 @@ graph TD
 
         subgraph SKILLS["Skill Manager V2"]
             RUNTIME["Tool Registry"]
-            BUILTIN["25+ Built-in Skills"]
+            BUILTIN["29 modules de skills builtin"]
             CUSTOM["Custom Skills (Supabase)"]
+            MCPTOOLS["Outils MCP (runtime)"]
         end
 
         subgraph AGENTS["Agent Orchestrator"]
@@ -235,7 +236,7 @@ server/runtime/
     └── metrics.ts           # GET /api/v2/metrics (+ /autonomy)
 ```
 
-Les 25+ skills natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`).
+Les **29 modules de skills** natifs (`server/skills/`) sont enregistrés une seule fois au démarrage via `bootstrapRuntimeSync`. Les custom skills sont chargés depuis Supabase (`sm.loadCustomSkills()`), et les outils MCP sont agrégés dynamiquement. Le **nombre total d'outils exposés au modèle est donc calculé au runtime** (builtin + MCP + custom) et n'est pas une constante — `reconcileCounts.ts` journalise le décompte réel au démarrage.
 
 ### Noyau P0 (noyau transactionnel durable)
 
@@ -471,11 +472,15 @@ Le serveur n'écoute que sur la loopback pour éviter l'exposition du terminal s
 
 Leanna utilise le **Node.js test runner natif** (`node:test`) pour tous les tests unitaires et d'intégration. Pas de framework externe (Jest, Mocha) : les tests sont simples, rapides et portables.
 
-**Couverture actuelle :**
-- ✅ **Skills** : ≥60% de couverture (136+ tests unitaires)
-- ✅ **Routes REST** : 118 tests d'intégration (22 fichiers `server/routes/*.test.ts`)
+**Couverture actuelle (mesurée le 2026-10-15) :**
+- ✅ **Global backend** : **1460 cas / 174 suites · 0 échec** sur **184 fichiers** `server/**/*.test.ts` (`npm test`, ~90 s)
+- ✅ **Frontend** : **90 cas · 0 échec** sur **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}` (`npm run test:ui`)
+- ✅ **Skills** : tests unitaires `server/skills/*.test.ts`
+- ✅ **Routes REST** : tests d'intégration `server/routes/*.test.ts`
 - ✅ **Noyau P0** : `server/core/*.test.ts` (machine à états, ledger, checkpoints, evidence, supervisor, safety gate, kernel)
-- ✅ **Global** : 1193+ tests automatisés (`node --import tsx --test server/**/*.test.ts`)
+
+> Les décomptes ci-dessus sont **mesurés** (suites exécutées). Aucun taux de
+> couverture de lignes n'est publié ici faute d'exécution d'un outil de coverage.
 
 ### Tests unitaires (Skills)
 
@@ -500,7 +505,7 @@ Fichiers : `server/routes/*.test.ts`
 - Validation des schémas de réponse JSON
 - Tests d'authentification et rate limiting
 
-**Couverture complète des domaines fonctionnels :**
+**Domaines fonctionnels couverts** *(les décomptes par domaine ci-dessous sont indicatifs ; le total mesuré de la suite backend est de 1460 cas sur 184 fichiers)* :
 
 | Domaine | Tests | Couverture |
 |---|---|---|
@@ -552,10 +557,15 @@ npm test -- --coverage
 
 ### CI/CD
 
-Les tests sont automatiquement exécutés sur chaque push et pull request via GitHub Actions. Un build échoué ou des tests en erreur bloquent le merge.
+> **État réel (2026-10-15) :** le répertoire `.github/workflows/` est **vide** — il
+> n'existe **aucun pipeline CI GitHub Actions** bloquant à ce jour. La validation
+> est donc **locale et manuelle**. La mise en place d'une CI bloquante
+> (lint + typecheck + test + build + `npm audit`) est une tâche **P0** de la
+> [ROADMAP](ROADMAP.md) (Phase R0).
 
-**Seuils de qualité :**
-- Build TypeScript doit passer (`tsc --noEmit`)
-- Lint doit passer (`npm run lint`)
-- Tous les tests doivent passer (`npm test`)
-- Coverage skills ≥60%
+**Portes de qualité recommandées (à exécuter localement avant toute PR) :**
+- Build TypeScript : `npm run typecheck` (`tsc --noEmit`)
+- Lint : `npm run lint`
+- Tests backend : `npm test` (1460 cas · 0 échec au 2026-10-15)
+- Tests frontend : `npm run test:ui` (90 cas · 0 échec)
+- Audit dépendances : `npm run audit:deps`

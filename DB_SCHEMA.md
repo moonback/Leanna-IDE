@@ -211,6 +211,14 @@ Suivi des coûts et de la consommation de tokens (Observabilité V1.1). Chaque a
 - `token_usage_agent_role_idx` — `(agent_role)` — coût par agent
 - `token_usage_model_idx` — `(model)` — coût par modèle
 
+**Colonnes v2 (migration 14, `20261015000000`) :** `cached_input_tokens`,
+`reasoning_tokens` (inclus dans input/output), `usage_source` (`provider` vs
+`estimated`), `pricing_source` (`exact`/normalisé/gratuit/défaut/non tarifé),
+`is_fallback` + `fallback_from` (bascule de fournisseur), `streamed`,
+`provider_cost_usd` (coût renvoyé par OpenRouter), `call_kind`
+(`text`/`embedding`/`tts`/`image`/`live`), `billed_units` + `billed_unit`.
+`TelemetryService` se replie sur le schéma v1 si ces colonnes sont absentes.
+
 **Vues :** `token_usage_daily_by_model` (coût quotidien par modèle) et `token_usage_by_mission` (coût par mission).
 
 **RLS :** `service_role` — accès total.
@@ -251,7 +259,10 @@ Toutes les migrations sont dans `supabase/migrations/` et doivent être appliqu�
 | 11 | `20260726000000_memories_updated_at.sql` | _(base existante avant v0.1)_ Backfill `updated_at` sur `memories` |
 | 12 | `20260927000000_memories_project_isolation.sql` | _(base existante avant v0.2)_ Ajout `project_id` sur `memories`, mise à jour `match_memories()` |
 | 13 | `20261001000000_create_agent_tables.sql` | Tables `agent_orchestrations`, `agent_tasks`, `agent_messages` ; corrections idempotentes des contraintes CHECK |
+| 14 | `20261015000000_token_usage_v2_columns.sql` | Télémétrie v2 : colonnes `token_usage` (`cached_input_tokens`, `reasoning_tokens`, `usage_source`, `pricing_source`, `is_fallback`, `fallback_from`, `streamed`, `provider_cost_usd`, `call_kind`, `billed_units`, `billed_unit`) + index `token_usage_provider_idx`. Repli automatique sur le schéma v1 si colonnes absentes. |
 
+> **Total : 14 migrations versionnées** dans `supabase/migrations/`. Huit schémas SQL ad-hoc subsistent à la racine `supabase/*.sql` (référence historique, à ne plus exécuter directement).
+>
 > **Migrations 11 et 12** : uniquement nécessaires sur une base créée *avant* les migrations initiales versionnées. Sur une base fraîche, les migrations 2 et 13 intègrent déjà les colonnes et contraintes à jour.
 
 ### Application

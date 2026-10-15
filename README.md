@@ -31,9 +31,9 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-184%20fichiers%20*.test.ts-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-1460%20pass%20(184%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
-<img src="https://img.shields.io/badge/Tests%20front-18%20fichiers%20(Vitest)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
+<img src="https://img.shields.io/badge/Tests%20front-90%20pass%20(18%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
 <img src="https://img.shields.io/badge/skills%20builtin-29%20modules-818CF8?style=for-the-badge" alt="29 Skills" />
 &nbsp;
@@ -2105,8 +2105,8 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test` via `tsx`, **184 fichiers** `server/**/*.test.ts`) |
-| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}`) |
+| `npm test` | Suite backend (`node --test` via `tsx`, **184 fichiers** `server/**/*.test.ts`, **1460 cas / 174 suites · 0 échec**) |
+| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}`, **90 cas · 0 échec**) |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |
 | `npm run typecheck:test` | Typage des fichiers de test |
@@ -2118,11 +2118,10 @@ npm run dist:win       # distribuable Windows
 | `npm run test:soak` | Soak test du gestionnaire de tâches d'autonomie |
 | `npm run jev:calibrate` | Calibration des seuils du Safety Gate |
 
-> **Décompte des tests.** Les chiffres ci-dessus sont des **nombres de fichiers**
-> `*.test.ts(x)` réellement présents dans le dépôt (184 côté serveur, 18 côté UI).
-> Le **nombre de cas de test** exécutés n'a pas été mesuré lors de cette révision
-> documentaire (la suite n'a pas été lancée). Pour l'obtenir : `npm test` puis
-> `npm run test:ui`.
+> **Décompte des tests (mesuré le 2026-10-15).** Les suites ont été exécutées :
+> `npm test` → **1460 cas sur 174 suites, 0 échec** (184 fichiers, ~90 s) ;
+> `npm run test:ui` → **90 cas, 0 échec** (18 fichiers). Reproductible via les deux
+> commandes ci-dessus.
 
 ### Validation de l'autonomie (banc E2E)
 

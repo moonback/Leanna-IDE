@@ -877,7 +877,7 @@ Mapping optimisé outil → agent principal. Utilisé par le frontend.
 
 **Authentification :** Oui
 
-**Réponse 200 :** `{ "success": true, "mapping": { "read_file": "coder", "run_tests": "test" }, "totalTools": 42 }`
+**Réponse 200 :** `{ "success": true, "mapping": { "read_file": "coder", "run_tests": "tester" }, "totalTools": 42 }`
 
 ---
 
@@ -2365,9 +2365,10 @@ Terminal PTY interactif.
 
 ## Tests d'intégration
 
-Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`.
-
-**Couverture actuelle : 118 tests d'intégration répartis sur 22 fichiers**
+Les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`
+(**24 fichiers** au 2026-10-15). Le tableau par routeur ci-dessous est **indicatif**
+(décomptes par domaine) ; la suite backend complète totalise **1460 cas sur 184
+fichiers · 0 échec** (`npm test`).
 
 ### Tests par routeur
 
@@ -2395,7 +2396,7 @@ Tous les endpoints REST disposent de tests d'intégration dans `server/routes/*.
 | Workspace | `workspace.test.ts` | 3 | GET info, POST interdit |
 | Mémoire hiérarchique | `hierarchicalMemory.test.ts` | 1 | Endpoint stats |
 | Health | `health.test.ts` | 1 | Health check |
-| **Total** | **22 fichiers** | **118** | **Couverture REST intégrale** |
+| **Total (indicatif)** | **24 fichiers** `server/routes/*.test.ts` | — | Les routes principales sont couvertes ; décompte de cas non ventilé ici |
 
 ### Exécuter les tests d'intégration
 
@@ -2412,7 +2413,7 @@ npm test 2>&1 | grep -E "(✔|✖)"
 
 ### Ajouter des tests pour une nouvelle route
 
-Voir le guide complet dans [CONTRIBUTING.md](CONTRIBUTING.md#ajouter-une-route-api).
+Voir les règles de contribution dans la section [Contribuer du README](README.md#-contribuer).
 
 Template minimal :
 
