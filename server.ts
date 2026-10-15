@@ -55,6 +55,7 @@ import { createMissionsRouter } from "./server/routes/missions.js";
 import { createSelfRootRouter } from "./server/routes/self-root.js";
 import safeguardsRouter from "./server/routes/safeguards.js";
 import pm2Router from "./server/routes/pm2.js";
+import systemRouter from "./server/routes/system.js";
 import { initSandboxWatchWSS } from "./server/routes/sandbox-watch.js";
 import { createUploadDocumentRouter } from "./server/routes/upload-document.js";
 import { createDocumentsRouter } from "./server/routes/documents.js";
@@ -700,6 +701,7 @@ async function startServer() {
   //   - Routeurs dont les routes internes sont génériques (/status, /, /config...) requièrent "/api/<prefix>"
   app.use("/api/audit", createAuditRouter(skillManager, mcpBridge));
   app.use("/api/pm2", pm2Router);
+  app.use("/api/system", systemRouter);
   app.use("/api/automation", automationRouter);
   app.use("/api/workflows", workflowsRouter);
   app.use("/api/custom-skills", createCustomSkillsRouter(skillManager));

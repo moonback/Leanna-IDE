@@ -43,6 +43,8 @@ export const ROUTES = {
   history: '/history',
   lists: '/lists',
   observability: '/observability',
+  // Vitrine interne du design system v3 (hors navigation)
+  devUi: '/dev/ui',
 } as const;
 
 export type NavId =

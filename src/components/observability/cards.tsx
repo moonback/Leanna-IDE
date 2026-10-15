@@ -1,4 +1,4 @@
-import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { fmt, fmtCost } from './format.js';
 
@@ -13,7 +13,7 @@ export function StatCard({
   sub,
   accent = false,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   label: string;
   value: string;
   sub?: string;

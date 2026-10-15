@@ -1,0 +1,361 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEBULA — design system v3 « Leanna Cockpit »
+   Plan : docs/PLAN_REFONTE_UI_IMMERSIVE.md §2 · Doc : src/DESIGN_TOKENS.md §v3
+
+   Trois couches :
+     1. Primitifs `--nb-*` : toujours définis, sans effet tant qu'ils ne sont
+        pas consommés. Les composants Nebula (GlowCard, RingGauge…) les
+        utilisent, donc ils fonctionnent aussi en interface classique.
+     2. Remappage v2 → v3 : actif uniquement sous `:root[data-ui="v3"]`
+        (feature flag uiV3). Il réécrit les tokens historiques (--bg-*,
+        --border-*, --text-*, --glass-*) pour que TOUTE l'app bascule sans
+        toucher aux composants. Les thèmes dark et cyberpunk deviennent
+        « Nebula », le thème light devient « Aurora ». sepia et high-contrast
+        ne sont pas touchés (le second reste la référence d'accessibilité).
+        L'accent (--accent-primary) reste le choix de l'utilisateur : il est
+        posé en style inline sur <html> par le profil.
+     3. Classes composants `.nb-*`, pilotées par les primitifs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Primitifs ────────────────────────────────────────────────────────── */
+:root {
+  /* Fonds */
+  --nb-void:       #070814;
+  --nb-deep:       #0d0f24;
+  --nb-surface:    #14163a;
+  --nb-panel:      rgba(20, 22, 48, 0.62);
+  --nb-panel-solid: rgba(17, 19, 42, 0.92);
+
+  /* Identité : violet = Leanna, magenta = IA/création, cyan = exécution */
+  --nb-violet:  #8b5cf6;
+  --nb-magenta: #d946ef;
+  --nb-cyan:    #22d3ee;
+  --nb-green:   #34d399;
+  --nb-amber:   #f59e0b;
+  --nb-pink:    #f472b6;
+  --nb-blue:    #60a5fa;
+
+  /* Couleurs par famille d'agents (src/components/ui/agentColors.ts) */
+  --nb-agent-design:    var(--nb-violet);   /* architect, planner, ui_ux */
+  --nb-agent-build:     var(--nb-cyan);     /* coder, refactor, debugger, formatter */
+  --nb-agent-quality:   var(--nb-amber);    /* tester, reviewer, proofreader, accessibility */
+  --nb-agent-perf:      var(--nb-green);    /* performance, seo */
+  --nb-agent-security:  var(--nb-magenta);  /* security */
+  --nb-agent-knowledge: var(--nb-blue);     /* writer, researcher, documentation… */
+
+  /* Texte sur fond Nebula (contraste AA vérifié sur --nb-void) */
+  --nb-text:       #eef0ff;
+  --nb-text-soft:  #b9bde0;
+  --nb-text-muted: #8f94bf;
+
+  /* Verre : 3 niveaux (panneau, carte, popover) */
+  --nb-glass-1-bg: rgba(18, 20, 46, 0.72);
+  --nb-glass-2-bg: rgba(26, 28, 62, 0.66);
+  --nb-glass-3-bg: rgba(30, 32, 72, 0.9);
+  --nb-glass-blur: 18px;
+  --nb-glass-saturate: 140%;
+  --nb-glass-edge: rgba(167, 139, 250, 0.22);
+  --nb-glass-highlight: rgba(255, 255, 255, 0.06);
+
+  /* Néon : couleur par défaut (les halos sont définis plus bas, cf. §1b) */
+  --nb-glow-color: var(--nb-violet);
+
+  /* Dégradé signature (bordures, barres, textes héroïques) */
+  --nb-gradient: linear-gradient(120deg, var(--nb-violet), var(--nb-magenta) 55%, var(--nb-cyan));
+
+  /* Profondeur : 4 plans (cf. plan §2.2), sous la pile d'overlays de layers.css */
+  --nb-depth-scene:   0;
+  --nb-depth-panel:   1;
+  --nb-depth-float:   2;
+  --nb-depth-overlay: 3;
+
+  /* Mouvement */
+  --nb-dur-1: 120ms;
+  --nb-dur-2: 200ms;
+  --nb-dur-3: 320ms;
+  --nb-dur-4: 600ms;
+  --nb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Typo d'affichage (titres, pods, chiffres clés) */
+  --nb-font-display: "Space Grotesk Variable", "Space Grotesk", var(--font-sans);
+}
+
+/* Aurora : primitifs pour le thème clair (verre clair, accents désaturés) */
+:root[data-theme="light"] {
+  --nb-void:       #f4f3ff;
+  --nb-deep:       #ebe9fb;
+  --nb-surface:    #ffffff;
+  --nb-panel:      rgba(255, 255, 255, 0.7);
+  --nb-panel-solid: rgba(255, 255, 255, 0.94);
+
+  --nb-violet:  #6d28d9;
+  --nb-magenta: #a21caf;
+  --nb-cyan:    #0e7490;
+  --nb-green:   #047857;
+  --nb-amber:   #b45309;
+  --nb-pink:    #be185d;
+  --nb-blue:    #1d4ed8;
+
+  --nb-text:       #17153a;
+  --nb-text-soft:  #3c3a66;
+  --nb-text-muted: #5f5d86;
+
+  --nb-glass-1-bg: rgba(255, 255, 255, 0.74);
+  --nb-glass-2-bg: rgba(255, 255, 255, 0.82);
+  --nb-glass-3-bg: rgba(255, 255, 255, 0.96);
+  --nb-glass-edge: rgba(109, 40, 217, 0.18);
+  --nb-glass-highlight: rgba(255, 255, 255, 0.7);
+
+}
+
+/* High-contrast : pas de halo, bords pleins */
+:root[data-theme="high-contrast"] {
+  --nb-glass-blur: 0px;
+  --nb-glass-edge: var(--border-strong);
+}
+
+/* ── 1b. Halos néon ──────────────────────────────────────────────────────────
+   Une propriété personnalisée qui en référence une autre est résolue là où
+   elle est DÉCLARÉE. Les halos sont donc redéclarés sur chaque élément qui
+   change --nb-glow-color : sinon ils garderaient le violet de :root. */
+:root, .nb-card, .nb-chip, .nb-holo, .nb-glow-sm, .nb-glow-md, .nb-glow-lg {
+  --nb-glow-sm: 0 0 6px color-mix(in srgb, var(--nb-glow-color) 55%, transparent);
+  --nb-glow-md: 0 0 10px color-mix(in srgb, var(--nb-glow-color) 45%, transparent),
+                0 0 28px color-mix(in srgb, var(--nb-glow-color) 22%, transparent);
+  --nb-glow-lg: 0 0 14px color-mix(in srgb, var(--nb-glow-color) 55%, transparent),
+                0 0 42px color-mix(in srgb, var(--nb-glow-color) 30%, transparent),
+                0 0 90px color-mix(in srgb, var(--nb-glow-color) 14%, transparent);
+}
+:root[data-theme="light"],
+:root[data-theme="light"] :is(.nb-card, .nb-chip, .nb-holo, .nb-glow-sm, .nb-glow-md, .nb-glow-lg) {
+  --nb-glow-sm: 0 0 0 1px color-mix(in srgb, var(--nb-glow-color) 30%, transparent);
+  --nb-glow-md: 0 4px 18px color-mix(in srgb, var(--nb-glow-color) 18%, transparent);
+  --nb-glow-lg: 0 8px 36px color-mix(in srgb, var(--nb-glow-color) 22%, transparent);
+}
+:root[data-theme="high-contrast"],
+:root[data-theme="high-contrast"] :is(.nb-card, .nb-chip, .nb-holo, .nb-glow-sm, .nb-glow-md, .nb-glow-lg) {
+  --nb-glow-sm: none;
+  --nb-glow-md: none;
+  --nb-glow-lg: none;
+}
+
+/* ── 2. Remappage des tokens historiques (flag uiV3) ─────────────────────── */
+:root[data-ui="v3"]:is([data-theme="dark"], [data-theme="cyberpunk"]) {
+  /* Fond principal légèrement translucide : la nébuleuse 3D transparaît
+     derrière les vues (phase 3). Les surfaces secondaires restent opaques. */
+  --bg-base:      color-mix(in srgb, var(--nb-void) 84%, transparent);
+  --bg-secondary: var(--nb-deep);
+  --bg-elevated:  var(--nb-surface);
+  --bg-panel:     var(--nb-panel-solid);
+  --bg-ctrl:      var(--nb-panel-solid);
+  --bg-sidebar:   rgba(9, 10, 26, 0.9);
+  --bg-input:     rgba(38, 40, 86, 0.5);
+  --bg-hover:     rgba(167, 139, 250, 0.08);
+  --bg-active:    rgba(167, 139, 250, 0.14);
+
+  --border-base:   rgba(167, 139, 250, 0.14);
+  --border-strong: rgba(167, 139, 250, 0.26);
+  --border-glow:   color-mix(in srgb, var(--nb-violet) 55%, transparent);
+
+  --text-primary:   var(--nb-text);
+  --text-secondary: var(--nb-text-soft);
+  --text-muted:     var(--nb-text-muted);
+  --text-dimmed:    var(--nb-text-muted);
+
+  --shadow-glow: var(--nb-glow-md);
+  --glass-bg:     var(--nb-glass-1-bg);
+  --glass-border: var(--nb-glass-edge);
+  --glass-blur:   var(--nb-glass-blur);
+
+  --scroll-thumb:       rgba(167, 139, 250, 0.18);
+  --scroll-thumb-hover: rgba(167, 139, 250, 0.45);
+}
+
+:root[data-ui="v3"][data-theme="light"] {
+  --bg-base:      color-mix(in srgb, var(--nb-void) 86%, transparent);
+  --bg-secondary: var(--nb-deep);
+  --bg-elevated:  var(--nb-surface);
+  --bg-panel:     var(--nb-panel-solid);
+  --bg-hover:     rgba(109, 40, 217, 0.06);
+  --bg-active:    rgba(109, 40, 217, 0.11);
+
+  --border-base:   rgba(109, 40, 217, 0.14);
+  --border-strong: rgba(109, 40, 217, 0.26);
+
+  --text-primary:   var(--nb-text);
+  --text-secondary: var(--nb-text-soft);
+  --text-muted:     var(--nb-text-muted);
+  --text-dimmed:    var(--nb-text-muted);
+
+  --glass-bg:     var(--nb-glass-1-bg);
+  --glass-border: var(--nb-glass-edge);
+  --glass-blur:   var(--nb-glass-blur);
+}
+
+/* Fond nébuleuse statique (le fond 3D animé arrive en phase 3) */
+:root[data-ui="v3"]:is([data-theme="dark"], [data-theme="cyberpunk"], [data-theme="light"]) body {
+  background-color: var(--nb-void);
+  background-image:
+    radial-gradient(1200px 700px at 78% -10%, color-mix(in srgb, var(--nb-violet) 22%, transparent), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, color-mix(in srgb, var(--nb-cyan) 12%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 50% 50%, color-mix(in srgb, var(--nb-magenta) 7%, transparent), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* ── 3. Utilitaires ──────────────────────────────────────────────────────── */
+.nb-glass-1, .nb-glass-2, .nb-glass-3 {
+  position: relative;
+  border: 1px solid var(--nb-glass-edge);
+  backdrop-filter: blur(var(--nb-glass-blur)) saturate(var(--nb-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--nb-glass-blur)) saturate(var(--nb-glass-saturate));
+  box-shadow: inset 0 1px 0 var(--nb-glass-highlight);
+}
+.nb-glass-1 { background: var(--nb-glass-1-bg); border-radius: var(--radius-xl); }
+.nb-glass-2 { background: var(--nb-glass-2-bg); border-radius: var(--radius-lg); }
+.nb-glass-3 { background: var(--nb-glass-3-bg); border-radius: var(--radius-lg); }
+
+.nb-glow-sm { box-shadow: var(--nb-glow-sm); }
+.nb-glow-md { box-shadow: var(--nb-glow-md); }
+.nb-glow-lg { box-shadow: var(--nb-glow-lg); }
+
+.nb-display {
+  font-family: var(--nb-font-display);
+  letter-spacing: 0.01em;
+}
+.nb-gradient-text {
+  background: var(--nb-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── 4. Composants ───────────────────────────────────────────────────────── */
+
+/* GlowCard : carte verre, bord en dégradé révélé au survol ou si active */
+.nb-card {
+  --nb-glow-color: var(--nb-card-color, var(--nb-violet));
+  padding: var(--space-4);
+  color: var(--nb-text);
+  transition: transform var(--nb-dur-2) var(--nb-ease),
+              box-shadow var(--nb-dur-2) var(--nb-ease),
+              border-color var(--nb-dur-2) var(--nb-ease);
+}
+.nb-card--interactive { cursor: pointer; }
+.nb-card--interactive:hover,
+.nb-card--interactive:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--nb-glow-color) 55%, transparent);
+  box-shadow: inset 0 1px 0 var(--nb-glass-highlight), var(--nb-glow-md);
+}
+.nb-card--interactive:focus-visible { outline: 2px solid var(--nb-glow-color); outline-offset: 2px; }
+.nb-card[data-active="true"] {
+  border-color: color-mix(in srgb, var(--nb-glow-color) 70%, transparent);
+  box-shadow: inset 0 1px 0 var(--nb-glass-highlight), var(--nb-glow-lg);
+}
+
+/* RingGauge : jauge circulaire SVG */
+.nb-ring { display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-1); color: var(--nb-text); }
+.nb-ring__svg { display: block; transform: rotate(-90deg); }
+.nb-ring__track { stroke: color-mix(in srgb, var(--nb-ring-color) 16%, transparent); }
+.nb-ring__value {
+  stroke: var(--nb-ring-color);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--nb-ring-color) 60%, transparent));
+  transition: stroke-dashoffset var(--nb-dur-4) var(--nb-ease);
+}
+.nb-ring__center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1.1;
+}
+.nb-ring__label { font-size: var(--text-xs); color: var(--nb-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.nb-ring__number { font-family: var(--nb-font-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ProgressBeam : barre de progression lumineuse */
+.nb-beam { display: flex; flex-direction: column; gap: 6px; color: var(--nb-text); }
+.nb-beam__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); }
+.nb-beam__pct { font-family: var(--nb-font-display); font-size: var(--text-xs); color: var(--nb-text-soft); font-variant-numeric: tabular-nums; }
+.nb-beam__track {
+  position: relative; height: 6px; overflow: hidden;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--nb-beam-color) 14%, transparent);
+}
+.nb-beam__fill {
+  position: absolute; inset: 0 auto 0 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--nb-beam-color) 55%, transparent), var(--nb-beam-color));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--nb-beam-color) 65%, transparent);
+  transition: width var(--nb-dur-4) var(--nb-ease);
+}
+.nb-beam[data-running="true"] .nb-beam__fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: nb-beam-sweep 1.6s linear infinite;
+}
+@keyframes nb-beam-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+/* AgentChip : pastille d'agent avec point d'état */
+.nb-chip {
+  --nb-glow-color: var(--nb-chip-color);
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--nb-chip-color) 35%, transparent);
+  background: color-mix(in srgb, var(--nb-chip-color) 12%, transparent);
+  color: var(--nb-text);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.nb-chip__dot {
+  width: 8px; height: 8px; flex: none;
+  border-radius: var(--radius-full);
+  background: var(--nb-chip-color);
+  box-shadow: var(--nb-glow-sm);
+}
+.nb-chip[data-status="active"] .nb-chip__dot { animation: nb-pulse 1.8s var(--nb-ease) infinite; }
+.nb-chip[data-status="idle"] .nb-chip__dot { opacity: 0.45; box-shadow: none; }
+@keyframes nb-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.35); opacity: 0.6; }
+}
+
+/* HoloButton : bouton holographique (pods d'action, CTA du cockpit) */
+.nb-holo {
+  --nb-glow-color: var(--nb-holo-color, var(--nb-violet));
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--nb-glow-color) 55%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nb-glow-color) 26%, transparent), color-mix(in srgb, var(--nb-glow-color) 8%, transparent));
+  color: var(--nb-text);
+  font-family: var(--nb-font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--nb-glow-sm);
+  transition: transform var(--nb-dur-1) var(--nb-ease),
+              box-shadow var(--nb-dur-2) var(--nb-ease),
+              background-color var(--nb-dur-2) var(--nb-ease);
+}
+.nb-holo--lg { min-height: 52px; padding: 0 var(--space-6); font-size: var(--text-base); border-radius: var(--radius-xl); }
+.nb-holo:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--nb-glow-md); transform: translateY(-1px); }
+.nb-holo:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+.nb-holo:focus-visible { outline: 2px solid var(--nb-glow-color); outline-offset: 3px; }
+.nb-holo:disabled { opacity: 0.5; cursor: not-allowed; }
+.nb-holo[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--nb-glow-lg); }
+
+/* ── 5. Accessibilité ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .nb-card, .nb-holo, .nb-beam__fill, .nb-ring__value { transition: none; }
+  .nb-card--interactive:hover, .nb-holo:hover:not(:disabled) { transform: none; }
+  .nb-chip[data-status="active"] .nb-chip__dot,
+  .nb-beam[data-running="true"] .nb-beam__fill::after { animation: none; }
+}
+:root[data-theme="high-contrast"] .nb-ring__value { filter: none; }
+:root[data-theme="high-contrast"] .nb-beam__fill { box-shadow: none; }
+:root[data-theme="high-contrast"] .nb-beam[data-running="true"] .nb-beam__fill::after { display: none; }

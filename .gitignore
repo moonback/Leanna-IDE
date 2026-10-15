@@ -28,3 +28,6 @@ graphify-out/
 .Leanna-strategy.json
 .Leanna-strategy.json.tmp
 
+
+# Modèle VRM de l avatar : non versionné tant que sa licence n est pas réglée (public/avatar/LISEZMOI.txt)
+public/avatar/*.vrm

@@ -8,6 +8,7 @@ import {
   Github, Terminal, FolderDown, Settings,
   FolderClock, Layers, Search, GitFork, BookOpen, Power,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
 import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
@@ -86,7 +87,7 @@ type TabId = 'recent' | 'open' | 'clone';
 interface TabDef {
   id: TabId;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   description: string;
 }
 

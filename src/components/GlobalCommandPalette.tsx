@@ -80,6 +80,9 @@ function buildItems(): PaletteItem[] {
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
+/** Événement window qui ouvre la palette (ex. bouton de recherche de la TopBar). */
+export const OPEN_COMMAND_PALETTE_EVENT = 'Leanna-open-command-palette';
+
 export function GlobalCommandPalette() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -115,6 +118,17 @@ export function GlobalCommandPalette() {
     close();
     navigate(item.path);
   }, [close, navigate]);
+
+  // Ouverture programmatique (bouton de recherche de la TopBar v3), y compris
+  // dans l'IDE où le raccourci Ctrl+K est laissé à la palette de l'éditeur.
+  useEffect(() => {
+    const onOpen = () => {
+      returnFocusRef.current = document.activeElement as HTMLElement | null;
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
+  }, []);
 
   // Raccourci global
   useEffect(() => {

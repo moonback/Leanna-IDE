@@ -1,0 +1,262 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEBULA SHELL — cadre applicatif v3 (src/shell/*), phase 2.
+   Monté uniquement quand le flag uiV3 est actif (CockpitShell).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.nb-shell {
+  flex: 1;
+  min-width: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+.nb-shell__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+/* Le contenu principal garde le comportement de .app-content */
+.nb-shell__body > .app-content { flex: 1; min-width: 0; }
+
+/* ── Scène 3D (SceneLayer / SceneHost) ─────────────────────────────────────── */
+/* Le fond de .app-layout laisse voir la scène, posée sous le contenu
+   (.app-layout est un contexte d'empilement isolé, cf. motion-pro.css). */
+:root[data-ui="v3"] .app-layout { background: transparent; }
+.nb-scene {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-below);
+  pointer-events: none;
+}
+.nb-scene canvas { display: block; width: 100% !important; height: 100% !important; }
+/* Mode Focus : surfaces opaques, aucune transparence décorative */
+:root[data-ui="v3"][data-focus="on"] { --bg-base: var(--nb-void); }
+
+/* ── BarButton ───────────────────────────────────────────────────────────── */
+.nb-barbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--nb-dur-1) var(--nb-ease),
+              color var(--nb-dur-1) var(--nb-ease),
+              border-color var(--nb-dur-1) var(--nb-ease);
+}
+.nb-barbtn--labeled { padding: 0 10px; }
+.nb-barbtn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nb-barbtn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.nb-barbtn[aria-pressed="true"] {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--nb-violet) 40%, transparent);
+  background: color-mix(in srgb, var(--nb-violet) 14%, transparent);
+}
+.nb-barbtn__icon { display: inline-flex; flex: none; }
+.nb-barbtn__label { overflow: hidden; text-overflow: ellipsis; }
+.nb-barbtn__kbd {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-base);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ── TopBar ──────────────────────────────────────────────────────────────── */
+.nb-topbar {
+  flex: none;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  backdrop-filter: blur(var(--nb-glass-blur)) saturate(var(--nb-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--nb-glass-blur)) saturate(var(--nb-glass-saturate));
+  position: relative;
+  z-index: var(--z-sticky);
+}
+.nb-topbar__search {
+  width: min(420px, 40vw);
+  justify-content: flex-start;
+  border-color: var(--border-base);
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+.nb-topbar__spacer, .nb-bottombar__spacer { flex: 1; }
+.nb-topbar__profile .nb-barbtn__label { max-width: 140px; }
+
+.nb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--nb-gradient);
+  color: var(--nb-void);
+  font-family: var(--nb-font-display);
+  font-weight: 700;
+  font-size: var(--text-xs);
+}
+
+.nb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-base);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.nb-pill__dot {
+  --nb-glow-color: var(--nb-pill-color);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--nb-pill-color);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--nb-pill-color) 70%, transparent);
+}
+.nb-pill[data-kind="ok"]      { --nb-pill-color: var(--nb-green); }
+.nb-pill[data-kind="pending"] { --nb-pill-color: var(--nb-amber); }
+.nb-pill[data-kind="down"]    { --nb-pill-color: var(--color-error); }
+
+/* ── RightRail ───────────────────────────────────────────────────────────── */
+.nb-rail {
+  flex: none;
+  width: 300px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-left: 1px solid var(--border-base);
+}
+.nb-rail__section { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.nb-rail__head { display: flex; align-items: center; gap: var(--space-2); }
+.nb-rail__icon { display: inline-flex; color: var(--nb-violet); }
+.nb-rail__title { flex: 1; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.nb-rail__more { height: 24px; min-width: 24px; padding: 0 4px; }
+.nb-rail__list { display: flex; flex-direction: column; gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
+.nb-rail__agent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.nb-rail__mission { display: flex; flex-direction: column; gap: 2px; }
+.nb-rail__sub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.nb-rail__empty { font-size: var(--text-xs); color: var(--text-muted); line-height: var(--leading-normal); }
+.nb-rail__gauges { display: flex; justify-content: space-around; }
+
+/* ── BottomBar ───────────────────────────────────────────────────────────── */
+.nb-bottombar {
+  flex: none;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-base) 80%, transparent);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.nb-bottombar__item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.nb-bottombar__muted { opacity: 0.8; }
+.nb-bottombar__activity { color: var(--text-secondary); }
+
+/* ── Responsive (plan §4, phase 2) ───────────────────────────────────────── */
+/* < 1280 px : le rail devient un tiroir superposé au contenu */
+@media (max-width: 1279px) {
+  .nb-rail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-sidepanel);
+    background: var(--nb-glass-3-bg);
+    backdrop-filter: blur(var(--nb-glass-blur));
+    -webkit-backdrop-filter: blur(var(--nb-glass-blur));
+    box-shadow: var(--shadow-xl);
+  }
+}
+/* < 900 px : recherche réduite à l'icône, libellés secondaires masqués */
+@media (max-width: 899px) {
+  .nb-topbar__search { width: auto; }
+  .nb-topbar .nb-barbtn__label,
+  .nb-topbar .nb-barbtn__kbd { display: none; }
+  .nb-pill { padding: 0 8px; font-size: 0; gap: 0; }
+  .nb-pill__dot { font-size: var(--text-xs); }
+  .nb-bottombar__item:not(.nb-bottombar__activity) { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-barbtn { transition: none; }
+}
+:root[data-theme="high-contrast"] .nb-topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg-base); }
+:root[data-theme="high-contrast"] .nb-pill__dot { box-shadow: none; }
+
+/* ── Avatar Leanna (phase 4) ─────────────────────────────────────────────── */
+.nb-avatar-stage {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.nb-avatar-stage__bubble {
+  position: relative;
+  z-index: var(--nb-depth-float);
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0 0 calc(-1 * var(--space-6));
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--nb-font-display);
+  font-size: var(--text-sm);
+  color: var(--nb-text);
+  border-bottom-left-radius: var(--radius-xs);
+}
+/* Zone transparente : le canvas WebGL dessine l'avatar dessous. */
+.nb-avatar-stage__anchor {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nb-avatar-stage__anchor:focus-visible { outline: 2px solid var(--nb-violet); outline-offset: 4px; }
+.nb-avatar-stage__anchor:disabled { cursor: default; }
+.nb-avatar-stage__loading { font-size: var(--text-xs); color: var(--text-muted); }
+.nb-avatar-stage__fallback {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

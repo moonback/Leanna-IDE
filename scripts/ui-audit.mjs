@@ -167,7 +167,8 @@ function ruleRawButton() {
       'src/hooks/',
       'examples/',
     ];
-    const relNorm = f.rel.replace(/\\/g, '/');
+    // f.rel est relatif à src/ : on le préfixe pour que les chemins ci-dessus correspondent.
+    const relNorm = 'src/' + f.rel.replace(/\\/g, '/');
     return !allowed.some(a => relNorm.includes(a));
   });
 }
@@ -184,7 +185,7 @@ function ruleInputWithoutLabel() {
       !line.includes('type={"hidden"}')
     );
   }, (f) => {
-    const relNorm = f.rel.replace(/\\/g, '/');
+    const relNorm = 'src/' + f.rel.replace(/\\/g, '/');
     return !relNorm.includes('src/components/ui/');
   });
 }

@@ -2,12 +2,13 @@
  * TemplateSelectorModal.tsx — Interactive Template Library UI with live variables editor and Markdown preview.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Search, Sparkles, Copy, Download, FileText, Layout, Check,
   Rocket, Cpu, ClipboardList, Code2, Calendar, Edit3, Eye
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { DOCUMENT_TEMPLATES, DocumentTemplate } from '../../config/documentTemplates.js';
 import {
   extractVariables,
@@ -25,7 +26,7 @@ interface Props {
   onCreateNote?: (title: string, content: string) => void;
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   Rocket,
   Cpu,
   ClipboardList,

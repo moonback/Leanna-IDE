@@ -140,7 +140,11 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
   // `Component` est polymorphe (`as` prop) : on l'élargit en ElementType pour
   // autoriser le spread de triggerProps (dont type/disabled, déjà conditionnés
   // à `undefined` hors <button>).
-  const TriggerTag = Component as React.ElementType;
+  // Typé comme un composant générique : React.ElementType ouvert entre en
+  // conflit avec les éléments 3D que @react-three/fiber ajoute à
+  // JSX.IntrinsicElements (props réduites à `never`). À l'exécution, c'est
+  // toujours l'une des 4 balises de `as`.
+  const TriggerTag = Component as unknown as React.FC<Record<string, unknown>>;
 
   return (
     <TriggerTag {...triggerProps}>

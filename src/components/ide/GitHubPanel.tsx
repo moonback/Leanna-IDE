@@ -5,6 +5,7 @@ import {
   FolderOpen, Lock, GitMerge, CheckCircle2, Circle, Clock,
   ChevronDown, Filter, MessageSquare, Tag, User, Calendar,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tooltip } from '../ui/Tooltip.js';
 import { WorkspacePublishPanel } from '../github/WorkspacePublishPanel.js';
@@ -120,7 +121,7 @@ const FILE_STATUS: Record<string, { bg: string; color: string }> = {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function EmptyState({ icon: Icon, title, subtitle }: {
-  icon: React.ElementType; title: string; subtitle?: string;
+  icon: LucideIcon; title: string; subtitle?: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full py-16 px-6 text-center gap-3">

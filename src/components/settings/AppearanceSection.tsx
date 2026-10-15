@@ -2,9 +2,18 @@ import { useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye, Pipette } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+import { Section, Field, ToggleSwitch, ChipGroup } from './SettingsPrimitives.js';
 import { ACCENTS, FONTS } from './constants.js';
 import { useFeatureFlag, setFeatureFlag } from '../../config/featureFlags.js';
+import { useScenePrefs, setScenePref } from '../../scene/scenePrefs.js';
+import type { SceneIntensity } from '../../scene/quality.js';
+
+const INTENSITY_OPTIONS: { id: SceneIntensity; label: string; desc: string }[] = [
+  { id: 'off', label: 'Off', desc: 'Fond statique, aucun WebGL' },
+  { id: 'sober', label: 'Sobre', desc: 'Peu de particules, 15–30 i/s' },
+  { id: 'standard', label: 'Standard', desc: 'Équilibre qualité et ressources' },
+  { id: 'cinematic', label: 'Cinématique', desc: 'Qualité maximale si le GPU suit' },
+];
 
 // Palette d'accents : les 5 de base (tokens) + variantes distinctes en hex.
 // (Les anciennes entrées « Indigo/Teal/Orange » réutilisaient des tokens déjà
@@ -21,6 +30,7 @@ const EXTENDED_ACCENTS = [
 export function AppearanceSection() {
   const { profile, setField } = useProfile();
   const uiV3 = useFeatureFlag('uiV3');
+  const scene = useScenePrefs();
 
   const applyAccent = useCallback((color: string) => {
     setField('accentColor', color);
@@ -231,6 +241,25 @@ export function AppearanceSection() {
           hint="Active la nouvelle interface immersive v3 en cours de développement"
         />
       </div>
+
+      {uiV3 && (
+        <>
+          <Field label="Intensité visuelle" hint="Le niveau réel est aussi limité par le GPU détecté et baisse automatiquement si l'affichage ralentit.">
+            <ChipGroup
+              aria-label="Intensité visuelle"
+              options={INTENSITY_OPTIONS}
+              value={scene.intensity}
+              onChange={v => setScenePref('intensity', v)}
+            />
+          </Field>
+          <ToggleSwitch
+            value={scene.focus}
+            onChange={v => setScenePref('focus', v)}
+            label="Mode Focus"
+            hint="Coupe tout le décor 3D pour travailler sans distraction (raccourci Ctrl+Alt+F)"
+          />
+        </>
+      )}
     </Section>
   );
 }

@@ -1,7 +1,7 @@
 # Leanna Design System Tokens
 
-**Version:** 2.1.0
-**Date:** 23 septembre 2026
+**Version:** 3.0.0-alpha (Nebula, derrière le flag `uiV3`)
+**Date:** 15 octobre 2026
 **Périmètre:** Tous les composants React dans `src/components/`
 
 Ce document définit les tokens, conventions visuelles et règles d'implémentation du design system de **Leanna**.
@@ -1007,3 +1007,72 @@ Fichiers : `src/styles/motion-pro.css` (CSS) · `src/lib/motion.ts` (miroir JS p
 | `.lea-glow-border` | opt-in | Bordure conique lumineuse en rotation |
 | `.lea-live-dot` | opt-in | Point d'état avec onde |
 | `data-spotlight` | attribut opt-in | Active le spotlight sur n'importe quel élément |
+
+---
+
+## Nebula — design system v3 (alpha, flag `uiV3`)
+
+Refonte « Leanna Cockpit » : voir `docs/PLAN_REFONTE_UI_IMMERSIVE.md`. Source : `src/styles/nebula.css`. Vitrine : route `/dev/ui` (`NebulaShowcaseView`).
+
+### Activation
+
+| Élément | Effet |
+|---|---|
+| `<html data-ui="v3">` | posé par `src/config/featureFlags.ts` (réglage Apparence, ou `?ui=v3`) |
+| Remappage v2 → v3 | sous `:root[data-ui="v3"]`, les tokens `--bg-*`, `--border-*`, `--text-*`, `--glass-*` deviennent Nebula (thèmes `dark` et `cyberpunk`) ou Aurora (`light`). Les thèmes `sepia` et `high-contrast` ne changent pas. |
+| Accent | `--accent-primary` reste le choix de l'utilisateur (style inline du profil). Les composants Nebula utilisent leurs propres couleurs `--nb-*`. |
+
+Les composants Nebula fonctionnent aussi en interface classique : leurs primitifs `--nb-*` sont toujours définis.
+
+### Primitifs
+
+| Groupe | Tokens |
+|---|---|
+| Fonds | `--nb-void`, `--nb-deep`, `--nb-surface`, `--nb-panel`, `--nb-panel-solid` |
+| Couleurs | `--nb-violet` (identité), `--nb-magenta`, `--nb-cyan`, `--nb-green`, `--nb-amber`, `--nb-pink`, `--nb-blue` |
+| Agents | `--nb-agent-{design,build,quality,perf,security,knowledge}` → `agentColor(role)` dans `components/ui/agentColors.ts` |
+| Texte | `--nb-text`, `--nb-text-soft`, `--nb-text-muted` |
+| Verre | `--nb-glass-{1,2,3}-bg`, `--nb-glass-blur`, `--nb-glass-edge`, `--nb-glass-highlight` |
+| Néon | `--nb-glow-color` + `--nb-glow-{sm,md,lg}` |
+| Profondeur | `--nb-depth-{scene,panel,float,overlay}` |
+| Mouvement | `--nb-dur-{1..4}` (120/200/320/600 ms), `--nb-ease` |
+| Typo | `--nb-font-display` (Space Grotesk Variable, OFL) |
+
+> **Piège :** une variable CSS qui en référence une autre est résolue là où elle est **déclarée**. Les halos `--nb-glow-*` sont donc redéclarés sur `.nb-card`, `.nb-chip`, `.nb-holo` et `.nb-glow-*`. Un nouveau composant qui change `--nb-glow-color` doit être ajouté à cette liste (§1b de `nebula.css`), sinon son halo reste violet.
+
+### Utilitaires
+
+`.nb-glass-{1,2,3}` (panneau, carte, popover) · `.nb-glow-{sm,md,lg}` · `.nb-display` · `.nb-gradient-text`
+
+### Composants (`src/components/ui/`)
+
+| Composant | Rôle | Accessibilité |
+|---|---|---|
+| `GlowCard` | carte en verre, halo coloré, `active` | devient `role="button"` activable au clavier avec `onClick` |
+| `RingGauge` | jauge circulaire (CPU, RAM, tokens) | `role="meter"`, valeur bornée |
+| `ProgressBeam` | barre de progression lumineuse, balayage si `running` | `role="progressbar"`, `aria-busy` |
+| `AgentChip` | pastille d'agent (`agentRole`), point pulsant | état annoncé en texte (`sr-only`) ; en erreur, couleur `--color-error` |
+| `HoloButton` | bouton holographique (pods, CTA) | `<button type="button">`, `aria-pressed` via `pressed` |
+
+### Règles
+
+- Couleurs uniquement via des tokens (`var(--nb-*)`), jamais en hex dans le TSX.
+- `prefers-reduced-motion` coupe les transitions, la pulsation et le balayage. `high-contrast` coupe halos, flou et balayage.
+- Une couleur ne porte jamais seule une information : un texte l'accompagne toujours.
+
+### Scène 3D (phase 3)
+
+Code : `src/scene/`. Le canvas WebGL est unique et chargé à la demande (`SceneHost`, chunk de 278 kB gz). Il est monté par `SceneLayer` dans `CockpitShell`.
+
+| Élément | Rôle |
+|---|---|
+| `quality.ts` | niveau `high` / `medium` / `low` / `off` selon le GPU détecté, le réglage « Intensité visuelle », `prefers-reduced-motion` et `high-contrast` ; descend d'un cran si la cadence mesurée est trop basse |
+| `sceneBus.ts` | énergie 0–1 de la scène = agents actifs + impulsions (`Leanna-tool-start`, `Leanna-agent-event`, `Leanna-mission-event`) |
+| `scenePrefs.ts` | intensité (Off / Sobre / Standard / Cinématique) et mode Focus ; `<html data-focus>` |
+| `useSceneVisibility.ts` | pause (image figée, 0 frame) si la fenêtre est masquée, sans focus, ou en mode Focus |
+
+- **Cadence :** `frameloop="demand"` plus un métronome (15 à 60 i/s selon le niveau et l'activité). Aucune image n'est rendue en pause.
+- **Mode Focus : Ctrl+Alt+F.** Ctrl+Shift+F reste la recherche globale de l'IDE.
+- **Repli :** sans WebGL, en `high-contrast` ou après une perte de contexte GPU, le décor CSS `AmbientBackdrop` prend le relais.
+- **Shaders :** les couleurs three.js sont en espace linéaire. Tout `ShaderMaterial` doit finir par `#include <colorspace_fragment>`, sinon le rendu est nettement trop sombre.
+- **Typage :** R3F ajoute ses éléments à `JSX.IntrinsicElements`. Ne pas typer un composant reçu en props avec `React.ElementType` (ses props deviennent `never`) : utiliser `LucideIcon` ou un `ComponentType` précis.

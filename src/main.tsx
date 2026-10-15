@@ -2,6 +2,7 @@
 
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
+import '@fontsource-variable/space-grotesk';
 import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
@@ -32,7 +33,9 @@ import { AmbientBackdrop } from './components/ui/AmbientBackdrop.js';
 import { RouteProgress } from './components/ui/RouteProgress.js';
 import { usePointerSpotlight } from './hooks/usePointerSpotlight.js';
 import { pageVariants } from './lib/motion.js';
-import { initFeatureFlags } from './config/featureFlags.js';
+import { initFeatureFlags, useFeatureFlag } from './config/featureFlags.js';
+import { CockpitShell } from './shell/CockpitShell.js';
+import { reloadScenePrefs } from './scene/scenePrefs.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -45,6 +48,7 @@ const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
 const PilotageView = lazy(() => import('./views/PilotageView.js'));
+const NebulaShowcaseView = lazy(() => import('./views/NebulaShowcaseView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 import { dedupKeyFor } from './lib/fetchDedup.js';
@@ -178,6 +182,7 @@ try {
 
 // ── Feature flags (data-ui="v3|classic") before first paint ────────────────
 initFeatureFlags();
+reloadScenePrefs(); // data-focus sur <html> avant le premier rendu
 
 // ── Sync profile to server on startup ──────────────────────────────────────
 // This ensures the WS session always uses the latest saved identity/voice.
@@ -508,6 +513,7 @@ function AnimatedRoutes() {
         <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
         <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
         <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
+        <Route path={ROUTES.devUi}         element={wrap(<NebulaShowcaseView />)} />
 
         {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
         <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
@@ -696,6 +702,17 @@ function Layout() {
     }
   }, [liveAPI.connected, liveAPI.sendTextMessage]);
 
+  // Shell v3 « Cockpit » derrière le feature flag (docs/PLAN_REFONTE_UI_IMMERSIVE.md).
+  const uiV3 = useFeatureFlag('uiV3');
+  const mainContent = (
+    <main id="main-content" className="app-content" tabIndex={-1}>
+      <IdeNavigationBridge />
+      <ConnectionBanner />
+      <GlobalAgentStatusBar />
+      <AnimatedRoutes />
+    </main>
+  );
+
   return (
     <LiveAPIContext.Provider value={liveAPI}>
       <ScreenShareProvider
@@ -704,16 +721,18 @@ function Layout() {
         onScreenShareChange={handleScreenShareChange}
       >
         <div className="app-layout">
-          <AmbientBackdrop />
+          {/* En v3, le décor est rendu par CockpitShell (SceneLayer). */}
+          {!uiV3 && <AmbientBackdrop />}
           <RouteProgress />
           <a className="skip-navigation-link" href="#main-content">Passer la navigation</a>
-          <NavSidebar />
-          <main id="main-content" className="app-content" tabIndex={-1}>
-            <IdeNavigationBridge />
-            <ConnectionBanner />
-            <GlobalAgentStatusBar />
-            <AnimatedRoutes />
-          </main>
+          {uiV3 ? (
+            <CockpitShell nav={<NavSidebar />}>{mainContent}</CockpitShell>
+          ) : (
+            <>
+              <NavSidebar />
+              {mainContent}
+            </>
+          )}
         </div>
         {/* Indicateur persistant de screen share (visible sur toutes les pages) */}
         <ScreenShareIndicator />

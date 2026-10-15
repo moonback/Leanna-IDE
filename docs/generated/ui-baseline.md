@@ -30,6 +30,8 @@
 | CSS total (3 fichiers) | 399 kB | 64 kB |
 | Durée de `vite build` | 1 min 52 s | |
 
+> **Note du 15 octobre 2026 (phase 1) :** `npm i` a resynchronisé `node_modules` avec le lockfile (mermaid 11.17.2). Le JS chargé à la demande est passé à 2 979 kB gz, avec de nouveaux diagrammes mermaid (`cynefin`, `swimlanes`). Ce changement ne vient pas de la refonte. Le bundle initial, seul soumis au budget, est mesuré à **351,6 kB gz après la phase 1** (+2,7 kB, dont environ 2,3 kB de CSS Nebula).
+
 **Plus gros chunks (gz) :** `vendor-monaco` 934 kB · `IdeView` 226 kB · `index` 155 kB · `cytoscape` 139 kB · `tsMode` 136 kB · `mermaid.core` 123 kB.
 
 **Budget v3 :** bundle initial ≤ **389 kB gz** (+40 kB). Le chunk 3D doit rester en lazy loading, avec au plus 450 kB gz. La vérification se fait avec `npx vite build`, puis `npm run ui:baseline -- --compare`.

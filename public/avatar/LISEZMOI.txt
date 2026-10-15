@@ -1,0 +1,14 @@
+Avatar 3D de Leanna (phase 4 de docs/PLAN_REFONTE_UI_IMMERSIVE.md)
+
+Déposer ici le modèle sous le nom : leanna.vrm
+(format VRM 0.x ou 1.0, exporté par exemple depuis VRoid Studio).
+
+- Le modèle doit être une création originale dont Leanna détient les droits
+  (cession écrite si commandé à un artiste). Pas de modèle téléchargé sans
+  licence claire.
+- Poids visé : 8 Mo au plus.
+- Expressions utilisées (presets VRM) : happy, angry, sad, relaxed,
+  surprised, aa, ih, ou, ee, oh, blink.
+- Autre emplacement : définir VITE_LEANNA_AVATAR_URL dans .env.
+
+Sans fichier, l'interface affiche automatiquement la mascotte 2D.

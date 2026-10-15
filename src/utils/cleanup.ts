@@ -37,7 +37,7 @@ export function cleanupGlobalResources(): void {
   
   try {
     // Nettoyer le store d'activité des agents
-    destroyActivityStore();
+    destroyActivityStore(true); // arrêt de l'app : ignore le compteur de montages
   } catch (e) {
     console.error('[Cleanup] Erreur lors du nettoyage du store d\'activité:', e);
   }

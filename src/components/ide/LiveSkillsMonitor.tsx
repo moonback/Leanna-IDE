@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Zap, Clock, CloudRain, Github, Globe, Database,
@@ -6,6 +6,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, ChevronRight, Loader2,
   Activity, CheckCircle2, Timer, TrendingUp,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 
 // ── Tool → Skill mapping ─────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ const TOOL_DISPLAY: Record<string, string> = {
 interface SkillMeta {
   label: string;
   desc: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   color: string;
 }
 

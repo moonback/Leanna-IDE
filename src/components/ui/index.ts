@@ -118,6 +118,15 @@ export {
   type IconButtonProps,
 } from './IconButton.js';
 
+// ─── 6. Nebula (design system v3, voir src/styles/nebula.css) ────────────────────
+
+export { GlowCard, type GlowCardProps } from './GlowCard.js';
+export { RingGauge, type RingGaugeProps } from './RingGauge.js';
+export { ProgressBeam, type ProgressBeamProps } from './ProgressBeam.js';
+export { AgentChip, type AgentChipProps, type AgentChipStatus } from './AgentChip.js';
+export { HoloButton, type HoloButtonProps } from './HoloButton.js';
+export { agentColor, agentFamily, type AgentFamily } from './agentColors.js';
+
 export {
   AgentTaskCard,
   type AgentTaskCardProps,

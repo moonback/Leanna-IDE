@@ -326,7 +326,15 @@ export async function syncActiveTasksFromServer(): Promise<void> {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/**
+ * Nombre de montages actifs. Plusieurs consommateurs (IdeView, OrbLiveView,
+ * rail du shell v3) initialisent le store : il n'est détruit qu'au départ du
+ * dernier, sinon le démontage d'une vue viderait les autres.
+ */
+let refCount = 0;
+
 export function initActivityStore() {
+  refCount += 1;
   if (initialized) {
     console.log('[agentActivityStore] ⚠️ Déjà initialisé, ignoré');
     return;
@@ -352,7 +360,9 @@ export function initActivityStore() {
  * Doit être appelé lors de la fermeture de l'application ou du reload
  * pour éviter les fuites mémoire.
  */
-export function destroyActivityStore() {
+export function destroyActivityStore(force = false) {
+  refCount = force ? 0 : Math.max(0, refCount - 1);
+  if (refCount > 0) return;
   if (!initialized) {
     console.log('[agentActivityStore] ⚠️ Pas initialisé, rien à détruire');
     return;
