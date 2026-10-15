@@ -16,6 +16,22 @@ function getAudioContext(): AudioContext {
  * Ne nécessite aucun fichier audio externe.
  */
 export function playSessionStartSound(): void {
+  playNotes([
+    { freq: 660, start: 0, duration: 0.12 },
+    { freq: 880, start: 0.1, duration: 0.16 },
+  ], 'playSessionStartSound');
+}
+
+/** Alerte d'approbation requise : trois bips, plus insistants que le "ding". */
+export function playApprovalRequestSound(): void {
+  playNotes([
+    { freq: 988, start: 0, duration: 0.12 },
+    { freq: 784, start: 0.14, duration: 0.12 },
+    { freq: 988, start: 0.28, duration: 0.18 },
+  ], 'playApprovalRequestSound');
+}
+
+function playNotes(notes: { freq: number; start: number; duration: number }[], label: string): void {
   try {
     const ctx = getAudioContext();
     if (ctx.state === 'suspended') {
@@ -23,10 +39,6 @@ export function playSessionStartSound(): void {
     }
 
     const now = ctx.currentTime;
-    const notes: { freq: number; start: number; duration: number }[] = [
-      { freq: 660, start: 0, duration: 0.12 },
-      { freq: 880, start: 0.1, duration: 0.16 },
-    ];
 
     for (const note of notes) {
       const osc = ctx.createOscillator();
@@ -48,7 +60,7 @@ export function playSessionStartSound(): void {
       osc.stop(endTime + 0.02);
     }
   } catch (err) {
-    console.warn('playSessionStartSound: unable to play sound', err);
+    console.warn(`${label}: unable to play sound`, err);
   }
 }
 

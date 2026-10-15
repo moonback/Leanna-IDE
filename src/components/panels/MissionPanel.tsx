@@ -7,7 +7,6 @@ import {
   DollarSign, Timer, Shield, Activity, Ban, RefreshCw, Sparkles,
 } from 'lucide-react';
 import { Panel } from '../ui/Panel.js';
-import { usePendingApprovals, clearPendingApproval } from '../../hooks/usePendingApprovals.js';
 import {
   useResumeConfirmations,
   clearResumeConfirmation,
@@ -43,11 +42,6 @@ interface MissionEvent {
   /** Délai avant refus automatique d'une approbation (ms). */
   timeoutMs?: number;
 }
-
-import type { PendingApprovalInfo } from '../../hooks/usePendingApprovals.js';
-
-/** Demande d'approbation en attente pour une action à effet de bord. */
-type PendingApproval = PendingApprovalInfo;
 
 interface MissionPlan {
   objectives: string[];
@@ -289,13 +283,9 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
-  // Source partagée : les approbations en attente sont aussi lues par la barre
-  // de statut (pastille globale), pour rester visibles panneau fermé.
-  const approvals = usePendingApprovals();
   // Missions interrompues (crash/redémarrage) en attente d'une décision :
   // réactiver ou effacer. Jamais relancées d'office par le serveur.
   const resumeConfirmations = useResumeConfirmations();
-  const [resolving, setResolving] = useState<string | null>(null);
   const [decidingResume, setDecidingResume] = useState<string | null>(null);
   const [busyMission, setBusyMission] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -337,26 +327,6 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
       setCreating(false);
     }
   }, [newTitle, newDescription, newPriority]);
-
-  // Résout une approbation (approuve ou refuse) via l'API.
-  const resolveApproval = useCallback(async (missionId: string, actionId: string, approved: boolean) => {
-    setResolving(actionId);
-    try {
-      const res = await fetch(`/api/missions/${missionId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId, approved }),
-      });
-      // Qu'elle réussisse ou expire côté serveur, on retire la demande localement.
-      if (res.ok || res.status === 404) {
-        clearPendingApproval(actionId);
-      }
-    } catch (err) {
-      console.error('[MissionPanel] Échec de résolution d\'approbation:', err);
-    } finally {
-      setResolving(null);
-    }
-  }, []);
 
   // Décide du sort d'une mission interrompue : la réactiver ou l'effacer.
   const decideResume = useCallback(async (missionId: string, decision: 'reactivate' | 'delete') => {
@@ -926,22 +896,7 @@ export function MissionPanel({ inline = false, onClose }: MissionPanelProps) {
         </div>
       )}
 
-      {/* Approbations en attente */}
-      {approvals.length > 0 && (
-        <div className="px-2 pt-2 space-y-1.5 flex-shrink-0">
-          <AnimatePresence initial={false}>
-            {approvals.map(approval => (
-              <ApprovalCard
-                key={approval.actionId}
-                approval={approval}
-                resolving={resolving === approval.actionId}
-                onApprove={() => resolveApproval(approval.missionId, approval.actionId, true)}
-                onReject={() => resolveApproval(approval.missionId, approval.actionId, false)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+      {/* Les approbations en attente s'affichent dans MissionApprovalModal (global). */}
 
       {/* Mission list */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2 custom-scrollbar">
@@ -1098,113 +1053,6 @@ function ResumeConfirmationCard({
           >
             <Trash2 size={11} />
             Effacer
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function ApprovalCard({
-  approval,
-  resolving,
-  onApprove,
-  onReject,
-}: {
-  approval: PendingApproval;
-  resolving: boolean;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
-  const argsPreview = approval.args && Object.keys(approval.args).length > 0
-    ? JSON.stringify(approval.args)
-    : null;
-
-  // Compte à rebours aligné sur CriticalEditConfirm : sans réponse, la demande
-  // expire (le serveur applique le refus « fail-closed »). La couleur s'intensifie
-  // sous 10 s pour signaler l'urgence.
-  const totalMs = Math.max(1, approval.expiresAt - approval.requestedAt);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, []);
-  const remainingMs = Math.max(0, approval.expiresAt - now);
-  const secondsLeft = Math.ceil(remainingMs / 1000);
-  const progressPct = Math.min(100, Math.max(0, Math.round((remainingMs / totalMs) * 100)));
-  const urgent = secondsLeft <= 10;
-  const timerColor = urgent ? 'var(--color-error)' : 'var(--color-warning)';
-  const prefersReducedMotion = useReducedMotion();
-
-  return (
-    <motion.div
-      initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
-      animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-      className="rounded-xl overflow-hidden"
-      style={{
-        backgroundColor: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
-      }}
-    >
-      <div className="px-3 py-2.5">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Pause size={13} style={{ color: 'var(--color-warning)' }} className="flex-shrink-0" />
-          <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: 'var(--color-warning)' }}>
-            Approbation requise
-          </span>
-          <span className="text-xs px-1 py-0.5 rounded flex items-center gap-1"
-            style={{ color: 'var(--accent-primary)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
-            title={approval.skill}>
-            <Zap size={9} /> {skillLabel(approval.skill)}
-          </span>
-        </div>
-
-        <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-muted)' }}>
-          {approval.reason}
-        </p>
-
-        {argsPreview && (
-          <p className="text-xs font-mono truncate mb-2 opacity-70" style={{ color: 'var(--text-dimmed)' }} title={argsPreview}>
-            {argsPreview}
-          </p>
-        )}
-
-        {/* Compte à rebours avant refus automatique */}
-        <div className="flex items-center gap-2 mb-1" aria-hidden={false}>
-          <Clock size={11} style={{ color: timerColor, flexShrink: 0 }} />
-          <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--color-warning) 15%, transparent)' }}>
-            <motion.div
-              className="h-full rounded-full"
-              style={{ backgroundColor: timerColor }}
-              initial={false}
-              animate={{ width: `${progressPct}%` }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: 'linear' }}
-            />
-          </div>
-          <span className="text-xs font-mono tabular-nums" style={{ color: timerColor }}>
-            {secondsLeft}s
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 mt-2">
-          <button
-            onClick={onApprove}
-            disabled={resolving}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
-            style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)' }}
-          >
-            {resolving ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
-            Approuver
-          </button>
-          <button
-            onClick={onReject}
-            disabled={resolving}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
-            style={{ color: 'var(--color-error)', backgroundColor: 'color-mix(in srgb, var(--color-error) 12%, transparent)' }}
-          >
-            <XCircle size={11} />
-            Refuser
           </button>
         </div>
       </div>

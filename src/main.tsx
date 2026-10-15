@@ -16,6 +16,7 @@ import { ScreenShareProvider, useScreenShare } from './context/ScreenShareContex
 import { useLiveAPI } from './hooks/useLiveAPI.js';
 import { FloatingOrb } from './components/FloatingOrb.js';
 import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
+import { MissionApprovalModal } from './components/MissionApprovalModal.js';
 import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
 import { EnvSetupModal } from './components/EnvSetupModal.js';
@@ -718,6 +719,8 @@ function Layout() {
         {profile.floatingOrb !== false && <FloatingOrbWrapper />}
         {/* Modale de confirmation pour les fichiers critiques */}
         <CriticalEditConfirm sendMessage={liveAPI.sendRawMessage} />
+        {/* Modale d'approbation des actions de mission (avec son) */}
+        <MissionApprovalModal />
         {/* Proposition d'ouvrir la vue des missions à la création d'une mission */}
         <MissionCreatedPrompt />
         {/* Palette de commandes globale (Cmd/Ctrl+K) */}

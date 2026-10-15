@@ -15,6 +15,7 @@
  */
 
 import { useSyncExternalStore } from 'react';
+import { playApprovalRequestSound } from '../lib/sound.js';
 
 export interface PendingApprovalInfo {
   actionId: string;
@@ -92,6 +93,7 @@ function handleMissionEvent(e: Event) {
       },
     ]);
     ensureSweeper();
+    playApprovalRequestSound();
   } else if (
     detail.event === 'action_denied' ||
     detail.event === 'approval_timeout' ||
