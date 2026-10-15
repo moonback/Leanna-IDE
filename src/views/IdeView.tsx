@@ -26,6 +26,8 @@ import { CommandPalette } from '../components/ide/CommandPalette.js';
 import { GlobalSearch } from '../components/ide/GlobalSearch.js';
 import { StatusBar } from '../components/ide/StatusBar.js';
 import { RightDock } from '../components/ide/RightDock.js';
+import { ImpactPanel } from '../components/knowledge/ImpactPanel.js';
+import { buildImpactRef, importedSymbolRef, toWorkspacePath } from '../components/knowledge/impactModel.js';
 import { BottomDock } from '../components/ide/BottomDock.js';
 import { ExplorerDock, getExplorerWidth } from '../components/ide/ExplorerDock.js';
 import { TelegramStatusModal } from '../components/ide/TelegramStatusModal.js';
@@ -192,6 +194,10 @@ export default function IdeView() {
   const [showTelegram, setShowTelegram] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showTokenDetail, setShowTokenDetail] = useState(false);
+  const [showImpact, setShowImpact] = useState(false);
+  // Cible épinglée du panneau d'impact (`fichier` ou `fichier#Symbole`) ;
+  // null = la cible suit le fichier actif.
+  const [impactPin, setImpactPin] = useState<string | null>(null);
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [showNotebooks, setShowNotebooks] = useState(false);
   const [showSandbox, setShowSandbox] = useState(false);
@@ -235,7 +241,7 @@ export default function IdeView() {
   // un panneau ferme tous les autres — « un panneau remplace l'autre dans sa zone ».
   type RightPanelName =
     | 'search' | 'mcp' | 'vision' | 'skillsMonitor' | 'missions'
-    | 'agents' | 'fleet' | 'telegram' | 'modelPicker' | 'tokenDetail';
+    | 'agents' | 'fleet' | 'telegram' | 'modelPicker' | 'tokenDetail' | 'impact';
 
   const openRightPanel = useCallback((target: RightPanelName | null) => {
     setShowGlobalSearch(target === 'search');
@@ -248,6 +254,7 @@ export default function IdeView() {
     setShowTelegram(target === 'telegram');
     setShowModelPicker(target === 'modelPicker');
     setShowTokenDetail(target === 'tokenDetail');
+    setShowImpact(target === 'impact');
   }, []);
 
   // Toggle: si le panneau ciblé est déjà ouvert, on ferme toute la zone droite ;
@@ -257,6 +264,8 @@ export default function IdeView() {
   }, [openRightPanel]);
 
   const closeRightPanel = useCallback(() => openRightPanel(null), [openRightPanel]);
+
+  const impactTarget = impactPin ?? toWorkspacePath(fileSystem.activePath);
 
   // ── Zone basse : Terminal et Logs partagent la même zone (mutuellement exclusifs) ──
   const toggleTerminal = useCallback(() => {
@@ -842,7 +851,25 @@ export default function IdeView() {
       contextMenuOrder: 1.5,
       run: sendSelectionToAI,
     });
-  }, [fileSystem.activePath, ideSettings, applySettingsToEditor, sendSelectionToAI]);
+
+    editor.addAction({
+      id: 'Leanna-analyze-impact',
+      label: "Analyser l'impact",
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.6,
+      run: (ed: any) => {
+        const file = toWorkspacePath(editorPathRef.current);
+        if (!file) return;
+        const pos = ed.getPosition();
+        const model = ed.getModel();
+        const word: string | null = pos ? model?.getWordAtPosition(pos)?.word ?? null : null;
+        // Symbole importé : viser sa définition plutôt que ce fichier.
+        const imported = word && model ? importedSymbolRef(model.getValue(), file, word) : null;
+        setImpactPin(imported ?? buildImpactRef(file, word));
+        openRightPanel('impact');
+      },
+    });
+  }, [fileSystem.activePath, ideSettings, applySettingsToEditor, sendSelectionToAI, openRightPanel]);
 
   // Apply settings changes imperatively
   useEffect(() => {
@@ -1258,7 +1285,7 @@ export default function IdeView() {
               open={
                 showGlobalSearch || showMcp || visionEnabled ||
                 (showSkillsMonitor && connected) || showMissions || showAgents ||
-                showFleet || showTelegram || showModelPicker || showTokenDetail
+                showFleet || showTelegram || showModelPicker || showTokenDetail || showImpact
               }
             >
               {showGlobalSearch && (
@@ -1298,6 +1325,15 @@ export default function IdeView() {
               {showTokenDetail && (
                 <TokenDetailModal docked onClose={closeRightPanel} />
               )}
+              {showImpact && (
+                <ImpactPanel
+                  target={impactTarget}
+                  pinned={impactPin !== null}
+                  onTogglePin={() => setImpactPin((p) => (p !== null ? null : impactTarget))}
+                  onOpenFile={(p, line) => { void openFileAt(p, line); }}
+                  onClose={closeRightPanel}
+                />
+              )}
             </RightDock>
           </div>
         </div>
@@ -1323,6 +1359,7 @@ export default function IdeView() {
           onToggleTelegram={() => toggleRightPanel('telegram', showTelegram)}
           onToggleModelPicker={() => toggleRightPanel('modelPicker', showModelPicker)}
           onToggleTokenDetail={() => toggleRightPanel('tokenDetail', showTokenDetail)}
+          onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
         />
       </div>
 
@@ -1384,6 +1421,7 @@ export default function IdeView() {
           onToggleWordWrap={() => updateSetting('wordWrap', !ideSettings.wordWrap)}
           onToggleSettings={openSettings}
           onShowDiff={() => setShowDiffViewer(true)}
+          onAnalyzeImpact={() => { setImpactPin(null); openRightPanel('impact'); }}
         />
       )}
 
