@@ -177,7 +177,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | ✅ ~~Jugement de risque pré-exécution~~ | P0 | L | ✅ `JevSafetyGate` + `jevGating` |
 | **Exporter OpenTelemetry réel** (OTLP → Jaeger/Tempo local en container) | P0 | S | 📋 |
 | **CI GitHub Actions bloquante** : lint + typecheck + test + build + `npm audit` | P0 | M | 📋 |
-| **Reconnexion WebSocket auto** (backoff) sur `/live`, `/notebook-live`, `/terminal`, `/sandbox-watch`, `/autonomy` | P0 | S | � ✅ `/live` (`useWebSocket`, backoff borné) ; 4 autres sockets à généraliser |
+| **Reconnexion WebSocket auto** (backoff) sur `/live`, `/notebook-live`, `/terminal`, `/sandbox-watch`, `/autonomy` | P0 | S | 🟡 ✅ `/live` (`useWebSocket`, backoff borné) ; 4 autres sockets à généraliser |
 | **Scan + redaction de secrets** dans logs, traces, prompts et avant tout commit/push agent | P0 | M | 📋 |
 | **Health check enrichi** `/api/health` : Supabase, Gemini, pgvector, Ollama, uptime, version | P1 | S | 📋 |
 
@@ -220,7 +220,7 @@ Constat honnête, tiré du code source. Chaque ligne ✅ est traçable à un fic
 | **Abstraction provider complète** : découpler les skills du client Gemini | P0 | L | 📋 |
 | **Fallback en cascade multi-niveaux** (Gemini → OpenRouter → Ollama local) | P0 | M | 🟡 2 niveaux sur 3 |
 | **Routeur de modèles intelligent** : choix auto par complexité, coût, latence, confidentialité | P1 | L | 📋 |
-| **Cache sémantique de prompts** : réponse réutilisée si prompt équivalent | P1 | M | � `promptCache.ts` = cache **exact** (non sémantique), non branché, sans test |
+| **Cache sémantique de prompts** : réponse réutilisée si prompt équivalent | P1 | M | 📋 aucun cache de prompts dans le code actuel (l'ancien `promptCache.ts` exact a été retiré) — à bâtir sur embeddings |
 | ✅ ~~Compression de contexte automatique~~ en fin de fenêtre | P1 | L | ✅ `LiveSocketHandler.autoSummarizeContext` (déclenchée au seuil de tokens) |
 
 ---

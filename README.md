@@ -105,7 +105,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 | | Section | | Section |
 |---|---|---|---|
 | 🧠 | [Qu'est-ce que Leanna ?](#-quest-ce-que-leanna-) | ⚙️ | [**Noyau P0 — le noyau transactionnel**](#-noyau-p0--le-noyau-transactionnel) |
-| 🖼️ | [Aperçu](#️-aperçu) | 🔄 | [Machine à états de mission](#machine-à-états-de-mission) |
+| 📷 | [Aperçu](#-aperçu) | 🔄 | [Machine à états de mission](#machine-à-états-de-mission) |
 | 💡 | [L'idée centrale](#-lidée-centrale) | 💾 | [Store durable + Ledger d'idempotence](#store-durable--ledger-didempotence) |
 | 🎯 | [Pourquoi Leanna existe](#-pourquoi-leanna-existe) | 📸 | [Checkpoints & cycle transactionnel](#checkpoints--cycle-transactionnel) |
 | ✨ | [Ce que Leanna peut faire](#-ce-que-leanna-peut-faire) | 🧾 | [Moteur de preuve (Evidence)](#moteur-de-preuve-evidence) |
@@ -248,7 +248,7 @@ enregistrement et de sa configuration d'exécution.
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 
-## �️ Aperçu
+## 📷 Aperçu
 
 <div align="center">
 
@@ -264,7 +264,7 @@ enregistrement et de sa configuration d'exécution.
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 
-## �🔄 La boucle d'exécution autonome
+## 🔄 La boucle d'exécution autonome
 
 Le modèle d'exécution repose sur une boucle de rétroaction fermée dans laquelle
 **la vérification fait partie de l'exécution**, et non d'une étape finale
