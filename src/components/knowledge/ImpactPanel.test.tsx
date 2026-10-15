@@ -7,9 +7,14 @@ const hookState = {
   loading: false,
   error: null as string | null,
   refresh: vi.fn(),
+  targets: [] as (string | null)[],
+  byTarget: null as Record<string, CodeMapImpactReport> | null,
 };
 vi.mock('../../hooks/useCodeMapImpact.js', () => ({
-  useCodeMapImpact: () => hookState,
+  useCodeMapImpact: (t: string | null) => {
+    hookState.targets.push(t);
+    return hookState.byTarget && t ? { ...hookState, report: hookState.byTarget[t] ?? null } : hookState;
+  },
   authHeaders: () => ({}),
 }));
 
@@ -31,6 +36,26 @@ beforeEach(() => {
   hookState.loading = false;
   hookState.error = null;
   hookState.refresh = vi.fn();
+  hookState.targets = [];
+  hookState.byTarget = null;
+});
+
+describe('ImpactPanel — symbole non suivi', () => {
+  it('retombe sur le fichier quand fichier#Symbole est introuvable, avec une note', () => {
+    hookState.byTarget = {
+      'src/a.ts#log': baseReport({ targets: [], unresolved: ['src/a.ts#log'] }),
+      'src/a.ts': baseReport(),
+    };
+    render(<ImpactPanel {...props({ target: 'src/a.ts#log', pinned: true })} />);
+    expect(hookState.targets.at(-1)).toBe('src/a.ts');
+    expect(screen.getByText('Symbole « log » non suivi par la cartographie : impact du fichier affiché')).toBeTruthy();
+  });
+
+  it('ne retombe pas sur un rapport d’une autre cible', () => {
+    hookState.report = baseReport({ targets: [], unresolved: ['src/old.ts#x'] });
+    render(<ImpactPanel {...props({ target: 'src/a.ts#log', pinned: true })} />);
+    expect(hookState.targets.at(-1)).toBe('src/a.ts#log');
+  });
 });
 
 describe('ImpactPanel — états', () => {

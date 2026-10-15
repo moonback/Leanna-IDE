@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isCodeFile, toWorkspacePath, buildImpactRef, targetFile, groupByDistance,
   countImpactedSources, firstLineFor, buildTestCommands, riskLabel, riskColor,
-  summaryHeadline,
+  summaryHeadline, importedSymbolRef, isAnalyzableTarget,
 } from './impactModel.js';
 import type { ImpactedFile, ImpactedNode } from '../../types/codeMap.js';
 
@@ -19,6 +19,19 @@ describe('isCodeFile', () => {
     for (const p of ['README.md', 'package.json', 'a.css', '', null, undefined]) {
       expect(isCodeFile(p)).toBe(false);
     }
+  });
+});
+
+describe('isAnalyzableTarget', () => {
+  it('accepte les fichiers de code et les modules sans extension', () => {
+    expect(isAnalyzableTarget('src/a.ts#x')).toBe(true);
+    expect(isAnalyzableTarget('server/utils/logger#createLogger')).toBe(true);
+    expect(isAnalyzableTarget('server/knowledge/Default')).toBe(true);
+  });
+  it('refuse les autres fichiers', () => {
+    expect(isAnalyzableTarget('README.md')).toBe(false);
+    expect(isAnalyzableTarget('docs/guide.md#Titre')).toBe(false);
+    expect(isAnalyzableTarget('')).toBe(false);
   });
 });
 
@@ -55,6 +68,36 @@ describe('buildImpactRef / targetFile', () => {
   it('extrait le fichier d’une cible', () => {
     expect(targetFile('src/a.ts#getUser')).toBe('src/a.ts');
     expect(targetFile('src/a.ts')).toBe('src/a.ts');
+  });
+});
+
+describe('importedSymbolRef', () => {
+  const src = [
+    "import { createLogger } from '../utils/logger.js';",
+    'import type { ImpactReport, DependencyCycle as Cycle } from "./types.js";',
+    "import express from 'express';",
+    "import Default from './Default';",
+    "import { a } from '@/lib/a';",
+    'const log = createLogger("x");',
+  ].join('\n');
+  const file = 'server/knowledge/ImpactAnalyzer.ts';
+
+  it('suit un import nommé relatif vers son fichier d’origine', () => {
+    expect(importedSymbolRef(src, file, 'createLogger')).toBe('server/utils/logger#createLogger');
+  });
+  it('gère les imports de type et les alias (nom d’origine)', () => {
+    expect(importedSymbolRef(src, file, 'ImpactReport')).toBe('server/knowledge/types#ImpactReport');
+    expect(importedSymbolRef(src, file, 'Cycle')).toBe('server/knowledge/types#DependencyCycle');
+  });
+  it('gère l’import par défaut relatif (cible = fichier)', () => {
+    expect(importedSymbolRef(src, file, 'Default')).toBe('server/knowledge/Default');
+  });
+  it('gère l’alias @/ vers src/', () => {
+    expect(importedSymbolRef(src, file, 'a')).toBe('src/lib/a#a');
+  });
+  it('ignore les paquets externes et les symboles locaux', () => {
+    expect(importedSymbolRef(src, file, 'express')).toBeNull();
+    expect(importedSymbolRef(src, file, 'log')).toBeNull();
   });
 });
 

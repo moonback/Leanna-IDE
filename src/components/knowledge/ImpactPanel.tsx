@@ -4,14 +4,14 @@
  * sur POST /api/knowledge/code-map/impact via useCodeMapImpact.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, Check, ClipboardCopy, FlaskConical, Pin, PinOff, RefreshCcw, X,
 } from 'lucide-react';
 import { authHeaders, useCodeMapImpact } from '../../hooks/useCodeMapImpact.js';
 import {
   buildTestCommands, countImpactedSources, firstLineFor, groupByDistance,
-  isCodeFile, riskColor, riskLabel, summaryHeadline, targetFile,
+  isAnalyzableTarget, riskColor, riskLabel, summaryHeadline, targetFile,
 } from './impactModel.js';
 import type { CodeMapImpactReport } from '../../types/codeMap.js';
 
@@ -183,8 +183,19 @@ function ReportView({ report, onOpenFile }: { report: CodeMapImpactReport; onOpe
 
 export function ImpactPanel({ target, pinned, onTogglePin, onOpenFile, onClose }: ImpactPanelProps) {
   const [depth, setDepth] = useState(3);
-  const analyzable = !!target && isCodeFile(targetFile(target));
-  const { report, loading, error, refresh } = useCodeMapImpact(analyzable ? target : null, depth);
+  const analyzable = !!target && isAnalyzableTarget(target);
+  // Symbole que la cartographie ne suit pas (variable locale…) : on retombe
+  // sur l'impact du fichier plutôt que d'afficher « introuvable ». Pas de
+  // repli sur le nom seul : il désignerait un homonyme d'un autre fichier.
+  const [fallbackFrom, setFallbackFrom] = useState<string | null>(null);
+  const usingFallback = !!target && fallbackFrom === target;
+  const effective = usingFallback ? targetFile(target) : target;
+  const { report, loading, error, refresh } = useCodeMapImpact(analyzable ? effective : null, depth);
+
+  useEffect(() => {
+    if (!target || usingFallback || !report || !target.includes('#')) return;
+    if (report.targets.length === 0 && report.unresolved.includes(target)) setFallbackFrom(target);
+  }, [report, target, usingFallback]);
   const [reindexing, setReindexing] = useState(false);
 
   const reindex = useCallback(async () => {
@@ -223,6 +234,11 @@ export function ImpactPanel({ target, pinned, onTogglePin, onOpenFile, onClose }
   );
   else body = (
     <div style={{ opacity: loading ? 0.5 : 1 }} aria-busy={loading}>
+      {usingFallback && (
+        <p className="px-3 pt-3 text-xs" style={{ color: 'var(--color-warning)' }}>
+          {`Symbole « ${target!.slice(target!.indexOf('#') + 1)} » non suivi par la cartographie : impact du fichier affiché`}
+        </p>
+      )}
       <ReportView report={report} onOpenFile={onOpenFile} />
     </div>
   );
