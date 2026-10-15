@@ -95,6 +95,8 @@ const READ_TOOLS = new Set([
   "knowledge_ast_callees",
   "knowledge_ast_call_chain",
   "knowledge_ast_file_inspect",
+  "knowledge_code_map_impact",
+  "knowledge_code_map_symbol",
 ]);
 
 /** Outils dont le résultat est mis en cache dans le contexte d'exécution. */

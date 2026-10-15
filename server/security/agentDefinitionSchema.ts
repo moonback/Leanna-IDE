@@ -59,6 +59,8 @@ export const ALLOWED_CAPABILITIES = new Set<string>([
   // ── AST call-graph ──
   "knowledge_ast_callers", "knowledge_ast_callees",
   "knowledge_ast_call_chain", "knowledge_ast_file_inspect",
+  // ── Cartographie vivante ──
+  "knowledge_code_map_impact", "knowledge_code_map_symbol",
   // ── Automatisation & vision ──
   "automation_navigate", "automation_click", "automation_type",
   "automation_extract", "automation_inspect", "automation_screenshot",

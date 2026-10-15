@@ -108,6 +108,8 @@ Attribution, niveau de risque et permissions de chaque outil enregistré dans le
 | `knowledge_ast_callees` | 2 | debugger, architect, researcher | low | read | non |
 | `knowledge_ast_call_chain` | 2 | debugger, architect | low | read | non |
 | `knowledge_ast_file_inspect` | 2 | debugger, reviewer, architect | low | read | non |
+| `knowledge_code_map_impact` | 2 | coder, refactor, debugger, reviewer, architect, tester, planner | low | read | non |
+| `knowledge_code_map_symbol` | 2 | coder, refactor, debugger, reviewer, architect, researcher | low | read | non |
 | `save_memory` | 2 | planner, researcher | medium | write | **oui** |
 | `search_memory` | 2 | planner, researcher, coder | low | read | non |
 | `delete_memory` | 3 | planner | medium | dangerous | **oui** |

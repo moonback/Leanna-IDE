@@ -112,6 +112,8 @@ const coderAgent: AgentDefinition = {
   name: "Agent Développeur",
   description: "Implémentation de fonctionnalités, écriture et modification de code propre et typé avec vérification rigoureuse.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "modify_project_file",
@@ -145,6 +147,8 @@ const refactorAgent: AgentDefinition = {
   name: "Agent Refactorisation",
   description: "Restructuration de code, réduction de dette technique, optimisation de lisibilité et respect des patterns SOLID/DRY sans altérer le comportement externe.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "modify_project_file",
@@ -177,6 +181,8 @@ const debuggerAgent: AgentDefinition = {
   name: "Agent Débogueur",
   description: "Diagnostic de bugs, analyse de stacktraces et root-causes, application de correctifs ciblés et vérification de non-régression.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "modify_project_file",
@@ -206,6 +212,8 @@ const reviewerAgent: AgentDefinition = {
   name: "Agent Revue de Code",
   description: "Audit de qualité de code, détection d'anti-patterns, vérification de la maintenabilité, lisibilité et conformité aux standards.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "list_project_files",
     "search_in_files",
@@ -231,6 +239,8 @@ const testerAgent: AgentDefinition = {
   name: "Agent QA & Tests",
   description: "Écriture et maintenance de tests automatisés (unitaires, intégration, e2e), validation des cas limites et de la couverture.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "modify_project_file",
@@ -281,6 +291,8 @@ const architectAgent: AgentDefinition = {
   name: "Agent Architecte Logiciel",
   description: "Conception logicielle de haut niveau, définition de structures de modules, contrats d'interfaces, schémas de données et choix de patterns.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "create_project_directory",
@@ -360,6 +372,7 @@ const researcherAgent: AgentDefinition = {
   name: "Agent Recherche",
   description: "Collecte d'informations, analyse d'impact, résumé de sources, vérification de faits et persistance dans ProjectMemory.",
   capabilities: [
+    "knowledge_code_map_symbol",
     "read_project_file",
     "list_project_files",
     "search_in_files",
@@ -445,6 +458,8 @@ const plannerAgent: AgentDefinition = {
   name: "Agent Planificateur",
   description: "Création de plans d'ingénierie et de documents, structuration d'architecture, alimentation de la mémoire projet et préparation des délégations.",
   capabilities: [
+    "knowledge_code_map_impact",
+    "knowledge_code_map_symbol",
     "read_project_file",
     "write_project_file",
     "modify_project_file",

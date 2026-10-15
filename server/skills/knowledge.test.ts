@@ -23,6 +23,8 @@ describe("knowledgeSkill", () => {
         "knowledge_ast_callees",
         "knowledge_ast_call_chain",
         "knowledge_ast_file_inspect",
+        "knowledge_code_map_impact",
+        "knowledge_code_map_symbol",
       ];
 
       const declaredNames = knowledgeSkill.declarations.map((d) => d.name);

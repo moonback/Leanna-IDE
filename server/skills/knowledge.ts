@@ -7,6 +7,7 @@ import {
   projectMemory,
   impactAnalyzer,
   knowledgeGraph,
+  codeMap,
   projectDoctor,
   predictionEngine,
   opportunityEngine,
@@ -74,6 +75,8 @@ export const knowledgeSkill: Skill = {
     knowledge_search_entities: ["read"],
     knowledge_search_hybrid: ["read"],
     knowledge_impact_analyze: ["read"],
+    knowledge_code_map_impact: ["read"],
+    knowledge_code_map_symbol: ["read"],
     knowledge_index_status: ["read"],
     knowledge_index_rebuild: ["read", "write"],
     knowledge_project_doctor: ["read"],
@@ -387,6 +390,63 @@ export const knowledgeSkill: Skill = {
       },
     },
     {
+      name: "knowledge_code_map_impact",
+      description:
+        "🗺️ Cartographie vivante — IMPACT AVANT MODIFICATION au niveau SYMBOLE. Pour une fonction, méthode, " +
+        "classe, interface, type ou fichier que tu t'apprêtes à modifier, retourne qui en dépend réellement " +
+        "(appels, références de type, héritage, imports nommés, à travers les barils de réexport), la chaîne " +
+        "de propagation, les fichiers touchés, les tests à relancer, les fichiers non couverts et un niveau de " +
+        "risque. Plus précis que knowledge_impact_analyze (niveau fichier). À appeler AVANT de changer une " +
+        "signature, un type exporté ou le comportement d'un symbole partagé.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          targets: {
+            type: "ARRAY",
+            description:
+              "Symboles ou fichiers visés. Formes : 'server/x.ts', 'server/x.ts#maFonction', " +
+              "'server/x.ts#MaClasse.maMethode', 'MaClasse.maMethode' ou un nom seul 'maFonction'.",
+            items: { type: "STRING" },
+          },
+          depth: {
+            type: "NUMBER",
+            description: "Profondeur de propagation (défaut: 3, max: 8).",
+          },
+          max_results: {
+            type: "NUMBER",
+            description: "Nombre max de symboles impactés détaillés dans la réponse (défaut: 40, max: 200).",
+          },
+        },
+        required: ["targets"],
+      },
+    },
+    {
+      name: "knowledge_code_map_symbol",
+      description:
+        "🗺️ Cartographie vivante — LOCALISER et DÉCRIRE un symbole ou un fichier : définition (fichier, lignes, " +
+        "signature, exporté ?), qui l'utilise, ce qu'il utilise, ses membres et ses tests. Accepte un nom " +
+        "partiel (recherche floue) ou une référence exacte 'chemin#Symbole'.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          query: {
+            type: "STRING",
+            description: "Nom (partiel ou exact) du symbole, 'chemin#Symbole' ou chemin de fichier.",
+          },
+          kinds: {
+            type: "ARRAY",
+            description: "Filtrer par nature : function, method, class, interface, type, enum, component, constant, variable.",
+            items: { type: "STRING" },
+          },
+          limit: {
+            type: "NUMBER",
+            description: "Nombre max de symboles décrits (défaut: 5, max: 20).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    {
       name: "knowledge_ast_file_inspect",
       description:
         "🌳 AST File Inspect : Inspecte l'AST Tree-sitter d'un fichier précis. Retourne toutes les fonctions/méthodes avec lignes exactes, signatures TypeScript typées, paramètres et appels détectés.",
@@ -587,6 +647,21 @@ export const knowledgeSkill: Skill = {
     }),
     knowledge_ast_file_inspect: z.object({
       file_path: z.string().min(1, "Le chemin de fichier ne peut être vide").trim(),
+    }),
+    knowledge_code_map_impact: z.object({
+      targets: z
+        .array(z.string().trim().min(1))
+        .min(1, "Au moins une cible doit être spécifiée")
+        .max(50, "Trop de cibles (max 50)"),
+      depth: z.number().int().positive().max(8).optional().default(3),
+      max_results: z.number().int().positive().max(200).optional().default(40),
+    }),
+    knowledge_code_map_symbol: z.object({
+      query: z.string().min(1, "La requête ne peut être vide").trim(),
+      kinds: z
+        .array(z.enum(["function", "method", "class", "interface", "type", "enum", "component", "constant", "variable"]))
+        .optional(),
+      limit: z.number().int().positive().max(20).optional().default(5),
     }),
     knowledge_project_doctor: z.object({
       include_missions: z.boolean().optional().default(true),
@@ -1201,6 +1276,106 @@ export const knowledgeSkill: Skill = {
         };
       } catch (e: any) {
         log(`ERROR ast_call_chain: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_code_map_impact — impact par symbole avant modification
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_code_map_impact") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_code_map_impact, args);
+        log(`code_map_impact targets=${JSON.stringify(validated.targets)} depth=${validated.depth}`);
+        if (knowledgeGraph.getAllFiles().length === 0) {
+          return { error: "Projet non indexé : la cartographie est vide. Lance knowledge_reindex puis réessaie." };
+        }
+
+        const report = codeMap.analyzeImpact(validated.targets, { maxDepth: validated.depth });
+        const max = validated.max_results;
+        return {
+          status: "success",
+          summary: report.summary,
+          risk: report.risk,
+          risk_score: report.riskScore,
+          targets: report.targets,
+          unresolved: report.unresolved,
+          ambiguous: report.ambiguous,
+          impacted_symbols_count: report.impacted.filter((i) => i.kind !== "file").length,
+          impacted_symbols: report.impacted
+            .filter((i) => i.kind !== "file")
+            .slice(0, max)
+            .map((i) => ({
+              symbol: i.name,
+              kind: i.kind,
+              file: i.filePath,
+              line: i.line ?? null,
+              distance: i.distance,
+              via: i.via,
+              chain: i.path,
+            })),
+          impacted_files: report.impactedFiles.slice(0, max).map((f) => ({
+            path: f.filePath,
+            distance: f.distance,
+            symbols: f.symbols.slice(0, 10),
+            is_test: f.isTest,
+          })),
+          tests_to_run: report.testsToRun,
+          untested_files: report.untestedFiles,
+          warnings: report.warnings,
+          max_depth_reached: report.maxDepthReached,
+          truncated: report.truncated || report.impacted.length > max,
+        };
+      } catch (e: any) {
+        log(`ERROR code_map_impact: ${e.message}`);
+        return { error: e.message };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // knowledge_code_map_symbol — localiser & décrire un symbole
+    // ─────────────────────────────────────────────────────────────────────────
+    if (name === "knowledge_code_map_symbol") {
+      try {
+        const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_code_map_symbol, args);
+        log(`code_map_symbol query='${validated.query}'`);
+        if (knowledgeGraph.getAllFiles().length === 0) {
+          return { error: "Projet non indexé : la cartographie est vide. Lance knowledge_reindex puis réessaie." };
+        }
+
+        // Référence exacte d'abord, recherche floue ensuite
+        const exact = codeMap.resolveRef(validated.query);
+        const ids = exact.length
+          ? exact
+          : codeMap.findSymbols(validated.query, { limit: validated.limit, kinds: validated.kinds }).map((n) => n.id);
+        const results = ids.slice(0, validated.limit).map((id) => {
+          const d = codeMap.describe(id)!;
+          return {
+            id: d.node.id,
+            name: d.node.className ? `${d.node.className}.${d.node.name}` : d.node.name,
+            kind: d.node.kind,
+            file: d.node.filePath,
+            lines: d.node.lineStart != null ? [d.node.lineStart, d.node.lineEnd ?? d.node.lineStart] : null,
+            exported: d.node.exported,
+            signature: d.node.signature ?? null,
+            used_by: d.usedBy.map((u) => ({ symbol: u.name, file: u.filePath, via: u.kind, line: u.line ?? null })),
+            uses: d.uses.map((u) => ({ symbol: u.name, file: u.filePath, via: u.kind })),
+            members: d.members.map((m) => ({ name: m.name, kind: m.kind, line: m.line ?? null, exported: m.exported })),
+            tests: d.tests,
+          };
+        });
+        return {
+          status: "success",
+          query: validated.query,
+          match: exact.length ? "exact" : "fuzzy",
+          count: results.length,
+          results,
+          hint: results.length
+            ? "Avant de modifier un de ces symboles, appelle knowledge_code_map_impact avec son id."
+            : "Aucun symbole trouvé. Vérifie l'orthographe ou utilise knowledge_search_entities.",
+        };
+      } catch (e: any) {
+        log(`ERROR code_map_symbol: ${e.message}`);
         return { error: e.message };
       }
     }

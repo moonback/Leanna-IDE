@@ -147,6 +147,8 @@ const SKILL_LABELS: Record<string, string> = {
   knowledge_ast_callees: 'Trouver les fonctions appelées',
   knowledge_ast_call_chain: 'Tracer la chaîne d\u2019appels',
   knowledge_ast_file_inspect: 'Inspecter un fichier (AST)',
+  knowledge_code_map_impact: 'Mesurer l’impact d’une modification',
+  knowledge_code_map_symbol: 'Localiser un symbole dans la cartographie',
 
   // ── Documents ─────────────────────────────────────────────────────────────
   doc_search: 'Rechercher dans les documents',

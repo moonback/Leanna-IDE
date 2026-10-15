@@ -100,6 +100,21 @@ export {
   type ImpactAnalysisOptions,
 } from "./ImpactAnalyzer.js";
 
+// Cartographie vivante du code — graphe symboles/fichiers + impact par symbole
+export {
+  CodeMap,
+  codeMap,
+  renderImpactSummary,
+  type CodeMapNode,
+  type CodeMapEdge,
+  type CodeMapNodeKind,
+  type CodeMapEdgeKind,
+  type CodeMapStats,
+  type CodeMapImpactReport,
+  type CodeMapImpactOptions,
+  type SymbolDescription,
+} from "./CodeMap.js";
+
 // Sprint 8 — PlanningEngine
 export {
   PlanningEngine,

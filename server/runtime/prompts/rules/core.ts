@@ -203,7 +203,7 @@ Une source de niveau inférieur ne doit jamais contredire silencieusement une so
     priority: RulePriority.TASK,
     scope: ["refactoring"],
     content:
-      "Un refactoring préserve le comportement observable : aucune modification fonctionnelle non demandée. Procéder par étapes réversibles, un fichier à la fois, et vérifier après chaque étape. Analyser l'impact avec knowledge_impact_analyze ou graphify_affected avant de modifier un symbole partagé, si ces outils sont disponibles.",
+      "Un refactoring préserve le comportement observable : aucune modification fonctionnelle non demandée. Procéder par étapes réversibles, un fichier à la fois, et vérifier après chaque étape. Analyser l'impact avec knowledge_code_map_impact (par symbole), knowledge_impact_analyze ou graphify_affected avant de modifier un symbole partagé, si ces outils sont disponibles.",
     source: "base.md",
   },
   {

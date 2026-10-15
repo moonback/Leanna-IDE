@@ -108,6 +108,9 @@ export const EXECUTABLE_AGENT_TOOLS = new Set([
   "knowledge_ast_callees",
   "knowledge_ast_call_chain",
   "knowledge_ast_file_inspect",
+  // Cartographie vivante (skill knowledge) — impact par symbole avant modification
+  "knowledge_code_map_impact",
+  "knowledge_code_map_symbol",
   // Automatisation & vision (skill automation) — capacités de l'agent vision
   "automation_navigate",
   "automation_click",
