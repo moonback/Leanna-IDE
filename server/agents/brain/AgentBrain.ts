@@ -16,6 +16,8 @@ import { agentOrchestrator, type AgentOrchestrator } from "../AgentOrchestrator.
 import { agentEventStream } from "../AgentEventStream.js";
 import { createLogger } from "../../utils/logger.js";
 import type { AgentTask } from "../types.js";
+import { AgentLead } from "../lead/AgentLead.js";
+import type { ArbitrationVerdict, DelegationKind, LeadPolicy, LeadRunState, LeadStop, StopDecision } from "../lead/types.js";
 
 const log = createLogger("AgentBrain");
 
@@ -28,6 +30,9 @@ interface BrainRunContext {
   correctionLoop: BrainCorrectionLoop;
   maxCorrectionAttempts: number;
   understanding: BrainPlan["understanding"];
+  /** Agent Lead actif pour ce run (null = désactivé ou indisponible). */
+  lead: LeadPolicy | null;
+  leadState: LeadRunState | null;
 }
 
 /**
@@ -40,6 +45,8 @@ export interface AgentBrainDeps {
   understandingEngine?: Pick<GoalUnderstandingEngine, "understand">;
   planner?: Pick<DynamicPlanner, "plan">;
   verifier?: BrainVerifier;
+  /** Politique de décision Agent Lead (défaut : AgentLead réel). */
+  lead?: LeadPolicy;
 }
 
 export class AgentBrain {
@@ -48,6 +55,7 @@ export class AgentBrain {
   private verifier: BrainVerifier;
   private validator = new BrainPlanValidator();
   private orchestrator: AgentOrchestrator;
+  private lead: LeadPolicy;
   private activePlans = new Map<string, BrainPlan>();
   private results = new Map<string, BrainExecutionResult>();
 
@@ -67,6 +75,11 @@ export class AgentBrain {
         : undefined;
       this.verifier = new BrainVerifier(runTool);
     }
+    this.lead = deps.lead ?? new AgentLead({
+      runningCount: typeof this.orchestrator.getRunningCount === "function"
+        ? (role) => this.orchestrator.getRunningCount(role)
+        : undefined,
+    });
   }
 
   /**
@@ -124,6 +137,12 @@ export class AgentBrain {
     const plan = await this.planGoal(input);
     plan.status = "executing";
 
+    // Agent Lead : actif par défaut, désactivable par `lead: false`.
+    const lead = input.lead === false ? null : this.lead;
+    const leadState = lead
+      ? this.safeLead("begin", () => lead.begin(plan, input.leadBudget), null as LeadRunState | null)
+      : null;
+
     // Contexte partagé accumulé au fil de l'exécution (et des réplanifications)
     const ctx: BrainRunContext = {
       verifications: [],
@@ -133,7 +152,11 @@ export class AgentBrain {
       correctionLoop: new BrainCorrectionLoop(input.maxCorrectionAttempts ?? 3),
       maxCorrectionAttempts: input.maxCorrectionAttempts ?? 3,
       understanding: plan.understanding,
+      lead: leadState ? lead : null,
+      leadState,
     };
+
+    this.applyAgentSelection(plan, ctx);
 
     const scheduler = new BrainScheduler((stage, deps) => this.executeStage(stage, plan, ctx, deps));
 
@@ -144,12 +167,18 @@ export class AgentBrain {
     const maxReplans = input.maxReplans ?? 2;
     let replans = 0;
     while (report.failed.length > 0 && replans < maxReplans) {
+      const gate = this.leadGate(ctx, "replan");
+      if (!gate.continue) {
+        log.warn(`🛑 Agent Lead : pas de réplanification (${gate.reason}) — ${gate.detail}`);
+        break;
+      }
       replans++;
       const replanned = await this.replanSubgraph(plan, report, ctx, replans, maxReplans);
       if (!replanned) {
         log.warn(`🛑 Réplanification impossible — arrêt propre après ${replans} tentative(s)`);
         break;
       }
+      this.applyAgentSelection(plan, ctx);
       report = await scheduler.execute(plan.stages);
     }
 
@@ -166,9 +195,13 @@ export class AgentBrain {
     );
 
     const failedStage = plan.stages.find((s) => s.status === "failed" || s.status === "skipped");
-    const summary = globalSuccess
+    const leadStop = ctx.leadState?.stopped;
+    const baseSummary = globalSuccess
       ? `Objectif accompli avec succès en ${plan.stages.length} étapes (${plan.stages.map((s) => s.agentRole).join(" → ")}). ${ctx.filesModified.size} fichier(s) mis à jour, validés et sans régression.`
       : `Exécution ${plan.status === "incomplete" ? "partielle" : "en échec"} — difficulté sur l'étape : ${failedStage?.title ?? "inconnue"}${replans > 0 ? ` (après ${replans} réplanification(s))` : ""}.`;
+    const summary = !globalSuccess && leadStop
+      ? `${baseSummary} Arrêt décidé par l'Agent Lead : ${leadStop.detail}.`
+      : baseSummary;
 
     const deliverables = [
       ...Array.from(ctx.filesModified).map((f) => `Fichier modifié : ${f}`),
@@ -187,6 +220,13 @@ export class AgentBrain {
       totalDurationMs,
       summary,
       deliverables,
+      ...(ctx.leadState
+        ? {
+            stopReason: ctx.leadState.stopped?.reason,
+            leadDecisions: [...ctx.leadState.decisions],
+            budgetUsage: { delegations: ctx.leadState.delegations, wallTimeMs: totalDurationMs },
+          }
+        : {}),
     };
 
     this.results.set(plan.id, result);
@@ -238,27 +278,33 @@ export class AgentBrain {
       timestamp: new Date().toISOString(),
     });
 
-    let stageTaskResult: any = null;
+    // Garde Agent Lead : aucune délégation une fois le budget épuisé.
+    const gate = this.leadGate(ctx, "delegation");
+    if (!gate.continue) {
+      const stopped = this.leadStopVerification(stage, gate);
+      stage.result = { success: false, outcome: "failed" as const, summary: stopped.summary, durationMs: 0, error: stopped.summary, filesModified: [] };
+      ctx.verifications.push(stopped);
+      return this.finishStage(stage, ctx, stopped, stageStartTime);
+    }
 
     try {
-      const delegatedTask: AgentTask = await this.orchestrator.delegateTask({
+      const delegatedTask: AgentTask = await this.delegateWithFallback(stage, ctx, {
         role: stage.agentRole,
         title: stage.title,
         description: `${stage.description}\n\nOutils autorisés : ${stage.tools.join(", ")}`,
         files: stage.files,
         instructions: stage.instructions,
         priority: stage.priority,
-      });
+      }, "stage");
 
-      stageTaskResult = await this.awaitTaskCompletion(delegatedTask.id);
+      const stageTaskResult = await this.awaitTaskCompletion(delegatedTask.id);
       stage.result = stageTaskResult;
-
       if (stageTaskResult?.filesModified) {
         for (const f of stageTaskResult.filesModified) ctx.filesModified.add(f);
       }
     } catch (err: any) {
       log.error(`❌ Erreur d'exécution de l'étape ${stage.id}: ${err.message}`);
-      stageTaskResult = {
+      stage.result = {
         success: false,
         outcome: "failed" as const,
         summary: err.message ?? "Erreur d'exécution",
@@ -266,91 +312,152 @@ export class AgentBrain {
         error: err.message,
         filesModified: [],
       };
-      stage.result = stageTaskResult;
     }
 
     // Vérification
-    let verification = await this.verifier.verifyStage(
-      stage,
-      ctx.understanding,
-      Array.from(ctx.filesModified)
-    );
+    let verification = await this.verifier.verifyStage(stage, ctx.understanding, Array.from(ctx.filesModified));
     ctx.verifications.push(verification);
 
-    // Boucle de correction autonome bornée
+    // Boucle de correction bornée, pilotée par l'arbitrage de l'Agent Lead
     let attempt = 1;
-    while (!verification.passed && attempt <= ctx.maxCorrectionAttempts) {
-      log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
+    let verdict = this.arbitrateStage(stage, verification, ctx, attempt);
+    while ((verdict.action === "correct" || verdict.action === "reassign") && attempt <= ctx.maxCorrectionAttempts) {
+      if (!this.leadGate(ctx, "delegation").continue) break;
       plan.status = "correcting";
 
-      const correction = ctx.correctionLoop.createCorrection(
-        stage,
-        verification,
-        attempt,
-        ctx.understanding
-      );
-      if (!correction) break;
-      ctx.corrections.push(correction);
-
-      agentEventStream.publish({
-        type: "agent_event",
-        event: "task_progress",
-        taskId: stage.id,
-        role: correction.targetRole,
-        title: `[Auto-Correction ${attempt}] Réparation pour ${stage.title}`,
-        status: "running",
-        agentName: correction.targetRole,
-        detail: correction.diagnostic,
-        timestamp: new Date().toISOString(),
-      });
-
-      try {
-        const fixTask = await this.orchestrator.delegateTask({
-          role: correction.targetRole,
-          title: `[Auto-Correction] Fix pour ${stage.title}`,
-          description: correction.correctiveInstructions,
-          files: correction.filesToFix,
-          priority: "critical",
-        });
-
-        const fixResult = await this.awaitTaskCompletion(fixTask.id);
-        if (fixResult?.filesModified) {
-          for (const f of fixResult.filesModified) ctx.filesModified.add(f);
-        }
-
-        // Reporter le résultat de la correction sur l'étape : la re-vérification
-        // doit refléter l'état corrigé, pas l'échec initial.
-        if (fixResult) {
-          stage.result = fixResult;
-        }
-
-        verification = await this.verifier.verifyStage(
-          stage,
-          ctx.understanding,
-          Array.from(ctx.filesModified)
-        );
-        ctx.verifications.push(verification);
-
-        if (verification.passed) {
-          correction.resolved = true;
-          log.info(`✅ Auto-correction réussie pour ${stage.id} à la tentative ${attempt}`);
-          break;
-        }
-      } catch (corrErr: any) {
-        log.error(`❌ Erreur pendant la correction: ${corrErr.message}`);
+      if (verdict.action === "reassign") {
+        verification = await this.reassignStage(stage, ctx, verdict.toRole, verdict.rationale);
+      } else {
+        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole);
+        if (!corrected) break;
+        verification = corrected;
       }
 
       attempt++;
+      verdict = this.arbitrateStage(stage, verification, ctx, attempt);
     }
 
+    // Le Lead peut rejeter une étape que le vérificateur a laissée passer.
+    if (verdict.action !== "accept" && verification.passed) {
+      verification = {
+        ...verification,
+        passed: false,
+        semanticCheckOk: false,
+        summary: `Rejeté par l'Agent Lead : ${verdict.rationale}`,
+        timestamp: new Date().toISOString(),
+      };
+      ctx.verifications.push(verification);
+    }
+
+    return this.finishStage(stage, ctx, verification, stageStartTime);
+  }
+
+  /** Une tentative de correction autonome (comportement historique), re-vérifiée. */
+  private async runCorrection(
+    stage: BrainStage,
+    ctx: BrainRunContext,
+    verification: StageVerification,
+    attempt: number,
+    targetRole?: string
+  ): Promise<StageVerification | null> {
+    log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
+    const correction = ctx.correctionLoop.createCorrection(stage, verification, attempt, ctx.understanding);
+    if (!correction) return null;
+    if (targetRole) correction.targetRole = targetRole;
+    ctx.corrections.push(correction);
+
+    agentEventStream.publish({
+      type: "agent_event",
+      event: "task_progress",
+      taskId: stage.id,
+      role: correction.targetRole,
+      title: `[Auto-Correction ${attempt}] Réparation pour ${stage.title}`,
+      status: "running",
+      agentName: correction.targetRole,
+      detail: correction.diagnostic,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const fixTask = await this.delegateWithFallback(stage, ctx, {
+        role: correction.targetRole,
+        title: `[Auto-Correction] Fix pour ${stage.title}`,
+        description: correction.correctiveInstructions,
+        files: correction.filesToFix,
+        priority: "critical",
+      }, "correction");
+
+      const fixResult = await this.awaitTaskCompletion(fixTask.id);
+      if (fixResult?.filesModified) {
+        for (const f of fixResult.filesModified) ctx.filesModified.add(f);
+      }
+      // La re-vérification doit refléter l'état corrigé, pas l'échec initial.
+      if (fixResult) stage.result = fixResult;
+    } catch (corrErr: any) {
+      log.error(`❌ Erreur pendant la correction: ${corrErr.message}`);
+      return verification;
+    }
+
+    const next = await this.verifier.verifyStage(stage, ctx.understanding, Array.from(ctx.filesModified));
+    ctx.verifications.push(next);
+    if (next.passed) {
+      correction.resolved = true;
+      log.info(`✅ Auto-correction réussie pour ${stage.id} à la tentative ${attempt}`);
+    }
+    return next;
+  }
+
+  /** Réattribue l'étape à un autre agent (décision Agent Lead), puis re-vérifie. */
+  private async reassignStage(
+    stage: BrainStage,
+    ctx: BrainRunContext,
+    toRole: string,
+    rationale: string
+  ): Promise<StageVerification> {
+    const fromRole = stage.agentRole;
+    stage.agentRole = toRole;
+    stage.agentReason = `${stage.agentReason} | Agent Lead : réattribution ${fromRole} → ${toRole} (${rationale})`;
+    log.warn(`🔀 Agent Lead : réattribution de "${stage.title}" ${fromRole} → ${toRole}`);
+
+    try {
+      const task = await this.delegateWithFallback(stage, ctx, {
+        role: toRole,
+        title: `[Agent Lead] Réattribution : ${stage.title}`,
+        description: `${stage.description}\n\nOutils autorisés : ${stage.tools.join(", ")}`,
+        files: stage.files,
+        instructions: stage.instructions,
+        priority: stage.priority,
+      }, "reassign");
+      const result = await this.awaitTaskCompletion(task.id);
+      if (result?.filesModified) {
+        for (const f of result.filesModified) ctx.filesModified.add(f);
+      }
+      if (result) stage.result = result;
+    } catch (err: any) {
+      log.error(`❌ Réattribution échouée pour ${stage.id}: ${err.message}`);
+    }
+
+    const next = await this.verifier.verifyStage(stage, ctx.understanding, Array.from(ctx.filesModified));
+    ctx.verifications.push(next);
+    return next;
+  }
+
+  /** Clôture commune d'une étape : durées, résultat, comptabilité Lead, événement. */
+  private finishStage(
+    stage: BrainStage,
+    ctx: BrainRunContext,
+    verification: StageVerification,
+    stageStartTime: number
+  ): StageVerification {
     stage.durationMs = Date.now() - stageStartTime;
     stage.completedAt = new Date().toISOString();
+    ctx.stageResults.set(stage.id, { stage, result: stage.result, durationMs: stage.durationMs });
 
-    ctx.stageResults.set(stage.id, {
-      stage,
-      result: stage.result,
-      durationMs: stage.durationMs,
-    });
+    if (ctx.lead && ctx.leadState) {
+      const lead = ctx.lead;
+      const state = ctx.leadState;
+      this.safeLead("recordStageOutcome", () => lead.recordStageOutcome(state, stage.id, verification.passed, ctx.filesModified.size), undefined);
+    }
 
     agentEventStream.publish({
       type: "agent_event",
@@ -365,6 +472,106 @@ export class AgentBrain {
     });
 
     return verification;
+  }
+
+  /**
+   * Délègue via l'orchestrateur en comptant la délégation dans le budget du
+   * Lead. Si le rôle est à capacité maximale, le Lead propose un autre agent
+   * (une seule nouvelle tentative).
+   */
+  private async delegateWithFallback(
+    stage: BrainStage,
+    ctx: BrainRunContext,
+    params: Parameters<AgentOrchestrator["delegateTask"]>[0],
+    kind: DelegationKind
+  ): Promise<AgentTask> {
+    const lead = ctx.lead;
+    const state = ctx.leadState;
+    if (lead && state) this.safeLead("recordDelegation", () => lead.recordDelegation(state, kind), undefined);
+
+    try {
+      return await this.orchestrator.delegateTask(params);
+    } catch (err: any) {
+      const message = String(err?.message ?? err);
+      if (!lead || !state || !message.includes("capacité maximale")) throw err;
+      const alt = this.safeLead("nextBestRole", () => lead.nextBestRole(stage, state, [params.role]), null as string | null);
+      if (!alt) throw err;
+      log.info(`🔁 Agent Lead : ${params.role} à capacité maximale → ${alt}`);
+      if (kind !== "correction") {
+        stage.agentReason = `${stage.agentReason} | Agent Lead : ${params.role} à capacité maximale → ${alt}`;
+        stage.agentRole = alt;
+      }
+      return await this.orchestrator.delegateTask({ ...params, role: alt });
+    }
+  }
+
+  /** Verdict d'étape : Agent Lead si actif, sinon règles historiques. */
+  private arbitrateStage(
+    stage: BrainStage,
+    verification: StageVerification,
+    ctx: BrainRunContext,
+    attempt: number
+  ): ArbitrationVerdict {
+    const legacy: ArbitrationVerdict = verification.passed
+      ? { action: "accept", rationale: "vérification réussie" }
+      : attempt <= ctx.maxCorrectionAttempts
+        ? { action: "correct", rationale: "vérification échouée" }
+        : { action: "abandon", rationale: "tentatives épuisées" };
+    const lead = ctx.lead;
+    const state = ctx.leadState;
+    if (!lead || !state) return legacy;
+    const verdict = this.safeLead(
+      "arbitrate",
+      () => lead.arbitrate({ stage, verification, result: stage.result, attempt, maxAttempts: ctx.maxCorrectionAttempts }, state),
+      legacy
+    );
+    // Garde-fou : le Lead ne peut pas accepter une étape non vérifiée.
+    return verdict.action === "accept" && !verification.passed ? legacy : verdict;
+  }
+
+  /** Point de décision continuer/arrêter (toujours « continuer » sans Lead). */
+  private leadGate(ctx: BrainRunContext, point: "delegation" | "replan"): StopDecision {
+    const lead = ctx.lead;
+    const state = ctx.leadState;
+    if (!lead || !state) return { continue: true };
+    return this.safeLead("shouldContinue", () => lead.shouldContinue(state, point), { continue: true } as StopDecision);
+  }
+
+  /** Réaffectation des rôles des étapes en attente ; régénère le Mermaid si besoin. */
+  private applyAgentSelection(plan: BrainPlan, ctx: BrainRunContext): void {
+    const lead = ctx.lead;
+    const state = ctx.leadState;
+    if (!lead || !state) return;
+    const before = plan.stages.map((s) => s.agentRole).join("|");
+    this.safeLead("selectAgents", () => lead.selectAgents(plan, state), undefined);
+    if (plan.stages.map((s) => s.agentRole).join("|") !== before) {
+      plan.mermaid = this.validator.toMermaid(plan);
+    }
+  }
+
+  private leadStopVerification(stage: BrainStage, stop: LeadStop): StageVerification {
+    const summary = `Arrêt Agent Lead : ${stop.detail}`;
+    return {
+      stageId: stage.id,
+      role: stage.agentRole,
+      passed: false,
+      syntaxCheckOk: false,
+      testsOk: false,
+      semanticCheckOk: false,
+      issues: [{ severity: "error", message: summary, rule: "agent_lead_stop" }],
+      summary,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /** Exécute un hook du Lead ; en cas d'exception, journalise et renvoie le repli historique. */
+  private safeLead<T>(label: string, fn: () => T, fallback: T): T {
+    try {
+      return fn();
+    } catch (err: any) {
+      log.warn(`Agent Lead (${label}) en erreur — repli sur le comportement standard : ${err?.message ?? err}`);
+      return fallback;
+    }
   }
 
   /**

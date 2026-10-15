@@ -87,7 +87,7 @@ describe("StageArbiter", () => {
         verification: verification(false),
         result: result({
           success: false, outcome: "failed", filesModified: [],
-          evidence: { filesRead: [], filesModified: [], toolsExecuted: ["read_project_file"], commandsExecuted: [] },
+          evidence: { filesRead: [], filesModified: [], toolsExecuted: ["read_project_file"], commandsExecuted: [] } as unknown as TaskResult["evidence"],
         }),
       }),
       state(), () => "debugger"
