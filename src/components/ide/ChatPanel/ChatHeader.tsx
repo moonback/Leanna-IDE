@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic, MicOff, X, Trash2, Power, GripVertical, Minus, PanelRight,
   Maximize2, Minimize2, Download, MessageSquare, MoreVertical,
   Hash, Loader2, Volume2, FileSearch, Search, Sparkles,
+  ChevronRight, FileText, FileJson, Printer,
 } from 'lucide-react';
 import { MenuButton } from './MenuButton.js';
+import type { ExportFormat } from './exportConversation.js';
 
 export interface ChatHeaderProps {
   aiName: string;
@@ -30,7 +32,7 @@ export interface ChatHeaderProps {
   onToggleInput: () => void;
   onToggleMenu: () => void;
   onToggleSearch: () => void;
-  onExport: () => void;
+  onExport: (format: ExportFormat) => void;
   onClear: () => void;
   onVoiceTest: () => void;
   onInspectPrompt: () => void;
@@ -51,6 +53,8 @@ export function ChatHeader({
   onToggleMinimized, onToggleConnect, onClose,
 }: ChatHeaderProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  // Sous-menu « Exporter » (choix du format) replié par défaut.
+  const [showExportFormats, setShowExportFormats] = useState(false);
 
   // Fermer le menu au clic extérieur.
   useEffect(() => {
@@ -61,6 +65,9 @@ export function ChatHeader({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu, onToggleMenu]);
+
+  // Replie le sous-menu de formats dès que le menu principal se ferme.
+  useEffect(() => { if (!showMenu) setShowExportFormats(false); }, [showMenu]);
 
   const statusColor = connected
     ? (isBusy ? 'var(--accent-primary)' : 'var(--color-success)')
@@ -224,11 +231,56 @@ export function ChatHeader({
                         shortcut="⌘F"
                         onClick={onToggleSearch}
                       />
-                      <MenuButton
-                        icon={<Download size={13} style={{ color: 'var(--accent-primary)' }} />}
-                        label="Exporter"
-                        onClick={onExport}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowExportFormats(v => !v)}
+                        className="flex items-center gap-3 w-full px-3 py-2 text-sm transition-colors text-left hover:bg-[var(--bg-hover)]"
+                        style={{ color: 'var(--text-primary)' }}
+                        aria-expanded={showExportFormats}
+                        title="Exporter la conversation en rapport technique"
+                      >
+                        <Download size={13} style={{ color: 'var(--accent-primary)' }} />
+                        <span className="flex-1">Exporter</span>
+                        <ChevronRight
+                          size={13}
+                          style={{
+                            color: 'var(--text-dimmed)',
+                            transform: showExportFormats ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s',
+                          }}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {showExportFormats && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="overflow-hidden"
+                            style={{ backgroundColor: 'color-mix(in srgb, var(--text-dimmed) 6%, transparent)' }}
+                          >
+                            <ExportFormatItem
+                              icon={<FileText size={13} style={{ color: 'var(--accent-primary)' }} />}
+                              label="Markdown"
+                              hint=".md"
+                              onClick={() => onExport('markdown')}
+                            />
+                            <ExportFormatItem
+                              icon={<Printer size={13} style={{ color: 'var(--accent-primary)' }} />}
+                              label="PDF"
+                              hint="impression"
+                              onClick={() => onExport('pdf')}
+                            />
+                            <ExportFormatItem
+                              icon={<FileJson size={13} style={{ color: 'var(--accent-primary)' }} />}
+                              label="JSON"
+                              hint=".json"
+                              onClick={() => onExport('json')}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                       <MenuButton
                         icon={<Trash2 size={13} style={{ color: 'var(--color-error)' }} />}
                         label="Effacer"
@@ -320,5 +372,28 @@ export function ChatHeader({
         )}
       </div>
     </div>
+  );
+}
+
+/** Ligne de choix de format dans le sous-menu « Exporter » (indentée). */
+function ExportFormatItem({
+  icon, label, hint, onClick,
+}: { icon: React.ReactNode; label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3 w-full pl-7 pr-3 py-2 text-sm transition-colors text-left hover:bg-[var(--bg-hover)]"
+      style={{ color: 'var(--text-primary)' }}
+    >
+      {icon}
+      <span className="flex-1">{label}</span>
+      <span
+        className="text-xs font-mono px-1.5 py-0.5 rounded"
+        style={{ color: 'var(--text-dimmed)', backgroundColor: 'color-mix(in srgb, var(--text-dimmed) 10%, transparent)' }}
+      >
+        {hint}
+      </span>
+    </button>
   );
 }

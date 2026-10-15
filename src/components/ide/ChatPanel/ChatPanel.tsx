@@ -16,6 +16,7 @@ import { ChatHeader } from './ChatHeader.js';
 import { SearchBar } from './SearchBar.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { InputArea, type InputAreaHandle } from './InputArea.js';
+import { exportConversation, deriveModifiedFiles, type ExportFormat } from './exportConversation.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { useDraggablePanel } from './useDraggablePanel.js';
 import { useResizablePanel } from './useResizablePanel.js';
@@ -199,32 +200,31 @@ export function ChatPanel({
     if (connected) disconnect(); else connect([], 'full');
   }, [connected, disconnect, connect]);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback((format: ExportFormat = 'markdown') => {
+    if (transcript.length === 0) {
+      showToast('Aucune conversation à exporter', <X size={13} style={{ color: 'var(--color-error)' }} />);
+      return;
+    }
     try {
-      const data = {
-        timestamp: new Date().toISOString(),
-        assistant: profile?.aiName || 'Leanna',
-        messages: transcript.map(e => ({
-          role: e.role,
-          content: e.text,
-          timestamp: e.timestamp.toISOString(),
-          sources: e.sources?.map(s => ({ path: s.path, lines: s.lines, tool: s.tool })),
-        })),
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `leanna-conversation-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Conversation exportée', <Download size={13} style={{ color: 'var(--accent-primary)' }} />);
+      const result = exportConversation(format, transcript, {
+        assistantName: profile?.aiName || 'Leanna',
+        userName: profile?.userName || undefined,
+        modifiedFiles: deriveModifiedFiles(activity),
+      });
+      if (!result) {
+        // Seul le PDF peut échouer ici (popup bloqué par le navigateur).
+        showToast('Export PDF bloqué : autorisez les fenêtres pop-up puis réessayez.', <X size={13} style={{ color: 'var(--color-error)' }} />);
+        return;
+      }
+      const label = format === 'markdown' ? 'Rapport Markdown exporté'
+        : format === 'json' ? 'Rapport JSON exporté'
+          : 'Rapport PDF prêt — choisissez « Enregistrer en PDF »';
+      showToast(label, <Download size={13} style={{ color: 'var(--accent-primary)' }} />);
     } catch (err) {
       console.error('[ChatPanel] Export failed:', err);
+      showToast("Échec de l'export de la conversation", <X size={13} style={{ color: 'var(--color-error)' }} />);
     }
-  }, [transcript, profile, showToast]);
+  }, [transcript, profile, showToast, activity]);
 
   // Test de la présence vocale via l'endpoint de debug protégé.
   const handleVoiceTest = useCallback(async () => {
@@ -384,7 +384,7 @@ export function ChatPanel({
           onToggleInput={() => setShowInput(s => !s)}
           onToggleMenu={() => setShowMenu(v => !v)}
           onToggleSearch={() => { toggleSearch(); setShowMenu(false); }}
-          onExport={() => { handleExport(); setShowMenu(false); }}
+          onExport={(format) => { handleExport(format); setShowMenu(false); }}
           onClear={() => { handleClear(); setShowMenu(false); }}
           onVoiceTest={() => { void handleVoiceTest(); setShowMenu(false); }}
           onInspectPrompt={() => { setShowPromptInspector(true); setShowMenu(false); }}
