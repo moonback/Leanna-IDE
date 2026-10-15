@@ -4,6 +4,7 @@ import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye, Pipette } from 'lucide-r
 import { useProfile } from '../../context/UserProfileContext.js';
 import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
 import { ACCENTS, FONTS } from './constants.js';
+import { useFeatureFlag, setFeatureFlag } from '../../config/featureFlags.js';
 
 // Palette d'accents : les 5 de base (tokens) + variantes distinctes en hex.
 // (Les anciennes entrées « Indigo/Teal/Orange » réutilisaient des tokens déjà
@@ -19,6 +20,7 @@ const EXTENDED_ACCENTS = [
 
 export function AppearanceSection() {
   const { profile, setField } = useProfile();
+  const uiV3 = useFeatureFlag('uiV3');
 
   const applyAccent = useCallback((color: string) => {
     setField('accentColor', color);
@@ -217,6 +219,16 @@ export function AppearanceSection() {
           onChange={v => setField('floatingOrb', v)}
           label="Orb flottant"
           hint="Bouton déplaçable pour contrôler Leanna depuis n'importe quelle page"
+        />
+      </div>
+
+      {/* Refonte v3 (feature flag) */}
+      <div className="pt-1" style={{ borderTop: '1px solid var(--border-base)' }}>
+        <ToggleSwitch
+          value={uiV3}
+          onChange={v => setFeatureFlag('uiV3', v)}
+          label="Interface Cockpit (bêta)"
+          hint="Active la nouvelle interface immersive v3 en cours de développement"
         />
       </div>
     </Section>

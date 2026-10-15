@@ -29,6 +29,7 @@
     "pack:win": "npm run build && electron-builder --win --dir",
     "dist:win": "npm run build && electron-builder --win",
     "ui:audit": "node scripts/ui-audit.mjs",
+    "ui:baseline": "node scripts/ui-baseline.mjs",
     "brain:smoke": "node scripts/brain-smoke.mjs",
     "test:missions": "node scripts/test-agent-missions.mjs",
     "jev:calibrate": "tsx scripts/jev-gate-calibrate.ts"

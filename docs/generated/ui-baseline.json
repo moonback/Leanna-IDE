@@ -1,0 +1,102 @@
+{
+  "measuredAt": "2026-10-15T09:27:14.637Z",
+  "initial": {
+    "files": [
+      "index.js",
+      "ide-core.js",
+      "index.css",
+      "panels.js",
+      "vendor-ui.js",
+      "vendor-react.js"
+    ],
+    "rawKB": 1490.1,
+    "gzKB": 348.9
+  },
+  "js": {
+    "count": 84,
+    "rawKB": 11336.5,
+    "gzKB": 2762.5
+  },
+  "css": {
+    "count": 3,
+    "rawKB": 398.8,
+    "gzKB": 64.2
+  },
+  "topChunks": [
+    {
+      "chunk": "vendor-monaco.js",
+      "rawKB": 3623.3,
+      "gzKB": 933.8
+    },
+    {
+      "chunk": "IdeView.js",
+      "rawKB": 1260.3,
+      "gzKB": 226
+    },
+    {
+      "chunk": "index.js",
+      "rawKB": 579.4,
+      "gzKB": 154.9
+    },
+    {
+      "chunk": "cytoscape.esm.js",
+      "rawKB": 433.4,
+      "gzKB": 138.7
+    },
+    {
+      "chunk": "tsMode.js",
+      "rawKB": 572.1,
+      "gzKB": 136.2
+    },
+    {
+      "chunk": "mermaid.core.js",
+      "rawKB": 442.1,
+      "gzKB": 123.1
+    },
+    {
+      "chunk": "RichDocumentViewer.js",
+      "rawKB": 456.2,
+      "gzKB": 117.4
+    },
+    {
+      "chunk": "gitGraph-YCYPL57B.js",
+      "rawKB": 333.9,
+      "gzKB": 86.3
+    },
+    {
+      "chunk": "NotebooksView.js",
+      "rawKB": 419.2,
+      "gzKB": 75.5
+    },
+    {
+      "chunk": "katex.js",
+      "rawKB": 255.2,
+      "gzKB": 75.4
+    },
+    {
+      "chunk": "SettingsView.js",
+      "rawKB": 459.6,
+      "gzKB": 71.1
+    },
+    {
+      "chunk": "ide-core.js",
+      "rawKB": 225.9,
+      "gzKB": 66.9
+    },
+    {
+      "chunk": "index.css",
+      "rawKB": 254.6,
+      "gzKB": 41.3
+    },
+    {
+      "chunk": "architectureDiagram-UYN6MBPD.js",
+      "rawKB": 144.2,
+      "gzKB": 40.5
+    },
+    {
+      "chunk": "panels.js",
+      "rawKB": 237.3,
+      "gzKB": 39.6
+    }
+  ]
+}

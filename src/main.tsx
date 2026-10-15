@@ -32,6 +32,7 @@ import { AmbientBackdrop } from './components/ui/AmbientBackdrop.js';
 import { RouteProgress } from './components/ui/RouteProgress.js';
 import { usePointerSpotlight } from './hooks/usePointerSpotlight.js';
 import { pageVariants } from './lib/motion.js';
+import { initFeatureFlags } from './config/featureFlags.js';
 const MemoriesView = lazy(() => import('./views/MemoriesView.js'));
 const SettingsView = lazy(() => import('./views/SettingsView.js'));
 const ListsView = lazy(() => import('./views/ListsView.js'));
@@ -174,6 +175,9 @@ try {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
 } catch { document.documentElement.setAttribute('data-theme', 'dark'); }
+
+// ── Feature flags (data-ui="v3|classic") before first paint ────────────────
+initFeatureFlags();
 
 // ── Sync profile to server on startup ──────────────────────────────────────
 // This ensures the WS session always uses the latest saved identity/voice.
