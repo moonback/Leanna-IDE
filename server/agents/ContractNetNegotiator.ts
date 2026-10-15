@@ -283,6 +283,18 @@ export class ContractNetNegotiator {
   }
 
   /**
+   * Score pondéré d'un bid (mêmes poids que l'enchère). Exposé pour que
+   * l'Agent Lead classe des candidats sans ouvrir d'enchère sur le bus.
+   */
+  scoreBid(bid: Bid): number {
+    return (
+      this.weights.skill * clamp01(bid.skillMatch) +
+      this.weights.confidence * clamp01(bid.confidence) -
+      this.weights.load * clamp01(bid.loadPenalty)
+    );
+  }
+
+  /**
    * Calcule la part de capacités requises couvertes par un ensemble de capacités.
    * Exposé pour que les agents construisent leur bid depuis leurs propres skills.
    */
@@ -407,26 +419,15 @@ export class ContractNetNegotiator {
 
   /** Score tous les bids. Un bid avec skillMatch === 0 est inéligible. */
   private scoreBids(bids: Bid[], requiredCapabilities: readonly string[]): ScoredBid[] {
-    return bids.map((bid) => {
-      const clampedSkill = clamp01(bid.skillMatch);
-      const clampedConf = clamp01(bid.confidence);
-      const clampedLoad = clamp01(bid.loadPenalty);
-
-      const score =
-        this.weights.skill * clampedSkill +
-        this.weights.confidence * clampedConf -
-        this.weights.load * clampedLoad;
-
-      return {
-        ...bid,
-        skillMatch: clampedSkill,
-        confidence: clampedConf,
-        loadPenalty: clampedLoad,
-        score,
-        eligible: clampedSkill > 0,
-        specificity: this.computeSpecificity(bid.role, requiredCapabilities),
-      };
-    });
+    return bids.map((bid) => ({
+      ...bid,
+      skillMatch: clamp01(bid.skillMatch),
+      confidence: clamp01(bid.confidence),
+      loadPenalty: clamp01(bid.loadPenalty),
+      score: this.scoreBid(bid),
+      eligible: clamp01(bid.skillMatch) > 0,
+      specificity: this.computeSpecificity(bid.role, requiredCapabilities),
+    }));
   }
 
   /** Part des capacités requises couvertes par l'agent (0..1). */

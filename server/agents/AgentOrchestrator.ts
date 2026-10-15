@@ -580,6 +580,11 @@ export class AgentOrchestrator {
     return this.tasks.get(taskId);
   }
 
+  /** Nombre de tâches en cours pour un rôle (lu par l'Agent Lead pour la capacité). */
+  getRunningCount(role: AgentRole): number {
+    return this.executor.getRunningCount(role);
+  }
+
   /** Liste les tâches avec filtres optionnels */
   listTasks(filters?: { role?: AgentRole; status?: TaskStatus; limit?: number }): AgentTask[] {
     let results = Array.from(this.tasks.values());
