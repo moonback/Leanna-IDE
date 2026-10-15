@@ -194,6 +194,16 @@ Chaque correction est petite, réversible et testable seule. Ordre recommandé :
   correctif.
 
 ### C2 — P0 · Un résultat qui ne peut pas mentir (runtime agentique)
+> **Implémenté le 2026-10-15.** Cause racine du faux `failed` après réparation : le cache de lecture
+> de 5 s de `ToolRegistry` (`read_project_file` / `list_project_files`) n'était jamais invalidé après
+> une écriture. La relecture post-écriture du `WorkspaceState` voyait donc l'ancien contenu, et le
+> fichier passait en `stale`. Ce cache est désormais vidé après tout appel d'un outil à effet de bord.
+> `success` n'est plus vrai que pour `outcome === "success"` (`partial` ⇒ échec, tâche `failed`, les
+> dépendants ne démarrent pas). `outcome` était déjà propagé jusqu'à `TaskResult`. Tests :
+> `ToolRegistry.readCache.test.ts`, scénarios B, E et F de `mission-harness.test.ts`, test de relecture
+> de `agentPerformance.test.ts`. Le moteur legacy `AgentExecutor` n'a pas été modifié : son `success`
+> dépend déjà de `verification.passed`.
+
 - **Fichiers :** `server/runtime/agentic/AgenticRuntime.ts:473, 1356-1395`, `server/agents/AgentRuntimeExecutor.ts:140`, `server/agents/types.ts`, `server/agents/TaskScheduler.ts`.
 - **Changement :** `success` vrai uniquement pour `outcome === "success"`. Propager `outcome` jusqu'à
   `TaskResult` (le type `TaskOutcome` existe déjà). Le scheduler n'enchaîne sur un `partial` que si la
