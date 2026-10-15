@@ -8,13 +8,13 @@
 --font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
 
-/* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. */
---text-xs:    0.75rem;    /* 12px  - Micro-labels, badges, tags */
---text-sm:    0.875rem;   /* 14px  - Secondary text, captions */
---text-base:  1rem;       /* 16px  - Body, forms, lists */
---text-lg:    1.125rem;   /* 18px  - Section headings, panel headers */
---text-xl:    1.25rem;    /* 20px  - View titles, secondary dialogs */
---text-2xl:   1.5rem;     /* 24px  - Primary titles, important modals */
+/* Font sizes — Aligned with DESIGN_TOKENS.md v2.0.0 — six standardized levels. (Reduced by 10%) */
+--text-xs:    0.675rem;   /* 10.8px - Micro-labels, badges, tags */
+--text-sm:    0.7875rem;  /* 12.6px - Secondary text, captions */
+--text-base:  0.9rem;     /* 14.4px - Body, forms, lists */
+--text-lg:    1.0125rem;  /* 16.2px - Section headings, panel headers */
+--text-xl:    1.125rem;   /* 18.0px - View titles, secondary dialogs */
+--text-2xl:   1.35rem;    /* 21.6px - Primary titles, important modals */
 
 /* Font weights */
 --font-light: 300;

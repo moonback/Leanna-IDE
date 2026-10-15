@@ -31,13 +31,13 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-~1441%20passing%20(171%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-1460%20pass%20(184%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
-<img src="https://img.shields.io/badge/Tests%20front-~45%20passing%20(14%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
+<img src="https://img.shields.io/badge/Tests%20front-90%20pass%20(18%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
 &nbsp;
-<img src="https://img.shields.io/badge/skills%20intégrées-28%20skills-818CF8?style=for-the-badge" alt="28 Skills" />
+<img src="https://img.shields.io/badge/skills%20builtin-29%20modules-818CF8?style=for-the-badge" alt="29 Skills" />
 &nbsp;
-<img src="https://img.shields.io/badge/outils%20agent-228%20outils-38BDF8?style=for-the-badge" alt="228 Outils" />
+<img src="https://img.shields.io/badge/outils%20agent-runtime%20(builtin%2BMCP%2Bcustom)-38BDF8?style=for-the-badge" alt="Outils agent" />
 &nbsp;
 <img src="https://img.shields.io/badge/version-2.0.0-A78BFA?style=for-the-badge" alt="Version" />
 
@@ -65,7 +65,7 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 <a href="#-noyau-p0--le-noyau-transactionnel"><kbd>⚙️ Noyau P0</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-multi-agents"><kbd>🤖 Agents</kbd></a>&nbsp;&nbsp;
 <a href="#-compilateur--architecture-des-prompts-système"><kbd>📜 Prompts Système</kbd></a>&nbsp;&nbsp;
-<a href="#-répertoire-complet-des-compétences--outils-28-skills--228-outils"><kbd>🧰 Skills & Outils (228)</kbd></a>&nbsp;&nbsp;
+<a href="#-compétences--outils"><kbd>🧰 Skills & Outils</kbd></a>&nbsp;&nbsp;
 <a href="#-architecture-de-sécurité"><kbd>🔐 Sécurité</kbd></a>
 
 <br><br>
@@ -105,16 +105,17 @@ Rien ne quitte votre machine sans action explicite. Chaque action à effet de bo
 | | Section | | Section |
 |---|---|---|---|
 | 🧠 | [Qu'est-ce que Leanna ?](#-quest-ce-que-leanna-) | ⚙️ | [**Noyau P0 — le noyau transactionnel**](#-noyau-p0--le-noyau-transactionnel) |
-| 💡 | [L'idée centrale](#-lidée-centrale) | 🔄 | [Machine à états de mission](#machine-à-états-de-mission) |
-| 🎯 | [Pourquoi Leanna existe](#-pourquoi-leanna-existe) | 💾 | [Store durable + Ledger d'idempotence](#store-durable--ledger-didempotence) |
-| ✨ | [Ce que Leanna peut faire](#-ce-que-leanna-peut-faire) | 📸 | [Checkpoints & cycle transactionnel](#checkpoints--cycle-transactionnel) |
-| 🔄 | [Boucle d'exécution autonome](#-la-boucle-dexécution-autonome) | 🧾 | [Moteur de preuve (Evidence)](#moteur-de-preuve-evidence) |
-| 🧠 | [Cerveau de l'agent](#-cerveau-de-lagent-agent-brain) | 🛡️ | [Safety Gate Jev](#safety-gate-jev) |
-| ⚡ | [Runtime agentique & budget](#-runtime-agentique--budget-transactionnel) | 🤖 | [Architecture multi-agents](#-architecture-multi-agents) |
-| 🎯 | [Système de missions & estimation](#-système-de-missions) | 🧩 | [Rôles d'agents (20)](#rôles-dagents-20-rôles-statiques) |
-| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
-| 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
-| 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
+| 📷 | [Aperçu](#-aperçu) | 🔄 | [Machine à états de mission](#machine-à-états-de-mission) |
+| 💡 | [L'idée centrale](#-lidée-centrale) | 💾 | [Store durable + Ledger d'idempotence](#store-durable--ledger-didempotence) |
+| 🎯 | [Pourquoi Leanna existe](#-pourquoi-leanna-existe) | 📸 | [Checkpoints & cycle transactionnel](#checkpoints--cycle-transactionnel) |
+| ✨ | [Ce que Leanna peut faire](#-ce-que-leanna-peut-faire) | 🧾 | [Moteur de preuve (Evidence)](#moteur-de-preuve-evidence) |
+| 🔄 | [Boucle d'exécution autonome](#-la-boucle-dexécution-autonome) | 🛡️ | [Safety Gate Jev](#safety-gate-jev) |
+| 🧠 | [Cerveau de l'agent](#-cerveau-de-lagent-agent-brain) | 🤖 | [Architecture multi-agents](#-architecture-multi-agents) |
+| ⚡ | [Runtime agentique & budget](#-runtime-agentique--budget-transactionnel) | 🧩 | [Rôles d'agents (20)](#rôles-dagents-20-rôles-statiques) |
+| 🎯 | [Système de missions & estimation](#-système-de-missions) | 🐝 | [Swarm & Contract-Net](#composition-déquipe--swarmcomposer) |
+| 🛰️ | [Autonomie proactive](#-autonomie-proactive) | 🖥️ | [Computer Use](#computer-use-computeruseagent) |
+| 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
+| 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | ✅ | [Vérification & récupération](#-vérification-et-récupération) |
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
 | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) |
@@ -244,6 +245,22 @@ critères de vérification, un comportement de récupération, un **état durabl
 
 La disponibilité effective d'un rôle ou d'un outil au runtime dépend de son
 enregistrement et de sa configuration d'exécution.
+
+<br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
+
+## 📷 Aperçu
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screen/accueil-dark.webp">
+  <source media="(prefers-color-scheme: light)" srcset="assets/screen/accueil-light.webp">
+  <img src="assets/screen/accueil-dark.webp" alt="Écran d'accueil de Leanna" width="100%">
+</picture>
+
+<sub>Écran d'accueil — thèmes clair (`assets/screen/accueil-light.webp`) et sombre (`assets/screen/accueil-dark.webp`).</sub>
+
+</div>
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 
@@ -1988,10 +2005,14 @@ fonctionnalités backend persistantes.
 ### Cloner & installer
 
 ```bash
-git clone https://github.com/moonback/Leanna.git
-cd Leanna
+git clone https://github.com/moonback/Jarvis-os-original.git
+cd Jarvis-os-original
 npm install
 ```
+
+> Le dépôt distant actuel est `moonback/Jarvis-os-original` (remote `origin`). Le
+> nom du produit est **Leanna** ; le répertoire local cloné portera le nom du
+> dépôt distant. Adaptez le chemin si vous renommez le dossier.
 
 ### Configuration
 
@@ -2084,8 +2105,8 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test`, ~1441 tests répartis sur 183 fichiers `*.test.ts`) |
-| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, ~45 tests sur 14 fichiers) |
+| `npm test` | Suite backend (`node --test` via `tsx`, **184 fichiers** `server/**/*.test.ts`, **1460 cas / 174 suites · 0 échec**) |
+| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}`, **90 cas · 0 échec**) |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |
 | `npm run typecheck:test` | Typage des fichiers de test |
@@ -2096,6 +2117,11 @@ npm run dist:win       # distribuable Windows
 | `npm run test:missions` | Tests de missions |
 | `npm run test:soak` | Soak test du gestionnaire de tâches d'autonomie |
 | `npm run jev:calibrate` | Calibration des seuils du Safety Gate |
+
+> **Décompte des tests (mesuré le 2026-10-15).** Les suites ont été exécutées :
+> `npm test` → **1460 cas sur 174 suites, 0 échec** (184 fichiers, ~90 s) ;
+> `npm run test:ui` → **90 cas, 0 échec** (18 fichiers). Reproductible via les deux
+> commandes ci-dessus.
 
 ### Validation de l'autonomie (banc E2E)
 

@@ -2,10 +2,13 @@ import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic, MicOff, X, Trash2, Power, GripVertical, Minus, PanelRight,
-  Maximize2, Minimize2, Download, MessageSquare, MoreVertical,
-  Hash, Loader2, Volume2, FileSearch, Search, Sparkles,
+  Maximize2, Minimize2, MessageSquare, MoreVertical,
+  Hash, Loader2, Volume2, FileSearch, Search, Sparkles, History,
 } from 'lucide-react';
 import { MenuButton } from './MenuButton.js';
+import { ProfileSwitcher } from './ProfileSwitcher.js';
+import { ExportMenuSection } from './ExportMenuSection.js';
+import type { ExportFormat } from './exportConversation.js';
 
 export interface ChatHeaderProps {
   aiName: string;
@@ -21,6 +24,12 @@ export interface ChatHeaderProps {
   showInput: boolean;
   showMenu: boolean;
   showClose: boolean;
+  /** Nombre de modifications appliquées (badge sur le bouton journal). */
+  changeLogCount?: number;
+  /** Journal des modifications ouvert ? */
+  showChangeLog?: boolean;
+  /** Profil de comportement actif (feature #7). */
+  activeProfileId?: string;
 
   // Drag
   dragHandlers: Record<string, unknown>;
@@ -30,7 +39,10 @@ export interface ChatHeaderProps {
   onToggleInput: () => void;
   onToggleMenu: () => void;
   onToggleSearch: () => void;
-  onExport: () => void;
+  onToggleChangeLog?: () => void;
+  /** Change de profil de comportement (applique/réinitialise la surcouche). */
+  onSelectProfile?: (id: string) => void;
+  onExport: (format: ExportFormat) => void;
   onClear: () => void;
   onVoiceTest: () => void;
   onInspectPrompt: () => void;
@@ -45,8 +57,9 @@ export interface ChatHeaderProps {
 export function ChatHeader({
   aiName, connected, connecting, isBusy, muted, reduceMotion, messageCount,
   docked, fullscreen, minimized, showInput, showMenu, showClose,
+  changeLogCount = 0, showChangeLog = false, activeProfileId = 'default',
   dragHandlers,
-  onToggleMute, onToggleInput, onToggleMenu, onToggleSearch, onExport, onClear,
+  onToggleMute, onToggleInput, onToggleMenu, onToggleSearch, onToggleChangeLog, onSelectProfile, onExport, onClear,
   onVoiceTest, onInspectPrompt, onToggleFullscreen, onToggleDocked,
   onToggleMinimized, onToggleConnect, onClose,
 }: ChatHeaderProps) {
@@ -132,6 +145,16 @@ export function ChatHeader({
             )}
             <span className={isBusy && !reduceMotion ? 'lea-shimmer-text' : undefined}>{statusLabel}</span>
           </span>
+
+          {/* Sélecteur de profil de comportement (feature #7) */}
+          {onSelectProfile && (
+            <ProfileSwitcher
+              activeId={activeProfileId}
+              connected={connected}
+              reduceMotion={reduceMotion}
+              onSelect={onSelectProfile}
+            />
+          )}
         </div>
       </div>
 
@@ -151,6 +174,27 @@ export function ChatHeader({
               aria-label="Rechercher dans la conversation"
             >
               <Search size={15} style={{ color: 'var(--text-muted)' }} />
+            </motion.button>
+          )}
+
+          {/* Journal des modifications appliquées */}
+          {onToggleChangeLog && changeLogCount > 0 && (
+            <motion.button
+              onClick={onToggleChangeLog}
+              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+              className="relative p-1.5 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
+              title="Modifications appliquées"
+              aria-label="Afficher les modifications appliquées"
+              aria-pressed={showChangeLog}
+              style={{ backgroundColor: showChangeLog ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' : 'transparent' }}
+            >
+              <History size={15} style={{ color: showChangeLog ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+              <span
+                className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center rounded-full text-[9px] font-bold leading-none"
+                style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-base, #0a1628)' }}
+              >
+                {changeLogCount > 9 ? '9+' : changeLogCount}
+              </span>
             </motion.button>
           )}
 
@@ -224,11 +268,7 @@ export function ChatHeader({
                         shortcut="⌘F"
                         onClick={onToggleSearch}
                       />
-                      <MenuButton
-                        icon={<Download size={13} style={{ color: 'var(--accent-primary)' }} />}
-                        label="Exporter"
-                        onClick={onExport}
-                      />
+                      <ExportMenuSection onExport={onExport} />
                       <MenuButton
                         icon={<Trash2 size={13} style={{ color: 'var(--color-error)' }} />}
                         label="Effacer"
@@ -322,3 +362,4 @@ export function ChatHeader({
     </div>
   );
 }
+

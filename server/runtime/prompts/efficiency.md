@@ -51,6 +51,11 @@ Appeler `knowledge_build_context` en début de mission, sauf si **toutes** ces c
 - Invoquer avant modification si **≥ 3 fichiers** sont impactés, ou si un fichier touché est un module central/critique.
 - Sauter l'analyse d'impact pour les modifications locales isolées (< 3 fichiers).
 
+### Impact par symbole `knowledge_code_map_impact`
+- Invoquer avant de changer la **signature**, le **type exporté** ou le **comportement** d'un symbole partagé (fonction, méthode, classe, interface, type exporté), même si un seul fichier est édité : la cartographie vivante liste les appelants, consommateurs de types, héritiers et tests à relancer.
+- Inutile pour un symbole non exporté sans appelant externe, ou une modification purement interne à un corps de fonction.
+- Relancer ensuite les `tests_to_run` retournés.
+
 ### Fraîcheur & Réindexation
 - Si la fraîcheur (`freshness`) ≥ 0.5 → sauter toute réindexation.
 - Si fraîcheur < 0.5, ou si un fichier a été modifié depuis le dernier build → lancer `knowledge_reindex`.

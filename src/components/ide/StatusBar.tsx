@@ -22,6 +22,7 @@ import {
   WifiOff,
   MoreHorizontal,
   Power,
+  Network,
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
@@ -60,6 +61,7 @@ interface StatusBarProps {
   onToggleTelegram?: () => void;
   onToggleModelPicker?: () => void;
   onToggleTokenDetail?: () => void;
+  onToggleImpact?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -308,6 +310,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleTelegram,
   onToggleModelPicker,
   onToggleTokenDetail,
+  onToggleImpact,
 }: StatusBarProps) {
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -766,6 +769,14 @@ export const StatusBar = memo(function StatusBar({
       iconColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
       count: pendingApprovalCount > 0 ? pendingApprovalCount : activeMissionCount,
       countColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
+    },
+    {
+      key: 'impact',
+      icon: Network,
+      label: 'Impact',
+      description: 'Ce qu’une modification du fichier actif risque de casser',
+      onClick: () => { onToggleImpact?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--color-warning)',
     },
     'divider',
     {

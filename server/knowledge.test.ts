@@ -4,6 +4,7 @@ import express from 'express';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { knowledgeRouter } from './routes/knowledge/index.js';
 import { getDocumentStore } from './knowledge/DocumentStore.js';
 import { knowledgeGraph } from './knowledge/KnowledgeGraph.js';
@@ -11,6 +12,7 @@ import { projectMemory } from './knowledge/ProjectMemory.js';
 import { astCallGraph } from './knowledge/ASTCallGraph.js';
 import { setSelfRoot } from './utils/selfRoot.js';
 import { setDocumentExtractionEnabled } from './knowledge/knowledgeSettings.js';
+import type { FileNode } from './knowledge/types.js';
 
 test('GET /api/knowledge/health returns knowledge system health structure', async () => {
   const app = express();
@@ -158,4 +160,39 @@ test('switching workspace clears knowledge graph and project memory data', () =>
 
   fs.rmSync(rootA, { recursive: true, force: true });
   fs.rmSync(rootB, { recursive: true, force: true });
+});
+
+test('KnowledgeGraph résout les imports ESM ./x.js vers x.ts et remplit dependents', () => {
+  // Racine temporaire hors du dépôt : update() persiste le graphe (écriture
+  // débouncée) dans <SELF_ROOT>/.project-knowledge.json — ne jamais écraser
+  // l'index réel du projet.
+  setSelfRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-kg-deps-')));
+
+  const node = (p: string, imports: string[]): FileNode => ({
+    path: p,
+    name: path.posix.basename(p),
+    extension: '.ts',
+    size: 10,
+    lines: 1,
+    lastModified: new Date().toISOString(),
+    imports,
+    exports: [],
+    entities: [],
+    language: 'typescript',
+  });
+
+  knowledgeGraph.update([
+    node('server/knowledge/a.ts', ['./types.js', '../utils/log', 'node:fs', 'express']),
+    node('server/knowledge/types.ts', []),
+    node('server/utils/log/index.ts', []),
+  ]);
+
+  assert.deepEqual(knowledgeGraph.getDependents('server/knowledge/types.ts'), ['server/knowledge/a.ts']);
+  assert.deepEqual(knowledgeGraph.getDependents('server/utils/log/index.ts'), ['server/knowledge/a.ts']);
+  // dependencies ne contient que les fichiers internes résolus (pas les paquets externes)
+  assert.deepEqual(knowledgeGraph.getDependencies('server/knowledge/a.ts'), [
+    'server/knowledge/types.ts',
+    'server/utils/log/index.ts',
+  ]);
+  assert.deepEqual(knowledgeGraph.getDependencies('server/knowledge/types.ts'), []);
 });

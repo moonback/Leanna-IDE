@@ -38,7 +38,9 @@ interface HealthData {
   };
   dependencyGraph: {
     cycleCount: number;
-    cycles: string[][];
+    // Le serveur renvoie des objets DependencyCycle ({ files, length }).
+    // On tolère aussi l'ancienne forme string[] par robustesse.
+    cycles: Array<{ files: string[]; length?: number } | string[]>;
   };
   projectMemory: {
     totalFacts: number;
@@ -830,15 +832,20 @@ export function KnowledgeHealthDashboard() {
               Cycles de Dépendances Circulaires Détectés
             </h3>
             <ol className="space-y-2" aria-label={`${dg.cycleCount} cycle${dg.cycleCount !== 1 ? 's' : ''} détecté${dg.cycleCount !== 1 ? 's' : ''}`}>
-              {dg.cycles.map((cycle, i) => (
-                <li
-                  key={i}
-                  className="p-3 rounded-xl bg-black/30 border border-amber-500/20 font-mono text-xs text-amber-200"
-                  aria-label={`Cycle ${i + 1} : ${cycle.join(' → ')}`}
-                >
-                  {cycle.join(' ➔ ')}
-                </li>
-              ))}
+              {dg.cycles.map((cycle, i) => {
+                // Normalise les deux formes possibles vers une liste de fichiers.
+                const files = Array.isArray(cycle) ? cycle : (cycle.files ?? []);
+                const label = files.join(' → ');
+                return (
+                  <li
+                    key={i}
+                    className="p-3 rounded-xl bg-black/30 border border-amber-500/20 font-mono text-xs text-amber-200"
+                    aria-label={`Cycle ${i + 1} : ${label}`}
+                  >
+                    {files.join(' ➔ ')}
+                  </li>
+                );
+              })}
             </ol>
           </div>
         )}

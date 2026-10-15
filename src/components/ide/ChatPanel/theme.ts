@@ -49,4 +49,5 @@ export const STORAGE_KEYS = {
   showInput: 'Leanna_chat_show_input',
   width:     'Leanna_chat_width',
   pinned:    'Leanna_chat_pinned',
+  profile:   'Leanna_chat_profile',
 } as const;

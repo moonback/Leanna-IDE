@@ -157,6 +157,8 @@ Leanna analyse le codebase en profondeur grâce au moteur **Tree-sitter WASM** (
 | `knowledge_ast_callees` | Trouve toutes les fonctions appelées par une fonction |
 | `knowledge_ast_call_chain` | Déroule l'arbre récursif BFS d'exécution |
 | `knowledge_ast_file_inspect` | Inspecte l'AST d'un fichier (signatures typées, plages de lignes, classes) |
+| `knowledge_code_map_impact` | Cartographie vivante : impact par symbole (appelants, consommateurs de types, héritiers, tests à relancer) avant modification |
+| `knowledge_code_map_symbol` | Cartographie vivante : localise un symbole et décrit qui l'utilise / ce qu'il utilise |
 | `knowledge_build_context` | Collecte le contexte optimal (fichiers, faits, AST) pour une mission |
 
 ---

@@ -317,7 +317,40 @@ export const ideApi = {
     readFileCache.delete(srcPath);
     treeCache.entry = null;
   },
+
+  /**
+   * Lance les tests unitaires d'un fichier précis via le serveur.
+   * Le serveur détecte le runner (vitest/jest/node:test) et borne l'exécution
+   * (timeout + sortie tronquée). Jette uniquement sur erreur de requête ; un
+   * échec de tests revient avec `ok: false` (ce n'est pas une erreur réseau).
+   */
+  async runTests(filePath: string): Promise<TestRunResult> {
+    const response = await fetchWithRetry('/api/ide/run-tests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ path: filePath }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error((data && (data.error as string)) || `HTTP ${response.status}`);
+    }
+    return data as TestRunResult;
+  },
 };
+
+/** Résultat normalisé d'une exécution de tests (voir POST /api/ide/run-tests). */
+export interface TestRunResult {
+  status: 'success';
+  /** true = tous les tests passent (exitCode 0). */
+  ok: boolean;
+  exitCode: number | null;
+  timedOut?: boolean;
+  command: string;
+  runner: 'vitest' | 'jest' | 'node-test';
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Mission control API — pilote la boucle humaine depuis l'UI.

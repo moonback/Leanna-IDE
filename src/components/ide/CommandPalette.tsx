@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileIcon } from './FileIcon.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import {
-  Search, Command, Save, WrapText, Map, AlignJustify,
+  Search, Command, Save, WrapText, Map, AlignJustify, Network,
   X, ArrowUp, ArrowDown, CornerDownLeft,
 } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
@@ -41,6 +41,8 @@ interface CommandPaletteProps {
   onToggleWordWrap: () => void;
   onToggleSettings: () => void;
   onShowDiff: () => void;
+  /** Ouvre le panneau d'impact sur le fichier actif (absent = commande masquée). */
+  onAnalyzeImpact?: () => void;
 }
 
 // ── Fuzzy match ────────────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ export function CommandPalette({
   onToggleWordWrap,
   onToggleSettings,
   onShowDiff,
+  onAnalyzeImpact,
 }: CommandPaletteProps) {
   const [mode, setMode] = useState<PaletteMode>(initialMode);
   const [query, setQuery] = useState('');
@@ -120,7 +123,10 @@ export function CommandPalette({
     { id: 'toggle-wrap',    label: 'Basculer le retour ligne', description: 'Activer ou désactiver le word wrap',                category: 'Affichage',   icon: <WrapText size={14} />,    shortcut: 'Alt+Z',     action: () => { onToggleWordWrap(); onClose(); } },
     { id: 'settings',       label: "Paramètres de l'éditeur",  description: 'Ouvrir le panneau de paramètres',                   category: 'Préférences', icon: <Command size={14} />,                           action: () => { onToggleSettings(); onClose(); } },
     { id: 'diff',           label: 'Voir les différences',     description: 'Comparer le fichier actif avec la version sauvegardée', category: 'Fichier', icon: <Search size={14} />,                            action: () => { onShowDiff();       onClose(); } },
-  ], [onSave, onFormat, onToggleMinimap, onToggleWordWrap, onToggleSettings, onShowDiff, onClose]);
+    ...(onAnalyzeImpact ? [
+      { id: 'analyze-impact', label: "Analyser l'impact du fichier", description: 'Voir ce qu’une modification du fichier actif risque de casser', category: 'Fichier', icon: <Network size={14} />, action: () => { onAnalyzeImpact(); onClose(); } },
+    ] : []),
+  ], [onSave, onFormat, onToggleMinimap, onToggleWordWrap, onToggleSettings, onShowDiff, onAnalyzeImpact, onClose]);
 
   const results = useMemo(() => {
     if (mode === 'files') {
