@@ -1,21 +1,21 @@
 /**
  * NotebookDetail — Vue détaillée d'un notebook (style NotebookLM)
  *
- * Layout 3 colonnes :
- * - Gauche : Sources (sidebar compacte)
- * - Centre : Chat IA (toujours visible) ou SourceViewer
- * - Droite : Studio (Notes, Générer, Audio)
- *
- * Avec navigation segmentée, split-view optionnel, et transitions fluides.
+ * Layout 3 panneaux flottants, chacun repliable en rail d'icônes :
+ * - Gauche : Sources (liste compacte + « Ajouter des sources »)
+ * - Centre : Discussion (titre + résumé IA en accueil) ou SourceViewer /
+ *   document généré / éditeur de note / gestionnaire d'ajout de sources
+ * - Droite : Studio (Générer, Notes, Historique, Audio)
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  ArrowLeft, FileText, MessageSquare, StickyNote, Sparkles, Mic, Clock,
-  Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose,
+  ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus,
+  Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
   Save,
 } from 'lucide-react';
+import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { useToast } from '../ui/Toast.js';
 import { api, apiVoid } from './api/client.js';
 import { SourcePanel } from './SourcePanel.js';
@@ -130,10 +130,10 @@ function NoteEditorCenter({
     <motion.div
       {...motionProps}
       transition={spring}
-      className="flex h-full flex-col bg-[var(--notebook-canvas)]"
+      className="flex h-full flex-col"
     >
       {/* Header */}
-      <div className="notebook-panel-header bg-[var(--notebook-surface-elevated)] px-6">
+      <div className="notebook-panel-header px-6">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
             <StickyNote className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
@@ -194,7 +194,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('sources');
+  // Centre = discussion par défaut (comme NotebookLM) ; 'sources' ouvre le
+  // gestionnaire d'ajout de sources (upload, URL, texte, GitHub, codebase).
+  const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [studioTab, setStudioTab] = useState<StudioTab>('generate');
   const [studioOpen, setStudioOpen] = useState(true);
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
@@ -208,24 +210,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
   const { spring, fadeOnly } = useFluidTransition();
   const prefersReducedMotion = useReducedMotion();
-  
-  // Détecte prefers-reduced-transparency pour le header
-  const [reducedTransparency, setReducedTransparency] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-transparency: reduce)');
-    setReducedTransparency(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedTransparency(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-  
-  const headerStyle = reducedTransparency
-    ? { backgroundColor: 'var(--notebook-surface-elevated)' }
-    : { 
-        backdropFilter: 'blur(20px) saturate(180%)', 
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-        backgroundColor: 'var(--notebook-surface-elevated)' 
-      };
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
@@ -277,8 +261,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
-        if (e.key === '1') { e.preventDefault(); setActiveTab('sources'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(true); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(false); }
+        if (e.key === '1') { e.preventDefault(); setSourceRailOpen(v => !v); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
@@ -316,6 +300,28 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
   ];
+  const studioShortcuts: Record<StudioTab, string> = {
+    notes: 'Ctrl+3 / ⌘3',
+    generate: 'Ctrl+4 / ⌘4',
+    audio: 'Ctrl+5 / ⌘5',
+    history: 'Ctrl+6 / ⌘6',
+  };
+
+  // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
+  const sourcesHash = notebook.sources.map((s: any) => s.id).sort().join('|');
+
+  /** Ouvre le gestionnaire d'ajout de sources dans la colonne centrale */
+  const openSourceManager = () => {
+    setActiveTab('sources');
+    setSelectedSourceId(null);
+    setViewingGeneratedDoc(null);
+    setNoteEditorData(null);
+  };
+
+  const openStudioTab = (key: StudioTab) => {
+    setStudioTab(key);
+    setStudioOpen(true);
+  };
 
   /** Renders all studio panels simultaneously — active one is visible, others are hidden.
    *  This preserves component state (e.g. GeneratePanel queue) across tab switches. */
@@ -376,7 +382,15 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     }
 
     if (activeTab === 'sources') {
-      return <SourcePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onUploadProgress={setIndexingProgress} />;
+      return (
+        <SourcePanel
+          notebookId={notebookId}
+          sources={notebook.sources}
+          onRefresh={loadNotebook}
+          onUploadProgress={setIndexingProgress}
+          onClose={() => setActiveTab('chat')}
+        />
+      );
     }
 
     return (
@@ -385,6 +399,29 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         hasSources={notebook.sources.length > 0}
         sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))}
         onRefresh={loadNotebook}
+        onAddSources={openSourceManager}
+        intro={
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl text-2xl"
+                style={{ backgroundColor: `color-mix(in srgb, ${notebook.color || 'var(--notebook-accent)'} 14%, transparent)` }}
+                aria-hidden
+              >
+                {notebook.icon || <BookOpen className="h-6 w-6" style={{ color: notebook.color }} />}
+              </div>
+              <div className="min-w-0">
+                <h2 className="notebook-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+                  {notebook.title}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  {notebook.sources.length} source{notebook.sources.length > 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <SourcesSummaryCard notebookId={notebookId} sourcesCount={notebook.sources.length} sourcesHash={sourcesHash} />
+          </div>
+        }
       />
     );
   };
@@ -400,24 +437,21 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       {/* ─── Header ─────────────────────────────────────────── */}
       <header
         className="notebook-header flex-shrink-0"
-        style={headerStyle}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <button
+          <NbIconButton
+            icon={ArrowLeft}
+            label="Retour aux notebooks"
             onClick={onBack}
-            className="notebook-icon-button transition-transform active:scale-90"
-            title="Retour aux notebooks"
-            aria-label="Retour aux notebooks"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+            className="transition-transform active:scale-90"
+          />
 
           <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-base"
-            style={{ backgroundColor: `${notebook.color}15`, color: notebook.color }}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-base"
+            style={{ backgroundColor: `color-mix(in srgb, ${notebook.color || 'var(--notebook-accent)'} 14%, transparent)`, color: notebook.color }}
             aria-hidden="true"
           >
-            {notebook.icon || <BookOpen className="h-5 w-5" />}
+            {notebook.icon || <BookOpen className="h-4 w-4" />}
           </div>
 
           <div className="min-w-0">
@@ -436,57 +470,19 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Center navigation */}
-        <nav className="notebook-segmented hidden md:flex" aria-label="Notebook navigation">
-          <button
-            onClick={() => { setActiveTab('sources'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(true); }}
-            className="notebook-segment transition-transform active:scale-95"
-            data-active={activeTab === 'sources' && !viewingGeneratedDoc && !noteEditorData && !selectedSourceId}
-            title="Sources (Ctrl+1 / ⌘1)"
-          >
-            <FileText className="h-4 w-4" />
-            <span>Sources</span>
-            <span className="notebook-count">{notebook.sources.length}</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setSourceRailOpen(false); }}
-            className="notebook-segment transition-transform active:scale-95"
-            data-active={activeTab === 'chat' && !viewingGeneratedDoc && !noteEditorData && !selectedSourceId}
-            title="Chat (Ctrl+2 / ⌘2)"
-          >
-            <MessageSquare className="h-4 w-4" />
-            <span>Chat</span>
-          </button>
-
-          {/* Assistant vocal — « Interroger à la voix », à côté de Sources / Chat.
-              Il consomme la session partagée via NotebookLiveProvider : reste
-              connecté quelle que soit la vue centrale affichée. */}
-          <NotebookVoicePanel
-            notebookId={notebookId}
-            prefersReducedMotion={prefersReducedMotion}
-          />
-        </nav>
-
         {/* Right actions */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setStudioOpen(v => !v)}
-            className="notebook-icon-button hidden md:flex transition-transform active:scale-90"
-            data-active={studioOpen}
-            title={studioOpen ? 'Fermer Studio (Ctrl+\\ / ⌘\\)' : 'Ouvrir Studio (Ctrl+\\ / ⌘\\)'}
-            aria-label={studioOpen ? 'Fermer Studio' : 'Ouvrir Studio'}
-            aria-pressed={studioOpen}
-          >
-            {studioOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-          </button>
-          <button
+        <div className="flex flex-shrink-0 items-center gap-2">
+          {/* Assistant vocal — consomme la session partagée via NotebookLiveProvider :
+              reste connecté quelle que soit la vue centrale affichée. */}
+          <div className="hidden md:flex">
+            <NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} />
+          </div>
+          <NbIconButton
+            icon={RefreshCw}
+            label="Actualiser"
             onClick={loadNotebook}
-            className="notebook-icon-button transition-transform active:scale-90"
-            title="Actualiser"
-            aria-label="Actualiser"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+            className="transition-transform active:scale-90"
+          />
         </div>
       </header>
 
@@ -515,12 +511,13 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ─── 3-Column Layout ──────────────────────────────── */}
+      {/* ─── 3 panneaux flottants (Sources · Discussion · Studio) ───── */}
       <div className="notebook-shell flex-1 overflow-hidden" data-studio-open={studioOpen} data-source-open={sourceRailOpen}>
-        {/* Left: Sources Rail */}
+        {/* Gauche : Sources */}
         <aside
-          className="notebook-source-rail hidden min-w-0 h-full lg:flex overflow-hidden flex-col"
+          className="notebook-panel notebook-panel--side hidden lg:flex"
           data-collapsed={!sourceRailOpen}
+          aria-label="Sources"
         >
           {sourceRailOpen ? (
             <SourcePanel
@@ -531,43 +528,34 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               compact
               onSelectSource={(id) => setSelectedSourceId(id === selectedSourceId ? null : id)}
               selectedSourceId={selectedSourceId}
+              onAddSources={openSourceManager}
+              onCollapse={() => setSourceRailOpen(false)}
             />
           ) : (
-            /* Collapsed rail — just the toggle button */
-            <div className="flex w-full flex-col items-center gap-3 pt-4">
+            <div className="notebook-panel-rail">
               <NbIconButton
                 icon={PanelLeftOpen}
-                label="Afficher les sources"
+                label="Afficher les sources (Ctrl+1 / ⌘1)"
                 onClick={() => setSourceRailOpen(true)}
               />
-              <span className="rotate-180 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-dimmed)] [text-orientation:mixed] [writing-mode:vertical-rl]">
-                Sources {notebook.sources.length > 0 ? `(${notebook.sources.length})` : ''}
-              </span>
-            </div>
-          )}
-          {/* Toggle button at bottom when open */}
-          {sourceRailOpen && (
-            <div className="flex-shrink-0 border-t border-[var(--notebook-border)] px-3 py-2">
-              <NbButton
-                variant="ghost"
-                size="sm"
-                icon={PanelLeftClose}
-                onClick={() => setSourceRailOpen(false)}
-                className="w-full justify-start"
-                title="Réduire le panneau sources"
-                aria-label="Réduire le panneau sources"
+              <NbIconButton icon={Plus} label="Ajouter des sources" onClick={openSourceManager} />
+              <button
+                type="button"
+                onClick={() => setSourceRailOpen(true)}
+                className="notebook-panel-rail-label"
               >
-                <span>Réduire</span>
-              </NbButton>
+                <FileText className="h-3.5 w-3.5 rotate-90" aria-hidden />
+                Sources{notebook.sources.length > 0 ? ` · ${notebook.sources.length}` : ''}
+              </button>
             </div>
           )}
         </aside>
 
-        {/* Center: Main Content (Chat or Sources full view) */}
-        <main className="notebook-main min-w-0">
+        {/* Centre : Discussion (ou source / document / note ouverts) */}
+        <main className="notebook-panel notebook-main min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
-              key={selectedSourceId || viewingGeneratedDoc?.id || activeTab}
+              key={selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : activeTab)}
               {...centerMotion}
               transition={spring}
               className="h-full"
@@ -577,47 +565,68 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           </AnimatePresence>
         </main>
 
-        {/* Right: Studio Panel (Notes / Generate / Audio) */}
-        {studioOpen && (
-          <aside className="notebook-context-rail hidden min-w-0 md:flex flex-col overflow-hidden">
-            {/* Studio tabs */}
-            <div className="flex items-center gap-1 border-b border-[var(--notebook-border)] px-4 py-3">
-              {studioTabs.map(({ key, icon: Icon, label, badge }) => {
-                const shortcuts: Record<StudioTab, string> = {
-                  notes: 'Ctrl+3 / ⌘3',
-                  generate: 'Ctrl+4 / ⌘4',
-                  history: 'Ctrl+6 / ⌘6',
-                  audio: 'Ctrl+5 / ⌘5',
-                };
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setStudioTab(key)}
-                    className="notebook-segment transition-transform active:scale-95"
-                    data-active={studioTab === key}
-                    title={`${label} (${shortcuts[key]})`}
-                    aria-label={label}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {badge !== undefined && badge > 0 && <span className="notebook-count">{badge}</span>}
-                  </button>
-                );
-              })}
-              <NbIconButton
-                icon={X}
-                size="sm"
-                label="Fermer le studio"
-                onClick={() => setStudioOpen(false)}
-                className="ml-auto flex-shrink-0"
-              />
-            </div>
+        {/* Droite : Studio (Générer · Notes · Historique · Audio) */}
+        <aside
+          className="notebook-panel notebook-panel--side notebook-panel--studio hidden lg:flex"
+          data-collapsed={!studioOpen}
+          aria-label="Studio"
+        >
+          {studioOpen ? (
+            <>
+              <div className="notebook-panel-header">
+                <h2 className="notebook-panel-title">Studio</h2>
+                <NbIconButton
+                  icon={PanelRightClose}
+                  label="Réduire le Studio (Ctrl+\ / ⌘\)"
+                  onClick={() => setStudioOpen(false)}
+                />
+              </div>
 
-            {/* Studio content — all panels always mounted, inactive ones hidden via display:none */}
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {renderStudioPanels()}
+              {/* Onglets du Studio */}
+              <div className="flex-shrink-0 px-3 pt-3">
+                <div className="notebook-segmented flex w-full" role="tablist" aria-label="Sections du Studio">
+                  {studioTabs.map(({ key, icon: Icon, label, badge }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={studioTab === key}
+                      onClick={() => setStudioTab(key)}
+                      className="notebook-segment min-w-0 flex-1 !px-2 transition-transform active:scale-95"
+                      data-active={studioTab === key}
+                      title={`${label} (${studioShortcuts[key]})`}
+                    >
+                      <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                      <span className="truncate text-xs">{label}</span>
+                      {badge !== undefined && badge > 0 && <span className="notebook-count">{badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tous les panneaux restent montés ; les inactifs sont masqués (display:none) */}
+              <div className="min-h-0 flex-1 overflow-hidden">
+                {renderStudioPanels()}
+              </div>
+            </>
+          ) : (
+            <div className="notebook-panel-rail">
+              <NbIconButton
+                icon={PanelRightOpen}
+                label="Ouvrir le Studio (Ctrl+\ / ⌘\)"
+                onClick={() => setStudioOpen(true)}
+              />
+              {studioTabs.map(({ key, icon, label }) => (
+                <NbIconButton
+                  key={key}
+                  icon={icon}
+                  label={`${label} (${studioShortcuts[key]})`}
+                  onClick={() => openStudioTab(key)}
+                />
+              ))}
             </div>
-          </aside>
-        )}
+          )}
+        </aside>
       </div>
     </div>
     </NotebookLiveProvider>

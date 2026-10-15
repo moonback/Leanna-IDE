@@ -56,6 +56,8 @@ interface Props {
   onEditCancel: () => void;
   onEditSubmit: (msgId: string) => void;
   onFetchCitation: (citation: Citation, x: number, y: number) => void;
+  /** En-tête d'accueil (titre + résumé du notebook) affiché tant qu'il n'y a aucun message */
+  intro?: React.ReactNode;
 }
 
 export function MessageList(props: Props) {
@@ -64,7 +66,7 @@ export function MessageList(props: Props) {
     suggestions, suggestionOffset, setSuggestionOffset,
     followUps, followUpOffset, setFollowUpOffset,
     streamingText, deepDiveProgress, loading, showScrollBtn, hoveredCitation,
-    prefersReducedMotion, onSend, onStopStreaming, scrollToBottom,
+    prefersReducedMotion, onSend, onStopStreaming, scrollToBottom, intro,
   } = props;
 
   const suggestionChipClass =
@@ -83,12 +85,17 @@ export function MessageList(props: Props) {
           </div>
         ) : messages.length === 0 ? (
           /* Welcome state */
-          <div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-4 py-12">
-            <NbEmptyState
-              icon={MessageCircle}
-              title="Interrogez vos sources"
-              description="Posez une question et l'IA répondra en citant les passages pertinents de vos documents."
-            />
+          <div className={intro
+            ? 'mx-auto flex max-w-3xl flex-col gap-6 py-2'
+            : 'mx-auto flex max-w-lg flex-col items-center justify-center gap-4 py-12'}
+          >
+            {intro ?? (
+              <NbEmptyState
+                icon={MessageCircle}
+                title="Interrogez vos sources"
+                description="Posez une question et l'IA répondra en citant les passages pertinents de vos documents."
+              />
+            )}
 
             {/* Suggestions — 2 visibles + bouton pour en voir d'autres */}
             {suggestions.length > 0 && (

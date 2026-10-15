@@ -7,9 +7,9 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Plus } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
-import { NbEmptyState } from './ui/primitives.js';
+import { NbButton, NbEmptyState } from './ui/primitives.js';
 import { api } from './api/client.js';
 import type { ChatMessage, SandboxFolder } from './chat/types.js';
 import { SLASH_COMMANDS, CONTEXT_SUGGESTIONS, PERSONALITIES } from './chat/constants.js';
@@ -28,9 +28,13 @@ interface Props {
   hasSources: boolean;
   sources?: { id: string; title: string }[];
   onRefresh?: () => void;
+  /** En-tête d'accueil affiché au-dessus des suggestions quand la discussion est vide */
+  intro?: React.ReactNode;
+  /** Action « Ajouter des sources » proposée dans l'état vide */
+  onAddSources?: () => void;
 }
 
-export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }: Props) {
+export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, intro, onAddSources }: Props) {
   const { error: toastError, success: toastSuccess } = useToast();
   const prefersReducedMotion = useReducedMotion();
 
@@ -221,6 +225,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
               L'IA répondra en citant les passages pertinents.
             </>
           }
+          action={onAddSources && (
+            <NbButton variant="primary" icon={Plus} onClick={onAddSources}>
+              Ajouter des sources
+            </NbButton>
+          )}
         />
       </div>
     );
@@ -297,6 +306,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh }
         onEditCancel={handleEditCancel}
         onEditSubmit={handleEditSubmit}
         onFetchCitation={fetchCitationChunk}
+        intro={intro}
       />
 
       <Composer

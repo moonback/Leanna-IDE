@@ -10,11 +10,10 @@
  *    SourceListFull (mode plein écran).
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Upload, Search, X } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
-import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { GitHubRepositoryImportModal } from './GitHubRepositoryImportModalLazy.js';
 import { SPRING_UI_SLOW as SPRING_UI, SPRING_SNAPPY } from './motion.js';
 import { useSourceUpload } from './sources/useSourceUpload.js';
@@ -37,9 +36,15 @@ interface Props {
   onSelectSource?: (sourceId: string) => void;
   /** Currently selected source ID (for highlighting in compact mode) */
   selectedSourceId?: string | null;
+  /** Mode compact : ouvre le gestionnaire d'ajout de sources */
+  onAddSources?: () => void;
+  /** Mode compact : replie le panneau */
+  onCollapse?: () => void;
+  /** Mode plein écran : ferme le gestionnaire (retour à la discussion) */
+  onClose?: () => void;
 }
 
-export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId }: Props) {
+export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId, onAddSources, onCollapse, onClose }: Props) {
   const { success, error: toastError } = useToast();
   const prefersReducedMotion = useReducedMotion();
 
@@ -71,7 +76,6 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
   const uploadDone = uploadQueue.filter(f => f.status === 'success').length;
   const uploadErrors = uploadQueue.filter(f => f.status === 'error').length;
 
-  const sourcesHash = useMemo(() => sources.map(s => s.id).sort().join('|'), [sources]);
 
   // ─── Mode compact ──────────────────────────────────────────────────────────
   if (compact) {
@@ -101,6 +105,8 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         onToggleSelect={list.handleToggleSelect}
         onDelete={list.handleDelete}
         onSelectSource={onSelectSource}
+        onAddSources={onAddSources}
+        onCollapse={onCollapse}
       />
     );
   }
@@ -143,12 +149,12 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       </AnimatePresence>
 
       {/* ── Sticky header + actions ─────────────────────────── */}
-      <div className="flex-shrink-0 space-y-2 border-b border-[var(--notebook-border)] bg-[var(--notebook-canvas)] px-4 pb-2 pt-3">
+      <div className="flex-shrink-0 space-y-3 border-b border-[var(--notebook-border)] px-5 pb-3 pt-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="notebook-panel-title">
-              Sources
+              Ajouter des sources
             </h1>
             <p className="text-xs text-[var(--text-muted)]">
               {sources.length === 0
@@ -156,6 +162,9 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
                 : `${sources.length} source${sources.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} mots · ${totalChunks} chunks`}
             </p>
           </div>
+          {onClose && (
+            <NbIconButton icon={X} label="Fermer et revenir à la discussion" onClick={onClose} />
+          )}
         </div>
 
         <UploadQueue uploadQueue={uploadQueue} uploadDone={uploadDone} uploadErrors={uploadErrors} spring={spring} />
@@ -187,8 +196,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
       </div>{/* end sticky header */}
 
       {/* ── Scrollable content ─────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 space-y-3">
-        <SourcesSummaryCard notebookId={notebookId} sourcesCount={sources.length} sourcesHash={sourcesHash} />
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 space-y-3">
 
         <SourceListFull
           sources={sources}

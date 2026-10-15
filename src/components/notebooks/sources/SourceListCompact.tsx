@@ -7,10 +7,10 @@
 import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Trash2, Plus, FileText, CheckSquare, Square, X,
+  Search, Trash2, Plus, FileText, CheckSquare, Square, X, PanelLeftClose,
 } from 'lucide-react';
 import { TYPE_ICONS, TYPE_COLORS, ACCEPTED_EXTENSIONS, type SourceItem } from './constants.js';
-import { NbButton, NbEmptyState, NbIconButton, NbSectionLabel } from '../ui/primitives.js';
+import { NbButton, NbEmptyState, NbIconButton } from '../ui/primitives.js';
 
 // Primitives animables (whileTap) comme les anciens motion.button.
 const MotionButton = motion.create(NbButton);
@@ -42,6 +42,10 @@ interface Props {
   onToggleSelect: (sourceId: string) => void;
   onDelete: (sourceId: string) => void;
   onSelectSource?: (sourceId: string) => void;
+  /** Ouvre le gestionnaire d'ajout (URL, texte, GitHub…) ; à défaut, le sélecteur de fichiers */
+  onAddSources?: () => void;
+  /** Replie le panneau Sources */
+  onCollapse?: () => void;
 }
 
 export function SourceListCompact(props: Props) {
@@ -51,22 +55,20 @@ export function SourceListCompact(props: Props) {
     totalWords, totalChunks, prefersReducedMotion,
     fileInputRef, spring, springSnappy, tapScale,
     onFileInputChange, openFilePicker, onSelectAll, onDeleteSelected, onDeleteAll,
-    onToggleSelect, onDelete, onSelectSource,
+    onToggleSelect, onDelete, onSelectSource, onAddSources, onCollapse,
   } = props;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Header */}
-      <div className="notebook-panel-header !py-3">
-        <div className="min-w-0">
-          <NbSectionLabel>Sources</NbSectionLabel>
-          <h2 className="notebook-panel-title truncate">
-            {sources.length} document{sources.length !== 1 ? 's' : ''}
-          </h2>
-        </div>
+      <div className="notebook-panel-header">
+        <h2 className="notebook-panel-title flex items-center gap-2">
+          Sources
+          {sources.length > 0 && <span className="notebook-count">{sources.length}</span>}
+        </h2>
         <div className="flex flex-shrink-0 items-center gap-1">
           <AnimatePresence mode="wait" initial={false}>
-            {selectedSources.length > 0 ? (
+            {selectedSources.length > 0 && (
               <motion.div
                 key="selection-actions"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -92,50 +94,36 @@ export function SourceListCompact(props: Props) {
                   onClick={onDeleteSelected}
                   className="!border-transparent !bg-[var(--color-error-subtle)] !text-[var(--color-error)]"
                 >
-                  <span>Supprimer ({selectedSources.length})</span>
-                </MotionButton>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="default-actions"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={springSnappy}
-                className="flex items-center gap-1"
-              >
-                {sources.length > 0 && (
-                  <MotionIconButton
-                    {...tapScale}
-                    icon={Trash2}
-                    tone="danger"
-                    label="Supprimer toutes les sources"
-                    title={confirmDeleteAll ? 'Cliquez pour confirmer' : 'Supprimer toutes les sources'}
-                    onClick={onDeleteAll}
-                    disabled={uploading}
-                    className={confirmDeleteAll ? '!bg-[var(--color-error-subtle)] !text-[var(--color-success)]' : undefined}
-                  />
-                )}
-                <MotionButton
-                  {...tapScale}
-                  variant="primary"
-                  size="sm"
-                  icon={Plus}
-                  loading={uploading}
-                  onClick={openFilePicker}
-                >
-                  <span>Ajouter</span>
+                  <span>{selectedSources.length}</span>
                 </MotionButton>
               </motion.div>
             )}
           </AnimatePresence>
+          {onCollapse && (
+            <NbIconButton
+              icon={PanelLeftClose}
+              label="Réduire le panneau Sources"
+              onClick={onCollapse}
+            />
+          )}
         </div>
         <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS} multiple onChange={onFileInputChange} className="hidden" />
       </div>
 
-      {/* Search */}
+      {/* Ajouter + recherche */}
+      <div className="flex-shrink-0 space-y-2 px-3 pb-1 pt-3">
+        <MotionButton
+          {...tapScale}
+          variant="secondary"
+          icon={Plus}
+          loading={uploading}
+          onClick={onAddSources ?? openFilePicker}
+          className="w-full !rounded-full"
+        >
+          Ajouter des sources
+        </MotionButton>
       {sources.length > 0 && (
-        <div className="flex-shrink-0 px-3 py-2">
+        <div>
           <div className="notebook-search-field !gap-2 !pr-1">
             <Search className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
             <input
@@ -157,6 +145,7 @@ export function SourceListCompact(props: Props) {
           </div>
         </div>
       )}
+      </div>
 
       {/* Source list */}
       <div className="custom-scrollbar max-h-full min-h-0 flex-1 overflow-y-auto px-2 pb-4">
@@ -171,7 +160,7 @@ export function SourceListCompact(props: Props) {
                 variant="primary"
                 size="sm"
                 icon={Plus}
-                onClick={openFilePicker}
+                onClick={onAddSources ?? openFilePicker}
               >
                 Ajouter une source
               </MotionButton>
@@ -261,10 +250,21 @@ export function SourceListCompact(props: Props) {
 
       {/* Footer stats */}
       {sources.length > 0 && (
-        <div className="flex-shrink-0 border-t border-[var(--notebook-border)] px-4 py-2">
-          <p className="text-center text-xs text-[var(--text-dimmed)]">
+        <div className="flex flex-shrink-0 items-center justify-between gap-2 border-t border-[var(--notebook-border)] py-1.5 pl-4 pr-2">
+          <p className="truncate text-xs tabular-nums text-[var(--text-dimmed)]">
             {totalWords.toLocaleString()} mots · {totalChunks} chunks
           </p>
+          <MotionIconButton
+            {...tapScale}
+            icon={Trash2}
+            size="sm"
+            tone="danger"
+            label="Supprimer toutes les sources"
+            title={confirmDeleteAll ? 'Cliquez pour confirmer' : 'Supprimer toutes les sources'}
+            onClick={onDeleteAll}
+            disabled={uploading}
+            className={confirmDeleteAll ? '!bg-[var(--color-error-subtle)] !text-[var(--color-error)]' : undefined}
+          />
         </div>
       )}
     </div>

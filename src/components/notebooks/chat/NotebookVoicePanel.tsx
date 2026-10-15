@@ -1,309 +1,318 @@
 /**
- * NotebookVoicePanel — contrôle du second assistant vocal « live » dédié au
- * Notebook Chat (« Interrogez vos sources »).
+ * NotebookVoicePanel — contrôle de l'assistant vocal « live » dédié au
+ * notebook (« Interroger à la voix »), rendu dans l'en-tête de NotebookDetail.
  *
- * Rendu compact, destiné à prendre place dans la ThreadBar à côté du bouton
- * « Nouveau ». Le bouton micro ouvre/ferme une session Gemini Live groundée
- * sur les sources du notebook ; un panneau de transcription en direct
- * (questions + réponses + sources citées) s'affiche en overlay sous le bouton.
+ * - Au repos : une pilule « Interroger à la voix ».
+ * - En session : la pilule devient une barre de contrôle (état, visualiseur,
+ *   couper le micro, terminer) et une carte live s'ancre dessous : transcription
+ *   en direct, sources citées par la dernière réponse et saisie clavier de
+ *   secours. La carte peut être repliée sans couper la session.
  *
- * Pendant que la session notebook est active, l'assistant vocal GLOBAL (Leanna)
- * est mis en sourdine pour éviter que les deux micros/haut-parleurs se chevauchent.
+ * La session elle-même vit dans NotebookLiveProvider (elle survit aux
+ * changements de vue centrale). Pendant qu'elle est active, l'assistant vocal
+ * GLOBAL (Leanna) est mis en sourdine pour éviter que les deux micros se
+ * chevauchent.
  */
 
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Loader2, Volume2 } from 'lucide-react';
+import {
+  Mic, MicOff, Loader2, PhoneOff, ChevronDown, ChevronUp, BookOpen, SendHorizontal, Search,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { NbIconButton } from '../ui/primitives.js';
 import { LiveAPIContext } from '../../../context/LiveAPIContext.js';
-import { useNotebookLive } from './useNotebookLive.js';
 import { useNotebookLiveContext } from './NotebookLiveContext.js';
 
 interface Props {
-  notebookId: string;
-  /**
-   * Sources filtrées + callbacks. Optionnels : quand le composant est rendu
-   * dans le header (via le provider), ils sont fournis par la vue chat au
-   * contexte, pas en props. Le bouton n'a alors besoin que de `notebookId`.
-   */
-  selectedSources?: string[];
   prefersReducedMotion: boolean | null;
-  onError?: (message: string) => void;
-  /** Notification de progression quand l'assistant génère un document. */
-  onInfo?: (message: string) => void;
-  /** Appelé quand l'assistant a généré un document (rafraîchir l'historique). */
-  onDocumentGenerated?: (doc: { id: string; type: string; title: string }) => void;
 }
 
-export function NotebookVoicePanel({ notebookId, selectedSources, prefersReducedMotion, onError, onInfo, onDocumentGenerated }: Props) {
-  // Session partagée via le provider (montée au niveau de NotebookDetail) : elle
-  // survit au démontage de NotebookChat quand on change de vue dans le notebook.
+type VoiceState = 'connecting' | 'muted' | 'busy' | 'speaking' | 'listening' | 'idle-live';
+
+const STATE_LABEL: Record<VoiceState, string> = {
+  connecting: 'Connexion…',
+  muted: 'Micro coupé',
+  busy: 'Recherche dans les sources…',
+  speaking: 'Répond…',
+  listening: 'Vous écoute…',
+  'idle-live': 'À l’écoute',
+};
+
+const STATE_COLOR: Record<VoiceState, string> = {
+  connecting: 'var(--text-muted)',
+  muted: 'var(--color-warning)',
+  busy: 'var(--color-warning)',
+  speaking: 'var(--color-accent-alt, var(--notebook-accent))',
+  listening: 'var(--notebook-accent)',
+  'idle-live': 'var(--notebook-accent)',
+};
+
+const BAR_JITTER = [0.7, 1, 1.25, 0.9, 0.6];
+
+export function NotebookVoicePanel({ prefersReducedMotion }: Props) {
   const shared = useNotebookLiveContext();
+  const live = shared?.live;
 
-  // Fallback : si aucun provider n'enveloppe ce composant (tests isolés), on
-  // instancie une session locale comme avant.
-  const localLive = useNotebookLive({
-    notebookId,
-    selectedSources: selectedSources ?? [],
-    onError,
-    onDocumentGenerating: (info) => {
-      onInfo?.(`Génération du document (${info.type})…`);
-      window.dispatchEvent(new CustomEvent('notebook-voice-generation-start', {
-        detail: { notebookId, taskId: info.taskId, type: info.type },
-      }));
-    },
-    onDocumentGenerated: (doc) => {
-      onInfo?.(`Document généré : ${doc.title}`);
-      window.dispatchEvent(new CustomEvent('notebook-voice-generation-done', {
-        detail: { notebookId, taskId: doc.taskId, type: doc.type, title: doc.title },
-      }));
-      onDocumentGenerated?.(doc);
-    },
-    onDocumentGenerationError: (info) => {
-      window.dispatchEvent(new CustomEvent('notebook-voice-generation-done', {
-        detail: { notebookId, taskId: info.taskId, type: info.type, error: info.error },
-      }));
-    },
-  });
+  const [cardOpen, setCardOpen] = useState(true);
+  const [draft, setDraft] = useState('');
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
-  // Quand le provider existe ET que cette instance porte une config (vue chat),
-  // on la pousse au contexte sans recréer la session. Rendu dans le header, le
-  // bouton ne passe aucune de ces props : on ne touche donc pas à la config.
-  useEffect(() => {
-    if (!shared) return;
-    const hasConfig = selectedSources !== undefined || onError || onInfo || onDocumentGenerated;
-    if (!hasConfig) return;
-    shared.setVoiceConfig({ selectedSources, onError, onInfo, onDocumentGenerated });
-  }, [shared, selectedSources, onError, onInfo, onDocumentGenerated]);
+  const connected = live?.connected ?? false;
+  const connecting = live?.connecting ?? false;
 
-  const live = shared ? shared.live : localLive;
-  const {
-    connected, connecting, busy, muted, toggleMute, transcript, toggle,
-    amplitude, inputLevel, outputLevel, isSpeaking, isListening,
-  } = live;
-
-  // Couleur de l'indicateur selon l'état courant.
-  const ampColor = busy
-    ? 'var(--color-warning)'
-    : isSpeaking
-      ? 'var(--color-accent-alt)'
-      : 'var(--notebook-accent)';
-  // Amplitude lissée vers une échelle visible (le niveau brut est souvent faible).
-  const ampScale = Math.min(1, amplitude * 2.2);
-
+  // ── Sourdine de l'assistant global pendant la session notebook ──────────
   // Accès défensif au contexte Live global (peut être absent en test isolé).
   const globalLive = useContext(LiveAPIContext);
   // On ne touche à la sourdine globale que si on l'a nous-mêmes activée.
   const didMuteGlobalRef = useRef(false);
-
   useEffect(() => {
     if (!globalLive) return;
     if (connected && globalLive.connected && !globalLive.muted) {
       globalLive.toggleMute();
       didMuteGlobalRef.current = true;
     } else if (!connected && didMuteGlobalRef.current) {
-      // Rétablir le son global quand on arrête la session notebook.
       if (globalLive.connected && globalLive.muted) globalLive.toggleMute();
       didMuteGlobalRef.current = false;
     }
   }, [connected, globalLive]);
 
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  // Chaque nouvelle session rouvre la carte live.
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcript]);
+    if (connected) setCardOpen(true);
+    else setDraft('');
+  }, [connected]);
 
+  // Suivre la fin de la transcription (sans scroller la page entière).
+  const transcriptLength = live?.transcript.reduce((n, e) => n + e.text.length, 0) ?? 0;
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [transcriptLength, cardOpen]);
+
+  // Échap replie la carte sans couper la session.
+  useEffect(() => {
+    if (!connected || !cardOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCardOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [connected, cardOpen]);
+
+  // Sans provider (rendu isolé), aucune session à piloter.
+  if (!live) return null;
+
+  const {
+    busy, muted, toggleMute, transcript, lastCitations, toggle, sendText,
+    inputLevel, outputLevel, isSpeaking, isListening,
+  } = live;
+
+  const state: VoiceState = connecting
+    ? 'connecting'
+    : muted
+      ? 'muted'
+      : busy
+        ? 'busy'
+        : isSpeaking
+          ? 'speaking'
+          : isListening
+            ? 'listening'
+            : 'idle-live';
+  const stateColor = STATE_COLOR[state];
+  const level = muted ? 0 : isSpeaking ? outputLevel : inputLevel;
+
+  const submitDraft = () => {
+    const text = draft.trim();
+    if (!text) return;
+    sendText(text);
+    setDraft('');
+  };
+
+  // ── Repos : pilule d'appel ──────────────────────────────────────────────
+  if (!connected && !connecting) {
+    return (
+      <motion.button
+        type="button"
+        onClick={toggle}
+        whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+        className="flex min-h-8 items-center gap-2 rounded-full border border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-3.5 py-1 text-sm font-medium text-[var(--notebook-accent)] transition-colors hover:border-[color-mix(in_srgb,var(--notebook-accent)_40%,transparent)] hover:bg-[var(--notebook-accent-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--notebook-accent)]"
+        title="Interroger vos sources à la voix"
+        aria-label="Démarrer l'assistant vocal"
+      >
+        <Mic className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+        <span className="hidden sm:inline">Interroger à la voix</span>
+      </motion.button>
+    );
+  }
+
+  // ── Session : barre de contrôle + carte live ────────────────────────────
   return (
-    <div className="relative flex items-center gap-2">
-      {/* ── Bouton « Interroger à la voix » (compact, pour la ThreadBar) ── */}
-      <div className="relative flex items-center">
-        {/* Anneaux d'amplitude animés — réagissent au niveau audio live */}
-        <AnimatePresence>
-          {connected && !muted && (ampScale > 0.02 || isSpeaking || isListening) && (
-            <>
-              {/* <motion.span
-                key="ring-outer"
-                className="pointer-events-none absolute inset-0 rounded-full"
-                style={{ border: `2px solid ${ampColor}` }}
-                initial={{ opacity: 0, scale: 1 }}
-                animate={prefersReducedMotion
-                  ? { opacity: 0.4, scale: 1 }
-                  : { opacity: 0.15 + ampScale * 0.5, scale: 1 + ampScale * 0.6 }}
-                exit={{ opacity: 0, scale: 1 }}
-                transition={{ duration: 0.12 }}
-                aria-hidden="true"
-              /> */}
-              {/* <motion.span
-                key="ring-mid"
-                className="pointer-events-none absolute inset-0 rounded-full"
-                style={{ border: `2px solid ${ampColor}` }}
-                initial={{ opacity: 0, scale: 1 }}
-                animate={prefersReducedMotion
-                  ? { opacity: 0.3, scale: 1 }
-                  : { opacity: 0.2 + ampScale * 0.5, scale: 1 + ampScale * 0.3 }}
-                exit={{ opacity: 0, scale: 1 }}
-                transition={{ duration: 0.1 }}
-                aria-hidden="true"
-              /> */}
-            </>
-          )}
-        </AnimatePresence>
-
-        <motion.button
-          onClick={toggle}
-          disabled={connecting}
-          whileTap={{ scale: 0.92 }}
-          transition={{ duration: 0.1 }}
-          className={clsx(
-            'relative z-10 flex min-h-8 items-center gap-2 rounded-full border border-[var(--notebook-border)] px-3 py-1 text-sm font-medium transition-colors disabled:opacity-60',
-            connected
-              ? 'text-[var(--notebook-accent-text)]'
-              : 'bg-transparent text-[var(--notebook-accent)] hover:bg-[var(--notebook-accent-surface)]',
-          )}
-          // Couleur d'état dynamique (occupé / parle / écoute)
-          style={connected ? { backgroundColor: ampColor } : undefined}
-          title={connected ? "Arrêter l'assistant vocal" : "Interroger vos sources à la voix"}
-          aria-label={connected ? "Arrêter l'assistant vocal" : "Démarrer l'assistant vocal"}
-          aria-pressed={connected}
+    <div className="relative flex items-center">
+      <div
+        className="flex min-h-8 items-center gap-1 rounded-full border bg-[var(--notebook-surface)] py-0.5 pl-3 pr-1 shadow-[var(--notebook-shadow-sm)] transition-colors"
+        style={{ borderColor: `color-mix(in srgb, ${stateColor} 45%, transparent)` }}
+      >
+        {/* Ouvrir / replier la carte live */}
+        <button
+          type="button"
+          onClick={() => setCardOpen(v => !v)}
+          className="flex min-w-0 items-center gap-2 rounded-full py-1 pr-1 text-sm font-medium text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--notebook-accent)]"
+          aria-expanded={cardOpen}
+          aria-controls="notebook-voice-card"
+          title={cardOpen ? 'Replier la transcription (Échap)' : 'Afficher la transcription'}
         >
           {connecting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-[var(--text-muted)]" aria-hidden />
           ) : (
-            <Mic className="h-3.5 w-3.5 flex-shrink-0" />
-          )}
-
-          {/* Barres d'amplitude animées (visualiseur) */}
-          {connected && !connecting && (
-            <span className="flex h-3.5 items-end gap-[2px]" aria-hidden="true">
-              {[0, 1, 2, 3].map((i) => {
-                // Chaque barre réagit un peu différemment pour un rendu organique.
-                const base = muted ? 0.08 : (isSpeaking ? outputLevel : inputLevel);
-                const jitter = [1, 0.7, 1.15, 0.85][i];
-                const h = prefersReducedMotion
-                  ? 0.35
-                  : Math.min(1, 0.12 + base * 2.6 * jitter);
+            <span className="flex h-3.5 items-center gap-[2px]" style={{ color: stateColor }} aria-hidden>
+              {BAR_JITTER.map((jitter, i) => {
+                const h = prefersReducedMotion || busy
+                  ? 0.4
+                  : Math.min(1, 0.18 + level * 2.6 * jitter);
                 return (
                   <motion.span
                     key={i}
                     className="w-[3px] rounded-full bg-current"
-                    style={{ originY: 1 }}
-                    animate={{ height: `${Math.round(h * 100)}%`, opacity: muted ? 0.5 : 0.9 }}
+                    animate={{ height: `${Math.round(h * 100)}%`, opacity: muted ? 0.4 : 1 }}
                     transition={{ duration: 0.08 }}
                   />
                 );
               })}
             </span>
           )}
-
-          <span className="hidden sm:inline">
-            {connecting
-              ? 'Connexion…'
-              : connected
-                ? (muted ? 'Micro coupé' : isSpeaking ? 'Répond…' : 'À l\u2019écoute')
-                : 'Interroger à la voix'}
+          <span className="hidden max-w-[11rem] truncate sm:inline" aria-live="polite">
+            {STATE_LABEL[state]}
           </span>
-        </motion.button>
-      </div>
+          {cardOpen
+            ? <ChevronUp className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />
+            : <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-dimmed)]" aria-hidden />}
+        </button>
 
-      {/* Bouton couper/réactiver le micro (visible en session) */}
-      {connected && (
         <NbIconButton
-          icon={muted ? MicOff : Volume2}
+          icon={muted ? MicOff : Mic}
           label={muted ? 'Réactiver le micro' : 'Couper le micro'}
           size="sm"
           active={muted}
+          disabled={connecting}
           onClick={toggleMute}
-          className={clsx(
-            'flex-shrink-0 !border !border-[var(--notebook-border)]',
-            muted && '!bg-[var(--color-warning-subtle)] !text-[var(--color-warning)]',
-          )}
+          className={clsx(muted && '!bg-[var(--color-warning-subtle)] !text-[var(--color-warning)]')}
         />
-      )}
+        <NbIconButton
+          icon={PhoneOff}
+          label="Terminer la session vocale"
+          size="sm"
+          tone="danger"
+          onClick={toggle}
+          className="!bg-[var(--color-error-subtle)] !text-[var(--color-error)]"
+        />
+      </div>
 
-      {/* ── Panneau de transcription live (overlay ancré) ─────────────── */}
+      {/* ── Carte live : transcription + sources + saisie clavier ───────── */}
       <AnimatePresence>
-        {/* {connected && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+        {cardOpen && (
+          <motion.section
+            id="notebook-voice-card"
+            aria-label="Session vocale — transcription en direct"
+            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={spring}
-            className="absolute top-full right-0 mt-2 z-50 w-80 max-w-[92vw] rounded-xl overflow-hidden shadow-xl"
-            style={{ backgroundColor: 'var(--notebook-surface)', border: '1px solid var(--notebook-border)', transformOrigin: 'top right' }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+            transition={prefersReducedMotion ? { duration: 0.1 } : { type: 'spring', bounce: 0, duration: 0.28 }}
+            className="absolute right-0 top-full z-50 mt-2 flex w-[380px] max-w-[calc(100vw-32px)] origin-top-right flex-col overflow-hidden rounded-2xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[var(--notebook-shadow-lg)]"
           >
-            <div
-              className="flex items-center justify-between px-3 py-2 border-b"
-              style={{ borderColor: 'var(--notebook-border)' }}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-error)] opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--color-error)]" />
-                </span>
-                <span className="text-smfont-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                  Interrogez vos sources
-                </span>
-                {busy && (
-                  <span className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: 'var(--notebook-accent)' }}>
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    recherche…
-                  </span>
+            {/* En-tête */}
+            <div className="flex items-center gap-2 border-b border-[var(--notebook-border)] px-4 py-2.5">
+              <span className="relative flex h-2 w-2 flex-shrink-0" aria-hidden>
+                {!prefersReducedMotion && !connecting && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: stateColor }} />
                 )}
-              </div>
-              <button
-                onClick={toggle}
-                className="p-1 rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] flex-shrink-0"
-                style={{ color: 'var(--text-muted)' }}
-                title="Arrêter l'assistant vocal"
-                aria-label="Arrêter l'assistant vocal"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: stateColor }} />
+              </span>
+              <span className="text-sm font-semibold text-[var(--text-primary)]">En direct</span>
+              <span className="truncate text-xs text-[var(--text-muted)]">· {STATE_LABEL[state]}</span>
+              {busy && <Search className="ml-auto h-3.5 w-3.5 flex-shrink-0 animate-pulse text-[var(--color-warning)]" aria-hidden />}
             </div>
 
-            <div className="max-h-56 overflow-y-auto px-3 py-2 space-y-2 custom-scrollbar">
+            {/* Transcription */}
+            <div
+              ref={transcriptRef}
+              className="custom-scrollbar max-h-72 min-h-[96px] space-y-3 overflow-y-auto px-4 py-3"
+              aria-live="polite"
+            >
               {transcript.length === 0 ? (
-                <p className="text-sm py-2 text-center" style={{ color: 'var(--text-dimmed)' }}>
-                  Parlez pour poser une question sur vos sources…
-                </p>
+                <div className="flex flex-col items-center gap-2 py-4 text-center">
+                  <Mic className="h-5 w-5 text-[var(--text-dimmed)]" aria-hidden />
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {connecting ? 'Préparation du micro…' : 'Posez votre question à voix haute.'}
+                  </p>
+                  <p className="text-xs text-[var(--text-dimmed)]">
+                    Les réponses s'appuient uniquement sur les sources du notebook.
+                  </p>
+                </div>
               ) : (
                 transcript.map((e) => (
-                  <div key={e.id} className="flex gap-2">
-                    <span
-                      className="flex-shrink-0 text-smfont-semibold mt-0.5"
-                      style={{ color: e.role === 'user' ? 'var(--notebook-accent)' : 'var(--text-muted)' }}
+                  <div
+                    key={e.id}
+                    className={clsx('flex', e.role === 'user' ? 'justify-end' : 'justify-start')}
+                  >
+                    <p
+                      className={clsx(
+                        'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed',
+                        e.role === 'user'
+                          ? 'rounded-br-md bg-[var(--notebook-chat-user)] text-[var(--text-primary)]'
+                          : 'rounded-bl-md bg-[var(--notebook-surface-muted)] text-[var(--text-secondary)]',
+                      )}
                     >
-                      {e.role === 'user' ? 'Vous' : 'IA'}
-                    </span>
-                    <span className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       {e.text}
-                    </span>
+                    </p>
                   </div>
                 ))
               )}
-              <div ref={transcriptEndRef} />
             </div>
 
+            {/* Sources citées par la dernière réponse */}
             {lastCitations.length > 0 && (
-              <div className="px-3 py-2 border-t flex flex-wrap gap-1.5" style={{ borderColor: 'var(--notebook-border)' }}>
-                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                  <BookOpen className="w-3 h-3" /> Sources :
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-[var(--notebook-border)] px-4 py-2">
+                <span className="flex items-center gap-1 text-xs text-[var(--text-dimmed)]">
+                  <BookOpen className="h-3 w-3" aria-hidden /> Sources
                 </span>
-                {lastCitations.map((c, i) => (
+                {lastCitations.slice(0, 6).map((c, i) => (
                   <span
                     key={`${c.chunkId}-${i}`}
-                    className="px-2 py-0.5 rounded-full text-xs"
-                    style={{ backgroundColor: 'var(--notebook-accent-surface)', color: 'var(--notebook-accent)' }}
+                    className="max-w-[12rem] truncate rounded-full bg-[var(--notebook-accent-surface)] px-2 py-0.5 text-xs text-[var(--notebook-accent)]"
                     title={c.excerpt}
                   >
-                    {c.sourceTitle.length > 28 ? c.sourceTitle.slice(0, 28) + '…' : c.sourceTitle}
+                    {c.sourceTitle}
                   </span>
                 ))}
+                {lastCitations.length > 6 && (
+                  <span className="text-xs text-[var(--text-dimmed)]">+{lastCitations.length - 6}</span>
+                )}
               </div>
             )}
-          </motion.div>
-        )} */}
+
+            {/* Saisie clavier de secours */}
+            <form
+              className="flex items-center gap-2 border-t border-[var(--notebook-border)] px-3 py-2"
+              onSubmit={(e) => { e.preventDefault(); submitDraft(); }}
+            >
+              <input
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={connecting}
+                placeholder="Ou écrivez votre question…"
+                aria-label="Écrire une question à l'assistant vocal"
+                className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)] disabled:opacity-60"
+              />
+              <NbIconButton
+                type="submit"
+                icon={SendHorizontal}
+                label="Envoyer"
+                size="sm"
+                disabled={!draft.trim() || connecting}
+              />
+            </form>
+          </motion.section>
+        )}
       </AnimatePresence>
     </div>
   );

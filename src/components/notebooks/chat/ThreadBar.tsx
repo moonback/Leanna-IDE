@@ -51,7 +51,9 @@ export function ThreadBar({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-shrink-0 items-center gap-2 px-5 py-4 lg:px-8">
+    <div className="notebook-panel-header !justify-start">
+      <h2 className="notebook-panel-title flex-shrink-0">Discussion</h2>
+      <span className="h-4 w-px flex-shrink-0 bg-[var(--notebook-border)]" aria-hidden />
       {/* Thread selector */}
       <div className="relative min-w-0 flex-1">
         <button

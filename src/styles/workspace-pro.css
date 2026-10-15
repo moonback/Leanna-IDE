@@ -59,23 +59,17 @@ html:root[data-theme="light"] {
 @keyframes lea-nb-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ── En-tête : verre dépoli + liseré lumineux ───────────────────────── */
+/* L'en-tête se fond dans le fond de page : ce sont les panneaux flottants
+   (Sources · Discussion · Studio) qui portent la structure, comme NotebookLM. */
 .notebook-workspace .notebook-header {
   position: relative;
-  background: color-mix(in srgb, var(--notebook-surface-elevated) 82%, transparent);
-  backdrop-filter: saturate(160%) blur(16px);
-  -webkit-backdrop-filter: saturate(160%) blur(16px);
-  box-shadow: 0 1px 0 var(--notebook-border), 0 8px 24px -16px rgba(0, 0, 0, 0.5);
-}
-.notebook-workspace .notebook-header::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--notebook-accent) 45%, transparent), transparent);
-  opacity: 0.6;
+  min-height: 60px;
+  padding-bottom: 0;
+  background: var(--notebook-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: none;
 }
 .notebook-workspace .notebook-title { font-size: 1.0625rem; letter-spacing: -0.022em; }
 
