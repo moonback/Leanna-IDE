@@ -27,7 +27,7 @@ import { createLogger } from "../utils/logger.js";
 import { WorkspaceState, type VerificationRecord, type VerificationIssue } from "./WorkspaceState.js";
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
 import { telemetryService } from "../observability/TelemetryService.js";
-import { setTelemetryContext, clearTelemetryContext } from "../utils/textGeneration.js";
+import { runWithTelemetryContext } from "../utils/textGeneration.js";
 
 const log = createLogger("AgentExecutor");
 
@@ -340,6 +340,21 @@ export class AgentExecutor implements AgentTaskRunner {
    * Modifie task.status, task.result, task.startedAt, task.completedAt in-place.
    */
   async execute(task: AgentTask): Promise<void> {
+    // Contexte de télémétrie propre à CETTE tâche (AsyncLocalStorage) : les
+    // tâches concurrentes ne peuvent plus s'écraser mutuellement leur
+    // attribution, et le missionId parent éventuel est conservé.
+    return runWithTelemetryContext(
+      {
+        taskId: task.id,
+        missionId: (task.context as any)?.missionId,
+        agentRole: task.role,
+        toolName: 'agent_execute',
+      },
+      () => this.executeTask(task),
+    );
+  }
+
+  private async executeTask(task: AgentTask): Promise<void> {
     const taskShortId = task.id.slice(0, 8);
     const role = task.role;
 
@@ -381,14 +396,6 @@ export class AgentExecutor implements AgentTaskRunner {
     // Start OpenTelemetry span for this task
     const missionId = (task.context as any).missionId; // Extract if available
     telemetryService.startTaskSpan(task.id, task.role, task.title, missionId);
-    
-    // Set telemetry context for all model calls in this task
-    setTelemetryContext({
-      taskId: task.id,
-      missionId,
-      agentRole: task.role,
-      toolName: 'agent_execute',
-    });
 
     const notifyProgress = (current: number, label: string) => {
       this.notifier.notify(task, "progress", { current, total: 5, label });
@@ -530,7 +537,6 @@ export class AgentExecutor implements AgentTaskRunner {
       
       // End task span with success
       telemetryService.endTaskSpan(task.id, true);
-      clearTelemetryContext();
     } catch (error) {
       const durationMs = Date.now() - startTime;
 
@@ -547,7 +553,6 @@ export class AgentExecutor implements AgentTaskRunner {
         };
         log.info(`[task:${taskShortId}] 🛑 [${agent.name}] Annulée après ${(durationMs / 1000).toFixed(1)}s`);
         telemetryService.endTaskSpan(task.id, false);
-        clearTelemetryContext();
         this.notifier.notify(task, "cancelled");
         return;
       }
@@ -570,7 +575,6 @@ export class AgentExecutor implements AgentTaskRunner {
       
       // End task span with failure
       telemetryService.endTaskSpan(task.id, false);
-      clearTelemetryContext();
       
       this.notifier.notify(task, "failed");
     } finally {

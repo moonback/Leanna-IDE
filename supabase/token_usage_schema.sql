@@ -18,6 +18,15 @@ create table if not exists public.token_usage (
     output_tokens integer not null default 0,
     total_tokens integer not null default 0,
     cost_usd double precision not null default 0,
+    -- v2 (migration 20261015000000) : détail de fiabilité de l'usage
+    cached_input_tokens integer not null default 0,
+    reasoning_tokens integer not null default 0,
+    usage_source text not null default 'provider',   -- 'provider' | 'estimated'
+    pricing_source text not null default 'exact',    -- 'exact' | 'normalized' | 'free' | 'default'
+    is_fallback boolean not null default false,
+    fallback_from text,
+    streamed boolean not null default false,
+    provider_cost_usd double precision,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

@@ -20,6 +20,25 @@ import { getEnv } from '../config/env.js';
 // Types
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Origine des compteurs de tokens :
+ *  - `provider`  : valeurs renvoyées par l'API (usageMetadata / usage) ;
+ *  - `estimated` : la réponse ne contenait aucune métadonnée d'usage, les
+ *    tokens sont estimés (~4 caractères/token) pour ne pas laisser un appel
+ *    facturé hors comptabilité ni hors budget.
+ */
+export type UsageSource = 'provider' | 'estimated';
+
+/**
+ * Origine du tarif appliqué :
+ *  - `exact`      : clé trouvée telle quelle dans MODEL_PRICING ;
+ *  - `normalized` : trouvée après normalisation (préfixe `models/`, suffixe
+ *    `-preview-…`, `-latest`, `-001`…) ;
+ *  - `free`       : variante OpenRouter `:free` (tarif nul) ;
+ *  - `default`    : modèle inconnu → DEFAULT_PRICING (coût NON fiable).
+ */
+export type PricingSource = 'exact' | 'normalized' | 'free' | 'default';
+
 export interface TokenUsage {
   id: string;
   missionId?: string;
@@ -28,12 +47,79 @@ export interface TokenUsage {
   toolName?: string;
   provider: 'gemini' | 'openrouter';
   model: string;
+  /** Tokens facturés en entrée (inclut les tokens mis en cache). */
   inputTokens: number;
+  /** Tokens facturés en sortie (inclut les tokens de raisonnement). */
   outputTokens: number;
   totalTokens: number;
   costUsd: number;
   timestamp: string;
+  /** Part de `inputTokens` servie depuis le cache du fournisseur, si exposée. */
+  cachedInputTokens?: number;
+  /** Part de `outputTokens` consacrée au raisonnement (« thoughts »), si exposée. */
+  reasoningTokens?: number;
+  usageSource: UsageSource;
+  pricingSource: PricingSource;
+  /** Vrai si l'appel a été servi par le fournisseur de secours. */
+  isFallback?: boolean;
+  /** Fournisseur initial en échec quand `isFallback` est vrai. */
+  fallbackFrom?: 'gemini' | 'openrouter';
+  streamed?: boolean;
+  /** Coût renvoyé par le fournisseur (OpenRouter `usage.cost`), pour comparaison. */
+  providerCostUsd?: number;
 }
+
+/** Tentative d'appel modèle en échec (aucun token facturé connu). */
+export interface FailedModelCall {
+  timestamp: string;
+  provider: 'gemini' | 'openrouter';
+  model: string;
+  missionId?: string;
+  taskId?: string;
+  agentRole?: string;
+  isFallback?: boolean;
+  error: string;
+}
+
+export interface RecordTokenUsageParams {
+  missionId?: string;
+  taskId?: string;
+  agentRole?: string;
+  toolName?: string;
+  provider: 'gemini' | 'openrouter';
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+  usageSource?: UsageSource;
+  isFallback?: boolean;
+  fallbackFrom?: 'gemini' | 'openrouter';
+  streamed?: boolean;
+  providerCostUsd?: number;
+}
+
+export interface PersistenceStatus {
+  /** Supabase configuré (URL + service role key). */
+  configured: boolean;
+  /** Persistance coupée à chaud (table absente, etc.). */
+  disabled: boolean;
+  disabledReason?: string;
+  /** Enregistrements en attente d'écriture. */
+  pending: number;
+  /** Enregistrements définitivement perdus (file pleine / table absente). */
+  droppedUnpersisted: number;
+  persistedTotal: number;
+  /** Schéma `token_usage` sans les colonnes v2 (migration 20261015 absente). */
+  legacySchema: boolean;
+  lastError?: string;
+  lastFlushAt?: string;
+}
+
+/** Résultat d'une réservation de budget avant un appel modèle. */
+export type BudgetReservation =
+  | { allowed: true; release: () => void }
+  | { allowed: false; reason: string };
 
 export interface BudgetConfig {
   maxTokens?: number;
@@ -77,6 +163,53 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
 
 // Fallback pricing for unknown models
 const DEFAULT_PRICING: ModelPricing = { inputPer1M: 0.50, outputPer1M: 1.50 };
+const FREE_PRICING: ModelPricing = { inputPer1M: 0, outputPer1M: 0 };
+
+const warnedUnknownModels = new Set<string>();
+
+/**
+ * Résout le tarif d'un modèle. Les tarifs sont ceux CONFIGURÉS ci-dessus : ils
+ * ne sont pas synchronisés avec les grilles publiques et ne certifient pas la
+ * facture réelle. La normalisation ne retire que des suffixes de version /
+ * préversion : une variante distincte (ex. `-lite`) n'hérite jamais du tarif
+ * du modèle de base et tombe sur DEFAULT_PRICING (source `default`).
+ */
+export function resolvePricing(model: string): { pricing: ModelPricing; source: PricingSource; key: string } {
+  if (MODEL_PRICING[model]) return { pricing: MODEL_PRICING[model], source: 'exact', key: model };
+
+  const lower = (model || '').trim().toLowerCase();
+  if (lower.endsWith(':free')) return { pricing: FREE_PRICING, source: 'free', key: lower };
+
+  const base = lower.replace(/^models\//, '').replace(/:[a-z0-9._-]+$/, '');
+  const candidates = [
+    base,
+    base.replace(/-(preview|exp|experimental|latest)(-[\w.-]*)?$/, ''),
+    base.replace(/-\d{3}$/, ''),
+  ];
+  for (const key of candidates) {
+    if (MODEL_PRICING[key]) return { pricing: MODEL_PRICING[key], source: 'normalized', key };
+  }
+
+  if (!warnedUnknownModels.has(model)) {
+    warnedUnknownModels.add(model);
+    console.warn(
+      `[TelemetryService] ⚠️ Tarif inconnu pour le modèle "${model}" — DEFAULT_PRICING appliqué ` +
+      `($${DEFAULT_PRICING.inputPer1M}/$${DEFAULT_PRICING.outputPer1M} par 1M). Coût non fiable.`,
+    );
+  }
+  return { pricing: DEFAULT_PRICING, source: 'default', key: 'default' };
+}
+
+/**
+ * Coût d'un appel à tarification simple. Les tokens mis en cache sont inclus
+ * dans `inputTokens` et facturés au tarif d'entrée plein : aucun tarif « cache »
+ * n'est configuré, l'estimation est donc volontairement conservatrice (majorante).
+ */
+function computeCost(pricing: ModelPricing, inputTokens: number, outputTokens: number): number {
+  return (inputTokens / 1_000_000) * pricing.inputPer1M + (outputTokens / 1_000_000) * pricing.outputPer1M;
+}
+
+const nonNegative = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TelemetryService
@@ -87,26 +220,58 @@ export class TelemetryService {
   private provider: NodeTracerProvider;
   private supabase: SupabaseClient | null = null;
   
-  /** In-memory token usage store (flush périodique) */
-  private usageStore: TokenUsage[] = [];
+  /**
+   * Fenêtre glissante des derniers enregistrements : source du dashboard et des
+   * agrégations. Indépendante de la file de persistance — un flush réussi ne
+   * fait plus disparaître les données du dashboard.
+   */
+  private recentRecords: TokenUsage[] = [];
+  /** File d'attente d'écriture vers Supabase (alimentée seulement si configuré). */
+  private pendingFlush: TokenUsage[] = [];
+  private recentFailures: FailedModelCall[] = [];
   private flushInterval: NodeJS.Timeout | null = null;
   /**
    * Persistance désactivée à chaud si la table `token_usage` est absente
-   * (PGRST205) ou si Supabase refuse durablement les écritures. Le dashboard
-   * continue de fonctionner en mémoire — dégradation silencieuse, cohérente
-   * avec le reste de l'application quand Supabase n'est pas provisionné.
+   * (PGRST205). L'état est exposé par getPersistenceStatus() : les métriques
+   * restantes sont alors explicitement « en mémoire uniquement ».
    */
   private persistenceDisabled = false;
-  
+  private persistenceDisabledReason?: string;
+  /** Table `token_usage` sans les colonnes v2 : on n'écrit que les colonnes v1. */
+  private legacySchema = false;
+  private flushInProgress = false;
+
+  /** Compteurs cumulés depuis le démarrage (non affectés par les fenêtres bornées). */
+  private counters = {
+    recorded: 0,
+    estimatedUsage: 0,
+    defaultPriced: 0,
+    fallbackCalls: 0,
+    failedCalls: 0,
+    droppedFromRecent: 0,
+    droppedUnpersisted: 0,
+    persisted: 0,
+    budgetDenials: 0,
+  };
+  private lastPersistenceError?: string;
+  private lastFlushAt?: string;
+
   /** Budget tracking per mission */
   private missionBudgets = new Map<string, BudgetConfig>();
   private missionUsage = new Map<string, BudgetStatus>();
-  
+  /** Réservations en vol (appels lancés mais non encore comptabilisés). */
+  private inFlight = new Map<string, { tokens: number; costUsd: number }>();
+
   /** Active spans registry (for correlation) */
   private activeSpans = new Map<string, Span>();
-  
+
   private static readonly FLUSH_INTERVAL_MS = 30_000; // 30s
+  /** Seuil déclenchant un flush anticipé. */
   private static readonly MAX_IN_MEMORY = 1000;
+  /** Borne de la file de persistance (au-delà : perte comptée et signalée). */
+  private static readonly MAX_PENDING = 5000;
+  private static readonly MAX_RECENT = 5000;
+  private static readonly MAX_FAILURES = 200;
 
   constructor() {
     // Initialize OpenTelemetry provider.
@@ -262,22 +427,13 @@ export class TelemetryService {
    * Record token usage from a model call.
    * Returns the calculated cost.
    */
-  recordTokenUsage(params: {
-    missionId?: string;
-    taskId?: string;
-    agentRole?: string;
-    toolName?: string;
-    provider: 'gemini' | 'openrouter';
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-  }): number {
-    const pricing = MODEL_PRICING[params.model] || DEFAULT_PRICING;
-    
-    const costUsd = 
-      (params.inputTokens / 1_000_000) * pricing.inputPer1M +
-      (params.outputTokens / 1_000_000) * pricing.outputPer1M;
-    
+  recordTokenUsage(params: RecordTokenUsageParams): number {
+    const inputTokens = nonNegative(params.inputTokens);
+    const outputTokens = nonNegative(params.outputTokens);
+    const { pricing, source: pricingSource } = resolvePricing(params.model);
+    const costUsd = computeCost(pricing, inputTokens, outputTokens);
+    const usageSource: UsageSource = params.usageSource ?? 'provider';
+
     const usage: TokenUsage = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       missionId: params.missionId,
@@ -286,39 +442,71 @@ export class TelemetryService {
       toolName: params.toolName,
       provider: params.provider,
       model: params.model,
-      inputTokens: params.inputTokens,
-      outputTokens: params.outputTokens,
-      totalTokens: params.inputTokens + params.outputTokens,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
       costUsd,
       timestamp: new Date().toISOString(),
+      usageSource,
+      pricingSource,
+      ...(params.cachedInputTokens ? { cachedInputTokens: nonNegative(params.cachedInputTokens) } : {}),
+      ...(params.reasoningTokens ? { reasoningTokens: nonNegative(params.reasoningTokens) } : {}),
+      ...(params.isFallback ? { isFallback: true, fallbackFrom: params.fallbackFrom } : {}),
+      ...(params.streamed ? { streamed: true } : {}),
+      ...(typeof params.providerCostUsd === 'number' ? { providerCostUsd: params.providerCostUsd } : {}),
     };
-    
-    this.usageStore.push(usage);
-    
+
+    this.counters.recorded++;
+    if (usageSource === 'estimated') this.counters.estimatedUsage++;
+    if (pricingSource === 'default') this.counters.defaultPriced++;
+    if (usage.isFallback) this.counters.fallbackCalls++;
+
+    this.recentRecords.push(usage);
+    if (this.recentRecords.length > TelemetryService.MAX_RECENT) {
+      const excess = this.recentRecords.length - TelemetryService.MAX_RECENT;
+      this.recentRecords.splice(0, excess);
+      this.counters.droppedFromRecent += excess;
+    }
+
     // Update mission budget tracking
     if (params.missionId) {
       this.updateMissionUsage(params.missionId, usage.totalTokens, costUsd);
     }
-    
-    // Flush if store is too large
-    if (this.usageStore.length >= TelemetryService.MAX_IN_MEMORY) {
-      this.flushToSupabase().catch(err => {
-        console.error('[TelemetryService] Emergency flush failed:', err);
-      });
+
+    // File de persistance : seulement si une persistance est réellement possible,
+    // sinon les données resteraient indéfiniment en mémoire (fuite).
+    if (this.supabase && !this.persistenceDisabled) {
+      this.pendingFlush.push(usage);
+      this.enforcePendingBound();
+      if (this.pendingFlush.length >= TelemetryService.MAX_IN_MEMORY) {
+        this.flushToSupabase().catch(err => {
+          console.error('[TelemetryService] Emergency flush failed:', err);
+        });
+      }
     }
-    
+
     return costUsd;
+  }
+
+  /**
+   * Enregistre une tentative d'appel en échec. Aucun token n'est ajouté : le
+   * fournisseur ne renvoie pas d'usage sur une erreur, le coût éventuel d'une
+   * requête traitée avant l'échec (timeout, coupure) est donc INCONNU — il est
+   * compté comme tel, pas comme gratuit.
+   */
+  recordFailedCall(params: Omit<FailedModelCall, 'timestamp'>): void {
+    this.counters.failedCalls++;
+    this.recentFailures.push({ ...params, timestamp: new Date().toISOString() });
+    if (this.recentFailures.length > TelemetryService.MAX_FAILURES) {
+      this.recentFailures.splice(0, this.recentFailures.length - TelemetryService.MAX_FAILURES);
+    }
   }
 
   /**
    * Calculate cost for given token counts (utility method).
    */
   calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-    const pricing = MODEL_PRICING[model] || DEFAULT_PRICING;
-    return (
-      (inputTokens / 1_000_000) * pricing.inputPer1M +
-      (outputTokens / 1_000_000) * pricing.outputPer1M
-    );
+    return computeCost(resolvePricing(model).pricing, nonNegative(inputTokens), nonNegative(outputTokens));
   }
 
   // ─── Budget Guardrails ─────────────────────────────────────────────────────
@@ -347,11 +535,69 @@ export class TelemetryService {
   }
 
   /**
+   * Contrôle PRÉVENTIF avant un appel modèle : refuse l'appel si le budget de
+   * la mission est déjà dépassé ou si la consommation enregistrée + les appels
+   * en vol + l'estimation d'entrée de cet appel dépasse la limite.
+   *
+   * Limites (documentées) : seule l'ENTRÉE est estimée (la sortie est inconnue
+   * avant génération), donc un appel autorisé peut encore faire franchir la
+   * limite de sa sortie ; le budget borne le lancement de nouveaux appels, il
+   * ne peut pas interrompre ni annuler une génération déjà facturée.
+   */
+  reserveBudget(
+    missionId: string | undefined,
+    estimate: { model: string; inputTokens: number },
+  ): BudgetReservation {
+    const noop: BudgetReservation = { allowed: true, release: () => {} };
+    if (!missionId) return noop;
+    const budget = this.missionBudgets.get(missionId);
+    if (!budget || (!budget.maxTokens && !budget.maxCostUsd)) return noop;
+
+    const status = this.checkBudget(missionId);
+    const deny = (reason: string): BudgetReservation => {
+      this.counters.budgetDenials++;
+      return { allowed: false, reason };
+    };
+    if (status.exceeded) return deny(status.reason || 'Budget de mission dépassé');
+
+    const tokens = nonNegative(estimate.inputTokens);
+    const costUsd = this.calculateCost(estimate.model, tokens, 0);
+    const reserved = this.inFlight.get(missionId) ?? { tokens: 0, costUsd: 0 };
+
+    if (budget.maxTokens && status.tokensUsed + reserved.tokens + tokens > budget.maxTokens) {
+      return deny(
+        `Token budget would be exceeded: ${status.tokensUsed} used + ${reserved.tokens} in flight + ~${tokens} estimated > ${budget.maxTokens}`,
+      );
+    }
+    if (budget.maxCostUsd && status.costUsd + reserved.costUsd + costUsd > budget.maxCostUsd) {
+      return deny(
+        `Cost budget would be exceeded: $${(status.costUsd + reserved.costUsd + costUsd).toFixed(4)} > $${budget.maxCostUsd.toFixed(4)}`,
+      );
+    }
+
+    this.inFlight.set(missionId, { tokens: reserved.tokens + tokens, costUsd: reserved.costUsd + costUsd });
+    let released = false;
+    return {
+      allowed: true,
+      release: () => {
+        if (released) return;
+        released = true;
+        const cur = this.inFlight.get(missionId);
+        if (!cur) return;
+        const next = { tokens: cur.tokens - tokens, costUsd: cur.costUsd - costUsd };
+        if (next.tokens <= 0 && next.costUsd <= 1e-12) this.inFlight.delete(missionId);
+        else this.inFlight.set(missionId, next);
+      },
+    };
+  }
+
+  /**
    * Clear budget tracking for a mission (after completion).
    */
   clearMissionBudget(missionId: string): void {
     this.missionBudgets.delete(missionId);
     this.missionUsage.delete(missionId);
+    this.inFlight.delete(missionId);
   }
 
   private updateMissionUsage(missionId: string, tokens: number, costUsd: number): void {
@@ -360,24 +606,25 @@ export class TelemetryService {
       costUsd: 0,
       exceeded: false,
     };
-    
+
     const updated: BudgetStatus = {
       tokensUsed: current.tokensUsed + tokens,
       costUsd: current.costUsd + costUsd,
       exceeded: current.exceeded,
+      ...(current.reason ? { reason: current.reason } : {}),
     };
-    
+
     const budget = this.missionBudgets.get(missionId);
     if (budget && !updated.exceeded) {
-      if (budget.maxTokens && updated.tokensUsed > budget.maxTokens) {
+      if (budget.maxTokens && updated.tokensUsed >= budget.maxTokens) {
         updated.exceeded = true;
-        updated.reason = `Token budget exceeded: ${updated.tokensUsed} > ${budget.maxTokens}`;
-      } else if (budget.maxCostUsd && updated.costUsd > budget.maxCostUsd) {
+        updated.reason = `Token budget exceeded: ${updated.tokensUsed} >= ${budget.maxTokens}`;
+      } else if (budget.maxCostUsd && updated.costUsd >= budget.maxCostUsd) {
         updated.exceeded = true;
-        updated.reason = `Cost budget exceeded: $${updated.costUsd.toFixed(4)} > $${budget.maxCostUsd.toFixed(4)}`;
+        updated.reason = `Cost budget exceeded: $${updated.costUsd.toFixed(4)} >= $${budget.maxCostUsd.toFixed(4)}`;
       }
     }
-    
+
     this.missionUsage.set(missionId, updated);
   }
 
@@ -392,8 +639,8 @@ export class TelemetryService {
     provider?: string;
     limit?: number;
   }): TokenUsage[] {
-    let records = [...this.usageStore];
-    
+    let records = [...this.recentRecords];
+
     if (filters?.missionId) {
       records = records.filter(r => r.missionId === filters.missionId);
     }
@@ -403,13 +650,19 @@ export class TelemetryService {
     if (filters?.provider) {
       records = records.filter(r => r.provider === filters.provider);
     }
-    
+
     const limit = filters?.limit || 100;
     return records.slice(-limit);
   }
 
+  getRecentFailures(limit = 50): FailedModelCall[] {
+    return this.recentFailures.slice(-limit);
+  }
+
   /**
    * Get aggregated stats (for dashboard).
+   * Calculées sur la fenêtre glissante en mémoire (MAX_RECENT enregistrements) :
+   * `coverage` indique si des enregistrements plus anciens en sont sortis.
    */
   getAggregatedStats(period?: 'day' | 'hour'): {
     totalTokens: number;
@@ -417,117 +670,206 @@ export class TelemetryService {
     byModel: Record<string, { tokens: number; cost: number; calls: number }>;
     byAgent: Record<string, { tokens: number; cost: number; calls: number }>;
     byMission: Record<string, { tokens: number; cost: number }>;
+    byProvider: Record<string, { tokens: number; cost: number; calls: number }>;
+    inputTokens: number;
+    outputTokens: number;
+    cachedInputTokens: number;
+    reasoningTokens: number;
+    estimatedCalls: number;
+    defaultPricedCalls: number;
+    fallbackCalls: number;
+    unattributedCalls: number;
+    coverage: {
+      windowSize: number;
+      droppedFromWindow: number;
+      failedCallsSinceStart: number;
+      budgetDenialsSinceStart: number;
+    };
   } {
-    const cutoff = period === 'day' 
+    const cutoff = period === 'day'
       ? Date.now() - 24 * 60 * 60 * 1000
       : period === 'hour'
       ? Date.now() - 60 * 60 * 1000
       : 0;
-    
-    const records = this.usageStore.filter(r => 
+
+    const records = this.recentRecords.filter(r =>
       new Date(r.timestamp).getTime() >= cutoff
     );
-    
+
     const stats = {
       totalTokens: 0,
       totalCost: 0,
       byModel: {} as Record<string, { tokens: number; cost: number; calls: number }>,
       byAgent: {} as Record<string, { tokens: number; cost: number; calls: number }>,
       byMission: {} as Record<string, { tokens: number; cost: number }>,
+      byProvider: {} as Record<string, { tokens: number; cost: number; calls: number }>,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      reasoningTokens: 0,
+      estimatedCalls: 0,
+      defaultPricedCalls: 0,
+      fallbackCalls: 0,
+      unattributedCalls: 0,
+      coverage: {
+        windowSize: TelemetryService.MAX_RECENT,
+        droppedFromWindow: this.counters.droppedFromRecent,
+        failedCallsSinceStart: this.counters.failedCalls,
+        budgetDenialsSinceStart: this.counters.budgetDenials,
+      },
     };
-    
+
+    const bump = (
+      bucket: Record<string, { tokens: number; cost: number; calls: number }>,
+      key: string,
+      record: TokenUsage,
+    ) => {
+      const entry = (bucket[key] ??= { tokens: 0, cost: 0, calls: 0 });
+      entry.tokens += record.totalTokens;
+      entry.cost += record.costUsd;
+      entry.calls += 1;
+    };
+
     for (const record of records) {
       stats.totalTokens += record.totalTokens;
       stats.totalCost += record.costUsd;
-      
-      // By model
-      if (!stats.byModel[record.model]) {
-        stats.byModel[record.model] = { tokens: 0, cost: 0, calls: 0 };
-      }
-      stats.byModel[record.model].tokens += record.totalTokens;
-      stats.byModel[record.model].cost += record.costUsd;
-      stats.byModel[record.model].calls += 1;
-      
-      // By agent
-      if (record.agentRole) {
-        if (!stats.byAgent[record.agentRole]) {
-          stats.byAgent[record.agentRole] = { tokens: 0, cost: 0, calls: 0 };
-        }
-        stats.byAgent[record.agentRole].tokens += record.totalTokens;
-        stats.byAgent[record.agentRole].cost += record.costUsd;
-        stats.byAgent[record.agentRole].calls += 1;
-      }
-      
-      // By mission
+      stats.inputTokens += record.inputTokens;
+      stats.outputTokens += record.outputTokens;
+      stats.cachedInputTokens += record.cachedInputTokens ?? 0;
+      stats.reasoningTokens += record.reasoningTokens ?? 0;
+      if (record.usageSource === 'estimated') stats.estimatedCalls++;
+      if (record.pricingSource === 'default') stats.defaultPricedCalls++;
+      if (record.isFallback) stats.fallbackCalls++;
+      if (!record.missionId && !record.taskId && !record.agentRole) stats.unattributedCalls++;
+
+      bump(stats.byModel, record.model, record);
+      bump(stats.byProvider, record.provider, record);
+      if (record.agentRole) bump(stats.byAgent, record.agentRole, record);
+
       if (record.missionId) {
-        if (!stats.byMission[record.missionId]) {
-          stats.byMission[record.missionId] = { tokens: 0, cost: 0 };
-        }
-        stats.byMission[record.missionId].tokens += record.totalTokens;
-        stats.byMission[record.missionId].cost += record.costUsd;
+        const m = (stats.byMission[record.missionId] ??= { tokens: 0, cost: 0 });
+        m.tokens += record.totalTokens;
+        m.cost += record.costUsd;
       }
     }
-    
+
     return stats;
+  }
+
+  getPersistenceStatus(): PersistenceStatus {
+    return {
+      configured: this.supabase !== null,
+      disabled: this.persistenceDisabled,
+      ...(this.persistenceDisabledReason ? { disabledReason: this.persistenceDisabledReason } : {}),
+      pending: this.pendingFlush.length,
+      droppedUnpersisted: this.counters.droppedUnpersisted,
+      persistedTotal: this.counters.persisted,
+      legacySchema: this.legacySchema,
+      ...(this.lastPersistenceError ? { lastError: this.lastPersistenceError } : {}),
+      ...(this.lastFlushAt ? { lastFlushAt: this.lastFlushAt } : {}),
+    };
   }
 
   // ─── Persistence ───────────────────────────────────────────────────────────
 
+  private enforcePendingBound(): void {
+    const excess = this.pendingFlush.length - TelemetryService.MAX_PENDING;
+    if (excess > 0) {
+      this.pendingFlush.splice(0, excess);
+      this.counters.droppedUnpersisted += excess;
+      console.warn(
+        `[TelemetryService] ⚠️ File de persistance pleine : ${excess} enregistrement(s) non persisté(s) abandonné(s) ` +
+        `(total perdu: ${this.counters.droppedUnpersisted}).`,
+      );
+    }
+  }
+
+  private toRow(u: TokenUsage): Record<string, unknown> {
+    const legacy = {
+      id: u.id,
+      mission_id: u.missionId,
+      task_id: u.taskId,
+      agent_role: u.agentRole,
+      tool_name: u.toolName,
+      provider: u.provider,
+      model: u.model,
+      input_tokens: u.inputTokens,
+      output_tokens: u.outputTokens,
+      total_tokens: u.totalTokens,
+      cost_usd: u.costUsd,
+      created_at: u.timestamp,
+    };
+    if (this.legacySchema) return legacy;
+    return {
+      ...legacy,
+      cached_input_tokens: u.cachedInputTokens ?? 0,
+      reasoning_tokens: u.reasoningTokens ?? 0,
+      usage_source: u.usageSource,
+      pricing_source: u.pricingSource,
+      is_fallback: u.isFallback ?? false,
+      fallback_from: u.fallbackFrom ?? null,
+      streamed: u.streamed ?? false,
+      provider_cost_usd: u.providerCostUsd ?? null,
+    };
+  }
+
   private async flushToSupabase(): Promise<void> {
-    if (!this.supabase || this.persistenceDisabled || this.usageStore.length === 0) return;
-    
-    const toFlush = this.usageStore.splice(0, 500); // Flush up to 500 at a time
-    
+    if (!this.supabase || this.persistenceDisabled || this.flushInProgress || this.pendingFlush.length === 0) return;
+    this.flushInProgress = true;
+
+    const toFlush = this.pendingFlush.splice(0, 500); // Flush up to 500 at a time
+
     try {
-      const { error } = await this.supabase
-        .from('token_usage')
-        .insert(toFlush.map(u => ({
-          id: u.id,
-          mission_id: u.missionId,
-          task_id: u.taskId,
-          agent_role: u.agentRole,
-          tool_name: u.toolName,
-          provider: u.provider,
-          model: u.model,
-          input_tokens: u.inputTokens,
-          output_tokens: u.outputTokens,
-          total_tokens: u.totalTokens,
-          cost_usd: u.costUsd,
-          created_at: u.timestamp,
-        })));
-      
+      let { error } = await this.supabase.from('token_usage').insert(toFlush.map(u => this.toRow(u)));
+
+      // Colonnes v2 absentes (migration 20261015000000 non appliquée) : repli
+      // sur le schéma v1 plutôt que de perdre les données.
+      if (error && !this.legacySchema && (error.code === 'PGRST204' || /column .* (does not exist|of 'token_usage')/i.test(error.message ?? ''))) {
+        this.legacySchema = true;
+        console.warn(
+          "[TelemetryService] ⚠️ Colonnes v2 absentes de 'token_usage' — écriture du schéma v1 uniquement " +
+          "(cache/raisonnement/estimation/fallback non persistés). Appliquez la migration 20261015000000.",
+        );
+        ({ error } = await this.supabase.from('token_usage').insert(toFlush.map(u => this.toRow(u))));
+      }
+
       if (error) {
+        this.lastPersistenceError = `${error.code ?? ''} ${error.message ?? ''}`.trim();
         // Table absente : désactiver la persistance pour éviter d'inonder les
         // logs et de re-empiler indéfiniment les mêmes enregistrements.
         if (error.code === 'PGRST205' || /Could not find the table/i.test(error.message ?? '')) {
           this.persistenceDisabled = true;
+          this.persistenceDisabledReason = "table 'token_usage' introuvable";
+          this.counters.droppedUnpersisted += toFlush.length + this.pendingFlush.length;
+          this.pendingFlush = [];
           console.warn(
             "[TelemetryService] ⚠️ Table 'token_usage' introuvable — persistance désactivée. " +
             "Exécutez supabase/token_usage_schema.sql dans Supabase pour l'activer. " +
-            "Le dashboard continue de fonctionner en mémoire."
+            "Les métriques restent en mémoire uniquement (non durables)."
           );
-          return; // On abandonne ce lot (pas de re-empilement)
+          return;
         }
         console.error('[TelemetryService] Supabase insert error:', error);
-        // Erreur transitoire : ré-empiler pour retenter au prochain flush,
-        // en bornant la taille du store pour éviter une croissance mémoire.
+        // Erreur transitoire : ré-empiler pour retenter au prochain flush.
         this.requeue(toFlush);
       } else {
+        this.counters.persisted += toFlush.length;
+        this.lastFlushAt = new Date().toISOString();
         console.log(`[TelemetryService] ✓ Flushed ${toFlush.length} token usage records to Supabase`);
       }
     } catch (err) {
+      this.lastPersistenceError = (err as Error)?.message ?? String(err);
       console.error('[TelemetryService] Flush exception:', err);
       this.requeue(toFlush);
+    } finally {
+      this.flushInProgress = false;
     }
   }
 
-  /** Ré-empile un lot en tête, en bornant la taille totale du store. */
+  /** Ré-empile un lot en tête, en bornant (et comptant) les pertes. */
   private requeue(batch: TokenUsage[]): void {
-    this.usageStore.unshift(...batch);
-    if (this.usageStore.length > TelemetryService.MAX_IN_MEMORY) {
-      // Conserver les plus récents (fin du tableau), abandonner les plus anciens.
-      this.usageStore.splice(0, this.usageStore.length - TelemetryService.MAX_IN_MEMORY);
-    }
+    this.pendingFlush.unshift(...batch);
+    this.enforcePendingBound();
   }
 
   /**
@@ -538,8 +880,11 @@ export class TelemetryService {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
     }
-    
+
     await this.flushToSupabase();
+    if (this.pendingFlush.length > 0) {
+      console.warn(`[TelemetryService] ⚠️ ${this.pendingFlush.length} enregistrement(s) non persisté(s) à l'arrêt.`);
+    }
     await this.provider.shutdown();
   }
 }

@@ -428,7 +428,10 @@ export async function summarizeWithLLM(
       return { summary: summarizeLocal(messages), method: 'local', tokensUsed: 0 };
     }
 
-    const tokensUsed = estimateTokens(summary) + inputTokens;
+    // Tokens réellement facturés quand le fournisseur les renvoie (sinon estimation).
+    const tokensUsed = response.tokenUsage && !response.tokenUsage.estimated
+      ? response.tokenUsage.totalTokens
+      : estimateTokens(summary) + inputTokens;
 
     logSuccess('summarizeWithLLM: résumé LLM réussi', {
       elapsed: `${elapsed}ms`,
