@@ -1719,7 +1719,13 @@ export class Executor {
     try {
       const dryRun = mission.getConfig().dryRun;
       const signal = this.getAbortController(mission.id).signal;
-      result = await this.skillHandler!(action.skillName, action.args, { dryRun, signal });
+      result = await this.skillHandler!(action.skillName, action.args, {
+        dryRun,
+        signal,
+        // Une action planifiée = une étape : sa reprise après crash est
+        // dédoublonnée (ou bloquée si son effet est incertain) par le ledger.
+        idempotencyScope: { missionId: mission.id, stepId: action.id },
+      });
       const failure = Executor.detectSkillFailure(result);
       success = failure === null;
       if (!success) {
@@ -2887,6 +2893,8 @@ export interface SkillHandlerOptions {
    * opération longue (fetch, shell…) au lieu de la mener à terme. (Audit, point 4.)
    */
   signal?: AbortSignal;
+  /** Étape de mission (clé d'idempotence) transmise au ToolRegistry. */
+  idempotencyScope?: { missionId: string; stepId: string };
 }
 
 /** Handler pour exécuter un skill */

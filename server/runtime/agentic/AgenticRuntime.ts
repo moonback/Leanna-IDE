@@ -470,7 +470,10 @@ export class AgenticRuntime implements IAgentRuntime {
     // ── COMPLETE ──
     task.onProgress?.("finalizing");
     const outcome = this.assessOutcome(session, plan);
-    const success = outcome === "success" || outcome === "partial";
+    // Seul un outcome "success" est un succès : un "partial" garde au moins une
+    // étape ou un outil en échec (ex. typecheck rouge) et ne doit ni marquer la
+    // tâche "completed" ni débloquer les tâches qui en dépendent.
+    const success = outcome === "success";
 
     // ── Récapitulatif diagnostique (audit) ─────────────────────────────────
     // Rend explicite, en fin de run, pourquoi un agent producteur a pu finir
@@ -817,7 +820,13 @@ export class AgenticRuntime implements IAgentRuntime {
     this.events?.emit({ type: "tool:called", toolName: name, agentId: session.agent.role });
 
     try {
-      const result = await this.registry.call(name, parameters, { agentId: session.agent.role });
+      // Étape d'idempotence = itération : un appel à effet de bord dupliqué
+      // dans le même tour est dédoublonné, une ré-exécution volontaire dans un
+      // tour suivant (réparation, nouveau test) s'exécute réellement.
+      const result = await this.registry.call(name, parameters, {
+        agentId: session.agent.role,
+        idempotencyScope: { missionId: session.taskId, stepId: `iter-${session.usage.iterations}` },
+      });
       const durationMs = Date.now() - start;
 
       // ── Détection d'échec « soft » AVANT toute comptabilité (audit) ────────
@@ -1392,7 +1401,7 @@ export class AgenticRuntime implements IAgentRuntime {
   ): Promise<AgentResult> {
     const final = error ? emptyFinal(error) : await this.finalize(task);
     session.usage.elapsedMs = Date.now() - session.startedAt;
-    const success = successOverride ?? (outcome === "success" || outcome === "partial");
+    const success = successOverride ?? outcome === "success";
 
     const result: AgentResult = {
       taskId: session.taskId,

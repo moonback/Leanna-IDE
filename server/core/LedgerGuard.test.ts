@@ -13,6 +13,11 @@ function ledgerFile(): string {
   return path.join(dir, "actions.jsonl");
 }
 
+function ledgerLines(file: string): string[] {
+  if (!fs.existsSync(file)) return [];
+  return fs.readFileSync(file, "utf8").trim().split("\n").filter(Boolean);
+}
+
 /** A registry that allows everything, so we test idempotency, not permissions. */
 function permissiveRegistry(guard: LedgerGuard): ToolRegistry {
   return new ToolRegistry({
@@ -21,68 +26,118 @@ function permissiveRegistry(guard: LedgerGuard): ToolRegistry {
   });
 }
 
-test("ToolRegistry skips re-execution of a completed effectful tool call", async () => {
-  const guard = new LedgerGuard(new ExecutionLedger(ledgerFile()));
-  guard.setContext({ missionId: "m1", stepId: "s1" });
-  const registry = permissiveRegistry(guard);
-
+/** Registers a counting tool and returns a getter for its execution count. */
+function countingTool(registry: ToolRegistry, name: string, permissions: string[]): () => number {
   let runs = 0;
   registry.register({
-    declaration: { name: "write_thing", description: "writes", parameters: { type: "object", properties: {} } },
+    declaration: { name, description: name, parameters: { type: "object", properties: {} } },
     handler: async () => {
       runs++;
       return { ok: true, n: runs };
     },
-    permissions: ["write"],
+    permissions,
   } as any);
+  return () => runs;
+}
 
-  const r1 = await registry.call("write_thing", { path: "a.ts" });
-  const r2 = await registry.call("write_thing", { path: "a.ts" });
+const SCOPE = { missionId: "m1", stepId: "a1" };
 
-  assert.equal(runs, 1, "effectful handler executed exactly once");
+test("ToolRegistry skips re-execution of a completed effectful call in the same mission step", async () => {
+  const guard = new LedgerGuard(new ExecutionLedger(ledgerFile()));
+  const registry = permissiveRegistry(guard);
+  const runs = countingTool(registry, "write_thing", ["write"]);
+
+  const r1 = await registry.call("write_thing", { path: "a.ts" }, { idempotencyScope: SCOPE });
+  const r2 = await registry.call("write_thing", { path: "a.ts" }, { idempotencyScope: SCOPE });
+
+  assert.equal(runs(), 1, "effectful handler executed exactly once");
   assert.deepEqual(r1, r2, "second call reused the recorded result");
 });
 
-test("ToolRegistry re-executes read-only tools (no side effect => no dedup risk)", async () => {
-  const guard = new LedgerGuard(new ExecutionLedger(ledgerFile()));
-  guard.setContext({ missionId: "m1", stepId: "s1" });
+test("read-only tools are never deduplicated nor journaled, even inside a mission step", async () => {
+  const file = ledgerFile();
+  const guard = new LedgerGuard(new ExecutionLedger(file));
   const registry = permissiveRegistry(guard);
+  const runs = countingTool(registry, "verify_file", ["read"]);
 
-  let runs = 0;
-  registry.register({
-    declaration: { name: "read_thing", description: "reads", parameters: { type: "object", properties: {} } },
-    handler: async () => {
-      runs++;
-      return runs;
-    },
-    permissions: ["read"],
-  } as any);
+  await registry.call("verify_file", { path: "a.ts" }, { idempotencyScope: SCOPE });
+  await registry.call("verify_file", { path: "a.ts" }, { idempotencyScope: SCOPE });
 
-  await registry.call("read_thing", { path: "a.ts" });
-  await registry.call("read_thing", { path: "a.ts" });
-  // Read-only: begin() returns "execute" the first time and "skip" only after a
-  // recorded completion — but a completed read is also skippable. What matters
-  // for safety is that reads are never BLOCKED after a crash. Here both calls
-  // complete, so the second is a legitimate cache hit.
-  assert.ok(runs >= 1);
+  assert.equal(runs(), 2, "a re-verification must observe the current state");
+  assert.equal(ledgerLines(file).length, 0, "reads leave no ledger entry");
+});
+
+test("read-only results are not served from the ledger after a restart", async () => {
+  const file = ledgerFile();
+  const reg1 = permissiveRegistry(new LedgerGuard(new ExecutionLedger(file)));
+  countingTool(reg1, "read_project_file", ["read"]);
+  await reg1.call("read_project_file", { path: "a.ts" }, { idempotencyScope: SCOPE });
+
+  const reg2 = permissiveRegistry(new LedgerGuard(new ExecutionLedger(file)));
+  const runs2 = countingTool(reg2, "read_project_file", ["read"]);
+  await reg2.call("read_project_file", { path: "a.ts" }, { idempotencyScope: SCOPE });
+
+  assert.equal(runs2(), 1, "the read ran again after restart");
+});
+
+test("effectful calls without a mission step scope always execute and are not journaled", async () => {
+  const file = ledgerFile();
+  const registry = permissiveRegistry(new LedgerGuard(new ExecutionLedger(file)));
+  const runs = countingTool(registry, "run_project_command", ["exec"]);
+
+  await registry.call("run_project_command", { cmd: "npm test" });
+  await registry.call("run_project_command", { cmd: "npm test" });
+  await registry.call("run_project_command", { cmd: "npm test" }, { idempotencyScope: { missionId: "m1" } });
+
+  assert.equal(runs(), 3, "no global cache across missions or without a step id");
+  assert.equal(ledgerLines(file).length, 0);
+});
+
+test("the same effectful call in another step or mission executes again", async () => {
+  const registry = permissiveRegistry(new LedgerGuard(new ExecutionLedger(ledgerFile())));
+  const runs = countingTool(registry, "run_project_command", ["exec"]);
+
+  await registry.call("run_project_command", { cmd: "npm test" }, { idempotencyScope: SCOPE });
+  await registry.call("run_project_command", { cmd: "npm test" }, { idempotencyScope: { missionId: "m1", stepId: "a2" } });
+  await registry.call("run_project_command", { cmd: "npm test" }, { idempotencyScope: { missionId: "m2", stepId: "a1" } });
+
+  assert.equal(runs(), 3);
+});
+
+test("an effectful call interrupted by a crash is blocked on replay of the same step only", () => {
+  const file = ledgerFile();
+  const g1 = new LedgerGuard(new ExecutionLedger(file));
+  const started = g1.guard("write_thing", { path: "a.ts" }, ["write"], undefined, SCOPE);
+  assert.equal(started.decision, "execute");
+  // crash: neither commit nor fail is called
+
+  const g2 = new LedgerGuard(new ExecutionLedger(file));
+  assert.equal(g2.guard("write_thing", { path: "a.ts" }, ["write"], undefined, SCOPE).decision, "block");
+  assert.equal(
+    g2.guard("write_thing", { path: "a.ts" }, ["write"], undefined, { missionId: "m2", stepId: "a1" }).decision,
+    "execute",
+    "another mission is not affected"
+  );
+});
+
+test("ambient mission context combines with the per-call step id", () => {
+  const file = ledgerFile();
+  const guard = new LedgerGuard(new ExecutionLedger(file));
+  guard.setContext({ missionId: "supervised" });
+  const g = guard.guard("write_thing", { path: "a.ts" }, ["write"], undefined, { missionId: "task-1", stepId: "iter-1" });
+  assert.equal(g.decision, "execute");
+  if (g.decision === "execute") g.commit(null);
+  const key = JSON.parse(ledgerLines(file).pop()!).idempotencyKey as string;
+  assert.ok(key.startsWith("supervised:iter-1:write_thing:"), `ambient mission id wins (got ${key})`);
 });
 
 test("guard without registry wiring leaves behavior unchanged", async () => {
-  // No idempotency guard configured at all.
   const registry = new ToolRegistry({
     permissionPolicy: PermissionPolicy.fromEnv({ Leanna_PERMISSION_MODE: "off" } as NodeJS.ProcessEnv),
   });
-  let runs = 0;
-  registry.register({
-    declaration: { name: "plain", description: "x", parameters: { type: "object", properties: {} } },
-    handler: async () => {
-      runs++;
-      return runs;
-    },
-    permissions: ["write"],
-  } as any);
+  const runs = countingTool(registry, "plain", ["write"]);
 
-  await registry.call("plain", { a: 1 });
-  await registry.call("plain", { a: 1 });
-  assert.equal(runs, 2, "without a guard, every call runs (unchanged behavior)");
+  await registry.call("plain", { a: 1 }, { idempotencyScope: SCOPE });
+  await registry.call("plain", { a: 1 }, { idempotencyScope: SCOPE });
+  assert.equal(runs(), 2, "without a guard, every call runs (unchanged behavior)");
 });
