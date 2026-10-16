@@ -117,6 +117,14 @@ export class Executor {
 
   /** Missions actives */
   private activeMissions: Map<string, Mission> = new Map();
+  /**
+   * File des missions réelles (hors dry-run) : une seule s'exécute à la fois,
+   * pour que deux missions n'écrivent jamais en parallèle dans le workspace
+   * (AUDIT-017). shortcut: file globale car un seul workspace est actif à la fois ; passer à une file par racine si plusieurs workspaces deviennent simultanés.
+   */
+  private writeQueue: Promise<unknown> = Promise.resolve();
+  private queuedMissions = new Set<string>();
+  private writeRunning = false;
 
   /** Missions complétées (historique, max 50) */
   private completedMissions: Mission[] = [];
@@ -531,11 +539,36 @@ export class Executor {
     // Sinon, exécution directe (chemin par défaut inchangé).
     // Contexte de télémétrie isolé par mission (AsyncLocalStorage) : deux
     // missions concurrentes ne partagent plus un missionId global.
-    const body = runWithTelemetryContext({ missionId: mission.id }, () =>
-      this.supervisor && this.supervisedMode
-        ? this.runSupervised(mission, availableSkills)
-        : this.executeMission(mission, availableSkills)
-    );
+    const execute = () =>
+      runWithTelemetryContext({ missionId: mission.id }, () =>
+        this.supervisor && this.supervisedMode
+          ? this.runSupervised(mission, availableSkills)
+          : this.executeMission(mission, availableSkills)
+      );
+
+    // Une simulation n'écrit rien : elle part tout de suite. Une mission réelle
+    // attend la fin de la précédente.
+    let body: Promise<void>;
+    if (mission.getConfig().dryRun) {
+      body = execute();
+    } else {
+      if (this.writeRunning || this.queuedMissions.size > 0) {
+        this.emit("mission_queued", { missionId: mission.id });
+      }
+      this.queuedMissions.add(mission.id);
+      body = this.writeQueue.then(async (): Promise<void> => {
+        this.queuedMissions.delete(mission.id);
+        // Annulée pendant l'attente : ne pas la démarrer.
+        if (mission.isCompleted()) return;
+        this.writeRunning = true;
+        try {
+          return await execute();
+        } finally {
+          this.writeRunning = false;
+        }
+      });
+      this.writeQueue = body.catch(() => undefined);
+    }
 
     const run = body.catch((err) => {
       console.error(`[Executor] Mission ${mission.id} failed:`, err);
@@ -569,8 +602,8 @@ export class Executor {
           return;
         }
 
-        // En pause : on ne consomme pas de budget de temps (l'échéance recule).
-        if (this.pausedMissions.has(mission.id)) {
+        // En pause ou en file d'attente : on ne consomme pas de budget de temps.
+        if (this.pausedMissions.has(mission.id) || this.queuedMissions.has(mission.id)) {
           return;
         }
 

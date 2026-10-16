@@ -9,6 +9,7 @@ import {
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
 import { ROUTES, viewHeaderProps } from '../config/navigation.js';
+import { useConfirm } from '../components/ui/ConfirmDialog.js';
 
 // ─── Types mirrored from the server insights engines ─────────────────────────
 
@@ -46,6 +47,39 @@ const DIMENSION_LABELS: Record<HealthDimension, string> = {
   autonomy: 'Autonomie',
 };
 
+/** Mode d'autonomie courant, rappelé avant toute exécution (AUDIT-018). */
+async function fetchAutonomyMode(): Promise<string> {
+  const data = await fetch('/api/missions/autonomy').then((r) => r.json()).catch(() => null);
+  return typeof data?.mode === 'string' ? data.mode : 'inconnu';
+}
+
+/**
+ * Simule la mission (aucun effet de bord) et résume ce qu'elle ferait :
+ * c'est ce texte que l'utilisateur valide avant l'exécution réelle.
+ */
+async function previewMission(title: string, description: string): Promise<string> {
+  const [res, mode] = await Promise.all([
+    fetch('/api/missions/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description }),
+    }),
+    fetchAutonomyMode(),
+  ]);
+  const sim = await res.json().catch(() => null);
+  if (!res.ok || !sim || sim.error) throw new Error(sim?.error ?? `Simulation impossible (HTTP ${res.status}).`);
+  const files: string[] = Array.isArray(sim.filesWouldChange) ? sim.filesWouldChange : [];
+  const filesText = files.length
+    ? files.slice(0, 8).join(', ') + (files.length > 8 ? ` … (+${files.length - 8})` : '')
+    : 'aucun fichier identifié par la simulation';
+  return [
+    sim.summary,
+    `Fichiers visés : ${filesText}`,
+    `Risque estimé : ${sim.riskLevel ?? 'inconnu'}`,
+    `Mode d'autonomie : ${mode}`,
+  ].filter(Boolean).join('\n');
+}
+
 /** Score → semantic token. */
 function scoreColor(n: number): string {
   if (n >= 85) return 'var(--color-success)';
@@ -65,6 +99,8 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
   const [loading, setLoading] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
+  const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
+  const { confirm } = useConfirm();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -86,6 +122,22 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
 
   /** « Diagnostiquer » : matérialise les missions d'amélioration du Doctor. */
   const diagnose = useCallback(async () => {
+    setDiagnoseError(null);
+    // AUDIT-018 : rien ne démarre sans confirmation explicite.
+    const planned = (health?.improvementMissions ?? []).slice(0, 5);
+    const mode = await fetchAutonomyMode();
+    const ok = await confirm({
+      title: `Exécuter ${planned.length} mission(s) d'amélioration ?`,
+      message: [
+        ...planned.map((m, i) => `${i + 1}. ${m.title}`),
+        '',
+        "Ces missions peuvent modifier le code. Elles s'exécutent une par une.",
+        `Mode d'autonomie : ${mode}`,
+      ].join('\n'),
+      confirmLabel: 'Exécuter',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setDiagnosing(true);
     setDiagnoseResult(null);
     try {
@@ -94,12 +146,15 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ max: 5 }),
       });
-      const data = await res.json();
-      if (res.ok && !data?.error) setDiagnoseResult(data as DiagnoseResult);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && !data.error) setDiagnoseResult(data as DiagnoseResult);
+      else setDiagnoseError(data?.error ?? `Création des missions impossible (HTTP ${res.status}).`);
+    } catch (err) {
+      setDiagnoseError(`Serveur injoignable : ${(err as Error).message}`);
     } finally {
       setDiagnosing(false);
     }
-  }, []);
+  }, [confirm, health]);
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
@@ -152,6 +207,7 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
               missions={health.improvementMissions}
               diagnosing={diagnosing}
               result={diagnoseResult}
+              error={diagnoseError}
               onDiagnose={() => void diagnose()}
               onOpenTimeline={() => navigate(ROUTES.missionTimeline)}
             />
@@ -210,13 +266,21 @@ type ActionStatus = 'idle' | 'loading' | 'done' | 'error';
 
 function useItemActions() {
   const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
-  const run = useCallback(async (key: string, fn: () => Promise<boolean>) => {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  /** `fn` renvoie true (fait), false (échec) ou null (annulé par l'utilisateur). */
+  const run = useCallback(async (key: string, fn: () => Promise<boolean | null>) => {
     setStatuses((s) => ({ ...s, [key]: 'loading' }));
-    let ok = false;
-    try { ok = await fn(); } catch { ok = false; }
-    setStatuses((s) => ({ ...s, [key]: ok ? 'done' : 'error' }));
+    setErrors((e) => { const next = { ...e }; delete next[key]; return next; });
+    let ok: boolean | null = false;
+    try {
+      ok = await fn();
+    } catch (err) {
+      ok = false;
+      setErrors((e) => ({ ...e, [key]: (err as Error).message }));
+    }
+    setStatuses((s) => ({ ...s, [key]: ok === null ? 'idle' : ok ? 'done' : 'error' }));
   }, []);
-  return { statuses, run };
+  return { statuses, errors, run };
 }
 
 /** Small inline action button that reflects an ActionStatus. */
@@ -341,17 +405,27 @@ const PROPOSAL_ICON: Record<AnticipationProposal['kind'], React.FC<{ size?: numb
 };
 
 function InsightsCard({ proposals, onLaunched }: { proposals: AnticipationProposal[]; onLaunched: () => void }) {
-  const { statuses, run } = useItemActions();
+  const { statuses, errors, run } = useItemActions();
+  const { confirm } = useConfirm();
+  // AUDIT-018 : simuler d'abord, exécuter seulement après confirmation explicite.
   const launch = (p: AnticipationProposal) => run(p.proposalId, async () => {
+    const preview = await previewMission(p.suggestedAction, p.message);
+    const ok = await confirm({
+      title: `Exécuter « ${p.suggestedAction} » ?`,
+      message: preview,
+      confirmLabel: 'Exécuter',
+      variant: 'warning',
+    });
+    if (!ok) return null;
     const res = await fetch('/api/missions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: p.suggestedAction, description: p.message }),
     });
     const data = await res.json().catch(() => null);
-    const ok = res.ok && data && !data.error;
-    if (ok) setTimeout(onLaunched, 600);
-    return ok;
+    if (!res.ok || !data || data.error) throw new Error(data?.error ?? `Lancement impossible (HTTP ${res.status}).`);
+    setTimeout(onLaunched, 600);
+    return true;
   });
   return (
     <Card icon={Sparkles} title="Insights (Anticipation)">
@@ -368,10 +442,13 @@ function InsightsCard({ proposals, onLaunched }: { proposals: AnticipationPropos
                 <div className="min-w-0 flex-1">
                   <p className="text-xs" style={{ color: 'var(--text-primary)' }}>{p.message}</p>
                   <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>→ {p.suggestedAction}</p>
+                  {errors[p.proposalId] && (
+                    <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>{errors[p.proposalId]}</p>
+                  )}
                 </div>
                 <ActionButton
                   status={statuses[p.proposalId] ?? 'idle'}
-                  idleLabel="Lancer"
+                  idleLabel="Simuler et lancer"
                   doneLabel="Lancée"
                   icon={Play}
                   onClick={() => void launch(p)}
@@ -436,10 +513,11 @@ function OpportunitiesCard({ opportunities }: { opportunities: Opportunity[] }) 
   );
 }
 
-function ImprovementPlanCard({ missions, diagnosing, result, onDiagnose, onOpenTimeline }: {
+function ImprovementPlanCard({ missions, diagnosing, result, error, onDiagnose, onOpenTimeline }: {
   missions: Array<{ title: string; priority: string }>;
   diagnosing: boolean;
   result: DiagnoseResult | null;
+  error: string | null;
   onDiagnose: () => void;
   onOpenTimeline: () => void;
 }) {
@@ -482,6 +560,9 @@ function ImprovementPlanCard({ missions, diagnosing, result, onDiagnose, onOpenT
           </li>
         ))}
       </ol>
+      {error && (
+        <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--color-error)' }}>{error}</p>
+      )}
       {result && result.failed.length > 0 && (
         <p className="mt-2 text-xs" style={{ color: 'var(--color-warning)' }}>
           {result.failed.length} mission(s) non créée(s) (voir les logs serveur).

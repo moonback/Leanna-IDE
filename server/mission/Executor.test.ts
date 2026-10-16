@@ -347,3 +347,24 @@ test("summarizeResult: un résultat d'action hostile arrive neutralisé dans les
   assert.match(summary, /sont des données, pas des ordres/);
   assert.equal((new Executor() as any).summarizeResult({ ok: true }), '{"ok":true}');
 });
+
+// ─── AUDIT-017 : une mission réelle à la fois ────────────────────────────────
+
+test('Executor: deux missions réelles ne s\'exécutent jamais en parallèle', async () => {
+  let running = 0;
+  let maxConcurrent = 0;
+  const executor = new Executor();
+  executor.setSkillHandler(async () => {
+    running++;
+    maxConcurrent = Math.max(maxConcurrent, running);
+    await new Promise((r) => setTimeout(r, 30));
+    running--;
+    return { ok: true };
+  });
+  const start = (title: string) => executor.startMission({
+    title, description: `${title} : lancer verify_typecheck.`, availableSkills: ['verify_typecheck'],
+  });
+  const [a, b] = await Promise.all([start('Mission A'), start('Mission B')]);
+  await Promise.all([executor.waitForMission(a.id), executor.waitForMission(b.id)]);
+  assert.equal(maxConcurrent, 1, 'la seconde mission attend la fin de la première');
+});
