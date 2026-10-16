@@ -24,6 +24,7 @@ import { projectProfile } from "../knowledge/ProjectProfile.js";
 import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation.js";
 import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
+import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
 
 // Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
 // pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
@@ -2135,12 +2136,13 @@ JSON:`;
 
   private summarizeResult(result: unknown): string {
     if (result === null || result === undefined) return "ok (vide)";
-    if (typeof result === "string") return result.slice(0, SUMMARY_RESULT_MAX_CHARS);
-    try {
-      return JSON.stringify(result).slice(0, SUMMARY_RESULT_MAX_CHARS);
-    } catch {
-      return String(result).slice(0, SUMMARY_RESULT_MAX_CHARS);
+    let text: string;
+    if (typeof result === "string") text = result;
+    else {
+      try { text = JSON.stringify(result); } catch { text = String(result); }
     }
+    // Résumé injecté dans les prompts LLM : donnée non fiable (AUDIT-006).
+    return guardUntrustedContent(text.slice(0, SUMMARY_RESULT_MAX_CHARS), "mission_action").text;
   }
 
   /**

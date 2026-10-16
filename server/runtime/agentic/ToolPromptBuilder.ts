@@ -10,6 +10,7 @@
  */
 
 import type { ToolRegistry } from "../ToolRegistry.js";
+import { guardUntrustedContent } from "../../utils/promptInjectionGuard.js";
 import type { ToolDeclaration } from "../types.js";
 import type { AgentBudget, BudgetUsage, Observation } from "./types.js";
 
@@ -122,8 +123,13 @@ export function buildObservationHistory(
     const recent = observations.length - 1 - i < RECENT_TURNS_FULL_FIDELITY;
     const resultChars = recent ? RECENT_RESULT_CHARS : OLD_RESULT_CHARS;
     const toolLines = obs.toolOutcomes.map((o) => {
-      const status = o.success ? (o.cached ? "OK (cache)" : "OK") : `ERREUR: ${o.error ?? "inconnue"}`;
-      const preview = renderResultForModel(o.result, resultChars);
+      // Résultats et erreurs d'outils = données non fiables (fichiers, web,
+      // issues…) : neutralisés avant d'entrer dans le prompt (AUDIT-006).
+      const source = `tool:${o.invocation.name}`;
+      const status = o.success
+        ? (o.cached ? "OK (cache)" : "OK")
+        : `ERREUR: ${guardUntrustedContent(o.error ?? "inconnue", source).text}`;
+      const preview = guardUntrustedContent(renderResultForModel(o.result, resultChars), source).text;
       return `  • ${o.invocation.name}(${renderParams(o.invocation.parameters)}) → ${status}${preview ? `\n${indent(preview)}` : ""}`;
     });
     const block = [
