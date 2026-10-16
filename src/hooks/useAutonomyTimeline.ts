@@ -198,7 +198,7 @@ export function useAutonomyTimeline({
       if (portStr) {
         const portNum = Number(portStr);
         const expressPort =
-          Number((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SERVER_PORT) || 4000;
+          Number(import.meta.env.VITE_SERVER_PORT) || 4000; // accès statique (AUDIT-001)
         if (!Number.isNaN(portNum) && portNum !== expressPort && !(portNum < 1024)) {
           host = `${window.location.hostname}:${expressPort}`;
         }

@@ -80,8 +80,8 @@ import { useToast } from '../components/ui/Toast.js';
 
 // Résolution du port serveur — cast nécessaire car ce tsconfig ne référence
 // pas vite/client dans ses types globaux (pas de "types": ["vite/client"]).
-const _importMeta = import.meta as ImportMeta & { env?: Record<string, string | undefined> };
-const SERVER_PORT = Number(_importMeta.env?.VITE_SERVER_PORT) || 5000;
+// Accès statique : lire `import.meta.env` via un cast inlinerait toutes les VITE_* au build (AUDIT-001).
+const SERVER_PORT = Number(import.meta.env.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
