@@ -8,6 +8,12 @@ import { importModule } from '../../utils/ModuleLoader.js';
 
 const router = Router();
 
+/** Entier de query string borné à [min, max] ; `fallback` si absent ou invalide. */
+function clampIntParam(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof raw === 'string' ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
 
 // GET /api/knowledge/status
 router.get('/status', (_req: Request, res: Response) => {
@@ -265,7 +271,7 @@ router.post('/reindex', async (_req: Request, res: Response) => {
       linksDetected,
     });
 
-    await projectIndexer.buildASTIndex();
+    // scanAll({ force: true }) a déjà construit l'index AST complet (CAS C).
     res.json({
       status: 'success',
       stats: {
@@ -530,8 +536,13 @@ router.get('/ast/file', async (req: Request, res: Response): Promise<void> => {
     const { astCallGraph, astParser } = await import('../../knowledge/index.js');
     let astData = knowledgeGraph.getASTResult(filePath);
     if (!astData) {
-      const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
-      const absPath = path.join(root, filePath);
+      const root = path.resolve(isSandboxActive() ? getSandboxRoot() : SELF_ROOT);
+      const absPath = path.resolve(root, filePath);
+      // Confinement : refuse toute lecture hors de la racine (ex. ../../.env).
+      if (!absPath.startsWith(root + path.sep)) {
+        res.status(400).json({ error: 'Chemin hors du projet.' });
+        return;
+      }
       const content = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf-8') : null;
       if (content) {
         const ext = path.extname(filePath);
@@ -612,7 +623,7 @@ router.get('/ast/chain', async (req: Request, res: Response): Promise<void> => {
     const fn = typeof req.query.fn === 'string' ? req.query.fn.trim() : '';
     const file = typeof req.query.file === 'string' ? req.query.file.trim() : '';
     const className = typeof req.query.class === 'string' ? req.query.class.trim() : undefined;
-    const depth = typeof req.query.depth === 'string' ? parseInt(req.query.depth, 10) : 4;
+    const depth = clampIntParam(req.query.depth, 4, 1, 6);
 
     if (!fn) {
       res.status(400).json({ error: 'Le paramètre "fn" est requis.' });
@@ -634,7 +645,7 @@ router.get('/ast/functions', async (req: Request, res: Response): Promise<void> 
   try {
     const query = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
     const fileFilter = typeof req.query.file === 'string' ? req.query.file.trim().toLowerCase() : '';
-    const limit = typeof req.query.limit === 'string' ? Math.min(100, parseInt(req.query.limit, 10)) : 50;
+    const limit = clampIntParam(req.query.limit, 50, 1, 100);
 
     const allFiles = knowledgeGraph.getAllFiles();
     const results: Array<{
