@@ -63,11 +63,11 @@ export function ProfileSwitcher({
   const pick = (id: string) => { onSelect(id); setOpen(false); };
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative min-w-0 flex-shrink" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 h-6 pl-1.5 pr-1 rounded-full text-xs font-medium transition-colors"
+        className="flex items-center gap-1 h-5.5 pl-1.5 pr-1 rounded-full text-[11px] font-medium transition-colors max-w-full min-w-0"
         style={{
           color: isDefault ? 'var(--text-muted)' : 'var(--accent-primary)',
           backgroundColor: isDefault
@@ -79,9 +79,9 @@ export function ProfileSwitcher({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <ActiveIcon size={11} />
-        <span className="max-w-[92px] truncate">{active.label}</span>
-        <ChevronDown size={11} style={{ opacity: 0.7 }} />
+        <ActiveIcon size={11} className="flex-shrink-0" />
+        <span className="max-w-[76px] sm:max-w-[92px] truncate">{active.label}</span>
+        <ChevronDown size={10} className="flex-shrink-0" style={{ opacity: 0.7 }} />
       </button>
 
       <AnimatePresence>
@@ -92,11 +92,11 @@ export function ProfileSwitcher({
             animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.96 }}
             transition={{ duration: 0.13 }}
-            className="absolute left-0 top-full mt-1.5 w-64 rounded-xl overflow-hidden z-50"
+            className="absolute left-0 top-full mt-1.5 w-60 max-w-[calc(100vw-2rem)] rounded-xl overflow-hidden z-50 shadow-2xl"
             style={{
               backgroundColor: 'var(--bg-panel)',
               border: '1px solid var(--border-base)',
-              boxShadow: '0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.04)',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
             }}
           >
             <div className="px-3 pt-2 pb-1">
