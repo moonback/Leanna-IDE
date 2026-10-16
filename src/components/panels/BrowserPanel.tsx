@@ -41,7 +41,7 @@ function newTabId(): string {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export const BROWSER_HOME_URL = 'https://www.google.com/webhp?igu=1';
+export const BROWSER_HOME_URL = 'about:blank';
 
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -108,7 +108,13 @@ export function BrowserPanel({
 
   // L'input de la barre d'adresse est édité librement : état séparé, resynchronisé
   // sur l'URL de l'onglet actif via l'effet ci-dessous.
-  const [inputValue, setInputValue] = useState(activeTab.url);
+  // about:blank = page d'accueil vide → afficher une chaîne vide dans la barre.
+  const [inputValue, setInputValue] = useState(activeTab.url === BROWSER_HOME_URL ? '' : activeTab.url);
+
+  // Resynchronise la barre d'adresse quand l'onglet actif change d'URL (navigation).
+  useEffect(() => {
+    setInputValue(activeTab.url === BROWSER_HOME_URL ? '' : activeTab.url);
+  }, [activeTab.id, activeTab.url]);
 
   // État dérivé de l'onglet actif (pilote la barre d'outils).
   const currentUrl = activeTab.url;
