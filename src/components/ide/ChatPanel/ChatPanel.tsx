@@ -4,6 +4,7 @@ import { X, RefreshCw, Download, Volume2, CheckCheck } from 'lucide-react';
 import { useLiveAPIContext } from '../../../context/LiveAPIContext.js';
 import { useProfile } from '../../../context/UserProfileContext.js';
 import { UnifiedTimeline } from '../UnifiedTimeline.js';
+import { PlanPanel } from './PlanPanel.js';
 import { PromptInspectorPanel } from '../PromptInspectorPanel.js';
 import { DropZoneOverlay, useDocumentDrop, type DocumentResult } from '../DocumentUpload.js';
 import type { TranscriptEntry } from '../../../hooks/useLiveAPI.js';
@@ -51,6 +52,7 @@ export function ChatPanel({
     activity, isBusy, muted, toggleMute, reasoning, promptDebug,
     systemOverride, sendSystemPromptOverride,
     systemReplace, sendSystemPromptReplace,
+    currentPlan, clearPlan,
   } = useLiveAPIContext();
   const { profile } = useProfile();
 
@@ -475,6 +477,11 @@ export function ChatPanel({
           <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
             <UnifiedTimeline steps={activity} reasoning={reasoning} connected={connected} />
           </div>
+        )}
+
+        {/* Plan d'exécution — affiché dès que set_plan est appelé */}
+        {!minimized && currentPlan && (
+          <PlanPanel plan={currentPlan} onDismiss={clearPlan} />
         )}
 
         {/* Body */}
