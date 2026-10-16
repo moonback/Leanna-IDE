@@ -12,6 +12,7 @@
  * - Rollback trivial (discard le sandbox)
  */
 
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
@@ -44,8 +45,11 @@ export function getRealSandboxRoot(): string {
 
 // Dossiers/fichiers à exclure de la copie (trop volumineux ou inutiles dans le sandbox)
 const EXCLUDE_PATTERNS = [
+  // node_modules est copié à part (ensureSandboxNodeModules) : copie réelle
+  // requise, Turbopack refusant tout fichier hors de `turbopack.root`.
   "node_modules",
   ".git",
+  ".next",
   "dist",
   "build",
   "release",
@@ -74,6 +78,7 @@ const DIFF_EXCLUDED_DIR_PREFIXES: readonly string[] = [
   ".Leanna",
   "node_modules",
   ".git",
+  ".next",
   "dist",
   "build",
   "release",
@@ -88,6 +93,10 @@ const DIFF_EXCLUDED_DIR_PREFIXES: readonly string[] = [
  */
 export function isExcludedFromDiff(relativePath: string): boolean {
   if (DIFF_EXCLUDED_BASENAMES.has(path.basename(relativePath))) {
+    return true;
+  }
+  // Cache incrémental de tsc (`tsc --incremental` lancé dans le sandbox).
+  if (relativePath.endsWith(".tsbuildinfo")) {
     return true;
   }
   // Normaliser les séparateurs pour comparer des préfixes de dossier de façon
@@ -315,6 +324,12 @@ export function assertSafeSandboxPath(requestedPath: string): string {
     throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", "Écriture refusée : le chemin sort du sandbox.");
   }
 
+  // node_modules du sandbox est une copie gérée par ensureSandboxNodeModules :
+  // l'agent ne doit jamais y écrire (insensible à la casse pour Windows).
+  if (relative.split(path.sep)[0].toLowerCase() === NODE_MODULES_DIR) {
+    throw new SandboxGuardError("SANDBOX_INVALID_PATH", "Écriture refusée : node_modules du sandbox est en lecture seule.");
+  }
+
   // Refuser tout lien symbolique déjà présent sur le trajet. Les segments qui
   // n'existent pas encore seront créés sous le dernier parent sûr.
   let current = realSandboxRoot;
@@ -385,6 +400,7 @@ export async function initSandbox(): Promise<{ created: boolean; path: string; f
   lastSyncTimestamp = Date.now();
 
   console.log(`[Sandbox] ${existed ? 'Rafraîchi' : 'Initialisé'}: ${copied} fichiers copiés → ${sandboxBase}`);
+  prefetchSandboxNodeModules();
   return { created: !existed, path: sandboxBase, fileCount: copied };
 }
 
@@ -876,6 +892,7 @@ export async function resetSandbox(): Promise<{ created: boolean; path: string; 
   activateSandbox();
 
   console.log(`[Sandbox] Réinitialisé: ${copied} fichiers copiés → ${sandboxBase}`);
+  prefetchSandboxNodeModules();
   return { created: true, path: sandboxBase, filesCopied: copied };
 }
 
@@ -1022,6 +1039,188 @@ export async function switchSandboxProject(projectPath: string): Promise<string>
   return newRoot;
 }
 
+// ── node_modules du sandbox ──────────────────────────────────────────────────
+//
+// Les builds lancés dans le sandbox (ex. `next build` avec Turbopack) ne
+// résolvent que des fichiers situés sous la racine du projet : ni la remontée
+// vers le node_modules parent ni une jonction ne suffisent. On maintient donc
+// une copie réelle, recopiée uniquement quand le lockfile change.
+
+const NODE_MODULES_DIR = "node_modules";
+const NODE_MODULES_STAMP = ".leanna-sandbox-sync.json";
+const LOCKFILES = ["package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"];
+const NODE_MODULES_COPY_TIMEOUT_MS = 15 * 60_000;
+
+export interface NodeModulesSyncResult {
+  status: "copied" | "up-to-date" | "skipped" | "failed";
+  reason?: string;
+  durationMs: number;
+}
+
+let nodeModulesSync: { key: string; promise: Promise<NodeModulesSyncResult> } | null = null;
+
+/**
+ * Empreinte des dépendances : lockfiles présents, sinon package.json.
+ * Retourne null si aucun des deux n'existe.
+ */
+export function computeDependencyFingerprint(projectRoot: string): string | null {
+  const hash = crypto.createHash("sha256");
+  let found = false;
+  for (const name of LOCKFILES) {
+    const file = path.join(projectRoot, name);
+    if (fs.existsSync(file)) {
+      hash.update(name).update("\0").update(fs.readFileSync(file));
+      found = true;
+    }
+  }
+  if (!found) {
+    const pkg = path.join(projectRoot, "package.json");
+    if (!fs.existsSync(pkg)) return null;
+    hash.update("package.json\0").update(fs.readFileSync(pkg));
+  }
+  return hash.digest("hex");
+}
+
+/**
+ * Garantit que `sandbox/node_modules` est une copie à jour de celle du projet.
+ * Les appels concurrents pour un même projet partagent la même copie en cours.
+ * Ne lève jamais : l'échec est rapporté dans le résultat.
+ */
+export function ensureSandboxNodeModules(): Promise<NodeModulesSyncResult> {
+  const projectRoot = SELF_ROOT;
+  const sandboxRoot = getSandboxRoot();
+  const key = `${projectRoot}|${sandboxRoot}`;
+  if (nodeModulesSync?.key === key) return nodeModulesSync.promise;
+
+  const promise = syncSandboxNodeModules(projectRoot, sandboxRoot).finally(() => {
+    // On libère le verrou pour que le prochain appel revérifie l'empreinte.
+    if (nodeModulesSync?.promise === promise) nodeModulesSync = null;
+  });
+  nodeModulesSync = { key, promise };
+  return promise;
+}
+
+/** Lance la copie en arrière-plan (hors tests) sans bloquer l'initialisation. */
+function prefetchSandboxNodeModules(): void {
+  if (process.env.NODE_TEST_CONTEXT) return;
+  void ensureSandboxNodeModules();
+}
+
+async function syncSandboxNodeModules(projectRoot: string, sandboxRoot: string): Promise<NodeModulesSyncResult> {
+  const started = Date.now();
+  const done = (status: NodeModulesSyncResult["status"], reason?: string): NodeModulesSyncResult => {
+    const result = { status, reason, durationMs: Date.now() - started };
+    if (status === "copied" || status === "failed") {
+      const log = status === "failed" ? console.warn : console.log;
+      log(`[Sandbox] node_modules ${status === "copied" ? "copié" : "non copié"} (${result.durationMs}ms)${reason ? ` — ${reason}` : ""}`);
+    }
+    return result;
+  };
+
+  try {
+    if (!projectRoot) return done("skipped", "aucun projet actif");
+    const source = path.join(projectRoot, NODE_MODULES_DIR);
+    const sourceStat = await fs.promises.lstat(source).catch(() => null);
+    if (!sourceStat?.isDirectory()) return done("skipped", "pas de node_modules dans le projet");
+
+    const fingerprint = computeDependencyFingerprint(projectRoot);
+    if (!fingerprint) return done("skipped", "ni lockfile ni package.json");
+
+    const target = resolveSandboxNodeModulesTarget(projectRoot, sandboxRoot);
+    const stampFile = path.join(target, NODE_MODULES_STAMP);
+
+    const targetStat = await fs.promises.lstat(target).catch(() => null);
+    if (targetStat?.isSymbolicLink()) {
+      // Ancienne jonction/lien : on retire le lien lui-même, jamais sa cible.
+      await removeLinkOnly(target);
+    } else if (targetStat?.isDirectory()) {
+      const stamp = await readNodeModulesStamp(stampFile);
+      if (stamp?.fingerprint === fingerprint && stamp.source === source) return done("up-to-date");
+    } else if (targetStat) {
+      await fs.promises.rm(target, { force: true });
+    }
+
+    // Une copie interrompue ne doit jamais passer pour valide.
+    await fs.promises.rm(stampFile, { force: true });
+    await copyNodeModules(source, target);
+    await fs.promises.writeFile(
+      stampFile,
+      JSON.stringify({ fingerprint, source, copiedAt: new Date().toISOString() }, null, 2),
+      "utf-8",
+    );
+    return done("copied");
+  } catch (error: any) {
+    return done("failed", error?.message ?? String(error));
+  }
+}
+
+/**
+ * Cible de la copie, validée : exactement `<sandbox>/node_modules`, sandbox réel
+ * (pas un lien) situé sous `<projet>/.Leanna`. `robocopy /MIR` supprimant tout
+ * ce qui n'existe pas dans la source, une cible erronée serait destructrice.
+ */
+function resolveSandboxNodeModulesTarget(projectRoot: string, sandboxRoot: string): string {
+  const expectedSandbox = path.resolve(projectRoot, ".Leanna", SANDBOX_DIR_NAME);
+  if (path.resolve(sandboxRoot) !== expectedSandbox) {
+    throw new Error(`racine sandbox inattendue (${sandboxRoot})`);
+  }
+  const sandboxStat = fs.lstatSync(expectedSandbox);
+  if (sandboxStat.isSymbolicLink() || !sandboxStat.isDirectory()) {
+    throw new Error("la racine du sandbox doit être un dossier réel");
+  }
+  // `.Leanna` et `sandbox` ne doivent pas être des liens (le projet lui-même peut l'être).
+  const expectedReal = path.join(fs.realpathSync(projectRoot), ".Leanna", SANDBOX_DIR_NAME);
+  if (fs.realpathSync(expectedSandbox).toLowerCase() !== expectedReal.toLowerCase()) {
+    throw new Error("un maillon du chemin du sandbox est un lien");
+  }
+  return path.join(expectedSandbox, NODE_MODULES_DIR);
+}
+
+async function readNodeModulesStamp(stampFile: string): Promise<{ fingerprint?: string; source?: string } | null> {
+  try {
+    return JSON.parse(await fs.promises.readFile(stampFile, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+async function copyNodeModules(source: string, target: string): Promise<void> {
+  if (process.platform !== "win32") {
+    await fs.promises.rm(target, { recursive: true, force: true });
+    await fs.promises.cp(source, target, { recursive: true, verbatimSymlinks: true });
+    return;
+  }
+
+  // /MIR : miroir (supprime aussi ce qui a disparu de la source, dans la cible
+  // uniquement). /XJ : ne suit aucune jonction de la source. Les codes de sortie
+  // 0-7 de robocopy signifient succès ; 8 et plus, échec.
+  const args = [
+    source, target, "/MIR", "/XJ", "/MT:16", "/R:1", "/W:1",
+    "/XD", ".cache", "/NFL", "/NDL", "/NJH", "/NJS", "/NP",
+  ];
+  try {
+    await execFileAsync("robocopy", args, {
+      timeout: NODE_MODULES_COPY_TIMEOUT_MS,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+  } catch (error: any) {
+    if (typeof error?.code === "number" && error.code < 8) return;
+    const detail = [error?.stdout, error?.stderr].filter(Boolean).join("\n").trim().slice(0, 500);
+    throw new Error(`robocopy a échoué (code ${error?.code ?? "inconnu"})${detail ? ` : ${detail}` : ""}`);
+  }
+}
+
+/** Retire un lien symbolique ou une jonction sans jamais toucher à sa cible. */
+async function removeLinkOnly(linkPath: string): Promise<void> {
+  try {
+    await fs.promises.unlink(linkPath);
+  } catch {
+    // Jonction/lien de dossier sous Windows : rmdir retire le point de montage.
+    await fs.promises.rmdir(linkPath);
+  }
+}
+
 // ── Helpers internes ─────────────────────────────────────────────────────────
 
 /**
@@ -1034,6 +1233,15 @@ async function emptyDirectory(dir: string): Promise<void> {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
     try {
+      const stat = await fs.promises.lstat(fullPath);
+      if (stat.isSymbolicLink()) {
+        // Ne jamais descendre dans un lien/une jonction : on retire le lien seul.
+        await removeLinkOnly(fullPath);
+        continue;
+      }
+      // node_modules est conservé : sa validité est contrôlée par l'empreinte du
+      // lockfile, et le recopier (souvent ~1 Go) à chaque abandon serait coûteux.
+      if (entry.toLowerCase() === NODE_MODULES_DIR) continue;
       await fs.promises.rm(fullPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     } catch (e: any) {
       console.warn(`[Sandbox] Avertissement suppression ${fullPath}:`, e.message);

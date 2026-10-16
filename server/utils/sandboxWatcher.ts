@@ -30,6 +30,7 @@ const DEBOUNCE_MS = 150; // debounce pour éviter les doublons
 const IGNORE_PATTERNS = [
   /node_modules/,
   /\.git[\/\\]/,
+  /(^|[\/\\])\.next[\/\\]/,
   /\.DS_Store/,
   /~$/,
   /\.swp$/,

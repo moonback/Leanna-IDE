@@ -17,7 +17,16 @@ interface KeyEntry {
   disabled?: boolean;
   lastError?: string;
   lastUsed?: string;
+  /**
+   * Capacités refusées par l'API pour cette clé (ex: un jeton « AQ. » accepté
+   * par Live mais rejeté par embedContent avec ACCESS_TOKEN_TYPE_UNSUPPORTED).
+   * En mémoire uniquement : la clé reste utilisable pour le reste.
+   */
+  unsupported?: Set<GeminiCapability>;
 }
+
+/** Familles d'appels pour lesquelles une clé peut être exclue individuellement. */
+export type GeminiCapability = "embed";
 
 let keyPool: KeyEntry[] = [];
 let currentIndex = 0;
@@ -68,7 +77,8 @@ export async function loadGeminiKeys(): Promise<void> {
  * Save current key pool to .gemini-keys.json
  */
 export async function saveGeminiKeys(): Promise<void> {
-  const toSave = keyPool.map((entry) => ({
+  // `unsupported` est volontairement non persisté (Set non sérialisable, état de session).
+  const toSave = keyPool.map(({ unsupported: _unsupported, ...entry }) => ({
     ...entry,
     key: encrypt(entry.key),
   }));
@@ -167,14 +177,15 @@ export async function updateGeminiKeyLabel(index: number, label: string): Promis
  * Get the next available (non-disabled) API key using round-robin.
  * Returns null if no keys are available.
  */
-export function getNextGeminiKey(): string | null {
-  const enabledKeys = keyPool.filter((e) => !e.disabled);
+export function getNextGeminiKey(capability?: GeminiCapability): string | null {
+  const isUsable = (e: KeyEntry) => !e.disabled && !(capability && e.unsupported?.has(capability));
+  const enabledKeys = keyPool.filter(isUsable);
   if (enabledKeys.length === 0) return null;
 
   // Find next enabled key starting from currentIndex
   for (let i = 0; i < keyPool.length; i++) {
     const idx = (currentIndex + i) % keyPool.length;
-    if (!keyPool[idx].disabled) {
+    if (isUsable(keyPool[idx])) {
       currentIndex = (idx + 1) % keyPool.length;
       keyPool[idx].lastUsed = new Date().toISOString();
       return keyPool[idx].key;
@@ -194,6 +205,26 @@ function markKeyError(apiKey: string, error: string): void {
 }
 
 /**
+ * Exclut une clé pour une capacité donnée jusqu'au prochain redémarrage.
+ */
+function markKeyUnsupported(apiKey: string, capability: GeminiCapability): void {
+  const entry = keyPool.find((e) => e.key === apiKey);
+  if (!entry) return;
+  entry.unsupported ??= new Set();
+  if (!entry.unsupported.has(capability)) {
+    entry.unsupported.add(capability);
+    console.warn(`[GeminiKeyPool] Clé ${describeKey(apiKey)} exclue pour « ${capability} » (401 refusé par l'API).`);
+  }
+}
+
+/** Erreur d'authentification (401 / type de jeton non supporté) : la clé ne servira jamais pour cet appel. */
+function isAuthError(error: any, status: unknown): boolean {
+  if (status === 401 || status === "UNAUTHENTICATED") return true;
+  const text = String(error?.message ?? "");
+  return text.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED") || text.includes('"code":401');
+}
+
+/**
  * Create a GoogleGenAI instance with the next available key.
  * Returns null if no key is available.
  */
@@ -206,14 +237,18 @@ export function createGeminiClient(): GoogleGenAI | null {
 /**
  * Execute a Gemini API call with automatic retry on 429 (rate limit).
  * Rotates through available keys before giving up.
+ * Avec `options.capability`, une clé refusée en 401 (ex: ACCESS_TOKEN_TYPE_UNSUPPORTED)
+ * est exclue pour cette capacité et l'appel est retenté avec la clé suivante.
  */
 export async function withGeminiRetry<T>(
   fn: (ai: GoogleGenAI) => Promise<T>,
   maxRetries?: number,
   /** Timeout global en ms (défaut: 120s). Protège contre les appels bloquants. */
-  timeoutMs: number = 120_000
+  timeoutMs: number = 120_000,
+  options: { capability?: GeminiCapability } = {}
 ): Promise<T> {
-  const enabledCount = keyPool.filter((e) => !e.disabled).length;
+  const { capability } = options;
+  const enabledCount = keyPool.filter((e) => !e.disabled && !(capability && e.unsupported?.has(capability))).length;
   const retries = maxRetries ?? Math.max(enabledCount, 2);
   let lastError: any = null;
 
@@ -228,8 +263,9 @@ export async function withGeminiRetry<T>(
 
   const execute = async (): Promise<T> => {
     for (let attempt = 0; attempt < retries; attempt++) {
-      const key = getNextGeminiKey();
+      const key = getNextGeminiKey(capability);
       if (!key) {
+        if (lastError) throw lastError;
         throw new Error("Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres.");
       }
 
@@ -255,6 +291,13 @@ export async function withGeminiRetry<T>(
           markKeyError(key, `${status} - ${status === 429 ? 'Rate limited' : 'Overloaded'} (${new Date().toLocaleTimeString()})`);
           // Small delay before retry
           await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        // Clé refusée pour cette capacité : on l'exclut et on passe à la suivante sans délai.
+        if (capability && isAuthError(error, status)) {
+          markKeyError(key, `401 - Refusée pour ${capability} (${new Date().toLocaleTimeString()})`);
+          markKeyUnsupported(key, capability);
           continue;
         }
 
