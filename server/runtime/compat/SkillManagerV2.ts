@@ -96,23 +96,7 @@ export class SkillManagerV2 {
     context?: any,
     options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope; autonomyApproved?: boolean }
   ): Promise<any> {
-    // Normalisation du nom (compatibilité Gemini qui préfixe)
-    let normalizedName = name;
-    if (name.includes(":")) {
-      normalizedName = name.split(":").pop()!;
-    } else if (!this.registry.has(name)) {
-      // Tenter de détecter un préfixe de skill
-      for (const skill of this.skills) {
-        const prefix = skill.name + "_";
-        if (name.startsWith(prefix)) {
-          const stripped = name.slice(prefix.length);
-          if (this.registry.has(stripped)) {
-            normalizedName = stripped;
-            break;
-          }
-        }
-      }
-    }
+    const normalizedName = this.normalizeName(name);
 
     // Toujours passer par le ToolRegistry, même avec un contexte (Live/chat) :
     // il transmet le contexte et le signal au handler, et applique permissions,
@@ -124,6 +108,29 @@ export class SkillManagerV2 {
       idempotencyScope: options?.idempotencyScope,
       autonomyApproved: options?.autonomyApproved,
     });
+  }
+
+  /** Normalise le nom d'outil (compatibilité Gemini qui préfixe). */
+  private normalizeName(name: string): string {
+    if (name.includes(":")) return name.split(":").pop()!;
+    if (this.registry.has(name)) return name;
+    // Tenter de détecter un préfixe de skill
+    for (const skill of this.skills) {
+      const prefix = skill.name + "_";
+      if (name.startsWith(prefix) && this.registry.has(name.slice(prefix.length))) {
+        return name.slice(prefix.length);
+      }
+    }
+    return name;
+  }
+
+  /**
+   * Vrai si l'outil est en lecture seule (aucune permission à effet de bord).
+   * Outil inconnu → false : prudence, il n'est pas rejouable.
+   */
+  isReadOnlyTool(name: string): boolean {
+    const def = this.registry.getDefinition(this.normalizeName(name));
+    return !!def && !this.registry.getDryRun().hasSideEffect(def.permissions);
   }
 
   /**

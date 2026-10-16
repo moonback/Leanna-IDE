@@ -96,6 +96,36 @@ export const SLOW_TOOLS_NO_RETRY = new Set<string>([
   'browser_research',
 ]);
 
+/**
+ * Détermine si une erreur sur un tool call mérite d'être retentée.
+ * Seules les erreurs transientes (réseau, IO, timeout) sont retryables.
+ * Les erreurs métier (validation, permission, outil introuvable) ne le sont pas.
+ */
+export function isRetryableToolError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  const name = (err as any).name ?? '';
+
+  // Erreurs non-retryables : logique métier, permission, validation
+  if (name === 'ToolNotFoundError') return false;
+  if (name === 'ToolPermissionError') return false;
+  // Refus d'autorisation : le rejouer redemanderait la même approbation.
+  if (name === 'PermissionDeniedError' || name === 'AutonomyDeniedError' || name === 'SafetyGateBlockedError') return false;
+  if (msg.includes('mode ask') || msg.includes('interdit') || msg.includes('bloqué')) return false;
+  if (msg.includes('validation') || msg.includes('invalid') || msg.includes('zod')) return false;
+  if (msg.includes('supervisor') || msg.includes('context gate')) return false;
+
+  // Erreurs retryables : timeout, réseau, IO, erreurs génériques d'exécution
+  if (name === 'ToolTimeoutError') return true;
+  if (msg.includes('timeout') || msg.includes('timed out')) return true;
+  if (msg.includes('econnrefused') || msg.includes('enotfound') || msg.includes('econnreset')) return true;
+  if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('socket')) return true;
+  if (msg.includes('enoent') || msg.includes('eperm') || msg.includes('ebusy')) return true;
+
+  // Par défaut, réessayer pour les erreurs inconnues (conservative retry)
+  return true;
+}
+
 // ─── Lecture de la configuration (env) ────────────────────────────────────────
 
 /** Mode de livraison des tool calls. Valeur invalide → `ack` (défaut sûr). */

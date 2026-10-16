@@ -13,6 +13,7 @@ import {
   buildAckResponse,
   withScheduling,
   applyToolBehavior,
+  isRetryableToolError,
   LONG_RUNNING_TOOLS,
 } from './toolExecution.js';
 
@@ -163,4 +164,14 @@ test('applyToolBehavior: NON_BLOCKING sur les outils longs en mode nonblocking, 
     assert.equal((out[0] as any).behavior, undefined);
     assert.equal((out[1] as any).behavior, undefined);
   }
+});
+
+// ─── AUDIT-016 : décision de relance ─────────────────────────────────────────
+
+test("isRetryableToolError: un refus d'autorisation n'est jamais rejoué", () => {
+  for (const name of ['PermissionDeniedError', 'AutonomyDeniedError', 'SafetyGateBlockedError']) {
+    const err = Object.assign(new Error('refusé'), { name });
+    assert.equal(isRetryableToolError(err), false, name);
+  }
+  assert.equal(isRetryableToolError(Object.assign(new Error('x'), { name: 'ToolTimeoutError' })), true);
 });

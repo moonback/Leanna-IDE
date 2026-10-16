@@ -34,7 +34,7 @@ import {
   ToolCallTracker, getToolDeliveryMode, getAckAfterMs,
   raceWithAbort, raceWithDeadline, abortableSleep, ToolCancelledError,
   summarizeForNotify, withScheduling, buildAckResponse, applyToolBehavior,
-  LONG_RUNNING_TOOLS, SLOW_TOOLS_NO_RETRY,
+  LONG_RUNNING_TOOLS, SLOW_TOOLS_NO_RETRY, isRetryableToolError,
 } from './toolExecution.js';
 
 // Type compatible avec l'ancien SkillManager pour une migration progressive
@@ -131,33 +131,6 @@ const AUDIO_RATE_WINDOW_MS = 1000;
 /** Nombre de violations avant de logguer un avertissement groupé. */
 const AUDIO_RATE_VIOLATION_LOG_INTERVAL = 10;
 
-/**
- * Détermine si une erreur sur un tool call mérite d'être retentée.
- * Seules les erreurs transientes (réseau, IO, timeout) sont retryables.
- * Les erreurs métier (validation, permission, outil introuvable) ne le sont pas.
- */
-function isRetryableToolError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  const name = (err as any).name ?? '';
-
-  // Erreurs non-retryables : logique métier, permission, validation
-  if (name === 'ToolNotFoundError') return false;
-  if (name === 'ToolPermissionError') return false;
-  if (msg.includes('mode ask') || msg.includes('interdit') || msg.includes('bloqué')) return false;
-  if (msg.includes('validation') || msg.includes('invalid') || msg.includes('zod')) return false;
-  if (msg.includes('supervisor') || msg.includes('context gate')) return false;
-
-  // Erreurs retryables : timeout, réseau, IO, erreurs génériques d'exécution
-  if (name === 'ToolTimeoutError') return true;
-  if (msg.includes('timeout') || msg.includes('timed out')) return true;
-  if (msg.includes('econnrefused') || msg.includes('enotfound') || msg.includes('econnreset')) return true;
-  if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('socket')) return true;
-  if (msg.includes('enoent') || msg.includes('eperm') || msg.includes('ebusy')) return true;
-
-  // Par défaut, réessayer pour les erreurs inconnues (conservative retry)
-  return true;
-}
 
 // ─── Helpers internes ─────────────────────────────────────────────────────────
 
@@ -1961,7 +1934,10 @@ async function handleToolCall(
   const runTool = async (call: any, failKey: string, signal: AbortSignal): Promise<any> => {
     const context = makeContext(signal);
     // Les outils lents sont exclus du retry (coût prohibitif, erreur rarement transiente).
-    const maxRetries = SLOW_TOOLS_NO_RETRY.has(call.name) ? 0 : TOOL_MAX_RETRIES;
+    // Un outil à effet de bord n'est jamais rejoué : un timeout peut masquer une
+    // action déjà effectuée (envoi, push, écriture) — AUDIT-016.
+    const maxRetries =
+      SLOW_TOOLS_NO_RETRY.has(call.name) || skillManager!.isReadOnlyTool?.(call.name) !== true ? 0 : TOOL_MAX_RETRIES;
 
     let response: unknown = undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
