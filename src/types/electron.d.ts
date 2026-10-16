@@ -25,14 +25,8 @@ export interface BrowserExtensionsRemoveResult {
 }
 
 export interface ElectronAPI {
-  folderContents: (folderPath: string) => Promise<Array<{ name: string; path: string; isDirectory: boolean }>>;
-  createFile: (folderPath: string, fileName: string) => Promise<string>;
-  createFolder: (folderPath: string, folderName: string) => Promise<string>;
-  deletePath: (targetPath: string) => Promise<boolean>;
-  openPath: (targetPath: string) => Promise<boolean>;
   /** Ouvre une URL dans le navigateur par défaut (allowlist http/https/mailto côté main). */
   openExternal?: (url: string) => Promise<{ success: boolean; error?: string }>;
-  getProjectRoot: () => Promise<string>;
   quit: () => Promise<void>;
   /** Liste les extensions chargées pour une partition de session. */
   browserExtensionsList?: (partition: string) => Promise<BrowserExtensionsListResult>;
