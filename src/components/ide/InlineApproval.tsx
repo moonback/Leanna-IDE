@@ -18,7 +18,7 @@ import { ShieldAlert, Check, X, FileText } from 'lucide-react';
 interface ConfirmRequest {
   requestId: string;
   filePath: string;
-  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename';
+  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file';
   reason?: string;
   timeoutMs: number;
 }
@@ -29,6 +29,7 @@ const OPERATION_LABELS: Record<string, string> = {
   patch: 'Patch',
   delete: 'Suppression',
   rename: 'Renommage',
+  'send-file': 'Envoi de fichier (Telegram)',
 };
 
 interface InlineApprovalProps {

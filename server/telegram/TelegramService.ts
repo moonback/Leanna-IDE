@@ -5,6 +5,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { Leanna_APP_ROOT, SELF_ROOT, hasProject, setSelfRoot, listWorkspaces } from "../utils/selfRoot.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
+import { resolveWorkspacePath } from "../security.js";
 import { generateText, getActiveProvider } from "../utils/textGeneration.js";
 import { buildSystemInstruction } from "../prompts/systemInstruction.js";
 import { agentOrchestrator } from "../agents/index.js";
@@ -1436,6 +1437,31 @@ export class TelegramService {
   }
 
   /**
+   * SECURITY (AUDIT-005) : résout un fichier du workspace envoyable par Telegram.
+   * Exclusions centrales (`.env*`, `.gemini-keys.json`, `.git`, `.Leanna`…) et
+   * liens symboliques résolus : la cible réelle doit rester dans le workspace.
+   */
+  public resolveSendableFile(relativePath: string): { ok: true; absolutePath: string } | { ok: false; error: string } {
+    if (!hasProject()) return { ok: false, error: "Aucun projet actif dans le workspace." };
+    const lexical = resolveWorkspacePath(relativePath, SELF_ROOT);
+    if (!lexical.ok) return { ok: false, error: `Envoi refusé (sécurité) : ${lexical.error}.` };
+    let realTarget: string;
+    let realRoot: string;
+    try {
+      realTarget = fs.realpathSync(lexical.absolutePath);
+      realRoot = fs.realpathSync(SELF_ROOT);
+    } catch {
+      return { ok: false, error: `Fichier introuvable : ${relativePath}` };
+    }
+    const real = resolveWorkspacePath(path.relative(realRoot, realTarget), realRoot);
+    if (!real.ok || real.absolutePath !== realTarget) {
+      return { ok: false, error: "Envoi refusé (sécurité) : le lien pointe hors du workspace ou vers un fichier exclu." };
+    }
+    if (!fs.statSync(realTarget).isFile()) return { ok: false, error: `Ce n'est pas un fichier : ${relativePath}` };
+    return { ok: true, absolutePath: realTarget };
+  }
+
+  /**
    * Envoie un fichier depuis le workspace racine (alias pratique pour les skills)
    */
   public async sendFromWorkspace(
@@ -1451,13 +1477,11 @@ export class TelegramService {
       return { success: false, chatId: String(chatId), error: "Aucun projet actif dans le workspace." };
     }
 
-    // Même vérification anti-path-traversal que resolveInsideRoot() : on compare
-    // avec un séparateur de fin pour éviter qu'un dossier voisin (ex: "projet-privé"
-    // vs racine "projet") ne passe le simple startsWith(root).
-    const resolved = this.resolveInsideRoot(SELF_ROOT, relativePath);
-    if (!resolved) {
-      return { success: false, chatId: String(chatId), error: "Tentative d'accès en dehors du workspace refusée (sécurité)." };
+    const check = this.resolveSendableFile(relativePath);
+    if (!check.ok) {
+      return { success: false, chatId: String(chatId), error: check.error };
     }
+    const resolved = check.absolutePath;
 
     const ext = path.extname(resolved).toLowerCase();
     const imageExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];

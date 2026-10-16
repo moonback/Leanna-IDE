@@ -9,7 +9,7 @@
 export interface ConfirmationRequest {
   requestId: string;
   filePath: string;
-  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command';
+  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file';
   reason?: string;
   riskLevel?: "standard" | "high";
   /** Timestamp de la demande */
