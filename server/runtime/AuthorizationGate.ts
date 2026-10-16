@@ -208,7 +208,7 @@ export class AuthorizationGate {
     // ── Axe 3 : curseur d'autonomie (suggest/ask/auto + .leannaignore) ───────
     let autonomyVerdict: AutonomyVerdict | undefined;
     if (this.autonomyPolicy) {
-      autonomyVerdict = this.autonomyPolicy.decide(req.toolName, req.args ?? {});
+      autonomyVerdict = this.autonomyPolicy.decide(req.toolName, req.args ?? {}, req.required);
       outcomes.push({
         axis: "autonomy",
         decision: autonomyVerdict.decision,

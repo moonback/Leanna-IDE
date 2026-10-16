@@ -7,7 +7,7 @@ import { Button } from './ui/Button.js';
 interface ConfirmRequest {
   requestId: string;
   filePath: string;
-  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file';
+  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file' | 'tool-call';
   reason?: string;
   timeoutMs: number;
 }
@@ -19,6 +19,7 @@ const OPERATION_LABELS: Record<string, string> = {
   delete: 'Suppression',
   rename: 'Renommage',
   'send-file': 'Envoi de fichier (Telegram)',
+  'tool-call': "Action de l'assistant",
 };
 
 interface Props {

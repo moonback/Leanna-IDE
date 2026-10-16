@@ -94,7 +94,7 @@ export class SkillManagerV2 {
     name: string,
     args: any,
     context?: any,
-    options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope }
+    options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope; autonomyApproved?: boolean }
   ): Promise<any> {
     // Normalisation du nom (compatibilité Gemini qui préfixe)
     let normalizedName = name;
@@ -122,6 +122,7 @@ export class SkillManagerV2 {
       dryRun: options?.dryRun,
       signal: options?.signal,
       idempotencyScope: options?.idempotencyScope,
+      autonomyApproved: options?.autonomyApproved,
     });
   }
 

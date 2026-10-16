@@ -332,7 +332,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
       executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string } }) =>
-        sm.handleToolCall(name, args, undefined, opts));
+        // L'Executor applique lui-même le curseur d'autonomie et obtient l'approbation.
+        sm.handleToolCall(name, args, undefined, { ...opts, autonomyApproved: true }));
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
       // génération d'arguments et validation des critères de succès.
@@ -428,6 +429,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         }))
       );
       executor.setAutonomyPolicy(autonomyPolicy);
+      // Même curseur pour la voix/le chat et les agents (AUDIT-012).
+      r.tools.setAutonomyPolicy(autonomyPolicy);
       console.log(`[Bootstrap] ✓ Curseur d'autonomie: mode "${autonomyMode}".`);
 
       initMissionSystem(executor, skillNames);

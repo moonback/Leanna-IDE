@@ -89,8 +89,10 @@ export class AutonomyPolicy {
   /**
    * Décide si une action peut s'exécuter, demande une approbation, ou est refusée.
    */
-  decide(skillName: string, args: Record<string, unknown>): AutonomyVerdict {
-    const sideEffect = this.hasSideEffect(skillName);
+  decide(skillName: string, args: Record<string, unknown>, permissions?: ToolPermission[]): AutonomyVerdict {
+    // `permissions` : déclaration réelle de l'outil (registre) ; sinon la table chargée au démarrage.
+    const perms = permissions ?? this.permissions.get(skillName);
+    const sideEffect = this.hasSideEffect(perms);
     const ignoredPaths = this.matchIgnored(args);
 
     // Les lectures sont toujours autorisées, quel que soit le mode.
@@ -138,7 +140,7 @@ export class AutonomyPolicy {
         // (git push, suppressions, exécution shell système…) restent
         // humaines-par-défaut. Elles ne passent en "allow" que si l'opérateur
         // a explicitement activé LEANNA_AUTO_ALLOW_DANGEROUS="true".
-        if (this.isDangerous(skillName) && !this.allowDangerousInAuto) {
+        if (this.isDangerous(perms) && !this.allowDangerousInAuto) {
           return {
             decision: "ask",
             reason:
@@ -164,8 +166,7 @@ export class AutonomyPolicy {
    * SIDE_EFFECT_PERMISSIONS. Un outil sans permissions déclarées est traité
    * prudemment comme ayant un effet de bord potentiel.
    */
-  private hasSideEffect(skillName: string): boolean {
-    const perms = this.permissions.get(skillName);
+  private hasSideEffect(perms: ToolPermission[] | undefined): boolean {
     if (perms === undefined) return true; // outil inconnu → prudence
     if (perms.length === 0) return true; // permissions non déclarées → prudence
     return perms.some((p) => (SIDE_EFFECT_PERMISSIONS as readonly string[]).includes(p));
@@ -177,8 +178,7 @@ export class AutonomyPolicy {
    * système). Un outil aux permissions non déclarées n'est PAS présumé
    * dangereux ici : la prudence s'exerce déjà via hasSideEffect().
    */
-  private isDangerous(skillName: string): boolean {
-    const perms = this.permissions.get(skillName);
+  private isDangerous(perms: ToolPermission[] | undefined): boolean {
     if (!perms || perms.length === 0) return false;
     return perms.includes("dangerous");
   }
