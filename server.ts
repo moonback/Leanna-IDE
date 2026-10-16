@@ -384,8 +384,9 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       // par l'Executor (réversible : sans le flag, on garde la vérif LLM).
       try {
         const { EvidenceEngine } = await import("./server/core/EvidenceEngine.js");
-        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase();
-        const evidenceEnabled = evidenceFlag === "true" || evidenceFlag === "1";
+        // Activée par défaut (AUDIT-013) : seul un "false"/"0" explicite la coupe.
+        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").trim().toLowerCase();
+        const evidenceEnabled = evidenceFlag !== "false" && evidenceFlag !== "0";
         executor.setEvidenceEngine(new EvidenceEngine(), evidenceEnabled);
         if (evidenceEnabled) {
           console.log(`[Bootstrap] ✓ Vérification d'objectif par preuve activée (EvidenceEngine).`);
