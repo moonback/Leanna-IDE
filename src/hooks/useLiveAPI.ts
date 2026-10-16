@@ -124,6 +124,12 @@ export function useLiveAPI() {
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
+  // ── Plan courant (set_plan) ─────────────────────────────────────────────────
+  // Mis à jour chaque fois que le modèle appelle set_plan. Exposé dans le contexte
+  // pour que PlanPanel puisse l'afficher. Remis à null à la déconnexion.
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const clearPlan = useCallback(() => setCurrentPlan(null), []);
+
   // ── Latency monitoring ─────────────────────────────────────────────────────
   // Timestamp du premier chunk audio envoyé (début d'utterance détecté par VAD)
   const utteranceStartRef = useRef<number | null>(null);
@@ -484,6 +490,14 @@ export function useLiveAPI() {
           detail: msg.result,
         }));
       }
+      // ── Plan déclaré : afficher le PlanPanel dans le chat ─────────────────
+      if (msg.tool_used === 'set_plan') {
+        try {
+          const args = typeof msg.info === 'string' ? JSON.parse(msg.info) : (msg.info ?? {});
+          const planText = typeof args.plan === 'string' ? args.plan.trim() : null;
+          if (planText) setCurrentPlan(planText);
+        } catch { /* args non-parsables, on ignore */ }
+      }
     }
     if (msg.error) {
       addLog(msg.error, 'error');
@@ -665,6 +679,7 @@ export function useLiveAPI() {
     cleanupAudio();
     clearTokenUsage();
     resetActivityState();
+    setCurrentPlan(null);
   }, [disconnectWebSocket, cleanupAudio, clearTokenUsage, resetActivityState]);
 
   const sendTextMessage = useCallback((text: string, displayText = text) => {
@@ -955,5 +970,8 @@ export function useLiveAPI() {
       disableAutoSummarize: () => setAutoSummarizeEnabled(false),
       setAutoSummarizeThreshold,
       setAutoSummarizeKeepTurns,
+      // ── Plan courant ─────────────────────────────────────────────────────
+      currentPlan,
+      clearPlan,
     };
 }
