@@ -332,7 +332,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
       executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string } }) =>
-        sm.handleToolCall(name, args, undefined, opts));
+        // L'Executor applique lui-même le curseur d'autonomie et obtient l'approbation.
+        sm.handleToolCall(name, args, undefined, { ...opts, autonomyApproved: true }));
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
       // génération d'arguments et validation des critères de succès.
@@ -383,8 +384,9 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       // par l'Executor (réversible : sans le flag, on garde la vérif LLM).
       try {
         const { EvidenceEngine } = await import("./server/core/EvidenceEngine.js");
-        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase();
-        const evidenceEnabled = evidenceFlag === "true" || evidenceFlag === "1";
+        // Activée par défaut (AUDIT-013) : seul un "false"/"0" explicite la coupe.
+        const evidenceFlag = String(process.env.LEANNA_MISSION_EVIDENCE ?? "").trim().toLowerCase();
+        const evidenceEnabled = evidenceFlag !== "false" && evidenceFlag !== "0";
         executor.setEvidenceEngine(new EvidenceEngine(), evidenceEnabled);
         if (evidenceEnabled) {
           console.log(`[Bootstrap] ✓ Vérification d'objectif par preuve activée (EvidenceEngine).`);
@@ -419,7 +421,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         | "suggest"
         | "ask"
         | "auto";
-      const autonomyPolicy = new AutonomyPolicy({ mode: autonomyMode, workspaceRoot: SELF_ROOT });
+      const autonomyPolicy = new AutonomyPolicy({ mode: autonomyMode, workspaceRoot: () => SELF_ROOT });
       // Fournir les permissions par outil (pour classer lecture vs effet de bord).
       autonomyPolicy.setToolPermissions(
         r.tools.getDefinitions().map((def: any) => ({
@@ -428,6 +430,8 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         }))
       );
       executor.setAutonomyPolicy(autonomyPolicy);
+      // Même curseur pour la voix/le chat et les agents (AUDIT-012).
+      r.tools.setAutonomyPolicy(autonomyPolicy);
       console.log(`[Bootstrap] ✓ Curseur d'autonomie: mode "${autonomyMode}".`);
 
       initMissionSystem(executor, skillNames);
@@ -694,6 +698,9 @@ async function startServer() {
   // contradiction avec API_DOCS.md. On applique désormais l'authentification
   // à toutes les routes /api/* (sauf /api/health, déjà traitée ci-dessus).
   app.use("/api", requireAuth);
+
+  // Sonde d'authentification de l'AuthGate : 200 si le jeton (cookie ou en-tête) est valide.
+  app.get("/api/auth/check", (_req, res) => { res.json({ ok: true }); });
 
   // ── Routeurs modulaires (refactorisation priorité #1) ────────────────────
   // Montés APRÈS requireAuth mais AVANT les routes inline legacy.

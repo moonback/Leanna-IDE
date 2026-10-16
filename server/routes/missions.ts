@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { missionTimeTravel, type TimelineMissionView } from "../mission/index.js";
 import { projectDoctor } from "../knowledge/index.js";
+import { writeEnvKey } from "./env.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Missions Router — Approbation humaine & curseur d'autonomie
@@ -471,7 +472,15 @@ export function createMissionsRouter(
     if (!policy) return res.status(503).json({ error: "Curseur d'autonomie non configuré." });
 
     policy.setMode(mode);
-    return res.json({ ok: true, mode });
+    // Persister le choix : sans cela il était perdu au redémarrage (AUDIT-011).
+    let persisted = true;
+    try {
+      writeEnvKey("LEANNA_AUTONOMY_MODE", mode);
+    } catch (err) {
+      persisted = false;
+      console.warn(`[missions] ⚠️ Mode d'autonomie non persisté: ${(err as Error).message}`);
+    }
+    return res.json({ ok: true, mode, persisted });
   });
 
   return router;

@@ -22,7 +22,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { SELF_ROOT, stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import { knowledgeGraph } from "./KnowledgeGraph.js";
 import type {
@@ -38,7 +38,7 @@ const log = createLogger("ProjectMemory");
  * Stocke les données localement dans le projet actif pour isoler chaque projet.
  */
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".project-memory.json");
+  return path.join(stateBaseDir(), ".project-memory.json");
 }
 
 /** Seuil absolu — déclenche élagage si dépassé */

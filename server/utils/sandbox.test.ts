@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import path from 'path';
+import os from 'os';
 import { setSelfRoot } from './selfRoot.js';
 import {
   getSandboxRoot,
@@ -19,15 +19,19 @@ import {
 // Ensure SELF_ROOT is set before sandbox functions are exercised.
 // sandbox.ts reads SELF_ROOT dynamically at call-time, so setting it here
 // (before any test runs) is sufficient.
+// AUDIT-035 : projet temporaire, jamais le dépôt — un reset de sandbox
+// recopierait sinon tout le dépôt dans son vrai .Leanna/sandbox.
 {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname_local = path.dirname(__filename);
-  setSelfRoot(path.resolve(__dirname_local, '..', '..'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-sandbox-utils-'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"name":"sandbox-test"}');
+  setSelfRoot(root);
 }
 
 test('sandbox: state management and path resolution', () => {
   const root = getSandboxRoot();
   assert.ok(root.includes('sandbox'));
+  // La copie isolée doit exister pour activer le sandbox (projet temporaire vide).
+  fs.mkdirSync(root, { recursive: true });
 
   activateSandbox();
   assert.equal(isSandboxActive(), true);

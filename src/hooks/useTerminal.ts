@@ -25,9 +25,10 @@ const getServerPort = (): number => {
   // ou on utilise 5000 par défaut
   if (typeof window !== 'undefined') {
     // En dev avec Vite, utiliser import.meta.env
-    const viteEnv = import.meta.env as unknown as Record<string, string | undefined>;
-    if (viteEnv?.VITE_SERVER_PORT) {
-      const envPort = Number(viteEnv.VITE_SERVER_PORT);
+    // Accès statique : `import.meta.env` entier inlinerait toutes les VITE_* au build (AUDIT-001).
+    const vitePort = import.meta.env.VITE_SERVER_PORT as string | undefined;
+    if (vitePort) {
+      const envPort = Number(vitePort);
       if (envPort) return envPort;
     }
     

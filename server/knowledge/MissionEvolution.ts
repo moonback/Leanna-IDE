@@ -23,7 +23,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("MissionEvolution");
@@ -68,7 +68,7 @@ const MIN_EVIDENCE = 2;
 const AVOID_THRESHOLD = 0.34;
 
 function storePath(): string {
-  return path.join(SELF_ROOT || process.cwd(), ".Leanna", "mission-evolution.json");
+  return path.join(stateBaseDir(), ".Leanna", "mission-evolution.json");
 }
 
 /** Stable id for an approach from its ordered skills. */

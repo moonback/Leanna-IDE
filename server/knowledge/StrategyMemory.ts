@@ -21,7 +21,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("StrategyMemory");
@@ -61,12 +61,12 @@ const FAILING_THRESHOLD = 0.34;
  * de ne pas polluer la racine du projet avec un fichier `.Leanna-strategy.json`.
  */
 function getStorePath(): string {
-  return path.join(SELF_ROOT || process.cwd(), ".Leanna", "strategy.json");
+  return path.join(stateBaseDir(), ".Leanna", "strategy.json");
 }
 
 /** Ancien emplacement (racine) — migré une fois vers `.Leanna/strategy.json`. */
 function getLegacyStorePath(): string {
-  return path.join(SELF_ROOT || process.cwd(), ".Leanna-strategy.json");
+  return path.join(stateBaseDir(), ".Leanna-strategy.json");
 }
 
 export class StrategyMemory {

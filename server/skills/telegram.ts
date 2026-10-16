@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Skill } from "./base.js";
 import { telegramService } from "../telegram/TelegramService.js";
+import { requestConfirmation } from "../utils/confirmationBridge.js";
 
 export const telegramSkill: Skill = {
   name: "telegram",
@@ -154,11 +155,37 @@ export const telegramSkill: Skill = {
       }),
     },
   ],
-  handleToolCall: async (name, args) => {
+  handleToolCall: async (name, args, context) => {
     const getDefaultChatId = (): string | undefined => {
       const cfg = telegramService.getConfig();
       return cfg.defaultChatId || cfg.allowedUsers.find((u) => /^\d+$/.test(u.trim()));
     };
+
+    // SECURITY (AUDIT-005) : tout envoi d'un fichier local passe par ici —
+    // destinataire connu, chemin du workspace non exclu, confirmation humaine.
+    const sendLocalFile = async (target: string, relPath: string, options: any) => {
+      const norm = (id: string) => String(id).trim().toLowerCase().replace(/^@/, "");
+      const cfg = telegramService.getConfig();
+      const known = [cfg.defaultChatId, ...cfg.allowedUsers].filter(Boolean).map((id) => norm(id as string));
+      if (!known.includes(norm(target))) {
+        return { success: false, error: "Destinataire refusé : un fichier ne peut être envoyé qu'au chat par défaut ou à un utilisateur autorisé." };
+      }
+      const check = telegramService.resolveSendableFile(relPath);
+      if (!check.ok) return { success: false, error: check.error };
+      if (!context?.emitToClient) {
+        return { success: false, error: "Confirmation interactive indisponible dans ce contexte : envoi de fichier refusé." };
+      }
+      const approved = await requestConfirmation(
+        relPath,
+        "send-file",
+        context.emitToClient,
+        `Envoi du fichier par Telegram au chat ${target}`,
+        "high"
+      );
+      if (!approved) return { success: false, error: "Envoi refusé par l'utilisateur ou expiré." };
+      return telegramService.sendFromWorkspace(target, relPath, options);
+    };
+    const isUrl = (s: string) => /^https?:\/\//i.test(s);
 
     const buildOptions = (args: any): any => {
       const opts: any = {};
@@ -225,6 +252,7 @@ export const telegramSkill: Skill = {
         return { success: false, error: "La source de la photo est requise." };
       }
       const options: any = buildOptions({ caption, parseMode });
+      if (!isUrl(photo.trim())) return sendLocalFile(target, photo.trim(), options);
       return telegramService.sendPhoto(target, photo.trim(), options);
     }
 
@@ -244,6 +272,7 @@ export const telegramSkill: Skill = {
         return { success: false, error: "La source du document est requise." };
       }
       const options: any = buildOptions({ caption, parseMode });
+      if (!isUrl(file.trim())) return sendLocalFile(target, file.trim(), options);
       return telegramService.sendDocument(target, file.trim(), options);
     }
 
@@ -263,7 +292,7 @@ export const telegramSkill: Skill = {
         return { success: false, error: "Le chemin du fichier dans le workspace est requis." };
       }
       const options: any = buildOptions({ caption, parseMode });
-      return telegramService.sendFromWorkspace(target, path.trim(), options);
+      return sendLocalFile(target, path.trim(), options);
     }
 
     // ─── telegram_broadcast ───────────────────────────────────────────────────

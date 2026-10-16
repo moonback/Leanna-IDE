@@ -47,6 +47,30 @@ async function resolveRealPathWithinProject(candidatePath: string): Promise<stri
 }
 
 const EXEC_TIMEOUT_MS = 10_000;
+
+// SECURITY (AUDIT-003) : les sous-processus lancés par l'assistant (npm, npx,
+// node, ouverture de fichiers…) ne reçoivent qu'un environnement en liste
+// blanche. Avant, ils héritaient de tout process.env, donc des clés API
+// déchiffrées au démarrage (un `postinstall` ou un script pouvait les lire).
+const CHILD_ENV_ALLOWLIST = new Set([
+    "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "OS",
+    "TEMP", "TMP", "TMPDIR", "HOME", "HOMEDRIVE", "HOMEPATH", "USERPROFILE", "USERNAME", "USER",
+    "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "COMMONPROGRAMFILES",
+    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "LANG", "LC_ALL", "TERM", "SHELL", "NODE_ENV", "CI",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+    // Session graphique Linux (xdg-open, notify-send).
+    "DISPLAY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CURRENT_DESKTOP",
+]);
+
+/** Environnement transmis aux sous-processus : liste blanche, comparaison insensible à la casse (Windows). */
+export function buildChildEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    for (const [key, value] of Object.entries(source)) {
+        if (value !== undefined && CHILD_ENV_ALLOWLIST.has(key.toUpperCase())) env[key] = value;
+    }
+    return env;
+}
+
 const MAX_BUFFER = 5 * 1024 * 1024; // 5 Mo
 
 const ALLOWED_COMMANDS = ["dir", "ls", "npm"] as const;
@@ -112,7 +136,7 @@ function spawnDetached(npmBin: string, args: string[], cwd: string): { pid: numb
         detached: true,
         stdio: "ignore",
         shell: isWindows, // Windows nécessite shell pour les .cmd
-        env: { ...process.env },
+        env: buildChildEnv(),
         windowsHide: false,
     });
     child.unref(); // Ne pas bloquer le process Node parent
@@ -276,7 +300,7 @@ async function runNpmSubcommand(
             timeout: timeoutMs,
             maxBuffer: MAX_BUFFER,
             shell: isWindows, // Windows nécessite shell pour les .cmd
-            env: { ...process.env },
+            env: buildChildEnv(),
             // Kill-switch temps-réel : tue le sous-processus npm à l'annulation.
             signal,
         });
@@ -349,7 +373,7 @@ export const systemSkill: Skill = {
         },
         {
             name: "run_project_command",
-            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. npm test, npm run build et npm run typecheck sont classés known-safe project execution et demandent une confirmation standard. Tout autre npm run <script> est un arbitrary script et demande une confirmation renforcée (commande réelle + risque élevé). Les commandes npm ls/list/outdated sont les seules opérations sans confirmation.",
+            description: "Exécute une commande npm, npx ou node dans le workspace du projet et retourne stdout/stderr. npm test, npm run build et npm run typecheck sont classés known-safe project execution et demandent une confirmation standard. Tout autre npm run <script> est un arbitrary script et demande une confirmation renforcée (commande réelle + risque élevé). Toute commande npx ou node demande aussi une confirmation renforcée ; node -e/-p/--eval/--print est refusé (écrire un script puis l'exécuter). Les commandes npm ls/list/outdated sont les seules opérations sans confirmation.",
             parameters: {
                 type: "OBJECT",
                 properties: {
@@ -416,6 +440,26 @@ export const systemSkill: Skill = {
                         return await runNpmSubcommand(parts, cwdPath, toolContext, RUN_TIMEOUT_MS, toolContext?.signal);
                     }
 
+                    // SECURITY (AUDIT-003) : node/npx exécutent du code arbitraire
+                    // (fichier écrit par l'agent, paquet npm téléchargé). Évaluation
+                    // inline interdite, et confirmation renforcée obligatoire.
+                    if (verb === "node" && parts.slice(1).some(a => /^-[a-z]*[ep][a-z]*$/i.test(a) || /^--(eval|print)(=|$)/i.test(a))) {
+                        return { error: "Commande refusée : l'évaluation de code inline (node -e/-p/--eval/--print) n'est pas autorisée. Écrivez un script puis exécutez-le." };
+                    }
+                    if (!toolContext?.emitToClient) {
+                        return { error: "Confirmation interactive indisponible dans ce contexte. Exécutez la commande manuellement dans le terminal." };
+                    }
+                    const approved = await requestConfirmation(
+                        rawCmd,
+                        "npm-command",
+                        toolContext.emitToClient,
+                        `[commande arbitraire — confirmation renforcée] ${rawCmd}\n→ exécutée dans : ${cwdPath}`,
+                        "high"
+                    );
+                    if (!approved) {
+                        return { error: "Commande refusée par l'utilisateur ou expirée." };
+                    }
+
                     console.log(`[System] run_project_command: ${rawCmd} (cwd: ${cwdPath})`);
 
                     const isWin = os.platform() === "win32";
@@ -437,7 +481,7 @@ export const systemSkill: Skill = {
                             timeout: RUN_TIMEOUT_MS,
                             maxBuffer: MAX_BUFFER,
                             shell: isWin && verb === "npx", // Windows nécessite shell pour npx.cmd
-                            env: { ...process.env },
+                            env: buildChildEnv(),
                             // Kill-switch temps-réel : Node tue le sous-processus dès que
                             // le signal se déclenche (annulation de la tâche).
                             signal: toolContext?.signal,
@@ -492,11 +536,11 @@ export const systemSkill: Skill = {
 
                     try {
                         if (platform === "win32") {
-                            await execFileAsync("cmd.exe", ["/c", "start", "", realPath], { timeout: EXEC_TIMEOUT_MS });
+                            await execFileAsync("cmd.exe", ["/c", "start", "", realPath], { timeout: EXEC_TIMEOUT_MS, env: buildChildEnv() });
                         } else if (platform === "darwin") {
-                            await execFileAsync("open", [realPath], { timeout: EXEC_TIMEOUT_MS });
+                            await execFileAsync("open", [realPath], { timeout: EXEC_TIMEOUT_MS, env: buildChildEnv() });
                         } else {
-                            await execFileAsync("xdg-open", [realPath], { timeout: EXEC_TIMEOUT_MS });
+                            await execFileAsync("xdg-open", [realPath], { timeout: EXEC_TIMEOUT_MS, env: buildChildEnv() });
                         }
                         return { status: "success", message: `Ouverture réussie: ${realPath}` };
                     } catch (error: any) {
@@ -522,7 +566,7 @@ export const systemSkill: Skill = {
                                     "Add-Type -AssemblyName System.Windows.Forms; " +
                                     "[System.Windows.Forms.MessageBox]::Show($env:NOTIF_MSG, $env:NOTIF_TITLE)"
                                 ],
-                                { timeout: EXEC_TIMEOUT_MS, env: { ...process.env, NOTIF_MSG: message, NOTIF_TITLE: title } }
+                                { timeout: EXEC_TIMEOUT_MS, env: { ...buildChildEnv(), NOTIF_MSG: message, NOTIF_TITLE: title } }
                             );
                         } else if (platform === "darwin") {
                             await execFileAsync(
@@ -531,10 +575,10 @@ export const systemSkill: Skill = {
                                     "-e",
                                     'display notification (system attribute "NOTIF_MSG") with title (system attribute "NOTIF_TITLE")'
                                 ],
-                                { timeout: EXEC_TIMEOUT_MS, env: { ...process.env, NOTIF_MSG: message, NOTIF_TITLE: title } }
+                                { timeout: EXEC_TIMEOUT_MS, env: { ...buildChildEnv(), NOTIF_MSG: message, NOTIF_TITLE: title } }
                             );
                         } else {
-                            await execFileAsync("notify-send", [title, message], { timeout: EXEC_TIMEOUT_MS });
+                            await execFileAsync("notify-send", [title, message], { timeout: EXEC_TIMEOUT_MS, env: buildChildEnv() });
                         }
                         return { status: "success" };
                     } catch (error: any) {

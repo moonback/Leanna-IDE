@@ -13,6 +13,7 @@ import { Memory } from "./Memory.js";
 import { PromptRegistry } from "./PromptRegistry.js";
 import { WorkflowEngine } from "./WorkflowEngine.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
+import { PermissionPolicy, PermissionDeniedError } from "./PermissionPolicy.js";
 import { defineAgent } from "./agents/plugin.js";
 import { createRuntime } from "./index.js";
 
@@ -317,6 +318,58 @@ describe("SkillManagerV2", () => {
 
     const result = await sm.handleToolCall("add", { a: 3, b: 4 });
     assert.equal(result, 7);
+  });
+
+  it("applique la politique de permissions même avec un contexte (AUDIT-004)", async () => {
+    const registry = new ToolRegistry({
+      permissionPolicy: new PermissionPolicy({ mode: "enforce" }),
+    });
+    const sm = new SkillManagerV2({ registry });
+    let called = false;
+    sm.registerSkill({
+      name: "mystery",
+      // Aucune permission déclarée ni inférable pour ce nom d'outil.
+      declarations: [{ name: "zzq_unknown_action", description: "?" }],
+      handleToolCall: async () => {
+        called = true;
+        return "exécuté";
+      },
+    });
+
+    await assert.rejects(
+      sm.handleToolCall("zzq_unknown_action", {}, { emitIdeAction: () => {} }),
+      PermissionDeniedError
+    );
+    assert.equal(called, false);
+  });
+
+  it("transmet le contexte d'appel au handler via le registre", async () => {
+    const sm = new SkillManagerV2();
+    sm.registerSkill({
+      name: "ctx",
+      permissions: ["read"],
+      declarations: [{ name: "read_ctx", description: "Lit le contexte" }],
+      handleToolCall: async (_name, _args, context) => context?.marker,
+    });
+
+    assert.equal(await sm.handleToolCall("read_ctx", {}, { marker: 42 }), 42);
+  });
+
+  it("isReadOnlyTool : seuls les outils en lecture sont rejouables (AUDIT-016)", () => {
+    const sm = new SkillManagerV2();
+    sm.registerSkill({
+      name: "files",
+      toolPermissions: { read_file: ["read"], write_file: ["write"] },
+      declarations: [
+        { name: "read_file", description: "lit" },
+        { name: "write_file", description: "écrit" },
+      ],
+      handleToolCall: async () => null,
+    });
+    assert.equal(sm.isReadOnlyTool("read_file"), true);
+    assert.equal(sm.isReadOnlyTool("files_read_file"), true, "nom préfixé normalisé");
+    assert.equal(sm.isReadOnlyTool("write_file"), false);
+    assert.equal(sm.isReadOnlyTool("inconnu"), false);
   });
 
   it("devrait retourner les déclarations", () => {

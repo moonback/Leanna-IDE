@@ -1,0 +1,67 @@
+# CI Leanna (AUDIT-022) : barrière automatique sur chaque push et pull request.
+# Runner Windows : c'est l'environnement cible (installateur win) et celui où
+# la suite de tests est validée aujourd'hui.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Le binaire Electron n'est pas nécessaire pour tester ni builder le web/serveur.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests serveur
+        run: npm test
+
+      - name: Les tests n'écrivent pas dans le dépôt (AUDIT-035)
+        run: |
+          if [ -e .Leanna ] || ls -d .tmp-* >/dev/null 2>&1; then
+            echo "::error::npm test a écrit dans le dépôt (.Leanna/ ou .tmp-*)"
+            ls -la .Leanna .tmp-* 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Tests UI
+        run: npm run test:ui
+
+      # Secrets factices : si le frontend se remettait à embarquer un jeton
+      # (variable VITE_*), le scan de build le détecterait (AUDIT-001).
+      - name: Secrets factices pour le scan de build
+        run: |
+          {
+            echo 'Leanna_API_TOKEN="ci_fake_token_0123456789abcdefghijklmnop"'
+            echo 'VITE_Leanna_API_TOKEN="ci_fake_token_0123456789abcdefghijklmnop"'
+          } > .env
+
+      - name: Build + scan des secrets du bundle
+        run: npm run build
+
+      # 181 erreurs ESLint existantes (P2.3) : signalées sans bloquer tant
+      # qu'elles ne sont pas corrigées. Passer à bloquant ensuite.
+      - name: ESLint (non bloquant)
+        continue-on-error: true
+        run: npx eslint . --quiet

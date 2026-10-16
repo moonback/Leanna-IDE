@@ -7,6 +7,55 @@ const path = require('path');
 const DEBUG = process.env.ELECTRON_DEBUG === '1';
 const isPackaged = app.isPackaged;
 
+// ── Jeton d'accès à l'API locale (AUDIT-001) ────────────────────────────────
+// Le jeton n'est plus embarqué dans le bundle web : le processus principal le
+// lit (serveur packagé dans ce processus, ou .env chargé par le lanceur dev) et
+// le pose en cookie httpOnly sur la session de l'app, jamais exposé au JS.
+function decryptGcm(value) {
+  const crypto = require('crypto');
+  const [, ivHex, tagHex, cipherHex] = value.split(':');
+  const key = Buffer.from(process.env.Leanna_MASTER_KEY || '', 'base64');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return decipher.update(cipherHex, 'hex', 'utf8') + decipher.final('utf8');
+}
+
+function readApiToken() {
+  const raw = (process.env.Leanna_API_TOKEN || '').trim();
+  if (!raw.startsWith('gcm:')) return raw;
+  // shortcut: seul le format GCM est géré (pas l'ancien CBC) ; sinon l'écran de saisie du jeton prend le relais.
+  try { return decryptGcm(raw); } catch { return ''; }
+}
+
+function getAppBaseUrl() {
+  return process.env.ELECTRON_START_URL || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || 4000}`;
+}
+
+async function setAuthCookie() {
+  // En mode packagé, le serveur (même processus) génère le jeton au démarrage :
+  // on l'attend brièvement plutôt que de charger une page qui recevrait 401.
+  let token = readApiToken();
+  for (let i = 0; !token && i < 100; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    token = readApiToken();
+  }
+  if (!token) return;
+  const { session } = require('electron');
+  await session.defaultSession.cookies.set({
+    url: getAppBaseUrl(),
+    name: 'Leanna_token',
+    value: token,
+    httpOnly: true,
+    sameSite: 'lax',
+  }).catch((e) => log('Auth cookie failed:', e.message));
+}
+
+function loadAppUrl(win, url) {
+  return setAuthCookie().finally(() => {
+    if (!win.isDestroyed()) win.loadURL(url);
+  });
+}
+
 function getWindowIcon() {
   const iconName = nativeTheme.shouldUseDarkColors ? 'icon-sombre.png' : 'icon-light.png';
   return path.join(__dirname, '../assets/images', iconName);
@@ -163,7 +212,7 @@ function createWindow(splash, splashMinEnd) {
   const port = process.env.VITE_SERVER_PORT || 4000;
   const startUrl = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
   log('Loading URL:', startUrl);
-  win.loadURL(startUrl);
+  loadAppUrl(win, startUrl);
 
   // Afficher la fenêtre principale une fois le contenu chargé
   win.webContents.on('did-finish-load', () => {
@@ -214,7 +263,7 @@ function createWindow(splash, splashMinEnd) {
     if (errorCode === -102 || errorCode === -6 || errorCode === -105) {
       setTimeout(() => {
         log('Retrying load...');
-        win.loadURL(startUrl);
+        loadAppUrl(win, startUrl);
       }, 1500);
     }
   });
@@ -400,42 +449,21 @@ app.whenReady().then(() => {
     }
   });
 
-  // --- IPC Handlers (inchangé) ---
-
-  ipcMain.handle('electron/folder-contents', async function (_event, folderPath) {
-    const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
-    return entries.map(function (entry) {
-      return {
-        name: entry.name,
-        isDirectory: entry.isDirectory(),
-        path: path.join(folderPath, entry.name),
-      };
+  // --- IPC Handlers ---
+  // SECURITY (AUDIT-007) : seules les pages de l'app (même origine que le
+  // serveur local) peuvent invoquer les IPC ; une page tierce chargée dans une
+  // fenêtre ou une frame est refusée.
+  const appOrigin = new URL(process.env.ELECTRON_START_URL || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || 4000}`).origin;
+  function handleTrusted(channel, handler) {
+    ipcMain.handle(channel, function (event, ...args) {
+      let origin = '';
+      try { origin = new URL(event.senderFrame?.url || '').origin; } catch { /* origine invalide */ }
+      if (origin !== appOrigin) throw new Error(`IPC ${channel} refusé : expéditeur non autorisé.`);
+      return handler(event, ...args);
     });
-  });
+  }
 
-  ipcMain.handle('electron/create-file', async function (_event, folderPath, fileName) {
-    const targetPath = path.join(folderPath, fileName);
-    await fs.promises.writeFile(targetPath, '', { flag: 'wx' });
-    return targetPath;
-  });
-
-  ipcMain.handle('electron/create-folder', async function (_event, folderPath, folderName) {
-    const targetPath = path.join(folderPath, folderName);
-    await fs.promises.mkdir(targetPath, { recursive: false });
-    return targetPath;
-  });
-
-  ipcMain.handle('electron/delete-path', async function (_event, targetPath) {
-    await fs.promises.rm(targetPath, { recursive: true, force: true });
-    return true;
-  });
-
-  ipcMain.handle('electron/open-path', async function (_event, targetPath) {
-    await shell.openPath(targetPath);
-    return true;
-  });
-
-  ipcMain.handle('electron/open-external', async function (_event, url) {
+  handleTrusted('electron/open-external', async function (_event, url) {
     // Allowlist stricte : seuls http(s) et mailto sont ouverts dans le navigateur
     // par défaut du système. Bloque file:, les protocoles custom, javascript:, etc.
     if (typeof url !== 'string' || !url.trim()) {
@@ -455,12 +483,7 @@ app.whenReady().then(() => {
     return { success: true };
   });
 
-  ipcMain.handle('electron/get-project-root', async function () {
-    // IDE : retourne toujours le dossier de l'app elle-même
-    return process.env.ELECTRON_APP_PATH || app.getAppPath();
-  });
-
-  ipcMain.handle('electron/select-folder', async function () {
+  handleTrusted('electron/select-folder', async function () {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Choisir le workspace',
@@ -474,7 +497,7 @@ app.whenReady().then(() => {
   // indépendante (process renderer distinct). Fenêtre unique : si elle existe
   // déjà, on la ramène au premier plan au lieu d'en créer une seconde.
   let orbWindow = null;
-  ipcMain.handle('electron/open-orb-window', function () {
+  handleTrusted('electron/open-orb-window', function () {
     if (orbWindow && !orbWindow.isDestroyed()) {
       if (orbWindow.isMinimized()) orbWindow.restore();
       orbWindow.focus();
@@ -501,7 +524,7 @@ app.whenReady().then(() => {
 
     const port = process.env.VITE_SERVER_PORT || 4000;
     const base = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
-    orbWindow.loadURL(`${base}/orb-live`);
+    loadAppUrl(orbWindow, `${base}/orb-live`);
 
     orbWindow.webContents.on('did-finish-load', () => {
       if (orbWindow && !orbWindow.isDestroyed()) orbWindow.show();
@@ -516,7 +539,7 @@ app.whenReady().then(() => {
   // action IDE (ouvrir un fichier, naviguer, piloter le navigateur…), on la
   // transmet à la fenêtre principale qui la rejoue localement.
   //   payload: { name: string, detail?: any, focusIde?: boolean }
-  ipcMain.handle('electron/forward-to-ide', function (_event, payload) {
+  handleTrusted('electron/forward-to-ide', function (_event, payload) {
     try {
       if (!win || win.isDestroyed()) return false;
       const name = payload && typeof payload.name === 'string' ? payload.name : null;
@@ -535,7 +558,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('electron/quit', function () {
+  handleTrusted('electron/quit', function () {
     app.isQuitting = true;
     app.quit();
   });
@@ -543,7 +566,7 @@ app.whenReady().then(() => {
   // ── Git Clone ────────────────────────────────────────────────────────────────
   // Clone un dépôt GitHub (ou tout dépôt git) dans un dossier local,
   // puis retourne le chemin du dossier cloné pour activation comme workspace.
-  ipcMain.handle('electron/git-clone', async function (_event, repoUrl, targetDir) {
+  handleTrusted('electron/git-clone', async function (_event, repoUrl, targetDir) {
     const { execFile } = require('child_process');
     const { promisify } = require('util');
     const os = require('os');
@@ -671,7 +694,7 @@ app.whenReady().then(() => {
     }
   }
 
-  ipcMain.handle('electron/browser-extensions-list', async function (_event, partition) {
+  handleTrusted('electron/browser-extensions-list', async function (_event, partition) {
     if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
     try {
       await hydratePartition(partition);
@@ -683,7 +706,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('electron/browser-extensions-load', async function (_event, partition, extPath) {
+  handleTrusted('electron/browser-extensions-load', async function (_event, partition, extPath) {
     if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
     let targetPath = extPath;
     // Si aucun chemin fourni, ouvrir un sélecteur de dossier.
@@ -722,7 +745,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('electron/browser-extensions-remove', async function (_event, partition, extensionId) {
+  handleTrusted('electron/browser-extensions-remove', async function (_event, partition, extensionId) {
     if (!isValidPartition(partition)) return { success: false, error: 'Partition invalide.' };
     if (typeof extensionId !== 'string' || !extensionId) {
       return { success: false, error: 'Identifiant d\'extension invalide.' };
@@ -747,7 +770,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('electron/get-screen-sources', async function () {
+  handleTrusted('electron/get-screen-sources', async function () {
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
       thumbnailSize: { width: 320, height: 180 },

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
@@ -13,6 +13,10 @@ import { astCallGraph } from './knowledge/ASTCallGraph.js';
 import { setSelfRoot } from './utils/selfRoot.js';
 import { setDocumentExtractionEnabled } from './knowledge/knowledgeSettings.js';
 import type { FileNode } from './knowledge/types.js';
+
+// AUDIT-023 : dossiers de test hors du dépôt, supprimés en fin de fichier.
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-knowledge-test-'));
+after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 test('GET /api/knowledge/health returns knowledge system health structure', async () => {
   const app = express();
@@ -41,8 +45,8 @@ test('GET /api/knowledge/health returns knowledge system health structure', asyn
 });
 
 test('getDocumentStore isolates documents per active workspace', () => {
-  const rootA = path.join(process.cwd(), '.tmp-docstore-a');
-  const rootB = path.join(process.cwd(), '.tmp-docstore-b');
+  const rootA = path.join(TMP, '.tmp-docstore-a');
+  const rootB = path.join(TMP, '.tmp-docstore-b');
 
   const storeA = getDocumentStore(rootA);
   const storeB = getDocumentStore(rootB);
@@ -52,7 +56,7 @@ test('getDocumentStore isolates documents per active workspace', () => {
 });
 
 test('POST /api/knowledge/reindex also reindexes project documents', async () => {
-  const root = path.join(process.cwd(), '.tmp-knowledge-reindex-docs');
+  const root = path.join(TMP, '.tmp-knowledge-reindex-docs');
   fs.rmSync(root, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(path.join(root, '.Leanna'), { recursive: true });
@@ -86,7 +90,7 @@ test('POST /api/knowledge/reindex also reindexes project documents', async () =>
 });
 
 test('POST /api/knowledge/reindex indexes pdf files from workspace', async () => {
-  const root = path.join(process.cwd(), '.tmp-knowledge-pdf-docs');
+  const root = path.join(TMP, '.tmp-knowledge-pdf-docs');
   fs.rmSync(root, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(path.join(root, '.Leanna'), { recursive: true });
@@ -121,8 +125,8 @@ test('POST /api/knowledge/reindex indexes pdf files from workspace', async () =>
 });
 
 test('switching workspace clears knowledge graph and project memory data', () => {
-  const rootA = path.join(process.cwd(), '.tmp-knowledge-a');
-  const rootB = path.join(process.cwd(), '.tmp-knowledge-b');
+  const rootA = path.join(TMP, '.tmp-knowledge-a');
+  const rootB = path.join(TMP, '.tmp-knowledge-b');
 
   fs.mkdirSync(rootA, { recursive: true });
   fs.mkdirSync(rootB, { recursive: true });

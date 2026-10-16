@@ -159,7 +159,7 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
             {/* Message */}
             <p
               id="confirm-dialog-message"
-              className="mb-6 text-sm"
+              className="mb-6 whitespace-pre-line text-sm"
               style={{ color: 'var(--text-secondary)' }}
             >
               {state.message}

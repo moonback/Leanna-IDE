@@ -23,6 +23,9 @@ import type {
 import type { EventBus } from "./EventBus.js";
 import { PermissionPolicy, PermissionDeniedError } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
+import { AuthorizationGate } from "./AuthorizationGate.js";
+import type { AutonomyPolicy } from "../mission/AutonomyPolicy.js";
+import { requestConfirmation } from "../utils/confirmationBridge.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -71,6 +74,11 @@ export interface ToolCallOptions {
    * déduplication (voir `LedgerGuard`).
    */
   idempotencyScope?: IdempotencyScope;
+  /**
+   * Le curseur d'autonomie a déjà été appliqué par l'appelant (l'Executor de
+   * missions décide et obtient lui-même l'approbation) : ne pas redemander.
+   */
+  autonomyApproved?: boolean;
 }
 
 /** Identifie l'étape de mission d'un appel d'outil (clé d'idempotence). */
@@ -159,6 +167,18 @@ export interface SafetyGate {
   ): Promise<{ decision: "allow" } | { decision: "block"; reason: string }>;
 }
 
+/** Erreur levée quand le curseur d'autonomie refuse une action (AUDIT-012). */
+export class AutonomyDeniedError extends Error {
+  readonly toolName: string;
+  readonly reason: string;
+  constructor(toolName: string, reason: string) {
+    super(`[autonomy] "${toolName}" refusé : ${reason}`);
+    this.name = "AutonomyDeniedError";
+    this.toolName = toolName;
+    this.reason = reason;
+  }
+}
+
 /** Erreur levée quand le garde de sécurité refuse une action. */
 export class SafetyGateBlockedError extends Error {
   readonly toolName: string;
@@ -187,6 +207,7 @@ export class ToolRegistry {
   private dryRun: DryRunController;
   private idempotency?: IdempotencyGuard;
   private safetyGate?: SafetyGate;
+  private autonomyPolicy?: AutonomyPolicy;
 
   constructor(config: ToolRegistryConfig = {}) {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 120_000;
@@ -207,6 +228,14 @@ export class ToolRegistry {
   /** Branche (ou remplace) le garde de sécurité pré-exécution après construction. */
   setSafetyGate(gate: SafetyGate | undefined): void {
     this.safetyGate = gate;
+  }
+
+  /**
+   * Branche le curseur d'autonomie (suggest/ask/auto + .leannaignore) sur TOUS
+   * les appels : voix/chat, agents et missions (AUDIT-012).
+   */
+  setAutonomyPolicy(policy: AutonomyPolicy | undefined): void {
+    this.autonomyPolicy = policy;
   }
 
   /** Retourne la politique de permissions appliquée au runtime. */
@@ -386,14 +415,39 @@ export class ToolRegistry {
     // Application de la politique de permissions au runtime.
     // Contrairement à checkPermissions (basé sur l'appelant), la politique
     // s'applique TOUJOURS — c'est l'exigence « appliqué au runtime ».
-    const decision = this.permissionPolicy.enforce(
-      name,
-      entry.definition.permissions,
-      options.agentId,
-      entry.definition.attribution
-    );
-    if (!decision.allowed) {
-      throw new PermissionDeniedError(decision);
+    // Point de passage unique des autorisations : AuthorizationGate combine la
+    // politique de permissions et, si branché, le curseur d'autonomie.
+    const verdict = new AuthorizationGate({
+      permissionPolicy: this.permissionPolicy,
+      ...(this.autonomyPolicy ? { autonomyPolicy: this.autonomyPolicy } : {}),
+    }).authorize({
+      toolName: name,
+      required: entry.definition.permissions,
+      attribution: entry.definition.attribution,
+      agentId: options.agentId,
+      args,
+    });
+    if (!verdict.permissionDecision.allowed) {
+      throw new PermissionDeniedError(verdict.permissionDecision);
+    }
+    // Une simulation n'agit pas : le curseur ne s'applique qu'aux exécutions réelles.
+    if (!(options.dryRun ?? this.dryRun.isEnabled()) && !options.autonomyApproved) {
+      if (verdict.decision === "deny") {
+        throw new AutonomyDeniedError(name, verdict.reason);
+      }
+      if (verdict.decision === "ask") {
+        const emit = options.context?.emitToClient;
+        // Sans canal d'approbation (agent autonome…), on refuse : fail-closed.
+        const approved =
+          typeof emit === "function" &&
+          (await requestConfirmation(name, "tool-call", emit, verdict.reason, "high"));
+        if (!approved) {
+          throw new AutonomyDeniedError(
+            name,
+            typeof emit === "function" ? "action non approuvée." : `${verdict.reason} Aucun canal d'approbation disponible.`
+          );
+        }
+      }
     }
 
     // Vérification additionnelle des permissions de l'appelant (le cas échéant).

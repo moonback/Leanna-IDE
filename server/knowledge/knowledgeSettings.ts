@@ -17,7 +17,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { SELF_ROOT, stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("KnowledgeSettings");
@@ -41,7 +41,7 @@ const DEFAULT_SETTINGS: KnowledgeSettings = {
  */
 function getSettingsPath(): string | null {
   if (!SELF_ROOT) return null;
-  return path.join(SELF_ROOT, ".Leanna", "knowledge-settings.json");
+  return path.join(stateBaseDir(), ".Leanna", "knowledge-settings.json");
 }
 
 /** Cache des réglages indexé par racine projet, pour éviter les relectures disque. */
