@@ -114,30 +114,9 @@ export class SkillManagerV2 {
       }
     }
 
-    // Si un contexte est fourni, chercher la skill correspondante et appeler son handler
-    // directement pour préserver le contexte (nécessaire pour emitIdeAction, etc.)
-    if (context) {
-      for (const skill of this.skills) {
-        const tool = skill.declarations.find(d => d.name === normalizedName);
-        if (tool) {
-          // En dry-run, on ne court-circuite PAS vers le handler direct pour les
-          // outils à effet de bord : on les intercepte via le registre pour
-          // garantir la simulation. Les outils en lecture seule passent en direct.
-          const dryRunActive = options?.dryRun ?? this.registry.getDryRun().isEnabled();
-          const def = this.registry.getDefinition(normalizedName);
-          if (dryRunActive && def && this.registry.getDryRun().hasSideEffect(def.permissions)) {
-            return this.registry.call(normalizedName, args ?? {}, { context, dryRun: true, signal: options?.signal });
-          }
-          // Propager le signal d'annulation au handler legacy via le contexte,
-          // pour qu'il puisse interrompre une opération longue.
-          const mergedContext =
-            options?.signal !== undefined ? { ...(context ?? {}), signal: options.signal } : context;
-          return skill.handleToolCall(normalizedName, args, mergedContext);
-        }
-      }
-    }
-
-    // Sinon, utiliser le ToolRegistry normal
+    // Toujours passer par le ToolRegistry, même avec un contexte (Live/chat) :
+    // il transmet le contexte et le signal au handler, et applique permissions,
+    // garde Jev, dry-run, idempotence et timeout (AUDIT-004).
     return this.registry.call(normalizedName, args ?? {}, {
       context,
       dryRun: options?.dryRun,
