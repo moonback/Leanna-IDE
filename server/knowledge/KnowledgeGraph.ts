@@ -295,24 +295,27 @@ export class KnowledgeGraph {
    * Supprime un fichier du graphe (quand un fichier est supprimé).
    */
   removeFile(filePath: string): void {
-    this.syncToCurrentWorkspace();
-    delete this.state.files[filePath];
-    this.rebuildEntityIndex();
-    this.rebuildDependencyGraph();
-    this.state.stats = this.computeStats();
-    this.state.lastIndexed = new Date().toISOString();
-    this.dirty = true;
-    this.save();
-    this.emitUpdate();
-    log.info(`🗑️ Fichier retiré du graphe: ${filePath}`);
+    this.applyChanges([], [filePath]);
   }
 
   /**
    * Réindexe un seul fichier (après modification).
    */
   updateFile(file: FileNode): void {
+    this.applyChanges([file], []);
+  }
+
+  /**
+   * Applique un lot d'ajouts/modifications et de suppressions avec UN SEUL
+   * rebuild des index (entités, dépendances, stats) et UNE seule notification.
+   * À privilégier pour les batches (watcher, mise à jour incrémentale) : appeler
+   * updateFile/removeFile en boucle coûte O(N) par fichier, donc O(N²) au total.
+   */
+  applyChanges(upserts: FileNode[], removals: string[]): void {
+    if (upserts.length === 0 && removals.length === 0) return;
     this.syncToCurrentWorkspace();
-    this.state.files[file.path] = file;
+    for (const filePath of removals) delete this.state.files[filePath];
+    for (const file of upserts) this.state.files[file.path] = file;
     this.rebuildEntityIndex();
     this.rebuildDependencyGraph();
     this.state.stats = this.computeStats();
@@ -320,7 +323,13 @@ export class KnowledgeGraph {
     this.dirty = true;
     this.save();
     this.emitUpdate();
-    log.info(`📝 Fichier mis à jour dans le graphe: ${file.path}`);
+    if (upserts.length + removals.length === 1) {
+      log.info(upserts.length
+        ? `📝 Fichier mis à jour dans le graphe: ${upserts[0].path}`
+        : `🗑️ Fichier retiré du graphe: ${removals[0]}`);
+    } else {
+      log.info(`📝 Graphe mis à jour par lot: ${upserts.length} fichier(s) mis à jour, ${removals.length} retiré(s)`);
+    }
   }
 
   // ─── Requêtes ─────────────────────────────────────────────────────────────

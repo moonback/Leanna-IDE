@@ -295,8 +295,10 @@ export class ProjectIndexer {
 
           // Supprimer les fichiers disparus (sans recalcul de relations à chaque
           // suppression : on diffère à la fin du batch).
+          // Tous les changements du graphe sont accumulés puis appliqués en UNE
+          // fois (applyChanges) : un rebuild des index par fichier serait O(N²).
+          const batch = { upserts: [] as FileNode[], removals: [...deletedFiles] };
           for (const delPath of deletedFiles) {
-            knowledgeGraph.removeFile(delPath);
             astCallGraph.removeFile(delPath);
             this._invalidateContentCache(delPath);
           }
@@ -310,8 +312,9 @@ export class ProjectIndexer {
             if (options.signal?.aborted) throw new ScanCancelledError();
             const changedPath = changedFiles[i];
             options.onProgress?.({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
-            await this.scanFile(changedPath, { skipRelationRefresh: true });
+            await this.scanFile(changedPath, { skipRelationRefresh: true, batch });
           }
+          knowledgeGraph.applyChanges(batch.upserts, batch.removals);
 
           // Recalcul unique des relations pour tout le batch.
           if (changedFiles.length > 0 || deletedFiles.length > 0) {
@@ -573,7 +576,14 @@ export class ProjectIndexer {
    * Scanne un seul fichier et met à jour le KnowledgeGraph.
    * Utile après une modification de fichier.
    */
-  async scanFile(relativePath: string, options: { skipRelationRefresh?: boolean } = {}): Promise<FileNode | null> {
+  async scanFile(
+    relativePath: string,
+    options: {
+      skipRelationRefresh?: boolean;
+      /** Si fourni, le changement est ajouté au lot au lieu d'être appliqué au graphe (cf. applyChanges). */
+      batch?: { upserts: FileNode[]; removals: string[] };
+    } = {}
+  ): Promise<FileNode | null> {
     try {
       const root = this.getActiveProjectRoot();
       const absPath = path.join(root, relativePath);
@@ -600,7 +610,8 @@ export class ProjectIndexer {
             astCallGraph.updateFile(astResult, knowledgeGraph.getAllASTResults());
           }
         }
-        knowledgeGraph.updateFile(fileNode);
+        if (options.batch) options.batch.upserts.push(fileNode);
+        else knowledgeGraph.updateFile(fileNode);
         // Le recalcul complet des relations est COÛTEUX (~2s sur ce projet).
         // Quand on scanne plusieurs fichiers d'affilée (mise à jour
         // incrémentale d'un batch), l'appelant le diffère et l'exécute UNE
@@ -614,7 +625,8 @@ export class ProjectIndexer {
         // pour éviter une entrée obsolète.
         if (knowledgeGraph.getFile(relativePath)) {
           log.debug(`🗑️ Fichier devenu non-indexable, retiré du graphe: ${relativePath}`);
-          knowledgeGraph.removeFile(relativePath);
+          if (options.batch) options.batch.removals.push(relativePath);
+          else knowledgeGraph.removeFile(relativePath);
           astCallGraph.removeFile(relativePath);
           this._invalidateContentCache(relativePath);
           if (!options.skipRelationRefresh) this.refreshSemanticRelations();
@@ -1659,11 +1671,13 @@ export class ProjectIndexer {
     let removed = 0;
     let errors = 0;
     const astResultsBatch = new Map<string, ASTFileResult>();
+    const upserts: FileNode[] = [];
+    const removals: string[] = [];
 
     for (const event of events) {
       try {
         if (event.type === "deleted") {
-          knowledgeGraph.removeFile(event.relativePath);
+          removals.push(event.relativePath);
           astCallGraph.removeFile(event.relativePath);
           this._invalidateContentCache(event.relativePath);
           removed++;
@@ -1686,14 +1700,14 @@ export class ProjectIndexer {
                 astResultsBatch.set(event.relativePath, astResult);
               }
             }
-            knowledgeGraph.updateFile(fileNode);
+            upserts.push(fileNode);
             indexed++;
           } else {
             // Bug 7 : fichier devenu non-indexable (trop gros, illisible…).
             // On le retire du graphe s'il y était déjà présent.
             if (knowledgeGraph.getFile(event.relativePath)) {
               log.debug(`🗑️ Fichier devenu non-indexable, retiré du graphe: ${event.relativePath}`);
-              knowledgeGraph.removeFile(event.relativePath);
+              removals.push(event.relativePath);
               astCallGraph.removeFile(event.relativePath);
               this._invalidateContentCache(event.relativePath);
               removed++;
@@ -1707,6 +1721,8 @@ export class ProjectIndexer {
     }
 
     if (indexed > 0 || removed > 0) {
+      // Un seul rebuild des index pour tout le batch du watcher.
+      knowledgeGraph.applyChanges(upserts, removals);
       // Bug 3 : passer tout l'index AST comme contexte de résolution — les
       // appels cross-file sont résolus contre le projet entier, pas seulement
       // le batch du watcher.

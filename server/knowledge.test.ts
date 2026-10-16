@@ -196,3 +196,54 @@ test('KnowledgeGraph résout les imports ESM ./x.js vers x.ts et remplit depende
   ]);
   assert.deepEqual(knowledgeGraph.getDependencies('server/knowledge/types.ts'), []);
 });
+
+test('KnowledgeGraph.applyChanges applique un lot avec une seule notification', () => {
+  setSelfRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-kg-batch-')));
+  const node = (p: string, imports: string[], entity: string): FileNode => ({
+    path: p, name: path.posix.basename(p), extension: '.ts', size: 10, lines: 1,
+    lastModified: new Date().toISOString(), imports, exports: [], language: 'typescript',
+    entities: [{ name: entity, type: 'function', filePath: p, lineStart: 1 }],
+  });
+
+  knowledgeGraph.update([node('a.ts', ['./b.js'], 'fa'), node('b.ts', [], 'fb'), node('c.ts', [], 'fc')]);
+
+  let notifications = 0;
+  const off = knowledgeGraph.onUpdate(() => { notifications++; });
+  try {
+    knowledgeGraph.applyChanges([node('a.ts', ['./d.js'], 'fa2'), node('d.ts', [], 'fd')], ['b.ts', 'c.ts']);
+  } finally {
+    off();
+  }
+
+  assert.equal(notifications, 1);
+  assert.deepEqual(knowledgeGraph.getAllFiles().map((f) => f.path).sort(), ['a.ts', 'd.ts']);
+  assert.deepEqual(knowledgeGraph.getDependencies('a.ts'), ['d.ts']);
+  assert.deepEqual(knowledgeGraph.getDependents('b.ts'), []);
+  assert.equal(knowledgeGraph.getEntities('fa').length, 0);
+  assert.equal(knowledgeGraph.getEntities('fa2').length, 1);
+  assert.equal(knowledgeGraph.getStats().totalFiles, 2);
+});
+
+test('GET /api/knowledge/ast/* refuse les chemins hors projet et borne les paramètres', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-ast-guard-'));
+  setSelfRoot(root);
+  const app = express();
+  app.use('/api/knowledge', knowledgeRouter);
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/knowledge`;
+
+  try {
+    const traversal = await fetch(`${base}/ast/file?file=${encodeURIComponent('../outside.ts')}`);
+    assert.equal(traversal.status, 400);
+
+    const fns = await fetch(`${base}/ast/functions?limit=abc`);
+    assert.equal(fns.status, 200);
+
+    const chain = await fetch(`${base}/ast/chain?fn=x&depth=99999`);
+    assert.equal(chain.status, 200);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
