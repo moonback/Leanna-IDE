@@ -238,6 +238,8 @@ import { bootstrapRuntimeSync } from "./server/runtime/bootstrap.js";
 import { Observability } from "./server/runtime/Observability.js";
 
 // Importer toutes les skills pour l'initialisation
+import { setPlanSkill } from "./server/skills/setPlan.js";
+import { finalizeMissionSkill } from "./server/skills/finalizeMission.js";
 import { automationSkill } from "./server/skills/automation.js";
 import { browserSkill } from "./server/skills/browser.js";
 import { codebaseSkill } from "./server/skills/codebase.js";
@@ -280,6 +282,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
     verifySkill, securityAuditSkill, weatherSkill, utilitiesSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
     documentKnowledgeSkill, richDocumentSkill, imageGenerationSkill, graphifySkill, telegramSkill,
+    setPlanSkill, finalizeMissionSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
   beforeAudits: async (_r, sm) => {

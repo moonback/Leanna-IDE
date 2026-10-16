@@ -364,6 +364,26 @@ const procedureRules: PromptRule[] = [
       "Forger uniquement un besoin récurrent sans couverture existante (vérifier forge_list et les rôles). Cycle : proposer, attendre l'accord, rédiger, tester sur un cas réel, enregistrer. Après deux échecs de test, réécrire une fois puis abandonner. Sans outils forge_*, écrire un brouillon en sandbox et ne jamais prétendre qu'il est actif.",
     source: "agent-forge.md",
   },
+  {
+    id: "procedure.plan-declaration",
+    priority: RulePriority.PROCEDURE,
+    scope: ["full"],
+    content:
+      "Toute mission de 2 étapes ou plus exige un appel à `set_plan` explicite AVANT la première modification, " +
+      "et une révision du plan à chaque bascule de périmètre. Une mission sans plan déclaré ne doit pas " +
+      "produire d'écriture en sandbox — exception : correction triviale en un seul fichier sans dépendance.",
+    source: "planning.md",
+  },
+  {
+    id: "procedure.finalize-requires-verification",
+    priority: RulePriority.PROCEDURE,
+    scope: ["full"],
+    content:
+      "Une mission ne peut être clôturée (`finalize_mission`) que si les 4 niveaux de vérification " +
+      "sont validés (intégrité, compilation, tests, comportement). Aucune clôture ne peut être déclarée " +
+      "sur la seule base d'un retour d'outil `ok: true`. Un échec de vérification impose un retour en RECOVER.",
+    source: "autonomy.md",
+  },
 ];
 
 // ============================================================================

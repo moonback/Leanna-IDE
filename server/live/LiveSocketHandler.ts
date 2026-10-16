@@ -529,6 +529,8 @@ export function attachLiveWebSocket(
         'agent_delegate', 'agent_negotiate', 'agent_orchestrate', 'agent_status', 'agent_create',
         // Missions autonomes — tâches complexes multi-étapes
         'mission_create', 'mission_status',
+        // Planification & clôture de mission
+        'set_plan', 'finalize_mission',
         'knowledge_search_entities', 'knowledge_status',
         'knowledge_memory_add', 'knowledge_memory_list',
         'knowledge_impact_analyze', 'knowledge_reindex',
@@ -569,6 +571,8 @@ export function attachLiveWebSocket(
         // Graphify — interrogeable en mode question (lecture seule sécurisée)
         'graphify_query', 'graphify_path', 'graphify_explain', 'graphify_affected',
         'graphify_god_nodes', 'graphify_read_report', 'graphify_update',
+        // Planification — déclaration de plan (sans écriture en sandbox)
+        'set_plan',
         // Telegram — statut et notifications en mode ask
         'telegram_notify', 'telegram_send_message', 'telegram_get_status', 'telegram_list_users',
       ]);

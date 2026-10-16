@@ -72,3 +72,12 @@ Un pivot est un changement qualitatif de méthode, jamais une répétition cosm�
 - **Épuisement du budget** : 3 approches infructueuses (6 essais) → arrêt immédiat et restitution d'un diagnostic d'escalade.
 - **Refus de sécurité** : Tout refus déclenché par les politiques de sécurité met fin à l'action sans réessai automatique.
 </anti_loop_safeguards>
+
+<mission_closure>
+## 8. Clôture de Mission (`finalize_mission`)
+Une mission n'est **close** qu'après appel de `finalize_mission` avec l'état des 4 niveaux de vérification.
+- **Précondition stricte** : les 4 niveaux (`integrity`, `compilation`, `tests`, `behavior`) doivent être à `true`. Un seul `false` interdit l'appel — retourner en phase RECOVER.
+- **Alignement avec les garde-fous** : si le budget est épuisé (3 approches, 6 essais), appeler `finalize_mission` avec les niveaux effectivement validés et `next_step` = escalade explicite vers l'utilisateur. Ne pas inventer un `true` sur un niveau non validé.
+- **Après clôture** : une seule prochaine étape peut être proposée (champ `next_step`), tirée du contexte réel (fichier touché, test manquant, dette observée). Pas de liste générique.
+- **Idempotence** : ne pas rappeler `finalize_mission` pour la même mission sans modification ultérieure.
+</mission_closure>

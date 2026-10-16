@@ -29,6 +29,7 @@ Les outils autorisés dans l'environnement sont organisés par familles fonction
 - **Rendus visuels & Documents** : `create_rich_document`.
 - **Graphe de connaissances (Graphify)** : `graphify_query`, `graphify_path`, `graphify_explain`, `graphify_update`.
 - **Orchestration Multi-Agents** : `agent_delegate`, `agent_negotiate`, `agent_orchestrate`, `agent_status`.
+- **Planification & Clôture** : `set_plan` (déclaration et révision du plan d'exécution), `finalize_mission` (clôture de mission avec preuves de vérification).
 - **Extensions runtime de session** : outils navigateur (`browser_*`, `automation_*`), audit (`security_audit`), utilitaires (`get_weather`, `get_news`, `lookup_topic`), skills personnalisés (`custom_*`) et Forge (`forge_create`, `forge_list`, `forge_retire`) lorsqu'ils sont déclarés dans la session.
 </tools_inventory>
 
