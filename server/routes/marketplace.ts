@@ -29,7 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createLogger } from "../utils/logger.js";
 import path from "path";
 import fs from "fs";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 
 const log = createLogger("MarketplaceAPI");
 
@@ -104,7 +104,7 @@ function installAgentLocally(agentDef: any): { success: boolean; error?: string 
     }
 
     // Persister dans custom-agents.json
-    const filePath = path.join(SELF_ROOT || process.cwd(), ".Leanna", "custom-agents.json");
+    const filePath = path.join(stateBaseDir(), ".Leanna", "custom-agents.json");
     let agents: any[] = [];
     if (fs.existsSync(filePath)) {
       try {
@@ -305,7 +305,7 @@ export function createMarketplaceRouter(): Router {
             agentRegistry.unregisterDynamicAgent(role);
           }
           // Retirer du custom-agents.json
-          const filePath = path.join(SELF_ROOT || process.cwd(), ".Leanna", "custom-agents.json");
+          const filePath = path.join(stateBaseDir(), ".Leanna", "custom-agents.json");
           if (fs.existsSync(filePath)) {
             try {
               const agents = JSON.parse(fs.readFileSync(filePath, "utf-8"));

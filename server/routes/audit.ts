@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import os from 'os';
 import path from 'path';
 import { readAuditEntries, analyzeAuditLog } from '../audit.js';
-import { SELF_ROOT } from '../utils/selfRoot.js';
+import { SELF_ROOT, stateBaseDir } from '../utils/selfRoot.js';
 import { isSandboxActive, getSandboxRoot } from '../utils/sandbox.js';
 import { getLogEntries, type LogLevel } from '../utils/logger.js';
 import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
@@ -84,7 +84,7 @@ function attachStaticRoutes(router: Router): void {
   // GET /api/audit/logs
   router.get('/logs', async (_req: Request, res: Response) => {
     try {
-      const logPath = path.join(SELF_ROOT, '.Leanna-audit.log');
+      const logPath = path.join(stateBaseDir(), '.Leanna-audit.log');
       const entries = await readAuditEntries(logPath, 20);
       res.json({ status: 'ok', entries });
     } catch (e: any) {
@@ -120,7 +120,7 @@ function attachStaticRoutes(router: Router): void {
 
   // GET /api/audit/analysis
   router.get('/analysis', (_req: Request, res: Response) => {
-    const logPath = path.join(SELF_ROOT, '.Leanna-audit.log');
+    const logPath = path.join(stateBaseDir(), '.Leanna-audit.log');
     const analysis = analyzeAuditLog(logPath);
     res.json({ status: 'success', analysis });
   });

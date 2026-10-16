@@ -21,7 +21,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT, getActiveProjectId } from "../utils/selfRoot.js";
+import { SELF_ROOT, getActiveProjectId, stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import { strategyMemory, type StrategyMemory } from "./StrategyMemory.js";
 import { playbookStore, type PlaybookStore } from "./PlaybookStore.js";
@@ -95,7 +95,7 @@ const EMPTY_DETECTED: DetectedStack = {
 };
 
 function profilePath(): string {
-  return path.join(SELF_ROOT || process.cwd(), ".Leanna", "project-profile.json");
+  return path.join(stateBaseDir(), ".Leanna", "project-profile.json");
 }
 
 function detectPackageManager(root: string): PackageManager {

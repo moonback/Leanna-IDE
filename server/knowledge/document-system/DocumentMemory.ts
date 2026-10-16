@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { createLogger } from "../../utils/logger.js";
-import { SELF_ROOT } from "../../utils/selfRoot.js";
+import { stateBaseDir } from "../../utils/selfRoot.js";
 import type {
   KnowledgeDocument,
   DocumentRelation,
@@ -38,7 +38,7 @@ const MAX_FACTS = 1000;
 const STORE_FILE = "DocumentKnowledge.json";
 
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".Leanna", STORE_FILE);
+  return path.join(stateBaseDir(), ".Leanna", STORE_FILE);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

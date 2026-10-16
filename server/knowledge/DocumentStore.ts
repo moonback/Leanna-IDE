@@ -14,7 +14,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { createLogger } from "../utils/logger.js";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 
 const log = createLogger("DocumentStore");
 
@@ -477,7 +477,7 @@ export class DocumentStore {
 const documentStoreCache = new Map<string, DocumentStore>();
 
 export function getDocumentStore(projectRoot?: string): DocumentStore {
-  const resolvedRoot = projectRoot ? path.resolve(projectRoot) : (SELF_ROOT || process.cwd());
+  const resolvedRoot = projectRoot ? path.resolve(projectRoot) : stateBaseDir();
   const normalizedRoot = path.resolve(resolvedRoot);
 
   if (!documentStoreCache.has(normalizedRoot)) {

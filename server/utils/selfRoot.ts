@@ -66,6 +66,15 @@ function getAppStateDir(): string {
 }
 
 /**
+ * Base des fichiers d'état `.Leanna/` : le projet actif, sinon le parent du
+ * dossier d'état de l'app (qui suit LEANNA_STATE_DIR). Résolveur unique pour
+ * ne jamais retomber sur `process.cwd()` — en test, ce serait le dépôt (AUDIT-035).
+ */
+export function stateBaseDir(): string {
+  return SELF_ROOT || path.dirname(getAppStateDir());
+}
+
+/**
  * Fichier de config interne (dans le dossier Leanna) qui mémorise
  * le dernier projet sélectionné par l'utilisateur.
  */

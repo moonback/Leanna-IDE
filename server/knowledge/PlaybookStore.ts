@@ -21,7 +21,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("PlaybookStore");
@@ -77,7 +77,7 @@ const MAX_EXAMPLE_MISSIONS = 10;
 const MIN_STEPS = 2;
 
 function getStorePath(): string {
-  return path.join(SELF_ROOT || process.cwd(), ".Leanna", "playbooks.json");
+  return path.join(stateBaseDir(), ".Leanna", "playbooks.json");
 }
 
 /**

@@ -2,16 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import { fileURLToPath } from 'url';
 import path from 'path';
+import os from 'os';
+import fs from 'fs';
 import { createSandboxRouter } from './sandbox.js';
 import { setSelfRoot } from '../utils/selfRoot.js';
 import { stopWatching } from '../utils/sandboxWatcher.js';
 
+// AUDIT-035 : projet temporaire, jamais le dépôt — un reset de sandbox
+// recopierait sinon tout le dépôt dans son vrai .Leanna/sandbox.
 {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname_local = path.dirname(__filename);
-  setSelfRoot(path.resolve(__dirname_local, '..', '..'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-sandbox-routes-'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"name":"sandbox-test"}');
+  setSelfRoot(root);
 }
 
 

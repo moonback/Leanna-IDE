@@ -20,7 +20,7 @@
 
 import fs from "fs";
 import path from "path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { SELF_ROOT, stateBaseDir } from "../utils/selfRoot.js";
 import { createLogger } from "../utils/logger.js";
 import { knowledgeGraphCache } from "./KnowledgeGraphCache.js";
 import { resolveImportSpecifier } from "./importResolution.js";
@@ -47,7 +47,7 @@ const log = createLogger("KnowledgeGraph");
  * Stocke les données localement dans le projet actif pour isoler chaque projet.
  */
 function getStorePath(): string {
-  return path.join(SELF_ROOT, ".project-knowledge.json");
+  return path.join(stateBaseDir(), ".project-knowledge.json");
 }
 
 // ─── Constantes de debounce ──────────────────────────────────────────────────

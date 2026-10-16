@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { SELF_ROOT } from './utils/selfRoot.js';
+import { stateBaseDir } from './utils/selfRoot.js';
 
 export interface AuditEvent {
   timestamp: string;
@@ -13,7 +13,7 @@ export interface AuditEvent {
 }
 
 export async function appendAuditEvent(event: Omit<AuditEvent, 'timestamp'> & { logPath?: string }) {
-  const logPath = event.logPath || path.join(SELF_ROOT, '.Leanna-audit.log');
+  const logPath = event.logPath || path.join(stateBaseDir(), '.Leanna-audit.log');
   const safeEvent: AuditEvent = {
     timestamp: new Date().toISOString(),
     action: event.action,

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { SELF_ROOT, CRITICAL_FILES, hasProject } from '../utils/selfRoot.js';
+import { SELF_ROOT, CRITICAL_FILES, hasProject, stateBaseDir } from '../utils/selfRoot.js';
 import {
   LEANNAIGNORE_FILENAME,
   getIgnoreFilePath,
@@ -46,7 +46,7 @@ function invalidateCache(configPath: string) {
 
 // GET /api/safeguards/config
 router.get('/config', (_req: Request, res: Response) => {
-  const configPath = path.join(SELF_ROOT, '.Leanna', 'safeguards.json');
+  const configPath = path.join(stateBaseDir(), '.Leanna', 'safeguards.json');
   const defaultConfig = {
     autoCheckpoint: true,
     postEditValidation: true,
@@ -60,7 +60,7 @@ router.get('/config', (_req: Request, res: Response) => {
 
 // POST /api/safeguards/config
 router.post('/config', (req: Request, res: Response) => {
-  const configDir = path.join(SELF_ROOT, '.Leanna');
+  const configDir = path.join(stateBaseDir(), '.Leanna');
   const configPath = path.join(configDir, 'safeguards.json');
   try {
     if (!fs.existsSync(configDir)) {

@@ -7,7 +7,7 @@ import type { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 import { dynamicAgentRegistry } from "../agents/DynamicAgentRegistry.js";
 import { agentRegistry } from "../agents/AgentRegistry.js";
 import { getAgentDefinition } from "../agents/roles.js";
@@ -64,11 +64,11 @@ const AgentImportSchema = z.object({
 });
 
 function getAgentsFilePath(): string {
-  return path.join(SELF_ROOT, ".Leanna", "custom-agents.json");
+  return path.join(stateBaseDir(), ".Leanna", "custom-agents.json");
 }
 
 function ensureDir() {
-  const dir = path.join(SELF_ROOT, ".Leanna");
+  const dir = path.join(stateBaseDir(), ".Leanna");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

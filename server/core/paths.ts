@@ -7,17 +7,16 @@
  * écriture de fichiers JSON sous `.Leanna/`.
  *
  * `SELF_ROOT` peut être "" (aucun projet actif au démarrage) — dans ce cas on
- * retombe sur `process.cwd()` pour rester toujours disponible.
+ * retombe sur le dossier d'état de l'app (`stateBaseDir`), jamais sur `process.cwd()`.
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { stateBaseDir } from "../utils/selfRoot.js";
 
-/** Racine effective du workspace : SELF_ROOT s'il est défini, sinon cwd. */
+/** Racine effective : SELF_ROOT s'il est défini, sinon le dossier d'état de l'app (jamais cwd). */
 export function workspaceRoot(): string {
-  const root = SELF_ROOT && SELF_ROOT.trim().length > 0 ? SELF_ROOT : process.cwd();
-  return path.resolve(root);
+  return path.resolve(stateBaseDir());
 }
 
 /** Répertoire `.Leanna/` du workspace actif (créé si nécessaire). */
