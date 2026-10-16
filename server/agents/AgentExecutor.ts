@@ -182,9 +182,12 @@ export class AgentExecutor implements AgentTaskRunner {
     
     // Outils de vérification (45-60s)
     'verify_file': 60_000,
-    'verify_typecheck': 120_000,
+    // Légèrement au-dessus des timeouts processus de verify.ts, pour que l'échec
+    // remonte avec la sortie du script plutôt qu'un « Outil timeout » muet.
+    'verify_typecheck': 320_000,
     'verify_lint': 120_000,
-    'verify_full': 180_000,
+    'verify_full': 320_000,
+    'verify_run_script': 620_000,
     'run_project_command': 120_000,
     
     // Outils d'écriture (30-60s)

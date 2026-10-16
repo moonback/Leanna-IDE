@@ -31,8 +31,18 @@ const testCache = new Map<string, TestCacheEntry>();
 const TEST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
+import { ensureSandboxNodeModules, isSandboxActive } from "../utils/sandbox.js";
 
 const TIMEOUT_MS = 60_000;
+/** tsc complet sur un gros projet dépasse souvent 60s (cf. timeouts des missions). */
+const TSC_TIMEOUT_MS = 300_000;
+/** Durée max par script npm : un `next build` prend plusieurs minutes. */
+const SCRIPT_TIMEOUTS_MS: Record<string, number> = {
+  build: 600_000,
+  typecheck: 300_000,
+  test: 600_000,
+  lint: 180_000,
+};
 const MAX_OUTPUT_CHARS = 8_000;
 
 function truncate(s: string): string {
@@ -508,6 +518,15 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
 
+  // Dans le sandbox, les outils (tsc, next, vitest…) doivent trouver leurs
+  // dépendances sous la racine : on attend la copie de node_modules (no-op si à jour).
+  if (isSandboxActive()) {
+    const sync = await ensureSandboxNodeModules();
+    if (sync.status === "failed") {
+      console.warn(`[Verify] node_modules du sandbox indisponible : ${sync.reason}`);
+    }
+  }
+
   const npxBin = isWin ? "npx.cmd" : "npx";
   const npmBin = isWin ? "npm.cmd" : "npm";
 
@@ -516,9 +535,14 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   // Windows. On active donc le shell uniquement sur Windows. Les arguments
   // restent passés sous forme de tableau et le nom de script est déjà validé
   // contre une liste blanche en amont : pas d'interpolation de valeur non fiable.
+  const timeout = cmd === "tsc"
+    ? TSC_TIMEOUT_MS
+    : cmd === "npm-run"
+      ? SCRIPT_TIMEOUTS_MS[args[0]] ?? TIMEOUT_MS
+      : TIMEOUT_MS;
   const opts = {
     cwd: root,
-    timeout: TIMEOUT_MS,
+    timeout,
     maxBuffer: 2 * 1024 * 1024,
     shell: isWin,
     env: { ...process.env },
