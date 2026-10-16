@@ -15,7 +15,7 @@ import {
 // correspondante (via le parent) ; « Standard » réinitialise au comportement
 // d'origine. Désactivé hors connexion (l'override agit sur la session en cours).
 
-const ICONS: Record<ProfileIcon, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
+const ICONS: Record<ProfileIcon, React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>> = {
   sparkles: Sparkles,
   shield: Shield,
   wrench: Wrench,
