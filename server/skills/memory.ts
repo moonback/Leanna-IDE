@@ -1,13 +1,30 @@
 import { Skill, validateArgs } from "./base.js";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { createGeminiClient } from "../utils/geminiKeyPool.js";
+import { withGeminiRetry } from "../utils/geminiKeyPool.js";
 import { trackedGeminiEmbed } from "../utils/textGeneration.js";
 import { getActiveProjectId } from "../utils/selfRoot.js";
 
 // Cache simple en mémoire pour les embeddings et les résultats de recherche
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Embedding via le pool de clés : rotation sur 429/503, et une clé refusée en 401
+ * (ex: jeton « AQ. » → ACCESS_TOKEN_TYPE_UNSUPPORTED) est exclue des embeddings.
+ */
+function embedWithKeyRotation(contents: string) {
+  return withGeminiRetry(
+    (ai) => trackedGeminiEmbed(ai, {
+      model: "gemini-embedding-2",
+      contents,
+      config: { outputDimensionality: 768 },
+    }),
+    undefined,
+    30_000,
+    { capability: "embed" },
+  );
+}
 
 /**
  * Cherche une mémoire sémantiquement proche ET partageant au moins un tag commun.
@@ -191,17 +208,10 @@ export const memorySkill: Skill = {
     // ── save_memory ─────────────────────────────────────────────────────────
     if (name === "save_memory") {
       try {
-        const ai = createGeminiClient();
-        if (!ai) return { error: "Aucune clé Gemini API disponible. Ajoutez des clés dans les paramètres." };
-
         const validated = validateArgs(memorySkill.inputSchemas!.save_memory, args);
         console.log(`[Memory] save: '${validated.content}' tags=${JSON.stringify(validated.tags)}`);
 
-        const embedResponse = await trackedGeminiEmbed(ai, {
-          model: "gemini-embedding-2",
-          contents: validated.content,
-          config: { outputDimensionality: 768 },
-        });
+        const embedResponse = await embedWithKeyRotation(validated.content);
         const embedding = embedResponse.embeddings?.[0]?.values;
         if (!embedding) return { error: "Erreur lors de la génération de l'embedding." };
 
@@ -304,14 +314,7 @@ export const memorySkill: Skill = {
           return { status: "success", results: cached.data, cached: true };
         }
 
-        const ai = createGeminiClient();
-        if (!ai) return { error: "Aucune clé Gemini API disponible." };
-
-        const embedResponse = await trackedGeminiEmbed(ai, {
-          model: "gemini-embedding-2",
-          contents: trimmedQuery,
-          config: { outputDimensionality: 768 },
-        });
+        const embedResponse = await embedWithKeyRotation(trimmedQuery);
         const queryEmbedding = embedResponse.embeddings?.[0]?.values;
         if (!queryEmbedding) return { error: "Erreur lors de la génération de l'embedding de la requête." };
 
