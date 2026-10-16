@@ -43,7 +43,10 @@ export class AutonomyPolicy {
   private mode: AutonomyMode;
   private permissions: Map<string, ToolPermission[]> = new Map();
   private ignorePatterns: string[] = [];
-  private workspaceRoot: string;
+  /** Racine lue à chaque décision : suit le projet actif (AUDIT-011). */
+  private readonly getRoot: () => string;
+  /** Racine et mtime du .leannaignore chargé, pour recharger au changement. */
+  private loadedFrom: { root: string; mtimeMs: number } | null = null;
   /**
    * En mode "auto", autorise-t-on les actions marquées « dangerous » sans
    * approbation humaine ? Par défaut false : les actions dangereuses restent
@@ -53,12 +56,14 @@ export class AutonomyPolicy {
 
   constructor(params: {
     mode?: AutonomyMode;
-    workspaceRoot: string;
+    /** Chemin, ou fonction pour suivre le projet actif (ex. `() => SELF_ROOT`). */
+    workspaceRoot: string | (() => string);
     /** Override explicite ; sinon lu depuis LEANNA_AUTO_ALLOW_DANGEROUS. */
     allowDangerousInAuto?: boolean;
   }) {
     this.mode = params.mode ?? "ask";
-    this.workspaceRoot = params.workspaceRoot;
+    const root = params.workspaceRoot;
+    this.getRoot = typeof root === "function" ? root : () => root;
     this.allowDangerousInAuto =
       params.allowDangerousInAuto ??
       String(process.env.LEANNA_AUTO_ALLOW_DANGEROUS ?? "").toLowerCase() === "true";
@@ -83,6 +88,7 @@ export class AutonomyPolicy {
 
   /** Recharge .leannaignore depuis le disque. */
   reloadIgnore(): void {
+    this.loadedFrom = null;
     this.loadIgnoreFile();
   }
 
@@ -93,6 +99,7 @@ export class AutonomyPolicy {
     // `permissions` : déclaration réelle de l'outil (registre) ; sinon la table chargée au démarrage.
     const perms = permissions ?? this.permissions.get(skillName);
     const sideEffect = this.hasSideEffect(perms);
+    this.loadIgnoreFile();
     const ignoredPaths = this.matchIgnored(args);
 
     // Les lectures sont toujours autorisées, quel que soit le mode.
@@ -206,10 +213,9 @@ export class AutonomyPolicy {
 
   /** Normalise un chemin en relatif POSIX par rapport à la racine du workspace. */
   private toRelativePosix(candidate: string): string {
-    const abs = path.isAbsolute(candidate)
-      ? candidate
-      : path.resolve(this.workspaceRoot, candidate);
-    const rel = path.relative(this.workspaceRoot, abs);
+    const root = this.getRoot();
+    const abs = path.isAbsolute(candidate) ? candidate : path.resolve(root, candidate);
+    const rel = path.relative(root, abs);
     return rel.split(path.sep).join("/");
   }
 
@@ -256,11 +262,18 @@ export class AutonomyPolicy {
     return new RegExp(`${prefix}${re}$`);
   }
 
+  /** (Re)charge .leannaignore si la racine ou le fichier a changé depuis le dernier chargement. */
   private loadIgnoreFile(): void {
+    const root = this.getRoot();
+    // Sans projet ouvert (racine vide), ne pas lire le .leannaignore du dossier courant.
+    const file = root ? path.join(root, ".leannaignore") : "";
+    let mtimeMs = -1;
+    try { if (file) mtimeMs = fs.statSync(file).mtimeMs; } catch { /* absent */ }
+    if (this.loadedFrom?.root === root && this.loadedFrom.mtimeMs === mtimeMs) return;
+    this.loadedFrom = { root, mtimeMs };
     this.ignorePatterns = [];
     try {
-      const file = path.join(this.workspaceRoot, ".leannaignore");
-      if (!fs.existsSync(file)) return;
+      if (mtimeMs < 0) return;
       const content = fs.readFileSync(file, "utf8");
       this.ignorePatterns = content
         .split(/\r?\n/)

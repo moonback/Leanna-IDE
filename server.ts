@@ -420,7 +420,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         | "suggest"
         | "ask"
         | "auto";
-      const autonomyPolicy = new AutonomyPolicy({ mode: autonomyMode, workspaceRoot: SELF_ROOT });
+      const autonomyPolicy = new AutonomyPolicy({ mode: autonomyMode, workspaceRoot: () => SELF_ROOT });
       // Fournir les permissions par outil (pour classer lecture vs effet de bord).
       autonomyPolicy.setToolPermissions(
         r.tools.getDefinitions().map((def: any) => ({

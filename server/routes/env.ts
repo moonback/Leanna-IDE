@@ -226,7 +226,7 @@ function parseEnvFile(): EnvSection[] {
  * Écrit une clé=valeur dans le .env actif. Préserve commentaires et autres clés.
  * Chiffre les valeurs sensibles. Réplique la logique de updateEnvFile (server.ts).
  */
-function writeEnvKey(key: string, value: string): void {
+export function writeEnvKey(key: string, value: string): void {
   const envPath = getEnvPath();
   // Seules les clés déchiffrées au démarrage sont chiffrées au repos. Les autres
   // secrets (Leanna_MASTER_KEY, VITE_*) restent masqués en lecture mais sont
