@@ -2,7 +2,7 @@
 
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
-import React, { StrictMode, useEffect, useMemo, useState, useCallback, lazy, Suspense } from 'react';
+import React, { StrictMode, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
@@ -49,10 +49,9 @@ const PilotageView = lazy(() => import('./views/PilotageView.js'));
 import './index.css';
 import { dedupKeyFor } from './lib/fetchDedup.js';
 
-const configuredApiToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_Leanna_API_TOKEN?.trim();
-if (configuredApiToken) {
-  localStorage.setItem('Leanna_api_token', configuredApiToken);
-}
+// SECURITY (AUDIT-001) : aucun jeton n'est embarqué au build. Sous Electron, le
+// cookie httpOnly `Leanna_token` est posé par le processus principal ; dans un
+// navigateur, l'utilisateur saisit le jeton (AuthGate), stocké localement.
 
 // ── Global fetch interceptor: auto-inject auth token + dedup + CIRCUIT BREAKER
 {
@@ -121,7 +120,7 @@ if (configuredApiToken) {
 
     let resolvedInit = init;
     if (isApi) {
-      const token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
+      const token = localStorage.getItem('Leanna_api_token');
       if (token) {
         const headers = new Headers(init?.headers);
         if (!headers.has('x-Leanna-token')) {
@@ -182,7 +181,7 @@ try {
   const raw = localStorage.getItem(PROFILE_KEY);
   if (raw) {
     const p = JSON.parse(raw);
-    const _token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
+    const _token = localStorage.getItem('Leanna_api_token');
     fetch('/api/profile', {
       method: 'POST',
       headers: {
@@ -207,7 +206,7 @@ try {
 // Cela permet au frontend de connaître quel agent utilise quel outil
 (async () => {
   try {
-    const _token = localStorage.getItem('Leanna_api_token') || configuredApiToken;
+    const _token = localStorage.getItem('Leanna_api_token');
     const response = await fetch('/api/agents/tool-mapping/primary', {
       headers: _token ? { 'x-Leanna-token': _token } : {},
     });
@@ -301,43 +300,68 @@ function IdeNavigationBridge() {
 
 // ── Layout ──────────────────────────────────────────────────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
+  // Le serveur est seul juge : on sonde une route protégée au lieu de comparer
+  // à un jeton côté client (AUDIT-009 pt 4).
+  const [status, setStatus] = useState<'checking' | 'ok' | 'denied'>('checking');
   const [token, setToken] = useState('');
-  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    const stored = localStorage.getItem('Leanna_api_token') || configuredApiToken || '';
-    setToken(stored);
-    setReady(true);
+  const isAuthorized = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/check', { cache: 'no-store' });
+      return res.status !== 401;
+    } catch {
+      // Serveur injoignable : l'application affiche ses propres erreurs réseau.
+      return true;
+    }
   }, []);
 
-  const isAuthenticated = useMemo(() => {
-    if (!configuredApiToken) return true;
-    return token === configuredApiToken;
-  }, [token]);
+  useEffect(() => {
+    void isAuthorized().then(ok => setStatus(ok ? 'ok' : 'denied'));
+  }, [isAuthorized]);
 
-  if (!ready) return null;
-  if (isAuthenticated) {
-    return <>{children}</>;
-  }
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('Leanna_api_token', token.trim());
+    if (await isAuthorized()) {
+      setStatus('ok');
+    } else {
+      localStorage.removeItem('Leanna_api_token');
+      setError('Jeton refusé par le serveur.');
+    }
+  };
+
+  if (status === 'checking') return null;
+  if (status === 'ok') return <>{children}</>;
 
   return (
     <div className="flex h-screen w-screen items-center justify-center" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <div className="w-full max-w-sm rounded-2xl border p-6" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border p-6" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
         <h1 className="text-lg font-semibold">Accès protégé</h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>Saisissez le token d’accès pour continuer.</p>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Le serveur Leanna exige un jeton d’accès. Dans l’application de bureau, il est fourni automatiquement :
+          redémarrez-la si cet écran persiste. Dans un navigateur, copiez la valeur de <code>Leanna_API_TOKEN</code> du fichier <code>.env</code>.
+        </p>
+        <label htmlFor="leanna-token" className="mt-4 block text-sm font-medium">Jeton d’accès</label>
         <input
+          id="leanna-token"
           type="password"
+          autoComplete="off"
           value={token}
-          onChange={e => {
-            const next = e.target.value;
-            setToken(next);
-            localStorage.setItem('Leanna_api_token', next);
-          }}
-          className="mt-4 w-full rounded-xl border px-3 py-2 text-sm"
+          onChange={e => { setToken(e.target.value); setError(''); }}
+          className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
           style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          placeholder="Token"
         />
-      </div>
+        {error && <p role="alert" className="mt-2 text-sm" style={{ color: 'var(--text-danger, #ef4444)' }}>{error}</p>}
+        <button
+          type="submit"
+          disabled={!token.trim()}
+          className="mt-4 w-full rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          style={{ backgroundColor: 'var(--accent, #6366f1)', color: '#fff' }}
+        >
+          Valider
+        </button>
+      </form>
     </div>
   );
 }

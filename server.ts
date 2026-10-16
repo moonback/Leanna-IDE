@@ -695,6 +695,9 @@ async function startServer() {
   // à toutes les routes /api/* (sauf /api/health, déjà traitée ci-dessus).
   app.use("/api", requireAuth);
 
+  // Sonde d'authentification de l'AuthGate : 200 si le jeton (cookie ou en-tête) est valide.
+  app.get("/api/auth/check", (_req, res) => { res.json({ ok: true }); });
+
   // ── Routeurs modulaires (refactorisation priorité #1) ────────────────────
   // Montés APRÈS requireAuth mais AVANT les routes inline legacy.
   // Express matche en ordre d'enregistrement : ces routeurs gagnent.

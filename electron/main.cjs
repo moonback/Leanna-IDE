@@ -7,6 +7,55 @@ const path = require('path');
 const DEBUG = process.env.ELECTRON_DEBUG === '1';
 const isPackaged = app.isPackaged;
 
+// ── Jeton d'accès à l'API locale (AUDIT-001) ────────────────────────────────
+// Le jeton n'est plus embarqué dans le bundle web : le processus principal le
+// lit (serveur packagé dans ce processus, ou .env chargé par le lanceur dev) et
+// le pose en cookie httpOnly sur la session de l'app, jamais exposé au JS.
+function decryptGcm(value) {
+  const crypto = require('crypto');
+  const [, ivHex, tagHex, cipherHex] = value.split(':');
+  const key = Buffer.from(process.env.Leanna_MASTER_KEY || '', 'base64');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return decipher.update(cipherHex, 'hex', 'utf8') + decipher.final('utf8');
+}
+
+function readApiToken() {
+  const raw = (process.env.Leanna_API_TOKEN || '').trim();
+  if (!raw.startsWith('gcm:')) return raw;
+  // shortcut: seul le format GCM est géré (pas l'ancien CBC) ; sinon l'écran de saisie du jeton prend le relais.
+  try { return decryptGcm(raw); } catch { return ''; }
+}
+
+function getAppBaseUrl() {
+  return process.env.ELECTRON_START_URL || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || 4000}`;
+}
+
+async function setAuthCookie() {
+  // En mode packagé, le serveur (même processus) génère le jeton au démarrage :
+  // on l'attend brièvement plutôt que de charger une page qui recevrait 401.
+  let token = readApiToken();
+  for (let i = 0; !token && i < 100; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    token = readApiToken();
+  }
+  if (!token) return;
+  const { session } = require('electron');
+  await session.defaultSession.cookies.set({
+    url: getAppBaseUrl(),
+    name: 'Leanna_token',
+    value: token,
+    httpOnly: true,
+    sameSite: 'lax',
+  }).catch((e) => log('Auth cookie failed:', e.message));
+}
+
+function loadAppUrl(win, url) {
+  return setAuthCookie().finally(() => {
+    if (!win.isDestroyed()) win.loadURL(url);
+  });
+}
+
 function getWindowIcon() {
   const iconName = nativeTheme.shouldUseDarkColors ? 'icon-sombre.png' : 'icon-light.png';
   return path.join(__dirname, '../assets/images', iconName);
@@ -163,7 +212,7 @@ function createWindow(splash, splashMinEnd) {
   const port = process.env.VITE_SERVER_PORT || 4000;
   const startUrl = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
   log('Loading URL:', startUrl);
-  win.loadURL(startUrl);
+  loadAppUrl(win, startUrl);
 
   // Afficher la fenêtre principale une fois le contenu chargé
   win.webContents.on('did-finish-load', () => {
@@ -214,7 +263,7 @@ function createWindow(splash, splashMinEnd) {
     if (errorCode === -102 || errorCode === -6 || errorCode === -105) {
       setTimeout(() => {
         log('Retrying load...');
-        win.loadURL(startUrl);
+        loadAppUrl(win, startUrl);
       }, 1500);
     }
   });
@@ -475,7 +524,7 @@ app.whenReady().then(() => {
 
     const port = process.env.VITE_SERVER_PORT || 4000;
     const base = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
-    orbWindow.loadURL(`${base}/orb-live`);
+    loadAppUrl(orbWindow, `${base}/orb-live`);
 
     orbWindow.webContents.on('did-finish-load', () => {
       if (orbWindow && !orbWindow.isDestroyed()) orbWindow.show();
