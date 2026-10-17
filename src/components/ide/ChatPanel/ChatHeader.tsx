@@ -145,8 +145,9 @@ export function ChatHeader({
             )}
           </div>
 
-          {/* Ligne 2 : Pastille de statut + Sélecteur de profil (protégés contre tout débordement) */}
-          <div className="flex items-center gap-1.5 mt-0.5 min-w-0 overflow-hidden">
+          {/* Ligne 2 : Pastille de statut + Sélecteur de profil */}
+          {/* overflow-hidden retiré : il clippait le dropdown absolu du ProfileSwitcher */}
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
             <span
               className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
               style={{
