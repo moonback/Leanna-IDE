@@ -368,3 +368,118 @@ test('Executor: deux missions réelles ne s\'exécutent jamais en parallèle', a
   await Promise.all([executor.waitForMission(a.id), executor.waitForMission(b.id)]);
   assert.equal(maxConcurrent, 1, 'la seconde mission attend la fin de la première');
 });
+
+// ─── Statut terminal : la racine est fermée même si un sous-objectif est bloqué ─
+
+test('a mission ending with an escalated (blocked) sub-goal is finalized as failed, not in_progress', async () => {
+  const executor = new Executor();
+  // Échec factuel systématique → réflexion "escalate" → blockGoal (reste sur la pile).
+  executor.setSkillHandler(async () => ({ status: 'failed', message: 'boom' }));
+  const mission = await executor.startMission({
+    title: 'Vérifier la compilation',
+    description: 'Lancer verify_typecheck.',
+    availableSkills: ['verify_typecheck'],
+  });
+  const done = await executor.waitForMission(mission.id);
+  assert.ok(done);
+  assert.equal(done.status, 'failed', 'une mission finalisée ne doit jamais rester in_progress');
+  assert.equal(done.getState().goals[done.rootGoal.id].status, 'failed');
+  // Le sous-objectif escaladé garde son statut "blocked" (pas requalifié en failed).
+  const sub = Object.values(done.getState().goals).filter((g) => g.parentId !== null);
+  assert.ok(sub.some((g) => g.status === 'blocked'));
+});
+
+test('supervised mode does not fake retries on an already finalized mission', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-sup-retry-'));
+  const mem = new Map<string, string>();
+  const supervisor = new LeannaSupervisor({
+    maxAttempts: 3,
+    missionStore: new DurableMissionStore(path.join(dir, 'missions')),
+    checkpoints: new CheckpointManager({
+      gateway: {
+        exists: (p: string) => mem.has(p),
+        read: (p: string) => mem.get(p) ?? '',
+        write: (p: string, c: string) => void mem.set(p, c),
+        remove: (p: string) => void mem.delete(p),
+      },
+      dirOverride: path.join(dir, 'cp'),
+    }),
+    evidence: new EvidenceEngine(path.join(dir, 'ev')),
+  });
+  const executor = new Executor();
+  executor.setSkillHandler(async () => ({ ok: true }));
+  // Objectif à livrable sans écriture → échec "simple" (replan suggéré).
+  executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev2')), true);
+  executor.setSupervisor(supervisor, true);
+  // Deux sous-objectifs INDÉPENDANTS qui échouent → aucun "blocked" → replan suggéré.
+  executor.setLLMDecompose(async () => JSON.stringify([1, 2].map((i) => ({
+    title: `Écrire le rapport ${i}`,
+    description: `Rédiger et écrire le rapport Markdown ${i}.`,
+    successCriteria: [`rapport ${i}.md écrit`],
+    priority: 'medium',
+    dependsOn: [],
+  }))));
+  let skillCalls = 0;
+  executor.setSkillHandler(async () => { skillCalls++; return { ok: true }; });
+  const supervised: Array<{ attempts: number; state: string }> = [];
+  executor.setEventEmitter((event, data) => {
+    if (event === 'mission_supervised') supervised.push({ attempts: data.attempts as number, state: data.lifecycleState as string });
+  });
+
+  const mission = await executor.startMission({
+    title: 'Produire le rapport d’audit',
+    description: 'Rédiger et écrire un rapport Markdown documentant les résultats.',
+    availableSkills: ['read_project_file'],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  assert.equal(done.status, 'failed', 'la mission finalisée garde son statut terminal');
+  assert.equal(supervised.length, 1);
+  assert.equal(supervised[0].attempts, 1, 'aucune tentative fantôme sur une mission déjà finalisée');
+  assert.equal(supervised[0].state, 'ESCALATED');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('supervised mode: a mission is never "completed" while the Supervisor rejects its evidence (F-07)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-f07-'));
+  const mem = new Map<string, string>();
+  const supervisor = new LeannaSupervisor({
+    maxAttempts: 1,
+    missionStore: new DurableMissionStore(path.join(dir, 'missions')),
+    checkpoints: new CheckpointManager({
+      gateway: {
+        exists: (p: string) => mem.has(p),
+        read: (p: string) => mem.get(p) ?? '',
+        write: (p: string, c: string) => void mem.set(p, c),
+        remove: (p: string) => void mem.delete(p),
+      },
+      dirOverride: path.join(dir, 'cp'),
+    }),
+    evidence: new EvidenceEngine(path.join(dir, 'ev')),
+  });
+  const executor = new Executor();
+  // Preuve par objectif NON branchée (LEANNA_MISSION_EVIDENCE=false) : seul le
+  // Supervisor juge sur faits. Une action échoue, la réflexion « continue »,
+  // la vérification LLM valide quand même l'objectif.
+  let n = 0;
+  executor.setSkillHandler(async () => (++n === 1 ? { status: 'failed', message: 'boom' } : { ok: true }));
+  executor.setLLMReflect(async () => JSON.stringify({ observation: 'o', hypothesis: 'h', confidence: 0.9, decision: 'continue', reasoning: 'non critique' }));
+  executor.setLLMVerify(async () => JSON.stringify({ passed: true, reasoning: 'ok' }));
+  executor.setLLMDecompose(async () => JSON.stringify([{ title: 'Vérifier a.ts', description: 'Lancer verify_typecheck puis lire a.ts', successCriteria: ['ok'], priority: 'medium', dependsOn: [] }]));
+  executor.setSupervisor(supervisor, true);
+  const states: string[] = [];
+  executor.setEventEmitter((event, data) => { if (event === 'mission_supervised') states.push(data.lifecycleState as string); });
+
+  const mission = await executor.startMission({
+    title: 'Vérifier a.ts',
+    description: 'Lancer verify_typecheck et lire a.ts',
+    availableSkills: ['verify_typecheck', 'read_project_file'],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  assert.deepEqual(states, ['ESCALATED']);
+  assert.notEqual(done.status, 'completed', 'statut mission cohérent avec le verdict du Supervisor');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

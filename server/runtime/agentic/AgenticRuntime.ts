@@ -1235,6 +1235,8 @@ export class AgenticRuntime implements IAgentRuntime {
     const usage = response.tokenUsage;
     const cost = usage ? usage.totalTokens / 1000 : 1; // ~1 unité si non renseigné
     session.usage.cost += cost;
+    if (usage) session.usage.tokens += usage.totalTokens;
+    else session.usage.unmeasuredLlmCalls++;
   }
 
   /**
@@ -1365,7 +1367,9 @@ export class AgenticRuntime implements IAgentRuntime {
   }
 
   private assessOutcome(session: RunSession, plan: Plan): import("./types.js").AgentOutcome {
-    const anyFailedStep = plan.steps.some((s) => s.status === "failed");
+    // Une étape ni done ni skipped (pending après budget épuisé, running après
+    // exception + abort) n'est pas accomplie : elle compte comme un échec.
+    const anyFailedStep = plan.steps.some((s) => s.status !== "done" && s.status !== "skipped");
     const wroteSomething = session.filesModified.size > 0;
     const anyToolError = session.observations.some((o) => o.toolOutcomes.some((t) => !t.success));
 
@@ -1615,6 +1619,8 @@ function buildExecutionTrace(plan: Plan, session: RunSession): ExecutionTrace {
       writeCalls: usage.writeCalls,
       verifyCalls: usage.verifyCalls,
       recoveryCalls: usage.recoveryCalls,
+      tokens: usage.tokens,
+      unmeasuredLlmCalls: usage.unmeasuredLlmCalls,
     },
     recoveries: session.recoveries.length,
     replans: session.replans,

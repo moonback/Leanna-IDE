@@ -20,7 +20,7 @@ import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
-import { createCoreKernel, type CoreKernel } from "../core/kernel.js";
+import { createCoreKernel, agentSupervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -62,6 +62,12 @@ export interface BootstrapConfig {
    * strictement inchangé.
    */
   enableIdempotency?: boolean;
+  /**
+   * Fait passer les tâches du runtime agentique par le LeannaSupervisor
+   * (preuve avant succès, rollback des fichiers déclarés). Par défaut, lu depuis
+   * `LEANNA_AGENT_SUPERVISED` ; désactivé sinon.
+   */
+  enableAgentSupervision?: boolean;
   /**
    * Callback exécuté APRÈS `runtime.start()` mais AVANT les audits de boot
    * (`applyAttributionAndAudits`). C'est le point d'enregistrement des outils
@@ -269,6 +275,10 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
       `journalisées ; un rejeu après crash est bloqué.`
     );
   }
+  if (config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv()) {
+    agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission);
+    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_AGENT_SUPERVISED).`);
+  }
   if (kernel.safetyGateMode !== "off") {
     console.log(
       `[Bootstrap] 🛡️  Safety gate Jev ${kernel.safetyGateMode === "enforce" ? "ACTIVÉ (enforce)" : "en AUDIT"} — ` +
@@ -350,8 +360,16 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
 
   // Brancher l'orchestrateur sur le runtime agentique (import dynamique pour
   // éviter la dépendance circulaire ; best-effort en mode synchrone).
+  // Le callback s'exécute après le retour de cette fonction : `kernel` (déclaré
+  // plus bas) est alors initialisé. La supervision suit enableAgenticRuntime.
+  const superviseAgents = config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv();
   import("../agents/AgentOrchestrator.js")
-    .then(({ agentOrchestrator }) => agentOrchestrator.enableAgenticRuntime(agentic))
+    .then(({ agentOrchestrator }) => {
+      agentOrchestrator.enableAgenticRuntime(agentic);
+      if (superviseAgents && agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission)) {
+        console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (mode synchrone).`);
+      }
+    })
     .catch((err) => console.error("[Bootstrap] enableAgenticRuntime (sync) échec:", err));
 
   // Noyau P0 (voir version async). Branchement de la garde d'idempotence gouverné

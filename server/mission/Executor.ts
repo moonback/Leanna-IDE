@@ -5,7 +5,7 @@ import { ReflectionEngine, type ReflectionInput } from "./Reflection.js";
 import { SkillScorer } from "./SkillScorer.js";
 import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
-import type { EvidenceEngine, EvidenceInput, CheckResult } from "../core/EvidenceEngine.js";
+import { EvidenceEngine, type EvidenceInput, type CheckResult } from "../core/EvidenceEngine.js";
 import type { LeannaSupervisor, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
@@ -653,7 +653,11 @@ export class Executor {
       // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
       // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
       await this.executeMission(mission, availableSkills);
-      return this.buildMissionOutcome(mission);
+      const outcome = this.buildMissionOutcome(mission);
+      // executeMission finalise la mission (retry/replan internes épuisés) : une
+      // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
+      if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
+      return outcome;
     };
 
     const result = await supervisor.runMission({
@@ -1078,7 +1082,10 @@ export class Executor {
         summary = `Mission "${mission.getState().title}" terminée avec des objectifs échoués.`;
       }
 
-      mission.completeActiveGoal({
+      // Fermer la RACINE explicitement : un sous-objectif bloqué (blockGoal ne
+      // dépile pas) peut rester au sommet de la pile, et completeActiveGoal
+      // le fermait à la place, laissant la mission finalisée en "in_progress".
+      mission.completeGoal(rootGoal.id, {
         success,
         summary,
         lessonsLearned: this.extractLessons(mission),
@@ -1998,7 +2005,12 @@ JSON:`;
     // que sur une narration LLM. La preuve prime : un seul check factuel échoué
     // interdit le succès. On ne retombe sur le LLM/heuristique QUE lorsqu'aucun
     // fait exploitable n'existe (objectif purement analytique sans check).
-    if (this.evidence && this.evidenceVerification) {
+    // En mode supervisé, le Supervisor juge la mission sur ces mêmes faits : les
+    // objectifs doivent l'être aussi, sinon une mission "completed" peut voir
+    // ses fichiers restaurés par un Supervisor qui refuse la preuve (F-07).
+    const supervised = this.supervisor !== null && this.supervisedMode;
+    if (supervised && !this.evidence) this.evidence = new EvidenceEngine();
+    if (this.evidence && (this.evidenceVerification || supervised)) {
       const verdict = this.verifyByEvidence(mission, goal, executed);
       if (verdict) return verdict;
     }

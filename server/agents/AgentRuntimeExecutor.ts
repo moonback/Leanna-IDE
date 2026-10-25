@@ -17,7 +17,9 @@ import type { AgentResult, AgentTask as AgenticTask, AgentBudget, RuntimePhase }
 import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
+import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
+import { randomUUID } from "node:crypto";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("AgentRuntimeExecutor");
@@ -43,12 +45,27 @@ const RUNTIME_PHASE_PROGRESS: Record<RuntimePhase, { current: number; total: num
 export class AgentRuntimeExecutor implements AgentTaskRunner {
   private runningCount = new Map<string, number>();
   private active = new Map<string, AbortController>();
+  /**
+   * Gouvernance optionnelle (F-05) : quand branchée, chaque tâche passe par le
+   * LeannaSupervisor (preuve avant succès, snapshot/rollback des fichiers
+   * déclarés, récupération bornée). Absente → exécution directe (défaut).
+   */
+  private supervise: CoreKernel["runSupervisedAgenticMission"] | null = null;
 
   constructor(
     private readonly agentic: AgenticRuntime,
     private readonly notifier: ProgressNotifier,
     private readonly defaultBudget?: Partial<AgentBudget>
   ) {}
+
+  /** Branche (ou retire avec `null`) la gouvernance du Supervisor. */
+  setSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null): void {
+    this.supervise = run;
+  }
+
+  isSupervised(): boolean {
+    return this.supervise !== null;
+  }
 
   /** Exécute un outil isolé (ex: verify_file relancé par la boucle autonome). */
   runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -135,13 +152,18 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
         },
       };
 
-      const result = await this.agentic.run(agenticTask);
+      const result = this.supervise
+        ? await this.runSupervised(this.supervise, task, agenticTask)
+        : await this.agentic.run(agenticTask);
       task.result = this.toTaskResult(result);
-      task.status = result.success ? "completed" : "failed";
+      // Le runtime RETOURNE un résultat "blocked" sur annulation (il ne lève pas) :
+      // sans ce test, une annulation utilisateur était rapportée "failed".
+      const cancelled = !result.success && controller.signal.aborted;
+      task.status = result.success ? "completed" : cancelled ? "cancelled" : "failed";
       task.completedAt = new Date().toISOString();
 
       this.notifier.notify(task, "progress", { current: 5, total: 5, label: "Terminé" });
-      this.notifier.notify(task, result.success ? "completed" : "failed");
+      this.notifier.notify(task, result.success ? "completed" : cancelled ? "cancelled" : "failed");
 
       log.info(
         `[task:${shortId}] ${result.success ? "✅" : "❌"} [${agent.name}] ` +
@@ -171,6 +193,39 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       this.active.delete(task.id);
       this.decrement(task.role);
     }
+  }
+
+  /**
+   * Exécute la tâche sous le Supervisor : le verdict du Supervisor (preuve)
+   * prime sur l'auto-évaluation du runtime. Une tentative non validée a vu ses
+   * fichiers déclarés restaurés : ils ne sont plus rapportés comme modifiés.
+   */
+  private async runSupervised(
+    supervise: CoreKernel["runSupervisedAgenticMission"],
+    task: AgentTask,
+    agenticTask: AgenticTask
+  ): Promise<AgentResult> {
+    const plannedFiles = task.context.files ?? [];
+    const sup = await supervise(this.agentic, {
+      // Identifiant unique par exécution : une ré-exécution de la même tâche ne
+      // doit pas être court-circuitée par un snapshot terminal précédent.
+      missionId: `agent-task:${task.id}:${randomUUID().slice(0, 8)}`,
+      goal: agenticTask.goal,
+      role: task.role,
+      plannedFiles,
+      baseTask: { ...agenticTask },
+    });
+    const last = sup.lastResult;
+    if (!last) throw new Error(`Supervisor: aucune tentative exécutée (état ${sup.finalState}).`);
+    if (sup.finalState === "COMPLETED") return last;
+
+    return {
+      ...last,
+      success: false,
+      outcome: last.success ? "partial" : last.outcome,
+      filesModified: last.filesModified.filter((f) => !plannedFiles.includes(f)),
+      error: last.error ?? `Supervisor: preuve insuffisante (état ${sup.finalState}, ${sup.attempts} tentative(s)).`,
+    };
   }
 
   // ─── Adaptation des formats ────────────────────────────────────────────────

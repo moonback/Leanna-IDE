@@ -152,3 +152,77 @@ describe("AgentRegistry.setRunner — bascule du moteur de la flotte", () => {
     registry.shutdown();
   });
 });
+
+describe("AgentRuntimeExecutor — annulation en cours d'exécution", () => {
+  beforeEach(() => registerRole("test_cancel_role"));
+
+  it("une tâche annulée pendant run() est rapportée cancelled, pas failed", async () => {
+    // Le runtime agentique RETOURNE (sans lever) un résultat "blocked" quand le
+    // signal est déclenché — c'est le chemin réel d'AgenticRuntime.run().
+    const fakeAgentic = {
+      async run(t: { signal?: AbortSignal }) {
+        await new Promise<void>((resolve) => t.signal?.addEventListener("abort", () => resolve(), { once: true }));
+        return {
+          success: false, outcome: "blocked", filesRead: [], filesModified: [], toolsExecuted: [],
+          verifications: [], durationMs: 1, error: "Tâche annulée par l'utilisateur.",
+          final: { summary: "annulée", details: "" },
+        };
+      },
+    };
+    const exec = new AgentRuntimeExecutor(fakeAgentic as never, new ProgressNotifier());
+    const task = makeTask("test_cancel_role");
+    const running = exec.execute(task);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(exec.cancel(task.id), true);
+    await running;
+    assert.equal(task.status, "cancelled");
+    assert.equal(task.result?.success, false);
+  });
+});
+
+describe("AgentRuntimeExecutor — gouvernance Supervisor (opt-in)", () => {
+  beforeEach(() => registerRole("test_sup_role"));
+
+  const rawResult = (success: boolean) => ({
+    success, outcome: success ? "success" : "failed", filesRead: [], filesModified: ["a.ts", "b.ts"],
+    toolsExecuted: ["modify_project_file"], verifications: [], durationMs: 1,
+    final: { summary: "s", details: "" },
+  });
+
+  it("le verdict du Supervisor prime : runtime 'success' mais preuve refusée → failed, fichiers restaurés retirés", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    let params: any;
+    exec.setSupervision((async (_rt: unknown, p: unknown) => {
+      params = p;
+      return { missionId: "x", finalState: "ESCALATED", attempts: 3, lastResult: rawResult(true) };
+    }) as never);
+    const task = makeTask("test_sup_role");
+    task.context.files = ["a.ts"];
+    await exec.execute(task);
+
+    assert.equal(task.status, "failed");
+    assert.equal(task.result?.outcome, "partial");
+    assert.deepEqual(task.result?.filesModified, ["b.ts"], "a.ts a été restauré par le rollback");
+    assert.deepEqual(params.plannedFiles, ["a.ts"]);
+    assert.ok(params.baseTask.signal, "le signal d'annulation est transmis");
+    assert.match(params.missionId, /^agent-task:task-phase5:/);
+  });
+
+  it("Supervisor COMPLETED → completed avec le résultat du runtime", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    exec.setSupervision((async () => ({ missionId: "x", finalState: "COMPLETED", attempts: 1, lastResult: rawResult(true) })) as never);
+    const task = makeTask("test_sup_role");
+    await exec.execute(task);
+    assert.equal(task.status, "completed");
+    assert.deepEqual(task.result?.filesModified, ["a.ts", "b.ts"]);
+  });
+
+  it("aucune tentative exécutée → failed avec erreur explicite", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    exec.setSupervision((async () => ({ missionId: "x", finalState: "FAILED", attempts: 0 })) as never);
+    const task = makeTask("test_sup_role");
+    await exec.execute(task);
+    assert.equal(task.status, "failed");
+    assert.match(task.result?.error ?? "", /aucune tentative/);
+  });
+});

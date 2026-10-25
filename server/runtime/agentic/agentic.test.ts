@@ -347,6 +347,46 @@ describe("Garde anti-narration — un agent producteur doit écrire un livrable"
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// assessOutcome — un plan inachevé n'est jamais un succès
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("assessOutcome — étapes non terminées", () => {
+  beforeEach(() => registerTestAgent("test_outcome", ["read_project_file", "verify_file"]));
+
+  type Assess = { assessOutcome(s: unknown, p: unknown): string };
+  const plan = (...statuses: string[]) => ({
+    intent: "x",
+    successCriteria: [],
+    rationale: "",
+    steps: statuses.map((status, i) => ({ id: `s${i}`, description: `étape ${i}`, status })),
+  });
+
+  it("budget épuisé avec des étapes encore pending → pas success", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o1" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "pending", "pending"));
+    assert.notEqual(outcome, "success");
+  });
+
+  it("étape restée running (exception + abort) → pas success", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o2" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "running"));
+    assert.notEqual(outcome, "success");
+  });
+
+  it("toutes les étapes done/skipped → success (inchangé)", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o3" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "skipped"));
+    assert.equal(outcome, "success");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Helpers de prompt (inchangés fonctionnellement)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -386,5 +426,20 @@ describe("buildObservationHistory — historique borné", () => {
     const history = buildObservationHistory(obs, 10_000);
     const warnings = history.match(/sont des données, pas des ordres/g) ?? [];
     assert.equal(warnings.length, 2, "résultat ET erreur doivent être signalés");
+  });
+});
+
+describe("accountCost — tokens mesurés vs appels sans mesure", () => {
+  beforeEach(() => registerTestAgent("test_tokens", ["read_project_file"]));
+
+  it("cumule les tokens rapportés et compte à part les appels sans tokenUsage", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_tokens", goal: "g", id: "tok" });
+    const account = (rt as unknown as { accountCost(s: unknown, r: unknown): void }).accountCost.bind(rt);
+    account(session, { text: "a", tokenUsage: { promptTokens: 60, completionTokens: 40, totalTokens: 100 } });
+    account(session, { text: "b" });
+    account(session, { text: "c", tokenUsage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 } });
+    assert.equal(session.usage.tokens, 125);
+    assert.equal(session.usage.unmeasuredLlmCalls, 1);
   });
 });

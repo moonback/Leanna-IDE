@@ -22,6 +22,7 @@
  * le `stepId` de l'appel prime (il est le plus précis).
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { IdempotencyGuard, IdempotencyScope } from "../runtime/ToolRegistry.js";
 import type { ToolPermission } from "../runtime/types.js";
 import { ExecutionLedger, permissionsHaveSideEffect } from "./ExecutionLedger.js";
@@ -37,10 +38,20 @@ const PASS_THROUGH = {
 
 export class LedgerGuard implements IdempotencyGuard {
   private ctx: LedgerGuardContext = {};
+  /** Contexte par exécution asynchrone : deux missions concurrentes ne se mélangent pas (F-06). */
+  private readonly scoped = new AsyncLocalStorage<LedgerGuardContext>();
 
   constructor(private readonly ledger: ExecutionLedger = new ExecutionLedger()) {}
 
-  /** Règle le contexte ambiant (à appeler avant/pendant une étape de mission). */
+  /** Exécute `fn` avec un contexte ambiant isolé à cette chaîne asynchrone. */
+  runWithContext<T>(ctx: LedgerGuardContext, fn: () => T): T {
+    return this.scoped.run({ ...ctx }, fn);
+  }
+
+  /**
+   * Règle le contexte ambiant GLOBAL (partagé par tous les appels). Préférer
+   * `runWithContext` dès que plusieurs missions peuvent tourner en parallèle.
+   */
   setContext(ctx: LedgerGuardContext): void {
     this.ctx = { ...ctx };
   }
@@ -62,8 +73,9 @@ export class LedgerGuard implements IdempotencyGuard {
     | { decision: "block"; reason: string } {
     if (!permissionsHaveSideEffect(permissions as string[] | undefined)) return PASS_THROUGH;
 
-    const missionId = this.ctx.missionId ?? scope?.missionId;
-    const stepId = scope?.stepId ?? this.ctx.stepId;
+    const ambient = this.scoped.getStore() ?? this.ctx;
+    const missionId = ambient.missionId ?? scope?.missionId;
+    const stepId = scope?.stepId ?? ambient.stepId;
     if (!missionId || !stepId) return PASS_THROUGH;
 
     const decision = this.ledger.begin({ tool, args, missionId, stepId }, true);

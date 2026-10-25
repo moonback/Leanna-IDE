@@ -11,6 +11,7 @@ import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
 import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
+import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
@@ -98,6 +99,16 @@ export class AgentOrchestrator {
    * Appelé une fois au bootstrap. Après migration, c'est le chemin par défaut :
    * plus aucun fallback silencieux vers `AgentExecutor` pour `agent_orchestrate`.
    */
+  /**
+   * Fait passer les tâches du runtime agentique par le LeannaSupervisor (F-05).
+   * Sans effet tant que `enableAgenticRuntime` n'a pas été appelé. `null` retire.
+   */
+  setAgentSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null): boolean {
+    if (!(this.executor instanceof AgentRuntimeExecutor)) return false;
+    this.executor.setSupervision(run);
+    return true;
+  }
+
   enableAgenticRuntime(agentic: AgenticRuntime): void {
     if (this.agenticEnabled && this.executor instanceof AgentRuntimeExecutor) {
       log.debug("Runtime agentique déjà activé sur l'orchestrateur — skip");
