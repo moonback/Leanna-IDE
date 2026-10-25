@@ -653,7 +653,11 @@ export class Executor {
       // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
       // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
       await this.executeMission(mission, availableSkills);
-      return this.buildMissionOutcome(mission);
+      const outcome = this.buildMissionOutcome(mission);
+      // executeMission finalise la mission (retry/replan internes épuisés) : une
+      // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
+      if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
+      return outcome;
     };
 
     const result = await supervisor.runMission({
@@ -1078,7 +1082,10 @@ export class Executor {
         summary = `Mission "${mission.getState().title}" terminée avec des objectifs échoués.`;
       }
 
-      mission.completeActiveGoal({
+      // Fermer la RACINE explicitement : un sous-objectif bloqué (blockGoal ne
+      // dépile pas) peut rester au sommet de la pile, et completeActiveGoal
+      // le fermait à la place, laissant la mission finalisée en "in_progress".
+      mission.completeGoal(rootGoal.id, {
         success,
         summary,
         lessonsLearned: this.extractLessons(mission),

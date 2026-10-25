@@ -1365,7 +1365,9 @@ export class AgenticRuntime implements IAgentRuntime {
   }
 
   private assessOutcome(session: RunSession, plan: Plan): import("./types.js").AgentOutcome {
-    const anyFailedStep = plan.steps.some((s) => s.status === "failed");
+    // Une étape ni done ni skipped (pending après budget épuisé, running après
+    // exception + abort) n'est pas accomplie : elle compte comme un échec.
+    const anyFailedStep = plan.steps.some((s) => s.status !== "done" && s.status !== "skipped");
     const wroteSomething = session.filesModified.size > 0;
     const anyToolError = session.observations.some((o) => o.toolOutcomes.some((t) => !t.success));
 

@@ -137,11 +137,14 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
 
       const result = await this.agentic.run(agenticTask);
       task.result = this.toTaskResult(result);
-      task.status = result.success ? "completed" : "failed";
+      // Le runtime RETOURNE un résultat "blocked" sur annulation (il ne lève pas) :
+      // sans ce test, une annulation utilisateur était rapportée "failed".
+      const cancelled = !result.success && controller.signal.aborted;
+      task.status = result.success ? "completed" : cancelled ? "cancelled" : "failed";
       task.completedAt = new Date().toISOString();
 
       this.notifier.notify(task, "progress", { current: 5, total: 5, label: "Terminé" });
-      this.notifier.notify(task, result.success ? "completed" : "failed");
+      this.notifier.notify(task, result.success ? "completed" : cancelled ? "cancelled" : "failed");
 
       log.info(
         `[task:${shortId}] ${result.success ? "✅" : "❌"} [${agent.name}] ` +

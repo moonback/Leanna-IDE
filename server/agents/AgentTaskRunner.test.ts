@@ -152,3 +152,30 @@ describe("AgentRegistry.setRunner — bascule du moteur de la flotte", () => {
     registry.shutdown();
   });
 });
+
+describe("AgentRuntimeExecutor — annulation en cours d'exécution", () => {
+  beforeEach(() => registerRole("test_cancel_role"));
+
+  it("une tâche annulée pendant run() est rapportée cancelled, pas failed", async () => {
+    // Le runtime agentique RETOURNE (sans lever) un résultat "blocked" quand le
+    // signal est déclenché — c'est le chemin réel d'AgenticRuntime.run().
+    const fakeAgentic = {
+      async run(t: { signal?: AbortSignal }) {
+        await new Promise<void>((resolve) => t.signal?.addEventListener("abort", () => resolve(), { once: true }));
+        return {
+          success: false, outcome: "blocked", filesRead: [], filesModified: [], toolsExecuted: [],
+          verifications: [], durationMs: 1, error: "Tâche annulée par l'utilisateur.",
+          final: { summary: "annulée", details: "" },
+        };
+      },
+    };
+    const exec = new AgentRuntimeExecutor(fakeAgentic as never, new ProgressNotifier());
+    const task = makeTask("test_cancel_role");
+    const running = exec.execute(task);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(exec.cancel(task.id), true);
+    await running;
+    assert.equal(task.status, "cancelled");
+    assert.equal(task.result?.success, false);
+  });
+});

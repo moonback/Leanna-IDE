@@ -347,6 +347,46 @@ describe("Garde anti-narration — un agent producteur doit écrire un livrable"
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// assessOutcome — un plan inachevé n'est jamais un succès
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("assessOutcome — étapes non terminées", () => {
+  beforeEach(() => registerTestAgent("test_outcome", ["read_project_file", "verify_file"]));
+
+  type Assess = { assessOutcome(s: unknown, p: unknown): string };
+  const plan = (...statuses: string[]) => ({
+    intent: "x",
+    successCriteria: [],
+    rationale: "",
+    steps: statuses.map((status, i) => ({ id: `s${i}`, description: `étape ${i}`, status })),
+  });
+
+  it("budget épuisé avec des étapes encore pending → pas success", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o1" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "pending", "pending"));
+    assert.notEqual(outcome, "success");
+  });
+
+  it("étape restée running (exception + abort) → pas success", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o2" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "running"));
+    assert.notEqual(outcome, "success");
+  });
+
+  it("toutes les étapes done/skipped → success (inchangé)", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_outcome", goal: "g", id: "o3" });
+    session.toolsExecuted.push("read_project_file");
+    const outcome = (rt as unknown as Assess).assessOutcome(session, plan("done", "skipped"));
+    assert.equal(outcome, "success");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Helpers de prompt (inchangés fonctionnellement)
 // ═══════════════════════════════════════════════════════════════════════════
 
