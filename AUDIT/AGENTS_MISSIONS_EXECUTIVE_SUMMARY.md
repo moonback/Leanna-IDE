@@ -28,7 +28,8 @@ Détails : [architecture](AGENTS_MISSIONS_ARCHITECTURE.md) · [constats](AGENTS_
 | F-04 Tentatives fantômes en mode supervisé | P1 | relance de `executeMission` sur une mission finalisée | escalade si la mission est terminale et en échec | `Executor.test.ts` « does not fake retries » | `attempts` 3 → 1 | Corrigé |
 | F-05 Noyau agentique supervisé non branché | P1 | aucun appelant de production ; le runner perdait signal et budget | branché en opt-in (`LEANNA_AGENT_SUPERVISED`), champs de tâche transmis, verdict Supervisor prioritaire | `kernel.test.ts` (transmission), `AgentTaskRunner.test.ts` (3) | réussis (simulés) | Branché opt-in, non validé avec LLM |
 | F-06 Contexte `LedgerGuard` global | P1 | état ambiant partagé entre missions concurrentes | `runWithContext` (`AsyncLocalStorage`) dans LedgerGuard et JevSafetyGate | `kernel.test.ts` « concurrent supervised missions » | échec sur l'ancien code → réussi | Corrigé |
-| F-07 Divergence statut/preuve en supervisé | P2 | actions `failed` non critiques comptées dans la preuve | aucune | non reproduit | — | Hypothèse |
+| F-07 Mission `completed` alors que le Supervisor rejette la preuve | P1 | objectifs jugés par LLM, mission par faits | en mode supervisé, objectifs jugés par la même preuve factuelle | `Executor.test.ts` « F-07 » | `completed` avant → réussi | Corrigé |
+| F-08 Tokens absents de l'UI, « coût » non mesuré | P2 | trace sans métrique de tokens ; coût = unité abstraite | tokens mesurés + appels non mesurés, affichés seulement si mesurés | `MissionDetail.test.tsx` (2), `agentic.test.ts` (1) | réussis | Corrigé |
 
 ## Critères de réussite
 

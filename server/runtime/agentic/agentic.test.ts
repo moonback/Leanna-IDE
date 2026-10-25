@@ -428,3 +428,18 @@ describe("buildObservationHistory — historique borné", () => {
     assert.equal(warnings.length, 2, "résultat ET erreur doivent être signalés");
   });
 });
+
+describe("accountCost — tokens mesurés vs appels sans mesure", () => {
+  beforeEach(() => registerTestAgent("test_tokens", ["read_project_file"]));
+
+  it("cumule les tokens rapportés et compte à part les appels sans tokenUsage", () => {
+    const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
+    const session = rt._seedSessionForTest({ role: "test_tokens", goal: "g", id: "tok" });
+    const account = (rt as unknown as { accountCost(s: unknown, r: unknown): void }).accountCost.bind(rt);
+    account(session, { text: "a", tokenUsage: { promptTokens: 60, completionTokens: 40, totalTokens: 100 } });
+    account(session, { text: "b" });
+    account(session, { text: "c", tokenUsage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 } });
+    assert.equal(session.usage.tokens, 125);
+    assert.equal(session.usage.unmeasuredLlmCalls, 1);
+  });
+});

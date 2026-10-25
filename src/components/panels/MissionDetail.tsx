@@ -32,6 +32,7 @@ export interface ExecutionTrace {
     iterations: number; maxIterations: number;
     toolCalls: number; maxToolCalls: number;
     readCalls: number; writeCalls: number; verifyCalls: number; recoveryCalls: number;
+    tokens?: number; unmeasuredLlmCalls?: number;
   };
   recoveries: number;
   replans: number;
@@ -363,6 +364,16 @@ function BudgetMeters({ budget }: { budget: ExecutionTrace['budget'] }) {
           </span>
         ))}
       </div>
+      {/* Tokens uniquement s'ils sont mesurés : un appel sans mesure n'est jamais compté comme 0. */}
+      {((budget.tokens ?? 0) > 0 || (budget.unmeasuredLlmCalls ?? 0) > 0) && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="lea-mission-dt">Tokens mesurés</span>
+          <span className="tabular-nums">
+            {(budget.tokens ?? 0) > 0 ? budget.tokens!.toLocaleString('fr-FR') : 'non mesurés'}
+            {(budget.unmeasuredLlmCalls ?? 0) > 0 && ` · ${budget.unmeasuredLlmCalls} appel(s) LLM sans mesure (total partiel)`}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

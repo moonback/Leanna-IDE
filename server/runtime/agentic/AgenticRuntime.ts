@@ -1235,6 +1235,8 @@ export class AgenticRuntime implements IAgentRuntime {
     const usage = response.tokenUsage;
     const cost = usage ? usage.totalTokens / 1000 : 1; // ~1 unité si non renseigné
     session.usage.cost += cost;
+    if (usage) session.usage.tokens += usage.totalTokens;
+    else session.usage.unmeasuredLlmCalls++;
   }
 
   /**
@@ -1617,6 +1619,8 @@ function buildExecutionTrace(plan: Plan, session: RunSession): ExecutionTrace {
       writeCalls: usage.writeCalls,
       verifyCalls: usage.verifyCalls,
       recoveryCalls: usage.recoveryCalls,
+      tokens: usage.tokens,
+      unmeasuredLlmCalls: usage.unmeasuredLlmCalls,
     },
     recoveries: session.recoveries.length,
     replans: session.replans,

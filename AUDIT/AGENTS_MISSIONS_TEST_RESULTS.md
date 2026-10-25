@@ -14,6 +14,22 @@ Tous les tests ci-dessous sont **simulés** (sans fournisseur LLM réel). Aucun 
 | `npm run build` | non exécuté | non exécuté | la logique serveur modifiée est déjà couverte par `tsc` + tests ; build non validé |
 | `npm run test:missions` | non exécuté | non exécuté | exige un serveur lancé et une clé LLM |
 
+## Lot 3 (F-07 / F-08)
+
+| Commande | Résultat |
+|---|---|
+| `npm test` | **1 504 / 1 504 réussis** (+2) |
+| `npm run test:ui` (vitest) | **96 / 96 réussis**, 20 fichiers (première exécution de la session) |
+| `npm run typecheck` | 0 erreur |
+| `npm run typecheck:test` | les 2 mêmes erreurs préexistantes, aucune nouvelle |
+
+| Test ajouté | Avant | Après |
+|---|---|---|
+| `Executor.test.ts` F-07 : mission non `completed` si le Supervisor rejette la preuve | ✖ (`completed`) | ✔ |
+| `agentic.test.ts` : `accountCost` cumule les tokens mesurés et compte les appels non mesurés | champs nouveaux | ✔ |
+| `MissionDetail.test.tsx` : aucune ligne de tokens sans mesure (section « Budget consommé » ouverte) | — | ✔ |
+| `MissionDetail.test.tsx` : tokens mesurés + total partiel signalé | — | ✔ |
+
 ## Lot 2 (F-05 / F-06)
 
 | Commande | Résultat |

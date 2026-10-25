@@ -440,3 +440,46 @@ test('supervised mode does not fake retries on an already finalized mission', as
   assert.equal(supervised[0].state, 'ESCALATED');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('supervised mode: a mission is never "completed" while the Supervisor rejects its evidence (F-07)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-f07-'));
+  const mem = new Map<string, string>();
+  const supervisor = new LeannaSupervisor({
+    maxAttempts: 1,
+    missionStore: new DurableMissionStore(path.join(dir, 'missions')),
+    checkpoints: new CheckpointManager({
+      gateway: {
+        exists: (p: string) => mem.has(p),
+        read: (p: string) => mem.get(p) ?? '',
+        write: (p: string, c: string) => void mem.set(p, c),
+        remove: (p: string) => void mem.delete(p),
+      },
+      dirOverride: path.join(dir, 'cp'),
+    }),
+    evidence: new EvidenceEngine(path.join(dir, 'ev')),
+  });
+  const executor = new Executor();
+  // Preuve par objectif NON branchée (LEANNA_MISSION_EVIDENCE=false) : seul le
+  // Supervisor juge sur faits. Une action échoue, la réflexion « continue »,
+  // la vérification LLM valide quand même l'objectif.
+  let n = 0;
+  executor.setSkillHandler(async () => (++n === 1 ? { status: 'failed', message: 'boom' } : { ok: true }));
+  executor.setLLMReflect(async () => JSON.stringify({ observation: 'o', hypothesis: 'h', confidence: 0.9, decision: 'continue', reasoning: 'non critique' }));
+  executor.setLLMVerify(async () => JSON.stringify({ passed: true, reasoning: 'ok' }));
+  executor.setLLMDecompose(async () => JSON.stringify([{ title: 'Vérifier a.ts', description: 'Lancer verify_typecheck puis lire a.ts', successCriteria: ['ok'], priority: 'medium', dependsOn: [] }]));
+  executor.setSupervisor(supervisor, true);
+  const states: string[] = [];
+  executor.setEventEmitter((event, data) => { if (event === 'mission_supervised') states.push(data.lifecycleState as string); });
+
+  const mission = await executor.startMission({
+    title: 'Vérifier a.ts',
+    description: 'Lancer verify_typecheck et lire a.ts',
+    availableSkills: ['verify_typecheck', 'read_project_file'],
+  });
+  const done = await executor.waitForMission(mission.id);
+
+  assert.ok(done);
+  assert.deepEqual(states, ['ESCALATED']);
+  assert.notEqual(done.status, 'completed', 'statut mission cohérent avec le verdict du Supervisor');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

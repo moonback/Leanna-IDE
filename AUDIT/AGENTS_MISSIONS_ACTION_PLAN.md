@@ -14,10 +14,10 @@ Lot 1 : cartographie et baseline. Lots 2 à 4 : correctifs F-01 à F-04, chacun 
 2. ~~F-06~~ : corrigé au lot 2.
 3. **Baseline LLM réelle** : lancer `npm run dev` puis `npm run test:missions` avec une clé configurée, plusieurs exécutions par scénario. Relever durée, appels LLM et tokens, puis remplir les colonnes « indisponible » de `AGENTS_MISSIONS_PERFORMANCE.md`.
 4. **`Mission.blockGoal` et la pile** (P2) : décider si un objectif bloqué doit être dépilé. Ce n'est plus nécessaire à la cohérence du statut final depuis F-03.
-5. **F-07** : reproduire ou écarter la divergence statut/preuve en mode supervisé avec la preuve désactivée.
+5. ~~F-07~~ : reproduit et corrigé au lot 3.
 6. **Taille des modules** (P2) : `Executor.ts` (2 951 lignes) et `AgenticRuntime.ts` (1 725 lignes) concentrent le risque de régression. Ne les découper qu'avec une couverture préalable.
 
 ## Hors périmètre de cette session
 
-- UI (`AgentFleetPanel`, `AgentPanel`, `MissionPanel`, `MissionDetail`) : seul le polling a été inspecté. L'absence de progression simulée ou de zéros trompeurs n'est pas vérifiée. Point à auditer. Effet de F-02 : l'UI recevra désormais `cancelled` sur ce chemin ; vérifier son rendu.
+- UI : statuts, estimations et budget vérifiés par lecture du code et tests (lot 3, F-08). Pas d'audit visuel dans le navigateur : il exigerait un serveur lancé et une mission réelle.
 - Benchmarks de charge.

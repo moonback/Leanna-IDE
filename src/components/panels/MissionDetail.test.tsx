@@ -92,3 +92,29 @@ describe('MissionDetail — plan et délégations', () => {
     });
   });
 });
+
+describe('MissionDetail — tokens mesurés', () => {
+  beforeEach(() => localStorage.clear());
+
+  const withBudget = (extra: Record<string, number>): MissionDetailData => ({
+    ...TASK,
+    execution: { ...TASK.execution!, budget: { ...TASK.execution!.budget, ...extra } },
+  });
+
+  it("n'affiche aucune ligne de tokens quand rien n'est mesuré (pas de zéro trompeur)", async () => {
+    mockFetchRouter([{ match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: TASK }) }]);
+    renderWithProviders(<MissionDetail taskId="task-1" status="completed" color="#4f8cff" />);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Budget consommé/ }));
+    expect(screen.getByText('Itérations')).toBeInTheDocument();
+    expect(screen.queryByText('Tokens mesurés')).not.toBeInTheDocument();
+  });
+
+  it('affiche les tokens mesurés et signale un total partiel', async () => {
+    mockFetchRouter([{ match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: withBudget({ tokens: 12345, unmeasuredLlmCalls: 2 }) }) }]);
+    renderWithProviders(<MissionDetail taskId="task-1" status="completed" color="#4f8cff" />);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Budget consommé/ }));
+    expect(screen.getByText('Tokens mesurés')).toBeInTheDocument();
+    expect(screen.getByText(/2 appel\(s\) LLM sans mesure/)).toBeInTheDocument();
+    expect(screen.getByText(/12\s345/)).toBeInTheDocument();
+  });
+});

@@ -80,6 +80,10 @@ export interface ExecutionTrace {
     writeCalls: number;
     verifyCalls: number;
     recoveryCalls: number;
+    /** Tokens mesurés par le fournisseur. */
+    tokens?: number;
+    /** Appels LLM sans mesure de tokens (le total ci-dessus est alors partiel). */
+    unmeasuredLlmCalls?: number;
   };
   recoveries: number;
   replans: number;
@@ -214,6 +218,10 @@ export interface BudgetUsage {
   elapsedMs: number;
   retries: number;
   cost: number;
+  /** Tokens réellement rapportés par le fournisseur (somme de `totalTokens`). */
+  tokens: number;
+  /** Appels LLM sans `tokenUsage` : leurs tokens sont inconnus (pas comptés à 0). */
+  unmeasuredLlmCalls: number;
 }
 
 /** Fabrique un `BudgetUsage` vierge. */
@@ -231,6 +239,8 @@ export function emptyBudgetUsage(): BudgetUsage {
     elapsedMs: 0,
     retries: 0,
     cost: 0,
+    tokens: 0,
+    unmeasuredLlmCalls: 0,
   };
 }
 

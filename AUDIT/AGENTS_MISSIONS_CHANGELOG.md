@@ -29,6 +29,18 @@ Aucune dépendance ajoutée. Aucune API, aucun contrat ni format persisté modif
 
 Par défaut (flag absent), le comportement est inchangé.
 
+## Lot 3 — cohérence supervisée (F-07) et tokens mesurés dans l'UI (F-08)
+
+| Fichier | Modification |
+|---|---|
+| `server/mission/Executor.ts` | en mode supervisé, verdict d'objectif par preuve factuelle (EvidenceEngine par défaut si absent) |
+| `server/runtime/agentic/types.ts` | `BudgetUsage.tokens`, `BudgetUsage.unmeasuredLlmCalls` ; champs optionnels dans `ExecutionTrace.budget` |
+| `server/runtime/agentic/AgenticRuntime.ts` | `accountCost` cumule les tokens mesurés et compte les appels sans mesure ; exposés dans la trace |
+| `src/components/panels/MissionDetail.tsx` | ligne « Tokens mesurés » (absente sans mesure, total partiel signalé) |
+| `server/mission/Executor.test.ts` | +1 test F-07 |
+| `server/runtime/agentic/agentic.test.ts` | +1 test `accountCost` |
+| `src/components/panels/MissionDetail.test.tsx` | +2 tests (aucun zéro trompeur, total partiel) |
+
 ## Changements de comportement observables
 
 - Une tâche agent arrêtée par épuisement du budget avant la fin de son plan n'est plus `success`. Elle devient `partial` (écritures vérifiées mais plan inachevé) ou `failed` (aucune écriture).

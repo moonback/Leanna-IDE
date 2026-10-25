@@ -57,7 +57,16 @@
 ## F-07 — P2 — Mode supervisé : divergence possible statut mission ↔ preuve
 
 - `buildMissionOutcome` compte comme contrôle échoué toute action `failed` restée dans le plan. Une action non critique en échec avec décision `continue`, suivie d'une validation LLM de l'objectif (preuve désactivée), peut donner une mission `completed` alors que le Supervisor rollback les fichiers.
-- **Statut** : Hypothèse, non reproduite. Le cas exige `LEANNA_MISSION_EVIDENCE=false` et `LEANNA_MISSION_SUPERVISED=1`.
+- **Reproduit (lot 3)** : test `Executor.test.ts` « …never "completed" while the Supervisor rejects its evidence (F-07) ». Une action échoue, la réflexion décide « continue », et la vérification LLM valide l'objectif. Résultat : mission `completed`, alors que le Supervisor est `ESCALATED` et a restauré les fichiers déclarés. L'utilisateur voyait « réussie » sur un travail annulé.
+- **Correction** : en mode supervisé, `verifyGoalCriteria` juge les objectifs par la preuve factuelle, comme le Supervisor, même si `LEANNA_MISSION_EVIDENCE` est coupé. Un `EvidenceEngine` par défaut est créé s'il n'en existe aucun.
+- **Statut** : Corrigé.
+
+## F-08 — P2 — UI : tokens absents, « coût » runtime non mesuré
+
+- `ExecutionTrace` n'exposait ni tokens ni coût. Le `usage.cost` du runtime est une unité abstraite (tokens/1000, ou **1 forfaitaire** quand le fournisseur ne renvoie pas d'usage) : l'afficher comme un coût aurait été trompeur.
+- **Correction** : `BudgetUsage` gagne `tokens` (somme des `totalTokens` rapportés) et `unmeasuredLlmCalls`. Les deux sont exposés dans la trace. `MissionDetail` affiche « Tokens mesurés » uniquement s'il y a une mesure, et signale un total partiel quand des appels n'ont pas été mesurés. Rien n'est affiché à 0 par défaut.
+- **Vérifié sans défaut** : le statut `cancelled` (effet de F-02) a son badge « Annulée ». Il est exclu du taux de réussite et compté avec les échecs dans le filtre « Échecs » d'`AgentPanel`. Les estimations du plan sont préfixées par `~`.
+- **Statut** : Corrigé (tests `MissionDetail.test.tsx` +2, `agentic.test.ts` +1).
 
 ## Vérifications sans défaut trouvé
 
