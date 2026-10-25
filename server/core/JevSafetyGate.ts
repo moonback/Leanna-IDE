@@ -16,6 +16,7 @@
  * d'une exécution, car `ToolRegistry.call` ne le fournit pas directement.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { SafetyGate } from "../runtime/ToolRegistry.js";
 import type { ToolPermission } from "../runtime/types.js";
 import { gateAgentAction, type GateAction } from "../utils/jevGating.js";
@@ -126,11 +127,18 @@ function summarize(
 
 export class JevSafetyGate implements SafetyGate {
   private ctx: JevSafetyGateContext = {};
+  /** Contexte par exécution asynchrone (missions concurrentes), prioritaire sur `ctx`. */
+  private readonly scoped = new AsyncLocalStorage<JevSafetyGateContext>();
 
   constructor(
     private readonly mode: SafetyGateMode,
     private readonly opts: { apiKey?: string; model?: string } = {},
   ) {}
+
+  /** Exécute `fn` avec un contexte ambiant isolé à cette chaîne asynchrone. */
+  runWithContext<T>(ctx: JevSafetyGateContext, fn: () => T): T {
+    return this.scoped.run({ ...ctx }, fn);
+  }
 
   /** Règle le contexte ambiant (missionId/taskId) pour la télémétrie et les spans. */
   setContext(ctx: JevSafetyGateContext): void {
@@ -157,13 +165,14 @@ export class JevSafetyGate implements SafetyGate {
     if (!shouldEvaluate(tool, args)) return { decision: "allow" };
 
     const { target, summary, facts } = summarize(tool, args, permissions);
+    const ctx = this.scoped.getStore() ?? this.ctx;
     const decision = await gateAgentAction(
       { tool, target, summary, facts },
       {
         apiKey: this.opts.apiKey,
         model: this.opts.model,
-        missionId: this.ctx.missionId,
-        taskId: this.ctx.taskId,
+        missionId: ctx.missionId,
+        taskId: ctx.taskId,
       },
     );
 

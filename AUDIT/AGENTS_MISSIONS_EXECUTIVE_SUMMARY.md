@@ -16,7 +16,7 @@ Détails : [architecture](AGENTS_MISSIONS_ARCHITECTURE.md) · [constats](AGENTS_
 2. **F-02** : une tâche agent annulée par l'utilisateur pendant son exécution était enregistrée `failed`.
 3. **F-03** : une mission dont un sous-objectif est escaladé était finalisée **et persistée** `in_progress`, puis reproposée comme « interrompue » au redémarrage.
 4. **F-04** : en mode supervisé, une mission en échec subissait 2 tentatives vides, chacune suivie d'un rollback.
-5. **F-05** : le chemin « mission agentique supervisée » du noyau (`runSupervisedAgenticMission`) n'a aucun appelant en production. Ses garanties ne s'appliquent pas aux tâches agents.
+5. **F-05** : le chemin « mission agentique supervisée » du noyau n'avait aucun appelant en production. Il est désormais branché en opt-in (`LEANNA_AGENT_SUPERVISED=1`, lot 2), avec isolation du contexte d'idempotence (F-06, corrigé).
 
 ## Tableau récapitulatif
 
@@ -26,8 +26,8 @@ Détails : [architecture](AGENTS_MISSIONS_ARCHITECTURE.md) · [constats](AGENTS_
 | F-02 Annulation rapportée `failed` | P0 | le runtime retourne `blocked` sans lever ; seul le `catch` posait `cancelled` | signal annulé + échec → `cancelled` | `AgentTaskRunner.test.ts` « annulation en cours d'exécution » | `failed` avant → 5/5 après | Corrigé |
 | F-03 Mission finalisée `in_progress` | P0 | `blockGoal` ne dépile pas ; `completeActiveGoal` fermait le sous-objectif au lieu de la racine | `completeGoal(rootGoal.id)` | `Executor.test.ts` « escalated (blocked) sub-goal » | échec avant → 19/19 après | Corrigé |
 | F-04 Tentatives fantômes en mode supervisé | P1 | relance de `executeMission` sur une mission finalisée | escalade si la mission est terminale et en échec | `Executor.test.ts` « does not fake retries » | `attempts` 3 → 1 | Corrigé |
-| F-05 Noyau agentique supervisé non branché | P1 | aucun appelant de production | aucune (décision requise, validation LLM nécessaire) | — | — | Confirmé, ouvert |
-| F-06 Contexte `LedgerGuard` global | P2 | état ambiant partagé | aucune (non exploitable tant que F-05 est inactif) | — | — | Confirmé, ouvert |
+| F-05 Noyau agentique supervisé non branché | P1 | aucun appelant de production ; le runner perdait signal et budget | branché en opt-in (`LEANNA_AGENT_SUPERVISED`), champs de tâche transmis, verdict Supervisor prioritaire | `kernel.test.ts` (transmission), `AgentTaskRunner.test.ts` (3) | réussis (simulés) | Branché opt-in, non validé avec LLM |
+| F-06 Contexte `LedgerGuard` global | P1 | état ambiant partagé entre missions concurrentes | `runWithContext` (`AsyncLocalStorage`) dans LedgerGuard et JevSafetyGate | `kernel.test.ts` « concurrent supervised missions » | échec sur l'ancien code → réussi | Corrigé |
 | F-07 Divergence statut/preuve en supervisé | P2 | actions `failed` non critiques comptées dans la preuve | aucune | non reproduit | — | Hypothèse |
 
 ## Critères de réussite

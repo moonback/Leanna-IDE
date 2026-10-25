@@ -22,7 +22,11 @@ import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
 import { LeannaSupervisor, type SupervisedResult } from "./LeannaSupervisor.js";
-import { createAgenticMissionRunner, type AgenticLike } from "./AgenticMissionRunner.js";
+import {
+  createAgenticMissionRunner,
+  type AgentResultLike,
+  type AgentTaskLike,
+} from "./AgenticMissionRunner.js";
 import { randomUUID } from "node:crypto";
 
 /** Paramètres d'une mission agentique gouvernée par le Supervisor. */
@@ -40,7 +44,17 @@ export interface SupervisedAgenticMissionParams {
    * pour permettre un rollback fidèle si la preuve échoue.
    */
   plannedFiles?: string[];
+  /**
+   * Champs de la tâche réelle transmis à chaque tentative (signal d'annulation,
+   * budget, onProgress/onTrace, files…).
+   */
+  baseTask?: Partial<AgentTaskLike> & Record<string, unknown>;
 }
+
+/** Résultat supervisé + dernier résultat brut du runtime (absent si aucune tentative). */
+export type SupervisedAgenticResult<R extends AgentResultLike = AgentResultLike> = SupervisedResult & {
+  lastResult?: R;
+};
 
 export interface CoreKernel {
   ledger: ExecutionLedger;
@@ -60,10 +74,10 @@ export interface CoreKernel {
    * rollback, preuve (la preuve prime sur la narration) et récupération. C'est
    * la couture P0.1 qui fait passer une exécution réelle par le Supervisor.
    */
-  runSupervisedAgenticMission(
-    runtime: AgenticLike,
+  runSupervisedAgenticMission<R extends AgentResultLike>(
+    runtime: { run(task: AgentTaskLike): Promise<R> },
     params: SupervisedAgenticMissionParams
-  ): Promise<SupervisedResult>;
+  ): Promise<SupervisedAgenticResult<R>>;
 }
 
 export interface CoreKernelOptions {
@@ -108,6 +122,15 @@ export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env):
 }
 
 /**
+ * Lit l'activation de la gouvernance des tâches agents par le Supervisor
+ * (`LEANNA_AGENT_SUPERVISED` = true/1). Désactivée par défaut.
+ */
+export function agentSupervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = (env.LEANNA_AGENT_SUPERVISED ?? "").toLowerCase().trim();
+  return raw === "true" || raw === "1";
+}
+
+/**
  * Construit le noyau P0 et, si demandé, branche la garde d'idempotence sur le
  * ToolRegistry fourni. Retourne toutes les briques pour usage ultérieur.
  */
@@ -139,31 +162,34 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
     options.registry.setSafetyGate(safetyGate);
   }
 
-  const runSupervisedAgenticMission = async (
-    runtime: AgenticLike,
+  const runSupervisedAgenticMission = async <R extends AgentResultLike>(
+    runtime: { run(task: AgentTaskLike): Promise<R> },
     params: SupervisedAgenticMissionParams
-  ): Promise<SupervisedResult> => {
+  ): Promise<SupervisedAgenticResult<R>> => {
     const missionId = params.missionId ?? randomUUID();
+    let lastResult: R | undefined;
     const runner = createAgenticMissionRunner(runtime, {
       role: params.role,
       instructions: params.instructions,
+      baseTask: params.baseTask,
+      onResult: (r) => { lastResult = r as R; },
     });
 
-    // Rend les clés d'idempotence stables pour cette mission (si la garde est
-    // branchée). On restaure le contexte précédent en fin d'exécution.
-    guard.setContext({ missionId });
-    safetyGate?.setContext({ missionId });
-    try {
-      return await supervisor.runMission({
+    // Clés d'idempotence stables pour cette mission. Contexte ISOLÉ par chaîne
+    // asynchrone (F-06) : deux missions supervisées concurrentes ne partagent
+    // plus un missionId global.
+    const ctx = { missionId };
+    const run = () =>
+      supervisor.runMission({
         missionId,
         goal: params.goal,
         plannedFiles: params.plannedFiles,
         runner,
       });
-    } finally {
-      guard.clearContext();
-      safetyGate?.clearContext();
-    }
+    const result = await guard.runWithContext(ctx, () =>
+      safetyGate ? safetyGate.runWithContext(ctx, run) : run()
+    );
+    return { ...result, lastResult };
   };
 
   return {

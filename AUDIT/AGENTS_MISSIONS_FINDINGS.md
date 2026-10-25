@@ -40,14 +40,19 @@
 ## F-05 — P1 — Chemin « noyau supervisé agentique » mort en production
 
 - `CoreKernel.runSupervisedAgenticMission` et `createAgenticMissionRunner` n'ont aucun appelant hors tests. Les garanties décrites dans ces fichiers (preuve avant COMPLETED, rollback) ne couvrent donc pas les tâches agents en production.
-- **Décision** : non supprimé (règle 6), non branché (changement de comportement non validable sans LLM réel). À trancher (voir plan d'action).
-- **Statut** : Confirmé, non corrigé.
+- **Branchement préparé (2026-10-25, lot 2)** : `AgentRuntimeExecutor.execute` passe par `kernel.runSupervisedAgenticMission` quand `LEANNA_AGENT_SUPERVISED=1` (ou `BootstrapConfig.enableAgentSupervision`), sur les deux chemins de bootstrap. **Désactivé par défaut.**
+  - Le runner transmet désormais les champs de la tâche réelle (`signal`, `budget`, `onProgress`, `onTrace`, `files`, `metadata`). Avant, il les perdait : une tâche supervisée n'était pas annulable et ignorait son budget.
+  - Le noyau renvoie le dernier `AgentResult` brut (`lastResult`), nécessaire à l'adaptation en `TaskResult`.
+  - Le verdict du Supervisor prime : runtime `success` mais état final autre que `COMPLETED` → tâche `failed` (`outcome: "partial"`). Les fichiers déclarés (`task.context.files`), restaurés par le rollback, sont retirés de `filesModified`.
+  - `missionId` unique par exécution (`agent-task:<taskId>:<suffixe>`) : une ré-exécution de la même tâche n'est pas court-circuitée par un snapshot terminal.
+- **Limites** : le rollback ne couvre que les fichiers déclarés avant l'exécution. Une annulation est escaladée (`blocked` → `escalate`), avec rollback des fichiers déclarés. Aucune validation avec un vrai LLM.
+- **Statut** : Branché en opt-in, testé en simulation. Activation par défaut à décider après une exécution réelle.
 
-## F-06 — P2 — `LedgerGuard` : contexte ambiant global
+## F-06 — P1 — `LedgerGuard` : contexte ambiant global
 
-- `setContext` écrit un état partagé par toutes les missions, et son `missionId` prime sur celui de l'appel. Avec deux missions supervisées concurrentes, la clé d'idempotence pourrait être attribuée à la mauvaise mission.
-- Non exploitable en production aujourd'hui : seul `runSupervisedAgenticMission` (F-05) l'appelle.
-- **Statut** : Confirmé, non corrigé. À traiter (AsyncLocalStorage, comme la télémétrie) si F-05 est branché.
+- `setContext` écrivait un état partagé par toutes les missions. Preuve : test « concurrent supervised missions… » (`kernel.test.ts`), exécuté sur l'ancien code (`git stash`) → échec. La mission B, en finissant, vidait le contexte global : l'écriture de la mission A passait **sans protection d'idempotence**. Avec un autre ordonnancement, la clé aurait été attribuée à la mauvaise mission, avec un `skip` à tort possible.
+- **Correction** : `LedgerGuard.runWithContext` et `JevSafetyGate.runWithContext` (`AsyncLocalStorage`), utilisés par le noyau. Le contexte isolé prime ; `setContext` reste disponible (compatibilité, tests existants).
+- **Statut** : Corrigé.
 
 ## F-07 — P2 — Mode supervisé : divergence possible statut mission ↔ preuve
 

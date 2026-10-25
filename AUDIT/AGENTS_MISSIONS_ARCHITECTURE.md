@@ -31,10 +31,12 @@ UI / API
 - `runtime/agentic/AgenticRuntime` exécute les **tâches agent** (boucle LLM outillée), via `AgentRuntimeExecutor` (`AgentOrchestrator.enableAgenticRuntime`). `AgentExecutor` (legacy) reste en repli derrière le contrat `AgentTaskRunner`.
 - Une même mission n'est pas exécutée par les deux : l'Executor appelle des **outils**, pas le runtime agentique.
 
-## Code présent mais non exécuté en production
+## Chemins opt-in
 
-- `CoreKernel.runSupervisedAgenticMission` et `core/AgenticMissionRunner.createAgenticMissionRunner` : **aucun appelant hors tests** (grep). Le Supervisor n'est atteint en prod que via `Executor.runSupervised`, opt-in.
-- `LedgerGuard.setContext` (contexte ambiant global) n'est appelé que par `runSupervisedAgenticMission`, donc jamais en prod.
+- Lot 1 : `CoreKernel.runSupervisedAgenticMission` n'avait aucun appelant hors tests.
+- Lot 2 : il est branché sur `AgentRuntimeExecutor.execute` si `LEANNA_AGENT_SUPERVISED=1` :
+  `AgentRuntimeExecutor.runSupervised` ─► `kernel.runSupervisedAgenticMission` ─► `LedgerGuard.runWithContext` / `JevSafetyGate.runWithContext` ─► `LeannaSupervisor.runMission` ─► `createAgenticMissionRunner` ─► `AgenticRuntime.run`.
+- Le contexte ambiant d'idempotence est isolé par `AsyncLocalStorage`. `setContext` (global) ne reste utilisé que par les tests.
 
 ## Matrice
 

@@ -125,16 +125,29 @@ export function toRunnerOutcome(result: AgentResultLike): RunnerOutcome {
  */
 export function createAgenticMissionRunner(
   runtime: AgenticLike,
-  options: { role?: string; instructions?: string } = {}
+  options: {
+    role?: string;
+    instructions?: string;
+    /**
+     * Champs de la tâche réelle transmis à chaque tentative (signal, budget,
+     * onProgress, onTrace, files…). id/role/goal restent pilotés par le runner.
+     */
+    baseTask?: Partial<AgentTaskLike> & Record<string, unknown>;
+    /** Reçoit le résultat brut de chaque tentative (l'appelant en a besoin). */
+    onResult?: (result: AgentResultLike) => void;
+  } = {}
 ): MissionRunner {
   return async ({ missionId, goal, attempt }) => {
+    const base = options.baseTask ?? {};
     const result = await runtime.run({
+      ...base,
       id: `${missionId}:attempt-${attempt}`,
       role: options.role ?? "coder",
       goal,
-      instructions: options.instructions,
-      metadata: { missionId, attempt },
+      instructions: options.instructions ?? base.instructions,
+      metadata: { ...base.metadata, missionId, attempt },
     });
+    options.onResult?.(result);
     return toRunnerOutcome(result);
   };
 }

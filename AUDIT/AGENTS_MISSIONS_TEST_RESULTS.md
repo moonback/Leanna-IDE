@@ -14,6 +14,24 @@ Tous les tests ci-dessous sont **simulés** (sans fournisseur LLM réel). Aucun 
 | `npm run build` | non exécuté | non exécuté | la logique serveur modifiée est déjà couverte par `tsc` + tests ; build non validé |
 | `npm run test:missions` | non exécuté | non exécuté | exige un serveur lancé et une clé LLM |
 
+## Lot 2 (F-05 / F-06)
+
+| Commande | Résultat |
+|---|---|
+| `npm test` | **1 502 / 1 502 réussis** (+5) |
+| `npm run typecheck` | 0 erreur |
+| `npm run typecheck:test` | les 2 mêmes erreurs préexistantes, aucune nouvelle |
+
+| Test ajouté | Fichier | Avant | Après |
+|---|---|---|---|
+| missions supervisées concurrentes : contexte d'idempotence propre à chacune | `server/core/kernel.test.ts` | ✖ sur l'ancien code (`git stash` des 3 fichiers core) | ✔ |
+| transmission des champs de tâche (signal, budget, metadata) + `lastResult` | idem | API nouvelle | ✔ |
+| verdict Supervisor prioritaire, fichiers restaurés retirés | `server/agents/AgentTaskRunner.test.ts` | API nouvelle | ✔ |
+| Supervisor `COMPLETED` → `completed` | idem | API nouvelle | ✔ |
+| aucune tentative exécutée → `failed` explicite | idem | API nouvelle | ✔ |
+
+Non testé : une exécution réelle `LEANNA_AGENT_SUPERVISED=1` avec `AgenticRuntime` et un vrai LLM ; le démarrage du serveur avec ce flag.
+
 ## Tests de régression ajoutés (échec avant correctif → succès après)
 
 | Test | Fichier | Avant | Après |

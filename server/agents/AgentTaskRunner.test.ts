@@ -179,3 +179,50 @@ describe("AgentRuntimeExecutor — annulation en cours d'exécution", () => {
     assert.equal(task.result?.success, false);
   });
 });
+
+describe("AgentRuntimeExecutor — gouvernance Supervisor (opt-in)", () => {
+  beforeEach(() => registerRole("test_sup_role"));
+
+  const rawResult = (success: boolean) => ({
+    success, outcome: success ? "success" : "failed", filesRead: [], filesModified: ["a.ts", "b.ts"],
+    toolsExecuted: ["modify_project_file"], verifications: [], durationMs: 1,
+    final: { summary: "s", details: "" },
+  });
+
+  it("le verdict du Supervisor prime : runtime 'success' mais preuve refusée → failed, fichiers restaurés retirés", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    let params: any;
+    exec.setSupervision((async (_rt: unknown, p: unknown) => {
+      params = p;
+      return { missionId: "x", finalState: "ESCALATED", attempts: 3, lastResult: rawResult(true) };
+    }) as never);
+    const task = makeTask("test_sup_role");
+    task.context.files = ["a.ts"];
+    await exec.execute(task);
+
+    assert.equal(task.status, "failed");
+    assert.equal(task.result?.outcome, "partial");
+    assert.deepEqual(task.result?.filesModified, ["b.ts"], "a.ts a été restauré par le rollback");
+    assert.deepEqual(params.plannedFiles, ["a.ts"]);
+    assert.ok(params.baseTask.signal, "le signal d'annulation est transmis");
+    assert.match(params.missionId, /^agent-task:task-phase5:/);
+  });
+
+  it("Supervisor COMPLETED → completed avec le résultat du runtime", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    exec.setSupervision((async () => ({ missionId: "x", finalState: "COMPLETED", attempts: 1, lastResult: rawResult(true) })) as never);
+    const task = makeTask("test_sup_role");
+    await exec.execute(task);
+    assert.equal(task.status, "completed");
+    assert.deepEqual(task.result?.filesModified, ["a.ts", "b.ts"]);
+  });
+
+  it("aucune tentative exécutée → failed avec erreur explicite", async () => {
+    const exec = new AgentRuntimeExecutor({} as never, new ProgressNotifier());
+    exec.setSupervision((async () => ({ missionId: "x", finalState: "FAILED", attempts: 0 })) as never);
+    const task = makeTask("test_sup_role");
+    await exec.execute(task);
+    assert.equal(task.status, "failed");
+    assert.match(task.result?.error ?? "", /aucune tentative/);
+  });
+});
