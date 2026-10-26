@@ -18,6 +18,7 @@
  *   scope    : liste de RuleScope séparés par des espaces
  *   priority : entier (ordre d'insertion de la section, défaut 100)
  *   requires : liste d'IDs de règles séparés par des espaces
+   status   : "reference" conserve le fichier sans l'activer comme section
  *
  * Ces champs sont retournés dans ParsedFrontMatter et utilisés par
  * SystemPromptBuilder.syncSectionsFromLegacy() pour enrichir le SectionRegistry.
@@ -74,6 +75,9 @@ export interface ParsedFrontMatter {
    * soit incluse. Parsé depuis `requires: safety.core authority.workspace`.
    */
   requires?: string[];
+
+  /** "reference" conserve le fichier sans l’activer comme section. */
+  status?: "reference";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -241,6 +245,8 @@ export function parseFrontMatter(raw: string): ParsedFrontMatter {
       .split(/\s+/)
       .filter(Boolean);
   }
+
+  if (pairs["status"] === "reference") result.status = "reference";
 
   return result;
 }
