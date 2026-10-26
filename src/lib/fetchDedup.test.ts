@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dedupKeyFor } from './fetchDedup';
+import { dedupKeyFor } from './fetchDedup.js';
 
 const ORIGIN = 'http://127.0.0.1:4000';
 
