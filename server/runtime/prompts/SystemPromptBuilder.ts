@@ -463,6 +463,10 @@ export class SystemPromptBuilder {
 
         const fm = meta.get(id);
 
+        // Les fichiers de référence restent accessibles au legacy registry et
+        // aux outils d'édition, mais ne deviennent pas des sections actives.
+        if (fm?.status === "reference") continue;
+
         // Scope : source de vérité = front-matter. Absence de scope déclaré →
         // section opt-in : elle n'est active dans aucun scope (au lieu de tomber
         // silencieusement sur ["global"], ce qui l'activait partout).

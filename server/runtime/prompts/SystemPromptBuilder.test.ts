@@ -86,6 +86,21 @@ test("buildFull() — le provider par défaut masque les directives spécifiques
   assert.ok(!hasGeminiSection(openrouter), "elle doit être masquée sur openrouter");
 });
 
+test("buildFull() — les fichiers consolidés restent hors des sections actives", () => {
+  const b = builder();
+  const built = b.buildFull({ mode: "full", taskType: "coding" });
+  const ids = new Set(built.sections.map(section => section.id));
+
+  assert.ok(ids.has("base"), "base.md doit rester actif");
+  assert.ok(ids.has("autonomy"), "autonomy.md doit rester actif");
+  assert.ok(!ids.has("fundamentals"), "fundamentals.md ne doit plus être compilé");
+  assert.ok(!ids.has("efficiency"), "efficiency.md ne doit plus être compilé");
+  assert.ok(!ids.has("planning"), "planning.md ne doit plus être compilé");
+  assert.ok(!built.content.includes("Référence consolidée"), "les pointeurs ne doivent pas consommer de tokens actifs");
+  assert.match(built.content, /Efficience & Économie de Contexte/);
+  assert.match(built.content, /Clôture de Mission/);
+});
+
 test("build() — mode ask et mode full produisent des prompts différents", () => {
   const b = builder();
   const ask = b.build({ mode: "ask" });
