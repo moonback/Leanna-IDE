@@ -132,9 +132,9 @@ import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaste
 // doublon en BDD à chaque redémarrage → timers multipliés côté serveur.
 (async () => {
   try {
-    // 0. Résoudre SELF_ROOT depuis la persistance (avant TOUT le reste)
-    // Si aucun projet n'a été persisté, SELF_ROOT reste "" et les inits
-    // projet-dépendantes sont sautées jusqu'à la sélection d'un projet.
+    // 0. Résoudre SELF_ROOT depuis la persistance (avant TOUT le reste).
+    // Si un projet a déjà été utilisé, il est restauré automatiquement.
+    // Sinon SELF_ROOT reste "" et les inits projet-dépendantes sont sautées.
     initSelfRoot();
 
     // 1. Tâches planifiées (indépendant)

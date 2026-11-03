@@ -466,11 +466,15 @@ export function hasProject(): boolean {
 /**
  * Initialise SELF_ROOT (et WORKSPACE_SITE_URL) depuis le projet persisté.
  * À appeler UNE SEULE FOIS au démarrage du serveur.
- * Si aucun projet n'est persisté, SELF_ROOT reste "" et
- * le serveur démarre en mode "aucun projet".
+ *
+ * Ordre de priorité :
+ *   1. Variable d'env Leanna_SELF_ROOT_OVERRIDE (tests/CI)
+ *   2. lastProject.json — dernier projet utilisé (restauration automatique)
+ *   3. Workspace le plus récent dans workspaces.json
+ *   4. Aucun projet (SELF_ROOT reste "")
  */
 export function initSelfRoot(): void {
-  // Override explicite (tests/CI uniquement)
+  // 1. Override explicite (tests/CI uniquement)
   if (process.env.Leanna_SELF_ROOT_OVERRIDE?.trim()) {
     const override = process.env.Leanna_SELF_ROOT_OVERRIDE.trim();
     if (fs.existsSync(override) && fs.statSync(override).isDirectory()) {
@@ -481,12 +485,52 @@ export function initSelfRoot(): void {
     }
   }
 
-  // Toujours démarrer sans projet actif : l'utilisateur doit choisir un workspace
-  // via le sélecteur Multi-Workspace à chaque démarrage.
-  // La liste des workspaces récents (workspaces.json) est conservée pour la sélection rapide.
+  // 2. Restaurer automatiquement le dernier projet depuis lastProject.json
+  try {
+    const configPath = getPersistedProjectPath();
+    if (fs.existsSync(configPath)) {
+      const data: PersistedProjectData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      const resolved = path.resolve(data.projectRoot);
+      if (resolved && fs.existsSync(resolved) && fs.statSync(resolved).isDirectory() && !isProhibitedSystemPath(resolved)) {
+        SELF_ROOT = resolved;
+        WORKSPACE_SITE_URL = data.siteUrl?.trim() ?? "";
+        addOrUpdateWorkspace(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
+        console.log(`[SelfRoot] Dernier projet restauré automatiquement: ${SELF_ROOT}`);
+        return;
+      }
+      console.warn(`[SelfRoot] Dernier projet persisté introuvable ou invalide (${data.projectRoot}), recherche dans l'historique…`);
+    }
+  } catch (e: any) {
+    console.warn("[SelfRoot] Lecture de lastProject.json échouée:", e.message);
+  }
+
+  // 3. Fallback : workspace le plus récemment ouvert dans workspaces.json
+  try {
+    const workspaces = loadWorkspaces();
+    if (workspaces.length > 0) {
+      // Trier par lastOpened décroissant
+      const sorted = [...workspaces].sort(
+        (a, b) => new Date(b.lastOpened).getTime() - new Date(a.lastOpened).getTime()
+      );
+      for (const ws of sorted) {
+        const resolved = path.resolve(ws.path);
+        if (resolved && fs.existsSync(resolved) && fs.statSync(resolved).isDirectory() && !isProhibitedSystemPath(resolved)) {
+          SELF_ROOT = resolved;
+          WORKSPACE_SITE_URL = ws.siteUrl?.trim() ?? "";
+          persistProject(SELF_ROOT, WORKSPACE_SITE_URL || undefined);
+          console.log(`[SelfRoot] Workspace récent restauré depuis l'historique: ${SELF_ROOT}`);
+          return;
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn("[SelfRoot] Lecture de workspaces.json échouée:", e.message);
+  }
+
+  // 4. Aucun projet persisté valide — démarrage sans projet
   SELF_ROOT = "";
   WORKSPACE_SITE_URL = "";
-  console.log("[SelfRoot] Démarrage sans projet — sélecteur Multi-Workspace requis.");
+  console.log("[SelfRoot] Démarrage sans projet — aucun workspace valide trouvé.");
 }
 
 /**
