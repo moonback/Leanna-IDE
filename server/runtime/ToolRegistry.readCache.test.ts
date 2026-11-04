@@ -30,7 +30,8 @@ function fileRegistry() {
   return registry;
 }
 
-const read = async (r: ToolRegistry) => ((await r.call("read_project_file", { path: "a.ts" })) as { content: string }).content;
+const read = async (r: ToolRegistry, context = { workspaceRoot: "/workspace" }) =>
+  ((await r.call("read_project_file", { path: "a.ts" }, { context })) as { content: string }).content;
 
 test("a read right after a write observes the new content (read cache invalidated)", async () => {
   const registry = fileRegistry();
