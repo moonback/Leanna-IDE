@@ -214,3 +214,44 @@ test("rollback removes a newly-created empty directory", () => {
   assert.deepEqual(mgr.changedFiles(cp.id), []);
   fs.rmSync(workspace, { recursive: true, force: true });
 });
+
+
+test("rollback reverses a directory move before restoring nested file snapshots", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const source = path.join(workspace, "src", "feature");
+  const destination = path.join(workspace, "archive", "feature");
+  fs.mkdirSync(path.join(source, "empty"), { recursive: true });
+  fs.writeFileSync(path.join(source, "index.ts"), "export const moved = true;", "utf8");
+
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.captureRename(cp.id, source, destination);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.renameSync(source, destination);
+
+  mgr.rollback(cp.id);
+  assert.equal(fs.readFileSync(path.join(source, "index.ts"), "utf8"), "export const moved = true;");
+  assert.equal(fs.statSync(path.join(source, "empty")).isDirectory(), true);
+  assert.equal(fs.existsSync(destination), false);
+  assert.deepEqual(mgr.changedFiles(cp.id), []);
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
+
+test("rollback reverses a file rename and restores a pre-existing destination", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const source = path.join(workspace, "before.txt");
+  const destination = path.join(workspace, "after.txt");
+  fs.writeFileSync(source, "source-original", "utf8");
+  fs.writeFileSync(destination, "destination-original", "utf8");
+
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.captureRename(cp.id, source, destination);
+  fs.renameSync(source, destination);
+
+  mgr.rollback(cp.id);
+  assert.equal(fs.readFileSync(source, "utf8"), "source-original");
+  assert.equal(fs.readFileSync(destination, "utf8"), "destination-original");
+  assert.deepEqual(mgr.changedFiles(cp.id), []);
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
