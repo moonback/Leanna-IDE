@@ -191,6 +191,7 @@ export function createMissionsRouter(
     const evaluation = typeof executor?.getSelfEvaluation === "function"
       ? executor.getSelfEvaluation(state.id)
       : undefined;
+    const plan = typeof executor?.getMissionPlan === "function" ? executor.getMissionPlan(state.id) : undefined;
 
     return {
       id: state.id,
@@ -206,8 +207,10 @@ export function createMissionsRouter(
         totalActions: state.metrics?.totalActions ?? 0,
         successfulActions: state.metrics?.successfulActions ?? 0,
         failedActions: state.metrics?.failedActions ?? 0,
-        totalDurationMs: state.metrics?.totalDurationMs ?? 0,
-        estimatedTokens: state.metrics?.estimatedTokens ?? 0,
+        // Durée murale de la mission (pas du temps CPU cumulé).
+        totalDurationMs: Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0,
+        // Estimation du plan, pas une mesure réelle de tokens consommés.
+        estimatedTokens: state.metrics?.estimatedTokens || plan?.estimatedTokens || 0,
       },
       artifacts: Array.from(new Set(
         Object.values(goalsRecord).flatMap((goal: any) => goal.result?.artifacts ?? [])
@@ -222,7 +225,7 @@ export function createMissionsRouter(
         ? { action: String(lastError.action), error: clipText(lastError.error, 500) }
         : undefined,
       errorCount: errors.length,
-      plan: typeof executor?.getMissionPlan === "function" ? executor.getMissionPlan(state.id) : undefined,
+      plan,
       selfEvaluation: evaluation
         ? {
             overall: evaluation.overall,
