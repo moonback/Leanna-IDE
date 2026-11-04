@@ -264,7 +264,7 @@ export class CheckpointManager {
   }
 
   private captureMissingDirectories(id: string, targetPath: string): void {
-    this.requireOpen(id);
+    const cp = this.requireOpen(id);
     const directories = [...(cp.directories ?? [])];
     const known = new Set(directories.map((entry) => entry.path));
     let cursor = path.resolve(targetPath);
@@ -328,9 +328,9 @@ export class CheckpointManager {
 
     // Snapshots of files/directories created underneath a moved directory
     // follow that directory back to its original path during rollback.
-    const fileSnapshots = cp.files.map((snap) => ({
+    const fileSnapshots = cp.files.map((snap, index) => ({
       ...snap,
-      path: this.remapNewDescendantPath(snap.path, cp.renames ?? [], cp.files.indexOf(snap), "file"),
+      path: this.remapNewDescendantPath(snap.path, cp.renames ?? [], index, "file"),
     }));
     const directorySnapshots = (cp.directories ?? []).map((directory, index) => ({
       ...directory,
@@ -367,7 +367,6 @@ export class CheckpointManager {
       }
     }
     const directoryFailures: string[] = [];
-    const directorySnapshots = cp.directories ?? [];
     // Recreate directories that existed at snapshot time, shallowest first.
     for (const directory of directorySnapshots.filter((entry) => entry.existed).sort((a, b) => a.path.split(path.sep).length - b.path.split(path.sep).length)) {
       try { this.gateway.makeDirectory?.(directory.path); }
