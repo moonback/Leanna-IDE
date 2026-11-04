@@ -99,3 +99,31 @@ test("checkpoints persist and hydrate from disk across instances", () => {
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("captureFile journals a dynamically discovered existing file before its first write", () => {
+  const gw = memGateway({ "planned.ts": "planned", "discovered.ts": "original-discovered" });
+  const mgr = new CheckpointManager({ gateway: gw, dirOverride: cpDir() });
+  const cp = mgr.snapshot(["planned.ts"]);
+  assert.equal(mgr.captureFile(cp.id, "discovered.ts"), true);
+  assert.equal(mgr.captureFile(cp.id, "discovered.ts"), false, "capture is idempotent");
+  gw.write("discovered.ts", "changed");
+  mgr.rollback(cp.id);
+  assert.equal(gw.store.get("discovered.ts"), "original-discovered");
+});
+
+test("captureFile journals a dynamically discovered new file so rollback removes it", () => {
+  const gw = memGateway();
+  const mgr = new CheckpointManager({ gateway: gw, dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.captureFile(cp.id, "created-later.ts");
+  gw.write("created-later.ts", "created");
+  mgr.rollback(cp.id);
+  assert.equal(gw.exists("created-later.ts"), false);
+});
+
+test("captureFile refuses to mutate a committed checkpoint", () => {
+  const mgr = new CheckpointManager({ gateway: memGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.commit(cp.id);
+  assert.throws(() => mgr.captureFile(cp.id, "late.ts"), /non ouvert/);
+});
