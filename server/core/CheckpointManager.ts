@@ -145,14 +145,6 @@ export class CheckpointManager {
       createdAt: new Date().toISOString(),
       status: "open",
       files: snapshots,
-    };
-    const cp: Checkpoint = {
-      id: `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      missionId: meta.missionId,
-      label: meta.label,
-      createdAt: new Date().toISOString(),
-      status: "open",
-      files: snapshots,
       directories: [],
     };
     this.persist(cp);
