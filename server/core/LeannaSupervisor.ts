@@ -226,7 +226,12 @@ export class LeannaSupervisor {
       // Exécution bornée par un timeout optionnel. Un dépassement ou une
       // exception sont traités comme une tentative échouée.
       const beforeToolCall = async (toolName: string, args: Record<string, unknown>) => {
-        for (const target of params.resolveWriteTargets?.(toolName, args) ?? []) {
+        const targets = params.resolveWriteTargets?.(toolName, args) ?? [];
+        if (toolName === "rename_project_file" && targets.length >= 2) {
+          this.checkpoints.captureRename(checkpoint.id, targets[0], targets[1]);
+          return;
+        }
+        for (const target of targets) {
           this.checkpoints.capturePath(checkpoint.id, target);
         }
       };
