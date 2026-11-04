@@ -3,12 +3,14 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentEventStream, AgentEventStream } from "./AgentEventStream.js";
+import { AgentEventStream } from "./AgentEventStream.js";
 import type { AgentEvent } from "./ProgressNotifier.js";
 
 test("agent event stream notifies subscribers and supports unsubscribe", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-agent-events-"));
+  const stream = new AgentEventStream({ filePath: path.join(dir, "events.jsonl") });
   const received: AgentEvent[] = [];
-  const unsubscribe = agentEventStream.subscribe(({ event }) => received.push(event));
+  const unsubscribe = stream.subscribe(({ event }) => received.push(event));
   const event = {
     type: "agent_event",
     event: "task_started",
@@ -20,12 +22,13 @@ test("agent event stream notifies subscribers and supports unsubscribe", () => {
     timestamp: new Date().toISOString(),
   } as AgentEvent;
 
-  agentEventStream.publish(event);
+  stream.publish(event);
   unsubscribe();
-  agentEventStream.publish(event);
+  stream.publish(event);
 
   assert.equal(received.length, 1);
   assert.equal(received[0].taskId, "task-test");
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 function makeEvent(taskId: string): AgentEvent {
