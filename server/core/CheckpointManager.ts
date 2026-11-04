@@ -347,6 +347,10 @@ export class CheckpointManager {
         continue;
       }
       if (nowExists) {
+        if (this.gateway.isDirectory?.(snap.path)) {
+          changed.push(snap.path);
+          continue;
+        }
         const hash = WorkspaceState.hash(this.gateway.read(snap.path));
         if (hash !== snap.hash) changed.push(snap.path);
       }
