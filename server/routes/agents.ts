@@ -504,22 +504,26 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    * GET /api/agents/events
    * Flux SSE des événements de progression des agents.
    */
-  router.get('/events', (_req: Request, res: Response) => {
+  router.get('/events', (req: Request, res: Response) => {
+    const rawCursor = req.get('Last-Event-ID') ?? req.query.lastEventId;
+    const parsedCursor = typeof rawCursor === 'string' ? Number(rawCursor) : Number.NaN;
+    const afterId = Number.isSafeInteger(parsedCursor) && parsedCursor >= 0 ? parsedCursor : undefined;
+
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
-    res.write('retry: 5000\n\n');
+    res.write('retry: 5000\\n\\n');
 
     const keepAlive = setInterval(() => {
-      if (!res.destroyed) res.write(': keep-alive\n\n');
+      if (!res.destroyed) res.write(': keep-alive\\n\\n');
     }, 15_000);
-    const unsubscribe = agentEventStream.subscribe((event) => {
+    const unsubscribe = agentEventStream.subscribe(({ id, event }) => {
       if (res.destroyed) return;
-      res.write(`event: agent_event\ndata: ${JSON.stringify(event)}\n\n`);
-    });
+      res.write(`id: ${id}\\nevent: agent_event\\ndata: ${JSON.stringify(event)}\\n\\n`);
+    }, afterId);
 
     res.on('close', () => {
       clearInterval(keepAlive);
