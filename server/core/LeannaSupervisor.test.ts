@@ -338,3 +338,28 @@ test("dynamically discovered files are captured before write and restored on fai
   assert.equal(gw.store.get("discovered.ts"), "original");
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("supervisor reports residual files when rollback cannot restore a locked file", async () => {
+  const gw = memGateway({ "a.ts": "original" });
+  const write = gw.write;
+  gw.write = (filePath, content) => {
+    if (filePath === "a.ts" && content === "original") throw new Error("file locked");
+    write(filePath, content);
+  };
+  const { sup, dir } = makeSupervisor(gw);
+  const runner: MissionRunner = async () => {
+    gw.write("a.ts", "changed");
+    return { success: true, evidence: { testsExecuted: [{ name: "unit", passed: false }] } };
+  };
+  const result = await sup.runMission({
+    missionId: "m-rollback-residual",
+    goal: "restore a locked file",
+    runner,
+    plannedFiles: ["a.ts"],
+  });
+  assert.equal(result.finalState, "FAILED");
+  assert.equal(result.rollbackComplete, false);
+  assert.deepEqual(result.residualFiles, ["a.ts"]);
+  assert.equal(gw.store.get("a.ts"), "changed");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
