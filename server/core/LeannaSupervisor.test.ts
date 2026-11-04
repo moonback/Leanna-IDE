@@ -316,3 +316,25 @@ test("PAUSED: shouldPause suspends then awaitResume lets the mission complete", 
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("dynamically discovered files are captured before write and restored on failed evidence", async () => {
+  const gw = memGateway({ "discovered.ts": "original" });
+  const { sup, dir } = makeSupervisor(gw);
+  const runner: MissionRunner = async ({ beforeToolCall }) => {
+    await beforeToolCall?.("write_project_file", { path: "discovered.ts" });
+    gw.write("discovered.ts", "mutated");
+    return {
+      success: true,
+      evidence: { testsExecuted: [{ name: "unit", passed: false }] },
+    };
+  };
+  const result = await sup.runMission({
+    missionId: "m-dynamic-capture",
+    goal: "edit an unplanned file",
+    runner,
+    resolveWriteTargets: (_tool, args) => args.path === "discovered.ts" ? ["discovered.ts"] : [],
+  });
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(gw.store.get("discovered.ts"), "original");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
