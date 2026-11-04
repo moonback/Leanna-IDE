@@ -99,7 +99,7 @@ export class Executor {
   private supervisor: LeannaSupervisor | null = null;
 
   /**
-   * Active le mode supervisé. Par défaut lu depuis `LEANNA_MISSION_SUPERVISED`
+   * Active le mode supervisé. Par défaut lu depuis `LEANNA_SUPERVISED`
    * (true/1), surchargé par `setSupervisor`.
    */
   private supervisedMode = false;
