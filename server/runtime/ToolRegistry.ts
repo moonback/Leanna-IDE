@@ -398,15 +398,6 @@ export class ToolRegistry {
       throw new ToolAbortedError(name);
     }
 
-    // Cache pour read_project_file et list_project_files
-    if (name === 'read_project_file' || name === 'list_project_files') {
-      const key = `${name}:${JSON.stringify(args)}`;
-      const cached = this.readCache.get(key);
-      if (cached && Date.now() < cached.expires) {
-        return cached.value;
-      }
-    }
-
     const entry = this.tools.get(name);
     if (!entry) {
       throw new ToolNotFoundError(name, this.getSuggestions(name));
@@ -453,6 +444,16 @@ export class ToolRegistry {
     // Vérification additionnelle des permissions de l'appelant (le cas échéant).
     if (entry.definition.permissions?.length) {
       this.checkPermissions(name, entry.definition.permissions, options.callerPermissions);
+    }
+
+    // Cache de lecture : uniquement APRÈS les contrôles d'autorisation.
+    // Sans racine de workspace explicite et stable, pas de cache (fail-safe).
+    const readCacheKey = this.getReadCacheKey(name, args, options.context);
+    if (readCacheKey) {
+      const cached = this.readCache.get(readCacheKey);
+      if (cached && Date.now() < cached.expires) {
+        return cached.value;
+      }
     }
 
     // ── Garde de sécurité pré-exécution (jugement Jev) ──────────────────────
@@ -543,9 +544,8 @@ export class ToolRegistry {
         );
 
         // Mettre en cache pour les outils de lecture
-        if (name === 'read_project_file' || name === 'list_project_files') {
-          const key = `${name}:${JSON.stringify(args)}`;
-          this.readCache.set(key, { value: result, expires: Date.now() + 5000 });
+        if (readCacheKey) {
+          this.readCache.set(readCacheKey, { value: result, expires: Date.now() + 5000 });
         }
 
         const durationMs = Date.now() - startTime;
@@ -577,6 +577,25 @@ export class ToolRegistry {
     if (invalidatesReads) this.readCache.clear();
 
     throw lastError!;
+  }
+
+  /**
+   * Construit une clé de cache isolée par workspace.
+   * Sans racine explicite et stable, le résultat n'est pas mis en cache.
+   */
+  private getReadCacheKey(
+    name: string,
+    args: Record<string, unknown>,
+    context?: any
+  ): string | undefined {
+    if (name !== "read_project_file" && name !== "list_project_files") return undefined;
+    const workspaceRoot =
+      context?.workspaceRoot ??
+      context?.workspacePath ??
+      context?.projectRoot ??
+      context?.rootPath;
+    if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) return undefined;
+    return `${workspaceRoot}:${name}:${JSON.stringify(args)}`;
   }
 
   // ─── Métriques ─────────────────────────────────────────────────────────────

@@ -37,6 +37,9 @@ jobs:
       - name: Tests serveur
         run: npm test
 
+      - name: Typecheck des tests
+        run: npm run typecheck:test
+
       - name: Les tests n'écrivent pas dans le dépôt (AUDIT-035)
         run: |
           if [ -e .Leanna ] || ls -d .tmp-* >/dev/null 2>&1; then
