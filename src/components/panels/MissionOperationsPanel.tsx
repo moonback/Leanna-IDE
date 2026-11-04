@@ -11,7 +11,9 @@ interface MissionItem {
   priority: string;
   createdAt: string;
   updatedAt?: string;
-  metrics?: { totalActions: number; successfulActions: number; failedActions: number; totalDurationMs?: number; estimatedTokens?: number };\n  artifacts?: string[];
+  metrics?: { totalActions: number; successfulActions: number; failedActions: number; totalDurationMs?: number; estimatedTokens?: number };
+  artifacts?: string[];
+  completedAt?: string;
   lastError?: { action: string; error?: string };
   errorCount?: number;
 }
