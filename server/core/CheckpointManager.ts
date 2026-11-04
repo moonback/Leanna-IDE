@@ -173,12 +173,23 @@ export class CheckpointManager {
     }
     if (cp.status === "rolledback") return; // idempotent
 
-    for (const snap of cp.files) {
-      if (snap.existed) {
-        this.gateway.write(snap.path, snap.content ?? "");
-      } else if (this.gateway.exists(snap.path)) {
-        this.gateway.remove(snap.path);
+    // Restore every entry even if one filesystem operation fails. A single
+    // locked/permission-denied file must not prevent unrelated files restoring.
+    // Keep the checkpoint open on partial failure so the caller can retry.
+    const failures: string[] = [];
+    for (const snap of [...cp.files].reverse()) {
+      try {
+        if (snap.existed) {
+          this.gateway.write(snap.path, snap.content ?? "");
+        } else if (this.gateway.exists(snap.path)) {
+          this.gateway.remove(snap.path);
+        }
+      } catch (error) {
+        failures.push(`${snap.path}: ${(error as Error).message}`);
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(`Rollback incomplet pour ${id} — ${failures.length} fichier(s) non restauré(s): ${failures.join(" ; ")}`);
     }
     this.persist({ ...cp, status: "rolledback" });
   }
