@@ -230,7 +230,7 @@ export class TaskScheduler {
     syncTerminalStatuses();
     if (cancelled.size > 0 && failed.size === 0) {
       plan.status = "cancelled";
-    } else if (failed.size > 0 && completed.size === 0 && incomplete.size === 0) {
+    } else if (failed.size > 0 && completed.size === 0) {
       plan.status = "failed";
     } else if (completed.size === plan.tasks.length) {
       plan.status = "completed";
