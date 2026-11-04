@@ -278,6 +278,6 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-md border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>{children}</p>;
 }
-function SmallButton({ children, label, disabled, danger, onClick }: { children: React.ReactNode; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }) {
+function SmallButton({ children, label, disabled, danger, onClick }: { children: ReactNode; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }) {
   return <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:opacity-50" style={{ borderColor: danger ? 'var(--color-error)' : 'var(--border-base)', color: danger ? 'var(--color-error)' : 'var(--text-secondary)' }}>{children}<span>{label}</span></button>;
 }
