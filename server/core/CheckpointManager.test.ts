@@ -127,3 +127,39 @@ test("captureFile refuses to mutate a committed checkpoint", () => {
   mgr.commit(cp.id);
   assert.throws(() => mgr.captureFile(cp.id, "late.ts"), /non ouvert/);
 });
+
+test("rollback restores unaffected files even when one file write fails, then can be retried", () => {
+  const gw = memGateway({ "a.ts": "a0", "b.ts": "b0" });
+  const originalWrite = gw.write;
+  let failOnce = true;
+  gw.write = (filePath, content) => {
+    if (filePath === "b.ts" && failOnce) {
+      failOnce = false;
+      throw new Error("file is temporarily locked");
+    }
+    originalWrite(filePath, content);
+  };
+  const mgr = new CheckpointManager({ gateway: gw, dirOverride: cpDir() });
+  const cp = mgr.snapshot(["a.ts", "b.ts"]);
+  gw.write = originalWrite;
+  gw.write("a.ts", "a1");
+  gw.write("b.ts", "b1");
+
+  // Restore order is reversed: b fails, but a must still be restored.
+  gw.write = (filePath, content) => {
+    if (filePath === "b.ts" && failOnce) {
+      failOnce = false;
+      throw new Error("file is temporarily locked");
+    }
+    originalWrite(filePath, content);
+  };
+  assert.throws(() => mgr.rollback(cp.id), /Rollback incomplet/);
+  assert.equal(gw.store.get("a.ts"), "a0");
+  assert.equal(gw.store.get("b.ts"), "b1");
+  assert.equal(mgr.get(cp.id)?.status, "open");
+
+  gw.write = originalWrite;
+  mgr.rollback(cp.id);
+  assert.equal(gw.store.get("b.ts"), "b0");
+  assert.equal(mgr.get(cp.id)?.status, "rolledback");
+});
