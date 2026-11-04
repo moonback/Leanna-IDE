@@ -198,3 +198,19 @@ test("rollback removes newly-created empty directories but never recursively del
   assert.equal(mgr.get(cp.id)?.status, "open");
   fs.rmSync(workspace, { recursive: true, force: true });
 });
+
+
+test("rollback removes a newly-created empty directory", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const newFolder = path.join(workspace, "new", "nested");
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.capturePath(cp.id, newFolder);
+  fs.mkdirSync(newFolder, { recursive: true });
+
+  mgr.rollback(cp.id);
+  assert.equal(fs.existsSync(newFolder), false);
+  assert.equal(fs.existsSync(path.join(workspace, "new")), false);
+  assert.deepEqual(mgr.changedFiles(cp.id), []);
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
