@@ -227,7 +227,7 @@ export class LeannaSupervisor {
       // exception sont traités comme une tentative échouée.
       const beforeToolCall = async (toolName: string, args: Record<string, unknown>) => {
         for (const target of params.resolveWriteTargets?.(toolName, args) ?? []) {
-          this.checkpoints.captureFile(checkpoint.id, target);
+          this.checkpoints.capturePath(checkpoint.id, target);
         }
       };
       const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
