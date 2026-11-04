@@ -176,7 +176,7 @@ export default function MissionOperationsPanel() {
     } finally {
       setBusyKey(null);
     }
-  }, [refresh]);
+  }, [confirm, refresh]);
 
   return (
     <section className="rounded-lg border p-4 shadow-sm" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }} aria-labelledby="mission-operations-title">
