@@ -18,6 +18,7 @@ export function useAgentEventStream(): void {
   useEffect(() => {
     let stopped = false;
     let retryDelay = RETRY_MIN_MS;
+    let lastEventId = 0;
     let controller: AbortController | null = null;
 
     const wait = (delay: number) => new Promise<void>((resolve) => setTimeout(resolve, delay));
@@ -27,7 +28,10 @@ export function useAgentEventStream(): void {
         controller = new AbortController();
         try {
           const token = localStorage.getItem('Leanna_api_token');
-          const response = await fetch('/api/agents/events', {
+          const eventsUrl = lastEventId > 0
+            ? `/api/agents/events?lastEventId=${lastEventId}`
+            : '/api/agents/events';
+          const response = await fetch(eventsUrl, {
             headers: token ? { 'x-leanna-token': token } : {},
             signal: controller.signal,
           });
@@ -45,8 +49,13 @@ export function useAgentEventStream(): void {
             const frames = buffer.split(/\r?\n\r?\n/);
             buffer = frames.pop() ?? '';
             for (const frame of frames) {
-              const data = frame
-                .split(/\r?\n/)
+              const lines = frame.split(/\r?\n/);
+              const idLine = lines.find((line) => line.startsWith('id:'));
+              if (idLine) {
+                const parsedId = Number(idLine.slice(3).trim());
+                if (Number.isSafeInteger(parsedId) && parsedId > lastEventId) lastEventId = parsedId;
+              }
+              const data = lines
                 .filter((line) => line.startsWith('data:'))
                 .map((line) => line.slice(5).trimStart())
                 .join('\n');
