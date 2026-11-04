@@ -60,6 +60,7 @@ export type MissionRunner = (ctx: {
   attempt: number;
   /** Signal d'annulation déclenché sur timeout runner (ou annulation externe). */
   signal?: AbortSignal;
+  beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }) => Promise<RunnerOutcome>;
 
 /**
@@ -153,6 +154,8 @@ export class LeannaSupervisor {
     plannedFiles?: string[];
     /** Hooks optionnels de gouvernance (pause / approbation humaine). */
     hooks?: SupervisorGovernanceHooks;
+    /** Resolve relative tool paths to the exact workspace targets used by writers. */
+    resolveWriteTargets?: (toolName: string, args: Record<string, unknown>) => string[];
   }): Promise<SupervisedResult> {
     const { missionId, goal, runner } = params;
     const hooks = params.hooks ?? {};
@@ -217,7 +220,12 @@ export class LeannaSupervisor {
 
       // Exécution bornée par un timeout optionnel. Un dépassement ou une
       // exception sont traités comme une tentative échouée.
-      const outcome = await this.runAttempt(runner, { missionId, goal, attempt });
+      const beforeToolCall = async (toolName: string, args: Record<string, unknown>) => {
+        for (const target of params.resolveWriteTargets?.(toolName, args) ?? []) {
+          this.checkpoints.captureFile(checkpoint.id, target);
+        }
+      };
+      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
 
       // VERIFY : la PREUVE prime sur ce que le runner "dit".
       this.advance(machine, "VERIFYING", "evaluate evidence");
@@ -349,7 +357,7 @@ export class LeannaSupervisor {
    */
   private async runAttempt(
     runner: MissionRunner,
-    ctx: { missionId: string; goal: string; attempt: number }
+    ctx: { missionId: string; goal: string; attempt: number; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
