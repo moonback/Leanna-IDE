@@ -275,7 +275,7 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
       `journalisées ; un rejeu après crash est bloqué.`
     );
   }
-  if (config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv()) {
+  if (config.enableAgentSupervision ?? supervisionEnabledFromEnv()) {
     agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission);
     console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_SUPERVISED).`);
   }
