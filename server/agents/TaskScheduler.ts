@@ -17,7 +17,72 @@ const log = createLogger("TaskScheduler");
  * par `AgentRuntimeExecutor` (runtime agentique). Le scheduler dépend de cette
  * interface partagée, pas d'une implémentation concrète.
  */
+
 export type TaskRunner = AgentTaskRunner;
+
+/** Diagnostic emitted when an orchestration graph is not executable. */
+export class InvalidOrchestrationPlanError extends Error {
+  constructor(public readonly issues: string[]) {
+    super(`Plan d'orchestration invalide : ${issues.join(" ; ")}`);
+    this.name = "InvalidOrchestrationPlanError";
+  }
+}
+
+/**
+ * Validate the complete dependency graph before any agent is started.
+ * Unknown references, duplicate task IDs, self-dependencies and cycles are
+ * rejected deterministically instead of leaving the scheduler in a deadlock.
+ */
+export function validateOrchestrationPlan(plan: OrchestrationPlan): void {
+  const issues: string[] = [];
+  const ids = plan.tasks.map((task) => task.id);
+  const known = new Set(ids);
+
+  if (known.size !== ids.length) issues.push("IDs de tâches dupliqués");
+
+  for (const task of plan.tasks) {
+    const deps = plan.dependencies?.[task.id] ?? [];
+    const seen = new Set<string>();
+    for (const depId of deps) {
+      if (seen.has(depId)) issues.push(`Dépendance dupliquée "${depId}" pour "${task.id}"`);
+      seen.add(depId);
+      if (!known.has(depId)) issues.push(`Dépendance inconnue "${depId}" référencée par "${task.id}"`);
+      if (depId === task.id) issues.push(`Auto-dépendance interdite pour "${task.id}"`);
+    }
+  }
+
+  for (const key of Object.keys(plan.dependencies ?? {})) {
+    if (!known.has(key)) issues.push(`Clé de dépendances sans tâche "${key}"`);
+  }
+
+  // Three-colour DFS: 0 = unseen, 1 = active stack, 2 = fully visited.
+  const color = new Map<string, 0 | 1 | 2>();
+  const stack: string[] = [];
+  const reportedCycles = new Set<string>();
+  const visit = (id: string): void => {
+    color.set(id, 1);
+    stack.push(id);
+    for (const depId of plan.dependencies?.[id] ?? []) {
+      if (!known.has(depId)) continue;
+      const state = color.get(depId) ?? 0;
+      if (state === 0) visit(depId);
+      else if (state === 1) {
+        const start = stack.indexOf(depId);
+        const cycle = [...stack.slice(start), depId];
+        const signature = [...cycle.slice(0, -1)].sort().join("|");
+        if (!reportedCycles.has(signature)) {
+          reportedCycles.add(signature);
+          issues.push(`Cycle de dépendances : ${cycle.join(" → ")}`);
+        }
+      }
+    }
+    stack.pop();
+    color.set(id, 2);
+  };
+  for (const id of ids) if ((color.get(id) ?? 0) === 0) visit(id);
+
+  if (issues.length) throw new InvalidOrchestrationPlanError(issues);
+}
 
 export class TaskScheduler {
   constructor(
@@ -36,6 +101,7 @@ export class TaskScheduler {
    * Gère le deadlock quand des dépendances échouent.
    */
   async execute(plan: OrchestrationPlan): Promise<void> {
+    validateOrchestrationPlan(plan);
     const orchShortId = plan.id.slice(0, 8);
     const startTime = Date.now();
 
