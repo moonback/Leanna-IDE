@@ -1043,8 +1043,8 @@ async function startServer() {
     }
 
     // Notification Telegram si activée
-    if (event?.event === "task_completed" || event?.event === "task_failed") {
-      const statusIcon = event.event === "task_completed" ? "✅" : "❌";
+    if (event?.event === "task_completed" || event?.event === "task_incomplete" || event?.event === "task_failed") {
+      const statusIcon = event.event === "task_completed" ? "✅" : event.event === "task_incomplete" ? "⚠️" : "❌";
       telegramService.notify(
         `Agent *${event.agentName || event.role || "système"}* : Tâche ${statusIcon}\n` +
         `• *Titre :* ${event.title || "Tâche"}\n` +
