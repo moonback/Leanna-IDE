@@ -28,6 +28,7 @@ import {
   type AgentTaskLike,
 } from "./AgenticMissionRunner.js";
 import { randomUUID } from "node:crypto";
+import { resolveWritePath } from "../skills/codebaseHelpers.js";
 
 /** Paramètres d'une mission agentique gouvernée par le Supervisor. */
 export interface SupervisedAgenticMissionParams {
@@ -184,6 +185,20 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
         missionId,
         goal: params.goal,
         plannedFiles: params.plannedFiles,
+        resolveWriteTargets: (toolName, args) => {
+          // Only file-level operations are journaled here. Directory deletion is
+          // deliberately excluded until recursive snapshots are supported.
+          const candidates: unknown[] =
+            toolName === "rename_project_file"
+              ? [args.oldPath, args.newPath]
+              : ["write_project_file", "modify_project_file", "patch_project_file", "apply_patch", "delete_project_file"].includes(toolName)
+                ? [args.path]
+                : [];
+          return candidates
+            .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+            .map((value) => resolveWritePath(value))
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        },
         runner,
       });
     const result = await guard.runWithContext(ctx, () =>
