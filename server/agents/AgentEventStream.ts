@@ -57,7 +57,8 @@ export class AgentEventStream {
   }
 
   publish(event: AgentEvent): number {
-    const entry: SequencedAgentEvent = { id: this.nextId++, event };
+    const id = this.nextId++;
+    const entry: SequencedAgentEvent = { id, event: { ...event, eventId: id } };
     this.history.push(entry);
     if (this.history.length > this.maxHistory) this.history.splice(0, this.history.length - this.maxHistory);
 
