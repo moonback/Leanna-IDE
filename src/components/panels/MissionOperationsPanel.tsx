@@ -151,6 +151,15 @@ export default function MissionOperationsPanel() {
   }, [refresh]);
 
   const decideResume = useCallback(async (item: ResumeItem, decision: 'reactivate' | 'delete') => {
+    if (decision === 'delete') {
+      const ok = await confirm({
+        title: 'Effacer cette mission interrompue ?',
+        message: 'La mission sera supprimée de la file de reprise et ne pourra plus être réactivée depuis cette interface.',
+        confirmLabel: 'Effacer définitivement',
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
     const key = `resume:${item.missionId}`;
     setBusyKey(key);
     try {
