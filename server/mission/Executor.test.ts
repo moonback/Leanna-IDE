@@ -27,6 +27,36 @@ test('Executor emits an explicit plan before mission start', async () => {
   assert.deepEqual(plan.targetedFiles, ['server.ts']);
 });
 
+test('Executor exposes approval details while preserving the legacy pending ID list', () => {
+  const executor = new Executor();
+  const timer = setTimeout(() => undefined, 60_000);
+  (executor as any).pendingApprovals.set('action-42', {
+    resolve: () => undefined,
+    timer,
+    missionId: 'mission-7',
+    goalId: 'goal-3',
+    skill: 'write_project_file',
+    args: { path: 'src/example.ts', accessToken: 'do-not-leak' },
+    reason: 'Écriture d’un fichier source',
+    requestedAt: '2026-11-04T10:00:00.000Z',
+    timeoutAt: '2026-11-04T10:05:00.000Z',
+  });
+
+  assert.deepEqual(executor.listPendingApprovals(), ['action-42']);
+  assert.deepEqual(executor.listPendingApprovalDetails(), [{
+    actionId: 'action-42',
+    missionId: 'mission-7',
+    goalId: 'goal-3',
+    skill: 'write_project_file',
+    args: { path: 'src/example.ts', accessToken: '[masqué]' },
+    reason: 'Écriture d’un fichier source',
+    requestedAt: '2026-11-04T10:00:00.000Z',
+    timeoutAt: '2026-11-04T10:05:00.000Z',
+  }]);
+  assert.equal(executor.resolveApproval('action-42', true), true);
+  assert.deepEqual(executor.listPendingApprovalDetails(), []);
+});
+
 test('Executor exposes a completion promise for autonomous callers', async () => {
   const executor = new Executor();
   executor.setSkillHandler(async () => null);

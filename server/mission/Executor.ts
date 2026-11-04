@@ -25,6 +25,7 @@ import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation
 import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { supervisionEnabledFromEnv } from "../core/supervisionConfig.js";
 
 // Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
 // pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
@@ -32,6 +33,24 @@ import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
 // typecheck en échec — et poussait le LLM à mal juger. 1200 laisse de la marge
 // tout en bornant la taille de la preuve.
 const SUMMARY_RESULT_MAX_CHARS = 1200;
+
+/** Évite d'exposer des secrets ou des payloads volumineux dans la file d'approbation UI. */
+function sanitizeApprovalArgs(value: unknown, depth = 0): unknown {
+  if (depth > 3) return '[profondeur limitée]';
+  if (typeof value === 'string') return value.length > 300 ? value.slice(0, 300) + '…' : value;
+  if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.slice(0, 10).map((item) => sanitizeApprovalArgs(item, depth + 1));
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).slice(0, 20);
+    return Object.fromEntries(entries.map(([key, item]) => {
+      if (/(password|passwd|secret|token|api[_-]?key|authorization|credential|cookie)/i.test(key)) {
+        return [key, '[masqué]'];
+      }
+      return [key, sanitizeApprovalArgs(item, depth + 1)];
+    }));
+  }
+  return String(value);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
@@ -98,7 +117,7 @@ export class Executor {
   private supervisor: LeannaSupervisor | null = null;
 
   /**
-   * Active le mode supervisé. Par défaut lu depuis `LEANNA_MISSION_SUPERVISED`
+   * Active le mode supervisé. Par défaut lu depuis `LEANNA_SUPERVISED`
    * (true/1), surchargé par `setSupervisor`.
    */
   private supervisedMode = false;
@@ -106,10 +125,17 @@ export class Executor {
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
 
-  /** Approbations en attente : actionId → resolver de décision. */
+  /** Approbations en attente : décision + contexte minimal pour l'interface opérateur. */
   private pendingApprovals: Map<string, {
     resolve: (approved: boolean) => void;
     timer: NodeJS.Timeout;
+    missionId: string;
+    goalId: string;
+    skill: string;
+    args: Record<string, unknown>;
+    reason: string;
+    requestedAt: string;
+    timeoutAt: string;
   }> = new Map();
 
   /** Délai d'attente d'une approbation avant refus par défaut (ms). */
@@ -277,8 +303,7 @@ export class Executor {
     const raw = (process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase().trim();
     this.evidenceVerification = raw === "true" || raw === "1";
     // Mode supervisé (couture Supervisor) activable par défaut via l'environnement.
-    const sup = (process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase().trim();
-    this.supervisedMode = sup === "true" || sup === "1";
+    this.supervisedMode = supervisionEnabledFromEnv();
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
@@ -392,9 +417,32 @@ export class Executor {
     return true;
   }
 
-  /** Liste les IDs d'actions en attente d'approbation. */
+  /** Liste historique des IDs, conservée pour compatibilité des scripts/API. */
   listPendingApprovals(): string[] {
     return Array.from(this.pendingApprovals.keys());
+  }
+
+  /** Détails minimaux des approbations pour le centre de pilotage. */
+  listPendingApprovalDetails(): Array<{
+    actionId: string;
+    missionId: string;
+    goalId: string;
+    skill: string;
+    args: Record<string, unknown>;
+    reason: string;
+    requestedAt: string;
+    timeoutAt: string;
+  }> {
+    return Array.from(this.pendingApprovals.entries()).map(([actionId, pending]) => ({
+      actionId,
+      missionId: pending.missionId,
+      goalId: pending.goalId,
+      skill: pending.skill,
+      args: sanitizeApprovalArgs(pending.args) as Record<string, unknown>,
+      reason: pending.reason.slice(0, 500),
+      requestedAt: pending.requestedAt,
+      timeoutAt: pending.timeoutAt,
+    }));
   }
 
   /**
@@ -2745,7 +2793,17 @@ JSON:`;
         resolve(false);
       }, this.approvalTimeoutMs);
 
-      this.pendingApprovals.set(action.id, { resolve, timer });
+      this.pendingApprovals.set(action.id, {
+        resolve,
+        timer,
+        missionId: mission.id,
+        goalId,
+        skill: action.skillName,
+        args: action.args ?? {},
+        reason,
+        requestedAt: new Date().toISOString(),
+        timeoutAt: new Date(Date.now() + this.approvalTimeoutMs).toISOString(),
+      });
     });
   }
 

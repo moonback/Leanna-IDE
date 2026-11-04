@@ -17,7 +17,72 @@ const log = createLogger("TaskScheduler");
  * par `AgentRuntimeExecutor` (runtime agentique). Le scheduler dépend de cette
  * interface partagée, pas d'une implémentation concrète.
  */
+
 export type TaskRunner = AgentTaskRunner;
+
+/** Diagnostic emitted when an orchestration graph is not executable. */
+export class InvalidOrchestrationPlanError extends Error {
+  constructor(public readonly issues: string[]) {
+    super(`Plan d'orchestration invalide : ${issues.join(" ; ")}`);
+    this.name = "InvalidOrchestrationPlanError";
+  }
+}
+
+/**
+ * Validate the complete dependency graph before any agent is started.
+ * Unknown references, duplicate task IDs, self-dependencies and cycles are
+ * rejected deterministically instead of leaving the scheduler in a deadlock.
+ */
+export function validateOrchestrationPlan(plan: OrchestrationPlan): void {
+  const issues: string[] = [];
+  const ids = plan.tasks.map((task) => task.id);
+  const known = new Set(ids);
+
+  if (known.size !== ids.length) issues.push("IDs de tâches dupliqués");
+
+  for (const task of plan.tasks) {
+    const deps = plan.dependencies?.[task.id] ?? [];
+    const seen = new Set<string>();
+    for (const depId of deps) {
+      if (seen.has(depId)) issues.push(`Dépendance dupliquée "${depId}" pour "${task.id}"`);
+      seen.add(depId);
+      if (!known.has(depId)) issues.push(`Dépendance inconnue "${depId}" référencée par "${task.id}"`);
+      if (depId === task.id) issues.push(`Auto-dépendance interdite pour "${task.id}"`);
+    }
+  }
+
+  for (const key of Object.keys(plan.dependencies ?? {})) {
+    if (!known.has(key)) issues.push(`Clé de dépendances sans tâche "${key}"`);
+  }
+
+  // Three-colour DFS: 0 = unseen, 1 = active stack, 2 = fully visited.
+  const color = new Map<string, 0 | 1 | 2>();
+  const stack: string[] = [];
+  const reportedCycles = new Set<string>();
+  const visit = (id: string): void => {
+    color.set(id, 1);
+    stack.push(id);
+    for (const depId of plan.dependencies?.[id] ?? []) {
+      if (!known.has(depId)) continue;
+      const state = color.get(depId) ?? 0;
+      if (state === 0) visit(depId);
+      else if (state === 1) {
+        const start = stack.indexOf(depId);
+        const cycle = [...stack.slice(start), depId];
+        const signature = [...cycle.slice(0, -1)].sort().join("|");
+        if (!reportedCycles.has(signature)) {
+          reportedCycles.add(signature);
+          issues.push(`Cycle de dépendances : ${cycle.join(" → ")}`);
+        }
+      }
+    }
+    stack.pop();
+    color.set(id, 2);
+  };
+  for (const id of ids) if ((color.get(id) ?? 0) === 0) visit(id);
+
+  if (issues.length) throw new InvalidOrchestrationPlanError(issues);
+}
 
 export class TaskScheduler {
   constructor(
@@ -36,6 +101,7 @@ export class TaskScheduler {
    * Gère le deadlock quand des dépendances échouent.
    */
   async execute(plan: OrchestrationPlan): Promise<void> {
+    validateOrchestrationPlan(plan);
     const orchShortId = plan.id.slice(0, 8);
     const startTime = Date.now();
 
@@ -44,11 +110,23 @@ export class TaskScheduler {
     plan.status = "running";
     const completed = new Set<string>();
     const failed = new Set<string>();
+    const incomplete = new Set<string>();
+    const cancelled = new Set<string>();
+    const unsatisfied = new Set<string>();
     let iteration = 0;
-
-    while (completed.size + failed.size < plan.tasks.length) {
+    const syncTerminalStatuses = (): void => {
+      for (const task of plan.tasks) {
+        if (task.status === "completed") completed.add(task.id);
+        else if (task.status === "failed") { failed.add(task.id); unsatisfied.add(task.id); }
+        else if (task.status === "incomplete") { incomplete.add(task.id); unsatisfied.add(task.id); }
+        else if (task.status === "cancelled") { cancelled.add(task.id); unsatisfied.add(task.id); }
+      }
+    };
+    syncTerminalStatuses();
+    while (completed.size + failed.size + incomplete.size + cancelled.size < plan.tasks.length) {
+      syncTerminalStatuses();
       iteration++;
-      log.debug(`[${orchShortId}] Itération ${iteration} — Terminées: ${completed.size} | Échouées: ${failed.size}`);
+      log.debug(`[${orchShortId}] Itération ${iteration} — Terminées: ${completed.size} | Échouées: ${failed.size} | Incomplètes: ${incomplete.size} | Annulées: ${cancelled.size}`);
 
       // Trouver les tâches prêtes (dépendances satisfaites et pas encore démarrées)
       const ready = plan.tasks.filter((t) => {
@@ -65,19 +143,20 @@ export class TaskScheduler {
           const blocked = plan.tasks.filter(t => t.status === "pending");
           for (const b of blocked) {
             const deps = plan.dependencies[b.id] ?? [];
-            const failedDeps = deps.filter(d => failed.has(d));
+            const failedDeps = deps.filter(d => unsatisfied.has(d));
             log.warn(`  Bloquée: "${b.title}" — attend: ${failedDeps.join(", ")}`);
             b.status = "incomplete";
             b.completedAt = new Date().toISOString();
             b.result = {
               success: false,
-              outcome: "failed",
+              outcome: "blocked",
               summary: "Tâche bloquée par une dépendance non terminée",
               error: `Dépendances non satisfaites: ${deps.join(", ") || "inconnues"}`,
               durationMs: 0,
             };
-            failed.add(b.id);
-            this.notifier?.notify(b, "failed");
+            incomplete.add(b.id);
+            unsatisfied.add(b.id);
+            this.notifier?.notify(b, "incomplete");
           }
           break;
         }
@@ -108,12 +187,14 @@ export class TaskScheduler {
         await this.executor.execute(task);
         const taskMs = Date.now() - taskStart;
 
+        syncTerminalStatuses();
+        const progress = completed.size + failed.size + incomplete.size + cancelled.size;
         if (task.status === "completed") {
-          completed.add(task.id);
-          log.info(`[${orchShortId}] [task:${taskShortId}] ✅ [${agentName}] Terminé en ${(taskMs / 1000).toFixed(1)}s | Progression: ${completed.size + failed.size}/${plan.tasks.length}`);
+          log.info(`[${orchShortId}] [task:${taskShortId}] ✅ [${agentName}] Terminé en ${(taskMs / 1000).toFixed(1)}s | Progression: ${progress}/${plan.tasks.length}`);
+        } else if (task.status === "cancelled") {
+          log.info(`[${orchShortId}] [task:${taskShortId}] 🛑 [${agentName}] Annulé | Progression: ${progress}/${plan.tasks.length}`);
         } else {
-          failed.add(task.id);
-          log.warn(`[${orchShortId}] [task:${taskShortId}] ❌ [${agentName}] Échoué en ${(taskMs / 1000).toFixed(1)}s — ${task.result?.error ?? "raison inconnue"} | Progression: ${completed.size + failed.size}/${plan.tasks.length}`);
+          log.warn(`[${orchShortId}] [task:${taskShortId}] ❌ [${agentName}] ${task.status} en ${(taskMs / 1000).toFixed(1)}s — ${task.result?.error ?? "raison inconnue"} | Progression: ${progress}/${plan.tasks.length}`);
         }
       });
 
@@ -124,20 +205,21 @@ export class TaskScheduler {
       for (const task of plan.tasks) {
         if (task.status !== "pending") continue;
         const deps = plan.dependencies[task.id] ?? [];
-        const hasFailedDep = deps.some((depId) => failed.has(depId));
-        if (hasFailedDep) {
+        const blockedDeps = deps.filter((depId) => unsatisfied.has(depId));
+        if (blockedDeps.length > 0) {
           task.status = "incomplete";
           task.completedAt = new Date().toISOString();
           task.result = {
             success: false,
-            outcome: "failed",
-            summary: "Tâche annulée : dépendance échouée",
-            error: `Dépendance(s) échouée(s): ${deps.filter(d => failed.has(d)).join(", ")}`,
+            outcome: "blocked",
+            summary: "Tâche incomplète : dépendance non satisfaite",
+            error: `Dépendance(s) non satisfaite(s): ${blockedDeps.join(", ")}`,
             durationMs: 0,
           };
-          failed.add(task.id);
-          this.notifier?.notify(task, "failed");
-          log.warn(`[${orchShortId}] Tâche "${task.title}" annulée (dépendance échouée)`);
+          incomplete.add(task.id);
+          unsatisfied.add(task.id);
+          this.notifier?.notify(task, "incomplete");
+          log.warn(`[${orchShortId}] Tâche "${task.title}" incomplète (dépendance non satisfaite)`);
         }
       }
     }
@@ -145,9 +227,14 @@ export class TaskScheduler {
     // Une orchestration n'est terminée avec succès que si chaque tâche porte un
     // résultat vérifié. Les exécutions partielles/incomplètes restent visibles.
     const totalDuration = Date.now() - startTime;
-    if (completed.size === plan.tasks.length) {
+    syncTerminalStatuses();
+    if (cancelled.size > 0 && failed.size === 0) {
+      plan.status = "cancelled";
+    } else if (failed.size > 0 && completed.size === 0) {
+      plan.status = "failed";
+    } else if (completed.size === plan.tasks.length) {
       plan.status = "completed";
-    } else if (completed.size > 0) {
+    } else if (completed.size > 0 || incomplete.size > 0 || cancelled.size > 0) {
       plan.status = "incomplete";
     } else {
       plan.status = "failed";
@@ -155,7 +242,7 @@ export class TaskScheduler {
     plan.completedAt = new Date().toISOString();
 
     const emoji = plan.status === "completed" ? "✅" : "❌";
-    log.info(`${emoji} Orchestration "${plan.title}" terminée en ${(totalDuration / 1000).toFixed(1)}s — ${completed.size}/${plan.tasks.length} vérifiée(s), ${failed.size} incomplète(s)/échouée(s)`);
+    log.info(`${emoji} Orchestration "${plan.title}" terminée en ${(totalDuration / 1000).toFixed(1)}s — ${completed.size}/${plan.tasks.length} vérifiée(s), ${incomplete.size} incomplète(s), ${failed.size} échouée(s), ${cancelled.size} annulée(s)`);
   }
 
   private sleep(ms: number): Promise<void> {

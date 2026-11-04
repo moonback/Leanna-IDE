@@ -10,7 +10,7 @@ import { useEffect, useCallback, useRef } from 'react';
 
 interface AgentEvent {
   type: 'agent_event';
-  event: 'task_started' | 'task_progress' | 'task_completed' | 'task_failed' | 'task_cancelled';
+  event: 'task_started' | 'task_progress' | 'task_completed' | 'task_incomplete' | 'task_failed' | 'task_cancelled';
   taskId: string;
   role: string;
   title: string;
@@ -26,6 +26,8 @@ interface NotificationOptions {
   notifyOnComplete?: boolean;
   /** Activer les notifications pour task_failed (par défaut: true) */
   notifyOnFailed?: boolean;
+  /** Activer les notifications pour task_incomplete (par défaut: true) */
+  notifyOnIncomplete?: boolean;
   /** Activer les notifications pour task_started (par défaut: false) */
   notifyOnStart?: boolean;
   /** Callback appelé à chaque événement de tâche */
@@ -39,6 +41,7 @@ interface NotificationOptions {
 const EMOJI_BY_EVENT: Record<string, string> = {
   task_started: '🚀',
   task_completed: '✅',
+  task_incomplete: '⚠️',
   task_failed: '❌',
   task_cancelled: '🛑',
   task_progress: '⏳',
@@ -52,6 +55,7 @@ export function useAgentNotifications(options: NotificationOptions = {}) {
   const {
     notifyOnComplete = true,
     notifyOnFailed = true,
+    notifyOnIncomplete = true,
     notifyOnStart = false,
     onTaskEvent,
     roleFilter,
@@ -127,6 +131,7 @@ export function useAgentNotifications(options: NotificationOptions = {}) {
       const shouldNotify =
         (event.event === 'task_completed' && notifyOnComplete) ||
         (event.event === 'task_failed' && notifyOnFailed) ||
+        (event.event === 'task_incomplete' && notifyOnIncomplete) ||
         (event.event === 'task_started' && notifyOnStart);
 
       if (shouldNotify) {
@@ -141,6 +146,7 @@ export function useAgentNotifications(options: NotificationOptions = {}) {
   }, [
     notifyOnComplete,
     notifyOnFailed,
+    notifyOnIncomplete,
     notifyOnStart,
     onTaskEvent,
     roleFilter,

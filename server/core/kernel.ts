@@ -28,6 +28,7 @@ import {
   type AgentTaskLike,
 } from "./AgenticMissionRunner.js";
 import { randomUUID } from "node:crypto";
+import { resolveWritePath } from "../skills/codebaseHelpers.js";
 
 /** Paramètres d'une mission agentique gouvernée par le Supervisor. */
 export interface SupervisedAgenticMissionParams {
@@ -121,15 +122,7 @@ export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env):
   return raw === "true" || raw === "1";
 }
 
-/**
- * Lit l'activation de la gouvernance des tâches agents par le Supervisor
- * (`LEANNA_AGENT_SUPERVISED` = true/1). Désactivée par défaut.
- */
-export function agentSupervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  const raw = (env.LEANNA_AGENT_SUPERVISED ?? "").toLowerCase().trim();
-  return raw === "true" || raw === "1";
-}
-
+export { supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./supervisionConfig.js";
 /**
  * Construit le noyau P0 et, si demandé, branche la garde d'idempotence sur le
  * ToolRegistry fourni. Retourne toutes les briques pour usage ultérieur.
@@ -183,7 +176,25 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
       supervisor.runMission({
         missionId,
         goal: params.goal,
-        plannedFiles: params.plannedFiles,
+        plannedFiles: (params.plannedFiles ?? [])
+          .map((file) => resolveWritePath(file))
+          .filter((file): file is string => typeof file === "string" && file.length > 0),
+        resolveWriteTargets: (toolName, args) => {
+          const candidates: unknown[] =
+            toolName === "rename_project_file"
+              ? [args.oldPath, args.newPath]
+              : [
+                  "write_project_file", "modify_project_file", "patch_project_file",
+                  "apply_patch", "delete_project_file", "delete_project_folder",
+                  "create_project_directory",
+                ].includes(toolName)
+                ? [args.path]
+                : [];
+          return candidates
+            .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+            .map((value) => resolveWritePath(value))
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        },
         runner,
       });
     const result = await guard.runWithContext(ctx, () =>

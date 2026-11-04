@@ -30,6 +30,13 @@ export interface FileGateway {
   read(filePath: string): string;
   write(filePath: string, content: string): void;
   remove(filePath: string): void;
+  /** Optional directory primitives used by recursive transactional snapshots. */
+  isDirectory?(directoryPath: string): boolean;
+  isSymbolicLink?(targetPath: string): boolean;
+  listDirectory?(directoryPath: string): Array<{ path: string; kind: "file" | "directory" }>;
+  makeDirectory?(directoryPath: string): void;
+  removeDirectory?(directoryPath: string): void;
+  rename?(sourcePath: string, destinationPath: string): void;
 }
 
 /** Implémentation par défaut sur `node:fs`. */
@@ -42,6 +49,25 @@ export function makeNodeFileGateway(): FileGateway {
       fs.writeFileSync(p, content, "utf8");
     },
     remove: (p) => fs.rmSync(p, { force: true }),
+    isDirectory: (p) => fs.existsSync(p) && fs.lstatSync(p).isDirectory(),
+    isSymbolicLink: (p) => {
+      try { return fs.lstatSync(p).isSymbolicLink(); }
+      catch { return false; }
+    },
+    listDirectory: (p) => fs.readdirSync(p, { withFileTypes: true }).map((entry) => {
+      const childPath = path.join(p, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`Lien symbolique non pris en charge dans un checkpoint récursif: ${childPath}`);
+      if (entry.isDirectory()) return { path: childPath, kind: "directory" as const };
+      if (entry.isFile()) return { path: childPath, kind: "file" as const };
+      throw new Error(`Type de fichier non pris en charge dans un checkpoint récursif: ${childPath}`);
+    }),
+    makeDirectory: (p) => fs.mkdirSync(p, { recursive: true }),
+    // Non-recursive by design: rollback must never erase files created after snapshot.
+    removeDirectory: (p) => fs.rmdirSync(p),
+    rename: (source, destination) => {
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.renameSync(source, destination);
+    },
   };
 }
 
@@ -55,6 +81,19 @@ export interface FileSnapshot {
   hash?: string;
 }
 
+export interface DirectorySnapshot {
+  path: string;
+  existed: boolean;
+}
+
+export interface RenameSnapshot {
+  sourcePath: string;
+  destinationPath: string;
+  /** Snapshot array lengths immediately after capturing both pre-rename paths. */
+  fileSnapshotCount: number;
+  directorySnapshotCount: number;
+}
+
 export type CheckpointStatus = "open" | "committed" | "rolledback";
 
 /** Un checkpoint : ensemble de snapshots de fichiers + statut. */
@@ -65,6 +104,10 @@ export interface Checkpoint {
   createdAt: string;
   status: CheckpointStatus;
   files: FileSnapshot[];
+  /** Directory structure, including empty directories and directories created during the attempt. */
+  directories?: DirectorySnapshot[];
+  /** Rename operations to reverse before restoring individual file snapshots. */
+  renames?: RenameSnapshot[];
 }
 
 export class CheckpointManager {
@@ -122,9 +165,146 @@ export class CheckpointManager {
       createdAt: new Date().toISOString(),
       status: "open",
       files: snapshots,
+      directories: [],
+      renames: [],
     };
     this.persist(cp);
     return cp;
+  }
+
+  /**
+   * Capture récursivement un dossier avant une suppression ou un déplacement.
+   * Les dossiers vides sont conservés et les liens symboliques refusés.
+   */
+  captureDirectory(id: string, directoryPath: string): void {
+    this.requireOpen(id);
+    const normalized = path.resolve(directoryPath);
+    const isDirectory = this.gateway.isDirectory;
+    const listDirectory = this.gateway.listDirectory;
+    if (!isDirectory || !listDirectory || !this.gateway.makeDirectory || !this.gateway.removeDirectory) {
+      throw new Error("Le FileGateway ne prend pas en charge les snapshots de dossiers.");
+    }
+
+    const directories = [...(cp.directories ?? [])];
+    const knownDirectories = new Set(directories.map((entry) => entry.path));
+    const addDirectory = (target: string, existed: boolean) => {
+      const key = path.resolve(target);
+      if (!knownDirectories.has(key)) {
+        directories.push({ path: key, existed });
+        knownDirectories.add(key);
+      }
+    };
+
+    // Record missing ancestors too: mkdir({ recursive:true }) may create them.
+    let cursor = normalized;
+    while (!this.gateway.exists(cursor)) {
+      addDirectory(cursor, false);
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+
+    if (isDirectory(normalized)) {
+      addDirectory(normalized, true);
+      const visit = (current: string): void => {
+        for (const entry of listDirectory(current)) {
+          if (entry.kind === "directory") {
+            addDirectory(entry.path, true);
+            visit(entry.path);
+          } else {
+            this.captureFile(id, entry.path);
+          }
+        }
+      };
+      visit(normalized);
+    } else if (this.gateway.exists(normalized)) {
+      this.captureFile(id, normalized);
+    }
+
+    this.persist({ ...this.require(id), directories });
+  }
+
+  /**
+   * Journalise un renommage/déplacement. Le rollback inverse le déplacement
+   * avant de restaurer les contenus, ce qui couvre aussi les dossiers entiers.
+   */
+  captureRename(id: string, sourcePath: string, destinationPath: string): void {
+    this.requireOpen(id);
+    if (!this.gateway.rename) throw new Error("Le FileGateway ne prend pas en charge les renommages transactionnels.");
+    const source = path.resolve(sourcePath);
+    const destination = path.resolve(destinationPath);
+    this.capturePath(id, source);
+    this.capturePath(id, destination);
+    const latest = this.require(id);
+    const renames = [...(latest.renames ?? [])];
+    if (!renames.some((entry) => entry.sourcePath === source && entry.destinationPath === destination)) {
+      renames.push({
+        sourcePath: source,
+        destinationPath: destination,
+        fileSnapshotCount: latest.files.length,
+        directorySnapshotCount: latest.directories?.length ?? 0,
+      });
+      this.persist({ ...latest, renames });
+    }
+  }
+
+  /** Capture un chemin dont le type (fichier/dossier) est déterminé au runtime. */
+  capturePath(id: string, targetPath: string): void {
+    if (this.gateway.isSymbolicLink?.(targetPath)) {
+      throw new Error(`Lien symbolique non pris en charge dans un checkpoint: ${targetPath}`);
+    }
+    if (this.gateway.isDirectory?.(targetPath)) {
+      this.captureDirectory(id, targetPath);
+    } else {
+      this.captureFile(id, targetPath);
+      // If the target is absent it may be a directory about to be created;
+      // if it is an existing file, only missing parents can be created by writers.
+      const missingRoot = this.gateway.exists(targetPath)
+        ? path.dirname(path.resolve(targetPath))
+        : path.resolve(targetPath);
+      this.captureMissingDirectories(id, missingRoot);
+    }
+  }
+
+  private captureMissingDirectories(id: string, targetPath: string): void {
+    const cp = this.requireOpen(id);
+    const directories = [...(cp.directories ?? [])];
+    const known = new Set(directories.map((entry) => entry.path));
+    let cursor = path.resolve(targetPath);
+    while (!this.gateway.exists(cursor)) {
+      if (!known.has(cursor)) {
+        directories.push({ path: cursor, existed: false });
+        known.add(cursor);
+      }
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    this.persist({ ...this.require(id), directories });
+  }
+
+  /**
+   * Capture un fichier découvert pendant l'exécution, immédiatement AVANT son
+   * premier effet de bord. L'opération est idempotente pour un chemin déjà
+   * présent dans le snapshot initial ou capturé par une autre étape.
+   */
+  captureFile(id: string, filePath: string): boolean {
+    const cp = this.requireOpen(id);
+    if (this.gateway.isSymbolicLink?.(filePath)) {
+      throw new Error(`Lien symbolique non pris en charge dans un checkpoint: ${filePath}`);
+    }
+    const normalized = filePath.replace(/\\/g, "/");
+    if (cp.files.some((entry) => entry.path === normalized)) return false;
+
+    const snapshot: FileSnapshot = this.gateway.exists(normalized)
+      ? (() => {
+          const content = this.gateway.read(normalized);
+          return { path: normalized, existed: true, content, hash: WorkspaceState.hash(content) };
+        })()
+      : { path: normalized, existed: false };
+
+    this.persist({ ...cp, files: [...cp.files, snapshot] });
+    return true;
   }
 
   /** COMMIT : fige le checkpoint. Un rollback devient alors impossible. */
@@ -149,12 +329,63 @@ export class CheckpointManager {
     }
     if (cp.status === "rolledback") return; // idempotent
 
-    for (const snap of cp.files) {
-      if (snap.existed) {
-        this.gateway.write(snap.path, snap.content ?? "");
-      } else if (this.gateway.exists(snap.path)) {
-        this.gateway.remove(snap.path);
+    // Snapshots of files/directories created underneath a moved directory
+    // follow that directory back to its original path during rollback.
+    const fileSnapshots = cp.files.map((snap, index) => ({
+      ...snap,
+      path: this.remapNewDescendantPath(snap.path, cp.renames ?? [], index, "file"),
+    }));
+    const directorySnapshots = (cp.directories ?? []).map((directory, index) => ({
+      ...directory,
+      path: this.remapNewDescendantPath(directory.path, cp.renames ?? [], index, "directory"),
+    }));
+
+    // Reverse structural moves first so source paths exist again before
+    // their original file contents are restored.
+    const failures: string[] = [];
+    for (const rename of [...(cp.renames ?? [])].reverse()) {
+      try {
+        if (!this.gateway.exists(rename.sourcePath) && this.gateway.exists(rename.destinationPath)) {
+          this.gateway.rename?.(rename.destinationPath, rename.sourcePath);
+        }
+      } catch (error) {
+        failures.push(`${rename.destinationPath} → ${rename.sourcePath}: ${(error as Error).message}`);
       }
+    }
+    // Restore every file even if one filesystem operation fails.
+    for (const snap of [...fileSnapshots].reverse()) {
+      try {
+        if (snap.existed) {
+          this.gateway.write(snap.path, snap.content ?? "");
+        } else if (
+          this.gateway.exists(snap.path) &&
+          !(this.gateway.isDirectory?.(snap.path) ?? false)
+        ) {
+          // A path captured as absent may later become a directory. Its
+          // DirectorySnapshot owns cleanup; never try to unlink it as a file.
+          this.gateway.remove(snap.path);
+        }
+      } catch (error) {
+        failures.push(`${snap.path}: ${(error as Error).message}`);
+      }
+    }
+    const directoryFailures: string[] = [];
+    // Recreate directories that existed at snapshot time, shallowest first.
+    for (const directory of directorySnapshots.filter((entry) => entry.existed).sort((a, b) => a.path.split(path.sep).length - b.path.split(path.sep).length)) {
+      try { this.gateway.makeDirectory?.(directory.path); }
+      catch (error) { directoryFailures.push(`${directory.path}: ${(error as Error).message}`); }
+    }
+    // Remove only newly-created empty directories, deepest first. Never recurse.
+    for (const directory of directorySnapshots.filter((entry) => !entry.existed).sort((a, b) => b.path.split(path.sep).length - a.path.split(path.sep).length)) {
+      try {
+        if (this.gateway.exists(directory.path)) this.gateway.removeDirectory?.(directory.path);
+      } catch (error) {
+        directoryFailures.push(`${directory.path}: ${(error as Error).message}`);
+      }
+    }
+    const allFailures = [...failures, ...directoryFailures];
+    if (allFailures.length > 0) {
+      throw new Error(`Rollback incomplet pour ${id} — ${allFailures.length} élément(s) non restauré(s): ${allFailures.join(" ; ")}`);
     }
     this.persist({ ...cp, status: "rolledback" });
   }
@@ -171,18 +402,55 @@ export class CheckpointManager {
   changedFiles(id: string): string[] {
     const cp = this.require(id);
     const changed: string[] = [];
-    for (const snap of cp.files) {
-      const nowExists = this.gateway.exists(snap.path);
+    for (const [index, snap] of cp.files.entries()) {
+      const target = this.remapNewDescendantPath(snap.path, cp.renames ?? [], index, "file");
+      const nowExists = this.gateway.exists(target);
       if (nowExists !== snap.existed) {
-        changed.push(snap.path);
+        changed.push(target);
         continue;
       }
       if (nowExists) {
-        const hash = WorkspaceState.hash(this.gateway.read(snap.path));
-        if (hash !== snap.hash) changed.push(snap.path);
+        if (this.gateway.isDirectory?.(target)) {
+          changed.push(target);
+          continue;
+        }
+        const hash = WorkspaceState.hash(this.gateway.read(target));
+        if (hash !== snap.hash) changed.push(target);
       }
     }
-    return changed;
+    for (const [index, directory] of (cp.directories ?? []).entries()) {
+      const target = this.remapNewDescendantPath(directory.path, cp.renames ?? [], index, "directory");
+      const nowExists = this.gateway.exists(target) && (this.gateway.isDirectory?.(target) ?? true);
+      if (nowExists !== directory.existed) changed.push(target);
+    }
+    return [...new Set(changed)];
+  }
+
+  private remapNewDescendantPath(
+    target: string,
+    renames: RenameSnapshot[],
+    snapshotIndex: number,
+    kind: "file" | "directory"
+  ): string {
+    let mapped = target;
+    for (const rename of [...renames].reverse()) {
+      const capturedBeforeRename = kind === "file"
+        ? snapshotIndex < rename.fileSnapshotCount
+        : snapshotIndex < rename.directorySnapshotCount;
+      if (capturedBeforeRename) continue;
+      const destination = path.resolve(rename.destinationPath);
+      const relative = path.relative(destination, mapped);
+      if (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
+        mapped = path.join(rename.sourcePath, relative);
+      }
+    }
+    return mapped;
+  }
+
+  private requireOpen(id: string): Checkpoint {
+    const cp = this.require(id);
+    if (cp.status !== "open") throw new Error(`Checkpoint ${id} non ouvert — capture impossible.`);
+    return cp;
   }
 
   private require(id: string): Checkpoint {

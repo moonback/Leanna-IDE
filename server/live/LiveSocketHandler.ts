@@ -1503,8 +1503,8 @@ export function attachLiveWebSocket(
       // l'assistant en soit informé sans avoir à poller `agent_status`.
       // Essentiel pour l'annulation déclenchée par l'utilisateur depuis l'UI :
       // sinon le modèle continue de croire que la tâche tourne encore.
-      const TERMINAL_TASK_EVENTS = new Set(['task_cancelled', 'task_completed', 'task_failed']);
-      const unsubscribeAgentEvents = agentEventStream.subscribe((event) => {
+      const TERMINAL_TASK_EVENTS = new Set(['task_cancelled', 'task_completed', 'task_incomplete', 'task_failed']);
+      const unsubscribeAgentEvents = agentEventStream.subscribe(({ event }) => {
         try {
           if (event.type !== 'agent_event') return;
           if (!TERMINAL_TASK_EVENTS.has(event.event)) return;
@@ -1516,6 +1516,9 @@ export function attachLiveWebSocket(
           if (event.event === 'task_cancelled') {
             notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) a été ANNULÉE par l'utilisateur${durationTxt}. `
               + `Ne poursuis pas cette tâche et ne poll pas agent_status pour cet id. Prends-en acte auprès de l'utilisateur et propose la suite.`;
+          } else if (event.event === 'task_incomplete') {
+            notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) est INCOMPLÈTE car une dépendance n'a pas été satisfaite${durationTxt}.`
+              + (event.detail ? ` Détail : ${event.detail}` : '');
           } else if (event.event === 'task_completed') {
             notice = `[SYSTÈME] La tâche déléguée "${event.title}" (agent ${event.agentName}, id ${String(event.taskId).slice(0, 8)}) est TERMINÉE${durationTxt}.`
               + (event.summary ? ` Résumé : ${event.summary}` : '');

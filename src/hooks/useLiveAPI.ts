@@ -537,6 +537,7 @@ export function useLiveAPI() {
     if (msg.type === 'agent_event') {
       const emoji = msg.event === 'task_started' ? '🤖'
         : msg.event === 'task_completed' ? '✅'
+        : msg.event === 'task_incomplete' ? '⚠️'
         : msg.event === 'task_failed' ? '❌'
         : msg.event === 'task_cancelled' ? '🛑'
         : '⏳';

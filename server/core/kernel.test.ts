@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { ToolRegistry } from "../runtime/ToolRegistry.js";
 import { PermissionPolicy } from "../runtime/PermissionPolicy.js";
-import { createCoreKernel, idempotencyEnabledFromEnv } from "./kernel.js";
+import { createCoreKernel, idempotencyEnabledFromEnv, supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./kernel.js";
 
 function ledgerFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-kernel-"));
@@ -140,4 +140,17 @@ test("runSupervisedAgenticMission forwards the real task fields and returns the 
   assert.equal(seen.metadata.title, "T");
   assert.equal(seen.metadata.missionId, "m-forward", "le missionId supervisé prime");
   assert.equal((res.lastResult as any)?.marker, 42);
+});
+
+
+test("one canonical supervision flag governs missions and agents with legacy fallback", () => {
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_SUPERVISED: "true" } as NodeJS.ProcessEnv), true);
+  assert.equal(agentSupervisionEnabledFromEnv({ LEANNA_SUPERVISED: "1" } as NodeJS.ProcessEnv), true);
+  assert.equal(missionSupervisionEnabledFromEnv({ LEANNA_SUPERVISED: "false", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), false,
+    "an explicit canonical false overrides legacy true");
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_MISSION_SUPERVISED: "true" } as NodeJS.ProcessEnv), true);
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_MISSION_SUPERVISED: "false", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), true,
+    "either legacy opt-in enables supervision when the canonical flag is absent");
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_AGENT_SUPERVISED: "1" } as NodeJS.ProcessEnv), true);
+  assert.equal(supervisionEnabledFromEnv({} as NodeJS.ProcessEnv), false);
 });

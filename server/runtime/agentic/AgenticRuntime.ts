@@ -361,6 +361,7 @@ export class AgenticRuntime implements IAgentRuntime {
       repairLoops: new Map<string, AgentRepairLoop>(),
       blockedFiles: new Set<string>(),
       lastPatchByFile: new Map<string, string>(),
+      beforeToolCall: task.onBeforeToolCall,
     };
     return session;
   }
@@ -828,6 +829,9 @@ export class AgenticRuntime implements IAgentRuntime {
       const result = await this.registry.call(name, parameters, {
         agentId: session.agent.role,
         idempotencyScope: { missionId: session.taskId, stepId: `iter-${session.usage.iterations}` },
+        ...(kind === "write" && session.beforeToolCall
+          ? { beforeExecute: session.beforeToolCall }
+          : {}),
       });
       const durationMs = Date.now() - start;
 
@@ -1521,6 +1525,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
 interface RunSession {
   taskId: string;
+  beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
   agent: AgentDefinition;
   tools: ToolDeclaration[];
   observations: Observation[];

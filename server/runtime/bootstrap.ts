@@ -20,7 +20,7 @@ import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
-import { createCoreKernel, agentSupervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
+import { createCoreKernel, supervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -65,7 +65,7 @@ export interface BootstrapConfig {
   /**
    * Fait passer les tâches du runtime agentique par le LeannaSupervisor
    * (preuve avant succès, rollback des fichiers déclarés). Par défaut, lu depuis
-   * `LEANNA_AGENT_SUPERVISED` ; désactivé sinon.
+   * `LEANNA_SUPERVISED` ; désactivé sinon.
    */
   enableAgentSupervision?: boolean;
   /**
@@ -275,9 +275,9 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
       `journalisées ; un rejeu après crash est bloqué.`
     );
   }
-  if (config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv()) {
+  if (config.enableAgentSupervision ?? supervisionEnabledFromEnv()) {
     agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission);
-    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_AGENT_SUPERVISED).`);
+    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_SUPERVISED).`);
   }
   if (kernel.safetyGateMode !== "off") {
     console.log(
@@ -362,7 +362,7 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   // éviter la dépendance circulaire ; best-effort en mode synchrone).
   // Le callback s'exécute après le retour de cette fonction : `kernel` (déclaré
   // plus bas) est alors initialisé. La supervision suit enableAgenticRuntime.
-  const superviseAgents = config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv();
+  const superviseAgents = config.enableAgentSupervision ?? supervisionEnabledFromEnv();
   import("../agents/AgentOrchestrator.js")
     .then(({ agentOrchestrator }) => {
       agentOrchestrator.enableAgenticRuntime(agentic);

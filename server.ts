@@ -14,6 +14,7 @@ import fs from "fs";
 import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
+import { supervisionEnabledFromEnv } from "./server/core/supervisionConfig.js";
 
 import { knowledgeGraph, projectMemory } from "./server/knowledge/index.js";
 
@@ -132,9 +133,9 @@ import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaste
 // doublon en BDD à chaque redémarrage → timers multipliés côté serveur.
 (async () => {
   try {
-    // 0. Résoudre SELF_ROOT depuis la persistance (avant TOUT le reste)
-    // Si aucun projet n'a été persisté, SELF_ROOT reste "" et les inits
-    // projet-dépendantes sont sautées jusqu'à la sélection d'un projet.
+    // 0. Résoudre SELF_ROOT depuis la persistance (avant TOUT le reste).
+    // Si un projet a déjà été utilisé, il est restauré automatiquement.
+    // Sinon SELF_ROOT reste "" et les inits projet-dépendantes sont sautées.
     initSelfRoot();
 
     // 1. Tâches planifiées (indépendant)
@@ -396,13 +397,12 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       }
 
       // Unification (audit, point 5) : brancher le LeannaSupervisor comme
-      // autorité de gouvernance, activable par LEANNA_MISSION_SUPERVISED. En mode
+      // autorité de gouvernance, activable par LEANNA_SUPERVISED (alias historiques acceptés). En mode
       // supervisé, l'exécution transite dans la boucle du Supervisor (état durable,
       // snapshots/rollback, preuve). Réversible : sans le flag, exécution directe.
       try {
         const { LeannaSupervisor } = await import("./server/core/LeannaSupervisor.js");
-        const supervisedFlag = String(process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase();
-        const supervisedEnabled = supervisedFlag === "true" || supervisedFlag === "1";
+        const supervisedEnabled = supervisionEnabledFromEnv();
         // Timeout runner optionnel aligné sur le timeout global de mission.
         executor.setSupervisor(new LeannaSupervisor(), supervisedEnabled);
         if (supervisedEnabled) {
@@ -1043,8 +1043,8 @@ async function startServer() {
     }
 
     // Notification Telegram si activée
-    if (event?.event === "task_completed" || event?.event === "task_failed") {
-      const statusIcon = event.event === "task_completed" ? "✅" : "❌";
+    if (event?.event === "task_completed" || event?.event === "task_incomplete" || event?.event === "task_failed") {
+      const statusIcon = event.event === "task_completed" ? "✅" : event.event === "task_incomplete" ? "⚠️" : "❌";
       telegramService.notify(
         `Agent *${event.agentName || event.role || "système"}* : Tâche ${statusIcon}\n` +
         `• *Titre :* ${event.title || "Tâche"}\n` +

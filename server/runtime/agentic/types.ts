@@ -58,6 +58,8 @@ export interface AgentTask {
    * lance plus de nouvel appel LLM.
    */
   signal?: AbortSignal;
+  /** Called before a write tool runs so the mission can journal its pre-image. */
+  onBeforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }
 
 /**

@@ -81,9 +81,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
   }
 
   /**
-   * Annulation coopérative. Le runtime agentique ne prend pas encore de signal
-   * d'annulation en cours de boucle ; on marque l'intention et on laisse la
-   * tâche se terminer au prochain point de contrôle naturel.
+   * Annulation coopérative : le signal est transmis à la boucle agentique et
+   * au ToolRegistry afin d'interrompre la planification et les outils actifs.
    */
   cancel(taskId: string): boolean {
     const controller = this.active.get(taskId);
@@ -155,10 +154,14 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       const result = this.supervise
         ? await this.runSupervised(this.supervise, task, agenticTask)
         : await this.agentic.run(agenticTask);
-      task.result = this.toTaskResult(result);
-      // Le runtime RETOURNE un résultat "blocked" sur annulation (il ne lève pas) :
-      // sans ce test, une annulation utilisateur était rapportée "failed".
+      // Le runtime agentique représente encore l'arrêt coopératif comme
+      // "blocked" en interne ; le contrat public AgentTask doit l'exposer comme
+      // une annulation explicite, jamais comme un blocage métier.
       const cancelled = !result.success && controller.signal.aborted;
+      task.result = {
+        ...this.toTaskResult(result),
+        ...(cancelled ? { outcome: "cancelled" as const } : {}),
+      };
       task.status = result.success ? "completed" : cancelled ? "cancelled" : "failed";
       task.completedAt = new Date().toISOString();
 
@@ -177,7 +180,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       task.completedAt = new Date().toISOString();
       task.result = {
         success: false,
-        outcome: cancelled ? "blocked" : "failed",
+        outcome: cancelled ? "cancelled" : "failed",
         summary: cancelled ? `Tâche "${task.title}" annulée` : `Échec de l'agent ${agent.name}`,
         error: cancelled ? undefined : (err as Error).message,
         durationMs: Date.now() - startTime,
@@ -198,7 +201,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
   /**
    * Exécute la tâche sous le Supervisor : le verdict du Supervisor (preuve)
    * prime sur l'auto-évaluation du runtime. Une tentative non validée a vu ses
-   * fichiers déclarés restaurés : ils ne sont plus rapportés comme modifiés.
+   * fichiers planifiés et découverts avant écriture restaurés ; seuls les
+   * chemins résiduels d'un rollback incomplet restent signalés.
    */
   private async runSupervised(
     supervise: CoreKernel["runSupervisedAgenticMission"],
@@ -223,7 +227,9 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       ...last,
       success: false,
       outcome: last.success ? "partial" : last.outcome,
-      filesModified: last.filesModified.filter((f) => !plannedFiles.includes(f)),
+      // The Supervisor restored the attempt. Report only residual paths when
+      // rollback could not fully restore the workspace; never report reverted edits as deliverables.
+      filesModified: sup.residualFiles ?? [],
       error: last.error ?? `Supervisor: preuve insuffisante (état ${sup.finalState}, ${sup.attempts} tentative(s)).`,
     };
   }

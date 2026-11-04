@@ -12,11 +12,9 @@
  *     d'indexation incrémentale, ni l'extraction des documents, ni leur
  *     watcher n'étaient relancés.
  *
- * Comme `initSelfRoot()` démarre TOUJOURS sans projet actif (sélecteur
- * Multi-Workspace obligatoire à chaque lancement), le chemin de démarrage
- * complet ne s'exécute jamais en usage normal : le graphe recevait son scan
- * initial puis se figeait (aucune mise à jour sur édition), et les documents
- * du workspace n'étaient jamais indexés.
+ * `initSelfRoot()` restaure désormais automatiquement le dernier projet utilisé
+ * au démarrage. Le chemin de démarrage complet s'exécute donc dès le premier
+ * lancement si un projet a déjà été ouvert précédemment.
  *
  * Ce module centralise la séquence complète en UNE fonction, appelée aussi bien
  * au démarrage (si un projet est actif) qu'à chaque connexion de workspace. Une

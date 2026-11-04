@@ -65,6 +65,7 @@ export function statusColor(status: AgentTaskEntry['status']): string {
   switch (status) {
     case 'completed': return 'var(--color-success)';
     case 'failed': return 'var(--color-error)';
+    case 'incomplete': return 'var(--color-warning)';
     case 'cancelled': return 'var(--text-dimmed)';
     default: return 'var(--accent-primary)';
   }
@@ -75,6 +76,7 @@ export const STATUS_LABEL_FR: Record<AgentTaskEntry['status'], string> = {
   pending: 'En attente',
   running: 'En cours',
   completed: 'Terminé',
+  incomplete: 'Incomplet',
   failed: 'Échoué',
   cancelled: 'Annulé',
 };

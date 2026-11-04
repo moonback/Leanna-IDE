@@ -183,11 +183,12 @@ export type TaskStatus = "pending" | "running" | "completed" | "incomplete" | "f
  * | blocked   | Erreur externe (préexistante ou hors périmètre) empêche la finition |
  * | no_change | Agent terminé sans modifier aucun fichier (pour une tâche de modif) |
  * | failed    | Exception agent / outil / timeout                                   |
+ * | cancelled | Arrêt volontaire demandé par l'utilisateur                          |
  *
  * Pour les tâches purement analytiques (researcher, planner, summarizer),
  * `success` est valide sans modification de fichiers.
  */
-export type TaskOutcome = "success" | "partial" | "blocked" | "no_change" | "failed";
+export type TaskOutcome = "success" | "partial" | "blocked" | "no_change" | "failed" | "cancelled";
 
 /** Priorité d'une tâche */
 export type TaskPriority = "low" | "medium" | "high" | "critical";

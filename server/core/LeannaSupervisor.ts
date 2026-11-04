@@ -60,6 +60,7 @@ export type MissionRunner = (ctx: {
   attempt: number;
   /** Signal d'annulation déclenché sur timeout runner (ou annulation externe). */
   signal?: AbortSignal;
+  beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }) => Promise<RunnerOutcome>;
 
 /**
@@ -108,6 +109,10 @@ export interface SupervisedResult {
   finalState: MissionLifecycleState;
   attempts: number;
   evidence?: EvidenceBundle;
+  /** True when every file changed by a failed attempt was restored. */
+  rollbackComplete?: boolean;
+  /** Files still differing from the pre-attempt snapshot after rollback retries. */
+  residualFiles?: string[];
 }
 
 export class LeannaSupervisor {
@@ -153,6 +158,8 @@ export class LeannaSupervisor {
     plannedFiles?: string[];
     /** Hooks optionnels de gouvernance (pause / approbation humaine). */
     hooks?: SupervisorGovernanceHooks;
+    /** Resolve relative tool paths to the exact workspace targets used by writers. */
+    resolveWriteTargets?: (toolName: string, args: Record<string, unknown>) => string[];
   }): Promise<SupervisedResult> {
     const { missionId, goal, runner } = params;
     const hooks = params.hooks ?? {};
@@ -174,6 +181,7 @@ export class LeannaSupervisor {
 
     let attempt = 0;
     let lastEvidence: EvidenceBundle | undefined;
+    let rollbackResidualFiles: string[] = [];
 
     while (attempt < this.maxAttempts) {
       attempt++;
@@ -192,7 +200,7 @@ export class LeannaSupervisor {
           : false;
         if (!approved) {
           this.safeAdvance(machine, "ESCALATED", "approval refused");
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
         }
         // Approuvé → repartir vers RUNNING (WAITING_APPROVAL → RUNNING est légal).
         this.advance(machine, "RUNNING", `attempt ${attempt} (approved)`);
@@ -217,7 +225,17 @@ export class LeannaSupervisor {
 
       // Exécution bornée par un timeout optionnel. Un dépassement ou une
       // exception sont traités comme une tentative échouée.
-      const outcome = await this.runAttempt(runner, { missionId, goal, attempt });
+      const beforeToolCall = async (toolName: string, args: Record<string, unknown>) => {
+        const targets = params.resolveWriteTargets?.(toolName, args) ?? [];
+        if (toolName === "rename_project_file" && targets.length >= 2) {
+          this.checkpoints.captureRename(checkpoint.id, targets[0], targets[1]);
+          return;
+        }
+        for (const target of targets) {
+          this.checkpoints.capturePath(checkpoint.id, target);
+        }
+      };
+      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
 
       // VERIFY : la PREUVE prime sur ce que le runner "dit".
       this.advance(machine, "VERIFYING", "evaluate evidence");
@@ -249,12 +267,16 @@ export class LeannaSupervisor {
         // fichiers déclarés) avant de décider de la suite.
         this.advance(machine, "RECOVERING", outcome.error ?? "evidence failed");
         this.checkpoints.rollback(checkpoint.id);
+        rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
+        if (rollbackResidualFiles.length > 0) {
+          throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
+        }
 
         const decision = this.decideRecovery(outcome, attempt);
 
         if (decision === "escalate" || attempt >= this.maxAttempts) {
           this.advance(machine, "ESCALATED", `recovery=${decision}, attempts=${attempt}`);
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle, rollbackComplete: true, residualFiles: [] };
         }
 
         // retry / repair / replan → on ramène la machine à READY, d'où le prochain
@@ -271,12 +293,17 @@ export class LeannaSupervisor {
         try {
           this.checkpoints.rollback(checkpoint.id);
         } catch {
-          /* le checkpoint a peut-être déjà été commité/supprimé */
+          /* Une nouvelle tentative peut encore restaurer les fichiers restants. */
+        }
+        try {
+          rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
+        } catch {
+          rollbackResidualFiles = ["<état du checkpoint indisponible>"];
         }
         // Transition de secours vers FAILED (toujours légale depuis les états
         // transitoires), avec persistance garantie.
         this.safeAdvance(machine, "FAILED", `supervisor error: ${(err as Error).message}`);
-        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence };
+        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
       }
     }
 
@@ -349,7 +376,7 @@ export class LeannaSupervisor {
    */
   private async runAttempt(
     runner: MissionRunner,
-    ctx: { missionId: string; goal: string; attempt: number }
+    ctx: { missionId: string; goal: string; attempt: number; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;

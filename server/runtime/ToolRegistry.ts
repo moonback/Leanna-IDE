@@ -79,6 +79,8 @@ export interface ToolCallOptions {
    * missions décide et obtient lui-même l'approbation) : ne pas redemander.
    */
   autonomyApproved?: boolean;
+  /** Runs after all authorization/idempotency gates and immediately before the handler. */
+  beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }
 
 /** Identifie l'étape de mission d'un appel d'outil (clé d'idempotence). */
@@ -534,6 +536,7 @@ export class ToolRegistry {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        await options.beforeExecute?.(name, args);
         const result = await this.executeWithTimeout(
           entry.definition.handler,
           args,

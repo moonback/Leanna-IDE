@@ -46,6 +46,7 @@ export interface AgentTaskLike {
   files?: string[];
   instructions?: string;
   metadata?: Record<string, unknown>;
+  onBeforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }
 
 /** Contrat structurel minimal du runtime agentique. */
@@ -137,7 +138,7 @@ export function createAgenticMissionRunner(
     onResult?: (result: AgentResultLike) => void;
   } = {}
 ): MissionRunner {
-  return async ({ missionId, goal, attempt }) => {
+  return async ({ missionId, goal, attempt, beforeToolCall }) => {
     const base = options.baseTask ?? {};
     const result = await runtime.run({
       ...base,
@@ -146,6 +147,7 @@ export function createAgenticMissionRunner(
       goal,
       instructions: options.instructions ?? base.instructions,
       metadata: { ...base.metadata, missionId, attempt },
+      onBeforeToolCall: beforeToolCall,
     });
     options.onResult?.(result);
     return toRunnerOutcome(result);

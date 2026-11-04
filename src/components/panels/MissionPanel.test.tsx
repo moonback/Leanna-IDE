@@ -28,6 +28,16 @@ const MISSIONS = [
     lastError: { action: 'run_project_command', error: 'exit 1' }, errorCount: 1,
     selfEvaluation: { overall: 35, scores: { planAccuracy: 30 }, notes: [], nextTimeStartWith: 'lire le schéma' },
   },
+  {
+    id: 'm-incomplete', title: 'Indexation interrompue', status: 'incomplete', paused: false,
+    priority: 'medium', goals: [], activeGoalId: null, confidence: 0.2, metrics: { totalActions: 1, successfulActions: 0, failedActions: 1 },
+    createdAt: '2026-10-13T08:00:00.000Z', completedAt: '2026-10-13T08:01:00.000Z',
+  },
+  {
+    id: 'm-unknown', title: 'État futur', status: 'future_state', paused: false,
+    priority: 'medium', goals: [], activeGoalId: null, confidence: 0.5, metrics: { totalActions: 0, successfulActions: 0, failedActions: 0 },
+    createdAt: '2026-10-13T07:00:00.000Z',
+  },
 ];
 
 function setup() {
@@ -57,6 +67,19 @@ describe('MissionPanel', () => {
     await user.click(screen.getByRole('tab', { name: /actives/ }));
     await waitFor(() => expect(screen.queryByText('Migration SQL')).not.toBeInTheDocument());
     expect(screen.getByText('Refactor du routeur')).toBeInTheDocument();
+  });
+
+  it('préserve les statuts incomplets et inconnus sans les reclasser en attente', async () => {
+    setup();
+    const user = userEvent.setup();
+    renderWithProviders(<MissionPanel inline />);
+
+    expect(await screen.findByText('Incomplète')).toBeInTheDocument();
+    expect(screen.getByText('État inconnu')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /terminées/ }));
+    expect(screen.getByText('Indexation interrompue')).toBeInTheDocument();
+    expect(screen.queryByText('État futur')).not.toBeInTheDocument();
   });
 
   it('montre la dernière erreur et l’auto-évaluation, puis relance la mission', async () => {

@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { LeannaSupervisor, type MissionRunner } from "./LeannaSupervisor.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
-import { CheckpointManager, type FileGateway } from "./CheckpointManager.js";
+import { CheckpointManager, makeNodeFileGateway, type FileGateway } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
 
 function memGateway(initial: Record<string, string> = {}): FileGateway & { store: Map<string, string> } {
@@ -315,4 +315,90 @@ test("PAUSED: shouldPause suspends then awaitResume lets the mission complete", 
   assert.ok(states?.includes("PAUSED"), "went through PAUSED");
 
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("dynamically discovered files are captured before write and restored on failed evidence", async () => {
+  const gw = memGateway({ "discovered.ts": "original" });
+  const { sup, dir } = makeSupervisor(gw);
+  const runner: MissionRunner = async ({ beforeToolCall }) => {
+    await beforeToolCall?.("write_project_file", { path: "discovered.ts" });
+    gw.write("discovered.ts", "mutated");
+    return {
+      success: true,
+      evidence: { testsExecuted: [{ name: "unit", passed: false }] },
+    };
+  };
+  const result = await sup.runMission({
+    missionId: "m-dynamic-capture",
+    goal: "edit an unplanned file",
+    runner,
+    resolveWriteTargets: (_tool, args) => args.path === "discovered.ts" ? ["discovered.ts"] : [],
+  });
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(gw.store.get("discovered.ts"), "original");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("supervisor reports residual files when rollback cannot restore a locked file", async () => {
+  const gw = memGateway({ "a.ts": "original" });
+  const write = gw.write;
+  gw.write = (filePath, content) => {
+    if (filePath === "a.ts" && content === "original") throw new Error("file locked");
+    write(filePath, content);
+  };
+  const { sup, dir } = makeSupervisor(gw);
+  const runner: MissionRunner = async () => {
+    gw.write("a.ts", "changed");
+    return { success: true, evidence: { testsExecuted: [{ name: "unit", passed: false }] } };
+  };
+  const result = await sup.runMission({
+    missionId: "m-rollback-residual",
+    goal: "restore a locked file",
+    runner,
+    plannedFiles: ["a.ts"],
+  });
+  assert.equal(result.finalState, "FAILED");
+  assert.equal(result.rollbackComplete, false);
+  assert.deepEqual(result.residualFiles, ["a.ts"]);
+  assert.equal(gw.store.get("a.ts"), "changed");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+
+test("supervisor rolls back a recursively deleted directory discovered at tool time", async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-supervised-workspace-"));
+  const folder = path.join(workspace, "src", "feature");
+  fs.mkdirSync(path.join(folder, "empty"), { recursive: true });
+  fs.writeFileSync(path.join(folder, "index.ts"), "export const safe = true;", "utf8");
+
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-dir-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 1,
+    missionStore: new DurableMissionStore(path.join(stateDir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: path.join(stateDir, "checkpoints") }),
+    evidence: new EvidenceEngine(path.join(stateDir, "evidence")),
+  });
+  const runner: MissionRunner = async ({ beforeToolCall }) => {
+    await beforeToolCall?.("delete_project_folder", { path: folder });
+    fs.rmSync(folder, { recursive: true, force: true });
+    return {
+      success: true,
+      evidence: { testsExecuted: [{ name: "verification", passed: false }] },
+    };
+  };
+
+  const result = await sup.runMission({
+    missionId: "m-recursive-folder-rollback",
+    goal: "delete then fail verification",
+    runner,
+    resolveWriteTargets: (_toolName, args) => typeof args.path === "string" ? [args.path] : [],
+  });
+
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(result.rollbackComplete, true);
+  assert.equal(fs.readFileSync(path.join(folder, "index.ts"), "utf8"), "export const safe = true;");
+  assert.equal(fs.statSync(path.join(folder, "empty")).isDirectory(), true);
+
+  fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(stateDir, { recursive: true, force: true });
 });

@@ -58,3 +58,37 @@ test("autonomyApproved (Executor) et dry-run ne redemandent pas", async () => {
   assert.ok(simulated, "la simulation doit répondre");
   assert.deepEqual(calls, ["write_file"]);
 });
+
+test("beforeExecute runs after authorization and immediately before the side effect", async () => {
+  const order: string[] = [];
+  const registry = new ToolRegistry({
+    permissionPolicy: PermissionPolicy.fromEnv({ Leanna_PERMISSION_MODE: "off" } as NodeJS.ProcessEnv),
+  });
+  registry.register({
+    declaration: { name: "write_project_file", description: "écrit", parameters: {} },
+    permissions: ["write"],
+    handler: async () => { order.push("handler"); return { ok: true }; },
+  });
+  await registry.call("write_project_file", { path: "src/new.ts" }, {
+    beforeExecute: async (toolName, args) => {
+      order.push(`before:${toolName}:${String(args.path)}`);
+    },
+  });
+  assert.deepEqual(order, ["before:write_project_file:src/new.ts", "handler"]);
+});
+
+test("beforeExecute is not called when authorization denies the write", async () => {
+  const registry = new ToolRegistry({
+    permissionPolicy: new PermissionPolicy({ mode: "enforce", granted: ["read"] }),
+  });
+  registry.register({
+    declaration: { name: "write_project_file", description: "écrit", parameters: {} },
+    permissions: ["write"],
+    handler: async () => ({ ok: true }),
+  });
+  let captured = false;
+  await assert.rejects(registry.call("write_project_file", { path: "src/new.ts" }, {
+    beforeExecute: async () => { captured = true; },
+  }));
+  assert.equal(captured, false);
+});

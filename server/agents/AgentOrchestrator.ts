@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
-import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
+import { TaskScheduler, validateOrchestrationPlan, type TaskRunner } from "./TaskScheduler.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
@@ -161,8 +161,10 @@ export class AgentOrchestrator {
   /** Configure le broadcaster d'événements temps réel vers le frontend */
   setEventBroadcaster(broadcaster: EventBroadcaster): void {
     const publish = (event: Parameters<EventBroadcaster>[0]) => {
-      broadcaster(event);
+      // Persist/sequence first: a failing UI broadcaster must not drop the
+      // canonical agent event from the reconnect journal.
       agentEventStream.publish(event);
+      try { broadcaster(event); } catch { /* UI transport is best-effort. */ }
     };
     this.notifier.setEventBroadcaster(publish);
     this.registry.setEventBroadcaster(publish);
@@ -469,6 +471,9 @@ export class AgentOrchestrator {
       createdAt: new Date().toISOString(),
     };
 
+    // Fail synchronously before persistence or background scheduling if the DAG is invalid.
+    validateOrchestrationPlan(plan);
+
     this.orchestrations.set(orchestrationId, plan);
     log.info(`Plan d'orchestration créé (${orchestrationId.slice(0, 8)}). Lancement...`);
 
@@ -645,7 +650,7 @@ export class AgentOrchestrator {
       task.completedAt = new Date().toISOString();
       task.result = {
         success: false,
-        outcome: "failed",
+        outcome: "cancelled",
         summary: `Tâche "${task.title}" annulée par l'utilisateur avant son démarrage`,
         error: "cancelled_by_user",
         durationMs: 0,
@@ -671,7 +676,8 @@ export class AgentOrchestrator {
           success: false,
           outcome: "failed",
           summary: `Tâche "${task.title}" annulée par l'utilisateur`,
-          error: "cancelled_by_user",
+          outcome: "cancelled",
+        error: "cancelled_by_user",
           durationMs: 0,
         };
         agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
