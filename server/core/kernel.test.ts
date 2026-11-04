@@ -149,6 +149,8 @@ test("one canonical supervision flag governs missions and agents with legacy fal
   assert.equal(missionSupervisionEnabledFromEnv({ LEANNA_SUPERVISED: "false", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), false,
     "an explicit canonical false overrides legacy true");
   assert.equal(supervisionEnabledFromEnv({ LEANNA_MISSION_SUPERVISED: "true" } as NodeJS.ProcessEnv), true);
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_MISSION_SUPERVISED: "false", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), true,
+    "either legacy opt-in enables supervision when the canonical flag is absent");
   assert.equal(supervisionEnabledFromEnv({ LEANNA_AGENT_SUPERVISED: "1" } as NodeJS.ProcessEnv), true);
   assert.equal(supervisionEnabledFromEnv({} as NodeJS.ProcessEnv), false);
 });
