@@ -19,7 +19,7 @@ export interface AgentTaskEntry {
   id: string;
   role: string;
   title: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'pending' | 'running' | 'completed' | 'incomplete' | 'failed' | 'cancelled';
   agentName: string;
   detail?: string;
   summary?: string;
@@ -130,10 +130,11 @@ function formatToolLabel(tool: string): string {
 }
 
 function mapStatus(status: string): AgentTaskEntry['status'] {
-  if (status === 'running' || status === 'pending' || status === 'completed' || status === 'failed' || status === 'cancelled') {
+  if (status === 'running' || status === 'pending' || status === 'completed' || status === 'incomplete' || status === 'failed' || status === 'cancelled') {
     return status;
   }
-  return 'pending';
+  // Unknown/future terminal states must not be misrepresented as queued work.
+  return 'incomplete';
 }
 
 function handleToolStart(e: Event) {
