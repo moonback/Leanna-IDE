@@ -65,6 +65,7 @@ interface BusMessage {
 
 interface IncomingAgentEvent {
   type: 'agent_event';
+  eventId?: number;
   event: string;
   taskId: string;
   role: string;
@@ -191,7 +192,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
     const handleAgentEvent = (e: Event) => {
       const ev = (e as CustomEvent<IncomingAgentEvent>).detail;
       if (!ev || ev.type !== 'agent_event') return;
-      const eventKey = `${ev.taskId}:${ev.event}:${ev.timestamp}`;
+      const eventKey = ev.eventId !== undefined ? `event:${ev.eventId}` : `${ev.taskId}:${ev.event}:${ev.timestamp}`;
       if (processedEventIds.current.has(eventKey)) return;
       processedEventIds.current.add(eventKey);
       if (processedEventIds.current.size > 1000) {
