@@ -294,7 +294,12 @@ export class CheckpointManager {
       try {
         if (snap.existed) {
           this.gateway.write(snap.path, snap.content ?? "");
-        } else if (this.gateway.exists(snap.path)) {
+        } else if (
+          this.gateway.exists(snap.path) &&
+          !(this.gateway.isDirectory?.(snap.path) ?? false)
+        ) {
+          // A path captured as absent may later become a directory. Its
+          // DirectorySnapshot owns cleanup; never try to unlink it as a file.
           this.gateway.remove(snap.path);
         }
       } catch (error) {
