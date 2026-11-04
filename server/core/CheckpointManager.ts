@@ -209,9 +209,12 @@ export class CheckpointManager {
       this.captureDirectory(id, targetPath);
     } else {
       this.captureFile(id, targetPath);
-      // Capture the missing parent chain so a later recursive mkdir can be undone.
-      const parent = path.dirname(path.resolve(targetPath));
-      if (parent !== path.resolve(targetPath)) this.captureMissingDirectories(id, parent);
+      // If the target is absent it may be a directory about to be created;
+      // if it is an existing file, only missing parents can be created by writers.
+      const missingRoot = this.gateway.exists(targetPath)
+        ? path.dirname(path.resolve(targetPath))
+        : path.resolve(targetPath);
+      this.captureMissingDirectories(id, missingRoot);
     }
   }
 
