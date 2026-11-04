@@ -36,6 +36,7 @@ export interface FileGateway {
   listDirectory?(directoryPath: string): Array<{ path: string; kind: "file" | "directory" }>;
   makeDirectory?(directoryPath: string): void;
   removeDirectory?(directoryPath: string): void;
+  rename?(sourcePath: string, destinationPath: string): void;
 }
 
 /** Implémentation par défaut sur `node:fs`. */
@@ -60,6 +61,10 @@ export function makeNodeFileGateway(): FileGateway {
     makeDirectory: (p) => fs.mkdirSync(p, { recursive: true }),
     // Non-recursive by design: rollback must never erase files created after snapshot.
     removeDirectory: (p) => fs.rmdirSync(p),
+    rename: (source, destination) => {
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.renameSync(source, destination);
+    },
   };
 }
 
@@ -78,6 +83,11 @@ export interface DirectorySnapshot {
   existed: boolean;
 }
 
+export interface RenameSnapshot {
+  sourcePath: string;
+  destinationPath: string;
+}
+
 export type CheckpointStatus = "open" | "committed" | "rolledback";
 
 /** Un checkpoint : ensemble de snapshots de fichiers + statut. */
@@ -90,6 +100,8 @@ export interface Checkpoint {
   files: FileSnapshot[];
   /** Directory structure, including empty directories and directories created during the attempt. */
   directories?: DirectorySnapshot[];
+  /** Rename operations to reverse before restoring individual file snapshots. */
+  renames?: RenameSnapshot[];
 }
 
 export class CheckpointManager {
@@ -148,6 +160,7 @@ export class CheckpointManager {
       status: "open",
       files: snapshots,
       directories: [],
+      renames: [],
     };
     this.persist(cp);
     return cp;
@@ -203,6 +216,25 @@ export class CheckpointManager {
     }
 
     this.persist({ ...this.require(id), directories });
+  }
+
+  /**
+   * Journalise un renommage/déplacement. Le rollback inverse le déplacement
+   * avant de restaurer les contenus, ce qui couvre aussi les dossiers entiers.
+   */
+  captureRename(id: string, sourcePath: string, destinationPath: string): void {
+    const cp = this.requireOpen(id);
+    if (!this.gateway.rename) throw new Error("Le FileGateway ne prend pas en charge les renommages transactionnels.");
+    const source = path.resolve(sourcePath);
+    const destination = path.resolve(destinationPath);
+    this.capturePath(id, source);
+    this.capturePath(id, destination);
+    const latest = this.require(id);
+    const renames = [...(latest.renames ?? [])];
+    if (!renames.some((entry) => entry.sourcePath === source && entry.destinationPath === destination)) {
+      renames.push({ sourcePath: source, destinationPath: destination });
+      this.persist({ ...latest, renames });
+    }
   }
 
   /** Capture un chemin dont le type (fichier/dossier) est déterminé au runtime. */
@@ -286,10 +318,19 @@ export class CheckpointManager {
     }
     if (cp.status === "rolledback") return; // idempotent
 
-    // Restore every entry even if one filesystem operation fails. A single
-    // locked/permission-denied file must not prevent unrelated files restoring.
-    // Keep the checkpoint open on partial failure so the caller can retry.
+    // Reverse structural moves first so source paths exist again before
+    // their original file contents are restored.
     const failures: string[] = [];
+    for (const rename of [...(cp.renames ?? [])].reverse()) {
+      try {
+        if (!this.gateway.exists(rename.sourcePath) && this.gateway.exists(rename.destinationPath)) {
+          this.gateway.rename?.(rename.destinationPath, rename.sourcePath);
+        }
+      } catch (error) {
+        failures.push(`${rename.destinationPath} → ${rename.sourcePath}: ${(error as Error).message}`);
+      }
+    }
+    // Restore every file even if one filesystem operation fails.
     for (const snap of [...cp.files].reverse()) {
       try {
         if (snap.existed) {
