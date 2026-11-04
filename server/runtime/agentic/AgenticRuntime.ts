@@ -826,10 +826,12 @@ export class AgenticRuntime implements IAgentRuntime {
       // Étape d'idempotence = itération : un appel à effet de bord dupliqué
       // dans le même tour est dédoublonné, une ré-exécution volontaire dans un
       // tour suivant (réparation, nouveau test) s'exécute réellement.
-      if (kind === "write") await session.beforeToolCall?.(name, parameters);
       const result = await this.registry.call(name, parameters, {
         agentId: session.agent.role,
         idempotencyScope: { missionId: session.taskId, stepId: `iter-${session.usage.iterations}` },
+        ...(kind === "write" && session.beforeToolCall
+          ? { beforeExecute: session.beforeToolCall }
+          : {}),
       });
       const durationMs = Date.now() - start;
 
