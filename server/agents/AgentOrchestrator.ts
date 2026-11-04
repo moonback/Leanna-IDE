@@ -647,6 +647,7 @@ export class AgentOrchestrator {
         success: false,
         outcome: "failed",
         summary: `Tâche "${task.title}" annulée par l'utilisateur avant son démarrage`,
+        outcome: "cancelled",
         error: "cancelled_by_user",
         durationMs: 0,
       };
@@ -671,7 +672,8 @@ export class AgentOrchestrator {
           success: false,
           outcome: "failed",
           summary: `Tâche "${task.title}" annulée par l'utilisateur`,
-          error: "cancelled_by_user",
+          outcome: "cancelled",
+        error: "cancelled_by_user",
           durationMs: 0,
         };
         agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
