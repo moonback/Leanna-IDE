@@ -109,6 +109,10 @@ export interface SupervisedResult {
   finalState: MissionLifecycleState;
   attempts: number;
   evidence?: EvidenceBundle;
+  /** True when every file changed by a failed attempt was restored. */
+  rollbackComplete?: boolean;
+  /** Files still differing from the pre-attempt snapshot after rollback retries. */
+  residualFiles?: string[];
 }
 
 export class LeannaSupervisor {
@@ -177,6 +181,7 @@ export class LeannaSupervisor {
 
     let attempt = 0;
     let lastEvidence: EvidenceBundle | undefined;
+    let rollbackResidualFiles: string[] = [];
 
     while (attempt < this.maxAttempts) {
       attempt++;
@@ -195,7 +200,7 @@ export class LeannaSupervisor {
           : false;
         if (!approved) {
           this.safeAdvance(machine, "ESCALATED", "approval refused");
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
         }
         // Approuvé → repartir vers RUNNING (WAITING_APPROVAL → RUNNING est légal).
         this.advance(machine, "RUNNING", `attempt ${attempt} (approved)`);
@@ -250,19 +255,23 @@ export class LeannaSupervisor {
           this.advance(machine, "COMMITTING", "evidence establishes success");
           this.checkpoints.commit(checkpoint.id);
           this.advance(machine, "COMPLETED", "committed");
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle, rollbackComplete: true, residualFiles: [] };
         }
 
         // ÉCHEC → RECOVER. On annule les effets de cette tentative (rollback des
         // fichiers déclarés) avant de décider de la suite.
         this.advance(machine, "RECOVERING", outcome.error ?? "evidence failed");
         this.checkpoints.rollback(checkpoint.id);
+        rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
+        if (rollbackResidualFiles.length > 0) {
+          throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
+        }
 
         const decision = this.decideRecovery(outcome, attempt);
 
         if (decision === "escalate" || attempt >= this.maxAttempts) {
           this.advance(machine, "ESCALATED", `recovery=${decision}, attempts=${attempt}`);
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle, rollbackComplete: true, residualFiles: [] };
         }
 
         // retry / repair / replan → on ramène la machine à READY, d'où le prochain
@@ -279,7 +288,12 @@ export class LeannaSupervisor {
         try {
           this.checkpoints.rollback(checkpoint.id);
         } catch {
-          /* le checkpoint a peut-être déjà été commité/supprimé */
+          /* Une nouvelle tentative peut encore restaurer les fichiers restants. */
+        }
+        try {
+          rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
+        } catch {
+          rollbackResidualFiles = ["<état du checkpoint indisponible>"];
         }
         // Transition de secours vers FAILED (toujours légale depuis les états
         // transitoires), avec persistance garantie.
