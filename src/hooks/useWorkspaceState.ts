@@ -4,6 +4,8 @@ export interface WorkspaceData {
   path: string;
   exists: boolean;
   selfReferential: boolean;
+  /** Nom réel du projet (dernier segment de rootPath, pas du chemin sandbox). */
+  projectName: string | null;
 }
 
 /**
@@ -20,15 +22,42 @@ export function useWorkspaceState() {
     setLoading(true);
     try {
       const token = localStorage.getItem('Leanna_api_token');
-      const res = await fetch('/api/workspace', {
-        headers: token ? { 'x-Leanna-token': token } : {},
-      });
-      if (!res.ok) return;
-      const data = await res.json();
+      const headers = token ? { 'x-Leanna-token': token } : {};
+
+      const [wsRes, statusRes] = await Promise.all([
+        fetch('/api/workspace', { headers }),
+        fetch('/api/self-root/status', { headers }),
+      ]);
+
+      if (!wsRes.ok) return;
+      const data = await wsRes.json();
+
+      // Récupérer le rootPath réel depuis /api/self-root/status pour éviter
+      // d'afficher le chemin sandbox à la place du nom du projet.
+      let projectName: string | null = null;
+      if (statusRes.ok) {
+        try {
+          const statusData = await statusRes.json();
+          const rootPath: string | null = statusData?.rootPath ?? null;
+          if (rootPath) {
+            projectName = rootPath.split(/[/\\]/).filter(Boolean).pop() ?? null;
+          }
+        } catch { /* silent — on retombe sur null */ }
+      }
+
+      // Fallback : si le status n'est pas dispo, on tente avec le path workspace
+      // mais en ignorant les segments qui ressemblent à "sandbox".
+      if (!projectName) {
+        const segments = (data.workspace as string).split(/[/\\]/).filter(Boolean);
+        const filtered = segments.filter(s => !/sandbox/i.test(s));
+        projectName = (filtered.length > 0 ? filtered : segments).pop() ?? null;
+      }
+
       setWorkspace({
         path: data.workspace,
         exists: data.exists,
         selfReferential: data.selfReferential ?? true,
+        projectName,
       });
     } catch {
       setError('Impossible de récupérer le workspace.');

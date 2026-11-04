@@ -917,7 +917,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   }, [onCreateFile, onShowSettings, handleConnect, onOpenSearch, showSystem]);
 
   const statusLabel = connected ? 'Prête' : isBusy ? 'Connexion…' : 'En attente';
-  const workspaceName = ws.workspace ? ws.workspace.path.split(/[/\\]/).pop() : null;
+  const workspaceName = ws.workspace?.projectName ?? null;
   const changedFiles = Array.isArray(gitInfo?.files) ? gitInfo!.files.length : null;
 
   const geminiProblem = geminiStatus === 'invalid' || geminiStatus === 'unconfigured';
@@ -993,16 +993,19 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               </p>
             </div>
 
-            <div className="ee-chip" role="status" aria-live="polite">
-              <span
-                className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ee-dot-live' : ''}${isBusy && !connected ? ' ee-dot-busy' : ''}`}
-                style={{
-                  backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
-                  boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,
-                }}
-              />
-              <span style={{ color: 'var(--text-secondary)' }}>{aiName}</span>
-              <span>{statusLabel}</span>
+            <div className="flex flex-col items-end gap-1.5">
+               
+              <div className="ee-chip" role="status" aria-live="polite">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0${connected ? ' ee-dot-live' : ''}${isBusy && !connected ? ' ee-dot-busy' : ''}`}
+                  style={{
+                    backgroundColor: connected ? 'var(--color-success, var(--primary))' : 'var(--text-muted)',
+                    boxShadow: connected ? '0 0 6px var(--color-success, var(--primary))' : undefined,
+                  }}
+                />
+                <span style={{ color: 'var(--text-secondary)' }}>{aiName}</span>
+                <span>{statusLabel}</span>
+              </div>
             </div>
           </motion.header>
 
