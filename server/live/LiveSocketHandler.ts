@@ -1504,7 +1504,7 @@ export function attachLiveWebSocket(
       // Essentiel pour l'annulation déclenchée par l'utilisateur depuis l'UI :
       // sinon le modèle continue de croire que la tâche tourne encore.
       const TERMINAL_TASK_EVENTS = new Set(['task_cancelled', 'task_completed', 'task_failed']);
-      const unsubscribeAgentEvents = agentEventStream.subscribe((event) => {
+      const unsubscribeAgentEvents = agentEventStream.subscribe(({ event }) => {
         try {
           if (event.type !== 'agent_event') return;
           if (!TERMINAL_TASK_EVENTS.has(event.event)) return;
