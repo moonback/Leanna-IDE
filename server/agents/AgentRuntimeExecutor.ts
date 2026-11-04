@@ -223,7 +223,9 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       ...last,
       success: false,
       outcome: last.success ? "partial" : last.outcome,
-      filesModified: last.filesModified.filter((f) => !plannedFiles.includes(f)),
+      // The Supervisor restored the attempt. Report only residual paths when
+      // rollback could not fully restore the workspace; never report reverted edits as deliverables.
+      filesModified: sup.residualFiles ?? [],
       error: last.error ?? `Supervisor: preuve insuffisante (état ${sup.finalState}, ${sup.attempts} tentative(s)).`,
     };
   }
