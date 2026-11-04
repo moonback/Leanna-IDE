@@ -25,7 +25,7 @@ import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation
 import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
-import { supervisionEnabledFromEnv } from "../core/kernel.js";
+import { supervisionEnabledFromEnv } from "../core/supervisionConfig.js";
 
 // Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
 // pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
