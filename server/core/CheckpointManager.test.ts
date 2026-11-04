@@ -255,3 +255,36 @@ test("rollback reverses a file rename and restores a pre-existing destination", 
   assert.deepEqual(mgr.changedFiles(cp.id), []);
   fs.rmSync(workspace, { recursive: true, force: true });
 });
+
+
+test("rollback removes files and subdirectories created after a directory move", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const source = path.join(workspace, "src", "feature");
+  const destination = path.join(workspace, "archive", "feature");
+  fs.mkdirSync(source, { recursive: true });
+  fs.writeFileSync(path.join(source, "original.ts"), "original", "utf8");
+
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.captureRename(cp.id, source, destination);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.renameSync(source, destination);
+
+  const addedFile = path.join(destination, "added.ts");
+  const addedDirectory = path.join(destination, "generated");
+  mgr.capturePath(cp.id, addedFile);
+  fs.writeFileSync(addedFile, "generated", "utf8");
+  mgr.capturePath(cp.id, addedDirectory);
+  fs.mkdirSync(addedDirectory, { recursive: true });
+  const nestedFile = path.join(addedDirectory, "nested.ts");
+  mgr.capturePath(cp.id, nestedFile);
+  fs.writeFileSync(nestedFile, "nested", "utf8");
+
+  mgr.rollback(cp.id);
+  assert.equal(fs.readFileSync(path.join(source, "original.ts"), "utf8"), "original");
+  assert.equal(fs.existsSync(path.join(source, "added.ts")), false);
+  assert.equal(fs.existsSync(path.join(source, "generated")), false);
+  assert.equal(fs.existsSync(destination), false);
+  assert.deepEqual(mgr.changedFiles(cp.id), []);
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
