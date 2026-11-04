@@ -34,6 +34,24 @@ import { supervisionEnabledFromEnv } from "../core/supervisionConfig.js";
 // tout en bornant la taille de la preuve.
 const SUMMARY_RESULT_MAX_CHARS = 1200;
 
+/** Évite d'exposer des secrets ou des payloads volumineux dans la file d'approbation UI. */
+function sanitizeApprovalArgs(value: unknown, depth = 0): unknown {
+  if (depth > 3) return '[profondeur limitée]';
+  if (typeof value === 'string') return value.length > 300 ? value.slice(0, 300) + '…' : value;
+  if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.slice(0, 10).map((item) => sanitizeApprovalArgs(item, depth + 1));
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).slice(0, 20);
+    return Object.fromEntries(entries.map(([key, item]) => {
+      if (/(password|passwd|secret|token|api[_-]?key|authorization|credential|cookie)/i.test(key)) {
+        return [key, '[masqué]'];
+      }
+      return [key, sanitizeApprovalArgs(item, depth + 1)];
+    }));
+  }
+  return String(value);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Executor — Boucle plan → agir → vérifier → corriger
 // ═══════════════════════════════════════════════════════════════════════════════
