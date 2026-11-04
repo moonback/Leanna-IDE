@@ -32,6 +32,7 @@ export interface FileGateway {
   remove(filePath: string): void;
   /** Optional directory primitives used by recursive transactional snapshots. */
   isDirectory?(directoryPath: string): boolean;
+  isSymbolicLink?(targetPath: string): boolean;
   listDirectory?(directoryPath: string): Array<{ path: string; kind: "file" | "directory" }>;
   makeDirectory?(directoryPath: string): void;
   removeDirectory?(directoryPath: string): void;
@@ -48,6 +49,7 @@ export function makeNodeFileGateway(): FileGateway {
     },
     remove: (p) => fs.rmSync(p, { force: true }),
     isDirectory: (p) => fs.existsSync(p) && fs.lstatSync(p).isDirectory(),
+    isSymbolicLink: (p) => fs.existsSync(p) && fs.lstatSync(p).isSymbolicLink(),
     listDirectory: (p) => fs.readdirSync(p, { withFileTypes: true }).map((entry) => {
       const childPath = path.join(p, entry.name);
       if (entry.isSymbolicLink()) throw new Error(`Lien symbolique non pris en charge dans un checkpoint récursif: ${childPath}`);
@@ -205,6 +207,9 @@ export class CheckpointManager {
 
   /** Capture un chemin dont le type (fichier/dossier) est déterminé au runtime. */
   capturePath(id: string, targetPath: string): void {
+    if (this.gateway.isSymbolicLink?.(targetPath)) {
+      throw new Error(`Lien symbolique non pris en charge dans un checkpoint: ${targetPath}`);
+    }
     if (this.gateway.isDirectory?.(targetPath)) {
       this.captureDirectory(id, targetPath);
     } else {
@@ -242,6 +247,9 @@ export class CheckpointManager {
    */
   captureFile(id: string, filePath: string): boolean {
     const cp = this.requireOpen(id);
+    if (this.gateway.isSymbolicLink?.(filePath)) {
+      throw new Error(`Lien symbolique non pris en charge dans un checkpoint: ${filePath}`);
+    }
     const normalized = filePath.replace(/\\/g, "/");
     if (cp.files.some((entry) => entry.path === normalized)) return false;
 
