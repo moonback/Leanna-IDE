@@ -123,16 +123,6 @@ export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env):
 }
 
 export { supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./supervisionConfig.js";
-/** Alias historique conservé pour les appelants existants. */
-export function agentSupervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  return supervisionEnabledFromEnv(env);
-}
-
-/** Alias historique conservé pour les appelants existants. */
-export function missionSupervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  return supervisionEnabledFromEnv(env);
-}
-
 /**
  * Construit le noyau P0 et, si demandé, branche la garde d'idempotence sur le
  * ToolRegistry fourni. Retourne toutes les briques pour usage ultérieur.
