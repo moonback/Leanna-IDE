@@ -50,7 +50,10 @@ export function makeNodeFileGateway(): FileGateway {
     },
     remove: (p) => fs.rmSync(p, { force: true }),
     isDirectory: (p) => fs.existsSync(p) && fs.lstatSync(p).isDirectory(),
-    isSymbolicLink: (p) => {\n      try { return fs.lstatSync(p).isSymbolicLink(); }\n      catch { return false; }\n    },
+    isSymbolicLink: (p) => {
+      try { return fs.lstatSync(p).isSymbolicLink(); }
+      catch { return false; }
+    },
     listDirectory: (p) => fs.readdirSync(p, { withFileTypes: true }).map((entry) => {
       const childPath = path.join(p, entry.name);
       if (entry.isSymbolicLink()) throw new Error(`Lien symbolique non pris en charge dans un checkpoint récursif: ${childPath}`);
