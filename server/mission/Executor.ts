@@ -438,8 +438,8 @@ export class Executor {
       missionId: pending.missionId,
       goalId: pending.goalId,
       skill: pending.skill,
-      args: pending.args,
-      reason: pending.reason,
+      args: sanitizeApprovalArgs(pending.args) as Record<string, unknown>,
+      reason: pending.reason.slice(0, 500),
       requestedAt: pending.requestedAt,
       timeoutAt: pending.timeoutAt,
     }));
