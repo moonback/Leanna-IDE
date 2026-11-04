@@ -22,6 +22,25 @@ function clipText(value: unknown, max: number): string | undefined {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
+/** Filtre les secrets et borne les snapshots avant exposition via les API de timeline. */
+function sanitizeMissionPayload(value: unknown, key = "", depth = 0): unknown {
+  if (/(password|passwd|secret|token|api[_-]?key|authorization|credential|cookie|private[_-]?key)/i.test(key)) {
+    return "[masqué]";
+  }
+  if (depth > 4) return "[profondeur limitée]";
+  if (typeof value === "string") return value.length > 1000 ? value.slice(0, 1000) + "…" : value;
+  if (value === null || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.slice(0, 30).map((item) => sanitizeMissionPayload(item, "", depth + 1));
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).slice(0, 40);
+    return Object.fromEntries(entries.map(([childKey, child]) => [
+      childKey,
+      sanitizeMissionPayload(child, childKey, depth + 1),
+    ]));
+  }
+  return String(value);
+}
+
 export function createMissionsRouter(
   getExecutor: () => any | null,
   handleToolCall?: (name: string, args: any) => Promise<any>
@@ -187,7 +206,14 @@ export function createMissionsRouter(
         totalActions: state.metrics?.totalActions ?? 0,
         successfulActions: state.metrics?.successfulActions ?? 0,
         failedActions: state.metrics?.failedActions ?? 0,
+        totalDurationMs: state.metrics?.totalDurationMs ?? 0,
+        estimatedTokens: state.metrics?.estimatedTokens ?? 0,
       },
+      artifacts: Array.from(new Set(
+        Object.values(goalsRecord).flatMap((goal: any) => goal.result?.artifacts ?? [])
+          .filter((artifact: unknown): artifact is string => typeof artifact === "string" && artifact.length > 0)
+          .map((artifact: string) => clipText(artifact, 500)!)
+      )).slice(0, 100),
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
       completedAt: state.completedAt,
@@ -240,7 +266,7 @@ export function createMissionsRouter(
     }
     try {
       const timeline = missionTimeTravel.buildTimeline(mission.getState() as TimelineMissionView);
-      return res.json({ status: "success", timeline });
+      return res.json({ status: "success", timeline: sanitizeMissionPayload(timeline) });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }
@@ -263,7 +289,7 @@ export function createMissionsRouter(
       if (!target) {
         return res.status(404).json({ error: `Étape ${step} hors limites.` });
       }
-      return res.json({ status: "success", target, trail });
+      return res.json({ status: "success", target: sanitizeMissionPayload(target), trail: sanitizeMissionPayload(trail) });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }
