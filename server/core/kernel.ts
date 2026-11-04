@@ -188,12 +188,14 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
           .map((file) => resolveWritePath(file))
           .filter((file): file is string => typeof file === "string" && file.length > 0),
         resolveWriteTargets: (toolName, args) => {
-          // Only file-level operations are journaled here. Directory deletion is
-          // deliberately excluded until recursive snapshots are supported.
           const candidates: unknown[] =
             toolName === "rename_project_file"
               ? [args.oldPath, args.newPath]
-              : ["write_project_file", "modify_project_file", "patch_project_file", "apply_patch", "delete_project_file"].includes(toolName)
+              : [
+                  "write_project_file", "modify_project_file", "patch_project_file",
+                  "apply_patch", "delete_project_file", "delete_project_folder",
+                  "create_project_directory",
+                ].includes(toolName)
                 ? [args.path]
                 : [];
           return candidates
