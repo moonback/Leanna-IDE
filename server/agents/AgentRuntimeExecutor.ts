@@ -177,7 +177,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       task.completedAt = new Date().toISOString();
       task.result = {
         success: false,
-        outcome: cancelled ? "blocked" : "failed",
+        outcome: cancelled ? "cancelled" : "failed",
         summary: cancelled ? `Tâche "${task.title}" annulée` : `Échec de l'agent ${agent.name}`,
         error: cancelled ? undefined : (err as Error).message,
         durationMs: Date.now() - startTime,
