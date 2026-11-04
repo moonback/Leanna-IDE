@@ -515,14 +515,14 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
-    res.write('retry: 5000\\n\\n');
+    res.write('retry: 5000\n\n');
 
     const keepAlive = setInterval(() => {
-      if (!res.destroyed) res.write(': keep-alive\\n\\n');
+      if (!res.destroyed) res.write(': keep-alive\n\n');
     }, 15_000);
     const unsubscribe = agentEventStream.subscribe(({ id, event }) => {
       if (res.destroyed) return;
-      res.write(`id: ${id}\\nevent: agent_event\\ndata: ${JSON.stringify(event)}\\n\\n`);
+      res.write(`id: ${id}\nevent: agent_event\ndata: ${JSON.stringify(event)}\n\n`);
     }, afterId);
 
     res.on('close', () => {
