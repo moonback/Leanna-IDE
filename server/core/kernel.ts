@@ -122,22 +122,7 @@ export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env):
   return raw === "true" || raw === "1";
 }
 
-/**
- * Source unique de vérité pour la gouvernance Agent ET Mission.
- *
- * `LEANNA_SUPERVISED` prend priorité, y compris lorsqu'il vaut explicitement
- * false. Les deux anciens noms restent des alias de compatibilité uniquement
- * si la variable canonique est absente.
- */
-export function supervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  const enabled = (value: string | undefined): boolean => {
-    const normalized = (value ?? "").toLowerCase().trim();
-    return normalized === "true" || normalized === "1";
-  };
-  if (env.LEANNA_SUPERVISED !== undefined) return enabled(env.LEANNA_SUPERVISED);
-  return enabled(env.LEANNA_MISSION_SUPERVISED) || enabled(env.LEANNA_AGENT_SUPERVISED);
-}
-
+export { supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./supervisionConfig.js";
 /** Alias historique conservé pour les appelants existants. */
 export function agentSupervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
   return supervisionEnabledFromEnv(env);
