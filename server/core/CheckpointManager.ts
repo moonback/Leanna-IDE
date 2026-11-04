@@ -318,6 +318,28 @@ export class CheckpointManager {
     }
     if (cp.status === "rolledback") return; // idempotent
 
+    // Snapshots of files/directories created underneath a moved directory
+    // follow that directory back to its original path during rollback.
+    const remapNewDescendant = (target: string): string => {
+      let mapped = target;
+      for (const rename of [...(cp.renames ?? [])].reverse()) {
+        const destination = path.resolve(rename.destinationPath);
+        const relative = path.relative(destination, mapped);
+        if (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
+          mapped = path.join(rename.sourcePath, relative);
+        }
+      }
+      return mapped;
+    };
+    const fileSnapshots = cp.files.map((snap) => ({
+      ...snap,
+      path: snap.existed ? snap.path : remapNewDescendant(snap.path),
+    }));
+    const directorySnapshots = (cp.directories ?? []).map((directory) => ({
+      ...directory,
+      path: directory.existed ? directory.path : remapNewDescendant(directory.path),
+    }));
+
     // Reverse structural moves first so source paths exist again before
     // their original file contents are restored.
     const failures: string[] = [];
@@ -331,7 +353,7 @@ export class CheckpointManager {
       }
     }
     // Restore every file even if one filesystem operation fails.
-    for (const snap of [...cp.files].reverse()) {
+    for (const snap of [...fileSnapshots].reverse()) {
       try {
         if (snap.existed) {
           this.gateway.write(snap.path, snap.content ?? "");
