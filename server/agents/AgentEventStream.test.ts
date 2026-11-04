@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agentEventStream } from "./AgentEventStream.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { agentEventStream, AgentEventStream } from "./AgentEventStream.js";
 import type { AgentEvent } from "./ProgressNotifier.js";
 
 test("agent event stream notifies subscribers and supports unsubscribe", () => {
   const received: AgentEvent[] = [];
-  const unsubscribe = agentEventStream.subscribe((event) => received.push(event));
+  const unsubscribe = agentEventStream.subscribe(({ event }) => received.push(event));
   const event = {
     type: "agent_event",
     event: "task_started",
@@ -24,10 +27,6 @@ test("agent event stream notifies subscribers and supports unsubscribe", () => {
   assert.equal(received.length, 1);
   assert.equal(received[0].taskId, "task-test");
 });
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { AgentEventStream } from "./AgentEventStream.js";
 
 function makeEvent(taskId: string): AgentEvent {
   return {
