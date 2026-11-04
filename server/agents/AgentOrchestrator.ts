@@ -161,8 +161,10 @@ export class AgentOrchestrator {
   /** Configure le broadcaster d'événements temps réel vers le frontend */
   setEventBroadcaster(broadcaster: EventBroadcaster): void {
     const publish = (event: Parameters<EventBroadcaster>[0]) => {
-      broadcaster(event);
+      // Persist/sequence first: a failing UI broadcaster must not drop the
+      // canonical agent event from the reconnect journal.
       agentEventStream.publish(event);
+      try { broadcaster(event); } catch { /* UI transport is best-effort. */ }
     };
     this.notifier.setEventBroadcaster(publish);
     this.registry.setEventBroadcaster(publish);
