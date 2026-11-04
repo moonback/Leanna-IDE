@@ -107,10 +107,17 @@ export class Executor {
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
 
-  /** Approbations en attente : actionId → resolver de décision. */
+  /** Approbations en attente : décision + contexte minimal pour l'interface opérateur. */
   private pendingApprovals: Map<string, {
     resolve: (approved: boolean) => void;
     timer: NodeJS.Timeout;
+    missionId: string;
+    goalId: string;
+    skill: string;
+    args: Record<string, unknown>;
+    reason: string;
+    requestedAt: string;
+    timeoutAt: string;
   }> = new Map();
 
   /** Délai d'attente d'une approbation avant refus par défaut (ms). */
@@ -392,9 +399,32 @@ export class Executor {
     return true;
   }
 
-  /** Liste les IDs d'actions en attente d'approbation. */
+  /** Liste historique des IDs, conservée pour compatibilité des scripts/API. */
   listPendingApprovals(): string[] {
     return Array.from(this.pendingApprovals.keys());
+  }
+
+  /** Détails minimaux des approbations pour le centre de pilotage. */
+  listPendingApprovalDetails(): Array<{
+    actionId: string;
+    missionId: string;
+    goalId: string;
+    skill: string;
+    args: Record<string, unknown>;
+    reason: string;
+    requestedAt: string;
+    timeoutAt: string;
+  }> {
+    return Array.from(this.pendingApprovals.entries()).map(([actionId, pending]) => ({
+      actionId,
+      missionId: pending.missionId,
+      goalId: pending.goalId,
+      skill: pending.skill,
+      args: pending.args,
+      reason: pending.reason,
+      requestedAt: pending.requestedAt,
+      timeoutAt: pending.timeoutAt,
+    }));
   }
 
   /**
@@ -2745,7 +2775,17 @@ JSON:`;
         resolve(false);
       }, this.approvalTimeoutMs);
 
-      this.pendingApprovals.set(action.id, { resolve, timer });
+      this.pendingApprovals.set(action.id, {
+        resolve,
+        timer,
+        missionId: mission.id,
+        goalId,
+        skill: action.skillName,
+        args: action.args ?? {},
+        reason,
+        requestedAt: new Date().toISOString(),
+        timeoutAt: new Date(Date.now() + this.approvalTimeoutMs).toISOString(),
+      });
     });
   }
 
