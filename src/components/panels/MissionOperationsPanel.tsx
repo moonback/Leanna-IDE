@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, Check, Clock3, Loader2, Pause, Play, RefreshCw, ShieldAlert, X, XCircle } from 'lucide-react';
+import { Activity, Check, Clock3, FileText, Loader2, Pause, Play, RefreshCw, ShieldAlert, X, XCircle } from 'lucide-react';
 import { useConfirm } from '../ui/ConfirmDialog.js';
 
 type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused' | 'cancelled' | 'incomplete';
@@ -11,9 +11,32 @@ interface MissionItem {
   priority: string;
   createdAt: string;
   updatedAt?: string;
-  metrics?: { totalActions: number; successfulActions: number; failedActions: number };
+  metrics?: { totalActions: number; successfulActions: number; failedActions: number; totalDurationMs?: number; estimatedTokens?: number };\n  artifacts?: string[];
   lastError?: { action: string; error?: string };
   errorCount?: number;
+}
+interface TimelineEvent {
+  index: number;
+  type: string;
+  at?: string;
+  label: string;
+  goalTitle?: string;
+  snapshot?: {
+    skillName?: string;
+    status?: string;
+    reasoning?: string;
+    observation?: string;
+    success?: string | null;
+    failure?: string | null;
+    result?: unknown;
+  };
+}
+interface MissionTimeline {
+  missionId: string;
+  title: string;
+  status: string;
+  events: TimelineEvent[];
+  summary: string;
 }
 interface ApprovalItem {
   actionId: string;
@@ -67,6 +90,10 @@ export default function MissionOperationsPanel() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTimeline, setSelectedTimeline] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<MissionTimeline | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
   const { confirm } = useConfirm();
 
   const refresh = useCallback(async (quiet = false) => {
@@ -107,6 +134,29 @@ export default function MissionOperationsPanel() {
   const liveMissions = useMemo(() => missions.filter((mission) => LIVE.has(mission.status)), [missions]);
   const completedCount = missions.filter((mission) => mission.status === 'completed').length;
   const failedCount = missions.filter((mission) => mission.status === 'failed' || mission.status === 'incomplete').length;
+
+  const toggleTimeline = useCallback(async (missionId: string) => {
+    if (selectedTimeline === missionId) {
+      setSelectedTimeline(null);
+      setTimeline(null);
+      setTimelineError(null);
+      return;
+    }
+    setSelectedTimeline(missionId);
+    setTimeline(null);
+    setTimelineError(null);
+    setTimelineLoading(true);
+    try {
+      const res = await fetch(`/api/missions/${encodeURIComponent(missionId)}/timeline`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Chargement de la timeline impossible (${res.status}).`);
+      setTimeline(data.timeline as MissionTimeline);
+    } catch (err) {
+      setTimelineError((err as Error).message);
+    } finally {
+      setTimelineLoading(false);
+    }
+  }, [selectedTimeline]);
 
   const control = useCallback(async (missionId: string, action: 'pause' | 'resume' | 'cancel') => {
     if (action === 'cancel') {
@@ -226,6 +276,20 @@ export default function MissionOperationsPanel() {
                   <span>{new Date(mission.createdAt).toLocaleString()}</span>
                 </div>
                 {mission.lastError?.error && <p className="mt-2 text-xs" style={{ color: 'var(--color-error)' }}>{mission.lastError.error}</p>}
+                <MissionDetails mission={mission} expanded={selectedTimeline === mission.id} timeline={timeline} loading={timelineLoading && selectedTimeline === mission.id} error={timelineError && selectedTimeline === mission.id ? timelineError : null} onToggle={() => void toggleTimeline(mission.id)} />
+              </article>
+            ))}
+            <h3 className="pt-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Missions récentes</h3>
+            {missions.filter((mission) => !LIVE.has(mission.status)).slice(0, 6).map((mission) => (
+              <article key={mission.id} className="rounded-md border p-3" style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{mission.title}</p>
+                    <p className="mt-1 text-[11px]" style={{ color: statusColor(mission.status) }}>{statusLabel(mission.status)} · {mission.metrics?.totalActions ?? 0} action(s)</p>
+                  </div>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{mission.completedAt ? new Date(mission.completedAt).toLocaleDateString() : new Date(mission.createdAt).toLocaleDateString()}</span>
+                </div>
+                <MissionDetails mission={mission} expanded={selectedTimeline === mission.id} timeline={timeline} loading={timelineLoading && selectedTimeline === mission.id} error={timelineError && selectedTimeline === mission.id ? timelineError : null} onToggle={() => void toggleTimeline(mission.id)} />
               </article>
             ))}
           </div>
@@ -269,6 +333,58 @@ export default function MissionOperationsPanel() {
         </div>
       )}
     </section>
+  );
+}
+
+function MissionDetails({ mission, expanded, timeline, loading, error, onToggle }: {
+  mission: MissionItem;
+  expanded: boolean;
+  timeline: MissionTimeline | null;
+  loading: boolean;
+  error: string | null;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--border-base)' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <span>{Math.round((mission.metrics?.totalDurationMs ?? 0) / 1000)} s cumulées</span>
+          <span>~{(mission.metrics?.estimatedTokens ?? 0).toLocaleString()} tokens</span>
+          <span>{mission.artifacts?.length ?? 0} livrable(s)</span>
+        </div>
+        <button type="button" onClick={onToggle} aria-expanded={expanded} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]" style={{ color: 'var(--accent-primary)' }}>
+          <Activity size={12} /> {expanded ? 'Masquer la timeline' : 'Preuves & timeline'}
+        </button>
+      </div>
+      {mission.artifacts && mission.artifacts.length > 0 && (
+        <div className="mt-2 space-y-1">
+          <p className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}><FileText size={11} /> Livrables</p>
+          {mission.artifacts.slice(0, 8).map((artifact, index) => <p key={`${artifact}:${index}`} className="break-all text-[10px]" style={{ color: 'var(--text-muted)' }}>{artifact}</p>)}
+        </div>
+      )}
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {loading && <p className="flex items-center gap-2 py-2 text-xs" style={{ color: 'var(--text-muted)' }}><Loader2 size={12} className="animate-spin" /> Chargement des preuves…</p>}
+          {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-error)' }}>{error}</p>}
+          {timeline && (
+            <ol className="max-h-72 space-y-2 overflow-y-auto border-l pl-3" style={{ borderColor: 'var(--border-base)' }}>
+              {timeline.events.slice(0, 60).map((event) => (
+                <li key={event.index} className="relative">
+                  <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{event.label}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {event.at ? new Date(event.at).toLocaleTimeString() : 'Heure non disponible'} · étape {event.index + 1}
+                  </p>
+                  {event.snapshot?.reasoning && <p className="mt-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>{event.snapshot.reasoning}</p>}
+                  {event.snapshot?.failure && <p className="mt-1 text-[10px]" style={{ color: 'var(--color-error)' }}>{event.snapshot.failure}</p>}
+                  {event.snapshot?.observation && <p className="mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>{event.snapshot.observation}</p>}
+                </li>
+              ))}
+            </ol>
+          )}
+          {timeline && timeline.events.length === 0 && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Aucun événement disponible.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
