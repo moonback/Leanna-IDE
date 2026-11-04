@@ -231,7 +231,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         const agents = prev.agents.map(a => {
           if (a.role !== ev.role) return a;
           const started = ev.event === 'task_started';
-          const terminal = ev.event === 'task_completed' || ev.event === 'task_failed' || ev.event === 'task_cancelled';
+          const terminal = ev.event === 'task_completed' || ev.event === 'task_incomplete' || ev.event === 'task_failed' || ev.event === 'task_cancelled';
           const runningTasks = started
             ? a.runningTasks + 1
             : terminal
