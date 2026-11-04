@@ -20,7 +20,7 @@ import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
-import { createCoreKernel, agentSupervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
+import { createCoreKernel, supervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -65,7 +65,7 @@ export interface BootstrapConfig {
   /**
    * Fait passer les tâches du runtime agentique par le LeannaSupervisor
    * (preuve avant succès, rollback des fichiers déclarés). Par défaut, lu depuis
-   * `LEANNA_AGENT_SUPERVISED` ; désactivé sinon.
+   * `LEANNA_SUPERVISED` ; désactivé sinon.
    */
   enableAgentSupervision?: boolean;
   /**
@@ -277,7 +277,7 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   }
   if (config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv()) {
     agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission);
-    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_AGENT_SUPERVISED).`);
+    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_SUPERVISED).`);
   }
   if (kernel.safetyGateMode !== "off") {
     console.log(
