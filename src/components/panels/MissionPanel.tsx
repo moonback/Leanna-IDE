@@ -56,7 +56,7 @@ interface MissionPlan {
   estimationConfidence?: number;
 }
 
-type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused' | 'cancelled';
+type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'paused' | 'cancelled' | 'incomplete' | 'unknown';
 
 /** Auto-évaluation post-mission (plan vs exécution vs résultat), calculée côté serveur. */
 interface MissionSelfEvaluation {
@@ -134,6 +134,8 @@ function statusIcon(status: string, size = 10) {
     case 'blocked': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
     case 'paused': return <Pause size={size} style={{ color: 'var(--color-warning)' }} />;
     case 'cancelled': return <Ban size={size} style={{ color: 'var(--text-dimmed)' }} />;
+    case 'incomplete': return <AlertTriangle size={size} style={{ color: 'var(--color-warning)' }} />;
+    case 'unknown': return <AlertTriangle size={size} style={{ color: 'var(--text-dimmed)' }} />;
     default: return <Clock size={size} style={{ color: 'var(--text-dimmed)' }} />;
   }
 }
@@ -147,7 +149,10 @@ function statusLabel(status: string): { text: string; color: string } {
     case 'blocked': return { text: 'Bloquée', color: 'var(--color-warning)' };
     case 'paused': return { text: 'En pause', color: 'var(--color-warning)' };
     case 'cancelled': return { text: 'Annulée', color: 'var(--text-dimmed)' };
-    default: return { text: 'En attente', color: 'var(--text-dimmed)' };
+    case 'incomplete': return { text: 'Incomplète', color: 'var(--color-warning)' };
+    case 'unknown': return { text: 'État inconnu', color: 'var(--text-dimmed)' };
+    case 'pending': return { text: 'En attente', color: 'var(--text-dimmed)' };
+    default: return { text: 'État inconnu', color: 'var(--text-dimmed)' };
   }
 }
 
@@ -210,7 +215,7 @@ function formatDuration(ms?: number): string {
 /** Missions vivantes (en cours, en pause, bloquées ou pas encore démarrées). */
 const LIVE_STATUSES: ReadonlySet<MissionStatus> = new Set(['pending', 'in_progress', 'paused', 'blocked']);
 /** Missions terminées (historique). */
-const DONE_STATUSES: ReadonlySet<MissionStatus> = new Set(['completed', 'failed', 'cancelled']);
+const DONE_STATUSES: ReadonlySet<MissionStatus> = new Set(['completed', 'failed', 'cancelled', 'incomplete']);
 
 type MissionFilter = 'all' | 'live' | 'done';
 
@@ -224,11 +229,18 @@ function sortMissions(list: MissionEntry[]): MissionEntry[] {
 
 /** Normalise une mission renvoyée par GET /api/missions. */
 function fromServer(m: any): MissionEntry {
+  const knownStatuses: ReadonlySet<string> = new Set([
+    'pending', 'in_progress', 'completed', 'failed', 'blocked', 'paused', 'cancelled', 'incomplete',
+  ]);
+  const rawStatus = typeof m.status === 'string' ? m.status : 'unknown';
+  const status: MissionStatus = m.paused && rawStatus === 'in_progress'
+    ? 'paused'
+    : knownStatuses.has(rawStatus) ? rawStatus as MissionStatus : 'unknown';
   return {
     id: m.id,
     title: m.title ?? 'Mission',
     description: typeof m.description === 'string' ? m.description : undefined,
-    status: m.paused && m.status === 'in_progress' ? 'paused' : (m.status ?? 'pending'),
+    status,
     priority: m.priority ?? 'medium',
     goals: Array.isArray(m.goals) ? m.goals : [],
     activeGoalId: m.activeGoalId ?? null,
