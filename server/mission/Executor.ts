@@ -25,6 +25,7 @@ import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation
 import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
+import { supervisionEnabledFromEnv } from "../core/kernel.js";
 
 // Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
 // pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
@@ -277,8 +278,7 @@ export class Executor {
     const raw = (process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase().trim();
     this.evidenceVerification = raw === "true" || raw === "1";
     // Mode supervisé (couture Supervisor) activable par défaut via l'environnement.
-    const sup = (process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase().trim();
-    this.supervisedMode = sup === "true" || sup === "1";
+    this.supervisedMode = supervisionEnabledFromEnv();
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
