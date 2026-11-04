@@ -14,7 +14,7 @@ import fs from "fs";
 import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
-import { supervisionEnabledFromEnv } from "./server/core/kernel.js";
+import { supervisionEnabledFromEnv } from "./server/core/supervisionConfig.js";
 
 import { knowledgeGraph, projectMemory } from "./server/knowledge/index.js";
 
