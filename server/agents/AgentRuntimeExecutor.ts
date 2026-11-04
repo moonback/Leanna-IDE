@@ -81,9 +81,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
   }
 
   /**
-   * Annulation coopérative. Le runtime agentique ne prend pas encore de signal
-   * d'annulation en cours de boucle ; on marque l'intention et on laisse la
-   * tâche se terminer au prochain point de contrôle naturel.
+   * Annulation coopérative : le signal est transmis à la boucle agentique et
+   * au ToolRegistry afin d'interrompre la planification et les outils actifs.
    */
   cancel(taskId: string): boolean {
     const controller = this.active.get(taskId);
@@ -202,7 +201,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
   /**
    * Exécute la tâche sous le Supervisor : le verdict du Supervisor (preuve)
    * prime sur l'auto-évaluation du runtime. Une tentative non validée a vu ses
-   * fichiers déclarés restaurés : ils ne sont plus rapportés comme modifiés.
+   * fichiers planifiés et découverts avant écriture restaurés ; seuls les
+   * chemins résiduels d'un rollback incomplet restent signalés.
    */
   private async runSupervised(
     supervise: CoreKernel["runSupervisedAgenticMission"],
