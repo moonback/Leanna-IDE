@@ -14,7 +14,7 @@ const log = createLogger("AgentProgress");
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ProgressEvent = "started" | "progress" | "completed" | "failed" | "cancelled";
+export type ProgressEvent = "started" | "progress" | "completed" | "incomplete" | "failed" | "cancelled";
 
 /** Callback de notification de progression */
 export type ProgressCallback = (task: AgentTask, event: ProgressEvent) => void;
@@ -27,7 +27,7 @@ export interface AgentEvent {
   type: "agent_event";
   /** Monotonic ID assigned by AgentEventStream for replay-safe UI deduplication. */
   eventId?: number;
-  event: "task_started" | "task_progress" | "task_completed" | "task_failed" | "task_cancelled" | "orchestration_started" | "orchestration_completed" | "orchestration_cancelled";
+  event: "task_started" | "task_progress" | "task_completed" | "task_incomplete" | "task_failed" | "task_cancelled" | "orchestration_started" | "orchestration_completed" | "orchestration_cancelled";
   taskId: string;
   role: AgentRole;
   title: string;
@@ -73,6 +73,9 @@ export class ProgressNotifier {
       case "completed":
         log.info(`✅ ${agentName} — "${task.title}" terminée: ${task.result?.summary ?? ""}`);
         break;
+      case "incomplete":
+        log.warn(`⚠️ ${agentName} — "${task.title}" incomplète: ${task.result?.error ?? ""}`);
+        break;
       case "failed":
         log.error(`❌ ${agentName} — "${task.title}" échouée: ${task.result?.error ?? ""}`);
         break;
@@ -94,7 +97,7 @@ export class ProgressNotifier {
     }
 
     // Persistance Supabase (best-effort, non bloquant)
-    if (event === "started" || event === "completed" || event === "failed" || event === "cancelled") {
+    if (event === "started" || event === "completed" || event === "incomplete" || event === "failed" || event === "cancelled") {
       agentPersistence.updateTaskStatus(
         task.id,
         task.status,
