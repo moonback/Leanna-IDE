@@ -552,10 +552,9 @@ export class AgentExecutor implements AgentTaskRunner {
         task.completedAt = new Date().toISOString();
         task.result = {
           success: false,
-          outcome: "failed",
-          summary: `Tâche annulée par l'utilisateur après ${(durationMs / 1000).toFixed(1)}s`,
           outcome: "cancelled",
-        error: "cancelled_by_user",
+          summary: `Tâche annulée par l'utilisateur après ${(durationMs / 1000).toFixed(1)}s`,
+          error: "cancelled_by_user",
           durationMs,
         };
         log.info(`[task:${taskShortId}] 🛑 [${agent.name}] Annulée après ${(durationMs / 1000).toFixed(1)}s`);
