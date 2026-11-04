@@ -49,3 +49,41 @@ test("rejects duplicate task IDs", () => {
 test("rejects dependency maps containing unknown task keys", () => {
   expectInvalid(plan(["a"], { a: [], ghost: [] }), /Clé de dépendances sans tâche/);
 });
+
+
+test("scheduler preserves blocked dependencies as incomplete rather than failed", async () => {
+  const value: OrchestrationPlan = {
+    id: "orch-run", title: "execution", description: "execution",
+    tasks: ["root", "child"].map(task), dependencies: { root: [], child: ["root"] },
+    status: "pending", createdAt: new Date(0).toISOString(),
+  };
+  const events: string[] = [];
+  const { TaskScheduler } = await import("./TaskScheduler.js");
+  const { ProgressNotifier } = await import("./ProgressNotifier.js");
+  const notifier = new ProgressNotifier();
+  notifier.setProgressCallback((_task, event) => events.push(event));
+  const scheduler = new TaskScheduler({ async execute(current) {
+    current.status = "failed";
+    current.result = { success: false, outcome: "failed", summary: "failed", error: "agent error", durationMs: 1 };
+  } }, notifier);
+  await scheduler.execute(value);
+  assert.equal(value.tasks[1].status, "incomplete");
+  assert.equal(value.tasks[1].result?.outcome, "blocked");
+  assert.deepEqual(events, ["incomplete"]);
+  assert.equal(value.status, "failed");
+});
+
+test("scheduler preserves cancellation as a distinct orchestration terminal state", async () => {
+  const value: OrchestrationPlan = {
+    id: "orch-cancel", title: "cancel", description: "cancel", tasks: [task("root")],
+    dependencies: { root: [] }, status: "pending", createdAt: new Date(0).toISOString(),
+  };
+  const { TaskScheduler } = await import("./TaskScheduler.js");
+  const scheduler = new TaskScheduler({ async execute(current) {
+    current.status = "cancelled";
+    current.result = { success: false, outcome: "cancelled", summary: "cancelled", error: "cancelled_by_user", durationMs: 1 };
+  } });
+  await scheduler.execute(value);
+  assert.equal(value.tasks[0].status, "cancelled");
+  assert.equal(value.status, "cancelled");
+});
