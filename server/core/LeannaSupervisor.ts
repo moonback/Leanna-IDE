@@ -255,7 +255,7 @@ export class LeannaSupervisor {
           this.advance(machine, "COMMITTING", "evidence establishes success");
           this.checkpoints.commit(checkpoint.id);
           this.advance(machine, "COMPLETED", "committed");
-          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle, rollbackComplete: true, residualFiles: [] };
+          return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
         }
 
         // ÉCHEC → RECOVER. On annule les effets de cette tentative (rollback des
@@ -298,7 +298,7 @@ export class LeannaSupervisor {
         // Transition de secours vers FAILED (toujours légale depuis les états
         // transitoires), avec persistance garantie.
         this.safeAdvance(machine, "FAILED", `supervisor error: ${(err as Error).message}`);
-        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence };
+        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
       }
     }
 
