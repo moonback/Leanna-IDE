@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { CheckpointManager, type FileGateway } from "./CheckpointManager.js";
+import { CheckpointManager, makeNodeFileGateway, type FileGateway } from "./CheckpointManager.js";
 
 /** In-memory FileGateway for deterministic tests (no real disk for content). */
 function memGateway(initial: Record<string, string> = {}): FileGateway & { store: Map<string, string> } {
@@ -162,4 +162,39 @@ test("rollback restores unaffected files even when one file write fails, then ca
   mgr.rollback(cp.id);
   assert.equal(gw.store.get("b.ts"), "b0");
   assert.equal(mgr.get(cp.id)?.status, "rolledback");
+});
+
+
+test("recursive directory snapshot restores nested files and empty directories", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const folder = path.join(workspace, "src", "feature");
+  fs.mkdirSync(path.join(folder, "empty"), { recursive: true });
+  fs.writeFileSync(path.join(folder, "index.ts"), "export const before = true;", "utf8");
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.capturePath(cp.id, folder);
+
+  fs.rmSync(folder, { recursive: true, force: true });
+  assert.equal(fs.existsSync(folder), false);
+  mgr.rollback(cp.id);
+
+  assert.equal(fs.readFileSync(path.join(folder, "index.ts"), "utf8"), "export const before = true;");
+  assert.equal(fs.statSync(path.join(folder, "empty")).isDirectory(), true);
+  assert.deepEqual(mgr.changedFiles(cp.id), []);
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
+
+test("rollback removes newly-created empty directories but never recursively deletes unexpected files", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const newFolder = path.join(workspace, "new", "nested");
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  mgr.capturePath(cp.id, newFolder);
+  fs.mkdirSync(newFolder, { recursive: true });
+  fs.writeFileSync(path.join(newFolder, "untracked.txt"), "keep me", "utf8");
+
+  assert.throws(() => mgr.rollback(cp.id), /Rollback incomplet/);
+  assert.equal(fs.readFileSync(path.join(newFolder, "untracked.txt"), "utf8"), "keep me");
+  assert.equal(mgr.get(cp.id)?.status, "open");
+  fs.rmSync(workspace, { recursive: true, force: true });
 });
