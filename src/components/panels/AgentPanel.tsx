@@ -112,7 +112,7 @@ function StatusBadge({ status }: { status: string }) {
     pending:   { color: 'var(--text-muted)', bg: 'var(--bg-input)', label: 'Attente', icon: <Clock size={9} /> },
     running:   { color: 'var(--accent-secondary)', bg: 'var(--color-info-subtle)', label: 'En cours', icon: <Loader2 size={9} className="animate-spin" /> },
     completed: { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
-    incomplete:{ color: 'var(--color-warning)', bg: 'var(--color-warning-subtle)', label: 'Incomplet', icon: <AlertTriangle size={9} /> },
+    incomplete:{ color: 'var(--color-warning)', bg: 'var(--color-warning-subtle)', label: 'Incomplet', icon: <ShieldAlert size={9} /> },
     failed:    { color: 'var(--color-error)', bg: 'var(--color-error-subtle)', label: 'Erreur', icon: <XCircle size={9} /> },
     cancelled: { color: 'var(--text-muted)', bg: 'rgba(113,113,122,0.12)', label: 'Annulée', icon: <Ban size={9} /> },
     done:      { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
