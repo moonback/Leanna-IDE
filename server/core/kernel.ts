@@ -130,13 +130,12 @@ export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env):
  * si la variable canonique est absente.
  */
 export function supervisionEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  const canonical = env.LEANNA_SUPERVISED;
-  const raw = String(
-    canonical !== undefined
-      ? canonical
-      : (env.LEANNA_MISSION_SUPERVISED ?? env.LEANNA_AGENT_SUPERVISED ?? "")
-  ).toLowerCase().trim();
-  return raw === "true" || raw === "1";
+  const enabled = (value: string | undefined): boolean => {
+    const normalized = (value ?? "").toLowerCase().trim();
+    return normalized === "true" || normalized === "1";
+  };
+  if (env.LEANNA_SUPERVISED !== undefined) return enabled(env.LEANNA_SUPERVISED);
+  return enabled(env.LEANNA_MISSION_SUPERVISED) || enabled(env.LEANNA_AGENT_SUPERVISED);
 }
 
 /** Alias historique conservé pour les appelants existants. */
