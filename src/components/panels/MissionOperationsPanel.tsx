@@ -350,8 +350,8 @@ function MissionDetails({ mission, expanded, timeline, loading, error, onToggle 
     <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--border-base)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-          <span>{Math.round((mission.metrics?.totalDurationMs ?? 0) / 1000)} s cumulées</span>
-          <span>~{(mission.metrics?.estimatedTokens ?? 0).toLocaleString()} tokens</span>
+          <span>{Math.round((mission.metrics?.totalDurationMs ?? 0) / 1000)} s écoulées</span>
+          <span>~{(mission.metrics?.estimatedTokens ?? 0).toLocaleString()} tokens estimés</span>
           <span>{mission.artifacts?.length ?? 0} livrable(s)</span>
         </div>
         <button type="button" onClick={onToggle} aria-expanded={expanded} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]" style={{ color: 'var(--accent-primary)' }}>
