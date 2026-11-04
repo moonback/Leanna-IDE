@@ -14,6 +14,7 @@ import fs from "fs";
 import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
+import { supervisionEnabledFromEnv } from "./server/core/kernel.js";
 
 import { knowledgeGraph, projectMemory } from "./server/knowledge/index.js";
 
@@ -396,13 +397,12 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       }
 
       // Unification (audit, point 5) : brancher le LeannaSupervisor comme
-      // autorité de gouvernance, activable par LEANNA_MISSION_SUPERVISED. En mode
+      // autorité de gouvernance, activable par LEANNA_SUPERVISED (alias historiques acceptés). En mode
       // supervisé, l'exécution transite dans la boucle du Supervisor (état durable,
       // snapshots/rollback, preuve). Réversible : sans le flag, exécution directe.
       try {
         const { LeannaSupervisor } = await import("./server/core/LeannaSupervisor.js");
-        const supervisedFlag = String(process.env.LEANNA_MISSION_SUPERVISED ?? "").toLowerCase();
-        const supervisedEnabled = supervisedFlag === "true" || supervisedFlag === "1";
+        const supervisedEnabled = supervisionEnabledFromEnv();
         // Timeout runner optionnel aligné sur le timeout global de mission.
         executor.setSupervisor(new LeannaSupervisor(), supervisedEnabled);
         if (supervisedEnabled) {
