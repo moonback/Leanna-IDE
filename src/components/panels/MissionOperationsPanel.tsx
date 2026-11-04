@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Activity, Check, Clock3, Loader2, Pause, Play, RefreshCw, ShieldAlert, X, XCircle } from 'lucide-react';
 import { useConfirm } from '../ui/ConfirmDialog.js';
 
@@ -266,7 +266,7 @@ export default function MissionOperationsPanel() {
 function Metric({ label, value }: { label: string; value: string | number }) {
   return <div className="rounded-md px-3 py-2" style={{ backgroundColor: 'var(--bg-base)' }}><p className="text-lg font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{value}</p><p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{label}</p></div>;
 }
-function Empty({ children }: { children: React.ReactNode }) {
+function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-md border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>{children}</p>;
 }
 function SmallButton({ children, label, disabled, danger, onClick }: { children: React.ReactNode; label: string; disabled?: boolean; danger?: boolean; onClick: () => void }) {
