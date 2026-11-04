@@ -362,7 +362,7 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   // éviter la dépendance circulaire ; best-effort en mode synchrone).
   // Le callback s'exécute après le retour de cette fonction : `kernel` (déclaré
   // plus bas) est alors initialisé. La supervision suit enableAgenticRuntime.
-  const superviseAgents = config.enableAgentSupervision ?? agentSupervisionEnabledFromEnv();
+  const superviseAgents = config.enableAgentSupervision ?? supervisionEnabledFromEnv();
   import("../agents/AgentOrchestrator.js")
     .then(({ agentOrchestrator }) => {
       agentOrchestrator.enableAgenticRuntime(agentic);
