@@ -232,7 +232,13 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
           if (a.role !== ev.role) return a;
           const started = ev.event === 'task_started';
           const terminal = ev.event === 'task_completed' || ev.event === 'task_failed' || ev.event === 'task_cancelled';
-          const runningTasks = Math.max(0, a.runningTasks + (started ? 1 : terminal ? -1 : 0));
+          const runningTasks = started
+            ? a.runningTasks + 1
+            : terminal
+              ? Math.max(0, a.runningTasks - 1)
+              : ev.event === 'task_progress'
+                ? Math.max(1, a.runningTasks)
+                : a.runningTasks;
           // One task finishing must not mark an agent idle while other work remains.
           const status: AgentStat['status'] = !a.isOnline
             ? 'offline'
