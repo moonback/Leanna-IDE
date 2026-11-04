@@ -26,14 +26,17 @@ function fakeMission(id: string, overrides: Record<string, unknown> = {}) {
       root: { id: "root", parentId: null, title: "racine", status: "in_progress", plannedActions: [] },
       g1: {
         id: "g1", parentId: "root", title: "Lire", status: "failed",
+        result: { success: false, summary: "Lecture interrompue", artifacts: ["src/private.ts"] },
         plannedActions: [{
           id: "a1", skillName: "read_project_file", status: "failed", durationMs: 12,
-          reflection: { confidence: 0.2, decision: "replan", failure: "Fichier introuvable" },
+          args: { path: "src/private.ts", accessToken: "never-show-this" },
+          result: { apiKey: "never-show-this-either", excerpt: "source excerpt" },
+          reflection: { confidence: 0.2, decision: "replan", failure: "Fichier introuvable", reasoning: "Relire le fichier" },
         }],
       },
     },
     activeGoalId: "g1",
-    metrics: { averageConfidence: 0.4, totalActions: 1, successfulActions: 0, failedActions: 1 },
+    metrics: { averageConfidence: 0.4, totalActions: 1, successfulActions: 0, failedActions: 1, totalDurationMs: 1200, estimatedTokens: 840 },
     context: { errors: [{ action: "read_project_file", error: "ENOENT" }] },
     createdAt: "2026-10-13T10:00:00.000Z",
     updatedAt: "2026-10-13T10:01:00.000Z",
@@ -95,6 +98,30 @@ describe("createMissionsRouter", () => {
     assert.equal(a.goals[0].actions[0].failure, "Fichier introuvable");
     assert.equal(old.durationMs, 30_000);
     assert.equal(old.selfEvaluation.overall, 42);
+  });
+
+  it("expose durée, tokens estimés et livrables dans le résumé des missions", async () => {
+    const res = await fetch(`${base}/missions`);
+    const { missions } = await res.json();
+    const activeMission = missions.find((mission: { id: string }) => mission.id === "m-active");
+
+    assert.equal(activeMission.metrics.totalDurationMs, 1200);
+    assert.equal(activeMission.metrics.estimatedTokens, 840);
+    assert.deepEqual(activeMission.artifacts, ["src/private.ts"]);
+  });
+
+  it("filtre les secrets des arguments et résultats de la timeline", async () => {
+    const res = await fetch(`${base}/missions/m-active/timeline`);
+    assert.equal(res.status, 200);
+    const { timeline } = await res.json();
+    const action = timeline.events.find((event: { type: string }) => event.type === "action");
+
+    assert.ok(action);
+    assert.equal(action.snapshot.args.accessToken, "[masqué]");
+    assert.equal(action.snapshot.result.apiKey, "[masqué]");
+    assert.equal(action.snapshot.args.path, "src/private.ts");
+    assert.equal(action.snapshot.reasoning, "Relire le fichier");
+    assert.equal(JSON.stringify(timeline).includes("never-show-this"), false);
   });
 
   it("relance une mission de l'historique avec le même brief", async () => {
