@@ -127,6 +127,30 @@ export class CheckpointManager {
     return cp;
   }
 
+  /**
+   * Capture un fichier découvert pendant l'exécution, immédiatement AVANT son
+   * premier effet de bord. L'opération est idempotente pour un chemin déjà
+   * présent dans le snapshot initial ou capturé par une autre étape.
+   */
+  captureFile(id: string, filePath: string): boolean {
+    const cp = this.require(id);
+    if (cp.status !== "open") {
+      throw new Error(`Checkpoint ${id} non ouvert — capture impossible.`);
+    }
+    const normalized = filePath.replace(/\\/g, "/");
+    if (cp.files.some((entry) => entry.path === normalized)) return false;
+
+    const snapshot: FileSnapshot = this.gateway.exists(normalized)
+      ? (() => {
+          const content = this.gateway.read(normalized);
+          return { path: normalized, existed: true, content, hash: WorkspaceState.hash(content) };
+        })()
+      : { path: normalized, existed: false };
+
+    this.persist({ ...cp, files: [...cp.files, snapshot] });
+    return true;
+  }
+
   /** COMMIT : fige le checkpoint. Un rollback devient alors impossible. */
   commit(id: string): void {
     const cp = this.require(id);
