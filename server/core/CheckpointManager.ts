@@ -320,24 +320,13 @@ export class CheckpointManager {
 
     // Snapshots of files/directories created underneath a moved directory
     // follow that directory back to its original path during rollback.
-    const remapNewDescendant = (target: string): string => {
-      let mapped = target;
-      for (const rename of [...(cp.renames ?? [])].reverse()) {
-        const destination = path.resolve(rename.destinationPath);
-        const relative = path.relative(destination, mapped);
-        if (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
-          mapped = path.join(rename.sourcePath, relative);
-        }
-      }
-      return mapped;
-    };
     const fileSnapshots = cp.files.map((snap) => ({
       ...snap,
-      path: snap.existed ? snap.path : remapNewDescendant(snap.path),
+      path: snap.existed ? snap.path : this.remapNewDescendantPath(snap.path, cp.renames ?? []),
     }));
     const directorySnapshots = (cp.directories ?? []).map((directory) => ({
       ...directory,
-      path: directory.existed ? directory.path : remapNewDescendant(directory.path),
+      path: directory.existed ? directory.path : this.remapNewDescendantPath(directory.path, cp.renames ?? []),
     }));
 
     // Reverse structural moves first so source paths exist again before
@@ -404,25 +393,39 @@ export class CheckpointManager {
     const cp = this.require(id);
     const changed: string[] = [];
     for (const snap of cp.files) {
-      const nowExists = this.gateway.exists(snap.path);
+      const target = snap.existed ? snap.path : this.remapNewDescendantPath(snap.path, cp.renames ?? []);
+      const nowExists = this.gateway.exists(target);
       if (nowExists !== snap.existed) {
-        changed.push(snap.path);
+        changed.push(target);
         continue;
       }
       if (nowExists) {
-        if (this.gateway.isDirectory?.(snap.path)) {
-          changed.push(snap.path);
+        if (this.gateway.isDirectory?.(target)) {
+          changed.push(target);
           continue;
         }
-        const hash = WorkspaceState.hash(this.gateway.read(snap.path));
-        if (hash !== snap.hash) changed.push(snap.path);
+        const hash = WorkspaceState.hash(this.gateway.read(target));
+        if (hash !== snap.hash) changed.push(target);
       }
     }
     for (const directory of cp.directories ?? []) {
-      const nowExists = this.gateway.exists(directory.path) && (this.gateway.isDirectory?.(directory.path) ?? true);
-      if (nowExists !== directory.existed) changed.push(directory.path);
+      const target = directory.existed ? directory.path : this.remapNewDescendantPath(directory.path, cp.renames ?? []);
+      const nowExists = this.gateway.exists(target) && (this.gateway.isDirectory?.(target) ?? true);
+      if (nowExists !== directory.existed) changed.push(target);
     }
     return [...new Set(changed)];
+  }
+
+  private remapNewDescendantPath(target: string, renames: RenameSnapshot[]): string {
+    let mapped = target;
+    for (const rename of [...renames].reverse()) {
+      const destination = path.resolve(rename.destinationPath);
+      const relative = path.relative(destination, mapped);
+      if (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
+        mapped = path.join(rename.sourcePath, relative);
+      }
+    }
+    return mapped;
   }
 
   private requireOpen(id: string): Checkpoint {
