@@ -10,6 +10,7 @@ import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useAutonomyTimeline, type AnticipationProposal } from '../hooks/useAutonomyTimeline.js';
 import { ROUTES, viewHeaderProps } from '../config/navigation.js';
 import { useConfirm } from '../components/ui/ConfirmDialog.js';
+import MissionOperationsPanel from '../components/panels/MissionOperationsPanel.js';
 
 // ─── Types mirrored from the server insights engines ─────────────────────────
 
@@ -185,6 +186,9 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
           {briefing && !briefingDismissed && (
             <DailyBriefingBanner briefing={briefing} reduceMotion={!!reduceMotion} onDismiss={() => setBriefingDismissed(true)} />
           )}
+
+          {/* Mission Control — état réel, validations et reprises */}
+          <MissionOperationsPanel />
 
           {/* Row 1 — Agent state + health global */}
           <div className="lea-stagger grid grid-cols-1 gap-4 md:grid-cols-2">
