@@ -30,6 +30,11 @@ export interface FileGateway {
   read(filePath: string): string;
   write(filePath: string, content: string): void;
   remove(filePath: string): void;
+  /** Optional directory primitives used by recursive transactional snapshots. */
+  isDirectory?(directoryPath: string): boolean;
+  listDirectory?(directoryPath: string): Array<{ path: string; kind: "file" | "directory" }>;
+  makeDirectory?(directoryPath: string): void;
+  removeDirectory?(directoryPath: string): void;
 }
 
 /** Implémentation par défaut sur `node:fs`. */
@@ -42,6 +47,17 @@ export function makeNodeFileGateway(): FileGateway {
       fs.writeFileSync(p, content, "utf8");
     },
     remove: (p) => fs.rmSync(p, { force: true }),
+    isDirectory: (p) => fs.existsSync(p) && fs.lstatSync(p).isDirectory(),
+    listDirectory: (p) => fs.readdirSync(p, { withFileTypes: true }).map((entry) => {
+      const childPath = path.join(p, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`Lien symbolique non pris en charge dans un checkpoint récursif: ${childPath}`);
+      if (entry.isDirectory()) return { path: childPath, kind: "directory" as const };
+      if (entry.isFile()) return { path: childPath, kind: "file" as const };
+      throw new Error(`Type de fichier non pris en charge dans un checkpoint récursif: ${childPath}`);
+    }),
+    makeDirectory: (p) => fs.mkdirSync(p, { recursive: true }),
+    // Non-recursive by design: rollback must never erase files created after snapshot.
+    removeDirectory: (p) => fs.rmdirSync(p),
   };
 }
 
@@ -55,6 +71,11 @@ export interface FileSnapshot {
   hash?: string;
 }
 
+export interface DirectorySnapshot {
+  path: string;
+  existed: boolean;
+}
+
 export type CheckpointStatus = "open" | "committed" | "rolledback";
 
 /** Un checkpoint : ensemble de snapshots de fichiers + statut. */
@@ -65,6 +86,8 @@ export interface Checkpoint {
   createdAt: string;
   status: CheckpointStatus;
   files: FileSnapshot[];
+  /** Directory structure, including empty directories and directories created during the attempt. */
+  directories?: DirectorySnapshot[];
 }
 
 export class CheckpointManager {
@@ -123,8 +146,98 @@ export class CheckpointManager {
       status: "open",
       files: snapshots,
     };
+    const cp: Checkpoint = {
+      id: `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      missionId: meta.missionId,
+      label: meta.label,
+      createdAt: new Date().toISOString(),
+      status: "open",
+      files: snapshots,
+      directories: [],
+    };
     this.persist(cp);
     return cp;
+  }
+
+  /**
+   * Capture récursivement un dossier avant une suppression ou un déplacement.
+   * Les dossiers vides sont conservés et les liens symboliques refusés.
+   */
+  captureDirectory(id: string, directoryPath: string): void {
+    const cp = this.requireOpen(id);
+    const normalized = path.resolve(directoryPath);
+    const isDirectory = this.gateway.isDirectory;
+    const listDirectory = this.gateway.listDirectory;
+    if (!isDirectory || !listDirectory || !this.gateway.makeDirectory || !this.gateway.removeDirectory) {
+      throw new Error("Le FileGateway ne prend pas en charge les snapshots de dossiers.");
+    }
+
+    const directories = [...(cp.directories ?? [])];
+    const knownDirectories = new Set(directories.map((entry) => entry.path));
+    const addDirectory = (target: string, existed: boolean) => {
+      const key = path.resolve(target);
+      if (!knownDirectories.has(key)) {
+        directories.push({ path: key, existed });
+        knownDirectories.add(key);
+      }
+    };
+
+    // Record missing ancestors too: mkdir({ recursive:true }) may create them.
+    let cursor = normalized;
+    while (!this.gateway.exists(cursor)) {
+      addDirectory(cursor, false);
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+
+    if (isDirectory(normalized)) {
+      addDirectory(normalized, true);
+      const visit = (current: string): void => {
+        for (const entry of listDirectory(current)) {
+          if (entry.kind === "directory") {
+            addDirectory(entry.path, true);
+            visit(entry.path);
+          } else {
+            this.captureFile(id, entry.path);
+          }
+        }
+      };
+      visit(normalized);
+    } else if (this.gateway.exists(normalized)) {
+      this.captureFile(id, normalized);
+    }
+
+    this.persist({ ...this.require(id), directories });
+  }
+
+  /** Capture un chemin dont le type (fichier/dossier) est déterminé au runtime. */
+  capturePath(id: string, targetPath: string): void {
+    if (this.gateway.isDirectory?.(targetPath)) {
+      this.captureDirectory(id, targetPath);
+    } else {
+      this.captureFile(id, targetPath);
+      // Capture the missing parent chain so a later recursive mkdir can be undone.
+      const parent = path.dirname(path.resolve(targetPath));
+      if (parent !== path.resolve(targetPath)) this.captureMissingDirectories(id, parent);
+    }
+  }
+
+  private captureMissingDirectories(id: string, targetPath: string): void {
+    const cp = this.requireOpen(id);
+    const directories = [...(cp.directories ?? [])];
+    const known = new Set(directories.map((entry) => entry.path));
+    let cursor = path.resolve(targetPath);
+    while (!this.gateway.exists(cursor)) {
+      if (!known.has(cursor)) {
+        directories.push({ path: cursor, existed: false });
+        known.add(cursor);
+      }
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    this.persist({ ...this.require(id), directories });
   }
 
   /**
@@ -133,10 +246,7 @@ export class CheckpointManager {
    * présent dans le snapshot initial ou capturé par une autre étape.
    */
   captureFile(id: string, filePath: string): boolean {
-    const cp = this.require(id);
-    if (cp.status !== "open") {
-      throw new Error(`Checkpoint ${id} non ouvert — capture impossible.`);
-    }
+    const cp = this.requireOpen(id);
     const normalized = filePath.replace(/\\/g, "/");
     if (cp.files.some((entry) => entry.path === normalized)) return false;
 
@@ -188,8 +298,24 @@ export class CheckpointManager {
         failures.push(`${snap.path}: ${(error as Error).message}`);
       }
     }
-    if (failures.length > 0) {
-      throw new Error(`Rollback incomplet pour ${id} — ${failures.length} fichier(s) non restauré(s): ${failures.join(" ; ")}`);
+    const directoryFailures: string[] = [];
+    const directorySnapshots = cp.directories ?? [];
+    // Recreate directories that existed at snapshot time, shallowest first.
+    for (const directory of directorySnapshots.filter((entry) => entry.existed).sort((a, b) => a.path.split(path.sep).length - b.path.split(path.sep).length)) {
+      try { this.gateway.makeDirectory?.(directory.path); }
+      catch (error) { directoryFailures.push(`${directory.path}: ${(error as Error).message}`); }
+    }
+    // Remove only newly-created empty directories, deepest first. Never recurse.
+    for (const directory of directorySnapshots.filter((entry) => !entry.existed).sort((a, b) => b.path.split(path.sep).length - a.path.split(path.sep).length)) {
+      try {
+        if (this.gateway.exists(directory.path)) this.gateway.removeDirectory?.(directory.path);
+      } catch (error) {
+        directoryFailures.push(`${directory.path}: ${(error as Error).message}`);
+      }
+    }
+    const allFailures = [...failures, ...directoryFailures];
+    if (allFailures.length > 0) {
+      throw new Error(`Rollback incomplet pour ${id} — ${allFailures.length} élément(s) non restauré(s): ${allFailures.join(" ; ")}`);
     }
     this.persist({ ...cp, status: "rolledback" });
   }
@@ -217,7 +343,17 @@ export class CheckpointManager {
         if (hash !== snap.hash) changed.push(snap.path);
       }
     }
-    return changed;
+    for (const directory of cp.directories ?? []) {
+      const nowExists = this.gateway.exists(directory.path) && (this.gateway.isDirectory?.(directory.path) ?? true);
+      if (nowExists !== directory.existed) changed.push(directory.path);
+    }
+    return [...new Set(changed)];
+  }
+
+  private requireOpen(id: string): Checkpoint {
+    const cp = this.require(id);
+    if (cp.status !== "open") throw new Error(`Checkpoint ${id} non ouvert — capture impossible.`);
+    return cp;
   }
 
   private require(id: string): Checkpoint {
