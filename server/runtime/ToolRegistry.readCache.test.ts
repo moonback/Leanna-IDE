@@ -77,7 +77,9 @@ test("read cache entries are isolated by workspace root", async () => {
   const registry = new ToolRegistry({ permissionPolicy: new PermissionPolicy({ mode: "off" }) });
   registry.register({
     declaration: { name: "read_project_file", description: "lit", parameters: { path: "string" } },
-    handler: async (_args, context) => ({ content: context.workspaceRoot }),
+    handler: async (_args, context?: { workspaceRoot: string }) => ({
+      content: context?.workspaceRoot ?? "",
+    }),
     permissions: ["read"],
   });
   const a = { workspaceRoot: "/workspace-a" };
