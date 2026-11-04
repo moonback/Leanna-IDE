@@ -292,3 +292,18 @@ test("rollback removes files and subdirectories created after a directory move",
   assert.deepEqual(mgr.changedFiles(cp.id), []);
   fs.rmSync(workspace, { recursive: true, force: true });
 });
+
+
+test("recursive snapshots fail closed on symbolic links", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-workspace-"));
+  const outside = path.join(workspace, "outside.txt");
+  const link = path.join(workspace, "link.txt");
+  fs.writeFileSync(outside, "outside", "utf8");
+  fs.symlinkSync(outside, link);
+
+  const mgr = new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: cpDir() });
+  const cp = mgr.snapshot([]);
+  assert.throws(() => mgr.capturePath(cp.id, link), /Lien symbolique/);
+  assert.equal(fs.readFileSync(outside, "utf8"), "outside");
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
