@@ -171,7 +171,7 @@ export class CheckpointManager {
    * Les dossiers vides sont conservés et les liens symboliques refusés.
    */
   captureDirectory(id: string, directoryPath: string): void {
-    const cp = this.requireOpen(id);
+    this.requireOpen(id);
     const normalized = path.resolve(directoryPath);
     const isDirectory = this.gateway.isDirectory;
     const listDirectory = this.gateway.listDirectory;
@@ -223,7 +223,7 @@ export class CheckpointManager {
    * avant de restaurer les contenus, ce qui couvre aussi les dossiers entiers.
    */
   captureRename(id: string, sourcePath: string, destinationPath: string): void {
-    const cp = this.requireOpen(id);
+    this.requireOpen(id);
     if (!this.gateway.rename) throw new Error("Le FileGateway ne prend pas en charge les renommages transactionnels.");
     const source = path.resolve(sourcePath);
     const destination = path.resolve(destinationPath);
@@ -256,7 +256,7 @@ export class CheckpointManager {
   }
 
   private captureMissingDirectories(id: string, targetPath: string): void {
-    const cp = this.requireOpen(id);
+    this.requireOpen(id);
     const directories = [...(cp.directories ?? [])];
     const known = new Set(directories.map((entry) => entry.path));
     let cursor = path.resolve(targetPath);
