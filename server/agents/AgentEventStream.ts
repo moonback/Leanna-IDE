@@ -70,7 +70,7 @@ export class AgentEventStream {
         fs.writeFileSync(tempPath, this.history.map((item) => JSON.stringify({
           ...item,
           recordedAt: new Date().toISOString(),
-        })).join("\\n") + "\\n", "utf8");
+        })).join("\n") + "\n", "utf8");
         fs.renameSync(tempPath, this.filePath);
       } else {
         appendJsonl(this.filePath, persisted);
