@@ -155,10 +155,14 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
       const result = this.supervise
         ? await this.runSupervised(this.supervise, task, agenticTask)
         : await this.agentic.run(agenticTask);
-      task.result = this.toTaskResult(result);
-      // Le runtime RETOURNE un résultat "blocked" sur annulation (il ne lève pas) :
-      // sans ce test, une annulation utilisateur était rapportée "failed".
+      // Le runtime agentique représente encore l'arrêt coopératif comme
+      // "blocked" en interne ; le contrat public AgentTask doit l'exposer comme
+      // une annulation explicite, jamais comme un blocage métier.
       const cancelled = !result.success && controller.signal.aborted;
+      task.result = {
+        ...this.toTaskResult(result),
+        ...(cancelled ? { outcome: "cancelled" as const } : {}),
+      };
       task.status = result.success ? "completed" : cancelled ? "cancelled" : "failed";
       task.completedAt = new Date().toISOString();
 
