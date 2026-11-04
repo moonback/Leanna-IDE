@@ -416,7 +416,10 @@ export function createMissionsRouter(
   router.get("/missions/pending-approvals", (_req: Request, res: Response) => {
     const executor = requireExecutor(res);
     if (!executor) return;
-    return res.json({ pending: executor.listPendingApprovals() });
+    const pending = typeof executor.listPendingApprovalDetails === "function"
+      ? executor.listPendingApprovalDetails()
+      : executor.listPendingApprovals();
+    return res.json({ pending });
   });
 
   // ── Lister les missions interrompues en attente de décision ──────────────
