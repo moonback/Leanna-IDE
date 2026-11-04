@@ -141,6 +141,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const busRef = useRef<HTMLDivElement>(null);
+  const processedEventIds = useRef<Set<string>>(new Set());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
@@ -190,6 +191,13 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
     const handleAgentEvent = (e: Event) => {
       const ev = (e as CustomEvent<IncomingAgentEvent>).detail;
       if (!ev || ev.type !== 'agent_event') return;
+      const eventKey = `${ev.taskId}:${ev.event}:${ev.timestamp}`;
+      if (processedEventIds.current.has(eventKey)) return;
+      processedEventIds.current.add(eventKey);
+      if (processedEventIds.current.size > 1000) {
+        const oldest = processedEventIds.current.values().next().value;
+        if (oldest) processedEventIds.current.delete(oldest);
+      }
 
       if (ev.detail?.startsWith('bus:')) {
         const parts = ev.detail.split(':');
@@ -200,7 +208,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         if (msgType === 'status_query' || msgType === 'broadcast') return;
 
         const busMsg: BusMessage = {
-          id: `bus-${ev.taskId.slice(0, 8)}`,
+          id: `bus-${ev.taskId}`,
           type: msgType,
           from: fromRole,
           to: toRole,
@@ -217,21 +225,23 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
         return;
       }
 
-      const newStatus: AgentStat['status'] =
-        ev.event === 'task_started' ? 'busy' :
-        ev.event === 'task_completed' ? 'idle' :
-        ev.event === 'task_failed' ? 'idle' :
-        ev.event === 'task_progress' ? 'busy' : 'idle';
-
       setFleet(prev => {
         if (!prev?.agents) return prev;
         const agents = prev.agents.map(a => {
           if (a.role !== ev.role) return a;
-          const delta = ev.event === 'task_started' ? 1 : ev.event === 'task_completed' || ev.event === 'task_failed' ? -1 : 0;
+          const started = ev.event === 'task_started';
+          const terminal = ev.event === 'task_completed' || ev.event === 'task_failed' || ev.event === 'task_cancelled';
+          const runningTasks = Math.max(0, a.runningTasks + (started ? 1 : terminal ? -1 : 0));
+          // One task finishing must not mark an agent idle while other work remains.
+          const status: AgentStat['status'] = !a.isOnline
+            ? 'offline'
+            : runningTasks > 0
+              ? (a.status === 'overloaded' ? 'overloaded' : 'busy')
+              : 'idle';
           return {
             ...a,
-            status: newStatus,
-            runningTasks: Math.max(0, a.runningTasks + delta),
+            status,
+            runningTasks,
             delegationSuccess: ev.event === 'task_completed' ? a.delegationSuccess + 1 : a.delegationSuccess,
           };
         });
@@ -243,7 +253,7 @@ export function AgentFleetPanel({ inline = false, docked = false, onClose }: Age
       });
 
       const syntheticEvent: BusMessage = {
-        id: `ev-${ev.taskId.slice(0, 8)}-${ev.event}`,
+        id: `ev-${ev.taskId}-${ev.event}-${ev.timestamp}`,
         type: 'event',
         from: ev.role,
         to: 'orchestrator',
