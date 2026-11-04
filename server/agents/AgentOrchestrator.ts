@@ -9,7 +9,7 @@ import type {
 } from "./types.js";
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
-import { TaskScheduler, type TaskRunner } from "./TaskScheduler.js";
+import { TaskScheduler, validateOrchestrationPlan, type TaskRunner } from "./TaskScheduler.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
@@ -468,6 +468,9 @@ export class AgentOrchestrator {
       status: "pending",
       createdAt: new Date().toISOString(),
     };
+
+    // Fail synchronously before persistence or background scheduling if the DAG is invalid.
+    validateOrchestrationPlan(plan);
 
     this.orchestrations.set(orchestrationId, plan);
     log.info(`Plan d'orchestration créé (${orchestrationId.slice(0, 8)}). Lancement...`);
