@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { AgentEvent } from "./ProgressNotifier.js";
 import { appendJsonl, coreDir, readJsonl } from "../core/paths.js";
 
@@ -61,7 +63,18 @@ export class AgentEventStream {
 
     try {
       const persisted: PersistedAgentEvent = { ...entry, recordedAt: new Date().toISOString() };
-      appendJsonl(this.filePath, persisted);
+      if (entry.id % this.maxHistory === 0) {
+        // Periodically compact the append-only log so disk usage remains bounded.
+        const tempPath = `${this.filePath}.${process.pid}.${entry.id}.tmp`;
+        fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+        fs.writeFileSync(tempPath, this.history.map((item) => JSON.stringify({
+          ...item,
+          recordedAt: new Date().toISOString(),
+        })).join("\\n") + "\\n", "utf8");
+        fs.renameSync(tempPath, this.filePath);
+      } else {
+        appendJsonl(this.filePath, persisted);
+      }
     } catch {
       // Never block agent execution if local persistence is temporarily unavailable.
     }
