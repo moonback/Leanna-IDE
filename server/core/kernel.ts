@@ -184,7 +184,9 @@ export function createCoreKernel(options: CoreKernelOptions = {}): CoreKernel {
       supervisor.runMission({
         missionId,
         goal: params.goal,
-        plannedFiles: params.plannedFiles,
+        plannedFiles: (params.plannedFiles ?? [])
+          .map((file) => resolveWritePath(file))
+          .filter((file): file is string => typeof file === "string" && file.length > 0),
         resolveWriteTargets: (toolName, args) => {
           // Only file-level operations are journaled here. Directory deletion is
           // deliberately excluded until recursive snapshots are supported.
