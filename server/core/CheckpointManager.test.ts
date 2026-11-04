@@ -270,6 +270,10 @@ test("rollback removes files and subdirectories created after a directory move",
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.renameSync(source, destination);
 
+  const movedFile = path.join(destination, "original.ts");
+  mgr.capturePath(cp.id, movedFile);
+  fs.writeFileSync(movedFile, "modified after move", "utf8");
+
   const addedFile = path.join(destination, "added.ts");
   const addedDirectory = path.join(destination, "generated");
   mgr.capturePath(cp.id, addedFile);
