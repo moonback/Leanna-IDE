@@ -112,6 +112,7 @@ function StatusBadge({ status }: { status: string }) {
     pending:   { color: 'var(--text-muted)', bg: 'var(--bg-input)', label: 'Attente', icon: <Clock size={9} /> },
     running:   { color: 'var(--accent-secondary)', bg: 'var(--color-info-subtle)', label: 'En cours', icon: <Loader2 size={9} className="animate-spin" /> },
     completed: { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
+    incomplete:{ color: 'var(--color-warning)', bg: 'var(--color-warning-subtle)', label: 'Incomplet', icon: <AlertTriangle size={9} /> },
     failed:    { color: 'var(--color-error)', bg: 'var(--color-error-subtle)', label: 'Erreur', icon: <XCircle size={9} /> },
     cancelled: { color: 'var(--text-muted)', bg: 'rgba(113,113,122,0.12)', label: 'Annulée', icon: <Ban size={9} /> },
     done:      { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
@@ -304,12 +305,12 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
   const liveRunning = toolActivities.filter(a => a.status === 'running').length;
   const delegatedRunning = delegatedTasks.filter(t => t.status === 'running' || t.status === 'pending').length;
   const delegatedDone = delegatedTasks.filter(t => t.status === 'completed').length;
-  const delegatedFailed = delegatedTasks.filter(t => t.status === 'failed').length;
+  const delegatedFailed = delegatedTasks.filter(t => (t.status === 'failed' || t.status === 'incomplete')).length;
   const totalDone = toolActivities.filter(a => a.status === 'done').length;
 
   // Bilan des missions terminées : taux de réussite et durée moyenne
   const missionStats = useMemo(() => {
-    const finished = delegatedTasks.filter(t => t.status === 'completed' || t.status === 'failed');
+    const finished = delegatedTasks.filter(t => t.status === 'completed' || t.status === 'failed' || t.status === 'incomplete');
     const ok = finished.filter(t => t.status === 'completed').length;
     const durations = finished.map(t => t.durationMs).filter((d): d is number => typeof d === 'number' && d > 0);
     return {
@@ -564,7 +565,7 @@ function RosterTab({ tasks, allowedRoles, activeRoles, agentsEnabled, onToggleRo
     for (const t of tasks) {
       const e = m.get(t.role) ?? { done: 0, failed: 0, queued: 0 };
       if (t.status === 'completed') e.done++;
-      else if (t.status === 'failed') e.failed++;
+      else if (t.status === 'failed' || t.status === 'incomplete') e.failed++;
       else if (t.status === 'pending') e.queued++;
       else if (t.status === 'running' && !e.current) e.current = t;
       m.set(t.role, e);
@@ -867,7 +868,7 @@ function RunningElapsed({ startTime }: { startTime: number }) {
 
 // Ordre d'affichage : en cours d'abord, puis la file d'attente, puis les terminées.
 const TASK_STATUS_ORDER: Record<AgentTaskEntry['status'], number> = {
-  running: 0, pending: 1, failed: 2, completed: 3, cancelled: 4,
+  running: 0, pending: 1, incomplete: 2, failed: 3, completed: 4, cancelled: 5,
 };
 
 function DelegatedTab({ tasks, expanded, onToggle }: {
@@ -904,13 +905,13 @@ function DelegatedTab({ tasks, expanded, onToggle }: {
     all: tasks.length,
     active: running.length + pending.length,
     completed: tasks.filter(t => t.status === 'completed').length,
-    failed: tasks.filter(t => t.status === 'failed' || t.status === 'cancelled').length,
+    failed: tasks.filter(t => t.status === 'failed' || t.status === 'incomplete' || t.status === 'cancelled').length,
   };
   const q = query.trim().toLowerCase();
   const visible = tasks.filter(t => {
     if (filter === 'active' && t.status !== 'running' && t.status !== 'pending') return false;
     if (filter === 'completed' && t.status !== 'completed') return false;
-    if (filter === 'failed' && t.status !== 'failed' && t.status !== 'cancelled') return false;
+    if (filter === 'failed' && t.status !== 'failed' && t.status !== 'incomplete' && t.status !== 'cancelled') return false;
     if (!q) return true;
     return [t.title, t.agentName, t.role, t.summary ?? '', t.detail ?? ''].some(v => v.toLowerCase().includes(q));
   });
