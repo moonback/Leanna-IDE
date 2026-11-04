@@ -86,6 +86,9 @@ export interface DirectorySnapshot {
 export interface RenameSnapshot {
   sourcePath: string;
   destinationPath: string;
+  /** Snapshot array lengths immediately after capturing both pre-rename paths. */
+  fileSnapshotCount: number;
+  directorySnapshotCount: number;
 }
 
 export type CheckpointStatus = "open" | "committed" | "rolledback";
@@ -232,7 +235,12 @@ export class CheckpointManager {
     const latest = this.require(id);
     const renames = [...(latest.renames ?? [])];
     if (!renames.some((entry) => entry.sourcePath === source && entry.destinationPath === destination)) {
-      renames.push({ sourcePath: source, destinationPath: destination });
+      renames.push({
+        sourcePath: source,
+        destinationPath: destination,
+        fileSnapshotCount: latest.files.length,
+        directorySnapshotCount: latest.directories?.length ?? 0,
+      });
       this.persist({ ...latest, renames });
     }
   }
@@ -322,11 +330,11 @@ export class CheckpointManager {
     // follow that directory back to its original path during rollback.
     const fileSnapshots = cp.files.map((snap) => ({
       ...snap,
-      path: snap.existed ? snap.path : this.remapNewDescendantPath(snap.path, cp.renames ?? []),
+      path: this.remapNewDescendantPath(snap.path, cp.renames ?? [], cp.files.indexOf(snap), "file"),
     }));
-    const directorySnapshots = (cp.directories ?? []).map((directory) => ({
+    const directorySnapshots = (cp.directories ?? []).map((directory, index) => ({
       ...directory,
-      path: directory.existed ? directory.path : this.remapNewDescendantPath(directory.path, cp.renames ?? []),
+      path: this.remapNewDescendantPath(directory.path, cp.renames ?? [], index, "directory"),
     }));
 
     // Reverse structural moves first so source paths exist again before
@@ -392,8 +400,8 @@ export class CheckpointManager {
   changedFiles(id: string): string[] {
     const cp = this.require(id);
     const changed: string[] = [];
-    for (const snap of cp.files) {
-      const target = snap.existed ? snap.path : this.remapNewDescendantPath(snap.path, cp.renames ?? []);
+    for (const [index, snap] of cp.files.entries()) {
+      const target = this.remapNewDescendantPath(snap.path, cp.renames ?? [], index, "file");
       const nowExists = this.gateway.exists(target);
       if (nowExists !== snap.existed) {
         changed.push(target);
@@ -408,17 +416,26 @@ export class CheckpointManager {
         if (hash !== snap.hash) changed.push(target);
       }
     }
-    for (const directory of cp.directories ?? []) {
-      const target = directory.existed ? directory.path : this.remapNewDescendantPath(directory.path, cp.renames ?? []);
+    for (const [index, directory] of (cp.directories ?? []).entries()) {
+      const target = this.remapNewDescendantPath(directory.path, cp.renames ?? [], index, "directory");
       const nowExists = this.gateway.exists(target) && (this.gateway.isDirectory?.(target) ?? true);
       if (nowExists !== directory.existed) changed.push(target);
     }
     return [...new Set(changed)];
   }
 
-  private remapNewDescendantPath(target: string, renames: RenameSnapshot[]): string {
+  private remapNewDescendantPath(
+    target: string,
+    renames: RenameSnapshot[],
+    snapshotIndex: number,
+    kind: "file" | "directory"
+  ): string {
     let mapped = target;
     for (const rename of [...renames].reverse()) {
+      const capturedBeforeRename = kind === "file"
+        ? snapshotIndex < rename.fileSnapshotCount
+        : snapshotIndex < rename.directorySnapshotCount;
+      if (capturedBeforeRename) continue;
       const destination = path.resolve(rename.destinationPath);
       const relative = path.relative(destination, mapped);
       if (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)) {
