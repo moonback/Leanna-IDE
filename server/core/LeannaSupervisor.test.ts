@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { LeannaSupervisor, type MissionRunner } from "./LeannaSupervisor.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
-import { CheckpointManager, type FileGateway } from "./CheckpointManager.js";
+import { CheckpointManager, makeNodeFileGateway, type FileGateway } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
 
 function memGateway(initial: Record<string, string> = {}): FileGateway & { store: Map<string, string> } {
@@ -362,4 +362,43 @@ test("supervisor reports residual files when rollback cannot restore a locked fi
   assert.deepEqual(result.residualFiles, ["a.ts"]);
   assert.equal(gw.store.get("a.ts"), "changed");
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+
+test("supervisor rolls back a recursively deleted directory discovered at tool time", async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-supervised-workspace-"));
+  const folder = path.join(workspace, "src", "feature");
+  fs.mkdirSync(path.join(folder, "empty"), { recursive: true });
+  fs.writeFileSync(path.join(folder, "index.ts"), "export const safe = true;", "utf8");
+
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-dir-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 1,
+    missionStore: new DurableMissionStore(path.join(stateDir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: makeNodeFileGateway(), dirOverride: path.join(stateDir, "checkpoints") }),
+    evidence: new EvidenceEngine(path.join(stateDir, "evidence")),
+  });
+  const runner: MissionRunner = async ({ beforeToolCall }) => {
+    await beforeToolCall?.("delete_project_folder", { path: folder });
+    fs.rmSync(folder, { recursive: true, force: true });
+    return {
+      success: true,
+      evidence: { testsExecuted: [{ name: "verification", passed: false }] },
+    };
+  };
+
+  const result = await sup.runMission({
+    missionId: "m-recursive-folder-rollback",
+    goal: "delete then fail verification",
+    runner,
+    resolveWriteTargets: (_toolName, args) => typeof args.path === "string" ? [args.path] : [],
+  });
+
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(result.rollbackComplete, true);
+  assert.equal(fs.readFileSync(path.join(folder, "index.ts"), "utf8"), "export const safe = true;");
+  assert.equal(fs.statSync(path.join(folder, "empty")).isDirectory(), true);
+
+  fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(stateDir, { recursive: true, force: true });
 });
