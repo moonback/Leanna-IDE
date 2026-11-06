@@ -200,3 +200,15 @@ Le hook `ToolRegistry.beforeExecute` s'exécute après les contrôles d'autorisa
 - La transaction ne capture pas encore les effets externes (DB, API, commandes système, services distants). Ces opérations nécessitent une compensation ou un contrat idempotent ; un rollback fichier ne peut pas les annuler.
 - Le verrouillage exclusif inter-processus et la réconciliation durable des checkpoints après crash restent à implémenter.
 - Les tests/typecheck/CI n'ont pas été exécutés depuis cette session GitHub.
+
+## Passe Recovery R0 — blocage des reprises ambiguës (2026-11-06)
+
+Le Supervisor inspecte les checkpoints ouverts avant toute reprise. Si un checkpoint ouvert a survécu à l’instance précédente, il ne lance ni le runner ni un rollback spéculatif. Il place la mission dans `RECOVERY_REQUIRED` et renvoie les identifiants des checkpoints à réconcilier.
+
+- Nouvel état durable `RECOVERY_REQUIRED`, distinct de `RECOVERING`.
+- `CheckpointManager.listOpenByMission()` expose les transactions ouvertes après hydratation disque.
+- `runMission()` bloque toute réexécution si une transaction ouverte est détectée.
+- `ensureReady()` ne ramène jamais `RECOVERY_REQUIRED` automatiquement vers `READY`.
+- Un test simule un crash après écriture et avant décision : le runner ne doit pas être rappelé et aucun rollback automatique ne doit être tenté.
+
+Cette passe est un garde-fou fail-closed, pas encore un orchestrateur complet. La réconciliation manuelle du checkpoint et du ledger, le verrou inter-processus, le journal de tentative atomique et la comparaison des empreintes externes restent à implémenter. Tests/typecheck non exécutés depuis la session GitHub.
