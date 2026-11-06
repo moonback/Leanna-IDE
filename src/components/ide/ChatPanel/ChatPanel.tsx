@@ -350,9 +350,10 @@ export function ChatPanel({
         style={{
           top:    fullscreen ? '0' : docked ? '0'    : '80px',
           right:  fullscreen ? '0' : docked ? '0'    : '24px',
-          left:   fullscreen ? '50vw' : undefined,
+          left:   fullscreen ? '0' : undefined,
           bottom: fullscreen ? '0' : docked ? '32px' : '40px',
-          width:  fullscreen ? '50vw' : `${width}px`,
+          width:  fullscreen ? '100vw' : `${width}px`,
+          maxWidth: fullscreen ? '100vw' : 'calc(100vw - 16px)',
           height: fullscreen
             ? '100vh'
             : minimized
@@ -365,7 +366,7 @@ export function ChatPanel({
           zIndex:    fullscreen ? 99999 : 9990,
           backgroundColor: 'var(--bg-panel)',
           border:     fullscreen || docked ? 'none' : '1px solid var(--border-base)',
-          borderLeft: (fullscreen || docked) ? '1px solid var(--border-base)' : undefined,
+          borderLeft: fullscreen ? 'none' : docked ? '1px solid var(--border-base)' : undefined,
           borderRadius: fullscreen ? '0' : docked ? '0' : RADII.xl,
           x: fullscreen || docked ? 0 : mx,
           y: fullscreen || docked ? 0 : my,
