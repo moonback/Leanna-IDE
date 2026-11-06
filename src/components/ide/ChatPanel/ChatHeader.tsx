@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic, MicOff, X, Trash2, Power, GripVertical, Minus, PanelRight,
   Maximize2, Minimize2, MessageSquare, MoreVertical,
-  Hash, Loader2, Volume2, FileSearch, Search, Sparkles, History,
+  Hash, Loader2, Volume2, FileSearch, Search, Sparkles, History, Radio,
 } from 'lucide-react';
 import { MenuButton } from './MenuButton.js';
 import { ProfileSwitcher } from './ProfileSwitcher.js';
@@ -36,6 +36,8 @@ export interface ChatHeaderProps {
 
   // Actions
   onToggleMute: () => void;
+  onToggleVoiceDuo?: () => void;
+  voiceDuoOpen?: boolean;
   onToggleInput: () => void;
   onToggleMenu: () => void;
   onToggleSearch: () => void;
@@ -59,7 +61,7 @@ export function ChatHeader({
   docked, fullscreen, minimized, showInput, showMenu, showClose,
   changeLogCount = 0, showChangeLog = false, activeProfileId = 'default',
   dragHandlers,
-  onToggleMute, onToggleInput, onToggleMenu, onToggleSearch, onToggleChangeLog, onSelectProfile, onExport, onClear,
+  onToggleMute, onToggleVoiceDuo, voiceDuoOpen = false, onToggleInput, onToggleMenu, onToggleSearch, onToggleChangeLog, onSelectProfile, onExport, onClear,
   onVoiceTest, onInspectPrompt, onToggleFullscreen, onToggleDocked,
   onToggleMinimized, onToggleConnect, onClose,
 }: ChatHeaderProps) {
@@ -260,6 +262,27 @@ export function ChatHeader({
               ) : (
                 <Mic size={14} style={{ color: 'var(--color-success)' }} />
               )}
+            </motion.button>
+          )}
+
+          {/* Duo vocal : démarre Leanna + Roxane sans quitter le ChatPanel */}
+          {onToggleVoiceDuo && (
+            <motion.button
+              type="button"
+              onClick={onToggleVoiceDuo}
+              whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+              className="relative w-7 h-6.5 rounded-md flex items-center justify-center gap-1 transition-colors hover:bg-[var(--bg-active)]"
+              title={voiceDuoOpen ? "Fermer le Duo vocal" : "Activer Leanna + Roxane"}
+              aria-label={voiceDuoOpen ? "Fermer le Duo vocal" : "Activer le Duo vocal Leanna et Roxane"}
+              aria-pressed={voiceDuoOpen}
+              style={{
+                backgroundColor: voiceDuoOpen ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'transparent',
+                color: voiceDuoOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+              }}
+            >
+              <Radio size={14} />
+              <span className="text-[9px] font-semibold">DUO</span>
+              {voiceDuoOpen && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />}
             </motion.button>
           )}
 
