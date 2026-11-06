@@ -6,7 +6,7 @@ import { SkillScorer } from "./SkillScorer.js";
 import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
 import { EvidenceEngine, type EvidenceInput, type CheckResult } from "../core/EvidenceEngine.js";
-import type { LeannaSupervisor, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
+import type { LeannaSupervisor, MissionRunner, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
