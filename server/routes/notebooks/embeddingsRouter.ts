@@ -1,8 +1,19 @@
 import { Router, Request, Response } from "express";
 import { notebookManager, embeddingStore } from "../../notebooks/index.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createEmbeddingsRouter(): Router {
   const router = Router();
+
+  // Refuser les identifiants appartenant à un autre workspace avant toute
+  // lecture, mutation, génération, export ou réindexation.
+  router.use("/:id", (req: Request, res: Response, next) => {
+    if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
+      res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
+      return;
+    }
+    next();
+  });
 
   router.post("/:id/embeddings/reindex", async (req: Request, res: Response): Promise<void> => {
     try {
