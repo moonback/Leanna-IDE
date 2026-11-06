@@ -437,3 +437,8 @@ Cette section suit les corrections effectivement apportées après l'audit. Elle
 - Redémarrer le serveur avec des tâches pending et vérifier leur reprise.
 - Simuler un arrêt avec une tâche processing et confirmer qu'elle n'est pas silencieusement rejouée.
 - Vérifier le chemin de stockage dans Electron et en mode serveur.
+
+
+### Contrôle des routes statiques
+
+Le middleware d'isolation est placé avant les routes métier. Les segments réservés `stats`, `sandbox` et `embeddings` sont explicitement laissés aux endpoints statiques correspondants (`/stats/global`, `/sandbox/folders`, `/embeddings/memory`) afin que le garde workspace ne les interprète pas comme des identifiants de notebook.
