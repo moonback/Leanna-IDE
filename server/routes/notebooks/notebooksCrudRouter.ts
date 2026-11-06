@@ -111,7 +111,7 @@ export function createNotebooksCrudRouter(): Router {
 
   router.get("/stats/global", (_req: Request, res: Response): void => {
     try {
-      const stats = notebookManager.getStats();
+      const stats = notebookManager.getStats(SELF_ROOT || undefined);
       res.json({ status: "success", stats });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
