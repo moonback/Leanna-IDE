@@ -543,3 +543,36 @@ test('artifact intent does not misclassify analytical goals as file deliverables
     successCriteria: ['Fichiers pertinents identifiés', 'Plan compris'],
   }), false, 'reading existing files and plans is not a production request');
 });
+
+
+test('evidence verification accepts a successful analysis without requiring a file write', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-analysis-'));
+  try {
+    const executor = new Executor();
+    executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+    const goal = {
+      id: 'analysis-goal',
+      title: 'Analyser la stack technique et l’architecture',
+      description: 'Identifier les frameworks, dépendances et composants existants.',
+      successCriteria: ['Architecture comprise', 'Plan technique identifié', 'Documentation existante analysée'],
+    };
+    const verdict = (executor as any).verifyByEvidence(
+      { id: 'analysis-mission' },
+      goal,
+      [{
+        id: 'read-1',
+        skillName: 'read_project_file',
+        args: { path: 'package.json' },
+        rationale: 'Lire la configuration',
+        score: 50,
+        order: 1,
+        status: 'completed',
+        result: { ok: true },
+      }],
+    );
+
+    assert.equal(verdict.passed, true, 'a factual successful analysis must not fail the artifact check');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
