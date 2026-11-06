@@ -13,6 +13,7 @@ export function RoxaneDebateLauncher() {
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [preferredVoice, setPreferredVoice] = useState('');
   const recognitionRef = useRef<any>(null);
   const speechRunRef = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -28,14 +29,23 @@ export function RoxaneDebateLauncher() {
     return () => window.removeEventListener('Leanna-start-roxane-debate', openPanel);
   }, []);
 
-  useEffect(() => () => { window.speechSynthesis?.cancel(); recognitionRef.current?.stop?.(); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/debate/config').then(r => r.ok ? r.json() : null)
+      .then(data => { if (alive && typeof data?.config?.voice === 'string') setPreferredVoice(data.config.voice); })
+      .catch(() => {});
+    return () => { alive = false; window.speechSynthesis?.cancel(); recognitionRef.current?.stop?.(); };
+  }, []);
 
   const createUtterance = (text: string, speaker: 'leanna' | 'roxane') => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
     utterance.rate = speaker === 'roxane' ? 0.96 : 1.03;
     const frenchVoices = window.speechSynthesis.getVoices().filter(v => /^fr/i.test(v.lang));
-    const preferred = frenchVoices.find(v =>
+    const configuredVoice = preferredVoice.trim()
+      ? frenchVoices.find(v => v.name.toLowerCase().includes(preferredVoice.toLowerCase()))
+      : undefined;
+    const preferred = configuredVoice ?? frenchVoices.find(v =>
       speaker === 'roxane'
         ? /audrey|hortense|amelie|female|julie/i.test(v.name)
         : /marie|julie|female|audrey/i.test(v.name)
