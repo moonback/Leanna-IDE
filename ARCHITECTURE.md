@@ -506,7 +506,7 @@ Fichiers : `server/routes/*.test.ts`
 - Validation des schémas de réponse JSON
 - Tests d'authentification et rate limiting
 
-**Domaines fonctionnels couverts** *(les décomptes par domaine ci-dessous sont indicatifs ; le total mesuré de la suite backend est de 1460 cas sur 184 fichiers)* :
+**Domaines fonctionnels couverts** *(les décomptes par domaine ci-dessous sont indicatifs ; le dernier résultat d'exécution documenté est de 1460 cas sur 184 fichiers au 2026-10-15 ; l'inventaire actuel est de 193 fichiers backend)* :
 
 | Domaine | Tests | Couverture |
 |---|---|---|
