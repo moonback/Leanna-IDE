@@ -24,6 +24,7 @@ interface TextGenProfile {
   openrouterApiKey?: string;
   /** Default temperature for conversational generation (0–2). */
   temperature?: number;
+  agents?: { customAgents?: Array<{ role: string; model?: string }> };
 }
 
 let _profile: TextGenProfile = {};
@@ -69,10 +70,18 @@ export function getActiveProvider(): 'gemini' | 'openrouter' {
  * planning/estimation code so projected costs follow the user's actual model
  * selection instead of a hard-coded provider default.
  */
-export function getActiveModel(): string {
-  return _profile.textProvider === 'openrouter'
-    ? (_profile.openrouterModel?.trim() || 'google/gemini-3.6-flash')
-    : 'gemini-3.8-flash';
+export function getActiveModel(agentRole?: string): string {
+  if (_profile.textProvider !== 'openrouter') return 'gemini-3.8-flash';
+  const agentModel = getAgentModelOverride(agentRole);
+  return agentModel || _profile.openrouterModel?.trim() || 'google/gemini-3.6-flash';
+}
+
+/** Modèle OpenRouter explicitement configuré pour un agent personnalisé. */
+function getAgentModelOverride(agentRole?: string): string | undefined {
+  if (!agentRole) return undefined;
+  const model = _profile.agents?.customAgents?.find((agent) => agent.role === agentRole)?.model;
+  return typeof model === 'string' && model.trim() ? model.trim() : undefined;
+}
 }
 
 // ── Options for generateText ────────────────────────────────────────────────
@@ -90,8 +99,10 @@ export interface GenerateTextOptions {
   maxOutputTokens?: number;
   /** Gemini model override (default gemini-3.8-flash) */
   geminiModel?: string;
-  /** OpenRouter model override (uses profile setting if not provided) */
+  /** OpenRouter model override (uses agent/profile setting if not provided) */
   openrouterModel?: string;
+  /** Role used to resolve an optional model configured on a custom agent. */
+  agentRole?: string;
   /** Gemini thinking budget override; use 0 when an agent needs visible output immediately. */
   thinkingBudget?: number;
   /** For Gemini: if you need to pass multimodal parts directly */
@@ -332,7 +343,7 @@ function promptChars(options: GenerateTextOptions): number {
 
 function modelFor(provider: Provider, options: GenerateTextOptions): string {
   return provider === 'openrouter'
-    ? options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash'
+    ? options.openrouterModel || getAgentModelOverride(options.agentRole) || _profile.openrouterModel || 'google/gemini-3.6-flash'
     : options.geminiModel || 'gemini-3.8-flash';
 }
 
@@ -734,7 +745,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
     return streamWithGemini(options);
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
+  const model = modelFor('openrouter', options);
 
   const messages: any[] = [];
   if (options.systemPrompt) {
