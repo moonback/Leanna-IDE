@@ -109,7 +109,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
               const userText = inputTranscript.trim().slice(0, 3000);
               if (transcript.length < 32) transcript.push({ speaker: 'user', text: userText, round: rounds + 1 });
               send({ type: 'user_transcript', text: inputTranscript });
-              if (/\\b(?:stop|arrête(?:z)?|on arrête|je tranche|j'ai décidé|ma décision est|c'est décidé)\\b/i.test(userText)) {
+              if (/\b(?:stop|arrête(?:z)?|on arrête|je tranche|j'ai décidé|ma décision est|c'est décidé)\b/i.test(userText)) {
                 finished = true;
                 send({ type: 'debate_complete', turns: transcript, reason: 'user_decision' });
                 closeSessions();
