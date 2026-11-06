@@ -1,3 +1,9 @@
+> **Statut au 2026-11-06 : implémentation présente.** Le panneau d'impact et son hook sont
+> présents dans le dépôt. Cette spec est conservée comme décision de conception historique,
+> pas comme fonctionnalité encore à créer.
+>
+> ---
+>
 # Panneau d'impact de la cartographie du code — Design
 
 - **Date** : 2026-10-15
