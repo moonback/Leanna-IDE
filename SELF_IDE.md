@@ -14,7 +14,10 @@ Cette contrainte est **structurelle**, pas cosmétique :
 - Les chemins système racine (`C:\`, `/`, `C:\Windows`, etc.) sont bloqués dès la pré-validation (`validateWorkspacePath`).
 - Tous les accès filesystem passent par une validation de chemin centralisée et un suivi anti-symlink escape.
 - Les fichiers critiques nécessitent une confirmation explicite avant modification.
-- Chaque écriture crée un checkpoint git automatique (rollback trivial).
+- Les checkpoints Git automatiques ne sont actuellement **pas disponibles** :
+  `server/utils/checkpoint.ts` est explicitement désactivé (`createCheckpoint`
+  retourne `null`, `rollbackToCheckpoint` retourne `false`, `listCheckpoints`
+  retourne un tableau vide). Ne pas compter sur un rollback Git automatique.
 - Les documents PDF du workspace sont lus et indexés dans le périmètre autorisé, puis rendus dans l’IDE pour lecture et analyse documentaire.
 
 ---
@@ -112,8 +115,9 @@ if (critical && toolContext.emitToClient) {
   if (!approved) return { error: "Refusé par l'utilisateur." };
 }
 
-// 4. Checkpoint git AVANT écriture
-await createCheckpoint(`avant écriture: ${requestedPath}`);
+// 4. Checkpoint Git : actuellement désactivé dans server/utils/checkpoint.ts.
+ // createCheckpoint() retourne null ; cette étape ne protège donc pas l'écriture.
+ // Ne pas présenter ce mécanisme comme une sauvegarde ou un rollback effectif.
 
 // 5. Écriture effective
 await fs.promises.writeFile(normalized, content, "utf-8");
@@ -131,7 +135,7 @@ scheduleValidation();
 
 | Module | Rôle |
 |--------|------|
-| `utils/checkpoint.ts` | Snapshot git avant modification, rollback, validation `tsc` |
+| `utils/checkpoint.ts` | Validation `tsc` disponible ; checkpoints Git et rollback désactivés (fonctions no-op) |
 | `utils/confirmationBridge.ts` | Demande de confirmation UI (timeout 30s → refus) |
 | `utils/serverRestart.ts` | Détecte les modifs serveur, redémarrage contrôlé |
 | `utils/postEditValidator.ts` | Lance `tsc --noEmit` automatiquement (debounce 2.5s) |
@@ -202,7 +206,7 @@ npm run test
 ## 8. Interface utilisateur
 
 - **Settings → Self-Root** : affiche le root verrouillé, la branche git, le statut sync.
-- **Settings → Garde-fous** : toggles (checkpoint auto, validation, confirmation critique), liste des checkpoints, rollback.
+- **Settings → Garde-fous** : les options de checkpoint/rollback ne doivent pas être présentées comme opérationnelles tant que `server/utils/checkpoint.ts` reste désactivé ; la validation et les confirmations doivent être vérifiées séparément.
 - **Self-Edit Banner** : bandeau dans l'éditeur quand l'IA modifie le fichier ouvert.
 - **StatusBar** : branche git, statut build, connexion MCP, compteur tokens.
 - **Onboarding** : écran de premier lancement expliquant le périmètre.
@@ -211,6 +215,6 @@ npm run test
 
 | Raccourci | Action |
 |-----------|--------|
-| `Ctrl+Shift+K` | Créer un checkpoint manuel |
+| `Ctrl+Shift+K` | Raccourci historique ; checkpoint Git désactivé actuellement |
 | `Ctrl+Shift+B` | Lancer la validation (`tsc --noEmit`) |
 | `Ctrl+Shift+H` | Afficher le panneau des checkpoints |
