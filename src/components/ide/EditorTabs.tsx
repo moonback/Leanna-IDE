@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe, MoreHorizontal } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
@@ -55,10 +55,10 @@ export function EditorTabs({
   const [showMore, setShowMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
-  const closeMore = () => {
+  const closeMore = useCallback(() => {
     setShowMore(false);
     moreButtonRef.current?.focus();
-  };
+  }, []);
 
   useEffect(() => {
     if (!showMore) return;
@@ -77,7 +77,7 @@ export function EditorTabs({
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [showMore]);
+  }, [showMore, closeMore]);
 
   if (openFiles.length === 0) return null;
 
