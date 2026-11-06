@@ -634,3 +634,29 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Modifier un secret après l'avoir révélé ; vérifier qu'il est masqué par défaut et que l'utilisateur peut le révéler/masquer explicitement.
 - Cliquer sur Recharger avec des modifications en attente, confirmer puis annuler ; vérifier la conservation ou l'abandon attendu.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis tester les parcours secrets dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-septième passe — Cohérence de persistance du profil et des préférences
+
+### Constats vérifiés
+
+- La sauvegarde du profil contrôlait le statut HTTP, mais pas le contrat JSON `{ success: true }` renvoyé par la route serveur ; une réponse HTTP 200 avec un corps applicatif en erreur pouvait être annoncée comme réussie.
+- Le paramètre « Présence vocale continue » (`voiceAlwaysOn`) était modifiable dans l'interface mais absent du payload manuel de sauvegarde et de la liste des champs synchronisés par le contexte.
+- La réinitialisation supprimait uniquement la copie locale : le profil serveur conservait ses anciennes valeurs et pouvait les réappliquer au prochain chargement.
+- La réinitialisation n'était pas protégée par le verrou de sauvegarde pendant son opération asynchrone et ne notifiait pas les sessions actives après synchronisation.
+
+### Corrections appliquées
+
+- La synchronisation centralisée du profil vérifie désormais le statut HTTP, parse défensivement le JSON et exige `success === true`.
+- Le champ `voiceAlwaysOn` est inclus dans les champs synchronisés et dans la sauvegarde manuelle.
+- La réinitialisation écrit les valeurs par défaut dans le stockage local puis les synchronise avec `/api/profile`.
+- Le bouton de réinitialisation utilise le même verrou que la sauvegarde, affiche un état occupé et distingue le succès complet d'un échec de synchronisation.
+- Une notification de changement des paramètres est émise après la réinitialisation synchronisée afin que les sessions actives puissent se reconnecter.
+
+### Validation restante
+
+- Sauvegarder le profil avec une réponse serveur `200 { success: false }`, une réponse non JSON, une erreur HTTP et une panne réseau ; aucun de ces cas ne doit afficher un succès.
+- Modifier `voiceAlwaysOn`, sauvegarder, redémarrer l'application et vérifier que l'option reste cohérente côté UI et runtime.
+- Réinitialiser le profil, vérifier les valeurs par défaut en local et via `GET /api/profile`, puis redémarrer.
+- Simuler une panne serveur pendant la réinitialisation : les valeurs locales doivent rester réinitialisées et l'interface doit signaler clairement la synchronisation incomplète.
+- Vérifier que le bouton reste désactivé pendant la sauvegarde/réinitialisation et que la session vocale est reconnectée après succès.
+- Exécuter typecheck, lint, tests du profil et tests de parcours Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
