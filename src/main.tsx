@@ -28,6 +28,7 @@ import { GlobalSidebar } from './components/GlobalSidebar.js';
 import { ROUTES } from './config/navigation.js';
 import { AgentStatusBar } from './components/AgentStatusBar.js';
 import { GlobalCommandPalette } from './components/GlobalCommandPalette.js';
+import { RoxaneDebateLauncher } from './components/RoxaneDebateLauncher.js';
 import { ConnectionBanner } from './components/ui/ConnectionBanner.js';
 import { AmbientBackdrop } from './components/ui/AmbientBackdrop.js';
 import { RouteProgress } from './components/ui/RouteProgress.js';
@@ -739,6 +740,7 @@ function Layout() {
         {/* Indicateur persistant de screen share (visible sur toutes les pages) */}
         <ScreenShareIndicator />
         <ScreenShareSourcePicker />
+        <RoxaneDebateLauncher />
         {/* Orb flottant déplaçable — visible uniquement hors de l'IDE (le chat panel le remplace) */}
         {profile.floatingOrb !== false && <FloatingOrbWrapper />}
         {/* Modale de confirmation pour les fichiers critiques */}
