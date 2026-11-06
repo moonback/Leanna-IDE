@@ -68,7 +68,7 @@ export function RoxaneSettingsSection() {
         <label className="text-xs space-y-1">Durée maximale (secondes)<input className={field} style={style} type="number" min="60" max="1800" value={config.maxDurationSeconds} onChange={e => update('maxDurationSeconds', Number(e.target.value))}/></label>
       </div>
       <label className="block text-xs space-y-2">Niveau de contradiction : {config.contradictionLevel}%<input className="w-full" type="range" min="0" max="100" value={config.contradictionLevel} onChange={e => update('contradictionLevel', Number(e.target.value))}/></label>
-      <label className="flex items-center justify-between text-sm"><span>Lire les interventions à voix haute</span><input type="checkbox" checked={config.useSpeech} onChange={e => update('useSpeech', e.target.checked)}/></label>
+      <label className="flex items-center justify-between text-sm"><span>Activer la voix de Roxane (Gemini Live)</span><input type="checkbox" checked={config.useSpeech} onChange={e => update('useSpeech', e.target.checked)}/></label>
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Le modèle Live de Roxane doit être compatible Gemini Live (ex. gemini-3.8-live). OpenRouter reste utilisable pour les débats texte, mais ne fournit pas la session audio Live. La voix est sélectionnée séparément pour chaque session.</p>
     </section>
     <div className="flex justify-end"><button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--accent-primary)' }}><Save className="h-4 w-4"/>{saving ? 'Enregistrement…' : 'Enregistrer Roxane'}</button></div>
