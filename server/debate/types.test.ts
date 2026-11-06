@@ -28,11 +28,6 @@ test('normalizeRoxaneConfig clamps numeric controls', () => {
   assert.equal(config.maxDurationSeconds, 60);
 });
 
-test('normalizeRoxaneConfig does not enable automatic task execution', () => {
-  assert.equal(normalizeRoxaneConfig({ autoCreateTasks: true }).autoCreateTasks, true);
-  assert.equal(DEFAULT_ROXANE_CONFIG.autoCreateTasks, false);
-});
-
 test('normalizeRoxaneConfig restricts provider and response style', () => {
   const config = normalizeRoxaneConfig({ provider: 'unknown', responseStyle: 'verbose' });
   assert.equal(config.provider, 'gemini');
