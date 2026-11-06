@@ -13,6 +13,11 @@ export function createSourcesRouter(upload: multer.Multer): Router {
   // Refuser les identifiants appartenant à un autre workspace avant toute
   // lecture, mutation, génération, export ou réindexation.
   router.use("/:id", (req: Request, res: Response, next) => {
+    // Préserver les endpoints statiques qui partagent le premier segment.
+    if (req.params.id === "sandbox") {
+      next();
+      return;
+    }
     if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
       res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
       return;
