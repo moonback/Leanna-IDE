@@ -18,7 +18,6 @@ import {
   Square,
   Target,
   Wifi,
-  WifiOff,
   MoreHorizontal,
   Power,
   Network,
