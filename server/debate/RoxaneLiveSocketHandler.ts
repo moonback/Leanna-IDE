@@ -143,8 +143,27 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       if (!topic) { send({ type: 'error', message: 'Le sujet du débat est obligatoire.' }); return; }
       send({ type: 'status', status: 'connecting' });
       try {
-        [leanna, roxane] = await Promise.all([connectSession('leanna'), connectSession('roxane')]);
-        if (closed) { closeSessions(); return; }
+        const settled = await Promise.allSettled([connectSession('leanna'), connectSession('roxane')]);
+        const opened = settled.filter((item): item is PromiseFulfilledResult<any> => item.status === 'fulfilled').map(item => item.value);
+        if (settled.some(item => item.status === 'rejected')) {
+          for (const session of opened) {
+            try { session.close(); } catch { /* already closed */ }
+            deps.activeGeminiSessions.delete(session);
+          }
+          throw settled.find(item => item.status === 'rejected')?.status === 'rejected'
+            ? (settled.find(item => item.status === 'rejected') as PromiseRejectedResult).reason
+            : new Error('Session Live non disponible.');
+        }
+        leanna = settled[0].status === 'fulfilled' ? settled[0].value : null;
+        roxane = settled[1].status === 'fulfilled' ? settled[1].value : null;
+        if (closed) {
+          for (const session of [leanna, roxane]) {
+            if (!session) continue;
+            try { session.close(); } catch { /* already closed */ }
+            deps.activeGeminiSessions.delete(session);
+          }
+          return;
+        }
         send({ type: 'ready', topic, models: { leanna: 'gemini-3.8-live', roxane: config.model } });
         active = 'leanna';
         rounds = 1;
