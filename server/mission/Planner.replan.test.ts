@@ -1,13 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
 import { Planner } from "./Planner.js";
 import { SkillScorer } from "./SkillScorer.js";
 import { Mission } from "./Mission.js";
 import { DEFAULT_MISSION_CONFIG } from "./types.js";
-import { strategyMemory } from "../knowledge/StrategyMemory.js";
-import { SELF_ROOT } from "../utils/selfRoot.js";
+import { StrategyMemory } from "../knowledge/StrategyMemory.js";
 
 /**
  * R2-R3 + GAP-1: dynamic replanning must consult durable skill reliability, so a
@@ -15,18 +12,16 @@ import { SELF_ROOT } from "../utils/selfRoot.js";
  * re-observed failure in the current mission — while never removing every tool.
  */
 
-function cleanup() {
-  const file = path.join(SELF_ROOT || process.cwd(), ".Leanna-strategy.json");
-  try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch { /* ignore */ }
-  strategyMemory.reset();
+function createTestStrategy() {
+  return new StrategyMemory({ ephemeral: true });
 }
 
 test("replan drops a durably-failing tool while keeping at least one option", async () => {
-  cleanup();
+  const strategy = createTestStrategy();
   // Record enough failures to flag "unreliable_tool" as durably failing.
-  for (let i = 0; i < 5; i++) strategyMemory.recordSkillOutcome("unreliable_tool", false, 100);
+  for (let i = 0; i < 5; i++) strategy.recordSkillOutcome("unreliable_tool", false, 100);
 
-  const planner = new Planner(new SkillScorer());
+  const planner = new Planner(new SkillScorer(), strategy);
   const mission = new Mission("t", "corriger le bug", "high", { ...DEFAULT_MISSION_CONFIG });
   const goalId = mission.rootGoal.id;
 
@@ -36,13 +31,11 @@ test("replan drops a durably-failing tool while keeping at least one option", as
   const actions = await planner.replan(mission, goalId, failed, "boom", available);
   const usedSkills = new Set(actions.map((a) => a.skillName));
   assert.equal(usedSkills.has("unreliable_tool"), false, "durably-failing tool must be excluded on replan");
-  cleanup();
 });
 
 
 test("replan excludes the just-failed skill immediately when an alternative exists", async () => {
-  cleanup();
-  const planner = new Planner(new SkillScorer());
+  const planner = new Planner(new SkillScorer(), strategy);
   const mission = new Mission("t", "corriger le bug", "high", {
     ...DEFAULT_MISSION_CONFIG,
     minSkillScore: 0,
@@ -71,14 +64,12 @@ test("replan excludes the just-failed skill immediately when an alternative exis
     actions.every((action) => action.skillName !== "failed_tool"),
     "the first replan must not immediately select the tool that just failed",
   );
-  cleanup();
 });
 
 test("replan never removes every tool (keeps availability if all are failing)", async () => {
-  cleanup();
-  for (let i = 0; i < 5; i++) strategyMemory.recordSkillOutcome("only_tool", false, 100);
+  for (let i = 0; i < 5; i++) strategy.recordSkillOutcome("only_tool", false, 100);
 
-  const planner = new Planner(new SkillScorer());
+  const planner = new Planner(new SkillScorer(), strategy);
   const mission = new Mission("t", "corriger le bug", "high", { ...DEFAULT_MISSION_CONFIG, minSkillScore: 0 });
   const goalId = mission.rootGoal.id;
   const failed = { id: "a", skillName: "only_tool", args: {}, rationale: "", score: 40, order: 1, status: "failed" as const };
@@ -86,5 +77,4 @@ test("replan never removes every tool (keeps availability if all are failing)", 
   const actions = await planner.replan(mission, goalId, failed, "boom", ["only_tool"]);
   // With every available tool failing, replanning must still be possible.
   assert.ok(actions.length >= 0, "replan must not throw when all tools are unreliable");
-  cleanup();
 });
