@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { validateOrchestrationPlan, InvalidOrchestrationPlanError } from "./TaskScheduler.js";
 import type { OrchestrationPlan, AgentTask } from "./types.js";
+import { TaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 
 function task(id: string): AgentTask {
   return {
@@ -81,6 +82,42 @@ test("scheduler bounds parallel task execution and drains ready tasks in batches
   assert.equal(active, 0, "toutes les exécutions doivent être terminées");
   assert.equal(value.tasks.filter((current) => current.status === "completed").length, 7);
   assert.equal(value.status, "completed");
+});
+
+test("several scheduler instances share one process-wide execution limit", async () => {
+  const { TaskScheduler } = await import("./TaskScheduler.js");
+  const limiter = new TaskExecutionLimiter(2);
+  let active = 0;
+  let peak = 0;
+  const makePlan = (prefix: string): OrchestrationPlan => ({
+    id: prefix,
+    title: prefix,
+    description: prefix,
+    tasks: Array.from({ length: 4 }, (_, index) => task(`${prefix}-${index}`)),
+    dependencies: Object.fromEntries(
+      Array.from({ length: 4 }, (_, index) => [`${prefix}-${index}`, []])
+    ),
+    status: "pending",
+    createdAt: new Date(0).toISOString(),
+  });
+  const runner = {
+    async execute(current: AgentTask) {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      current.status = "completed";
+      current.result = { success: true, outcome: "success", summary: "done", durationMs: 5 };
+      active--;
+    },
+  };
+  const first = new TaskScheduler(runner, undefined, { maxConcurrentTasks: 4, globalLimiter: limiter });
+  const second = new TaskScheduler(runner, undefined, { maxConcurrentTasks: 4, globalLimiter: limiter });
+
+  await Promise.all([first.execute(makePlan("first")), second.execute(makePlan("second"))]);
+
+  assert.equal(peak, 2, "les schedulers doivent partager le même plafond global");
+  assert.equal(limiter.activeCount, 0);
+  assert.equal(limiter.pendingCount, 0);
 });
 
 test("scheduler rejects an invalid concurrency limit", async () => {
