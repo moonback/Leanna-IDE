@@ -660,3 +660,32 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Simuler une panne serveur pendant la réinitialisation : les valeurs locales doivent rester réinitialisées et l'interface doit signaler clairement la synchronisation incomplète.
 - Vérifier que le bouton reste désactivé pendant la sauvegarde/réinitialisation et que la session vocale est reconnectée après succès.
 - Exécuter typecheck, lint, tests du profil et tests de parcours Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-huitième passe — Fiabilité et périmètre des suppressions de données
+
+### Constats vérifiés
+
+- Les suppressions de conversations et les purges sélectives lisaient le JSON sans vérifier le statut HTTP ; une réponse HTTP d'erreur ou un corps non JSON pouvait produire un message trompeur.
+- Le vidage mémoire ne validait pas le compteur retourné et ne distinguait pas explicitement les erreurs HTTP des réponses métier.
+- Le scope `memories` de `DELETE /api/data/all` supprimait toutes les lignes de la table, alors que la route dédiée limite la suppression au projet actif. La sélection multiple pouvait donc avoir un périmètre plus large que le parcours dédié.
+- Les actions de purge s'appuyaient principalement sur l'état React pour éviter les doubles clics ; aucun verrou synchrone ne protégeait les requêtes avant le rendu suivant.
+- La route de purge sélective ignorait silencieusement les scopes invalides lorsqu'au moins un scope valide était fourni.
+
+### Corrections appliquées
+
+- Ajout d'un parseur de réponse API défensif : contrôle HTTP, gestion des réponses non JSON et validation de l'objet JSON avant lecture des champs.
+- Vérification du contrat applicatif et du compteur pour les suppressions de conversations, mémoires et scopes sélectionnés ; les erreurs serveur sont affichées au lieu d'être interprétées comme des succès.
+- Ajout de verrous synchrones pour les actions de suppression des conversations, mémoires et sélections. Le stockage local conserve également son verrou anti-double déclenchement.
+- Alignement du scope sélectif `memories` sur le projet actif, avec invalidation du cache mémoire après suppression.
+- Rejet HTTP 400 de toute sélection contenant un scope inconnu ou mal typé, au lieu de supprimer silencieusement un sous-ensemble différent de celui demandé.
+- Le message de réussite du vidage mémoire précise désormais qu'il concerne le projet actif.
+
+### Validation restante
+
+- Vérifier les réponses de `DELETE /api/memories/all` : succès avec compteur numérique, HTTP 400 (aucun projet actif), HTTP 500, panne réseau et JSON invalide.
+- Purger le scope `memories` seul puis avec d'autres scopes ; vérifier que seules les mémoires du projet actif sont supprimées et que les mémoires d'un autre projet restent intactes.
+- Envoyer un scope valide accompagné d'un scope inconnu ou non textuel ; vérifier que l'API répond HTTP 400 et ne lance aucune suppression.
+- Double-cliquer rapidement sur chacune des actions ; vérifier qu'une seule opération est déclenchée.
+- Tester les réponses de purge complète et partielle (HTTP 200/207), vérifier le détail des scopes supprimés et les erreurs par scope.
+- Vérifier que le stockage local ne se vide qu'après confirmation, que l'annulation ne déclenche rien et que le rechargement intervient après succès.
+- Exécuter typecheck, lint, tests API/UI et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
