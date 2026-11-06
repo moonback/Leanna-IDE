@@ -60,7 +60,7 @@ router.get("/list", async (req: Request, res: Response) => {
     const items = await hierarchicalMemoryService.list(tier, { limit, offset });
     res.json({ success: true, tier, count: items.length, items });
   } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
