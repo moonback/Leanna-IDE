@@ -506,3 +506,27 @@ Validation locale recommandée :
 - simuler un remplacement interrompu après flush source mais avant suppression vectorielle, puis vérifier l'absence des anciens chunk IDs après reprise ;
 - simuler une réponse embedding partielle et vérifier `partial`, puis le retry ;
 - vérifier qu'une source historique sans état n'est pas réindexée automatiquement.
+
+
+### Septième passe — supervision API et retry borné de l'indexation
+
+| Sujet | État | Détail |
+|---|---|---|
+| Métadonnées de retry | Implémenté | Chaque source persiste le nombre de tentatives et la date de la prochaine tentative. Les notebooks existants restent compatibles avec des champs facultatifs. |
+| Backoff exponentiel | Implémenté | Retry automatique après 5 s, 10 s, 20 s, etc., plafonné à 5 minutes et limité à 5 tentatives. L'échéance est enregistrée afin de restaurer le délai après redémarrage. |
+| Reprise au démarrage | Renforcée | Une opération restée `pending` au crash est reprise ; les états `failed` et `partial` attendent leur échéance persistée et ne sont pas relancés avant celle-ci. Les échecs ayant épuisé le budget attendent une action manuelle. |
+| Supervision API | Implémentée | `GET /:id/embeddings/indexing-status` retourne les compteurs et les états par source sans exposer le texte brut. |
+| Retry manuel | Implémenté | `POST /:id/embeddings/sources/:sourceId/retry` remet à zéro le budget de retry et relance une seule source. |
+| Réindexation globale | Centralisée | `POST /:id/embeddings/reindex` déclenche maintenant le pipeline de source central et répond HTTP 202 avec le nombre de sources acceptées, au lieu de contourner les statuts durables. |
+| Déduplication des indexations | Corrigée | Suppression d'un ancien appel direct à `EmbeddingStore.indexChunks()` qui doublonnait l'indexation lorsqu'un import identique était détecté. |
+
+**Limites :** le centre de supervision est exposé par API, mais aucun panneau UI n'est encore ajouté. Les retries sont gérés par timers en mémoire et réhydratés à partir de `indexingNextRetryAt` au redémarrage ; il n'existe pas encore de file durable dédiée par chunk. Le retry relance toute la source après nettoyage des vecteurs. Le système n'a pas été exécuté dans cette session : typecheck, tests et vérification runtime restent nécessaires.
+
+Validation locale à ajouter :
+- statut agrégé sur un notebook vide, indexé, partiel et en échec ;
+- progression des tentatives et échéances 5/10/20 secondes, plafond à 5 minutes ;
+- arrêt/redémarrage avant échéance puis reprise exactement à l'échéance ;
+- aucune tentative automatique après 5 échecs, puis succès après retry manuel ;
+- retry d'une source n'affectant pas les autres sources ;
+- import identique ne déclenchant qu'une seule indexation ;
+- réindexation globale passant par le pipeline et les statuts durables.
