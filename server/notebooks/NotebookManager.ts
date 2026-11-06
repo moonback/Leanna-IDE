@@ -294,41 +294,85 @@ export class NotebookManager {
     const notebook = this.notebooks.get(notebookId);
     if (!notebook) return undefined;
 
-    // Empreinte du contenu extrait : stable entre deux imports du même fichier,
-    // indépendamment de l'UUID temporaire généré pendant l'ingestion.
     const contentHash = createHash("sha256").update(source.rawText || "", "utf-8").digest("hex");
     source.contentHash = contentHash;
-    const normalizedOrigin = source.origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-    const duplicate = notebook.sources.find(existing => {
-      const existingHash = existing.contentHash || createHash("sha256").update(existing.rawText || "", "utf-8").digest("hex");
-      const existingOrigin = existing.origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-      return existing.type === source.type && existingOrigin === normalizedOrigin && existingHash === contentHash;
-    });
+    const normalizeOrigin = (origin: string) => origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    const normalizedOrigin = normalizeOrigin(source.origin);
+    const sameOrigin = notebook.sources.find(existing =>
+      existing.type === source.type && normalizeOrigin(existing.origin) === normalizedOrigin
+    );
 
-    if (duplicate) {
-      // Préserver l'identité durable et les IDs de chunks de la source déjà
-      // enregistrée. Le caller reçoit aussi l'objet canonique.
-      if (!duplicate.contentHash) {
-        duplicate.contentHash = contentHash;
-        notebook.updatedAt = new Date().toISOString();
-        this.flushNotebook(notebook);
+    if (sameOrigin) {
+      const existingHash = sameOrigin.contentHash
+        || createHash("sha256").update(sameOrigin.rawText || "", "utf-8").digest("hex");
+
+      if (existingHash === contentHash) {
+        if (!sameOrigin.contentHash) {
+          sameOrigin.contentHash = contentHash;
+          notebook.updatedAt = new Date().toISOString();
+          if (!this.flushNotebook(notebook)) {
+            delete sameOrigin.contentHash;
+            throw new Error("Impossible de persister l'empreinte de la source existante.");
+          }
+        }
+        Object.assign(source, sameOrigin);
+        log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
+        void embeddingStore.indexChunks(
+          sameOrigin.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+          sameOrigin.id,
+          notebookId
+        ).catch(error => log.warn(`Réindexation de la source existante impossible: ${error.message}`));
+        return notebook;
       }
-      Object.assign(source, duplicate);
-      log.info(`⏭️ Source déjà présente, import ignoré: "${duplicate.title}" (${duplicate.id})`);
-      // Une nouvelle tentative peut réparer des embeddings manquants.
+
+      // Préparer une nouvelle version sans modifier l'objet canonique avant
+      // que le nouveau document puisse être publié durablement.
+      const previous = { ...sameOrigin };
+      const replacementSource: Source = {
+        ...source,
+        id: sameOrigin.id,
+        notebookId,
+        addedAt: sameOrigin.addedAt,
+        chunks: source.chunks.map(chunk => ({
+          ...chunk,
+          id: randomUUID(),
+          sourceId: sameOrigin.id,
+        })),
+      };
+
+      Object.assign(sameOrigin, replacementSource);
+      notebook.updatedAt = new Date().toISOString();
+      const pendingTimer = this.persistTimers.get(notebookId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.persistTimers.delete(notebookId);
+      }
+
+      if (!this.flushNotebook(notebook)) {
+        Object.assign(sameOrigin, previous);
+        throw new Error("Le remplacement n'a pas pu être enregistré durablement ; l'ancienne source est conservée.");
+      }
+
+      // La nouvelle version est durable. Invalider maintenant les vecteurs
+      // de l'ancienne version ; les indexations en vol sont clôturées par
+      // le compteur de génération de l'EmbeddingStore.
+      Object.assign(source, sameOrigin);
+      embeddingStore.removeSource(sameOrigin.id, notebookId);
       void embeddingStore.indexChunks(
-        duplicate.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
-        duplicate.id,
+        sameOrigin.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+        sameOrigin.id,
         notebookId
-      ).catch(error => log.warn(`Réindexation de la source existante impossible: ${error.message}`));
+      ).catch(error => log.warn(`Réindexation de la source remplacée impossible: ${error.message}`));
+
+      chatResponseCache.invalidateNotebook(notebookId);
+      ragSearchCache.invalidateNotebook(notebookId);
+      log.info(`🔄 Source mise à jour à origine constante: "${sameOrigin.title}" (${sameOrigin.id})`);
       return notebook;
     }
 
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
 
-    // Garantir que la source est durable AVANT de lancer les effets secondaires
-    // (embeddings). En cas de crash, reconcileNotebook pourra reconstruire l'index.
     const pendingTimer = this.persistTimers.get(notebookId);
     if (pendingTimer) {
       clearTimeout(pendingTimer);
@@ -345,7 +389,6 @@ export class NotebookManager {
       notebookId
     ).catch(error => log.warn(`Indexation différée des embeddings échouée pour ${source.id}: ${error.message}`));
 
-    // Les sources ont changé : les réponses chat/RAG en cache ne sont plus fiables.
     chatResponseCache.invalidateNotebook(notebookId);
     ragSearchCache.invalidateNotebook(notebookId);
     log.info(`📄 Source ajoutée au notebook "${notebook.title}": "${source.title}"`);
