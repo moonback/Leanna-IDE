@@ -344,9 +344,9 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                       onSelectNotebook(nb.id);
                     }
                   }}
-                  role="button"
+                  role="group"
                   tabIndex={0}
-                  aria-label={`Ouvrir le notebook ${nb.title}`}
+                  aria-label={`Notebook : ${nb.title}`}
                   data-spotlight
                   data-interactive="true"
                   className="notebook-card group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-xl py-3 pl-5 pr-3 hover:shadow-md"
