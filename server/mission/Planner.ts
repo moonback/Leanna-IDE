@@ -132,19 +132,17 @@ export class Planner {
     // Enregistrer l'erreur dans le contexte
     mission.addError(failedAction.skillName, error);
 
-    // Exclure le skill qui a échoué (si déjà échoué plusieurs fois)
     const failCount = mission
       .getContext()
       .errors.filter((e) => e.action === failedAction.skillName).length;
 
-    // Boucle d'apprentissage inter-missions (GAP-1) : lors d'une replanification,
-    // écarter aussi les outils durablement peu fiables (mémoire de stratégie),
-    // même sans échec re-observé dans cette mission — mais toujours en gardant au
-    // moins un outil disponible pour ne pas rendre la replanification impossible.
+    // Une replanification doit changer quelque chose dès le premier échec :
+    // réintroduire immédiatement le même outil laisse le Planner reconstruire
+    // exactement le plan qui vient d'échouer. On l'écarte donc pour ce tour,
+    // ainsi que les outils durablement peu fiables. Si aucune alternative
+    // n'existe, on conserve le dernier outil disponible plutôt que de bloquer.
     const durableFailing = this.durableFailingSkillNames(availableSkills);
-    const toExclude = new Set<string>(durableFailing);
-    if (failCount >= 2) toExclude.add(failedAction.skillName);
-
+    const toExclude = new Set<string>([...durableFailing, failedAction.skillName]);
     const filtered = availableSkills.filter((s) => !toExclude.has(s));
     const filteredSkills = filtered.length > 0 ? filtered : availableSkills;
 
