@@ -74,4 +74,34 @@ describe('IndexingMonitor', () => {
     });
   });
 
+
+  it('affiche le détail de l’historique des tentatives', async () => {
+    const history = [{
+      attempt: 2,
+      at: '2026-11-07T10:00:00.000Z',
+      outcome: 'failed' as const,
+      category: 'transient' as const,
+      durationMs: 1250,
+      message: 'Provider indisponible',
+    }];
+    mockFetchRouter([{
+      match: '/embeddings/indexing-status',
+      respond: () => jsonResponse({
+        status: 'success',
+        indexing: {
+          total: 1, indexed: 0, pending: 0, partial: 0, failed: 1, attempts: 2,
+          sources: [{
+            id: 'source-history', title: 'Source avec historique', type: 'pdf',
+            indexingStatus: 'failed', indexingAttempts: 2, indexingHistory: history,
+          }],
+        },
+      }),
+    }], () => jsonResponse({}));
+    renderWithProviders(<IndexingMonitor notebookId="nb-history" />);
+    expect(await screen.findByText('Source avec historique')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByText(/Historique des 1 dernière/));
+    expect(screen.getByText(/Erreur temporaire/)).toBeInTheDocument();
+    expect(screen.getByText('Provider indisponible')).toBeInTheDocument();
+  });
+
 });
