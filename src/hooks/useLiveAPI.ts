@@ -266,8 +266,8 @@ export function useLiveAPI() {
     const handleRoxaneState = (event: Event) => {
       const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
       if (active) {
-        handleInterrupt();
         if (muteBeforeRoxaneRef.current === null) {
+          handleInterrupt();
           muteBeforeRoxaneRef.current = currentMutedRef.current;
           if (!currentMutedRef.current) {
             currentMutedRef.current = true;
