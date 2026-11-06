@@ -28,20 +28,15 @@ export function createEmbeddingsRouter(): Router {
         return;
       }
 
-      let totalIndexed = 0;
+      let queued = 0;
       for (const source of notebook.sources) {
-        const indexed = await embeddingStore.indexChunks(
-          source.chunks.map(c => ({ id: c.id, content: c.content })),
-          source.id,
-          notebook.id
-        );
-        totalIndexed += indexed;
+        if (notebookManager.retrySourceIndexing(notebook.id, source.id)) queued++;
       }
 
-      res.json({
-        status: "success",
-        message: `${totalIndexed} chunks vectorisés sur ${notebook.sources.reduce((acc, s) => acc + s.chunks.length, 0)} total.`,
-        indexed: totalIndexed,
+      res.status(202).json({
+        status: "accepted",
+        message: `${queued} source(s) placée(s) en réindexation. Consultez indexing-status pour suivre la progression.`,
+        queued,
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -74,6 +69,26 @@ export function createEmbeddingsRouter(): Router {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  /** Vue opérationnelle du pipeline d'indexation, sans exposer le texte source. */
+  router.get("/:id/embeddings/indexing-status", (req: Request, res: Response): void => {
+    const status = notebookManager.getSourceIndexingStatus(req.params.id);
+    if (!status) {
+      res.status(404).json({ error: "Notebook introuvable." });
+      return;
+    }
+    res.json({ status: "success", indexing: status });
+  });
+
+  /** Retry ciblé d'une source ; l'opération continue en arrière-plan. */
+  router.post("/:id/embeddings/sources/:sourceId/retry", (req: Request, res: Response): void => {
+    const retried = notebookManager.retrySourceIndexing(req.params.id, req.params.sourceId);
+    if (!retried) {
+      res.status(404).json({ error: "Source introuvable dans ce notebook." });
+      return;
+    }
+    res.status(202).json({ status: "accepted", sourceId: req.params.sourceId });
   });
 
   router.get("/:id/embeddings/stats", (req: Request, res: Response): void => {
