@@ -70,6 +70,7 @@ import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
 import { createTTSRouter } from "./server/routes/tts.js";
+import { createDebateRouter } from "./server/routes/debate.js";
 import { notebookManager, embeddingStore } from "./server/notebooks/index.js";
 import { backupService } from "./server/notebooks/BackupService.js";
 import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue.js";
@@ -733,6 +734,7 @@ async function startServer() {
   app.use("/api/observability", observabilityRouter);
 
   app.use("/api", createProfileRouter(() => currentProfile, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile, getWorkspaceRoot, updateEnvFile));
+  app.use("/api/debate", createDebateRouter(() => currentProfile as any, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile));
   app.use("/api", createTokensRouter(updateEnvFile, async () => { await loadGeminiKeys(); }));
   app.use("/api/openrouter", createOpenRouterRouter(() => currentProfile));
   app.use("/api/tokens", createTokensOptimizationRouter(() => currentProfile, getWorkspaceRoot));
