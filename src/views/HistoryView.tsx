@@ -57,6 +57,7 @@ export default function HistoryView() {
   const [query, setQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
+  const messageRequestRef = useRef(0);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -114,6 +115,7 @@ export default function HistoryView() {
   }, [success, toastError, selectedId, conversations, confirm]);
 
   const handleSelect = useCallback(async (id: string) => {
+    const requestId = ++messageRequestRef.current;
     setSelectedId(id);
     setMessages([]);
     setMessagesError(null);
@@ -123,12 +125,14 @@ export default function HistoryView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (!Array.isArray(data.messages)) throw new Error('Réponse invalide : messages indisponibles.');
+      if (requestId !== messageRequestRef.current) return;
       setMessages(data.messages);
     } catch (error) {
+      if (requestId !== messageRequestRef.current) return;
       setMessagesError(error instanceof Error ? error.message : 'Impossible de charger cette conversation.');
       toastError('Impossible de charger la conversation');
     } finally {
-      setLoadingMessages(false);
+      if (requestId === messageRequestRef.current) setLoadingMessages(false);
     }
   }, [toastError]);
 
