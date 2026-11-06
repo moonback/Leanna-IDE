@@ -689,3 +689,54 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Tester les réponses de purge complète et partielle (HTTP 200/207), vérifier le détail des scopes supprimés et les erreurs par scope.
 - Vérifier que le stockage local ne se vide qu'après confirmation, que l'annulation ne déclenche rien et que le rechargement intervient après succès.
 - Exécuter typecheck, lint, tests API/UI et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-neuvième passe — Intégrité des sauvegardes, import et restauration
+
+### Constats vérifiés
+
+- Le routeur de sauvegarde acceptait des identifiants de backup et de notebook sans validation de format avant leur utilisation par le service de fichiers.
+- La restauration d'un notebook copiait le fichier sans vérifier préalablement que son JSON était valide et cohérent avec l'identifiant demandé.
+- Les métadonnées des sauvegardes étaient parsées puis utilisées sans contrôle de leur structure, de leur date, de leurs compteurs ou de la cohérence entre l'identifiant du dossier et celui du document.
+- La création d'un backup comptabilisait le nombre de fichiers candidats plutôt que le nombre de notebooks effectivement copiés et validés.
+- La configuration de rotation acceptait des intervalles et des nombres de backups non bornés.
+- L'import Marketplace lisait le JSON puis appelait directement l'installation avec l'identifiant fourni. Un fichier exporté depuis un autre registre n'était donc pas réellement importé : son identifiant n'existait pas nécessairement dans le registre local.
+- L'import ne limitait pas la taille du fichier ni le nombre de paquets et ne validait pas suffisamment leur structure avant de commencer les mutations.
+
+### Corrections appliquées
+
+- Validation stricte des identifiants backup-* et des identifiants de notebook avant tout accès aux chemins de restauration.
+- Vérification que le dossier de sauvegarde résolu reste dans le répertoire de backups.
+- Validation des métadonnées : identifiant correspondant au dossier, date exploitable, compteurs entiers non négatifs et liste d'identifiants valide. Les métadonnées corrompues sont ignorées.
+- Validation du JSON du notebook et de la cohérence de son identifiant avant restauration.
+- Validation des embeddings présents avant le remplacement des fichiers courants ; écriture des fichiers restaurés via fichiers temporaires puis renommage.
+- Comptage des notebooks effectivement validés et copiés lors de la création d'une sauvegarde.
+- Bornes de configuration : intervalle de 60 secondes à 30 jours, rotation de 1 à 100 sauvegardes et booléen strict pour l'activation.
+- Contrats HTTP de sauvegarde renforcés : corps JSON, identifiants, compteurs de restauration et propriétés de configuration validés ; les restaurations partielles renvoient HTTP 207.
+- Import Marketplace réellement fonctionnel : contrôle du format, taille maximale de 5 Mo, maximum de 20 paquets, validation structurelle de l'ensemble du fichier, republication dans le registre local (validation Zod et nouvelle analyse de sécurité serveur), puis installation. Les erreurs partielles sont remontées.
+
+### Fichiers concernés
+
+- server/notebooks/BackupService.ts
+- server/notebooks/BackupService.test.ts
+- server/routes/notebooks/backupRouter.ts
+- server/routes/notebooks/backupRouter.test.ts
+- src/components/panels/MarketplacePanel.tsx
+
+### Vérifications automatisées ajoutées
+
+- Refus des identifiants de restauration contenant un chemin.
+- Ignorance des métadonnées invalides ou incohérentes.
+- Refus des identifiants de notebook mal typés.
+- Refus des intervalles et limites de rotation hors bornes.
+- Refus des propriétés inconnues et des configurations vides.
+
+### Validation restante
+
+- Exécuter les tests BackupService.test.ts et backupRouter.test.ts, puis typecheck, lint et tests complets.
+- Vérifier une restauration valide avec et sans embeddings, puis une sauvegarde contenant un notebook JSON corrompu.
+- Simuler une erreur d'écriture disque et vérifier qu'aucun backup incomplet n'est annoncé comme complet.
+- Importer un paquet exporté depuis un autre profil, un JSON mal formé, un tableau vide, un tableau de 21 paquets et un paquet signalé par l'analyse de sécurité.
+- Vérifier le résultat d'un import partiel et empêcher une double importation déclenchée par des événements rapprochés.
+- Tester les exports PDF/DOCX/HTML et les téléchargements Marketplace avec des noms contenant guillemets, caractères Unicode et caractères de contrôle.
+- Vérifier manuellement dans Electron les confirmations, états de progression, retours d'erreur et téléchargements.
+- Les commandes locales et les parcours Electron ne sont pas exécutés par l'accès GitHub seul ; aucune réussite de typecheck ou de CI n'est revendiquée ici.
