@@ -98,3 +98,15 @@ test("ProcessingQueue.waitForTask rejects when a queued task fails permanently",
   assert.ok(task);
   await assert.rejects(queue.waitForTask(task.id), /terminal failure/);
 });
+
+test("ProcessingQueue rejects enqueue when the initial durable write fails", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-notebook-queue-write-failure-"));
+  try {
+    const queue = new ProcessingQueue<{ value: string }>({ persistenceFile: directory });
+    const task = queue.enqueue("not-durable", "test", { value: "must not be accepted" });
+    assert.equal(task, null);
+    assert.equal(queue.getPending().length, 0);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
