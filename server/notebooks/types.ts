@@ -33,6 +33,8 @@ export interface Source {
   type: SourceType;
   /** URL ou chemin d'origine */
   origin: string;
+  /** Empreinte SHA-256 du texte extrait, utilisée pour la déduplication. */
+  contentHash?: string;
   /** Texte brut extrait */
   rawText: string;
   /** HTML brut original (pour sources HTML uniquement) */
