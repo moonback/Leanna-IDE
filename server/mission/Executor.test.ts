@@ -513,3 +513,33 @@ test('supervised mode: a mission is never "completed" while the Supervisor rejec
   assert.notEqual(done.status, 'completed', 'statut mission cohérent avec le verdict du Supervisor');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test('artifact intent does not misclassify analytical goals as file deliverables', () => {
+  const executor = new Executor();
+  const expectsArtifact = (goal: unknown) => (executor as any).goalExpectsArtifact(goal);
+
+  assert.equal(expectsArtifact({
+    title: 'Analyser la stack technique et l’architecture',
+    description: 'Identifier les frameworks, dépendances et composants existants.',
+    successCriteria: ['Architecture comprise', 'Plan technique identifié', 'Documentation existante analysée'],
+  }), false, 'analysis and discovery criteria must not require a write');
+
+  assert.equal(expectsArtifact({
+    title: 'Mettre à jour le README.md',
+    description: 'Écrire une documentation complète et enregistrer le fichier.',
+    successCriteria: ['README.md mis à jour'],
+  }), true, 'an explicit file update must require a persistent artifact');
+
+  assert.equal(expectsArtifact({
+    title: 'Produire le rapport d’audit',
+    description: 'Rédiger et écrire un rapport Markdown documentant les résultats.',
+    successCriteria: ['Rapport Markdown créé'],
+  }), true, 'an explicit report-writing objective must require an artifact');
+
+  assert.equal(expectsArtifact({
+    title: 'Examiner les fichiers du projet',
+    description: 'Lire le plan de déploiement et comprendre les documents existants.',
+    successCriteria: ['Fichiers pertinents identifiés', 'Plan compris'],
+  }), false, 'reading existing files and plans is not a production request');
+});
