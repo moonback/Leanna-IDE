@@ -401,3 +401,27 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier les boutons de catégories, de sélection, d'onglet, de copie, de téléchargement et d'application au clavier.
 - Tester le rendu sur petite fenêtre : la bibliothèque utilise actuellement une largeur latérale minimale de 300 px et une hauteur de 85 vh ; vérifier qu'aucun panneau ni contrôle ne devient inaccessible.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron.
+
+
+## Dix-huitième passe — Parcours clavier du sélecteur de workspace
+
+### Constats vérifiés
+
+- Le sélecteur de workspace était un dialogue modal personnalisé : il gérait Escape localement, mais ne piégeait pas le focus et ne verrouillait pas le défilement de l'application.
+- La fermeture par clic sur le voile était un simple `onClick`, sans distinguer un clic réel d'un glisser-déposer commencé dans le dialogue.
+- La modale de démarrage peut être empilée avec la confirmation de fermeture de l'application ; la gestion Escape doit donc respecter la pile commune des overlays.
+
+### Corrections appliquées
+
+- Le sélecteur utilise désormais `useOverlay` pour le focus trap, la restitution du focus, la pile Escape et le scroll lock.
+- Les règles existantes de fermeture par Escape sont conservées : aucune fermeture pendant un clonage, un chargement ou une sélection forcée.
+- Le clic sur le voile conserve son comportement conditionnel et bénéficie maintenant de la protection contre les drags.
+- La référence de focus est attachée au panneau de dialogue, et non au voile.
+
+### Validation restante
+
+- Vérifier le focus initial et le parcours Tab/Shift+Tab dans les onglets Récents/Ouvrir/Cloner.
+- Vérifier la fermeture Escape dans les états normaux, pendant le chargement, pendant un clonage et en sélection forcée.
+- Ouvrir la confirmation Quitter depuis le sélecteur et vérifier que seul l'overlay supérieur réagit à Escape, puis que le focus revient au sélecteur.
+- Vérifier clic sur voile, drag depuis le panneau vers le voile, verrouillage/restauration du scroll et tailles de fenêtre réduites.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le parcours complet de démarrage dans Electron.
