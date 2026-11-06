@@ -252,13 +252,9 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
             turnComplete: true,
           });
         } else if (msg.type === "reset") {
-          chainId += 1;
-          chainActive = false;
-          autonomousTurns = 0;
-          advancing = false;
-          history.length = 0;
-          activeSpeaker = "leanna";
-          send({ type: "reset" });
+          // Une session Live conserve son contexte fournisseur : un reset réel
+          // exige de fermer les deux sessions et d'en ouvrir de nouvelles.
+          client.close(1000, "Conversation reset");
         } else if (msg.type === "interrupt") {
           // Le barge-in effectif est déclenché par l'audio micro envoyé en continu
           // à la session active ; ce message coupe la lecture côté client.
