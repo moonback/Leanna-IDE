@@ -57,14 +57,20 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     const declarations = deps.skillManager.getToolDeclarations();
     const profileMode = profile.mode === "ask" ? "ask" : "full";
     const askAllowed = new Set([
-      "read_file_outline", "read_project_file", "list_project_files", "search_in_files",
-      "open_project_file", "open_ide", "get_workspace_info", "analyze_project_file",
-      "save_memory", "search_memory", "list_memories", "knowledge_build_context",
-      "knowledge_semantic_search", "knowledge_memory_search", "get_current_time",
-      "automation_search", "search_history", "list_conversations", "get_conversation_messages",
-      "get_weather", "get_github_user", "system_info", "set_plan", "graphify_query",
-      "graphify_path", "graphify_explain", "graphify_affected", "graphify_god_nodes",
-      "graphify_read_report", "graphify_update", "list_custom_skills",
+      "list_project_files", "read_project_file", "read_file_outline", "search_in_files",
+      "analyze_project_file", "get_workspace_info", "open_project_file", "open_ide", "security_audit",
+      "save_memory", "search_memory", "list_memories",
+      "knowledge_build_context", "knowledge_semantic_search", "knowledge_memory_search",
+      "knowledge_memory_list", "knowledge_search_entities", "knowledge_status",
+      "get_current_time", "get_weather", "get_github_user", "list_list_all", "list_get",
+      "system_info", "search_history", "list_conversations", "get_conversation_messages",
+      "write_project_file", "automation_search", "automation_list_scheduled_tasks",
+      "agent_delegate", "agent_negotiate", "agent_orchestrate", "agent_status", "agent_create",
+      "agent_list_tasks", "agent_list_roles", "agent_cancel", "agent_cancel_orchestration", "agent_stats",
+      "list_custom_skills", "create_custom_skill", "update_custom_skill", "delete_custom_skill", "toggle_custom_skill",
+      "graphify_query", "graphify_path", "graphify_explain", "graphify_affected", "graphify_god_nodes",
+      "graphify_read_report", "graphify_update", "set_plan",
+      "telegram_notify", "telegram_send_message", "telegram_get_status", "telegram_list_users",
     ]);
     const availableDeclarations = declarations
       .filter((d: any) => (d as any)._mcpServerId || (!d.name.startsWith("git_") &&
