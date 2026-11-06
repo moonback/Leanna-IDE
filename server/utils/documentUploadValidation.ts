@@ -40,8 +40,10 @@ export function validateDocumentUpload(fileName: string, mimeType: string, buffe
   if (extension === ".pdf" && !buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
     return { valid: false, fileName: safeName, mimeType, error: "Le contenu ne correspond pas à un fichier PDF valide." };
   }
-  if (extension !== ".pdf" && (buffer.includes(0) || buffer.toString("utf8").includes("\uFFFD"))) {
-    return { valid: false, fileName: safeName, mimeType, error: "Le fichier texte contient des données binaires ou un encodage invalide." };
+  if (extension !== ".pdf") {
+    try { new TextDecoder("utf-8", { fatal: true }).decode(buffer); }
+    catch { return { valid: false, fileName: safeName, mimeType, error: "Le fichier texte contient un encodage UTF-8 invalide." }; }
+    if (buffer.includes(0)) return { valid: false, fileName: safeName, mimeType, error: "Le fichier texte contient des données binaires." };
   }
 
   return { valid: true, fileName: safeName, mimeType: type.canonicalMime };
