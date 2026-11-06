@@ -46,3 +46,23 @@ export function validateDocumentUpload(fileName: string, mimeType: string, buffe
 
   return { valid: true, fileName: safeName, mimeType: type.canonicalMime };
 }
+
+/** Multimodal upload contract for the chat/document analysis endpoint. */
+export function validateMultimodalDocumentUpload(fileName: string, mimeType: string, buffer: Buffer): DocumentUploadValidation {
+  const extension = path.extname(fileName.replace(/\\/g, "/")).toLowerCase();
+  const imageSignatures: Record<string, { mime: string; valid: (data: Buffer) => boolean }> = {
+    ".jpg": { mime: "image/jpeg", valid: data => data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff },
+    ".jpeg": { mime: "image/jpeg", valid: data => data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff },
+    ".png": { mime: "image/png", valid: data => data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+    ".webp": { mime: "image/webp", valid: data => data.length >= 12 && data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP" },
+  };
+  const image = imageSignatures[extension];
+  if (!image) return validateDocumentUpload(fileName, mimeType, buffer);
+  const safeName = path.basename(fileName.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180);
+  if (!buffer.length) return { valid: false, fileName: safeName, mimeType, error: "Le fichier est vide." };
+  if (buffer.length > MAX_DOCUMENT_UPLOAD_BYTES) return { valid: false, fileName: safeName, mimeType, error: "Fichier trop volumineux (10 Mio maximum)." };
+  if (mimeType.toLowerCase() !== image.mime || !image.valid(buffer)) {
+    return { valid: false, fileName: safeName, mimeType, error: "Le contenu de l'image ne correspond pas à son extension ou à son type MIME." };
+  }
+  return { valid: true, fileName: safeName, mimeType: image.mime };
+}
