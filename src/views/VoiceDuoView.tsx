@@ -19,18 +19,29 @@ export default function VoiceDuoView() {
   const sessionsReadyRef = useRef(false);
   const intentionalCloseRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const interruptOutputRef = useRef<() => void>(() => {});
 
   const onAudioData = useCallback((pcm16: ArrayBuffer) => {
     const ws = wsRef.current;
     if (activeRef.current && sessionsReadyRef.current && ws?.readyState === WebSocket.OPEN) ws.send(pcm16);
   }, []);
 
+  const onVadSpeech = useCallback(() => {
+    if (!activeRef.current || !sessionsReadyRef.current) return;
+    // Coupe localement la lecture avant d’envoyer le prochain paquet micro.
+    interruptOutputRef.current();
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "interrupt" }));
+  }, []);
+
   const audio = useAudio({
     onAudioData,
+    onVadSpeech,
     vadEnabled: profile.vadEnabled ?? true,
     vadThreshold: profile.vadThreshold ?? 28,
     vadSilenceDuration: profile.vadSilenceDuration ?? 700,
   });
+  interruptOutputRef.current = audio.handleInterrupt;
 
   const appendEntry = useCallback((speaker: "user" | Speaker, name: string, fragment: string) => {
     const text = fragment.trim();
