@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe, MoreHorizontal } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
@@ -54,7 +55,20 @@ export function EditorTabs({
 }: EditorTabsProps) {
   const [showMore, setShowMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const [morePosition, setMorePosition] = useState({ top: 0, right: 8 });
+
+  const updateMorePosition = useCallback(() => {
+    const anchor = moreButtonRef.current?.getBoundingClientRect();
+    if (!anchor) return;
+    // Le menu est rendu dans document.body : il échappe aux overflow:hidden
+    // de la scène IDE et reste ancré au bouton même après un redimensionnement.
+    setMorePosition({
+      top: Math.round(anchor.bottom + 6),
+      right: Math.max(8, Math.round(window.innerWidth - anchor.right)),
+    });
+  }, []);
   const closeMore = useCallback(() => {
     setShowMore(false);
     moreButtonRef.current?.focus();
@@ -62,9 +76,14 @@ export function EditorTabs({
 
   useEffect(() => {
     if (!showMore) return;
+    updateMorePosition();
     const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !moreRef.current?.contains(event.target)) setShowMore(false);
+      if (!(event.target instanceof Node)) return;
+      if (!moreRef.current?.contains(event.target) && !moreMenuRef.current?.contains(event.target)) {
+        setShowMore(false);
+      }
     };
+    const onViewportChange = () => updateMorePosition();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -73,11 +92,15 @@ export function EditorTabs({
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
     };
-  }, [showMore, closeMore]);
+  }, [showMore, closeMore, updateMorePosition]);
 
   if (openFiles.length === 0) return null;
 
@@ -213,7 +236,10 @@ export function EditorTabs({
         <button
           ref={moreButtonRef}
           type="button"
-          onClick={() => setShowMore((value) => !value)}
+          onClick={() => {
+            if (!showMore) updateMorePosition();
+            setShowMore((value) => !value);
+          }}
           className={iconButton}
           aria-label="Autres options de l'éditeur"
           aria-controls="editor-tabs-more-options"
@@ -222,12 +248,14 @@ export function EditorTabs({
           <MoreHorizontal size={15} style={{ color: showMore ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
         </button>
 
-        {showMore && (
+        {showMore && createPortal(
           <div
+            ref={moreMenuRef}
             id="editor-tabs-more-options"
             role="group"
             aria-label="Options de l'éditeur"
-            className="glass-float absolute right-1 top-[calc(100%+6px)] z-[var(--z-popover)] min-w-[220px] p-1.5 shadow-xl"
+            className="glass-float fixed z-[10000] min-w-[240px] max-w-[min(320px,calc(100vw-16px))] p-1.5 shadow-xl"
+            style={{ top: morePosition.top, right: morePosition.right }}
           >
             <button
               type="button"
