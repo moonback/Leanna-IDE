@@ -706,8 +706,19 @@ export class Executor {
   private async runSupervised(mission: Mission, availableSkills: string[]): Promise<void> {
     const supervisor = this.supervisor!;
 
+    // Resolve every planned path against the exact active workspace before the
+    // initial snapshot; relative paths against process.cwd() are not safe here.
+    const resolveWorkspaceTarget = (target: string): string => {
+      if (!SELF_ROOT) throw new Error("Checkpoint refused: no active workspace.");
+      const absolute = path.resolve(SELF_ROOT, target);
+      const relative = path.relative(SELF_ROOT, absolute);
+      if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+        throw new Error("Checkpoint refused: target outside workspace (" + target + ").");
+      }
+      return absolute;
+    };
     // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
-    const plannedFiles = this.collectPlannedFiles(mission);
+    const plannedFiles = this.collectPlannedFiles(mission).map(resolveWorkspaceTarget);
 
     const runner: MissionRunner = async ({ signal, beforeToolCall }) => {
       if (beforeToolCall) this.supervisorWriteHooks.set(mission.id, beforeToolCall);
@@ -742,7 +753,6 @@ export class Executor {
       runner,
       plannedFiles,
       resolveWriteTargets: (toolName, args) => {
-        if (!SELF_ROOT) throw new Error("Checkpoint refused: no active workspace.");
         const targets: string[] = [];
         const singlePath = typeof args.path === "string" ? args.path : undefined;
         const pathTools = ["write_project_file", "modify_project_file", "apply_patch", "patch_project_file", "delete_project_file", "delete_project_folder", "create_project_directory"];
@@ -752,14 +762,7 @@ export class Executor {
           if (typeof args.newPath === "string") targets.push(args.newPath);
         }
         if (targets.length === 0) throw new Error("Checkpoint refused: no write target for " + toolName + ".");
-        return targets.map((target) => {
-          const absolute = path.resolve(SELF_ROOT, target);
-          const relative = path.relative(SELF_ROOT, absolute);
-          if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
-            throw new Error("Checkpoint refused: target outside workspace (" + target + ").");
-          }
-          return absolute;
-        });
+        return targets.map(resolveWorkspaceTarget);
       },
     });
 
