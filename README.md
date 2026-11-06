@@ -24,16 +24,16 @@
 
 <br>
 
-<sub>Leanna est une plateforme desktop local-first dédiée à l'exécution sécurisée et transparente d'agents IA autonomes. Conçue pour offrir un contrôle total, l'application orchestre des tâches complexes via un cycle strict : Comprendre, Planifier, Agir, Observer, Vérifier et Récupérer.
+<sub>Leanna est une plateforme desktop local-first dédiée à l'exécution sécurisée et transparente d'agents IA autonomes. Elle orchestre les tâches selon un cycle de compréhension, planification, action, observation, vérification et récupération.
 
-Rien ne quitte votre machine sans action explicite. Chaque action à effet de bord traverse une chaîne de sécurité rigoureuse (idempotence, permissions, sandbox, dry-run, Safety Gate Jev, **approbation humaine interactive**), et surtout un **noyau transactionnel** qui snapshot, agit, vérifie par la preuve, puis commit ou rollback.</sub>
+Les actions locales et les intégrations externes sont encadrées par les permissions et les contrôles applicables à leur chemin d'exécution. Le noyau transactionnel P0, le ledger d'idempotence et le Safety Gate Jev sont des composants présents dans le dépôt, mais leur activation et leur couverture dépendent de la configuration et du runtime utilisé : ils ne doivent pas être considérés comme une garantie globale sur chaque action.</sub>
 
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-1478%20pass%20(184%20fichiers)-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
+<img src="https://img.shields.io/badge/Tests%20backend-193%20fichiers-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Inventaire tests backend" />
 &nbsp;
-<img src="https://img.shields.io/badge/Tests%20front-90%20pass%20(18%20fichiers)-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests front" />
+<img src="https://img.shields.io/badge/Tests%20front-19%20fichiers-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Inventaire tests frontend" />
 &nbsp;
 <img src="https://img.shields.io/badge/skills%20builtin-29%20modules-818CF8?style=for-the-badge" alt="29 Skills" />
 &nbsp;
@@ -336,15 +336,16 @@ Détails : [`docs/AGENTIC_RUNTIME.md`](docs/AGENTIC_RUNTIME.md) §6 bis.
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 ## ⚙️ Noyau P0 — le noyau transactionnel
 
-> **Section nouvelle.** Le noyau P0 (« Kernel ») est le socle d'industrialisation
-> de Leanna. Il transforme une boucle agentique « best-effort » en un système
-> **durable, idempotent et transactionnel**. Tout vit sous `server/core/` et
-> persiste localement sous `.Leanna/core/` — aucune dépendance Supabase requise
-> pour survivre à un crash.
+> Le noyau P0 (« Kernel ») fournit les composants nécessaires à une exécution
+> **durable, idempotente et transactionnelle**. Ils vivent sous `server/core/`
+> et utilisent une persistance locale sous `.Leanna/core/`. Leur branchement
+> aux outils et aux missions est conditionnel : le noyau est non intrusif par
+> défaut et ne constitue pas une garantie universelle pour tous les chemins
+> d'exécution. Voir `ARCHITECTURE.md` pour les conditions d'activation.
 
 Le noyau se compose de dix briques, assemblées par une fabrique unique
-(`createCoreKernel`). Chaque brique a une responsabilité étroite ; le
-`LeannaSupervisor` les coud ensemble en un cycle transactionnel.
+(`createCoreKernel`). Lorsque le noyau est activé et branché au chemin concerné,
+le `LeannaSupervisor` les coud ensemble en un cycle transactionnel.
 
 | Brique | Fichier | Rôle | Statut |
 |---|---|---|:---:|
@@ -2105,8 +2106,8 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test` via `tsx`, **184 fichiers** `server/**/*.test.ts`, **1460 cas / 174 suites · 0 échec**) |
-| `npm run test:ui` | Tests frontend (Vitest + React Testing Library, **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}`, **90 cas · 0 échec**) |
+| `npm test` | Suite backend (`node --test` via `tsx`), **193 fichiers** `server/**/*.test.ts` recensés dans l'arborescence actuelle |
+| `npm run test:ui` | Tests frontend (Vitest + React Testing Library), **19 fichiers** `src/**/*.{test,spec}.{ts,tsx}` recensés dans l'arborescence actuelle |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |
 | `npm run typecheck:test` | Typage des fichiers de test |
@@ -2118,10 +2119,12 @@ npm run dist:win       # distribuable Windows
 | `npm run test:soak` | Soak test du gestionnaire de tâches d'autonomie |
 | `npm run jev:calibrate` | Calibration des seuils du Safety Gate |
 
-> **Décompte des tests (mesuré le 2026-10-15).** Les suites ont été exécutées :
-> `npm test` → **1460 cas sur 174 suites, 0 échec** (184 fichiers, ~90 s) ;
-> `npm run test:ui` → **90 cas, 0 échec** (18 fichiers). Reproductible via les deux
-> commandes ci-dessus.
+> **Dernière exécution documentée : 2026-10-15** — `npm test` : **1460 cas /
+> 174 suites, 0 échec** (184 fichiers) ; `npm run test:ui` : **90 cas, 0 échec**
+> (18 fichiers). Ces résultats sont historiques et ne décrivent pas une exécution
+> du code actuel. L'inventaire Git actuel recense 193 fichiers de test backend et
+> 19 fichiers de test UI ; les suites doivent être relancées pour actualiser les
+> nombres de cas et leur statut.
 
 ### Validation de l'autonomie (banc E2E)
 
