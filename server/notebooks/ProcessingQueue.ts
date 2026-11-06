@@ -168,7 +168,14 @@ export class ProcessingQueue<T = unknown> {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(temp, JSON.stringify(
-        { version: 2, tasks: [...this.queue, ...this.retrying.values()], history: this.completed.slice(-200).map(task => ({ ...task, payload: undefined })) },
+        { version: 2, tasks: [...this.queue, ...this.retrying.values()], history: this.completed.slice(-200).map(task => ({
+          ...task,
+          // Garder seulement l'identifiant du notebook pour autoriser la consultation
+          // après redémarrage, sans conserver les buffers ou le contenu des sources.
+          payload: task.payload && typeof task.payload === "object" && "notebookId" in task.payload
+            ? { notebookId: (task.payload as { notebookId: string }).notebookId }
+            : undefined,
+        })) },
         (_key, value) => {
           // Buffer.toJSON() s'exécute avant le replacer : compresser son enveloppe
           // en base64 évite un tableau JSON d'octets plusieurs fois plus volumineux.
