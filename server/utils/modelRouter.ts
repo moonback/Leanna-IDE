@@ -2,12 +2,31 @@ import { resolvePricing, type FailedModelCall, type TokenUsage } from '../observ
 
 export type TaskComplexity = 'simple' | 'standard' | 'complex';
 
+const latencySamples = new Map<string, number[]>();
+
+/** Latence observée en mémoire, bornée aux 50 derniers appels par modèle. */
+export function recordModelLatency(model: string, latencyMs: number): void {
+  if (!model || !Number.isFinite(latencyMs) || latencyMs <= 0) return;
+  const samples = latencySamples.get(model) ?? [];
+  samples.push(latencyMs);
+  if (samples.length > 50) samples.shift();
+  latencySamples.set(model, samples);
+}
+
+export function getModelLatencySnapshot(): Record<string, number> {
+  return Object.fromEntries([...latencySamples].map(([model, samples]) => {
+    const sorted = [...samples].sort((a, b) => a - b);
+    return [model, sorted[Math.floor(sorted.length / 2)] ?? 0];
+  }));
+}
+
 export interface AdaptiveModelInput {
   candidates: string[];
   promptChars: number;
   maxOutputTokens?: number;
   usage: TokenUsage[];
   failures: FailedModelCall[];
+  latencyMsByModel?: Record<string, number>;
 }
 
 export interface AdaptiveModelDecision {
@@ -57,7 +76,9 @@ export function selectAdaptiveModel(input: AdaptiveModelInput): AdaptiveModelDec
     const estimatedCostUsd =
       (estimatedInputTokens / 1_000_000) * resolved.pricing.inputPer1M +
       (estimatedOutputTokens / 1_000_000) * resolved.pricing.outputPer1M;
-    const score = estimatedCostUsd * (1 + failureRate * riskWeight);
+    const latencyMs = input.latencyMsByModel?.[model] ?? 0;
+    const latencyFactor = latencyMs > 0 ? 1 + Math.min(2, latencyMs / (complexity === 'complex' ? 15_000 : 8_000)) : 1;
+    const score = estimatedCostUsd * (1 + failureRate * riskWeight) * latencyFactor;
     return [{
       model,
       complexity,
