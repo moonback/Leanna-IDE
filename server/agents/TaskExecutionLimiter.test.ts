@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TaskExecutionLimiter } from "./TaskExecutionLimiter.js";
+import { TaskExecutionCancelledError, TaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 
 test("TaskExecutionLimiter caps concurrent operations and drains its FIFO queue", async () => {
   const limiter = new TaskExecutionLimiter(2);
@@ -42,4 +42,28 @@ test("TaskExecutionLimiter releases its slot when an operation rejects", async (
 test("TaskExecutionLimiter rejects invalid capacity", () => {
   assert.throws(() => new TaskExecutionLimiter(0), /maxConcurrent/);
   assert.throws(() => new TaskExecutionLimiter(1.5), /maxConcurrent/);
+});
+
+test("TaskExecutionLimiter removes a cancelled waiter without starting it later", async () => {
+  const limiter = new TaskExecutionLimiter(1);
+  let releaseFirst!: () => void;
+  let secondStarted = false;
+
+  const first = limiter.run(() => new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  }), "first-task");
+  const second = limiter.run(async () => {
+    secondStarted = true;
+  }, "cancelled-task");
+
+  await Promise.resolve();
+  assert.equal(limiter.pendingCount, 1);
+  assert.equal(limiter.cancel("cancelled-task"), true);
+  await assert.rejects(second, TaskExecutionCancelledError);
+
+  releaseFirst();
+  await first;
+  assert.equal(secondStarted, false);
+  assert.equal(limiter.activeCount, 0);
+  assert.equal(limiter.pendingCount, 0);
 });
