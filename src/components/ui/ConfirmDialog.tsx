@@ -1,20 +1,11 @@
 /**
  * ConfirmDialog — Generic reusable confirmation modal.
- * Replaces window.confirm for consistent theming in the application.
- *
- * Usage:
- *   const { confirm } = useConfirm();
- *   const result = await confirm({
- *     title: 'Delete file',
- *     message: 'Are you sure you want to delete this file?',
- *     confirmLabel: 'Delete',
- *     cancelLabel: 'Cancel',
- *   });
- *   if (result) { // action confirmed }
+ * Reuses the shared Modal primitive for focus management, Escape handling,
+ * scroll locking, backdrop safety and focus restoration.
  */
-
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { AlertTriangle, Check } from 'lucide-react';
+import { Modal } from './Modal.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,8 +24,6 @@ interface ConfirmDialogContextValue {
 const ConfirmDialogContext = createContext<ConfirmDialogContextValue>({
   confirm: async () => false,
 });
-
-// ── Confirm Dialog Component ────────────────────────────────────────────────
 
 interface ConfirmDialogState {
   open: boolean;
@@ -57,7 +46,7 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
     resolve: () => {},
   });
 
-  const confirm = useCallback(async (options: ConfirmOptions): Promise<boolean> => {
+  const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
       setState({
         open: true,
@@ -73,118 +62,79 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
 
   const handleConfirm = useCallback(() => {
     state.resolve(true);
-    setState(prev => ({ ...prev, open: false }));
-  }, [state]);
+    setState((previous) => ({ ...previous, open: false }));
+  }, [state.resolve]);
 
   const handleCancel = useCallback(() => {
     state.resolve(false);
-    setState(prev => ({ ...prev, open: false }));
-  }, [state]);
+    setState((previous) => ({ ...previous, open: false }));
+  }, [state.resolve]);
 
-  const handleBackdrop = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      handleCancel();
-    }
-  }, [handleCancel]);
-
-  const getVariantStyles = useCallback(() => {
-    switch (state.variant) {
-      case 'danger':
-        return {
-          icon: <AlertTriangle size={20} style={{ color: 'var(--color-error)' }} />,
-          confirmColor: 'var(--color-error)',
-          confirmBg: 'color-mix(in srgb, var(--color-error) 15%, transparent)',
-          confirmBorder: 'color-mix(in srgb, var(--color-error) 30%, transparent)',
-        };
-      case 'warning':
-        return {
-          icon: <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />,
-          confirmColor: 'var(--color-warning)',
-          confirmBg: 'color-mix(in srgb, var(--color-warning) 15%, transparent)',
-          confirmBorder: 'color-mix(in srgb, var(--color-warning) 30%, transparent)',
-        };
-      default:
-        return {
-          icon: <Check size={20} style={{ color: 'var(--accent-primary)' }} />,
-          confirmColor: 'var(--accent-primary)',
-          confirmBg: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-          confirmBorder: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-        };
-    }
-  }, [state.variant]);
+  const isDanger = state.variant === 'danger';
+  const isWarning = state.variant === 'warning';
+  const iconColor = isDanger
+    ? 'var(--color-error)'
+    : isWarning
+      ? 'var(--color-warning)'
+      : 'var(--accent-primary)';
+  const confirmColor = iconColor;
+  const confirmBg = `color-mix(in srgb, ${confirmColor} 15%, transparent)`;
+  const confirmBorder = `color-mix(in srgb, ${confirmColor} 30%, transparent)`;
 
   return (
     <ConfirmDialogContext.Provider value={{ confirm }}>
       {children}
-      
-      {/* Modal Overlay */}
-      {state.open && (
-        <div
-          className="glass-veil fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 'var(--z-modal)' as any }}
-          onClick={handleBackdrop}
-        >
-          <div
-            className="glass-modal w-full max-w-sm p-5"
-            style={{ color: 'var(--text-primary)' }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            aria-describedby="confirm-dialog-message"
-          >
-            {/* Header */}
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex-shrink-0">
-                {getVariantStyles().icon}
-              </div>
-              <div>
-                <h3
-                  id="confirm-dialog-title"
-                  className="text-sm font-semibold"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  {state.title}
-                </h3>
-              </div>
+      <Modal
+        open={state.open}
+        onClose={handleCancel}
+        title={state.title}
+        size="sm"
+        tone={state.variant === 'default' ? 'default' : state.variant}
+        aria-describedby="confirm-dialog-message"
+      >
+        <Modal.Body>
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex-shrink-0" aria-hidden="true">
+              {isDanger || isWarning
+                ? <AlertTriangle size={20} style={{ color: iconColor }} />
+                : <Check size={20} style={{ color: iconColor }} />}
             </div>
-
-            {/* Message */}
             <p
               id="confirm-dialog-message"
-              className="mb-6 whitespace-pre-line text-sm"
+              className="whitespace-pre-line text-sm"
               style={{ color: 'var(--text-secondary)' }}
             >
               {state.message}
             </p>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={handleCancel}
-                className="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:opacity-90"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid var(--border-base)',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                {state.cancelLabel}
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:opacity-90"
-                style={{
-                  backgroundColor: getVariantStyles().confirmBg,
-                  border: `1px solid ${getVariantStyles().confirmBorder}`,
-                  color: getVariantStyles().confirmColor,
-                }}
-              >
-                {state.confirmLabel}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            {state.cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
+            style={{
+              backgroundColor: confirmBg,
+              border: `1px solid ${confirmBorder}`,
+              color: confirmColor,
+            }}
+          >
+            {state.confirmLabel}
+          </button>
+        </Modal.Footer>
+      </Modal>
     </ConfirmDialogContext.Provider>
   );
 }
@@ -194,8 +144,6 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
 export function useConfirm() {
   return useContext(ConfirmDialogContext);
 }
-
-// ── Exports ─────────────────────────────────────────────────────────────────
 
 export { ConfirmDialogProvider };
 export type { ConfirmOptions };
