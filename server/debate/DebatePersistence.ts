@@ -22,6 +22,7 @@ export async function persistLiveDebate(
     synthesis.agreements.length ? `Accords : ${synthesis.agreements.join(' ; ')}` : '',
     synthesis.disagreements.length ? `Désaccords : ${synthesis.disagreements.join(' ; ')}` : '',
     synthesis.decisions.length ? `Décisions : ${synthesis.decisions.join(' ; ')}` : '',
+    synthesis.tasks.length ? `Tâches proposées : ${synthesis.tasks.map(task => `${task.title} (${task.priority}) — ${task.description}`).join(' ; ')}` : '',
   ].filter(Boolean).join('\n');
 
   const { data: conversation, error: conversationError } = await supabase
