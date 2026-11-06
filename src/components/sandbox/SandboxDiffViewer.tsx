@@ -756,18 +756,33 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     });
   }, []);
 
+  // Les fichiers critiques (server.ts, .env…) ne passent qu'après une confirmation explicite.
+  const confirmCriticalFiles = useCallback((paths: string[]) => confirm({
+    title: `Appliquer ${paths.length > 1 ? `${paths.length} fichiers critiques` : 'un fichier critique'} ?`,
+    message: `${paths.join(', ')} ${paths.length > 1 ? 'sont protégés' : 'est protégé'} : ces fichiers touchent la sécurité ou le démarrage de l’application. Vérifiez le diff avant de confirmer.`,
+    confirmLabel: 'Appliquer quand même',
+    cancelLabel: 'Annuler',
+    variant: 'danger',
+  }), [confirm]);
+
   // ─── Accept / Reject file ──────────────────────────────────────────────────
   const handleAcceptFile = useCallback(async (filePath: string) => {
     setActionBusy(filePath);
     setFeedback(null);
     const next = neighbourOf(filePath);
-    try {
+    const post = async (confirmCritical: boolean) => {
       const res = await fetch('/api/sandbox/accept-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ path: filePath }),
+        body: JSON.stringify({ path: filePath, confirmCritical }),
       });
-      const data = await res.json();
+      return { res, data: await res.json() };
+    };
+    try {
+      let { res, data } = await post(false);
+      if (data.critical === true && await confirmCriticalFiles([filePath])) {
+        ({ res, data } = await post(true));
+      }
       if (res.ok && data.status === 'success' && data.applied === true) {
         setFeedback({ type: 'success', msg: `${filePath.split('/').pop()} appliqué au projet` });
         setSelectedFile(next); // enchaîne directement sur le fichier suivant
@@ -781,7 +796,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     } finally {
       setActionBusy(null);
     }
-  }, [loadDiffs, neighbourOf]);
+  }, [loadDiffs, neighbourOf, confirmCriticalFiles]);
 
   const handleRejectFile = useCallback(async (filePath: string) => {
     const name = filePath.split('/').pop();
@@ -830,14 +845,29 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     if (!ok) return;
     setActionBusy('all');
     setFeedback(null);
+    const post = async (confirmCritical: boolean) => (await fetch('/api/sandbox/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ confirmCritical }),
+    })).json();
     try {
-      const res = await fetch('/api/sandbox/sync', { method: 'POST', headers: getAuthHeaders() });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setFeedback({ type: 'success', msg: `${files.length} fichier(s) appliqué(s)` });
-        setFiles([]);
+      let data = await post(false);
+      let synced = Array.isArray(data.synced) ? data.synced.length : 0;
+      const critical: string[] = (Array.isArray(data.skipped) ? data.skipped : [])
+        .filter((s: { critical?: boolean }) => s.critical)
+        .map((s: { path: string }) => s.path);
+      if (critical.length > 0 && await confirmCriticalFiles(critical)) {
+        data = await post(true);
+        synced += Array.isArray(data.synced) ? data.synced.length : 0;
+      }
+      if (data.status === 'success' || synced > 0) {
+        const skipped: Array<{ path: string; reason: string }> = Array.isArray(data.skipped) ? data.skipped : [];
+        setFeedback(skipped.length > 0
+          ? { type: 'error', msg: `${synced} fichier(s) appliqué(s), ${skipped.length} non appliqué(s) : ${skipped.map(s => s.reason).join(' ; ')}` }
+          : { type: 'success', msg: `${synced} fichier(s) appliqué(s)` });
         setSelectedFile(null);
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
+        await loadDiffs(); // les fichiers ignorés restent listés
       } else if (data.status === 'validation_failed') {
         const errCount = data.errorCount || 0;
         const warnCount = data.warningCount || 0;
@@ -850,7 +880,7 @@ export function SandboxDiffViewer({ onClose, initialSelectedFile, embedded = fal
     } finally {
       setActionBusy(null);
     }
-  }, [files.length, confirm]);
+  }, [files.length, confirm, loadDiffs, confirmCriticalFiles]);
 
   const handleRejectAll = useCallback(async () => {
     const ok = await confirm({

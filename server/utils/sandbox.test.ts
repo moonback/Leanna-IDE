@@ -140,3 +140,41 @@ test('sandbox: isExcludedFromDiff exclut .Leanna/core et les dossiers internes',
   // Un dossier qui commence par le même texte mais n'est pas le préfixe exact.
   assert.ok(!isExcludedFromDiff('.Leannafoo/bar.ts'));
 });
+
+// ── Régression : « Tout appliquer » annulait tout si un seul fichier était critique ──
+test('sandbox: syncToMain applique les fichiers autorisés et garde les critiques en attente', async () => {
+  const { initSandbox, syncToMain } = await import('./sandbox.js');
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-sandbox-sync-'));
+  try {
+    fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{"name":"test"}', 'utf-8');
+    fs.writeFileSync(path.join(tmpRoot, 'server.ts'), '// original', 'utf-8');
+    fs.mkdirSync(path.join(tmpRoot, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'src', 'a.ts'), '// original', 'utf-8');
+    setSelfRoot(tmpRoot);
+    await initSandbox();
+    activateSandbox();
+
+    for (const rel of ['server.ts', 'src/a.ts']) {
+      fs.writeFileSync(resolveSandboxPath(rel)!, '// modifié', 'utf-8');
+      markFileModified(rel);
+    }
+
+    const result = await syncToMain();
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.synced, ['src/a.ts']);
+    assert.equal(result.skipped?.length, 1);
+    assert.equal(result.skipped?.[0].critical, true);
+    assert.equal(fs.readFileSync(path.join(tmpRoot, 'src', 'a.ts'), 'utf-8'), '// modifié');
+    assert.equal(fs.readFileSync(path.join(tmpRoot, 'server.ts'), 'utf-8'), '// original');
+    assert.deepEqual(getSandboxModifiedFiles(), ['server.ts']);
+
+    // Confirmation explicite de l'utilisateur → le fichier critique passe.
+    const confirmed = await syncToMain({ confirmCritical: true });
+    assert.deepEqual(confirmed.synced, ['server.ts']);
+    assert.equal(fs.readFileSync(path.join(tmpRoot, 'server.ts'), 'utf-8'), '// modifié');
+    assert.deepEqual(getSandboxModifiedFiles(), []);
+  } finally {
+    deactivateSandbox();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
