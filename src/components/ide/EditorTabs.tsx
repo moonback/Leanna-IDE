@@ -210,7 +210,7 @@ export function EditorTabs({
           className={iconButton}
           title="Autres options de l'éditeur"
           aria-label="Autres options de l'éditeur"
-          aria-haspopup="menu"
+          aria-haspopup="true"
           aria-expanded={showMore}
         >
           <MoreHorizontal size={15} style={{ color: showMore ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -218,14 +218,13 @@ export function EditorTabs({
 
         {showMore && (
           <div
-            role="menu"
+            role="group"
             aria-label="Options de l'éditeur"
             className="glass-float absolute right-1 top-[calc(100%+6px)] z-[var(--z-popover)] min-w-[220px] p-1.5 shadow-xl"
           >
             <button
               type="button"
-              role="menuitemcheckbox"
-              aria-checked={showMinimap}
+              aria-pressed={showMinimap}
               onClick={() => { onToggleMinimap(); setShowMore(false); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
@@ -236,8 +235,7 @@ export function EditorTabs({
             </button>
             <button
               type="button"
-              role="menuitemcheckbox"
-              aria-checked={wordWrap}
+              aria-pressed={wordWrap}
               onClick={() => { onToggleWordWrap(); setShowMore(false); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
@@ -249,7 +247,6 @@ export function EditorTabs({
             <div className="my-1 h-px" style={{ background: 'var(--border-base)' }} />
             <button
               type="button"
-              role="menuitem"
               onClick={() => { onFormat(); setShowMore(false); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
