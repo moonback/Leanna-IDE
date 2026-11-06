@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { AudioLines, Check, Mic, MicOff, Send, Sparkles, Square, Users, X } from 'lucide-react';
+import { AudioLines, Mic, MicOff, Send, Sparkles, Square, Users, X } from 'lucide-react';
 
 type Turn = { id: string; speaker: 'leanna' | 'roxane' | 'user'; text: string; round: number };
-type Result = { id: string; topic: string; turns: Turn[]; synthesis: string; status: string; durationMs: number };
 
 export function RoxaneDebateLauncher() {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('');
   const [context, setContext] = useState('');
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [preferredVoice, setPreferredVoice] = useState('');
   const [liveStatus, setLiveStatus] = useState('idle');
   const [liveTurns, setLiveTurns] = useState<Turn[]>([]);
   const [interjection, setInterjection] = useState('');
@@ -21,7 +18,6 @@ export function RoxaneDebateLauncher() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioScheduleRef = useRef(0);
   const recognitionRef = useRef<any>(null);
-  const speechRunRef = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,52 +31,11 @@ export function RoxaneDebateLauncher() {
     return () => window.removeEventListener('Leanna-start-roxane-debate', openPanel);
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    fetch('/api/debate/config').then(r => r.ok ? r.json() : null)
-      .then(data => { if (alive && typeof data?.config?.voice === 'string') setPreferredVoice(data.config.voice); })
-      .catch(() => {});
-    return () => { alive = false; window.speechSynthesis?.cancel(); recognitionRef.current?.stop?.(); liveSocketRef.current?.close(); void audioContextRef.current?.close(); };
+  useEffect(() => () => {
+    recognitionRef.current?.stop?.();
+    liveSocketRef.current?.close();
+    void audioContextRef.current?.close();
   }, []);
-
-  const createUtterance = (text: string, speaker: 'leanna' | 'roxane') => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.rate = speaker === 'roxane' ? 0.96 : 1.03;
-    const frenchVoices = window.speechSynthesis.getVoices().filter(v => /^fr/i.test(v.lang));
-    const configuredVoice = preferredVoice.trim()
-      ? frenchVoices.find(v => v.name.toLowerCase().includes(preferredVoice.toLowerCase()))
-      : undefined;
-    const preferred = configuredVoice ?? frenchVoices.find(v =>
-      speaker === 'roxane'
-        ? /audrey|hortense|amelie|female|julie/i.test(v.name)
-        : /marie|julie|female|audrey/i.test(v.name)
-    ) ?? frenchVoices[0];
-    if (preferred) utterance.voice = preferred;
-    return utterance;
-  };
-
-  const speak = (text: string, speaker: 'leanna' | 'roxane') => {
-    if (!('speechSynthesis' in window)) return;
-    speechRunRef.current += 1;
-    window.speechSynthesis.cancel();
-    const utterance = createUtterance(text, speaker);
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const speakSequence = (turns: Turn[], index = 0, runId = ++speechRunRef.current) => {
-    if (!('speechSynthesis' in window) || runId !== speechRunRef.current) return;
-    const turn = turns[index];
-    if (!turn) { setSpeaking(false); return; }
-    const utterance = createUtterance(turn.text, turn.speaker === 'roxane' ? 'roxane' : 'leanna');
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => speakSequence(turns, index + 1, runId);
-    utterance.onerror = () => speakSequence(turns, index + 1, runId);
-    window.speechSynthesis.speak(utterance);
-  };
 
   const startRecognition = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -101,7 +56,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const run = async () => {
-    setError(''); setResult(null); setLiveTurns([]); setBusy(true); setLiveStatus('connecting'); stopSpeech();
+    setError(''); setLiveTurns([]); setBusy(true); setLiveStatus('connecting');
     try {
       const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(`${scheme}//${window.location.host}/roxane-live`);
@@ -161,8 +116,7 @@ export function RoxaneDebateLauncher() {
     setBusy(false); setSpeaking(false); setLiveStatus('interrupted');
   };
 
-  const stopSpeech = () => { speechRunRef.current += 1; window.speechSynthesis?.cancel(); setSpeaking(false); };
-  const close = () => { stopSpeech(); stopLive(); recognitionRef.current?.stop?.(); setListening(false); setOpen(false); };
+  const close = () => { stopLive(); recognitionRef.current?.stop?.(); setListening(false); setOpen(false); };
 
   return <>
     <button type="button" onClick={() => { setOpen(true); setLiveStatus('idle'); }} title="Débattre avec Roxane" aria-label="Ouvrir le débat Roxane" className="fixed bottom-5 right-5 z-[80] flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold shadow-xl transition-transform hover:scale-[1.03]" style={{ background: 'linear-gradient(135deg,#49318b,#7650c9)', borderColor: 'rgba(196,181,253,.35)', color: '#fff' }}>
