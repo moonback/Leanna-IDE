@@ -375,6 +375,17 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
             {/* Navigation groupée (routes) ou outils (IDE) */}
             <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
+              {mode === 'ide' && NAV_GROUPS.map((group, gi) => (
+                <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
+                  open={!closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                  hasActive={group.items.some((item) => isActive(item.path))}>
+                  {group.items.map((item) => (
+                    <li key={item.id}>
+                      <NavButton item={item} active={isActive(item.path)} collapsed={collapsed} onClick={() => navigate(item.path)} />
+                    </li>
+                  ))}
+                </Group>
+              ))}
               {mode === 'ide'
                 ? toolGroups.map((group, gi) => (
                     <Group
