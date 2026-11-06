@@ -25,7 +25,16 @@ interface CommandEntry {
   label: string;
   description?: string;
   category?: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
+  shortcut?: string;
+  action: () => void;
+}
+
+export interface CommandPaletteExtraCommand {
+  id: string;
+  label: string;
+  description?: string;
+  category?: string;
   shortcut?: string;
   action: () => void;
 }
@@ -43,6 +52,8 @@ interface CommandPaletteProps {
   onShowDiff: () => void;
   /** Ouvre le panneau d'impact sur le fichier actif (absent = commande masquée). */
   onAnalyzeImpact?: () => void;
+  /** Actions contextuelles fournies par IdeView (navigation et panneaux). */
+  extraCommands?: CommandPaletteExtraCommand[];
 }
 
 // ── Fuzzy match ────────────────────────────────────────────────────────────
@@ -82,6 +93,7 @@ export function CommandPalette({
   onToggleSettings,
   onShowDiff,
   onAnalyzeImpact,
+  extraCommands = [],
 }: CommandPaletteProps) {
   const [mode, setMode] = useState<PaletteMode>(initialMode);
   const [query, setQuery] = useState('');
@@ -126,7 +138,12 @@ export function CommandPalette({
     ...(onAnalyzeImpact ? [
       { id: 'analyze-impact', label: "Analyser l'impact du fichier", description: 'Voir ce qu’une modification du fichier actif risque de casser', category: 'Fichier', icon: <Network size={14} />, action: () => { onAnalyzeImpact(); onClose(); } },
     ] : []),
-  ], [onSave, onFormat, onToggleMinimap, onToggleWordWrap, onToggleSettings, onShowDiff, onAnalyzeImpact, onClose]);
+    ...extraCommands.map((command) => ({
+      ...command,
+      icon: undefined,
+      action: () => { command.action(); onClose(); },
+    })),
+  ], [onSave, onFormat, onToggleMinimap, onToggleWordWrap, onToggleSettings, onShowDiff, onAnalyzeImpact, extraCommands, onClose]);
 
   const results = useMemo(() => {
     if (mode === 'files') {
@@ -274,7 +291,7 @@ export function CommandPalette({
                       onClick={() => handleSelect(i)}
                       onMouseEnter={() => setSelectedIndex(i)}
                     >
-                      <span style={{ color: 'var(--text-muted)' }}>{cmd.icon}</span>
+                      {cmd.icon && <span style={{ color: 'var(--text-muted)' }}>{cmd.icon}</span>}
                       <div className="flex flex-1 flex-col min-w-0">
                         <span style={{ color: 'var(--text-primary)' }}>{cmd.label}</span>
                         {cmd.description && (
