@@ -7,7 +7,7 @@ La page `/voice-duo` ouvre un WebSocket authentifié sur `/voice-duo-live`. Le s
 - **Leanna** : persona principale, voix `aiVoice`.
 - **Roxane** : persona critique et complémentaire, voix `duoVoice`.
 
-Chaque session conserve son propre état conversationnel côté Gemini. L'orchestrateur maintient un transcript partagé borné et transmet à chaque IA les interventions récentes de l'utilisateur et de l'autre IA avant de lui donner la parole. Une seule session est autorisée à produire de l'audio vers le client à un instant donné : les sorties ne se chevauchent donc pas.
+Chaque session conserve son propre état conversationnel côté Gemini. Les deux sessions reçoivent les déclarations d'outils du `SkillManagerV2` (outils natifs, skills et outils MCP chargés), et leurs appels sont exécutés par le pipeline partagé de `/live` via `executeLiveToolCall`. L'orchestrateur maintient un transcript partagé borné et transmet à chaque IA les interventions récentes de l'utilisateur et de l'autre IA avant de lui donner la parole. Une seule session est autorisée à produire de l'audio vers le client à un instant donné : les sorties ne se chevauchent donc pas.
 
 ## Flux audio temps réel
 
@@ -29,6 +29,14 @@ Dans **Paramètres → Assistant IA** :
 - Valeurs initiales : Leanna / Aoede et Roxane / Kore.
 
 Les noms et voix sont chargés depuis le profil courant. Les voix doivent appartenir au catalogue Gemini Live accepté par le modèle sélectionné.
+
+## Accès au runtime IDE
+
+- Les deux assistants disposent du catalogue d'outils du `SkillManagerV2` au démarrage : lecture/recherche de fichiers, édition et création, commandes projet, vérifications, sécurité, mémoire, Knowledge Graph, agents, automatisations, navigateur, GitHub, Telegram, custom skills et outils MCP lorsqu'ils sont configurés.
+- Le mode `ask` applique le même filtrage de fonctions en lecture seule que `/live`. Les outils Git restent retirés et les outils agents/reasoning respectent les options du profil.
+- Les appels passent par `executeLiveToolCall`, réutilisant les contrôles de démarrage du workspace, sandbox, mode Ask, Supervisor, context gate, retries, contrôle anti-injection des résultats, limites de taille et auto-vérification après écriture.
+- Une file d'exécution commune sérialise les lots d'appels provenant des deux sessions afin d'éviter les modifications simultanées du workspace. Les deux IA partagent également le même `Supervisor` de connexion.
+- Les événements `tool_call`, `tool_batch_complete` et `tool_error` sont relayés à l'interface Duo vocal.
 
 ## Sécurité et cycle de vie
 
