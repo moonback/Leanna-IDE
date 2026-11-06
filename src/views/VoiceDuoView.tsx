@@ -16,12 +16,13 @@ export default function VoiceDuoView() {
   const [sessionsReady, setSessionsReady] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const activeRef = useRef(false);
+  const sessionsReadyRef = useRef(false);
   const intentionalCloseRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   const onAudioData = useCallback((pcm16: ArrayBuffer) => {
     const ws = wsRef.current;
-    if (activeRef.current && ws?.readyState === WebSocket.OPEN) ws.send(pcm16);
+    if (activeRef.current && sessionsReadyRef.current && ws?.readyState === WebSocket.OPEN) ws.send(pcm16);
   }, []);
 
   const audio = useAudio({
@@ -48,6 +49,7 @@ export default function VoiceDuoView() {
     activeRef.current = false;
     setActive(false);
     setSessionsReady(false);
+    sessionsReadyRef.current = false;
     wsRef.current?.close(1000, "User ended voice duo");
     wsRef.current = null;
     audio.cleanupAudio();
@@ -80,6 +82,7 @@ export default function VoiceDuoView() {
         try {
           const msg = JSON.parse(event.data as string);
           if (msg.type === "ready") {
+            sessionsReadyRef.current = true;
             setSessionsReady(true);
             setStatus("Deux sessions Gemini Live connectées — vous pouvez parler");
             setActiveSpeaker("leanna");
@@ -113,6 +116,7 @@ export default function VoiceDuoView() {
       ws.onclose = event => {
         wsRef.current = null;
         setSessionsReady(false);
+        sessionsReadyRef.current = false;
         if (!intentionalCloseRef.current) {
           activeRef.current = false;
           setActive(false);
