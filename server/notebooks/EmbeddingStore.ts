@@ -416,7 +416,10 @@ export class EmbeddingStore {
     const newChunks = chunks.filter(c => {
       const existing = this.vectors.get(c.id);
       if (!existing) return true;
-      if (existing.sourceId === sourceId && existing.notebookId === notebookId) return false;
+      if (existing.notebookId !== notebookId) {
+        throw new Error(`Le chunk ${c.id} est déjà associé à un autre notebook.`);
+      }
+      if (existing.sourceId === sourceId) return false;
       log.warn(`Propriétaire embedding incohérent pour chunk ${c.id.slice(0, 8)} : remplacement`);
       this.vectors.delete(c.id);
       return true;
