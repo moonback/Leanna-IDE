@@ -40,6 +40,8 @@ export interface QueueTask<T = unknown> {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  /** Date de reprise après backoff, persistée pour survivre au redémarrage. */
+  nextAttemptAt?: string;
   /** Progression (0-100) */
   progress: number;
 }
@@ -102,6 +104,7 @@ export class ProcessingQueue<T = unknown> {
   /** Définit le handler qui traite les tâches */
   setHandler(handler: TaskHandler<T>): void {
     this.handler = handler;
+    for (const task of this.retrying.values()) this.scheduleRetry(task);
     this.processNext();
   }
 
@@ -123,7 +126,14 @@ export class ProcessingQueue<T = unknown> {
         && Number.isInteger(task.maxAttempts) && task.maxAttempts > task.attempts
         && typeof task.createdAt === "string" && task.payload !== undefined
       ).slice(0, this.config.maxQueueSize) as QueueTask<T>[];
-      this.queue = restored;
+      for (const task of restored) {
+        if (task.nextAttemptAt && Number.isFinite(Date.parse(task.nextAttemptAt)) && Date.parse(task.nextAttemptAt) > Date.now()) {
+          this.retrying.set(task.id, task);
+        } else {
+          delete task.nextAttemptAt;
+          this.queue.push(task);
+        }
+      }
       log.info(`♻️ ${restored.length} tâche(s) en attente restaurée(s)`);
     } catch (error: any) {
       log.error(`Impossible de restaurer la queue persistée : ${error.message}`);
@@ -221,6 +231,7 @@ export class ProcessingQueue<T = unknown> {
 
     const task = this.queue.shift()!;
     task.status = "processing";
+    delete task.nextAttemptAt;
     task.startedAt = new Date().toISOString();
     task.attempts++;
     this.persistPending();
@@ -253,17 +264,11 @@ export class ProcessingQueue<T = unknown> {
         task.progress = 0;
         const delay = this.config.retryBaseDelayMs * Math.pow(2, task.attempts - 1);
 
+        task.nextAttemptAt = new Date(Date.now() + delay).toISOString();
         log.info(`🔄 Retry dans ${delay}ms...`);
         this.retrying.set(task.id, task);
         this.persistPending();
-        const retryTimer = setTimeout(() => {
-          this.retryTimers.delete(task.id);
-          this.retrying.delete(task.id);
-          this.queue.unshift(task); // Remettre en tête
-          this.persistPending();
-          this.processNext();
-        }, delay);
-        this.retryTimers.set(task.id, retryTimer);
+        this.scheduleRetry(task);
       } else {
         task.status = "failed";
         task.error = e.message;
@@ -285,6 +290,23 @@ export class ProcessingQueue<T = unknown> {
   }
 
   // ─── Événements ────────────────────────────────────────────────────────────
+
+  /** Programme une reprise en respectant l'échéance persistée. */
+  private scheduleRetry(task: QueueTask<T>): void {
+    if (this.retryTimers.has(task.id)) return;
+    const dueAt = task.nextAttemptAt ? Date.parse(task.nextAttemptAt) : Date.now();
+    const delay = Math.max(0, dueAt - Date.now());
+    const retryTimer = setTimeout(() => {
+      this.retryTimers.delete(task.id);
+      this.retrying.delete(task.id);
+      delete task.nextAttemptAt;
+      const index = this.findInsertIndex(task.priority);
+      this.queue.splice(index, 0, task);
+      this.persistPending();
+      this.processNext();
+    }, delay);
+    this.retryTimers.set(task.id, retryTimer);
+  }
 
   /** S'abonner aux mises à jour d'une tâche */
   onUpdate(taskId: string, callback: (task: QueueTask<T>) => void): () => void {
