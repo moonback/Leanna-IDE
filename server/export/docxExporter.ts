@@ -99,8 +99,7 @@ function renderTokens(tokens: Token[], links: string[], listDepth = 0): string {
         return (token.items ?? []).map((item: Token) => {
           const itemRuns = inline(item.tokens ?? [{ type: 'text', text: item.text ?? '' }], links);
           const numId = ordered ? '2' : '1';
-          const bullet = ordered ? '' : '';
-          const first = paragraph(itemRuns, undefined, `<w:numPr><w:ilvl w:val="${Math.min(listDepth, 8)}"/><w:numId w:val="${numId}"/></w:numPr>`);
+          const first = paragraph(itemRuns, undefined, `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${numId}"/></w:numPr>`);
           return first + (item.items?.length ? renderTokens(item.items, links, listDepth + 1) : '');
         }).join('');
       }
@@ -196,7 +195,7 @@ export function exportToDocx(markdown: string, options: DocxExportOptions = {}):
   const title = options.title || 'Document Leanna';
   const author = options.author || 'Leanna';
   const links: string[] = [];
-  const body = renderTokens(Lexer.lex(markdown || ''), links);
+  const body = renderTokens(Lexer.lex(markdown || '') as unknown as Token[], links);
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>
 <w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>${run(title, { bold: true })}</w:p>
@@ -205,6 +204,7 @@ ${body}
 </w:body></w:document>`;
   const rels = [
     '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+    '<Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>',
     ...links,
   ].join('');
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
