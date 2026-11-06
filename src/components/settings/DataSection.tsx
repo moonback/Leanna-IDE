@@ -80,7 +80,7 @@ export function DataSection() {
     try {
       const res = await fetch('/api/memories/all', { method: 'DELETE' });
       const data = await readApiJson(res);
-      if (data.status === 'error' || !Number.isFinite(data.deleted)) throw new Error(data.error || 'Réponse de suppression des mémoires invalide.');
+      if (data.status !== 'success' || !Number.isFinite(data.deleted)) throw new Error(data.error || 'Réponse de suppression des mémoires invalide.');
       setMemoryResult({ type: 'success', message: `${data.deleted} mémoire(s) supprimée(s) dans le projet actif` });
     } catch (e: unknown) { setMemoryResult({ type: 'error', message: e instanceof Error ? e.message : 'Erreur réseau' }); }
     finally { clearingMemoryRef.current = false; setClearingMemory(false); setConfirmMemory(false); }
