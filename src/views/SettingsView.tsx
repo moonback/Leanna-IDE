@@ -123,6 +123,7 @@ export default function SettingsView() {
   const { success, error: toastError } = useToast();
   const { confirm } = useConfirm();
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Section initiale : URL > dernière section mémorisée > profil.
@@ -185,9 +186,15 @@ export default function SettingsView() {
   }, []);
 
   const handleSave = useCallback(async () => {
+    // Le verrou ref protège aussi les clics rapprochés avant le prochain rendu React.
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    let savedLocally = false;
     try {
+      // Le profil reste disponible localement même si le serveur est temporairement indisponible.
       save();
+      savedLocally = true;
       const response = await fetch('/api/profile', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -211,11 +218,18 @@ export default function SettingsView() {
       // Notifier la session live de se reconnecter pour prendre en compte
       // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
       window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
-    } catch { toastError('Erreur lors de la sauvegarde'); }
-    finally { setSaving(false); }
+    } catch {
+      toastError(savedLocally
+        ? 'Paramètres enregistrés localement, mais synchronisation serveur impossible'
+        : 'Impossible d’enregistrer les paramètres localement');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }, [save, profile, success, toastError]);
 
   const handleReset = useCallback(async () => {
+    if (savingRef.current) return;
     const confirmed = await confirm({
       title: 'Réinitialiser les paramètres ?',
       message: 'Tous les réglages du profil seront remplacés par leurs valeurs par défaut. Cette action ne peut pas être annulée.',
@@ -223,7 +237,7 @@ export default function SettingsView() {
       cancelLabel: 'Conserver mes réglages',
       variant: 'danger',
     });
-    if (!confirmed) return;
+    if (!confirmed || savingRef.current) return;
     reset();
     success('Paramètres réinitialisés');
   }, [confirm, reset, success]);
@@ -288,7 +302,7 @@ export default function SettingsView() {
             >
               <ArrowLeft className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
             </Tooltip>
-            <Button variant="secondary" size="sm" onClick={handleReset} iconLeft={<RotateCcw className="h-3.5 w-3.5" />}>
+            <Button variant="secondary" size="sm" onClick={handleReset} disabled={saving} iconLeft={<RotateCcw className="h-3.5 w-3.5" />}>
               <span className="hidden sm:inline">Réinitialiser</span>
             </Button>
             <Button variant="primary" size="sm" onClick={handleSave} disabled={saving} iconLeft={<Save className="h-3.5 w-3.5" />}>
