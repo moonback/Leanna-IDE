@@ -78,6 +78,8 @@ export interface Source {
 
 export interface Notebook {
   id: string;
+  /** Version du schéma persisté ; absente uniquement sur les anciens fichiers avant migration. */
+  schemaVersion?: number;
   /** Chemin absolu du workspace auquel appartient ce notebook. Undefined = global (rétrocompatibilité). */
   workspaceId?: string;
   title: string;
