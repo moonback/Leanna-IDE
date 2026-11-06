@@ -39,6 +39,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     let autonomousTurns = 0;
     let chainActive = false;
     let advancing = false;
+    let suppressOutputUntilUserText = false;
     let closed = false;
     const startedAt = Date.now();
 
@@ -131,11 +132,13 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
               chainId += 1;
               chainActive = false;
               advancing = false;
+              suppressOutputUntilUserText = true;
               send({ type: "interrupted", speaker });
             }
             const inputText = (content as any)?.inputTranscription?.text;
             if (typeof inputText === "string" && inputText.trim()) {
               append("user", inputText);
+              suppressOutputUntilUserText = false;
               chainId += 1;
               chainActive = true;
               autonomousTurns = 0;
@@ -149,7 +152,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
               send({ type: "transcript", speaker, name: names[speaker], text: outputText });
             }
             for (const part of content?.modelTurn?.parts ?? []) {
-              if (part.inlineData?.data && activeSpeaker === speaker && client.readyState === WebSocket.OPEN) {
+              if (part.inlineData?.data && !suppressOutputUntilUserText && activeSpeaker === speaker && client.readyState === WebSocket.OPEN) {
                 try { client.send(Buffer.from(part.inlineData.data, "base64"), { binary: true }); }
                 catch { /* client disconnected */ }
               }
@@ -239,6 +242,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
         if (msg.type === "text" && typeof msg.text === "string" && msg.text.trim()) {
           chainId += 1;
           chainActive = true;
+          suppressOutputUntilUserText = false;
           autonomousTurns = 0;
           advancing = false;
           append("user", msg.text);
