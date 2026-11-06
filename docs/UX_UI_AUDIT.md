@@ -712,7 +712,7 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Comptage des notebooks effectivement validés et copiés lors de la création d'une sauvegarde.
 - Bornes de configuration : intervalle de 60 secondes à 30 jours, rotation de 1 à 100 sauvegardes et booléen strict pour l'activation.
 - Contrats HTTP de sauvegarde renforcés : corps JSON, identifiants, compteurs de restauration et propriétés de configuration validés ; les restaurations partielles renvoient HTTP 207.
-- Import Marketplace réellement fonctionnel : contrôle du format, taille maximale de 5 Mo, maximum de 20 paquets, validation structurelle de l'ensemble du fichier, republication dans le registre local (validation Zod et nouvelle analyse de sécurité serveur), puis installation. Les erreurs partielles sont remontées.
+- Import Marketplace réellement fonctionnel : contrôle du format, taille maximale de 5 Mo, maximum de 20 paquets, validation structurelle de l'ensemble du fichier et prévalidation serveur de tous les paquets (schéma Zod + analyse de sécurité) avant toute écriture. Les paquets sont ensuite republiés dans le registre local puis installés ; les erreurs partielles sont remontées.
 
 ### Fichiers concernés
 
