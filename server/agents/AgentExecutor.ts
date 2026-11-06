@@ -28,6 +28,7 @@ import { WorkspaceState, type VerificationRecord, type VerificationIssue } from 
 import { AgentRepairLoop } from "./AgentRepairLoop.js";
 import { telemetryService } from "../observability/TelemetryService.js";
 import { runWithTelemetryContext } from "../utils/textGeneration.js";
+import { agentTaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 
 const log = createLogger("AgentExecutor");
 
@@ -310,7 +311,7 @@ export class AgentExecutor implements AgentTaskRunner {
    */
   cancel(taskId: string): boolean {
     const controller = this.abortControllers.get(taskId);
-    if (!controller) return false;
+    if (!controller) return agentTaskExecutionLimiter.cancel(taskId);
     if (controller.signal.aborted) return true;
     log.info(`[task:${taskId.slice(0, 8)}] 🛑 Annulation demandée — interruption à venir`);
     controller.abort();
@@ -349,14 +350,17 @@ export class AgentExecutor implements AgentTaskRunner {
     // Contexte de télémétrie propre à CETTE tâche (AsyncLocalStorage) : les
     // tâches concurrentes ne peuvent plus s'écraser mutuellement leur
     // attribution, et le missionId parent éventuel est conservé.
-    return runWithTelemetryContext(
-      {
-        taskId: task.id,
-        missionId: (task.context as any)?.missionId,
-        agentRole: task.role,
-        toolName: 'agent_execute',
-      },
-      () => this.executeTask(task),
+    return agentTaskExecutionLimiter.run(
+      () => runWithTelemetryContext(
+        {
+          taskId: task.id,
+          missionId: (task.context as any)?.missionId,
+          agentRole: task.role,
+          toolName: 'agent_execute',
+        },
+        () => this.executeTask(task),
+      ),
+      task.id,
     );
   }
 
