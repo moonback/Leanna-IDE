@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { DEFAULT_ROXANE_CONFIG, normalizeRoxaneConfig, type DebateRunRequest } from '../debate/types.js';
-import { runDebate } from '../debate/DebateOrchestrator.js';
+import { runDebate, synthesizeLiveDebate } from '../debate/DebateOrchestrator.js';
 
 export function createDebateRouter(
   getProfile: () => Record<string, any>,
@@ -26,6 +26,27 @@ export function createDebateRouter(
       voice: config.voice, maxRounds: config.maxRounds,
     });
     res.json({ success: true, config });
+  });
+
+  router.post('/synthesize-live', async (req: Request, res: Response) => {
+    const topic = typeof req.body?.topic === 'string' ? req.body.topic.trim().slice(0, 3000) : '';
+    const turns = Array.isArray(req.body?.turns) ? req.body.turns.slice(0, 32) : [];
+    if (!topic || turns.length === 0) {
+      res.status(400).json({ error: 'Sujet et transcription du débat requis.' });
+      return;
+    }
+    const safeTurns = turns.flatMap((turn: any) => {
+      if (!['leanna', 'roxane', 'user'].includes(turn?.speaker) || typeof turn?.text !== 'string') return [];
+      return [{ speaker: turn.speaker, text: turn.text.slice(0, 5000) }];
+    });
+    try {
+      const synthesis = await synthesizeLiveDebate(getProfile(), topic, safeTurns);
+      res.json({ success: true, synthesis });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[Roxane][Synthesis] Échec', message);
+      res.status(502).json({ error: 'La synthèse du débat a échoué.' });
+    }
   });
 
   router.post('/decisions/create-missions', async (req: Request, res: Response) => {
