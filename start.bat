@@ -28,7 +28,7 @@ if exist "%FS_VBS%" (
 :: Version 2.1 | Windows CMD | Node.js / Electron / PM2
 :: ============================================================
 
-set "VERSION=2.1.0"
+set "VERSION=2.2.0"
 set "LAUNCHER_VERSION=2.1"
 set "STEP=0"
 set "TOTAL=3"
