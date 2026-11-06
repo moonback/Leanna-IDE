@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectAdaptiveModel } from './modelRouter.js';
+import { getModelLatencySnapshot, recordModelLatency, selectAdaptiveModel } from './modelRouter.js';
 
 const success = (model: string, agentRole = 'coder') => ({
   id: model + '-success',
@@ -56,6 +56,13 @@ test('complex tasks increase the impact of historical failures', () => {
   assert.equal(result?.complexity, 'complex');
   assert.equal(result?.model, 'anthropic/claude-3.5-sonnet');
   assert.equal(result?.observedFailures, 0);
+});
+
+test('latency observations are retained in a bounded in-memory sample', () => {
+  const model = 'test/latency-sample';
+  recordModelLatency(model, 120);
+  recordModelLatency(model, 240);
+  assert.equal(getModelLatencySnapshot()[model], 240);
 });
 
 test('observed latency breaks ties between candidates with identical prices', () => {
