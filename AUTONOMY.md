@@ -243,26 +243,12 @@ Les tâches génériques du `TaskManager` sont désormais persistées quand Supa
 - **Reprise au démarrage** : `LeannaCore.start()` recharge les tâches `pending` et `running` non terminées et les re-soumet au `TaskManager`. Une tâche `running` interrompue par un crash repart en `pending`.
 - **Bornes réappliquées** : les tâches reprises repassent par la déduplication, les retries, le timeout et le circuit breaker existants. La reprise n’accorde aucune permission et ne contourne aucune politique.
 
-Créer la table une fois via `AutonomyPersistence.getMigrationSQL()` (dashboard Supabase ou migration) :
-
-```sql
-CREATE TABLE IF NOT EXISTS autonomy_tasks (
-  id              UUID PRIMARY KEY,
-  type            TEXT NOT NULL,
-  title           TEXT NOT NULL,
-  priority        TEXT NOT NULL DEFAULT 'medium',
-  source_event_id TEXT NOT NULL,
-  fingerprint     TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'pending',
-  attempts        INTEGER NOT NULL DEFAULT 0,
-  max_retries     INTEGER NOT NULL DEFAULT 3,
-  timeout_ms      INTEGER NOT NULL DEFAULT 60000,
-  metadata        JSONB,
-  error           TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+La table est déjà définie par la migration versionnée
+`supabase/migrations/20260101000008_create_autonomy_tasks.sql`. Appliquez les
+migrations de `supabase/migrations/` dans l'ordre chronologique, conformément à
+[DB_SCHEMA.md](DB_SCHEMA.md). `AutonomyPersistence.getMigrationSQL()` reste une
+représentation SQL de compatibilité ; ce n'est pas une migration supplémentaire
+à exécuter sur une base qui a déjà appliqué le fichier versionné.
 
 ## Limites connues et prochaines étapes
 
