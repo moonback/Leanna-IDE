@@ -87,6 +87,9 @@ backupService.start();
 // Configurer le handler de la queue de processing des sources
 sourceProcessingQueue.setHandler(async (task, onProgress) => {
   const { notebookId, fileName, mimeType, buffer } = task.payload;
+  if (!notebookManager.getNotebook(notebookId, SELF_ROOT || undefined)) {
+    throw new Error("Notebook introuvable dans le workspace actif ; tâche d'ingestion refusée.");
+  }
   onProgress(10);
 
   const source = await sourceIngester.ingestFromBuffer(
