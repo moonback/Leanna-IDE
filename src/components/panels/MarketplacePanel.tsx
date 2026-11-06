@@ -929,15 +929,26 @@ function ImportDropzone({ onImported }: { onImported: () => void }) {
         return typeof candidate.name !== "string" || candidate.name.trim().length < 2
           || typeof candidate.description !== "string" || candidate.description.trim().length < 10
           || typeof candidate.author !== "string"
-          || typeof candidate.type !== "string" || !["agent", "skill", "bundle"].includes(candidate.type);
+          || typeof candidate.type !== "string" || !new Set<string>(["agent", "skill", "bundle"]).has(candidate.type);
       });
       if (invalid) {
         throw new Error("Le fichier contient un paquet incomplet ou un format non pris en charge. Aucun paquet n'a été importé.");
       }
 
+      const packageRecords = packages as Array<Record<string, any>>;
+      // Pré-valider tous les paquets côté serveur avant la première écriture :
+      // un seul paquet invalide ou signalé bloque l'import complet.
+      const preflight = await Promise.all(packageRecords.map((pkg) => validateSecurity(pkg)));
+      const rejectedIndex = preflight.findIndex((check) =>
+        !check.success || check.securityReport?.trustLevel === "flagged"
+      );
+      if (rejectedIndex >= 0) {
+        throw new Error(`Import annulé : le paquet "${packageRecords[rejectedIndex].name}" est invalide ou signalé par l'analyse de sécurité.`);
+      }
+
       let installed = 0;
       const errors: string[] = [];
-      for (const pkg of packages as Array<Record<string, any>>) {
+      for (const pkg of packageRecords) {
         // Le paquet importé est d'abord republié dans le registre local :
         // l'API valide le schéma et recalcule son analyse de sécurité.
         const published = await publishPackage(pkg);
