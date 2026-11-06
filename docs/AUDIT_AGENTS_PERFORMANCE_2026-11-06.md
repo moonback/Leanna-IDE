@@ -444,3 +444,14 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 - Tests ajoutés pour le modèle OpenRouter personnalisé, la valeur OpenRouter vide et le défaut Gemini.
 
 **Limite conservée volontairement :** ce changement aligne le coût estimé sur le modèle de profil actif ; il ne choisit pas encore automatiquement un modèle selon la complexité. Les tarifs `MODEL_PRICING` restent des valeurs configurées et non certifiées par rapport à la facture fournisseur.
+
+
+### Phase suivante — modèle configurable par agent personnalisé
+
+- Le profil contient déjà `agents.customAgents[].model`, mais le runtime de génération ne le consultait pas : tous les agents personnalisés partageaient le modèle OpenRouter global.
+- `AgenticRuntime.callLLM()` transmet maintenant le rôle à `generateText()`. Pour un agent personnalisé, le modèle configuré sur son rôle est utilisé lorsque le provider actif est OpenRouter.
+- Ordre de priorité : surcharge explicite `openrouterModel` de l'appel, modèle de l'agent personnalisé, modèle OpenRouter global, puis défaut sûr.
+- Les rôles sans modèle personnalisé et les appels Gemini conservent leur comportement antérieur. Le choix global de provider n'est pas modifié.
+- Tests ajoutés pour la sélection par rôle, le repli sur le modèle global et la priorité de la surcharge explicite.
+
+**Limite :** cette passe ne crée pas de sélection automatique par complexité, coût ou latence. Elle rend opérationnelle la configuration par agent déjà exposée dans le profil ; le routage adaptatif nécessitera des benchmarks fiables et une politique activable explicitement.
