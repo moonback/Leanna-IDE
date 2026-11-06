@@ -52,7 +52,7 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - GitHub reste disponible comme destination globale hors IDE, mais son entrée de navigation est filtrée dans le contexte IDE où il existe déjà comme outil direct.
 - Suppression du doublon GitHub dans le menu secondaire de la barre de statut.
 - Dans les onglets éditeur, conservation des actions contextuelles (aperçu Markdown/HTML) et de l'enregistrement à portée immédiate ; minimap, retour à la ligne, formatage et modèles sont regroupés dans un menu « Plus ».
-- Ajout d'états accessibles pour les options activables et fermeture du menu par Échap ou clic extérieur.
+- Ajout d'états accessibles pour les options activables et fermeture du menu par Échap ou clic extérieur. Le focus revient au déclencheur à la fermeture ; la fermeture d'un onglet ne déclenche pas aussi sa sélection au clavier.
 - Les onglets de fichiers reçoivent un libellé accessible et une interaction clavier.
 - La palette de commandes accepte maintenant des actions contextuelles fournies par l'IDE : explorateur, recherche, terminal, GitHub, sandbox, workflows, agents, missions et paramètres.
 
