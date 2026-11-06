@@ -131,6 +131,8 @@ export function EnvSection() {
 
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);
+  const revealingRef = useRef<Set<string>>(new Set());
 
   // Index clé → valeur d'origine (pour reset par champ et détection de dirty réel).
   const originalByKey = useMemo(() => {
@@ -143,17 +145,18 @@ export function EnvSection() {
     setLoading(true);
     try {
       const res = await fetch('/api/env');
-      const data: EnvApiResponse = await res.json();
+      const data: EnvApiResponse = await res.json().catch(() => ({ status: 'error', error: 'Réponse serveur invalide.' } as EnvApiResponse));
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.sections)) {
+        throw new Error(data.error || `Impossible de charger le fichier .env (HTTP ${res.status}).`);
+      }
       if (data.status === 'success' && data.sections) {
         setSections(data.sections);
         if (data.path) setEnvFile(data.path);
         setEdits({});
         setRevealed({});
-      } else {
-        setFeedback({ type: 'error', message: data.error || 'Impossible de charger le fichier .env.' });
       }
-    } catch {
-      setFeedback({ type: 'error', message: 'Erreur réseau lors du chargement du .env.' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Erreur réseau lors du chargement du .env.' });
     } finally {
       setLoading(false);
     }
@@ -224,18 +227,22 @@ export function EnvSection() {
       });
       return;
     }
+    if (revealingRef.current.has(key)) return;
+    revealingRef.current.add(key);
     setRevealing(prev => new Set(prev).add(key));
     try {
       const res = await fetch(`/api/env/reveal/${encodeURIComponent(key)}`);
-      const data = await res.json() as { status: string; value?: string; error?: string };
+      const data = await res.json().catch(() => null) as { status?: string; value?: string; error?: string } | null;
+      if (!res.ok || !data || data.status !== 'success' || typeof data.value !== 'string') {
+        throw new Error(data?.error || `Impossible de révéler ce secret (HTTP ${res.status}).`);
+      }
       if (data.status === 'success') {
         setRevealed(prev => ({ ...prev, [key]: data.value ?? '' }));
-      } else {
-        setFeedback({ type: 'error', message: data.error || `Impossible de déchiffrer ${key}.` });
       }
-    } catch {
-      setFeedback({ type: 'error', message: 'Erreur réseau lors du déchiffrement.' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Erreur réseau lors du déchiffrement.' });
     } finally {
+      revealingRef.current.delete(key);
       setRevealing(prev => {
         const next = new Set(prev);
         next.delete(key);
@@ -263,7 +270,8 @@ export function EnvSection() {
   const hasInvalid = invalidKeys.size > 0;
 
   const handleSave = useCallback(async () => {
-    if (!hasChanges || hasInvalid) return;
+    if (savingRef.current || !hasChanges || hasInvalid) return;
+    savingRef.current = true;
     setSaving(true);
     setFeedback(null);
     try {
@@ -272,10 +280,14 @@ export function EnvSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates: edits }),
       });
-      const data: EnvApiResponse & { applied?: string[]; rejected?: string[] } = await res.json();
+      const data = await res.json().catch(() => null) as (EnvApiResponse & { applied?: string[]; rejected?: string[] }) | null;
+      if (!res.ok || !data || data.status !== 'success') {
+        throw new Error(data?.error || `Échec de la sauvegarde (HTTP ${res.status}).`);
+      }
       if (data.status === 'success') {
         if (data.sections) setSections(data.sections);
-        setEdits({});
+        const rejectedKeys = new Set(data.rejected ?? []);
+        setEdits(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => rejectedKeys.has(key))));
         setRevealed({});
         const n = data.applied?.length ?? 0;
         setFeedback({
@@ -285,12 +297,14 @@ export function EnvSection() {
           }`,
         });
         window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
-      } else {
-        setFeedback({ type: 'error', message: data.error || 'Échec de la sauvegarde.' });
+        if (rejectedKeys.size) {
+          setFeedback({ type: 'error', message: `${n} variable(s) enregistrée(s), ${rejectedKeys.size} refusée(s). Les modifications refusées sont conservées.` });
+        }
       }
-    } catch {
-      setFeedback({ type: 'error', message: 'Erreur réseau lors de la sauvegarde.' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Erreur réseau lors de la sauvegarde.' });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }, [edits, hasChanges, hasInvalid]);
@@ -489,7 +503,10 @@ export function EnvSection() {
         </button>
 
         <button
-          onClick={fetchEnv}
+          onClick={() => {
+            if (hasChanges && !window.confirm('Recharger le fichier .env et abandonner les modifications non enregistrées ?')) return;
+            fetchEnv();
+          }}
           disabled={saving}
           className="flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition hover:opacity-80 disabled:opacity-50"
           style={{ borderColor: 'var(--border-base)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)' }}
