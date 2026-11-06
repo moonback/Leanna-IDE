@@ -515,6 +515,34 @@ test('supervised mode: a mission is never "completed" while the Supervisor rejec
 });
 
 
+test('supervisor evidence includes files written through apply_patch', () => {
+  const executor = new Executor();
+  const mission = {
+    id: 'mission-apply-patch',
+    getState: () => ({
+      title: 'Patch a source file',
+      goals: {
+        root: { id: 'root', parentId: null, status: 'completed', plannedActions: [] },
+        child: {
+          id: 'child',
+          parentId: 'root',
+          status: 'completed',
+          plannedActions: [{
+            id: 'patch-1',
+            skillName: 'apply_patch',
+            args: { path: 'src/example.ts', patch: '...' },
+            status: 'completed',
+            result: { ok: true },
+          }],
+        },
+      },
+    }),
+  };
+  const outcome = (executor as any).buildMissionOutcome(mission);
+  assert.deepEqual(outcome.evidence.filesModified, ['src/example.ts']);
+  assert.deepEqual(outcome.evidence.toolsExecuted, ['apply_patch']);
+});
+
 test('artifact intent does not misclassify analytical goals as file deliverables', () => {
   const executor = new Executor();
   const expectsArtifact = (goal: unknown) => (executor as any).goalExpectsArtifact(goal);
