@@ -106,6 +106,8 @@ export class EmbeddingStore {
   private persistTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   /** Version monotone empêchant une ancienne écriture async d'écraser un flush plus récent. */
   private persistVersions: Map<string, number> = new Map();
+  /** Génération par source : invalide les embeddings d'une ingestion devenue obsolète. */
+  private sourceGenerations: Map<string, number> = new Map();
 
   constructor(options?: { maxVectorsInMemory?: number }) {
     this.maxVectorsInMemory = options?.maxVectorsInMemory ?? 50_000;
@@ -409,6 +411,8 @@ export class EmbeddingStore {
 
     // S'assurer que le notebook est en mémoire avant de dédupliquer
     this.ensureNotebookLoaded(notebookId);
+    const sourceGenerationKey = `${notebookId}:${sourceId}`;
+    const sourceGeneration = this.sourceGenerations.get(sourceGenerationKey) ?? 0;
 
     // Un chunk n'est réutilisable que si son vecteur appartient bien à
     // cette source ET à ce notebook. Un ID déjà présent avec un autre
@@ -442,6 +446,13 @@ export class EmbeddingStore {
 
     const vectors = await this.embedTexts(texts);
 
+    // Une source peut avoir été remplacée pendant l'appel réseau. Ne jamais
+    // publier les vecteurs calculés pour son ancienne version.
+    if ((this.sourceGenerations.get(sourceGenerationKey) ?? 0) !== sourceGeneration) {
+      log.info(`⏭️ Indexation obsolète ignorée pour source ${sourceId.slice(0, 8)}`);
+      return 0;
+    }
+
     let indexed = 0;
     for (let i = 0; i < newChunks.length; i++) {
       const vector = vectors[i];
@@ -468,6 +479,8 @@ export class EmbeddingStore {
    * Supprime tous les embeddings d'une source.
    */
   removeSource(sourceId: string, notebookId: string): void {
+    const generationKey = `${notebookId}:${sourceId}`;
+    this.sourceGenerations.set(generationKey, (this.sourceGenerations.get(generationKey) ?? 0) + 1);
     const toDelete: string[] = [];
     this.ensureNotebookLoaded(notebookId);
     for (const [chunkId, entry] of this.vectors) {
