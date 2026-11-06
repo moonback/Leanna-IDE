@@ -550,7 +550,14 @@ export default function GitHubView() {
                 <div
                   key={issue.number}
                   onClick={() => openExternal(issue.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      openExternal(issue.html_url);
+                    }
+                  }}
+                  tabIndex={0}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`Issue #${issue.number}: ${issue.title}`}
@@ -594,7 +601,14 @@ export default function GitHubView() {
                 <div
                   key={pr.number}
                   onClick={() => openExternal(pr.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      openExternal(pr.html_url);
+                    }
+                  }}
+                  tabIndex={0}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`PR #${pr.number}: ${pr.title}`}
