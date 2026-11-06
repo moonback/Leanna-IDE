@@ -34,6 +34,8 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Ajout de GitHub dans un groupe global **Intégrations**, sans modifier sa route ni son écran.
 - Renforcement sémantique de `ViewHeader` : en-tête nommé, description consultable au survol lorsqu'elle est tronquée, barre d'outils d'actions nommée.
 - Ajout d'ajustements responsives au header : les éléments secondaires se contractent avant les actions ; la pastille d'état et le badge sont masqués sur les fenêtres étroites ; les actions restent accessibles horizontalement.
+- La réinitialisation des paramètres demande désormais une confirmation destructive via le dialogue partagé ; une réponse HTTP en erreur n'est plus présentée comme une sauvegarde réussie.
+- La navigation interne des paramètres réduit sa largeur sur les fenêtres intermédiaires et étroites.
 - Les règles de couleurs, de surfaces et de flou restent pilotées par les tokens Full Glass existants.
 
 ## Architecture UX cible
