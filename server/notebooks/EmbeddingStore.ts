@@ -410,8 +410,17 @@ export class EmbeddingStore {
     // S'assurer que le notebook est en mémoire avant de dédupliquer
     this.ensureNotebookLoaded(notebookId);
 
-    // Filtrer les chunks déjà vectorisés (évite les appels API redondants)
-    const newChunks = chunks.filter(c => !this.vectors.has(c.id));
+    // Un chunk n'est réutilisable que si son vecteur appartient bien à
+    // cette source ET à ce notebook. Un ID déjà présent avec un autre
+    // propriétaire est une collision/incohérence, pas un cache hit.
+    const newChunks = chunks.filter(c => {
+      const existing = this.vectors.get(c.id);
+      if (!existing) return true;
+      if (existing.sourceId === sourceId && existing.notebookId === notebookId) return false;
+      log.warn(`Propriétaire embedding incohérent pour chunk ${c.id.slice(0, 8)} : remplacement`);
+      this.vectors.delete(c.id);
+      return true;
+    });
 
     if (newChunks.length === 0) {
       log.info(`⏭️ Tous les chunks déjà vectorisés pour source ${sourceId.slice(0, 8)}, skip`);
@@ -457,11 +466,64 @@ export class EmbeddingStore {
    */
   removeSource(sourceId: string, notebookId: string): void {
     const toDelete: string[] = [];
+    this.ensureNotebookLoaded(notebookId);
     for (const [chunkId, entry] of this.vectors) {
-      if (entry.sourceId === sourceId) toDelete.push(chunkId);
+      if (entry.sourceId === sourceId && entry.notebookId === notebookId) toDelete.push(chunkId);
     }
     for (const id of toDelete) this.vectors.delete(id);
     this.persistNotebook(notebookId);
+  }
+
+  /**
+   * Compare l'index vectoriel au corpus réellement enregistré et répare les écarts.
+   * Les embeddings sans chunk source sont supprimés ; les vecteurs manquants ou
+   * attribués au mauvais propriétaire sont recalculés. Cette opération est
+   * incrémentale et ne réindexe pas les chunks déjà cohérents.
+   */
+  async reconcileNotebook(
+    sources: Array<{ id: string; chunks: Array<{ id: string; content: string }> }>,
+    notebookId: string
+  ): Promise<{ expected: number; before: number; removed: number; indexed: number; missing: number }> {
+    this.ensureNotebookLoaded(notebookId);
+
+    const expected = new Map<string, string>();
+    for (const source of sources) {
+      for (const chunk of source.chunks || []) {
+        const owner = expected.get(chunk.id);
+        if (owner && owner !== source.id) {
+          throw new Error(`Identifiant de chunk partagé entre deux sources : ${chunk.id}`);
+        }
+        expected.set(chunk.id, source.id);
+      }
+    }
+
+    const before = [...this.vectors.values()].filter(entry => entry.notebookId === notebookId).length;
+    let removed = 0;
+    for (const [chunkId, entry] of this.vectors) {
+      if (entry.notebookId !== notebookId) continue;
+      const expectedOwner = expected.get(chunkId);
+      if (!expectedOwner || expectedOwner !== entry.sourceId) {
+        this.vectors.delete(chunkId);
+        removed++;
+      }
+    }
+
+    let indexed = 0;
+    for (const source of sources) {
+      indexed += await this.indexChunks(
+        (source.chunks || []).map(chunk => ({ id: chunk.id, content: chunk.content })),
+        source.id,
+        notebookId
+      );
+    }
+
+    const missing = [...expected.keys()].filter(chunkId => {
+      const entry = this.vectors.get(chunkId);
+      return !entry || entry.notebookId !== notebookId || expected.get(chunkId) !== entry.sourceId;
+    }).length;
+    if (removed > 0 || indexed > 0) this.persistNotebook(notebookId);
+
+    return { expected: expected.size, before, removed, indexed, missing };
   }
 
   /**
