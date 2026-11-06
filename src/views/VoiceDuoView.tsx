@@ -20,6 +20,7 @@ export default function VoiceDuoView() {
   const intentionalCloseRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const interruptOutputRef = useRef<() => void>(() => {});
+  const lastLocalInterruptAtRef = useRef(0);
 
   const onAudioData = useCallback((pcm16: ArrayBuffer) => {
     const ws = wsRef.current;
@@ -30,6 +31,7 @@ export default function VoiceDuoView() {
     if (!activeRef.current || !sessionsReadyRef.current) return;
     // Coupe localement la lecture avant d’envoyer le prochain paquet micro.
     interruptOutputRef.current();
+    lastLocalInterruptAtRef.current = Date.now();
     const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "interrupt" }));
   }, []);
@@ -109,7 +111,7 @@ export default function VoiceDuoView() {
             appendEntry("user", "Vous", msg.text || "");
             setStatus("Vous avez la parole");
           } else if (msg.type === "interrupted") {
-            audio.handleInterrupt();
+            if (Date.now() - lastLocalInterruptAtRef.current > 1200) audio.handleInterrupt();
             setStatus("Interruption détectée — à vous la parole");
           } else if (msg.type === "listening" || msg.type === "user_turn_complete") {
             setStatus("À votre écoute — parlez naturellement");
