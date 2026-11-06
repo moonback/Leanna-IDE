@@ -1,3 +1,11 @@
+> **Note de configuration (2026-11-06) :** ce contrat décrit les opérations autorisées
+> par conception, mais le comportement effectif dépend du mode d'autonomie, des permissions,
+> du dry-run et des options de gouvernance activées dans l'installation. Les contrôles Jev,
+> ledger et Supervisor ne sont pas automatiquement actifs sur tous les chemins. Voir
+> `docs/AUTONOMY_RUNTIME_MAP.md` et `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md`.
+>
+> ---
+>
 # Leanna — Autonomy Contract
 
 This contract defines precisely what Leanna's autonomous runtime may do on its own, what
