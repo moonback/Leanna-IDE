@@ -241,8 +241,10 @@ export class AgentOrchestrator {
     agentPersistence.saveTask(task).catch(() => {});
 
     // Lancer l'exécution en arrière-plan
-    agentTaskExecutionLimiter.run(() => this.executor.execute(task)).catch((err) => {
-      log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
+    agentTaskExecutionLimiter.run(() => this.executor.execute(task), task.id).catch((err) => {
+      if (task.status !== "cancelled") {
+        log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
+      }
     });
 
     return task;
@@ -647,6 +649,9 @@ export class AgentOrchestrator {
     if (!task) return false;
 
     if (task.status === "pending") {
+      // Retirer également la tâche de la file du limiteur global : sinon elle
+      // pourrait démarrer plus tard après que l'interface l'a marquée annulée.
+      agentTaskExecutionLimiter.cancel(taskId);
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
       task.result = {
