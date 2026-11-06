@@ -260,18 +260,26 @@ export function useLiveAPI() {
   // Pendant un débat Roxane, la capture audio de la session principale Leanna
   // est suspendue afin que le microphone ne soit pas envoyé à trois sessions.
   const muteBeforeRoxaneRef = useRef<boolean | null>(null);
+  const currentMutedRef = useRef(muted);
+  useEffect(() => { currentMutedRef.current = muted; }, [muted]);
   useEffect(() => {
     const handleRoxaneState = (event: Event) => {
       const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
       if (active) {
         handleInterrupt();
         if (muteBeforeRoxaneRef.current === null) {
-          muteBeforeRoxaneRef.current = muted;
-          if (!muted) toggleMute();
+          muteBeforeRoxaneRef.current = currentMutedRef.current;
+          if (!currentMutedRef.current) {
+            currentMutedRef.current = true;
+            toggleMute();
+          }
         }
       } else if (muteBeforeRoxaneRef.current !== null) {
         const restoreMuted = muteBeforeRoxaneRef.current;
-        if (muted !== restoreMuted) toggleMute();
+        if (currentMutedRef.current !== restoreMuted) {
+          currentMutedRef.current = restoreMuted;
+          toggleMute();
+        }
         muteBeforeRoxaneRef.current = null;
       }
     };
