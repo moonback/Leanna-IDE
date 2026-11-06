@@ -289,9 +289,15 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   const visibleNavGroups = useMemo(
     () => NAV_GROUPS.map((group) => ({
       ...group,
-      items: group.items.filter((item) => item.label.toLocaleLowerCase('fr').includes(normalizedQuery)),
+      // GitHub est un outil IDE à accès direct dans ideSidebarConfig.
+      // Il reste une destination globale hors IDE, mais ne doit pas être affiché
+      // deux fois dans la sidebar IDE.
+      items: group.items.filter((item) =>
+        !(mode === 'ide' && item.id === 'github') &&
+        item.label.toLocaleLowerCase('fr').includes(normalizedQuery),
+      ),
     })).filter((group) => group.items.length > 0),
-    [normalizedQuery],
+    [mode, normalizedQuery],
   );
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
   const visibleToolGroups = useMemo(
