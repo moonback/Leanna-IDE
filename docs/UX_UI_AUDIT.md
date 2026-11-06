@@ -111,3 +111,25 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Les panneaux et modales ont un rôle distinct et prévisible.
 - Les tokens Full Glass restent la source de vérité pour les surfaces et les couleurs.
 - Les vérifications automatisées passent ; les contrôles visuels sont effectués dans l'application Electron.
+
+
+## Quatrième passe — Géométrie du workspace et conteneurs de vues
+
+### Constats vérifiés
+
+- Le panneau de chat plein écran est positionné sur toute la fenêtre, mais `IdeView` conservait une largeur de workspace de `50vw` lorsque `chatFullscreen` était actif. Le parent et le panneau appliquaient donc deux géométries contradictoires.
+- Le conteneur animé des routes fixait `h-full` et `overflow-hidden` sans `min-h-0`. Dans une chaîne de layouts flex, l'absence de cette contrainte peut empêcher les descendants scrollables de rétrécir correctement.
+- Les vues Documents, Historique et Mémoire avaient des racines flex sans combinaison explicite `min-h-0` / `overflow-hidden`, contrairement à plusieurs autres pages.
+- La liste et le détail des Notebooks possèdent déjà chacun leur `ViewHeader` partagé : il ne faut pas ajouter un troisième header dans `NotebooksView` au risque de dupliquer le titre.
+
+### Corrections appliquées
+
+- En plein écran, le workspace IDE conserve désormais 100 % de sa largeur ; seul le mode chat docké réduit la largeur du workspace en fonction de `chatWidth`.
+- Le conteneur animé commun des routes reçoit `min-h-0` pour permettre aux vues flex internes de gérer leur propre scroll.
+- Documents, Historique et Mémoire adoptent une racine flex cohérente (`h-full min-h-0 overflow-hidden`) afin que leurs zones de contenu scrollables restent contenues dans la fenêtre.
+
+### Validation restante
+
+- Vérifier le chat plein écran avec et sans sidebar, puis revenir au mode docké et confirmer le calcul de largeur.
+- Parcourir Documents, Historique et Mémoire avec une fenêtre courte et une fenêtre étroite : le scroll doit rester dans la zone de contenu, sans débordement vertical du header.
+- Vérifier que les vues Notebooks liste et détail conservent un seul header chacune.
