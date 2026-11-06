@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { validateDocumentUpload, MAX_DOCUMENT_UPLOAD_BYTES } from "../utils/documentUploadValidation.js";
 import type { ProfileConfig } from "../prompts/systemInstruction.js";
 import {
   documentAnalyzer,
@@ -13,17 +14,18 @@ import {
   documentSearchEngine,
 } from "../knowledge/document-system/index.js";
 
-// Configuration multer pour uploads en mémoire
+// Only formats decoded by ContentExtractor.extractFromBuffer are accepted here.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: MAX_DOCUMENT_UPLOAD_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(pdf|txt|md|html|docx|png|jpg|jpeg|webp)$/i;
-    if (file.originalname.match(allowed) || file.mimetype.startsWith("text/") || file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error(`Type non supporté: ${file.mimetype}`));
+    const extension = file.originalname.split(".").pop()?.toLowerCase();
+    const allowed = new Set(["pdf", "txt", "md", "markdown", "html", "htm"]);
+    if (!extension || !allowed.has(extension)) {
+      cb(new Error("Format de document non pris en charge."));
+      return;
     }
+    cb(null, true);
   },
 });
 
@@ -34,11 +36,16 @@ export function createDocumentsRouter(_getProfile: () => ProfileConfig): Router 
   router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) { res.status(400).json({ error: "Aucun fichier fourni." }); return; }
+      const validation = validateDocumentUpload(req.file.originalname, req.file.mimetype, req.file.buffer);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
       const { collection, tags } = req.body;
-      const parsedTags = tags ? (typeof tags === "string" ? tags.split(",").map((t: string) => t.trim()) : tags) : [];
+      const parsedTags = tags ? (typeof tags === "string" ? tags.split(",").map((t: string) => t.trim()).filter(Boolean).slice(0, 30) : []) : [];
 
       const document = await documentAnalyzer.ingestFromBuffer(
-        req.file.buffer, req.file.originalname, req.file.mimetype,
+        req.file.buffer, validation.fileName, validation.mimeType,
         { collection, tags: parsedTags }
       );
       res.json({
