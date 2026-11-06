@@ -77,6 +77,10 @@ test("replan never removes every tool (keeps availability if all are failing)", 
   const failed = { id: "a", skillName: "only_tool", args: {}, rationale: "", score: 40, order: 1, status: "failed" as const };
 
   const actions = await planner.replan(mission, goalId, failed, "boom", ["only_tool"]);
-  // With every available tool failing, replanning must still be possible.
-  assert.ok(actions.length >= 0, "replan must not throw when all tools are unreliable");
+  // With every available tool failing, preserve the last viable option instead
+  // of returning an empty plan solely because reliability filtering removed it.
+  assert.ok(
+    actions.some((action) => action.skillName === "only_tool"),
+    "the only available tool must remain selectable when no alternative exists",
+  );
 });
