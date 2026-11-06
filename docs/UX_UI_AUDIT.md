@@ -546,3 +546,29 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Annuler puis confirmer la suppression ; vérifier qu'aucune requête DELETE ne part après annulation.
 - Vérifier le comportement de l'interface pendant une mutation et après démontage de la page.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-quatrième passe — Validation et tests OpenRouter
+
+### Constats vérifiés
+
+- Les tests de connexion texte et de génération d'image interprétaient le JSON sans vérifier le statut HTTP ; une réponse 401/500 pouvait être présentée comme une erreur applicative générique.
+- Une réponse non JSON provoquait une exception de parsing, sans message orienté utilisateur.
+- Les gestionnaires reposaient uniquement sur l'état React pour empêcher les doubles lancements ; deux événements rapprochés pouvaient démarrer plusieurs tests avant le rendu suivant.
+- Le test texte pouvait être lancé avec un identifiant de modèle vide ou composé d'espaces ; les identifiants personnalisés n'étaient pas normalisés à la sortie du champ.
+- Le test du modèle image ne vérifiait pas explicitement la présence de la clé API.
+
+### Corrections appliquées
+
+- Contrôle de `response.ok` et validation minimale de la réponse JSON pour les deux endpoints OpenRouter.
+- Messages explicites pour les réponses HTTP non réussies et les réponses non JSON.
+- Verrous synchrones via `useRef` pour empêcher les tests texte et image concurrents.
+- Vérification des champs obligatoires avant chaque test ; les valeurs transmises au serveur sont nettoyées avec `trim()`.
+- Normalisation des identifiants de modèles personnalisés au blur, limite de saisie à 200 caractères et libellés accessibles sur les deux champs.
+
+### Validation restante
+
+- Simuler HTTP 401, 429 et 500, une panne réseau et une réponse HTML/non JSON sur les deux endpoints.
+- Double-cliquer rapidement sur les deux boutons de test et vérifier qu'une seule requête part pour chaque type de test.
+- Vérifier les identifiants personnalisés avec espaces périphériques, champ vide, slash fournisseur/modèle, suffixe de variante et longueur maximale.
+- Vérifier qu'une clé absente ou un modèle vide bloque le test avec un message explicite.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les deux tests dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
