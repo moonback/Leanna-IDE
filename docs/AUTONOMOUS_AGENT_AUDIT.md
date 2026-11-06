@@ -1,3 +1,11 @@
+> **Statut au 2026-11-06 : audit historique du 2026-09-23.**
+> Les chemins de fichiers et l'architecture ont évolué depuis cette photographie.
+> Le runtime agentique actuel est `server/runtime/agentic/AgenticRuntime.ts` ;
+> l'ancien chemin `server/runtime/AgentRuntime.ts` cité ci-dessous n'est plus la référence.
+> Voir `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md` et `docs/AUTONOMY_RUNTIME_MAP.md`.
+>
+> ---
+>
 # Audit de l'agent autonome Leanna
 
 Date : 23 septembre 2026. Cet audit privilégie le code exécuté sur `output.md`, qui ne contient pas une cartographie exploitable complète.
