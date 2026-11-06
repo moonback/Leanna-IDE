@@ -837,6 +837,7 @@ async function startServer() {
 
   app.use("/api/notebooks", createNotebooksRouter());
   app.use("/api/tts", createTTSRouter());
+  app.use("/api/voice-duo", createVoiceDuoRouter(() => currentProfile));
 
   // ── Sprint 1 — routeurs extraits ──────────────────────────────────────────
   app.use("/api/agent-builder", createAgentBuilderRouter());
