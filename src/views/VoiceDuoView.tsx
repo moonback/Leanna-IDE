@@ -1,226 +1,188 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Volume2, Loader2, RotateCcw } from "lucide-react";
+import { Mic, PhoneOff, RotateCcw, Radio, Loader2, Volume2 } from "lucide-react";
 import { useProfile } from "../context/UserProfileContext.js";
+import { useAudio } from "../hooks/useAudio.js";
 
-type DuoMessage = { speaker: "leanna" | "roxane"; name: string; text: string; audio?: string | null };
-type SpeechRecognitionLike = {
-  lang: string; continuous: boolean; interimResults: boolean;
-  onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null;
-  onend: (() => void) | null; start: () => void; stop: () => void;
-};
-
-function playPcm24k(base64: string, context: AudioContext, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return resolve();
-    const binary = atob(base64);
-    const pcm = new Int16Array(binary.length / 2);
-    for (let i = 0; i < pcm.length; i++) {
-      const lo = binary.charCodeAt(i * 2);
-      const hi = binary.charCodeAt(i * 2 + 1);
-      pcm[i] = (hi << 8) | lo;
-    }
-    const buffer = context.createBuffer(1, pcm.length, 24_000);
-    const channel = buffer.getChannelData(0);
-    for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 32768;
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    const finish = () => { signal.removeEventListener("abort", stop); resolve(); };
-    const stop = () => { try { source.stop(); } catch { /* déjà arrêté */ } finish(); };
-    signal.addEventListener("abort", stop, { once: true });
-    source.onended = finish;
-    source.start();
-  });
-}
+type Speaker = "leanna" | "roxane";
+type Entry = { id: string; speaker: "user" | Speaker; name: string; text: string };
 
 export default function VoiceDuoView() {
   const { profile } = useProfile();
   const [active, setActive] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Prêt à démarrer");
-  const [messages, setMessages] = useState<DuoMessage[]>([]);
+  const [activeSpeaker, setActiveSpeaker] = useState<Speaker>("leanna");
+  const [messages, setMessages] = useState<Entry[]>([]);
   const [error, setError] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const playbackRef = useRef<AbortController | null>(null);
-  const speakingRef = useRef(false);
-  const historyRef = useRef<Array<{speaker:"user"|"leanna"|"roxane";text:string}>>([]);
+  const [sessionsReady, setSessionsReady] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
   const activeRef = useRef(false);
+  const intentionalCloseRef = useRef(false);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
 
-  const stopPlayback = useCallback(() => {
-    speakingRef.current = false;
-    playbackRef.current?.abort();
-    playbackRef.current = null;
+  const onAudioData = useCallback((pcm16: ArrayBuffer) => {
+    const ws = wsRef.current;
+    if (activeRef.current && ws?.readyState === WebSocket.OPEN) ws.send(pcm16);
   }, []);
 
-  const speak = useCallback(async (items: DuoMessage[]) => {
-    const context = audioContextRef.current || new AudioContext({ sampleRate: 24_000 });
-    audioContextRef.current = context;
-    if (context.state === "suspended") await context.resume();
-    const controller = new AbortController();
-    speakingRef.current = true;
-    playbackRef.current = controller;
-    for (const item of items) {
-      if (controller.signal.aborted || !activeRef.current) break;
-      setStatus(`${item.name} parle…`);
-      if (item.audio) {
-        try { await playPcm24k(item.audio, context, controller.signal); }
-        catch (e) { if (!controller.signal.aborted) throw e; }
-      } else if (!controller.signal.aborted) {
-        // Fallback accessible si le provider TTS est indisponible.
-        const utterance = new SpeechSynthesisUtterance(item.text);
-        utterance.lang = profile.language === "fr" ? "fr-FR" : profile.language || "fr-FR";
-        window.speechSynthesis.speak(utterance);
-        await new Promise<void>(resolve => { utterance.onend = () => resolve(); utterance.onerror = () => resolve(); });
+  const audio = useAudio({
+    onAudioData,
+    vadEnabled: true,
+    vadThreshold: 28,
+    vadSilenceDuration: 700,
+  });
+
+  const appendEntry = useCallback((speaker: "user" | Speaker, name: string, fragment: string) => {
+    const text = fragment.trim();
+    if (!text) return;
+    setMessages(prev => {
+      const last = prev[prev.length - 1];
+      if (last && last.speaker === speaker) {
+        return [...prev.slice(0, -1), { ...last, text: (last.text + " " + text).slice(-5000) }];
       }
-    }
-    if (playbackRef.current === controller) playbackRef.current = null;
-    speakingRef.current = false;
-  }, [profile.language]);
+      return [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, speaker, name, text }];
+    });
+  }, []);
 
-  const handleUtterance = useCallback(async (raw: string) => {
-    const text = raw.trim();
-    if (!text || !activeRef.current || speakingRef.current) return;
-    stopPlayback();
-    window.speechSynthesis?.cancel();
-    historyRef.current.push({ speaker: "user", text });
-    historyRef.current = historyRef.current.slice(-20);
-    setMessages(prev => [...prev, { speaker: "leanna", name: "Vous", text } as DuoMessage]);
-    setBusy(true);
-    setError("");
-    setStatus("Leanna et Roxane réfléchissent…");
-    try {
-      const response = await fetch("/api/voice-duo/turn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: historyRef.current, maxTurns: 4, includeAudio: true, language: profile.language }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Erreur du dialogue vocal");
-      const generated = (data.messages || []) as DuoMessage[];
-      if (!activeRef.current) return;
-      for (const item of generated) historyRef.current.push({ speaker: item.speaker, text: item.text });
-      historyRef.current = historyRef.current.slice(-20);
-      setMessages(prev => [...prev, ...generated]);
-      await speak(generated);
-      if (activeRef.current) setStatus("À votre écoute — vous pouvez interrompre à tout moment");
-    } catch (e) {
-      if (activeRef.current) {
-        const message = e instanceof Error ? e.message : "Erreur inconnue";
-        setError(message);
-        setStatus("Une erreur est survenue");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }, [profile.language, speak, stopPlayback]);
-
-  const start = useCallback(async () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError("La reconnaissance vocale n'est pas disponible dans ce navigateur. Utilisez Chrome ou Edge.");
-      return;
-    }
-    try {
-      const context = audioContextRef.current || new AudioContext({ sampleRate: 24_000 });
-      audioContextRef.current = context;
-      await context.resume();
-      const recognition = new SpeechRecognition() as SpeechRecognitionLike;
-      recognition.lang = profile.language === "fr" ? "fr-FR" : profile.language || "fr-FR";
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.onresult = event => {
-        const result = event.results?.[event.results.length - 1];
-        const transcript = result?.[0]?.transcript;
-        if (transcript) void handleUtterance(transcript);
-      };
-      recognition.onerror = event => {
-        if (event.error !== "no-speech" && event.error !== "aborted") setError(`Micro : ${event.error}`);
-      };
-      recognition.onend = () => {
-        if (activeRef.current) {
-          try { recognition.start(); } catch { /* une reprise est déjà en cours */ }
-        }
-      };
-      recognitionRef.current = recognition;
-      activeRef.current = true;
-      setActive(true);
-      setError("");
-      setStatus("À votre écoute — parlez naturellement");
-      recognition.start();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible d'activer le microphone");
-    }
-  }, [handleUtterance, profile.language]);
-
-  const stop = useCallback(() => {
+  const disconnect = useCallback(() => {
+    intentionalCloseRef.current = true;
     activeRef.current = false;
     setActive(false);
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
-    stopPlayback();
-    window.speechSynthesis?.cancel();
-    setBusy(false);
-    setStatus("Conversation arrêtée");
-  }, [stopPlayback]);
+    setSessionsReady(false);
+    wsRef.current?.close(1000, "User ended voice duo");
+    wsRef.current = null;
+    audio.cleanupAudio();
+    audio.handleInterrupt();
+    setStatus("Conversation terminée");
+  }, [audio.cleanupAudio, audio.handleInterrupt]);
+
+  const connect = useCallback(async () => {
+    if (activeRef.current) return;
+    setError("");
+    setMessages([]);
+    setStatus("Activation du microphone…");
+    intentionalCloseRef.current = false;
+    try {
+      await audio.initAudio();
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/voice-duo-live`);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+      ws.onopen = () => {
+        activeRef.current = true;
+        setActive(true);
+        setStatus("Connexion des deux sessions Gemini Live…");
+      };
+      ws.onmessage = event => {
+        if (event.data instanceof ArrayBuffer) {
+          if (activeRef.current) audio.playAudioChunk(event.data);
+          return;
+        }
+        try {
+          const msg = JSON.parse(event.data as string);
+          if (msg.type === "ready") {
+            setSessionsReady(true);
+            setStatus("Deux sessions Gemini Live connectées — vous pouvez parler");
+            setActiveSpeaker("leanna");
+          } else if (msg.type === "connecting") {
+            setStatus("Ouverture des deux sessions vocales…");
+          } else if (msg.type === "speaker") {
+            setActiveSpeaker(msg.speaker);
+            setStatus(`${msg.name || msg.speaker} prépare sa réponse…`);
+          } else if (msg.type === "transcript" || msg.type === "text") {
+            appendEntry(msg.speaker as Speaker, msg.name || (msg.speaker === "roxane" ? profile.duoName : profile.aiName), msg.text || "");
+            setStatus(`${msg.name || msg.speaker} parle…`);
+          } else if (msg.type === "user_text") {
+            appendEntry("user", "Vous", msg.text || "");
+            setStatus("Vous avez la parole");
+          } else if (msg.type === "interrupted") {
+            audio.handleInterrupt();
+            setStatus("Interruption détectée — à vous la parole");
+          } else if (msg.type === "listening" || msg.type === "user_turn_complete") {
+            setStatus("À votre écoute — parlez naturellement");
+          } else if (msg.type === "session_error" || msg.type === "error") {
+            setError(msg.message || "Erreur de session vocale");
+            setStatus("Une session vocale rencontre un problème");
+          } else if (msg.type === "session_closed") {
+            setError(`La session ${msg.speaker} s'est déconnectée.`);
+          }
+        } catch (e) {
+          console.warn("[VoiceDuo] Message serveur invalide", e);
+        }
+      };
+      ws.onerror = () => setError("Erreur WebSocket du Duo vocal.");
+      ws.onclose = event => {
+        wsRef.current = null;
+        setSessionsReady(false);
+        if (!intentionalCloseRef.current) {
+          activeRef.current = false;
+          setActive(false);
+          audio.cleanupAudio();
+          setError(event.reason || "Connexion Gemini Live interrompue.");
+          setStatus("Connexion interrompue");
+        }
+      };
+    } catch (e) {
+      audio.cleanupAudio();
+      setError(e instanceof Error ? e.message : "Impossible d'activer le microphone.");
+      setStatus("Démarrage impossible");
+    }
+  }, [appendEntry, audio.cleanupAudio, audio.handleInterrupt, audio.initAudio, audio.playAudioChunk, profile.aiName, profile.duoName]);
 
   const reset = useCallback(() => {
-    stopPlayback();
-    historyRef.current = [];
+    wsRef.current?.send(JSON.stringify({ type: "reset" }));
+    audio.handleInterrupt();
     setMessages([]);
-    setError("");
-    setStatus(activeRef.current ? "À votre écoute — parlez naturellement" : "Prêt à démarrer");
-  }, [stopPlayback]);
+    setStatus(sessionsReady ? "Conversation réinitialisée — à votre écoute" : "Prêt à démarrer");
+  }, [audio.handleInterrupt, sessionsReady]);
+
+  useEffect(() => {
+    transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => () => {
+    intentionalCloseRef.current = true;
     activeRef.current = false;
-    recognitionRef.current?.stop();
-    stopPlayback();
-    window.speechSynthesis?.cancel();
-    void audioContextRef.current?.close();
-  }, [stopPlayback]);
+    wsRef.current?.close();
+    audio.cleanupAudio();
+  }, [audio.cleanupAudio]);
 
   return (
     <main className="mx-auto flex h-full w-full max-w-5xl flex-col gap-5 overflow-hidden p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-primary)]">Conversation multi-IA</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-primary)]">Gemini Live · double session</p>
           <h1 className="mt-1 text-2xl font-bold">Leanna <span className="text-[var(--text-muted)]">×</span> {profile.duoName || "Roxane"}</h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Deux regards indépendants, une conversation vivante avec vous.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Deux sessions vocales indépendantes, un contexte de conversation partagé.</p>
         </div>
-        <button onClick={reset} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-base)] px-3 py-2 text-sm">
-          <RotateCcw size={15}/> Réinitialiser
-        </button>
+        <button onClick={reset} disabled={!active} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-base)] px-3 py-2 text-sm disabled:opacity-40"><RotateCcw size={15}/> Réinitialiser</button>
       </header>
-
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-secondary)] p-4">
-          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent-primary)]"><Volume2 size={19}/></div><div><p className="font-semibold">{profile.aiName || "Leanna"}</p><p className="text-xs text-[var(--text-muted)]">Voix : {profile.aiVoice || "Aoede"}</p></div></div>
-          <p className="mt-3 text-xs text-[var(--text-muted)]">Assistante principale · synthèse, coordination et décisions</p>
+        <div className={`rounded-2xl border p-4 ${activeSpeaker === "leanna" && active ? "border-[var(--accent-primary)] bg-[var(--accent-subtle)]" : "border-[var(--border-base)] bg-[var(--bg-secondary)]"}`}>
+          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent-primary)]"><Volume2 size={19}/></div><div><p className="font-semibold">{profile.aiName || "Leanna"}</p><p className="text-xs text-[var(--text-muted)]">Session Gemini Live · {profile.aiVoice || "Aoede"}</p></div></div>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">Assistante principale · analyse et coordination</p>
         </div>
-        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-secondary)] p-4">
-          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-purple-500/10 text-purple-400"><Volume2 size={19}/></div><div><p className="font-semibold">{profile.duoName || "Roxane"}</p><p className="text-xs text-[var(--text-muted)]">Voix : {profile.duoVoice || "Kore"}</p></div></div>
-          <p className="mt-3 text-xs text-[var(--text-muted)]">Perspective indépendante · critique et alternatives</p>
+        <div className={`rounded-2xl border p-4 ${activeSpeaker === "roxane" && active ? "border-purple-400 bg-purple-500/10" : "border-[var(--border-base)] bg-[var(--bg-secondary)]"}`}>
+          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full bg-purple-500/10 text-purple-400"><Volume2 size={19}/></div><div><p className="font-semibold">{profile.duoName || "Roxane"}</p><p className="text-xs text-[var(--text-muted)]">Session Gemini Live · {profile.duoVoice || "Kore"}</p></div></div>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">Perspective indépendante · contradiction constructive</p>
         </div>
       </section>
-
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-base)] bg-[var(--bg-panel)]">
         <div className="flex items-center justify-between border-b border-[var(--border-base)] px-4 py-3">
-          <div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500 animate-pulse" : "bg-[var(--text-muted)]"}`}/><span className="text-sm text-[var(--text-muted)]">{status}</span></div>
+          <div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${sessionsReady ? "bg-emerald-500 animate-pulse" : "bg-[var(--text-muted)]"}`}/><span className="text-sm text-[var(--text-muted)]">{status}</span></div>
           <span className="text-xs text-[var(--text-muted)]">{messages.length} interventions</span>
         </div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.length === 0 && <div className="grid h-full min-h-48 place-items-center text-center"><div><div className="mb-3 text-4xl">🎙️</div><p className="font-medium">Lancez la conversation</p><p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">Posez une question. Leanna et Roxane répondront chacune avec leur propre voix et pourront confronter leurs points de vue.</p></div></div>}
-          {messages.map((item, index) => <article key={index} className={`max-w-[90%] rounded-xl p-3 ${item.name === "Vous" ? "ml-auto bg-[var(--accent-subtle)]" : "bg-[var(--bg-secondary)]"}`}><p className="mb-1 text-xs font-semibold text-[var(--accent-primary)]">{item.name}</p><p className="whitespace-pre-wrap text-sm leading-relaxed">{item.text}</p></article>)}
+        <div ref={transcriptRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+          {messages.length === 0 && <div className="grid h-full min-h-48 place-items-center text-center"><div><div className="mb-3 text-4xl">🎙️</div><p className="font-medium">Lancez votre conversation vocale</p><p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">Leanna et Roxane ont chacune leur propre session Gemini Live. Parlez, interrompez-les et laissez-les confronter leurs points de vue.</p></div></div>}
+          {messages.map(item => <article key={item.id} className={`max-w-[90%] rounded-xl p-3 ${item.speaker === "user" ? "ml-auto bg-[var(--accent-subtle)]" : item.speaker === "roxane" ? "bg-purple-500/10" : "bg-[var(--bg-secondary)]"}`}><p className="mb-1 text-xs font-semibold text-[var(--accent-primary)]">{item.name}</p><p className="whitespace-pre-wrap text-sm leading-relaxed">{item.text}</p></article>)}
         </div>
         {error && <p role="alert" className="border-t border-red-500/20 px-4 py-2 text-sm text-red-400">{error}</p>}
         <div className="flex items-center justify-center gap-3 border-t border-[var(--border-base)] p-4">
-          {!active ? <button onClick={() => void start()} className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 py-3 font-semibold text-white"><Mic size={18}/> Démarrer la conversation</button> : <button onClick={stop} className="inline-flex items-center gap-2 rounded-full bg-red-500 px-6 py-3 font-semibold text-white"><PhoneOff size={18}/> Terminer</button>}
-          {busy && <span className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]"><Loader2 size={15} className="animate-spin"/> Réponse en cours</span>}
-          {active && <button onClick={() => { stopPlayback(); window.speechSynthesis?.cancel(); setStatus("Intervention interrompue — à vous la parole"); }} className="inline-flex items-center gap-2 rounded-full border border-[var(--border-base)] px-4 py-3 text-sm"><MicOff size={16}/> Interrompre</button>}
+          {!active ? <button onClick={() => void connect()} className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-primary)] px-6 py-3 font-semibold text-white"><Mic size={18}/> Démarrer les deux IA</button> : <button onClick={disconnect} className="inline-flex items-center gap-2 rounded-full bg-red-500 px-6 py-3 font-semibold text-white"><PhoneOff size={18}/> Terminer</button>}
+          {active && <span className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]"><Radio size={15}/> Micro actif · barge-in Gemini</span>}
+          {!sessionsReady && active && <Loader2 size={16} className="animate-spin"/>}
         </div>
       </section>
-      <p className="text-center text-xs text-[var(--text-muted)]">Le microphone reste actif pendant la conversation. Les échanges autonomes sont limités à deux prises de parole par intervention pour maîtriser la latence et les coûts.</p>
+      <p className="text-center text-xs text-[var(--text-muted)]">Deux sessions Gemini Live indépendantes · PCM16 16 kHz en entrée · PCM 24 kHz en sortie · interruption vocale native · tours autonomes bornés à quatre.</p>
     </main>
   );
 }
