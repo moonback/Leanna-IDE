@@ -40,23 +40,27 @@ async function purgeTable(supabase: SupabaseClient, table: string): Promise<numb
 }
 
 // DELETE /api/data/all — vide les données sélectionnées.
-// Corps JSON optionnel : { scopes: string[] }. Sans corps (ou scopes vide),
-// TOUT est purgé (rétro-compatibilité). OPÉRATION IRRÉVERSIBLE.
+// Corps JSON optionnel : { scopes: string[] }. Sans corps, TOUT est purgé
+// (rétro-compatibilité). Un tableau vide ou un corps scopes mal formé est refusé.
+// OPÉRATION IRRÉVERSIBLE.
 router.delete('/all', async (req: Request, res: Response) => {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return res.status(500).json({ status: 'error', error: 'Supabase not configured' });
   }
 
-  // Détermine les scopes demandés. Sans sélection → tout.
+  // Un corps explicite doit contenir une sélection non vide et entièrement valide.
+  const hasScopesProperty = Object.prototype.hasOwnProperty.call(req.body || {}, 'scopes');
   const requested: unknown = req.body?.scopes;
   let scopes: string[];
-  if (Array.isArray(requested) && requested.length > 0) {
+  if (hasScopesProperty) {
+    if (!Array.isArray(requested) || requested.length === 0) {
+      return res.status(400).json({ status: 'error', error: 'La sélection des scopes doit être un tableau non vide.' });
+    }
     const invalid = requested.filter((scope) => typeof scope !== 'string' || !ALL_SCOPES.includes(scope));
     if (invalid.length > 0) {
       return res.status(400).json({ status: 'error', error: `Scope(s) invalide(s) : ${invalid.map(String).join(', ')}.` });
     }
     scopes = [...new Set(requested as string[])];
-    if (scopes.length === 0) return res.status(400).json({ status: 'error', error: 'Aucun scope valide fourni.' });
   } else {
     scopes = [...ALL_SCOPES];
   }
