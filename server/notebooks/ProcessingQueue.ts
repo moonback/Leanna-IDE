@@ -113,7 +113,8 @@ export class ProcessingQueue<T = unknown> {
         throw new Error("Format de queue invalide.");
       }
       const restored = (parsed as any).tasks.filter((task: any) =>
-        task && typeof task.id === "string" && typeof task.type === "string"
+        task && typeof task.id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(task.id)
+        && typeof task.type === "string"
         && ["urgent", "normal", "low"].includes(task.priority)
         && task.status === "pending" && Number.isInteger(task.attempts)
         && Number.isInteger(task.maxAttempts) && task.maxAttempts > task.attempts
