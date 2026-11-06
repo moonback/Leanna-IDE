@@ -264,6 +264,7 @@ export function useLiveAPI() {
     const handleRoxaneState = (event: Event) => {
       const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
       if (active) {
+        handleInterrupt();
         if (muteBeforeRoxaneRef.current === null) muteBeforeRoxaneRef.current = muted;
         if (!muted) toggleMute();
       } else if (muteBeforeRoxaneRef.current !== null) {
@@ -274,7 +275,7 @@ export function useLiveAPI() {
     };
     window.addEventListener('Leanna-roxane-debate-state', handleRoxaneState);
     return () => window.removeEventListener('Leanna-roxane-debate-state', handleRoxaneState);
-  }, [muted, toggleMute]);
+  }, [muted, toggleMute, handleInterrupt]);
 
   // Define onMessage handler for WS events
   const handleWebSocketMessage = useCallback((msg: any) => {
