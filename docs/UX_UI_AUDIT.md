@@ -473,3 +473,26 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier que les zones de liste et de configuration défilent indépendamment et que le footer d'import reste visible.
 - Tester avec une hauteur de fenêtre réduite et avec la modale de configuration du token ouverte au-dessus.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis vérifier le rendu dans Electron.
+
+## Vingt-et-unième passe — Fiabilité de l'enregistrement des paramètres
+
+### Constats vérifiés
+
+- Le bouton Enregistrer utilisait uniquement l'état React `saving` pour désactiver l'action. Deux clics rapprochés avant le prochain rendu pouvaient donc lancer deux POST concurrents.
+- Le bouton Réinitialiser restait actif pendant la sauvegarde ; une confirmation déjà ouverte pouvait également être validée pendant qu'un enregistrement était en cours.
+- En cas d'échec HTTP ou réseau, le profil avait déjà été écrit dans `localStorage`, mais le toast générique ne distinguait pas cette sauvegarde locale de la synchronisation serveur échouée.
+
+### Corrections appliquées
+
+- Ajout d'un verrou synchrone `useRef` pour garantir une seule sauvegarde concurrente, y compris avant le prochain rendu React.
+- Désactivation de Réinitialiser pendant l'enregistrement et seconde vérification après la confirmation asynchrone.
+- Conservation explicite du comportement local-first : les réglages restent sauvegardés localement même si l'API est indisponible.
+- Le message d'erreur distingue désormais l'échec de sauvegarde locale de l'échec de synchronisation serveur ; le verrou est toujours libéré dans `finally`.
+
+### Validation restante
+
+- Simuler deux clics rapides sur Enregistrer et vérifier qu'un seul POST est envoyé.
+- Simuler HTTP 500 et une erreur réseau : vérifier que les réglages restent disponibles localement et que le message indique clairement l'échec de synchronisation.
+- Ouvrir Réinitialiser, lancer une sauvegarde avant de confirmer, puis vérifier que la réinitialisation ne s'exécute pas pendant celle-ci.
+- Vérifier qu'une nouvelle sauvegarde est possible après succès comme après échec.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
