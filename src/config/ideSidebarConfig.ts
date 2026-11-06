@@ -18,9 +18,9 @@
 import {
   Search,
   GitBranch, Github, Camera, Monitor, Boxes,
-  FolderTree, ChartNoAxesColumnIncreasing, Workflow,
-  Container, Bot, Crosshair, Database,
-  Activity, Wrench, Users,
+  FolderTree, Workflow,
+  Container, Database,
+  Activity, Wrench,
   Wand2, Globe, Terminal, Store,
   Brain, NotebookPen, BookMarked,
 } from 'lucide-react';
