@@ -600,7 +600,7 @@ export class NotebookManager {
             }, delay);
             timer.unref?.();
             this.sourceIndexRetryTimers.set(key, timer);
-          } else if (source.indexingHistory?.at(-1)?.category !== "permanent"
+          } else if (source.indexingHistory?.[source.indexingHistory.length - 1]?.category !== "permanent"
             && (source.indexingAttempts ?? 0) < NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
             await this.indexSourceChunks(notebook.id, source.id);
           }
