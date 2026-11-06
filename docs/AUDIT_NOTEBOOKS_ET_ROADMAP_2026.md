@@ -594,3 +594,9 @@ Validation locale requise :
 - Les tâches en cours au moment d'un crash ne sont pas rejouées automatiquement, car leur effet peut être partiel. Seules les tâches pending/retrying persistées sont restaurées.
 - La queue est partagée globalement par le processus ; l'isolation workspace est revalidée à l'exécution, mais un modèle de queue partitionnée par workspace reste préférable si plusieurs espaces doivent être traités simultanément.
 - Les commandes `npm run typecheck`, les tests ciblés et `npm run lint:eslint:notebooks` restent à exécuter localement.
+
+Compléments de la dixième passe :
+- Une tâche n'est pas acceptée si l'écriture atomique initiale de la queue échoue.
+- Les buffers sont sérialisés en base64 plutôt qu'en tableaux JSON d'octets, puis restaurés en véritables `Buffer`.
+- Les erreurs permanentes (validation et 4xx) ne consomment plus de tentatives automatiques ; les erreurs réseau usuelles, timeouts et HTTP 408/425/429/5xx sont retentées.
+- La persistance des transitions après acceptation initiale reste best-effort et les tâches `processing` ne sont pas récupérées après crash : ces limites sont explicites dans le compte rendu de passe.
