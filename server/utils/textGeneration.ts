@@ -64,6 +64,17 @@ export function getActiveProvider(): 'gemini' | 'openrouter' {
   return _profile.textProvider || 'gemini';
 }
 
+/**
+ * Returns the effective default model for the active profile. This is used by
+ * planning/estimation code so projected costs follow the user's actual model
+ * selection instead of a hard-coded provider default.
+ */
+export function getActiveModel(): string {
+  return _profile.textProvider === 'openrouter'
+    ? (_profile.openrouterModel?.trim() || 'google/gemini-3.6-flash')
+    : 'gemini-3.8-flash';
+}
+
 // ── Options for generateText ────────────────────────────────────────────────
 
 export interface GenerateTextOptions {
