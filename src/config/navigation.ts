@@ -16,7 +16,7 @@
  */
 import type { LucideIcon } from 'lucide-react';
 import {
-  LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
+  LayoutDashboard, Milestone,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History,
   Braces, BarChart2,
 } from 'lucide-react';
@@ -27,7 +27,7 @@ export const ROUTES = {
   settings: '/settings',
   // ── Pilotage hub (étape 3 : 6 vues fusionnées) ───────────────────────
   pilotage: '/pilotage',
-  // Old individual routes — kept as aliases that redirect to /pilotage?tab=…
+  // Anciens chemins (vues retirées ou fusionnées) — alias redirigeant vers /pilotage
   missionControl:    '/mission-control',
   missionTimeline:   '/mission-timeline',
   missionSimulation: '/mission-simulation',
@@ -47,8 +47,7 @@ export const ROUTES = {
 
 export type NavId =
   | 'pilotage'
-  | 'mission-control' | 'mission-timeline' | 'mission-simulation'
-  | 'agent-swarm' | 'explainability' | 'autonomy'
+  | 'mission-timeline'
   | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
   | 'memories' | 'history' | 'lists'
   | 'observability';
@@ -58,14 +57,9 @@ export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_ITEMS: Record<NavId, NavItem> = {
   // ── Pilotage hub ──────────────────────────────────────────────────────
-  'pilotage':           { id: 'pilotage',           path: ROUTES.pilotage,          label: 'Pilotage',        icon: LayoutDashboard },
+  'pilotage':           { id: 'pilotage',           path: ROUTES.pilotage,          label: 'Missions',        icon: LayoutDashboard },
   // Individual nav items (still used by viewHeaderProps + deep-link redirects)
-  'mission-control':    { id: 'mission-control',    path: ROUTES.missionControl,    label: 'Mission Control', icon: LayoutDashboard },
   'mission-timeline':   { id: 'mission-timeline',   path: ROUTES.missionTimeline,   label: 'Missions',        icon: Milestone },
-  'mission-simulation': { id: 'mission-simulation', path: ROUTES.missionSimulation, label: 'Simulation',      icon: FlaskConical },
-  'agent-swarm':        { id: 'agent-swarm',        path: ROUTES.agentSwarm,        label: 'Agent Swarm',     icon: Network },
-  'explainability':     { id: 'explainability',     path: ROUTES.explainability,    label: 'Pourquoi ?',      icon: HelpCircle },
-  'autonomy':           { id: 'autonomy',           path: ROUTES.autonomy,          label: 'Autonomie',       icon: Gauge },
   'ide':                { id: 'ide',                path: ROUTES.ide,               label: 'IDE',             icon: Code2 },
   'automation':         { id: 'automation',         path: ROUTES.automation,        label: 'Automatisations', icon: Zap },
   'notebooks':          { id: 'notebooks',          path: ROUTES.notebooks,         label: 'Notebooks',       icon: NotebookPen },
@@ -73,8 +67,7 @@ export const NAV_ITEMS: Record<NavId, NavItem> = {
   'github':             { id: 'github',             path: ROUTES.github,            label: 'GitHub',          icon: Github },
   'memories':           { id: 'memories',           path: ROUTES.memories,          label: 'Mémoire',         icon: BrainCircuit },
   'history':            { id: 'history',            path: ROUTES.history,           label: 'Historique',      icon: History },
-  // La page est une bibliothèque de snippets de code (≠ « listes ») ; Braces évite
-  // la collision visuelle avec l'icône de l'IDE (Code2).
+
   'lists':              { id: 'lists',              path: ROUTES.lists,             label: 'Snippets',        icon: Braces },
   'observability':      { id: 'observability',      path: ROUTES.observability,     label: 'Observabilité',   icon: BarChart2 },
 };
@@ -89,7 +82,6 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
 export const NAV_GROUPS: NavGroup[] = [
   // Les deux espaces de travail principaux, sans en-tête de groupe.
   { id: 'workspace', label: '', items: pick('ide', 'pilotage') },
-  { id: 'agents', label: 'Agents', items: pick('agent-swarm', 'autonomy', 'explainability') },
   { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
   // Ex-groupes « Automatisation » et « Système » à un seul item : fusionnés.
   { id: 'operations', label: 'Opérations', items: pick('automation', 'observability') },

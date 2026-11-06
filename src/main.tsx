@@ -526,12 +526,13 @@ function AnimatedRoutes() {
         {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
         <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
         {/* Old routes — backward-compatible deep links (navigate(ROUTES.missionTimeline) etc.) */}
-        <Route path={ROUTES.autonomy}          element={<Navigate to="/pilotage?tab=autonomie"        replace />} />
+        <Route path={ROUTES.autonomy}          element={<Navigate to="/pilotage"                     replace />} />
         <Route path={ROUTES.missionControl}    element={<Navigate to="/pilotage"                     replace />} />
-        <Route path={ROUTES.missionTimeline}   element={<Navigate to="/pilotage?tab=missions"         replace />} />
-        <Route path={ROUTES.missionSimulation} element={<Navigate to="/pilotage?tab=simulation"       replace />} />
-        <Route path={ROUTES.agentSwarm}        element={<Navigate to="/pilotage?tab=swarm"            replace />} />
-        <Route path={ROUTES.explainability}    element={<Navigate to="/pilotage?tab=pourquoi"         replace />} />
+        <Route path={ROUTES.missionTimeline}   element={<Navigate to="/pilotage"                     replace />} />
+        {/* Vues Simulation / Agent Swarm / Pourquoi ? retirées : anciens liens → Pilotage */}
+        <Route path={ROUTES.missionSimulation} element={<Navigate to="/pilotage"                     replace />} />
+        <Route path={ROUTES.agentSwarm}        element={<Navigate to="/pilotage"                     replace />} />
+        <Route path={ROUTES.explainability}    element={<Navigate to="/pilotage"                     replace />} />
         {/* ──────────────────────────────────────────────────────────────────── */}
 
         {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}

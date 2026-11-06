@@ -12,7 +12,7 @@ import { ROUTES } from '../config/navigation.js';
  * Auparavant une barre pleine largeur empilée au-dessus de chaque page ; c'est
  * désormais une pastille compacte dans l'en-tête unifié (<ViewHeader>), ce qui
  * rend une ligne entière à chaque page. Lecture seule, dérivée de
- * useAgentStatus ; clic → Mission Control. Masquée quand Leanna est inactive
+ * useAgentStatus ; clic → Pilotage (Missions). Masquée quand Leanna est inactive
  * ET hors ligne (rien à dire).
  */
 
@@ -41,8 +41,8 @@ export function AgentStatusPill() {
   return (
     <button
       type="button"
-      onClick={() => navigate(ROUTES.missionControl)}
-      aria-label={`État de Leanna : ${status.label}. ${status.reason}. Ouvrir Mission Control.`}
+      onClick={() => navigate(ROUTES.pilotage)}
+      aria-label={`État de Leanna : ${status.label}. ${status.reason}. Ouvrir le pilotage des missions.`}
       className="lea-status-pill min-w-0"
     >
       <span className="relative flex h-2 w-2 flex-shrink-0 items-center justify-center" aria-hidden>
