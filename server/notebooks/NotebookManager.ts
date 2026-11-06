@@ -327,7 +327,7 @@ export class NotebookManager {
         }
         Object.assign(source, sameOrigin);
         if (sameOrigin.indexingStatus !== "indexed") {
-          void this.indexSourceChunks(notebookId, sameOrigin.id, true);
+          void this.indexSourceChunks(notebookId, sameOrigin.id);
         }
         log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
         return notebook;
@@ -369,7 +369,7 @@ export class NotebookManager {
       // le compteur de génération de l'EmbeddingStore.
       Object.assign(source, sameOrigin);
       embeddingStore.removeSource(sameOrigin.id, notebookId);
-      void this.indexSourceChunks(notebookId, sameOrigin.id);
+      void this.indexSourceChunks(notebookId, sameOrigin.id, true);
 
       chatResponseCache.invalidateNotebook(notebookId);
       ragSearchCache.invalidateNotebook(notebookId);
