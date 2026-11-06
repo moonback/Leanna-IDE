@@ -24,6 +24,7 @@ export default function MemoriesView() {
   const { confirm } = useConfirm();
   const [memories, setMemories]     = useState<Memory[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState<string | null>(null);
   const [query, setQuery]           = useState('');
   const [deleting, setDeleting]     = useState<string | null>(null);
   const [confirmId, setConfirmId]   = useState<string | null>(null);
@@ -31,11 +32,20 @@ export default function MemoriesView() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     // limit élevé : la recherche est locale et le compteur doit refléter le vrai total.
     fetch('/api/memories?limit=500')
-      .then(r => r.json())
-      .then(d => setMemories(d.memories || []))
-      .catch(() => toastError('Impossible de charger les souvenirs'))
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        if (!Array.isArray(data.memories)) throw new Error('Réponse invalide : souvenirs indisponibles.');
+        return data;
+      })
+      .then(d => setMemories(d.memories))
+      .catch(() => {
+        setLoadError('Impossible de charger les souvenirs. Vérifiez la connexion au serveur puis réessayez.');
+        toastError('Impossible de charger les souvenirs');
+      })
       .finally(() => setLoading(false));
   }, [toastError]);
 
@@ -185,6 +195,11 @@ export default function MemoriesView() {
               <RefreshCw className="w-5 h-5 animate-spin" style={{ color: 'var(--text-dimmed)' }} />
             </div>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement des souvenirs…</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center">
+            <p className="max-w-md text-sm" style={{ color: 'var(--text-muted)' }}>{loadError}</p>
+            <button type="button" onClick={load} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>Réessayer</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 py-12">
