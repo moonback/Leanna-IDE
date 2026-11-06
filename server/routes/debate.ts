@@ -6,6 +6,7 @@ export function createDebateRouter(
   getProfile: () => Record<string, any>,
   setProfile: (profile: any) => void,
   saveProfile: (profile: any) => void,
+  handleToolCall?: (name: string, args: any) => Promise<any>,
 ): Router {
   const router = Router();
 
@@ -25,6 +26,41 @@ export function createDebateRouter(
       voice: config.voice, maxRounds: config.maxRounds,
     });
     res.json({ success: true, config });
+  });
+
+  router.post('/decisions/create-missions', async (req: Request, res: Response) => {
+    if (req.body?.approved !== true) {
+      res.status(400).json({ error: 'Une validation explicite est obligatoire avant de créer des missions.' });
+      return;
+    }
+    if (!handleToolCall) {
+      res.status(503).json({ error: 'Le Mission System n’est pas disponible.' });
+      return;
+    }
+    const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks.slice(0, 5) : [];
+    if (tasks.length === 0) {
+      res.status(400).json({ error: 'Ajoute au moins une tâche validée.' });
+      return;
+    }
+    const created: Array<{ title: string; missionId?: string }> = [];
+    const failed: Array<{ title: string; error: string }> = [];
+    for (const raw of tasks) {
+      const title = typeof raw?.title === 'string' ? raw.title.trim().slice(0, 160) : '';
+      const description = typeof raw?.description === 'string' ? raw.description.trim().slice(0, 4000) : '';
+      const priority = ['low', 'medium', 'high', 'critical'].includes(raw?.priority) ? raw.priority : 'medium';
+      if (!title || !description) { failed.push({ title: title || '(sans titre)', error: 'Titre et description obligatoires.' }); continue; }
+      try {
+        const result = await handleToolCall('mission_create', { title, description, priority, dryRun: false });
+        if (result && typeof result === 'object' && result.missionId) {
+          created.push({ title, missionId: String(result.missionId) });
+        } else {
+          failed.push({ title, error: String(result?.error || 'Mission non créée.') });
+        }
+      } catch (error) {
+        failed.push({ title, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    res.json({ success: failed.length === 0, created, failed });
   });
 
   router.post('/run', async (req: Request, res: Response) => {
