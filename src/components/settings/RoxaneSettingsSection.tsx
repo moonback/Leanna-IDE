@@ -9,7 +9,7 @@ type Config = {
   useSpeech: boolean; maxRounds: number; maxDurationSeconds: number;
 };
 const defaults: Config = {
-  enabled: true, name: 'Roxane', provider: 'gemini', model: 'gemini-3.8-flash', voice: 'Kore',
+  enabled: true, name: 'Roxane', provider: 'gemini', model: 'gemini-3.8-live', voice: 'Kore',
   systemPrompt: "Tu es Roxane, une analyste indépendante, exigeante et constructive. Tu examines les hypothèses, cherches les angles morts, compares les alternatives et contestes les propositions insuffisamment justifiées. Tu ne contredis pas artificiellement : reconnais clairement les bons arguments. Réponds en français, à l'oral, de manière naturelle et concise.",
   temperature: 0.75, topP: 0.9, maxTokens: 1200, language: 'fr', responseStyle: 'balanced',
   contradictionLevel: 80, useSpeech: true, maxRounds: 3, maxDurationSeconds: 600,
