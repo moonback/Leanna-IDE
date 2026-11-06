@@ -1175,6 +1175,19 @@ button {
   position: relative;
   background: transparent;
 }
+
+/* Shared page frame: every route inherits the same workspace surface and sizing.
+   Individual modules may still provide their own contextual sub-navigation. */
+.app-route-frame {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  isolation: isolate;
+}
 .app-content > main,
 .app-content > section {
   max-width: var(--premium-content-max);
