@@ -106,8 +106,15 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
             }
             const inputTranscript = (message.serverContent as any)?.inputTranscription?.text;
             if (!finished && typeof inputTranscript === 'string' && inputTranscript.trim()) {
-              if (transcript.length < 32) transcript.push({ speaker: 'user', text: inputTranscript.trim().slice(0, 3000), round: rounds + 1 });
+              const userText = inputTranscript.trim().slice(0, 3000);
+              if (transcript.length < 32) transcript.push({ speaker: 'user', text: userText, round: rounds + 1 });
               send({ type: 'user_transcript', text: inputTranscript });
+              if (/\\b(?:stop|arrête(?:z)?|on arrête|je tranche|j'ai décidé|ma décision est|c'est décidé)\\b/i.test(userText)) {
+                finished = true;
+                send({ type: 'debate_complete', turns: transcript, reason: 'user_decision' });
+                closeSessions();
+                return;
+              }
             }
             if (message.serverContent?.interrupted) send({ type: 'interrupted', speaker: role });
             if (message.serverContent?.turnComplete && active === role && !finished) {
