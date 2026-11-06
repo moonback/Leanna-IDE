@@ -144,7 +144,7 @@ ${transcript}`;
     profile,
     config,
   );
-  const cleaned = result.text.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');
+  const cleaned = result.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   const parsed = JSON.parse(cleaned) as Partial<DebateSynthesis>;
   const priorities = ['low', 'medium', 'high', 'critical'];
   return {
