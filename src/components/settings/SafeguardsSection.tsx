@@ -15,10 +15,16 @@ interface Checkpoint {
 }
 
 export function SafeguardsSection() {
-  const { config, update } = useSafeguardsConfig();
-  const saveConfig = (next: SafeguardsConfig) => { void update(next); };
+  const { config, update, saving, error: configError, reload: reloadConfig } = useSafeguardsConfig();
+  const saveConfig = (patch: Partial<SafeguardsConfig>) => {
+    void update(patch).catch(() => undefined);
+  };
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
+  const [checkpointError, setCheckpointError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const validationRef = useRef(false);
+  const rollbackRef = useRef(false);
   const [validationStatus, setValidationStatus] = useState<'idle' | 'running' | 'pass' | 'fail'>('idle');
   const [rollbackHash, setRollbackHash] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -34,28 +40,43 @@ export function SafeguardsSection() {
     setLoadingCheckpoints(true);
     try {
       const res = await fetch('/api/safeguards/checkpoints?limit=5');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.checkpoints)) setCheckpoints(data.checkpoints);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data?.checkpoints)) {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Impossible de charger les checkpoints (HTTP ${res.status}).`);
       }
-    } catch { setCheckpoints([]); }
-    finally { setLoadingCheckpoints(false); }
+      setCheckpoints(data.checkpoints.filter((cp: any) => cp && typeof cp.hash === 'string' && typeof cp.message === 'string'));
+      setCheckpointError(null);
+    } catch (err) {
+      setCheckpointError(err instanceof Error ? err.message : 'Erreur lors du chargement des checkpoints.');
+    } finally { setLoadingCheckpoints(false); }
   };
 
   const runValidation = async () => {
+    if (validationRef.current) return;
+    validationRef.current = true;
+    setValidating(true);
     setValidationStatus('running');
     try {
       const res = await fetch('/api/safeguards/validate', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || typeof data.success !== 'boolean') {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Échec de validation (HTTP ${res.status}).`);
+      }
       setValidationStatus(data.success ? 'pass' : 'fail');
-    } catch {
+      if (!data.success) setFeedback({ type: 'error', message: typeof data.error === 'string' ? data.error : 'La validation a détecté des erreurs. Consultez les logs.' });
+    } catch (err) {
       setValidationStatus('fail');
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Impossible de lancer la validation.' });
+    } finally {
+      validationRef.current = false;
+      setValidating(false);
     }
-    setTimeout(() => setValidationStatus('idle'), 5000);
   };
 
   const rollbackTo = async (hash: string) => {
+    if (rollbackRef.current) return;
     if (!confirm(`Revenir au checkpoint ${hash.slice(0, 7)} ? Cette action est irréversible.`)) return;
+    rollbackRef.current = true;
     setRollbackHash(hash);
     setFeedback(null);
     try {
@@ -65,16 +86,17 @@ export function SafeguardsSection() {
         body: JSON.stringify({ hash }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.status !== 'error') {
+      if (res.ok && data && data.status !== 'error') {
         setFeedback({ type: 'success', message: `Retour au checkpoint ${hash.slice(0, 7)} effectué.` });
       } else {
         setFeedback({ type: 'error', message: data.error || 'Échec du retour arrière.' });
       }
-      fetchCheckpoints();
+      await fetchCheckpoints();
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Erreur réseau lors du retour arrière.';
       setFeedback({ type: 'error', message });
     } finally {
+      rollbackRef.current = false;
       setRollbackHash(null);
     }
   };
@@ -93,33 +115,41 @@ export function SafeguardsSection() {
       >
         <AutonomyLevelSelector
           value={config.autonomyLevel ?? 'manual'}
-          onChange={level => saveConfig({ ...config, autonomyLevel: level })}
+          onChange={level => saveConfig({ autonomyLevel: level })}
         />
       </Field>
+
+      {(configError || saving) && (
+        <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs"
+          style={{ backgroundColor: configError ? 'color-mix(in srgb, var(--color-error) 10%, transparent)' : 'var(--bg-secondary)', color: configError ? 'var(--color-error)' : 'var(--text-muted)' }}>
+          <span>{configError ? `Erreur de sauvegarde : ${configError}` : 'Enregistrement des garde-fous…'}</span>
+          {configError && <button type="button" onClick={() => void reloadConfig()} className="underline">Recharger</button>}
+        </div>
+      )}
 
       {/* ─── Toggles ─── */}
       <div className="flex flex-col gap-1">
         <ToggleSwitch
           value={config.autoCheckpoint}
-          onChange={v => saveConfig({ ...config, autoCheckpoint: v })}
+          onChange={v => saveConfig({ autoCheckpoint: v })}
           label="Checkpoint automatique"
           hint="Commit git local avant chaque écriture de fichier par l'IA"
         />
         <ToggleSwitch
           value={config.postEditValidation}
-          onChange={v => saveConfig({ ...config, postEditValidation: v })}
+          onChange={v => saveConfig({ postEditValidation: v })}
           label="Validation post-édition"
           hint="Lance tsc + tests après chaque série de modifications"
         />
         <ToggleSwitch
           value={config.criticalFileConfirm}
-          onChange={v => saveConfig({ ...config, criticalFileConfirm: v })}
+          onChange={v => saveConfig({ criticalFileConfirm: v })}
           label="Confirmation fichiers critiques"
           hint="Demande une validation utilisateur avant de modifier un fichier sensible"
         />
         <ToggleSwitch
           value={config.autoRestart}
-          onChange={v => saveConfig({ ...config, autoRestart: v })}
+          onChange={v => saveConfig({ autoRestart: v })}
           label="Redémarrage contrôlé"
           hint="Relance automatiquement le serveur après une modification du backend"
         />
@@ -150,7 +180,7 @@ export function SafeguardsSection() {
         <motion.button
           type="button"
           onClick={runValidation}
-          disabled={validationStatus === 'running'}
+          disabled={validating}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           className="flex items-center justify-center gap-2 w-full rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-200 disabled:opacity-60"
@@ -235,12 +265,18 @@ export function SafeguardsSection() {
               <span className="text-sm" style={{ color: 'var(--text-dimmed)' }}>Chargement…</span>
             </div>
           )}
-          {!loadingCheckpoints && checkpoints.length === 0 && (
+          {!loadingCheckpoints && checkpointError && (
+            <div className="flex flex-col items-center gap-2 py-3 text-center">
+              <p className="text-xs" style={{ color: 'var(--color-error)' }}>{checkpointError}</p>
+              <button type="button" onClick={fetchCheckpoints} className="text-xs underline" style={{ color: 'var(--accent-primary)' }}>Réessayer</button>
+            </div>
+          )}
+          {!loadingCheckpoints && !checkpointError && checkpoints.length === 0 && (
             <p className="text-sm text-center py-3" style={{ color: 'var(--text-dimmed)' }}>
               Aucun checkpoint disponible.
             </p>
           )}
-          {!loadingCheckpoints && checkpoints.length > 0 && (
+          {!loadingCheckpoints && !checkpointError && checkpoints.length > 0 && (
             <ul className="space-y-1.5">
               {checkpoints.map((cp, idx) => (
                 <motion.li
