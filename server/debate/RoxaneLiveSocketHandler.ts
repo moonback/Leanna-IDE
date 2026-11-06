@@ -65,8 +65,10 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       const session = await deps.createGeminiAI().live.connect({
         model: liveModel,
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: role === 'roxane' && !config.useSpeech ? [Modality.TEXT] : [Modality.AUDIO],
           temperature: role === 'roxane' ? config.temperature : (profile.temperature ?? 0.7),
+          topP: role === 'roxane' ? config.topP : undefined,
+          maxOutputTokens: role === 'roxane' ? config.maxTokens : undefined,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           systemInstruction: { parts: [{ text: rolePrompt(role) }] },
           inputAudioTranscription: {},
@@ -86,8 +88,10 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 const audio = part.inlineData?.data;
                 if (audio) send({ type: 'audio', speaker: role, data: audio, mimeType: part.inlineData?.mimeType || 'audio/pcm;rate=24000' });
               }
-              const output = (message.serverContent as any)?.outputTranscription?.text;
-              if (typeof output === 'string' && output) {
+              const transcription = (message.serverContent as any)?.outputTranscription?.text;
+              const textParts = parts.map(part => part.text).filter((value): value is string => typeof value === 'string').join('');
+              const output = typeof transcription === 'string' && transcription ? transcription : textParts;
+              if (output) {
                 currentText += output;
                 send({ type: 'transcript_delta', speaker: role, text: output });
               }
