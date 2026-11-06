@@ -229,12 +229,48 @@ function ToolsMenuRow({ item }: { item: ToolsMenuItem }) {
 }
 
 function ToolsMenuModal({ items, onClose }: { items: (ToolsMenuItem | 'divider')[]; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const getFocusable = () => Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => element.getAttribute('aria-hidden') !== 'true');
+
+    // Placer immédiatement le focus dans la boîte de dialogue.
+    requestAnimationFrame(() => (getFocusable()[0] ?? dialogRef.current)?.focus());
+
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [onClose]);
 
   return (
@@ -254,7 +290,10 @@ function ToolsMenuModal({ items, onClose }: { items: (ToolsMenuItem | 'divider')
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 12 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-        className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+        ref={dialogRef}
+        id="ide-tools-menu-dialog"
+        tabIndex={-1}
+        className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden flex flex-col outline-none"
         style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', maxHeight: '80vh' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -709,6 +748,7 @@ export const StatusBar = memo(function StatusBar({
 
   // ── Menu Outils ───────────────────────────────────────────────────────────
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const closeToolsMenu = useCallback(() => setShowToolsMenu(false), []);
 
   const handleReindex = useCallback(async () => {
     if (reindexing || indexing.active) return;
@@ -976,6 +1016,7 @@ export const StatusBar = memo(function StatusBar({
             title="Ouvrir le menu Outils"
             aria-haspopup="dialog"
             aria-expanded={showToolsMenu}
+            aria-controls="ide-tools-menu-dialog"
           >
             <MoreHorizontal size={13} style={{ color: 'var(--accent-primary)' }} />
             <span>Outils</span>
@@ -1136,7 +1177,7 @@ export const StatusBar = memo(function StatusBar({
 
       <AnimatePresence>
         {showToolsMenu && (
-          <ToolsMenuModal items={toolsMenuItems} onClose={() => setShowToolsMenu(false)} />
+          <ToolsMenuModal items={toolsMenuItems} onClose={closeToolsMenu} />
         )}
       </AnimatePresence>
 
