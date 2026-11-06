@@ -450,6 +450,7 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 
 - Le profil contient déjà `agents.customAgents[].model`, mais le runtime de génération ne le consultait pas : tous les agents personnalisés partageaient le modèle OpenRouter global.
 - `AgenticRuntime.callLLM()` transmet maintenant le rôle à `generateText()`. Pour un agent personnalisé, le modèle configuré sur son rôle est utilisé lorsque le provider actif est OpenRouter.
+- Le contrat `ProfileConfig.agents` expose désormais explicitement `customAgents[].model` côté serveur, afin que le profil chargé au démarrage et rechargé à chaud conserve un typage cohérent.
 - Ordre de priorité : surcharge explicite `openrouterModel` de l'appel, modèle de l'agent personnalisé, modèle OpenRouter global, puis défaut sûr.
 - Les rôles sans modèle personnalisé et les appels Gemini conservent leur comportement antérieur. Le choix global de provider n'est pas modifié.
 - Tests ajoutés pour la sélection par rôle, le repli sur le modèle global et la priorité de la surcharge explicite.
