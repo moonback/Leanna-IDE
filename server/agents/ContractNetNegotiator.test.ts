@@ -9,6 +9,7 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { AgentMessageBus } from "./AgentMessageBus.js";
 import { ContractNetNegotiator, type NegotiationTask } from "./ContractNetNegotiator.js";
+import { StrategyMemory } from "../knowledge/StrategyMemory.js";
 import { AutonomousAgent } from "./AutonomousAgent.js";
 import type { AgentTask } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
@@ -114,6 +115,27 @@ describe("ContractNetNegotiator", () => {
     const researchTask = makeTask({ requiredCapabilities: ["knowledge_search_entities", "knowledge_memory_list"] });
     assert.equal(negotiator.buildAutoBid("researcher", researchTask)!.skillMatch, 1);
     assert.ok(negotiator.buildAutoBid("coder", researchTask)!.skillMatch < 1);
+  });
+
+  it("calibre la confiance depuis les résultats des capacités requises, pas depuis le trafic global", () => {
+    const memory = new StrategyMemory({ ephemeral: true });
+    const isolatedNegotiator = new ContractNetNegotiator(bus, {
+      strategyMemory: memory,
+      biddingWindowMs: 20,
+    });
+    const task = makeTask({ requiredCapabilities: ["verify_full"] });
+
+    const unseen = isolatedNegotiator.buildAutoBid("tester", task);
+    assert.equal(unseen?.confidence, 0.5, "absence d'historique = confiance neutre");
+
+    for (let i = 0; i < 10; i++) memory.recordSkillOutcome("verify_full", true, 100);
+    const reliable = isolatedNegotiator.buildAutoBid("tester", task);
+    assert.ok((reliable?.confidence ?? 0) > 0.8, "les succès observés doivent augmenter la confiance");
+
+    memory.reset();
+    for (let i = 0; i < 10; i++) memory.recordSkillOutcome("verify_full", false, 100);
+    const unreliable = isolatedNegotiator.buildAutoBid("tester", task);
+    assert.ok((unreliable?.confidence ?? 1) < 0.2, "les échecs observés doivent réduire la confiance");
   });
 
   it("retourne winner=null quand aucun bid n'est reçu", async () => {
