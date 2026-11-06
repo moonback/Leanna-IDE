@@ -94,7 +94,7 @@ export class SkillManagerV2 {
     name: string,
     args: any,
     context?: any,
-    options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope; autonomyApproved?: boolean }
+    options?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: IdempotencyScope; autonomyApproved?: boolean; beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
   ): Promise<any> {
     const normalizedName = this.normalizeName(name);
 
@@ -107,6 +107,7 @@ export class SkillManagerV2 {
       signal: options?.signal,
       idempotencyScope: options?.idempotencyScope,
       autonomyApproved: options?.autonomyApproved,
+      beforeExecute: options?.beforeExecute,
     });
   }
 
