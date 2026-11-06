@@ -42,6 +42,9 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     const language = profile.language || "fr";
     const sessions = new Map<Speaker, LiveSession>();
     const supervisor = new Supervisor();
+    // Les deux IA partagent une file d’exécution : aucune écriture workspace
+    // concurrente ne peut être lancée par les deux sessions en parallèle.
+    let toolExecutionQueue: Promise<void> = Promise.resolve();
     const liveToolDeps: LiveSocketDeps = {
       skillManager: deps.skillManager,
       getCurrentProfile: deps.getCurrentProfile,
@@ -176,12 +179,15 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
             }
             if (message.toolCall && sessionRef) {
               send({ type: "tool_call", speaker, calls: message.toolCall.functionCalls?.map((call: any) => ({ id: call.id, name: call.name })) ?? [] });
-              void executeLiveToolCall(message.toolCall, sessionRef, client, liveToolDeps, voices[speaker], supervisor)
-                .then(() => send({ type: "tool_batch_complete", speaker }))
-                .catch(error => {
-                  console.error(`[VoiceDuoLive][${speaker}] Tool execution failed`, error);
-                  send({ type: "tool_error", speaker, message: "Une action IDE a échoué." });
-                });
+              const toolSession = sessionRef;
+              toolExecutionQueue = toolExecutionQueue.then(async () => {
+                if (closed) return;
+                await executeLiveToolCall(message.toolCall, toolSession, client, liveToolDeps, voices[speaker], supervisor, profileMode);
+                send({ type: "tool_batch_complete", speaker });
+              }).catch(error => {
+                console.error(`[VoiceDuoLive][${speaker}] Tool execution failed`, error);
+                send({ type: "tool_error", speaker, message: "Une action IDE a échoué." });
+              });
             }
             const content = message.serverContent;
             if (content?.interrupted) {
