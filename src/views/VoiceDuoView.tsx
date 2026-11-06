@@ -27,9 +27,9 @@ export default function VoiceDuoView() {
 
   const audio = useAudio({
     onAudioData,
-    vadEnabled: true,
-    vadThreshold: 28,
-    vadSilenceDuration: 700,
+    vadEnabled: profile.vadEnabled ?? true,
+    vadThreshold: profile.vadThreshold ?? 28,
+    vadSilenceDuration: profile.vadSilenceDuration ?? 700,
   });
 
   const appendEntry = useCallback((speaker: "user" | Speaker, name: string, fragment: string) => {
