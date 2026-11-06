@@ -904,25 +904,63 @@ function ImportDropzone({ onImported }: { onImported: () => void }) {
   const toast = useToast();
 
   const processFile = async (file: File) => {
-    setBusy(true); setResult(null);
+    if (busy) return;
+    const filename = file.name.toLowerCase();
+    if (!(filename.endsWith(".json") || filename.endsWith(".leanna.json"))) {
+      setResult({ error: "Format refusé : sélectionnez un fichier JSON .leanna.json." });
+      return;
+    }
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      setResult({ error: "Le fichier doit contenir des données et ne pas dépasser 5 Mo." });
+      return;
+    }
+
+    setBusy(true);
+    setResult(null);
     try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      // Peut être un tableau ou un seul paquet
-      const list = Array.isArray(json) ? json : [json];
-      // Installer chaque paquet via l'API
-      let installed = 0;
-      for (const pkg of list) {
-        if (!pkg?.id) continue;
-        const r = await installPackage(pkg.id);
-        if (r.success) installed++;
+      const parsed: unknown = JSON.parse(await file.text());
+      const packages = Array.isArray(parsed) ? parsed : [parsed];
+      if (packages.length === 0 || packages.length > 20) {
+        throw new Error("Le fichier doit contenir entre 1 et 20 paquets.");
       }
-      setResult({ count: installed });
-      if (installed > 0) { toast.success(`${installed} paquet(s) importé(s) !`); onImported(); }
-      else setResult({ error: 'Aucun paquet valide trouvé dans le fichier.' });
-    } catch (e: any) {
-      setResult({ error: e.message });
-    } finally { setBusy(false); }
+      const invalid = packages.find((pkg) =>
+        !pkg || typeof pkg !== "object" || Array.isArray(pkg)
+        || typeof pkg.name !== "string" || pkg.name.trim().length < 2
+        || typeof pkg.description !== "string" || pkg.description.trim().length < 10
+        || typeof pkg.author !== "string" || !["agent", "skill", "bundle"].includes(pkg.type)
+      );
+      if (invalid) {
+        throw new Error("Le fichier contient un paquet incomplet ou un format non pris en charge. Aucun paquet n'a été importé.");
+      }
+
+      let installed = 0;
+      const errors: string[] = [];
+      for (const pkg of packages) {
+        // Le paquet importé est d'abord republié dans le registre local :
+        // l'API valide le schéma et recalcule son analyse de sécurité.
+        const published = await publishPackage(pkg);
+        if (!published.success || !published.package?.id) {
+          errors.push(`${pkg.name}: ${published.error || "publication refusée"}`);
+          continue;
+        }
+        const outcome = await installPackage(published.package.id);
+        if (outcome.success) installed++;
+        else errors.push(`${pkg.name}: ${outcome.error || "installation échouée"}`);
+      }
+
+      if (installed > 0) {
+        setResult({ count: installed, error: errors.length ? `${errors.length} paquet(s) non importé(s) : ${errors.slice(0, 3).join(" · ")}` : undefined });
+        toast.success(`${installed} paquet(s) importé(s) et installé(s).`);
+        onImported();
+      } else {
+        setResult({ error: errors.slice(0, 3).join(" · ") || "Aucun paquet n'a pu être importé." });
+      }
+    } catch (e: unknown) {
+      setResult({ error: e instanceof Error ? e.message : "Fichier JSON invalide." });
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   return (
@@ -932,21 +970,22 @@ function ImportDropzone({ onImported }: { onImported: () => void }) {
         borderColor: dragging ? 'var(--accent-primary)' : 'var(--border-base)',
         backgroundColor: dragging ? 'color-mix(in srgb, var(--accent-primary) 5%, transparent)' : 'var(--bg-surface)',
       }}
-      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragOver={e => { e.preventDefault(); if (!busy) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={e => {
         e.preventDefault(); setDragging(false);
         const f = e.dataTransfer.files[0];
-        if (f) processFile(f);
+        if (f) void processFile(f);
       }}
-      onClick={() => fileRef.current?.click()}
+      onClick={() => !busy && fileRef.current?.click()}
     >
-      <input ref={fileRef} type="file" accept=".json,.leanna.json" className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) processFile(f); }} />
+      <input ref={fileRef} type="file" accept=".json,.leanna.json,application/json" className="hidden"
+        disabled={busy}
+        onChange={e => { const f = e.target.files?.[0]; if (f) void processFile(f); }} />
       {busy ? (
         <div className="flex flex-col items-center gap-2">
           <span className="w-6 h-6 border-2 border-t-[var(--accent-primary)] border-[var(--border-base)] rounded-full animate-spin" />
-          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Import en cours...</span>
+          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Validation, publication et installation…</span>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2">
@@ -954,7 +993,7 @@ function ImportDropzone({ onImported }: { onImported: () => void }) {
           <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
             Glisser un fichier <code>.leanna.json</code>
           </p>
-          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>ou cliquer pour sélectionner</p>
+          <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>JSON · 5 Mo maximum · 20 paquets maximum</p>
         </div>
       )}
       {result && (
