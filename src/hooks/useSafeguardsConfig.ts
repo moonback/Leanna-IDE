@@ -53,14 +53,15 @@ export function useSafeguardsConfig(): UseSafeguardsConfigResult {
     setLoading(true);
     try {
       const res = await fetch('/api/safeguards/config');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.config && typeof data.config === 'object') {
-          configRef.current = { ...DEFAULT_SAFEGUARDS_CONFIG, ...data.config };
-          setConfig(configRef.current);
-          setError(null);
-        }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.config || typeof data.config !== 'object') {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Impossible de charger la configuration (HTTP ${res.status}).`);
       }
+      const loaded = { ...DEFAULT_SAFEGUARDS_CONFIG, ...data.config };
+      if (!Array.isArray(loaded.criticalFiles)) loaded.criticalFiles = DEFAULT_SAFEGUARDS_CONFIG.criticalFiles;
+      configRef.current = loaded;
+      setConfig(loaded);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de charger les garde-fous.');
     } finally {
