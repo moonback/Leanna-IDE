@@ -70,6 +70,7 @@ import listsRouter from "./server/routes/lists.js";
 import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
 import { createTTSRouter } from "./server/routes/tts.js";
+import { createVoiceDuoRouter } from "./server/routes/voice-duo.js";
 import { notebookManager, embeddingStore } from "./server/notebooks/index.js";
 import { backupService } from "./server/notebooks/BackupService.js";
 import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue.js";
