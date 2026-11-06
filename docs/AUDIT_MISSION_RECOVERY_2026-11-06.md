@@ -236,3 +236,12 @@ Cette passe est un garde-fou fail-closed, pas encore un orchestrateur complet. L
 - La détection d'écritures externes concurrentes reste à renforcer par comparaison d'empreintes et politique de conflit. Un rollback automatique ne doit jamais écraser silencieusement une modification extérieure.
 - Les effets externes (API, base de données, Git distant, commandes système) ne sont pas annulables par un checkpoint fichier. Ils nécessitent des contrats de compensation ou une réconciliation métier.
 - Les tests, le typecheck et la CI n'ont pas été exécutés depuis cette session GitHub. Aucune validation d'exécution n'est revendiquée.
+
+
+### Durcissement complémentaire — lease exclusif inter-processus
+
+- Ajout de `MissionExecutionLease`, un verrou fichier atomique créé avec le flag exclusif `wx`.
+- Le verrou est acquis avant le chargement de l'état de mission et libéré dans un `finally`, y compris si le runner ou la persistance échoue.
+- Une deuxième exécution de la même mission est refusée tant que le premier processus détient le lease.
+- Un lease n'est automatiquement récupéré que si son propriétaire est sur le même hôte et que son PID est démontrablement arrêté. Les verrous distants, illisibles ou ambigus sont conservés (fail-closed).
+- Tests ajoutés pour la contention, la libération par token propriétaire et la récupération d'un PID mort. Ils ne sont pas exécutés dans cette session.
