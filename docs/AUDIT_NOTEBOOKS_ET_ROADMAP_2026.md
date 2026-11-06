@@ -557,3 +557,20 @@ Validation locale requise :
 - `npm run lint:eslint:notebooks`
 - vérifier le polling, le démontage du composant, les réponses 202, les erreurs 4xx/5xx et le comportement sur notebook vide.
 - vérifier visuellement l'onglet sur largeur standard et étroite du panneau Studio.
+
+## Huitième passe — panneau UI de supervision de l'indexation
+
+- Ajout/intégration du panneau `IndexingMonitor` dans le Studio du notebook, avec raccourci `Ctrl/Cmd+7`.
+- Lecture de l'endpoint `GET /:id/embeddings/indexing-status` et actualisation automatique toutes les 5 secondes, avec arrêt du timer au démontage.
+- Vue agrégée : nombre total de sources, indexées, en attente, partielles, en échec, couverture par nombre de sources et tentatives cumulées.
+- Vue par source : type, état, nombre de tentatives, dernière mise à jour, prochaine reprise et dernière erreur.
+- Actions de retry individuel et réindexation groupée via les endpoints existants ; confirmation du nombre de sources mises en file.
+- Correction : les sources historiques avec état `unknown` peuvent également être relancées individuellement. Elles n'étaient pas indexées automatiquement lors de la migration afin d'éviter un coût inattendu, mais doivent rester réparables depuis l'interface.
+
+### Limites fonctionnelles explicites
+
+- La progression affichée est celle de l'indexation vectorielle par source ; elle ne mesure pas un pourcentage interne d'appel d'embedding.
+- L'extraction, le chunking et la génération de résumé ne disposent pas encore d'événements d'étape persistés. Le panneau ne les présente donc pas comme des étapes suivies.
+- L'historique multi-tentatives n'est pas encore conservé : seules la dernière erreur, la date de mise à jour, le compteur et la prochaine échéance sont disponibles.
+- Le panneau est intégré au Studio desktop large ; son accessibilité dans une disposition étroite/mobile reste à examiner.
+- Les tests UI, le typecheck et les tests serveur doivent être exécutés localement avant de considérer cette passe comme validée.
