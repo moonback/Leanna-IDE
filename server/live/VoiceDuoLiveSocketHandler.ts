@@ -54,6 +54,17 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
       browserReadPending: deps.browserReadPending,
       browserActionPending: deps.browserActionPending,
     };
+    // Même rafraîchissement best-effort des custom skills que /live avant
+    // de figer le catalogue d'outils des deux sessions.
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const { invalidateCustomSkillsCache } = await import("../skills/customSkills.js");
+        invalidateCustomSkillsCache();
+        await deps.skillManager.loadCustomSkills();
+      } catch (error) {
+        console.warn("[VoiceDuoLive] Custom skills refresh skipped", error);
+      }
+    }
     const declarations = deps.skillManager.getToolDeclarations();
     const profileMode = profile.mode === "ask" ? "ask" : "full";
     const askAllowed = new Set([
