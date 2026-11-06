@@ -5,7 +5,7 @@
  * ajout/suppression de sources, gestion des notes.
  */
 
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "../utils/logger.js";
@@ -292,9 +292,49 @@ export class NotebookManager {
     const notebook = this.notebooks.get(notebookId);
     if (!notebook) return undefined;
 
+    // Empreinte du contenu extrait : stable entre deux imports du même fichier,
+    // indépendamment de l'UUID temporaire généré pendant l'ingestion.
+    const contentHash = createHash("sha256").update(source.rawText || "", "utf-8").digest("hex");
+    source.contentHash = contentHash;
+    const normalizedOrigin = source.origin.trim().replace(/\\\\/g, "/").replace(/\\/$/, "").toLowerCase();
+    const duplicate = notebook.sources.find(existing => {
+      const existingHash = existing.contentHash || createHash("sha256").update(existing.rawText || "", "utf-8").digest("hex");
+      const existingOrigin = existing.origin.trim().replace(/\\\\/g, "/").replace(/\\/$/, "").toLowerCase();
+      return existing.type === source.type && existingOrigin === normalizedOrigin && existingHash === contentHash;
+    });
+
+    if (duplicate) {
+      // Préserver l'identité durable et les IDs de chunks de la source déjà
+      // enregistrée. Le caller reçoit aussi l'objet canonique.
+      Object.assign(source, duplicate);
+      log.info(`⏭️ Source déjà présente, import ignoré: "${duplicate.title}" (${duplicate.id})`);
+      // Une nouvelle tentative peut réparer des embeddings manquants.
+      void embeddingStore.indexChunks(
+        duplicate.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+        duplicate.id,
+        notebookId
+      ).catch(error => log.warn(`Réindexation de la source existante impossible: ${error.message}`));
+      return notebook;
+    }
+
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
-    this.persist(notebook);
+
+    // Garantir que la source est durable AVANT de lancer les effets secondaires
+    // (embeddings). En cas de crash, reconcileNotebook pourra reconstruire l'index.
+    const pendingTimer = this.persistTimers.get(notebookId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.persistTimers.delete(notebookId);
+    }
+    this.flushNotebook(notebook);
+
+    void embeddingStore.indexChunks(
+      source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+      source.id,
+      notebookId
+    ).catch(error => log.warn(`Indexation différée des embeddings échouée pour ${source.id}: ${error.message}`));
+
     // Les sources ont changé : les réponses chat/RAG en cache ne sont plus fiables.
     chatResponseCache.invalidateNotebook(notebookId);
     ragSearchCache.invalidateNotebook(notebookId);
