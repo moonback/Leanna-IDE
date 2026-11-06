@@ -122,7 +122,7 @@ export class ProcessingQueue<T = unknown> {
         }
         return value;
       });
-      if (!parsed || typeof parsed !== "object" || (parsed as any).version !== 1 || !Array.isArray((parsed as any).tasks)) {
+      if (!parsed || typeof parsed !== "object" || ![1, 2].includes((parsed as any).version) || !Array.isArray((parsed as any).tasks)) {
         throw new Error("Format de queue invalide.");
       }
       const restored = (parsed as any).tasks.filter((task: any) =>
@@ -141,7 +141,20 @@ export class ProcessingQueue<T = unknown> {
           this.queue.push(task);
         }
       }
-      log.info(`♻️ ${restored.length} tâche(s) en attente restaurée(s)`);
+
+      const history = Array.isArray((parsed as any).history) ? (parsed as any).history : [];
+      this.completed = history.filter((task: any) =>
+        task && typeof task.id === "string"
+        && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(task.id)
+        && typeof task.type === "string"
+        && ["urgent", "normal", "low"].includes(task.priority)
+        && ["completed", "failed", "cancelled"].includes(task.status)
+        && Number.isInteger(task.attempts)
+        && Number.isInteger(task.maxAttempts)
+        && typeof task.createdAt === "string"
+        && typeof task.completedAt === "string"
+      ).slice(-200).map((task: QueueTask<T>) => ({ ...task, payload: undefined as T }));
+      log.info(`♻️ ${restored.length} tâche(s) en attente et ${this.completed.length} résultat(s) historique(s) restaurés`);
     } catch (error: any) {
       log.error(`Impossible de restaurer la queue persistée : ${error.message}`);
     }
@@ -155,7 +168,7 @@ export class ProcessingQueue<T = unknown> {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(temp, JSON.stringify(
-        { version: 1, tasks: [...this.queue, ...this.retrying.values()] },
+        { version: 2, tasks: [...this.queue, ...this.retrying.values()], history: this.completed.slice(-200).map(task => ({ ...task, payload: undefined })) },
         (_key, value) => {
           // Buffer.toJSON() s'exécute avant le replacer : compresser son enveloppe
           // en base64 évite un tableau JSON d'octets plusieurs fois plus volumineux.
@@ -496,9 +509,12 @@ export class ProcessingQueue<T = unknown> {
 
 export interface SourceProcessingPayload {
   notebookId: string;
-  fileName: string;
-  mimeType: string;
-  buffer: Buffer;
+  /** Absent sur les tâches upload historiques : elles sont interprétées comme buffer. */
+  kind?: "buffer" | "url";
+  fileName?: string;
+  mimeType?: string;
+  buffer?: Buffer;
+  url?: string;
 }
 
 const NOTEBOOK_DATA_DIR = path.join(
