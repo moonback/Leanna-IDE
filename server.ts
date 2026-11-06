@@ -108,6 +108,10 @@ sourceProcessingQueue.setHandler(async (task, onProgress) => {
   return {
     sourceId: source.id,
     title: source.title,
+    type: source.type,
+    summary: source.summary,
+    keywords: source.keywords,
+    language: source.language,
     chunksCount: source.chunks.length,
     wordCount: source.wordCount,
   };
