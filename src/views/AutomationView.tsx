@@ -180,7 +180,7 @@ export default function AutomationView() {
           <div className="grid gap-5">
             {tasks.map(task => (
               <div key={task.id} 
-                className="group border border-[var(--border-base)] p-5 rounded-2xl bg-[var(--bg-panel)] flex items-center justify-between gap-6 transition-all hover:border-[var(--border-strong)] hover:shadow-lg hover:-translate-y-0.5"
+                className="group flex min-w-0 flex-col gap-4 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-panel)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-lg sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5"
                 style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                 
                 <div className="flex-1 min-w-0">
@@ -203,7 +203,7 @@ export default function AutomationView() {
                     {task.description || 'Pas de description fournie.'}
                   </p>
                   
-                  <div className="flex items-center gap-4 mt-3.5 text-xs text-[var(--text-muted)] bg-[var(--bg-ctrl)] px-3 py-1.5 rounded-full w-fit border border-[var(--border-base)]">
+                  <div className="mt-3.5 flex w-fit max-w-full flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--bg-ctrl)] px-3 py-2 text-xs text-[var(--text-muted)]">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Clock className="w-3.5 h-3.5" /> Intervalle: <span className="text-[var(--text-primary)] font-semibold">{task.interval}</span>
                     </span>
@@ -214,7 +214,7 @@ export default function AutomationView() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2.5 flex-shrink-0">
+                <div className="flex shrink-0 items-center justify-end gap-2 self-end sm:self-auto">
                   <button type="button" aria-label={`Lancer ${task.name} maintenant`} onClick={() => runNow(task.id)} 
                     className="p-3 rounded-xl transition-colors hover:bg-[var(--ctrl-hover)] text-[var(--ctrl-icon)] hover:text-[var(--accent-primary)] bg-[var(--bg-ctrl)] border border-[var(--border-base)]"
                     title="Lancer maintenant">
