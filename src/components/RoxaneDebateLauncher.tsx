@@ -11,6 +11,7 @@ export function RoxaneDebateLauncher() {
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
   const [liveStatus, setLiveStatus] = useState('idle');
   const [liveTurns, setLiveTurns] = useState<Turn[]>([]);
   const [interjection, setInterjection] = useState('');
@@ -20,6 +21,10 @@ export function RoxaneDebateLauncher() {
   const liveSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioScheduleRef = useRef(0);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const inputContextRef = useRef<AudioContext | null>(null);
+  const inputProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const recognitionRef = useRef<any>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +44,8 @@ export function RoxaneDebateLauncher() {
     recognitionRef.current?.stop?.();
     liveSocketRef.current?.close();
     void audioContextRef.current?.close();
+    void inputContextRef.current?.close();
+    micStreamRef.current?.getTracks().forEach(track => track.stop());
   }, []);
 
   const startRecognition = () => {
@@ -112,7 +119,9 @@ export function RoxaneDebateLauncher() {
           }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
             .finally(() => { setBusy(false); setLiveStatus('complete'); });
         }
-        if (msg.type === 'interrupted_by_user') { setBusy(false); setSpeaking(false); setLiveStatus('interrupted'); }
+        if (msg.type === 'interrupted') clearAudioOutput();
+        if (msg.type === 'user_transcript' && typeof msg.text === 'string') setLiveTurns(prev => [...prev, { id: 'user-' + Date.now(), speaker: 'user', text: msg.text, round: 0 }]);
+        if (msg.type === 'interrupted_by_user') { clearAudioOutput(); setBusy(false); setLiveStatus('interrupted'); }
       };
       socket.onerror = () => { setError('Connexion WebSocket Roxane impossible.'); setBusy(false); setLiveStatus('error'); };
       socket.onclose = () => setBusy(false);
@@ -147,11 +156,78 @@ export function RoxaneDebateLauncher() {
     } catch (e) { setMissionStatus(e instanceof Error ? e.message : 'Erreur lors de la création'); }
   };
 
+  const stopMicrophone = () => {
+    if (inputProcessorRef.current) {
+      inputProcessorRef.current.onaudioprocess = null;
+      inputProcessorRef.current.disconnect();
+      inputProcessorRef.current = null;
+    }
+    inputSourceRef.current?.disconnect();
+    inputSourceRef.current = null;
+    micStreamRef.current?.getTracks().forEach(track => track.stop());
+    micStreamRef.current = null;
+    void inputContextRef.current?.close();
+    inputContextRef.current = null;
+    setMicEnabled(false);
+  };
+
+  const toggleMicrophone = async () => {
+    if (micStreamRef.current) { stopMicrophone(); return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Le microphone nécessite un navigateur compatible et un contexte sécurisé.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
+      const context = new AudioContext({ sampleRate: 16000 });
+      const source = context.createMediaStreamSource(stream);
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      const mute = context.createGain();
+      mute.gain.value = 0;
+      processor.onaudioprocess = event => {
+        const socket = liveSocketRef.current;
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const ratio = context.sampleRate / 16000;
+        const outputLength = Math.floor(input.length / ratio);
+        const pcm = new Int16Array(outputLength);
+        for (let i = 0; i < outputLength; i++) {
+          const sample = input[Math.min(input.length - 1, Math.floor(i * ratio))] || 0;
+          const clipped = Math.max(-1, Math.min(1, sample));
+          pcm[i] = clipped < 0 ? clipped * 32768 : clipped * 32767;
+        }
+        if (pcm.length > 0 && socket.bufferedAmount < 256 * 1024) socket.send(pcm.buffer);
+      };
+      source.connect(processor);
+      processor.connect(mute);
+      mute.connect(context.destination);
+      micStreamRef.current = stream;
+      inputContextRef.current = context;
+      inputSourceRef.current = source;
+      inputProcessorRef.current = processor;
+      setMicEnabled(true);
+      setError('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Accès au microphone refusé.');
+      stopMicrophone();
+    }
+  };
+
+  const clearAudioOutput = () => {
+    audioScheduleRef.current = 0;
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+    setSpeaking(false);
+  };
+
   const stopLive = () => {
+    stopMicrophone();
+    clearAudioOutput();
     if (liveSocketRef.current?.readyState === WebSocket.OPEN) liveSocketRef.current.send(JSON.stringify({ type: 'interrupt' }));
     liveSocketRef.current?.close(); liveSocketRef.current = null;
-    audioScheduleRef.current = 0; void audioContextRef.current?.close(); audioContextRef.current = null;
-    setBusy(false); setSpeaking(false); setLiveStatus('interrupted');
+    setBusy(false); setLiveStatus('interrupted');
   };
 
   const close = () => { stopLive(); recognitionRef.current?.stop?.(); setListening(false); setOpen(false); };
@@ -189,6 +265,7 @@ export function RoxaneDebateLauncher() {
               <textarea value={approvedTasks} onChange={e => setApprovedTasks(e.target.value)} placeholder="Ex. : Auditer les dépendances du module vocal&#10;Ajouter les tests d'interruption audio" className="min-h-20 w-full rounded-xl border p-3 text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/>
               <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{missionStatus}</span><button onClick={createApprovedMissions} disabled={!approvedTasks.trim()} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#059669' }}>Approuver et créer les missions</button></div>
             </div>}
+            {liveStatus === 'live' && <button onClick={() => void toggleMicrophone()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: micEnabled ? 'rgba(16,185,129,.5)' : 'var(--border-base)' }}><Mic className="h-4 w-4"/>{micEnabled ? 'Désactiver le micro' : 'Parler aux deux IA'}</button>}
             {liveStatus !== 'complete' && liveStatus !== 'interrupted' && <div className="flex gap-2"><input value={interjection} onChange={e => setInterjection(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendInterjection(); }} placeholder="Interromps et donne ton avis…" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/><button onClick={sendInterjection} disabled={!interjection.trim()} className="rounded-xl px-3 py-2 text-white" style={{ background: '#7650c9' }}><Send className="h-4 w-4"/></button></div>}
           </section>}
 
