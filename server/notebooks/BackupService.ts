@@ -287,16 +287,20 @@ export class BackupService {
         throw new Error("Le contenu du notebook sauvegardé est invalide.");
       }
 
+      // Valider toutes les pièces avant de remplacer le moindre fichier courant.
+      const embSource = path.join(backupPath, "embeddings", notebookFile);
+      let embeddingContent: string | null = null;
+      if (fs.existsSync(embSource)) {
+        embeddingContent = fs.readFileSync(embSource, "utf-8");
+        JSON.parse(embeddingContent);
+      }
+
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
       const tempDest = `${destPath}.restore-${process.pid}-${Date.now()}.tmp`;
       fs.writeFileSync(tempDest, JSON.stringify(notebook), "utf-8");
       fs.renameSync(tempDest, destPath);
 
-      // Les embeddings sont facultatifs ; s'ils existent, ils doivent être du JSON valide.
-      const embSource = path.join(backupPath, "embeddings", notebookFile);
-      if (fs.existsSync(embSource)) {
-        const embeddingContent = fs.readFileSync(embSource, "utf-8");
-        JSON.parse(embeddingContent);
+      if (embeddingContent !== null) {
         const embDir = path.join(this.getNotebooksDir(), "embeddings");
         fs.mkdirSync(embDir, { recursive: true });
         const embDest = path.join(embDir, notebookFile);
