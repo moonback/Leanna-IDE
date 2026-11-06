@@ -30,3 +30,13 @@ test("document upload validation strips path components and control characters",
   assert.equal(result.valid, true);
   assert.equal(result.fileName, "rapport.txt");
 });
+
+
+test("multimodal upload validation checks raster image signatures and MIME", async () => {
+  const { validateMultimodalDocumentUpload } = await import("./documentUploadValidation.js");
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  assert.equal(validateMultimodalDocumentUpload("photo.png", "image/png", png).valid, true);
+  assert.equal(validateMultimodalDocumentUpload("photo.png", "image/png", Buffer.from("not png")).valid, false);
+  assert.equal(validateMultimodalDocumentUpload("photo.png", "image/jpeg", png).valid, false);
+  assert.equal(validateMultimodalDocumentUpload("photo.svg", "image/svg+xml", Buffer.from("<svg/>")).valid, false);
+});
