@@ -255,7 +255,7 @@ export default function SettingsView() {
   const active = getActiveLabel(activeSection);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden font-sans text-xs" style={{ color: 'var(--text-primary)' }}>
+    <div className="settings-view h-full flex flex-col overflow-hidden font-sans text-xs" style={{ color: 'var(--text-primary)' }}>
 
       {/* En-tête unique, pleine largeur : la page s'appelle « Paramètres », la
           section active est en badge et sa description en ligne. */}
@@ -287,7 +287,7 @@ export default function SettingsView() {
       <div className="flex min-h-0 flex-1">
       {/* ── Navigation des sections ── */}
       <nav
-        className="flex flex-col flex-shrink-0 select-none"
+        className="settings-nav flex flex-col flex-shrink-0 select-none"
         style={{ width: 232, borderRight: '1px solid var(--glass-stroke)' }}
       >
         {/* Search input */}
