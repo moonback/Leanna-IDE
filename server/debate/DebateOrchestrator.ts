@@ -145,7 +145,18 @@ ${transcript}`;
     config,
   );
   const cleaned = result.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const parsed = JSON.parse(cleaned) as Partial<DebateSynthesis>;
+  let parsed: Partial<DebateSynthesis>;
+  try {
+    parsed = JSON.parse(cleaned) as Partial<DebateSynthesis>;
+  } catch {
+    return {
+      recommendation: result.text.trim().slice(0, 4000),
+      agreements: [],
+      disagreements: [],
+      decisions: [],
+      tasks: [],
+    };
+  }
   const priorities = ['low', 'medium', 'high', 'critical'];
   return {
     recommendation: typeof parsed.recommendation === 'string' ? parsed.recommendation.slice(0, 4000) : '',
