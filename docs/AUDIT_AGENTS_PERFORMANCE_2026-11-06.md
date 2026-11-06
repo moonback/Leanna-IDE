@@ -413,12 +413,13 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 Étendre la gouvernance de concurrence au-delà d'une orchestration isolée : limites partagées entre orchestrations, quotas par rôle et par fournisseur LLM, annulation et libération garanties des créneaux, puis métriques p50/p95 et coût par tâche réussie.
 
 
-### Phase 0 — complément : limiteur global centralisé
+### Phase 0 — complément : limites globales et par rôle
 
 - Nouveau `TaskExecutionLimiter` FIFO, appelé à la frontière de `AgentExecutor.execute()` et `AgentRuntimeExecutor.execute()`. Les chemins `TaskScheduler`, délégation directe et flotte autonome qui utilisent ces exécuteurs partagent donc le même budget.
 - Plafond global du processus : **8 tâches actives** ; plafond local inchangé : **4 tâches par orchestration**.
+- Quota par rôle : `getAgentDefinition(role).maxConcurrency` est réservé atomiquement à l'entrée dans l'exécuteur, file d'attente comprise. Un rôle saturé ne bloque pas les autres rôles : le limiteur accorde les créneaux au premier waiter éligible.
 - Les créneaux sont transmis directement au prochain élément de la file afin d'éviter une course entre libération et nouvelle arrivée.
 - Annulation d'une tâche encore en file : `cancel()` retire le waiter ; une tâche annulée ne peut donc pas démarrer ultérieurement par erreur. `AgentOrchestrator.cancelTask()` relaie l'annulation à l'exécuteur.
-- Tests ajoutés pour le plafond concurrent, la libération après exception, la capacité invalide et l'annulation d'un waiter.
+- Tests ajoutés pour les plafonds globaux, les quotas par rôle, l'équité entre rôles, la libération après exception, les capacités invalides et l'annulation d'un waiter.
 
-**Limite connue à traiter ensuite :** le plafond global n'est pas encore décliné en quotas par rôle ou fournisseur LLM. La vérification `maxConcurrency` de la délégation directe observe les tâches déjà actives, mais ne réserve pas encore de capacité par rôle pour les tâches en file. Une file très chargée peut donc dépasser le quota de rôle au moment où plusieurs tâches deviennent actives. Il faut ajouter une réservation atomique par rôle sans affamer les autres rôles.
+**Limite connue à traiter ensuite :** les quotas par fournisseur/modèle LLM ne sont pas encore centralisés. Plusieurs rôles peuvent utiliser le même fournisseur ; il faut donc ajouter un plafond fournisseur distinct, configurable et compatible avec les limites de débit réelles des API.
