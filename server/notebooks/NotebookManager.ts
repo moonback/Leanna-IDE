@@ -105,6 +105,8 @@ export class NotebookManager {
   private notebooks: Map<string, Notebook> = new Map();
   /** Timers de debounce pour la persistence asynchrone */
   private persistTimers: Map<string, NodeJS.Timeout> = new Map();
+  /** Empêche deux reprises concurrentes d'écrire un statut d'indexation obsolète. */
+  private sourceIndexRuns: Map<string, number> = new Map();
 
   constructor() {
     this.loadAll();
@@ -407,6 +409,11 @@ export class NotebookManager {
     const source = notebook?.sources.find(item => item.id === sourceId);
     if (!notebook || !source) return;
 
+    const runKey = `${notebookId}:${sourceId}`;
+    const runId = (this.sourceIndexRuns.get(runKey) ?? 0) + 1;
+    this.sourceIndexRuns.set(runKey, runId);
+    const expectedContentHash = source.contentHash;
+
     source.indexingStatus = "pending";
     source.indexingError = undefined;
     source.indexingUpdatedAt = new Date().toISOString();
@@ -425,6 +432,10 @@ export class NotebookManager {
         source.id,
         notebookId
       );
+      if (this.sourceIndexRuns.get(runKey) !== runId
+        || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
+        return;
+      }
       source.indexingStatus = indexed >= source.chunks.length ? "indexed" : "partial";
       source.indexingError = indexed >= source.chunks.length
         ? undefined
@@ -435,6 +446,10 @@ export class NotebookManager {
         log.warn(`Indexation partielle de la source ${sourceId}: ${source.indexingError}`);
       }
     } catch (error: any) {
+      if (this.sourceIndexRuns.get(runKey) !== runId
+        || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
+        return;
+      }
       source.indexingStatus = "failed";
       source.indexingError = String(error?.message || error).slice(0, 500);
       source.indexingUpdatedAt = new Date().toISOString();
