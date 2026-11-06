@@ -603,3 +603,34 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Double-cliquer sur Validation manuelle et vérifier qu'une seule requête part ; tester réponses success, échec métier, HTTP 500 et JSON invalide.
 - Confirmer puis annuler un rollback ; vérifier qu'une seule mutation est lancée, que le retour est signalé correctement et que la liste est rafraîchie.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-sixième passe — Sécurité d'affichage et fiabilité des variables d'environnement
+
+### Constats vérifiés
+
+- Le chargement et la révélation des secrets ne contrôlaient pas systématiquement le statut HTTP ; une réponse serveur non JSON pouvait masquer la nature de l'erreur.
+- Le bouton de rechargement pouvait effacer les modifications non enregistrées sans confirmation.
+- La sauvegarde ne vérifiait que le statut applicatif et pouvait interpréter une réponse HTTP d'erreur comme un succès si le corps contenait un statut trompeur.
+- Les réponses partielles contenant des clés rejetées effaçaient toutes les modifications locales, y compris les champs refusés.
+- Les champs restaient éditables pendant une sauvegarde ; une modification faite pendant la requête pouvait être supprimée par le nettoyage de l'état après succès.
+- Lorsqu'un secret était modifié après révélation, le composant pouvait basculer vers un champ texte sans mécanisme de masquage local ; le bouton de masquage était désactivé pendant l'édition.
+
+### Corrections appliquées
+
+- Vérification HTTP et parsing JSON défensif pour le chargement, la révélation et la sauvegarde.
+- Messages d'erreur distincts pour les réponses invalides, les erreurs HTTP et les pannes réseau.
+- Confirmation explicite avant un rechargement manuel qui abandonnerait des modifications non enregistrées.
+- Verrou synchrone contre les doubles sauvegardes et contre les demandes de révélation concurrentes pour une même clé.
+- Conservation des modifications rejetées par le serveur et affichage d'un retour d'erreur explicite au lieu de les perdre silencieusement.
+- Conservation des nouvelles modifications saisies pendant une sauvegarde, en comparant l'état courant au snapshot réellement envoyé.
+- Les secrets en cours d'édition restent dans un champ masquable (type password par défaut) ; le contrôle de masquage/révélation reste disponible pendant l'édition.
+
+### Validation restante
+
+- Simuler GET /api/env et GET /api/env/reveal/:key en HTTP 401/500, réponse HTML/non JSON et panne réseau.
+- Simuler POST /api/env en HTTP 500, réponse JSON invalide, succès complet et succès partiel avec clés rejetées.
+- Modifier un champ pendant une sauvegarde lente ; vérifier que la nouvelle valeur reste en attente après la réponse.
+- Cliquer deux fois rapidement sur Enregistrer et sur Révéler ; vérifier une seule requête par action.
+- Modifier un secret après l'avoir révélé ; vérifier qu'il est masqué par défaut et que l'utilisateur peut le révéler/masquer explicitement.
+- Cliquer sur Recharger avec des modifications en attente, confirmer puis annuler ; vérifier la conservation ou l'abandon attendu.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis tester les parcours secrets dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
