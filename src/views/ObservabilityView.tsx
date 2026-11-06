@@ -113,6 +113,8 @@ export default function ObservabilityView() {
               {(['day', 'hour'] as const).map(p => (
                 <button
                   key={p}
+                  type="button"
+                  aria-pressed={period === p}
                   onClick={() => setPeriod(p)}
                   className="px-3 py-1.5 font-medium transition-colors"
                   style={{
@@ -125,6 +127,7 @@ export default function ObservabilityView() {
               ))}
             </div>
             <button
+              type="button"
               onClick={fetchDashboard}
               className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--bg-secondary)]"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
@@ -140,6 +143,8 @@ export default function ObservabilityView() {
       <div
         className="flex border-b"
         style={{ borderColor: 'var(--border-base)' }}
+        role="tablist"
+        aria-label="Sections de l’observabilité"
       >
         {([
           { key: 'overview', label: 'Vue d\'ensemble', icon: TrendingUp },
@@ -149,6 +154,9 @@ export default function ObservabilityView() {
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
             onClick={() => setTab(key)}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors"
             style={{
