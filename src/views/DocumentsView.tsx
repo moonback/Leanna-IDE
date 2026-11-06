@@ -161,7 +161,7 @@ export default function DocumentsView() {
   const [activeTab, setActiveTab] = useState<Tab>('stats');
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Header */}
       <ViewHeader
         {...viewHeaderProps('documents')}
