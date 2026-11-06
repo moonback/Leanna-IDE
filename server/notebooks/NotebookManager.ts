@@ -107,6 +107,10 @@ export class NotebookManager {
   private persistTimers: Map<string, NodeJS.Timeout> = new Map();
   /** Empêche deux reprises concurrentes d'écrire un statut d'indexation obsolète. */
   private sourceIndexRuns: Map<string, number> = new Map();
+  private sourceIndexRetryTimers: Map<string, NodeJS.Timeout> = new Map();
+  private static readonly MAX_SOURCE_INDEX_ATTEMPTS = 5;
+  private static readonly SOURCE_INDEX_RETRY_BASE_MS = 5_000;
+  private static readonly SOURCE_INDEX_RETRY_MAX_MS = 5 * 60_000;
 
   constructor() {
     this.loadAll();
@@ -323,11 +327,6 @@ export class NotebookManager {
           void this.indexSourceChunks(notebookId, sameOrigin.id);
         }
         log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
-        void embeddingStore.indexChunks(
-          sameOrigin.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
-          sameOrigin.id,
-          notebookId
-        ).catch(error => log.warn(`Réindexation de la source existante impossible: ${error.message}`));
         return notebook;
       }
 
@@ -410,12 +409,19 @@ export class NotebookManager {
     if (!notebook || !source) return;
 
     const runKey = `${notebookId}:${sourceId}`;
+    const existingTimer = this.sourceIndexRetryTimers.get(runKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.sourceIndexRetryTimers.delete(runKey);
+    }
     const runId = (this.sourceIndexRuns.get(runKey) ?? 0) + 1;
     this.sourceIndexRuns.set(runKey, runId);
     const expectedContentHash = source.contentHash;
 
+    source.indexingAttempts = (source.indexingAttempts ?? 0) + 1;
     source.indexingStatus = "pending";
     source.indexingError = undefined;
+    source.indexingNextRetryAt = undefined;
     source.indexingUpdatedAt = new Date().toISOString();
     if (!this.flushNotebook(notebook)) {
       log.warn(`Impossible de persister l'état pending de l'indexation source ${sourceId}`);
@@ -423,9 +429,8 @@ export class NotebookManager {
     }
 
     try {
-      // Nettoyer les IDs de chunks d'une éventuelle version précédente avant
-      // de recalculer. Cela ferme aussi la fenêtre de crash après publication
-      // de la nouvelle source mais avant le nettoyage des anciens vecteurs.
+      // Retirer les vecteurs d'une version précédente avant de reconstruire
+      // l'index de la version courante.
       embeddingStore.removeSource(source.id, notebookId);
       const indexed = await embeddingStore.indexChunks(
         source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
@@ -436,15 +441,16 @@ export class NotebookManager {
         || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
         return;
       }
-      source.indexingStatus = indexed >= source.chunks.length ? "indexed" : "partial";
-      source.indexingError = indexed >= source.chunks.length
+
+      const complete = indexed >= source.chunks.length;
+      source.indexingStatus = complete ? "indexed" : "partial";
+      source.indexingError = complete
         ? undefined
         : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`;
       source.indexingUpdatedAt = new Date().toISOString();
+      if (!complete) this.scheduleSourceIndexRetry(notebookId, source);
       this.flushNotebook(notebook);
-      if (source.indexingStatus !== "indexed") {
-        log.warn(`Indexation partielle de la source ${sourceId}: ${source.indexingError}`);
-      }
+      if (!complete) log.warn(`Indexation partielle de la source ${sourceId}: ${source.indexingError}`);
     } catch (error: any) {
       if (this.sourceIndexRuns.get(runKey) !== runId
         || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
@@ -453,18 +459,103 @@ export class NotebookManager {
       source.indexingStatus = "failed";
       source.indexingError = String(error?.message || error).slice(0, 500);
       source.indexingUpdatedAt = new Date().toISOString();
+      this.scheduleSourceIndexRetry(notebookId, source);
       this.flushNotebook(notebook);
       log.warn(`Indexation échouée pour source ${sourceId}: ${source.indexingError}`);
     }
+  }
+
+  private scheduleSourceIndexRetry(notebookId: string, source: Source): void {
+    const attempts = source.indexingAttempts ?? 0;
+    if (attempts >= NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
+      source.indexingNextRetryAt = undefined;
+      log.warn(`Nombre maximal de tentatives atteint pour source ${source.id}`);
+      return;
+    }
+
+    const delay = Math.min(
+      NotebookManager.SOURCE_INDEX_RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1),
+      NotebookManager.SOURCE_INDEX_RETRY_MAX_MS
+    );
+    const nextRetryAt = new Date(Date.now() + delay);
+    source.indexingNextRetryAt = nextRetryAt.toISOString();
+    const key = `${notebookId}:${source.id}`;
+    const oldTimer = this.sourceIndexRetryTimers.get(key);
+    if (oldTimer) clearTimeout(oldTimer);
+    const timer = setTimeout(() => {
+      this.sourceIndexRetryTimers.delete(key);
+      void this.indexSourceChunks(notebookId, source.id);
+    }, delay);
+    timer.unref?.();
+    this.sourceIndexRetryTimers.set(key, timer);
+  }
+
+  /** Statut agrégé, destiné au panneau de supervision Notebook. */
+  getSourceIndexingStatus(notebookId: string): {
+    total: number;
+    indexed: number;
+    pending: number;
+    partial: number;
+    failed: number;
+    attempts: number;
+    sources: Array<Pick<Source, "id" | "title" | "type" | "indexingStatus" | "indexingError" | "indexingUpdatedAt" | "indexingAttempts" | "indexingNextRetryAt">>;
+  } | undefined {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook) return undefined;
+    const sources = notebook.sources.map(source => ({
+      id: source.id,
+      title: source.title,
+      type: source.type,
+      indexingStatus: source.indexingStatus ?? "unknown",
+      indexingError: source.indexingError,
+      indexingUpdatedAt: source.indexingUpdatedAt,
+      indexingAttempts: source.indexingAttempts ?? 0,
+      indexingNextRetryAt: source.indexingNextRetryAt,
+    }));
+    return {
+      total: sources.length,
+      indexed: sources.filter(source => source.indexingStatus === "indexed").length,
+      pending: sources.filter(source => source.indexingStatus === "pending").length,
+      partial: sources.filter(source => source.indexingStatus === "partial").length,
+      failed: sources.filter(source => source.indexingStatus === "failed").length,
+      attempts: sources.reduce((sum, source) => sum + source.indexingAttempts, 0),
+      sources,
+    };
+  }
+
+  /** Relance manuellement une source, en réinitialisant son budget de retry. */
+  retrySourceIndexing(notebookId: string, sourceId: string): boolean {
+    const source = this.notebooks.get(notebookId)?.sources.find(item => item.id === sourceId);
+    if (!source) return false;
+    source.indexingAttempts = 0;
+    source.indexingNextRetryAt = undefined;
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    void this.indexSourceChunks(notebookId, sourceId);
+    return true;
   }
 
   /** Reprend au démarrage uniquement les sources explicitement non indexées. */
   private async recoverPendingSourceIndexes(): Promise<void> {
     for (const notebook of this.notebooks.values()) {
       for (const source of notebook.sources) {
-        if (source.indexingStatus === "pending" || source.indexingStatus === "failed" || source.indexingStatus === "partial") {
-          log.info(`♻️ Reprise de l'indexation source ${source.id} (${source.indexingStatus})`);
+        if (source.indexingStatus === "pending") {
+          // Un état pending au démarrage correspond à une opération interrompue.
           await this.indexSourceChunks(notebook.id, source.id);
+        } else if (source.indexingStatus === "failed" || source.indexingStatus === "partial") {
+          const retryAt = source.indexingNextRetryAt ? Date.parse(source.indexingNextRetryAt) : 0;
+          if (Number.isFinite(retryAt) && retryAt > Date.now()) {
+            const delay = retryAt - Date.now();
+            const key = `${notebook.id}:${source.id}`;
+            const timer = setTimeout(() => {
+              this.sourceIndexRetryTimers.delete(key);
+              void this.indexSourceChunks(notebook.id, source.id);
+            }, delay);
+            timer.unref?.();
+            this.sourceIndexRetryTimers.set(key, timer);
+          } else if ((source.indexingAttempts ?? 0) < NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
+            await this.indexSourceChunks(notebook.id, source.id);
+          }
         }
       }
     }
