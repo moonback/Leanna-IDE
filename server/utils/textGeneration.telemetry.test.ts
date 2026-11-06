@@ -174,6 +174,20 @@ test('primary failure then fallback success: attributed to the fallback provider
   assert.equal(failures[0].provider, 'gemini');
 });
 
+test('permanent OpenRouter 401 does not silently fail over to another provider', async () => {
+  mockOpenRouter({ status: 401 });
+  await assert.rejects(() => generateText({ prompt: 'x' }), /OpenRouter 401/);
+  assert.equal(fetchCalls, 1, 'the invalid credential must not trigger a second provider');
+  assert.equal(telemetryService.getRecentFailures().length, 1);
+});
+
+test('transient OpenRouter 429 remains eligible for cross-provider failover', async () => {
+  mockOpenRouter({ status: 429 });
+  await assert.rejects(() => generateText({ prompt: 'x' }), /Aucune clé Gemini API disponible/);
+  assert.equal(fetchCalls, 1, 'OpenRouter is attempted once before Gemini fallback');
+  assert.equal(telemetryService.getRecentFailures().length, 2);
+});
+
 test('all providers failing: error raised, attempts bounded, no tokens recorded', async () => {
   mockOpenRouter({ status: 500 });
   await assert.rejects(() => generateText({ prompt: 'x' }), /Tous les providers ont échoué/);
