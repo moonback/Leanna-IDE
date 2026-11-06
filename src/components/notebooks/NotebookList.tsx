@@ -45,6 +45,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const prefersReducedMotion = useReducedMotion();
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,10 +73,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await api<{ notebooks?: NotebookSummary[] }>('/api/notebooks');
-      setNotebooks(data.notebooks || []);
-    } catch {
+      if (!Array.isArray(data.notebooks)) throw new Error('Réponse invalide : liste des notebooks absente.');
+      setNotebooks(data.notebooks);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Impossible de charger les notebooks.');
       toastError('Impossible de charger les notebooks');
     } finally {
       setLoading(false);
@@ -266,6 +270,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="notebook-card flex flex-col items-center gap-3 rounded-xl px-6 py-16 text-center">
+            <p className="max-w-lg text-sm text-[var(--text-muted)]">{loadError}</p>
+            <NbButton variant="secondary" onClick={loadNotebooks}>Réessayer</NbButton>
           </div>
         ) : notebooks.length === 0 ? (
           /* ─── Empty state ─── */
