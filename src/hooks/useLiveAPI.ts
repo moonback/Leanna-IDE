@@ -579,13 +579,13 @@ export function useLiveAPI() {
       // « Roxane, donne ton avis ». La session Live de Leanna reste ouverte.
       const voiceCommand = String(msg.user_text).trim();
       roxaneVoiceCommandBufferRef.current = `${roxaneVoiceCommandBufferRef.current} ${voiceCommand}`.slice(-500);
-      const trigger = roxaneVoiceCommandBufferRef.current.match(/\\broxane\\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
+      const trigger = roxaneVoiceCommandBufferRef.current.match(/\broxane\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
       if (trigger) {
         roxaneVoiceCommandBufferRef.current = '';
         const recentContext = transcript.slice(-24).map(entry =>
           `${entry.role === 'user' ? 'UTILISATEUR' : 'LEANNA'} : ${entry.text}`
-        ).join('\\n\\n');
-        const requestedTopic = trigger[2]?.replace(/^[\\s:,.!?-]+/, '').trim();
+        ).join('\n\n');
+        const requestedTopic = trigger[2]?.replace(/^[\s:,.!?-]+/, '').trim();
         window.dispatchEvent(new CustomEvent('Leanna-start-roxane-debate', {
           detail: {
             topic: requestedTopic || 'Débattre de la dernière idée de la conversation',
