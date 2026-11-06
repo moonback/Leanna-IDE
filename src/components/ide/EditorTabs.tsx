@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe } from 'lucide-react';
+import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe, MoreHorizontal } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
 import { fileName } from '../../utils/fileUtils.js';
 import type { OpenFile } from '../../types/ide.js';
@@ -8,7 +9,7 @@ import type { OpenFile } from '../../types/ide.js';
 function getHostnameDisplay(url: string): string {
   try {
     const urlObj = new URL(url);
-    return urlObj.hostname.replace(/^www\./, '');
+    return urlObj.hostname.replace(/^www\\./, '');
   } catch {
     return url;
   }
@@ -51,57 +52,82 @@ export function EditorTabs({
   onToggleHtmlPreview,
   onOpenTemplates,
 }: EditorTabsProps) {
+  const [showMore, setShowMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMore) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !moreRef.current?.contains(event.target)) setShowMore(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowMore(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showMore]);
+
   if (openFiles.length === 0) return null;
 
   const isMarkdownFile = activePath?.toLowerCase().endsWith('.md') ?? false;
   const isHtmlFile = activePath?.toLowerCase().endsWith('.html') ?? false;
+  const iconButton = 'w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]';
 
   return (
-    <div 
-      className="flex items-center justify-between border-b select-none" 
-      style={{ 
-        height: '35px', 
-        borderColor: 'var(--border-base)', 
-        backgroundColor: 'var(--bg-sidebar)' 
+    <div
+      className="flex items-center justify-between border-b select-none min-w-0"
+      style={{
+        height: '35px',
+        minHeight: '35px',
+        borderColor: 'var(--border-base)',
+        backgroundColor: 'var(--bg-sidebar)',
       }}
     >
-      {/* Scrollable Tabs List */}
-      <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden custom-scrollbar">
+      {/* Onglets : zone scrollable indépendante de la barre d'actions */}
+      <div className="flex flex-1 h-full min-w-0 overflow-x-auto overflow-y-hidden custom-scrollbar" role="tablist" aria-label="Fichiers ouverts">
         {openFiles.map((file) => {
           const isActive = activePath === file.path;
           const isBrowserTab = file.type === 'browser';
-          const displayName = isBrowserTab && file.browserUrl 
-            ? getHostnameDisplay(file.browserUrl) 
+          const displayName = isBrowserTab && file.browserUrl
+            ? getHostnameDisplay(file.browserUrl)
             : fileName(file.path);
-          const tabTitle = isBrowserTab && file.browserUrl 
-            ? file.browserUrl 
-            : file.path;
-          
+          const tabTitle = isBrowserTab && file.browserUrl ? file.browserUrl : file.path;
+
           return (
             <div
               key={file.path}
-              className="group flex items-center gap-2 h-full px-4 text-sm cursor-pointer relative border-r transition-all duration-150"
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              className="group flex items-center gap-2 h-full px-3 sm:px-4 text-sm cursor-pointer relative border-r transition-colors duration-150"
               style={{
                 borderColor: 'var(--border-base)',
                 backgroundColor: isActive ? 'var(--bg-base)' : 'transparent',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                minWidth: '130px',
+                minWidth: '112px',
                 maxWidth: '180px',
               }}
               onClick={() => onSelectTab(file.path)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectTab(file.path);
+                }
+              }}
               title={tabTitle}
             >
-              {/* Top active tab indicator line — animated slide */}
               {isActive && (
                 <motion.div
                   layoutId="active-tab-indicator"
-                  className="absolute top-0 left-0 right-0 h-0.5" 
+                  className="absolute top-0 left-0 right-0 h-0.5"
                   style={{ backgroundColor: 'var(--accent-primary)' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
-
-              {/* File Icon */}
               <div className="flex-shrink-0 opacity-80 group-hover:opacity-100">
                 {isBrowserTab ? (
                   <Globe size={13} style={{ color: 'var(--accent-primary)' }} />
@@ -109,30 +135,24 @@ export function EditorTabs({
                   <FileIcon filePath={file.path} />
                 )}
               </div>
-
-              {/* Filename */}
-              <span className="flex-1 truncate font-medium">
-                {displayName}
-              </span>
-
-              {/* Status / Close indicators */}
+              <span className="flex-1 truncate font-medium">{displayName}</span>
               <div className="flex items-center justify-center w-4 h-4 relative">
-                {file.dirty ? (
-                  // Show dot if dirty
-                  <div 
-                    className="w-1.5 h-1.5 rounded-full transition-opacity group-hover:opacity-0" 
-                    style={{ backgroundColor: 'var(--accent-primary)' }} 
+                {file.dirty && (
+                  <div
+                    className="w-1.5 h-1.5 rounded-full transition-opacity group-hover:opacity-0"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
                   />
-                ) : null}
-
-                {/* Close Button: shows on hover, or replaces dot on hover */}
+                )}
                 <button
-                  className={`absolute inset-0 flex items-center justify-center rounded p-0.5 hover:bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity`}
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onCloseTab(file.path);
                   }}
+                  className="absolute inset-0 flex items-center justify-center rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--bg-hover)] transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]"
                   title="Fermer (Ctrl+W)"
+                  aria-label={`Fermer ${displayName}`}
+                  tabIndex={isActive ? 0 : -1}
                 >
                   <X size={10.5} style={{ color: 'var(--text-muted)' }} />
                 </button>
@@ -142,14 +162,16 @@ export function EditorTabs({
         })}
       </div>
 
-      {/* Editor Actions bar on the right */}
-      <div className="flex items-center gap-0.5 px-2 h-full border-l" style={{ borderColor: 'var(--border-base)' }}>
-        {/* Markdown preview toggle — visible only for .md files */}
+      {/* Actions essentielles visibles ; réglages secondaires dans le menu « Plus ». */}
+      <div className="relative flex items-center gap-0.5 px-1.5 h-full flex-shrink-0 border-l" style={{ borderColor: 'var(--border-base)' }} ref={moreRef}>
         {isMarkdownFile && (
           <button
+            type="button"
             onClick={onToggleMarkdownPreview}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
-            title={markdownPreview ? 'Voir le texte brut (Ctrl+Shift+M)' : 'Voir la prévisualisation Markdown (Ctrl+Shift+M)'}
+            className={iconButton}
+            title={markdownPreview ? 'Voir le texte brut' : 'Prévisualiser le Markdown'}
+            aria-label={markdownPreview ? 'Voir le texte brut' : 'Prévisualiser le Markdown'}
+            aria-pressed={markdownPreview}
           >
             {markdownPreview
               ? <Code size={13} style={{ color: 'var(--accent-primary)' }} />
@@ -158,61 +180,99 @@ export function EditorTabs({
           </button>
         )}
 
-        {/* HTML preview toggle — visible only for .html files */}
         {isHtmlFile && (
           <button
+            type="button"
             onClick={onToggleHtmlPreview}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
-            title={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML dans le navigateur intégré'}
+            className={iconButton}
+            title={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML'}
+            aria-label={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML'}
+            aria-pressed={htmlPreview}
           >
             <Globe size={13} style={{ color: htmlPreview ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
           </button>
         )}
 
         <button
-          onClick={onToggleMinimap}
-          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition`}
-          title="Basculer la minimap"
-        >
-          <Map size={13} style={{ color: showMinimap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={onToggleWordWrap}
-          className={`w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition`}
-          title="Basculer le retour à la ligne automatique (Alt+Z)"
-        >
-          <WrapText size={13} style={{ color: wordWrap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
-        </button>
-
-        <button
-          onClick={onFormat}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
-          title="Formater le document (Shift+Alt+F)"
-        >
-          <AlignJustify size={13} style={{ color: 'var(--text-muted)' }} />
-        </button>
-
-        {onOpenTemplates && (
-          <button
-            onClick={onOpenTemplates}
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition"
-            title="Bibliothèque de Templates & Modèles"
-          >
-            <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
-          </button>
-        )}
-
-        <button
+          type="button"
           onClick={onSave}
           disabled={!activeFileDirty}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition"
+          className={iconButton + ' disabled:opacity-30'}
           title="Enregistrer le fichier (Ctrl+S)"
+          aria-label="Enregistrer le fichier"
         >
           <Save size={13} style={{ color: activeFileDirty ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
         </button>
-      </div>
-          </div>
-        );
-      };
 
+        <button
+          type="button"
+          onClick={() => setShowMore((value) => !value)}
+          className={iconButton}
+          title="Autres options de l'éditeur"
+          aria-label="Autres options de l'éditeur"
+          aria-haspopup="menu"
+          aria-expanded={showMore}
+        >
+          <MoreHorizontal size={15} style={{ color: showMore ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+        </button>
+
+        {showMore && (
+          <div
+            role="menu"
+            aria-label="Options de l'éditeur"
+            className="glass-float absolute right-1 top-[calc(100%+6px)] z-[var(--z-popover)] min-w-[220px] p-1.5 shadow-xl"
+          >
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={showMinimap}
+              onClick={() => { onToggleMinimap(); setShowMore(false); }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <Map size={14} style={{ color: showMinimap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+              <span className="flex-1">Minimap</span>
+              <span style={{ color: 'var(--text-muted)' }}>{showMinimap ? 'Activée' : 'Désactivée'}</span>
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={wordWrap}
+              onClick={() => { onToggleWordWrap(); setShowMore(false); }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <WrapText size={14} style={{ color: wordWrap ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
+              <span className="flex-1">Retour automatique à la ligne</span>
+              <span style={{ color: 'var(--text-muted)' }}>{wordWrap ? 'Activé' : 'Désactivé'}</span>
+            </button>
+            <div className="my-1 h-px" style={{ background: 'var(--border-base)' }} />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { onFormat(); setShowMore(false); }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <AlignJustify size={14} style={{ color: 'var(--text-muted)' }} />
+              <span className="flex-1">Formater le document</span>
+              <kbd className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Shift+Alt+F</kbd>
+            </button>
+            {onOpenTemplates && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { onOpenTemplates(); setShowMore(false); }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
+                <span className="flex-1">Bibliothèque de modèles</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
