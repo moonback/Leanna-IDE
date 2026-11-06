@@ -265,8 +265,10 @@ export function useLiveAPI() {
       const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
       if (active) {
         handleInterrupt();
-        if (muteBeforeRoxaneRef.current === null) muteBeforeRoxaneRef.current = muted;
-        if (!muted) toggleMute();
+        if (muteBeforeRoxaneRef.current === null) {
+          muteBeforeRoxaneRef.current = muted;
+          if (!muted) toggleMute();
+        }
       } else if (muteBeforeRoxaneRef.current !== null) {
         const restoreMuted = muteBeforeRoxaneRef.current;
         if (muted !== restoreMuted) toggleMute();
