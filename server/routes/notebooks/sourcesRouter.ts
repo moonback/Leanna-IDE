@@ -54,7 +54,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
     }
   });
 
-  router.post("/:id/sources/upload-multi", upload.array("files", 20), async (req: Request, res: Response): Promise<void> => {
+  router.post("/:id/sources/upload-multi", upload.array("files", 10), async (req: Request, res: Response): Promise<void> => {
     try {
       const notebookId = req.params.id;
       const notebook = notebookManager.getNotebook(notebookId);
