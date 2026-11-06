@@ -6,13 +6,13 @@ type Config = {
   enabled: boolean; name: string; provider: 'gemini' | 'openrouter'; model: string; voice: string;
   systemPrompt: string; temperature: number; topP: number; maxTokens: number; language: string;
   responseStyle: 'concise' | 'balanced' | 'detailed'; contradictionLevel: number;
-  useSpeech: boolean; maxRounds: number; maxDurationSeconds: number; autoCreateTasks: boolean;
+  useSpeech: boolean; maxRounds: number; maxDurationSeconds: number;
 };
 const defaults: Config = {
   enabled: true, name: 'Roxane', provider: 'gemini', model: 'gemini-3.8-flash', voice: 'Kore',
   systemPrompt: "Tu es Roxane, une analyste indépendante, exigeante et constructive. Tu examines les hypothèses, cherches les angles morts, compares les alternatives et contestes les propositions insuffisamment justifiées. Tu ne contredis pas artificiellement : reconnais clairement les bons arguments. Réponds en français, à l'oral, de manière naturelle et concise.",
   temperature: 0.75, topP: 0.9, maxTokens: 1200, language: 'fr', responseStyle: 'balanced',
-  contradictionLevel: 80, useSpeech: true, maxRounds: 3, maxDurationSeconds: 600, autoCreateTasks: false,
+  contradictionLevel: 80, useSpeech: true, maxRounds: 3, maxDurationSeconds: 600,
 };
 
 export function RoxaneSettingsSection() {
@@ -69,7 +69,6 @@ export function RoxaneSettingsSection() {
       </div>
       <label className="block text-xs space-y-2">Niveau de contradiction : {config.contradictionLevel}%<input className="w-full" type="range" min="0" max="100" value={config.contradictionLevel} onChange={e => update('contradictionLevel', Number(e.target.value))}/></label>
       <label className="flex items-center justify-between text-sm"><span>Lire les interventions à voix haute</span><input type="checkbox" checked={config.useSpeech} onChange={e => update('useSpeech', e.target.checked)}/></label>
-      <label className="flex items-center justify-between text-sm"><span>Créer automatiquement les tâches après validation</span><input type="checkbox" checked={config.autoCreateTasks} onChange={e => update('autoCreateTasks', e.target.checked)}/></label>
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Le modèle Live de Roxane doit être compatible Gemini Live (ex. gemini-3.8-live). OpenRouter reste utilisable pour les débats texte, mais ne fournit pas la session audio Live. La voix est sélectionnée séparément pour chaque session.</p>
     </section>
     <div className="flex justify-end"><button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--accent-primary)' }}><Save className="h-4 w-4"/>{saving ? 'Enregistrement…' : 'Enregistrer Roxane'}</button></div>
