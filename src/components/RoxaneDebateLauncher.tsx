@@ -14,6 +14,7 @@ export function RoxaneDebateLauncher() {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const speechRunRef = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,18 +30,39 @@ export function RoxaneDebateLauncher() {
 
   useEffect(() => () => { window.speechSynthesis?.cancel(); recognitionRef.current?.stop?.(); }, []);
 
-  const speak = (text: string, speaker: 'leanna' | 'roxane') => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
+  const createUtterance = (text: string, speaker: 'leanna' | 'roxane') => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
-    utterance.rate = speaker === 'roxane' ? 0.98 : 1.03;
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => /fr/i.test(v.lang) && (speaker === 'roxane' ? /female|audrey|hortense|amelie/i.test(v.name) : /female|julie|marie/i.test(v.name)));
+    utterance.rate = speaker === 'roxane' ? 0.96 : 1.03;
+    const frenchVoices = window.speechSynthesis.getVoices().filter(v => /^fr/i.test(v.lang));
+    const preferred = frenchVoices.find(v =>
+      speaker === 'roxane'
+        ? /audrey|hortense|amelie|female|julie/i.test(v.name)
+        : /marie|julie|female|audrey/i.test(v.name)
+    ) ?? frenchVoices[0];
     if (preferred) utterance.voice = preferred;
+    return utterance;
+  };
+
+  const speak = (text: string, speaker: 'leanna' | 'roxane') => {
+    if (!('speechSynthesis' in window)) return;
+    speechRunRef.current += 1;
+    window.speechSynthesis.cancel();
+    const utterance = createUtterance(text, speaker);
     utterance.onstart = () => setSpeaking(true);
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const speakSequence = (turns: Turn[], index = 0, runId = ++speechRunRef.current) => {
+    if (!('speechSynthesis' in window) || runId !== speechRunRef.current) return;
+    const turn = turns[index];
+    if (!turn) { setSpeaking(false); return; }
+    const utterance = createUtterance(turn.text, turn.speaker === 'roxane' ? 'roxane' : 'leanna');
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => speakSequence(turns, index + 1, runId);
+    utterance.onerror = () => speakSequence(turns, index + 1, runId);
     window.speechSynthesis.speak(utterance);
   };
 
@@ -71,13 +93,12 @@ export function RoxaneDebateLauncher() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Le débat n’a pas pu démarrer.');
       setResult(data);
-      const first = data.turns?.[0];
-      if (first) speak(first.text, first.speaker);
+      if (Array.isArray(data.turns) && data.turns.length > 0) speakSequence(data.turns);
     } catch (e) { setError(e instanceof Error ? e.message : 'Erreur inconnue'); }
     finally { setBusy(false); }
   };
 
-  const stopSpeech = () => { window.speechSynthesis?.cancel(); setSpeaking(false); };
+  const stopSpeech = () => { speechRunRef.current += 1; window.speechSynthesis?.cancel(); setSpeaking(false); };
   const close = () => { stopSpeech(); recognitionRef.current?.stop?.(); setListening(false); setOpen(false); };
 
   return <>
