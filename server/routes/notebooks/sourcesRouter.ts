@@ -5,9 +5,20 @@ import fs from "fs";
 import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { validateNotebookSourceUpload, MAX_NOTEBOOK_BATCH_BYTES } from "../../utils/notebookSourceUploadValidation.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();
+
+  // Refuser les identifiants appartenant à un autre workspace avant toute
+  // lecture, mutation, génération, export ou réindexation.
+  router.use("/:id", (req: Request, res: Response, next) => {
+    if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
+      res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
+      return;
+    }
+    next();
+  });
 
   router.post("/:id/sources/upload", upload.single("file"), async (req: Request, res: Response): Promise<void> => {
     try {
