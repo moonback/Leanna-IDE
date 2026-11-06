@@ -44,3 +44,31 @@ test("ProcessingQueue ignores malformed persisted tasks", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("ProcessingQueue persists tasks waiting for retry backoff", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-notebook-queue-retry-"));
+  const persistenceFile = path.join(directory, "queue.json");
+  const queue = new ProcessingQueue<{ value: string }>({
+    persistenceFile,
+    retryBaseDelayMs: 30_000,
+    maxRetries: 2,
+  });
+  try {
+    queue.setHandler(async () => {
+      throw new Error("temporary failure");
+    });
+    queue.enqueue("retry-task", "source-ingest", { value: "retry me" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(queue.getPending().length, 1);
+    assert.equal(queue.getTask("retry-task")?.status, "pending");
+
+    const restarted = new ProcessingQueue<{ value: string }>({ persistenceFile });
+    assert.equal(restarted.getPending().length, 1);
+    assert.equal(restarted.getPending()[0].id, "retry-task");
+    assert.equal(restarted.getPending()[0].attempts, 1);
+  } finally {
+    queue.cancel("retry-task");
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
