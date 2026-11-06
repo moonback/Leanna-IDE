@@ -95,7 +95,6 @@ export function EditorTabs({
           const displayName = isBrowserTab && file.browserUrl
             ? getHostnameDisplay(file.browserUrl)
             : fileName(file.path);
-          const tabTitle = isBrowserTab && file.browserUrl ? file.browserUrl : file.path;
 
           return (
             <div
