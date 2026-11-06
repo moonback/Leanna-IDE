@@ -171,6 +171,8 @@ export default function DocumentsView() {
 
       {/* Tabs */}
       <div
+        role="tablist"
+        aria-label="Sections des documents et connaissances"
         className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b lg:px-7"
         style={{ borderColor: 'var(--border-base)' }}
       >
@@ -182,6 +184,10 @@ export default function DocumentsView() {
         ]).map(({ key, icon: Icon, label }) => (
           <button
             key={key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === key}
+            tabIndex={activeTab === key ? 0 : -1}
             onClick={() => setActiveTab(key)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
@@ -832,7 +838,8 @@ function MemoryTab() {
     });
     if (!confirmed) return;
     try {
-      await fetch(`/api/documents/facts/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/documents/facts/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setFacts(prev => prev.filter(f => f.id !== id));
       success('Fait supprimé');
     } catch {
