@@ -152,7 +152,7 @@ export class NotebookManager {
    * Écriture atomique : le fichier temporaire est entièrement écrit avant le
    * rename. Un arrêt ou une erreur pendant l'écriture ne laisse pas un JSON tronqué.
    */
-  private flushNotebook(notebook: Notebook): void {
+  private flushNotebook(notebook: Notebook): boolean {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(notebook.id)) {
       log.warn("Persistence refusée : identifiant de notebook invalide.");
       return;
@@ -165,9 +165,11 @@ export class NotebookManager {
       fs.writeFileSync(tempPath, JSON.stringify(notebook, null, 2), "utf-8");
       fs.renameSync(tempPath, filePath);
       log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté atomiquement`);
+      return true;
     } catch (err: any) {
       try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
       log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
+      return false;
     }
   }
 
@@ -332,7 +334,10 @@ export class NotebookManager {
       clearTimeout(pendingTimer);
       this.persistTimers.delete(notebookId);
     }
-    this.flushNotebook(notebook);
+    if (!this.flushNotebook(notebook)) {
+      notebook.sources.pop();
+      throw new Error("La source n'a pas pu être enregistrée durablement ; indexation annulée.");
+    }
 
     void embeddingStore.indexChunks(
       source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
