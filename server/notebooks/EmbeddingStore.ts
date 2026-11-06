@@ -238,9 +238,21 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
-    fs.writeFile(filePath, JSON.stringify(index), "utf-8", (err) => {
-      if (err) log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${err.message}`);
-      else log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (${entries.length} vecteurs)`);
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    fs.writeFile(tempPath, JSON.stringify(index), "utf-8", (writeError) => {
+      if (writeError) {
+        log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${writeError.message}`);
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        return;
+      }
+      fs.rename(tempPath, filePath, (renameError) => {
+        if (renameError) {
+          log.warn(`Erreur publication index ${notebookId.slice(0, 8)}: ${renameError.message}`);
+          try { fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        } else {
+          log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté atomiquement (${entries.length} vecteurs)`);
+        }
+      });
     });
   }
 
@@ -256,9 +268,6 @@ export class EmbeddingStore {
       if (entry.notebookId === notebookId) entries.push(entry);
     }
 
-    // Rien à écrire : ne pas créer de fichier vide inutile.
-    if (entries.length === 0) return;
-
     const index: EmbeddingIndex = {
       version: 1,
       model: EMBEDDING_MODEL,
@@ -267,10 +276,13 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     try {
-      fs.writeFileSync(filePath, JSON.stringify(index), "utf-8");
-      log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (sync, ${entries.length} vecteurs)`);
+      fs.writeFileSync(tempPath, JSON.stringify(index), "utf-8");
+      fs.renameSync(tempPath, filePath);
+      log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté atomiquement (sync, ${entries.length} vecteurs)`);
     } catch (err: any) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
       log.warn(`Erreur persistence sync notebook ${notebookId.slice(0, 8)}: ${err.message}`);
     }
   }
@@ -283,7 +295,7 @@ export class EmbeddingStore {
     for (const [notebookId, timer] of this.persistTimers) {
       clearTimeout(timer);
       this.persistTimers.delete(notebookId);
-      this.flushNotebook(notebookId);
+      this.flushNotebookSync(notebookId);
     }
   }
 
