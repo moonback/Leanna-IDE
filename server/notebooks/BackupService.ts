@@ -43,7 +43,7 @@ function isValidBackupMetadata(value: unknown, directoryName: string): value is 
     && (meta.checksums === undefined || (
       !!meta.checksums && typeof meta.checksums === "object" && !Array.isArray(meta.checksums)
       && Object.entries(meta.checksums).every(([file, checksum]) =>
-        /^(?:embeddings\\/)?[A-Za-z0-9][A-Za-z0-9_-]{0,127}\\.json$/.test(file)
+        /^(?:embeddings\/)?[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.json$/.test(file)
         && typeof checksum === "string" && /^[a-f0-9]{64}$/.test(checksum))
     ));
 }
