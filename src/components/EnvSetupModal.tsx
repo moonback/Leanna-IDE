@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { KeyRound, CheckCircle2, AlertCircle, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Field, SecretInput, TextInput } from './settings/SettingsPrimitives.js';
 import { KEY_GROUPS, ALL_SPECS, REQUIRED_KEYS } from './envSetupKeys.js';
+import { useOverlay } from '../hooks/useOverlay.js';
 
 /**
  * EnvSetupModal — assistant de première configuration.
@@ -20,7 +21,6 @@ import { KEY_GROUPS, ALL_SPECS, REQUIRED_KEYS } from './envSetupKeys.js';
 
 const SETUP_DONE_KEY = 'Leanna-env-setup-done';
 const LAUNCHER_DONE_KEY = 'Leanna-launcher-done';
-const OVERLAY_FADE = { duration: 0.25, ease: 'easeOut' as const };
 
 interface EnvVarMeta { key: string; hasValue: boolean; }
 interface EnvSectionData { title: string; vars: EnvVarMeta[]; }
@@ -102,15 +102,13 @@ export function EnvSetupModal() {
     setIsOpen(false);
   }, []);
 
-  // Fermeture au clavier (Échap) — comportement standard d'un modal.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !saving) dismiss();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, saving, dismiss]);
+  // Réutilise les garanties communes des overlays : focus trap, Escape et scroll lock.
+  const { containerRef, backdropProps } = useOverlay<HTMLDivElement>({
+    open: isOpen,
+    onClose: dismiss,
+    disableEscape: saving,
+    disableBackdropClick: true,
+  });
 
   const handleSave = useCallback(async () => {
     const updates: Record<string, string> = {};
@@ -168,19 +166,16 @@ export function EnvSetupModal() {
   if (checking || !isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={OVERLAY_FADE}
-        className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto p-4 sm:p-6"
-        style={{ backgroundColor: 'rgba(5, 7, 12, 0.74)', backdropFilter: 'blur(6px)' }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="env-setup-title"
-      >
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto p-4 sm:p-6"
+      style={{ backgroundColor: 'rgba(5, 7, 12, 0.74)', backdropFilter: 'blur(6px)' }}
+      {...backdropProps}
+    >
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="env-setup-title"
           initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 10 }}
@@ -357,8 +352,7 @@ export function EnvSetupModal() {
             </button>
           </div>
         </motion.div>
-      </motion.div>
-    </AnimatePresence>
+    </div>
   );
 }
 
