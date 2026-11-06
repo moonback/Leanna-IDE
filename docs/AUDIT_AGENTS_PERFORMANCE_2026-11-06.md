@@ -411,3 +411,14 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 ### Prochaine étape
 
 Étendre la gouvernance de concurrence au-delà d'une orchestration isolée : limites partagées entre orchestrations, quotas par rôle et par fournisseur LLM, annulation et libération garanties des créneaux, puis métriques p50/p95 et coût par tâche réussie.
+
+
+### Phase 0 — complément : limiteur global partagé
+
+- Nouveau `TaskExecutionLimiter` FIFO, partagé entre les instances de `TaskScheduler` et la délégation directe de `AgentOrchestrator`.
+- Plafond global du processus : **8 tâches actives** ; plafond local inchangé : **4 tâches par orchestration**.
+- Les créneaux sont transmis directement au prochain élément de la file afin d'éviter une course entre libération et nouvelle arrivée.
+- Annulation d'une tâche encore en file : le limiteur retire le waiter ; une tâche annulée ne peut donc pas démarrer ultérieurement par erreur.
+- Tests ajoutés pour le plafond entre plusieurs schedulers, la libération après exception, la capacité invalide et l'annulation d'un waiter.
+
+**Périmètre restant à intégrer :** les chemins d'exécution directs de la flotte autonome qui appellent le runner sans passer par `TaskScheduler` ou `AgentOrchestrator.delegateTask` ne sont pas encore tous raccordés au limiteur. La limite de 8 est donc garantie pour les deux chemins intégrés, pas encore comme invariant universel de toute la flotte. La prochaine étape doit centraliser le contrôle à la frontière commune `AgentTaskRunner` / exécuteurs, en préservant l'annulation et le swap legacy/runtime.
