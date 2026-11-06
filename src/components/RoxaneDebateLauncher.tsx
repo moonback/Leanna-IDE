@@ -19,6 +19,7 @@ export function RoxaneDebateLauncher() {
   const [missionStatus, setMissionStatus] = useState('');
   const [autoStartPending, setAutoStartPending] = useState(false);
   const [synthesis, setSynthesis] = useState<any>(null);
+  const [historyStatus, setHistoryStatus] = useState('');
   const liveSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioScheduleRef = useRef(0);
@@ -71,7 +72,7 @@ export function RoxaneDebateLauncher() {
 
   const run = async () => {
     window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: true } }));
-    setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setSynthesis(null); setBusy(true); setLiveStatus('connecting');
+    setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setSynthesis(null); setHistoryStatus(''); setBusy(true); setLiveStatus('connecting');
     try {
       const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(`${scheme}//${window.location.host}/roxane-live`);
@@ -122,6 +123,7 @@ export function RoxaneDebateLauncher() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Synthèse indisponible');
             setSynthesis(data.synthesis);
+            setHistoryStatus(data.historyId ? 'Débat sauvegardé dans l’historique.' : 'Historique Supabase indisponible pour cette session.');
             setApprovedTasks((data.synthesis?.tasks || []).map((task: any) => task.title + ' | ' + task.description + ' | ' + task.priority).join('\n'));
           }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
             .finally(() => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setBusy(false); setLiveStatus('complete'); });
@@ -278,6 +280,7 @@ export function RoxaneDebateLauncher() {
             {synthesis && <section className="space-y-2 rounded-xl border p-4" style={{ borderColor: 'rgba(16,185,129,.35)' }}>
               <h4 className="text-sm font-semibold">Synthèse de Leanna</h4>
               <p className="text-sm">{synthesis.recommendation}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{historyStatus}</p>
               {Array.isArray(synthesis.agreements) && synthesis.agreements.length > 0 && <div><p className="text-xs font-semibold">Accords</p><ul className="list-disc pl-5 text-xs">{synthesis.agreements.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
               {Array.isArray(synthesis.disagreements) && synthesis.disagreements.length > 0 && <div><p className="text-xs font-semibold">Désaccords à arbitrer</p><ul className="list-disc pl-5 text-xs">{synthesis.disagreements.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
               {Array.isArray(synthesis.decisions) && synthesis.decisions.length > 0 && <div><p className="text-xs font-semibold">Décisions explicitement relevées</p><ul className="list-disc pl-5 text-xs">{synthesis.decisions.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
@@ -295,7 +298,7 @@ export function RoxaneDebateLauncher() {
         </div>
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-4" style={{ borderColor: 'var(--border-base)' }}>
           <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>{speaking ? <><AudioLines className="h-4 w-4 text-violet-400"/>Lecture Live</> : liveStatus === 'live' ? 'Deux sessions Live connectées' : 'Intervention utilisateur prioritaire'}</div>
-          <div className="flex gap-2">{(busy || liveStatus === 'live') && <button onClick={stopLive} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}><Square className="h-3.5 w-3.5"/>Arrêter le débat</button>}{(liveStatus === 'complete' || liveStatus === 'interrupted' || liveStatus === 'error') && <button onClick={() => { setLiveStatus('idle'); setLiveTurns([]); setSynthesis(null); setApprovedTasks(''); setError(''); }} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Nouveau débat</button>}<button onClick={close} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Fermer</button>{liveStatus === 'idle' && <button onClick={run} disabled={busy || !topic.trim()} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#7650c9' }}><Send className="h-3.5 w-3.5"/>{busy ? 'Connexion…' : 'Lancer le débat vocal'}</button>}</div>
+          <div className="flex gap-2">{(busy || liveStatus === 'live') && <button onClick={stopLive} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}><Square className="h-3.5 w-3.5"/>Arrêter le débat</button>}{(liveStatus === 'complete' || liveStatus === 'interrupted' || liveStatus === 'error') && <button onClick={() => { setLiveStatus('idle'); setLiveTurns([]); setSynthesis(null); setHistoryStatus(''); setApprovedTasks(''); setError(''); }} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Nouveau débat</button>}<button onClick={close} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Fermer</button>{liveStatus === 'idle' && <button onClick={run} disabled={busy || !topic.trim()} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#7650c9' }}><Send className="h-3.5 w-3.5"/>{busy ? 'Connexion…' : 'Lancer le débat vocal'}</button>}</div>
         </footer>
       </div>
     </div>}
