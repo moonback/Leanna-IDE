@@ -13,7 +13,9 @@ export interface DocxExportOptions {
  */
 export function exportToDocx(markdown: string, options: DocxExportOptions = {}): Buffer {
   const { title = 'Document Leanna', author = 'Leanna' } = options;
-  const contentHtml = marked.parse(markdown || '', { async: false }) as string;
+  const renderer = new marked.Renderer();
+  renderer.html = ({ text }) => escapeHtml(text);
+  const contentHtml = marked.parse(markdown || '', { async: false, renderer }) as string;
 
   const wordDocument = `
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
