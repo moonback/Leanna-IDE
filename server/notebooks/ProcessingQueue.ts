@@ -230,6 +230,20 @@ export class ProcessingQueue<T = unknown> {
 
   // ─── Processing ────────────────────────────────────────────────────────────
 
+  /** Les erreurs de validation ne doivent pas être rejouées comme des pannes réseau. */
+  private isRetryableError(error: unknown): boolean {
+    const value = error as { retryable?: boolean; code?: string; status?: number; statusCode?: number; message?: string };
+    if (typeof value?.retryable === "boolean") return value.retryable;
+    const code = String(value?.code ?? "").toUpperCase();
+    const status = Number(value?.status ?? value?.statusCode);
+    const message = String(value?.message ?? error).toLowerCase();
+
+    if (["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "EPIPE"].includes(code)) return true;
+    if (status === 408 || status === 425 || status === 429 || status >= 500) return true;
+    if (status >= 400 && status < 500) return false;
+    return /timeout|timed out|temporar|rate.?limit|network|socket|unavailable|overloaded|fetch failed/.test(message);
+  }
+
   private async processNext(): Promise<void> {
     if (!this.handler) return;
     if (this.processing.size >= this.config.concurrency) return;
@@ -264,7 +278,7 @@ export class ProcessingQueue<T = unknown> {
     } catch (e: any) {
       log.error(`❌ Erreur tâche ${task.id} (tentative ${task.attempts}/${task.maxAttempts}): ${e.message}`);
 
-      if (task.attempts < task.maxAttempts) {
+      if (task.attempts < task.maxAttempts && this.isRetryableError(e)) {
         // Retry avec backoff exponentiel
         task.status = "pending";
         task.progress = 0;
