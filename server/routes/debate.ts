@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { DEFAULT_ROXANE_CONFIG, normalizeRoxaneConfig, type DebateRunRequest } from '../debate/types.js';
 import { runDebate, synthesizeLiveDebate } from '../debate/DebateOrchestrator.js';
+import { persistLiveDebate } from '../debate/DebatePersistence.js';
 
 export function createDebateRouter(
   getProfile: () => Record<string, any>,
@@ -41,7 +42,10 @@ export function createDebateRouter(
     });
     try {
       const synthesis = await synthesizeLiveDebate(getProfile(), topic, safeTurns);
-      res.json({ success: true, synthesis });
+      let historyId: string | null = null;
+      try { historyId = await persistLiveDebate(topic, safeTurns, synthesis); }
+      catch (persistError) { console.error('[Roxane][Persistence] Échec non bloquant', persistError); }
+      res.json({ success: true, synthesis, historyId });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('[Roxane][Synthesis] Échec', message);
