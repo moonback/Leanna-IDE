@@ -677,14 +677,14 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérification du contrat applicatif et du compteur pour les suppressions de conversations, mémoires et scopes sélectionnés ; les erreurs serveur sont affichées au lieu d'être interprétées comme des succès.
 - Ajout de verrous synchrones pour les actions de suppression des conversations, mémoires et sélections. Le stockage local conserve également son verrou anti-double déclenchement.
 - Alignement du scope sélectif `memories` sur le projet actif, avec invalidation du cache mémoire après suppression.
-- Rejet HTTP 400 de toute sélection contenant un scope inconnu ou mal typé, au lieu de supprimer silencieusement un sous-ensemble différent de celui demandé.
+- Rejet HTTP 400 de toute sélection vide, de tout corps `scopes` mal formé et de toute sélection contenant un scope inconnu ou mal typé ; une requête explicite invalide ne peut plus retomber sur la purge globale.
 - Le message de réussite du vidage mémoire précise désormais qu'il concerne le projet actif.
 
 ### Validation restante
 
 - Vérifier les réponses de `DELETE /api/memories/all` : succès avec compteur numérique, HTTP 400 (aucun projet actif), HTTP 500, panne réseau et JSON invalide.
 - Purger le scope `memories` seul puis avec d'autres scopes ; vérifier que seules les mémoires du projet actif sont supprimées et que les mémoires d'un autre projet restent intactes.
-- Envoyer un scope valide accompagné d'un scope inconnu ou non textuel ; vérifier que l'API répond HTTP 400 et ne lance aucune suppression.
+- Envoyer un tableau vide, un champ `scopes` non tableau, ou un scope valide accompagné d'un scope inconnu/non textuel ; vérifier que l'API répond HTTP 400 et ne lance aucune suppression.
 - Double-cliquer rapidement sur chacune des actions ; vérifier qu'une seule opération est déclenchée.
 - Tester les réponses de purge complète et partielle (HTTP 200/207), vérifier le détail des scopes supprimés et les erreurs par scope.
 - Vérifier que le stockage local ne se vide qu'après confirmation, que l'annulation ne déclenche rien et que le rechargement intervient après succès.
