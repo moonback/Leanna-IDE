@@ -158,6 +158,7 @@ export class BackupService {
       let totalSize = 0;
       let totalSources = 0;
       const incrementalIds: string[] = [];
+      const previousTimestamps = new Map(this.lastBackupTimestamps);
 
       for (const file of modifiedFiles) {
         const sourcePath = path.join(notebooksDir, file);
@@ -184,6 +185,13 @@ export class BackupService {
         }
       }
 
+      // Une sauvegarde partielle ne doit jamais être annoncée comme complète.
+      if (incrementalIds.length !== modifiedFiles.length) {
+        this.lastBackupTimestamps = previousTimestamps;
+        fs.rmSync(backupPath, { recursive: true, force: true });
+        throw new Error(`Backup incomplet : ${incrementalIds.length}/${modifiedFiles.length} notebook(s) validé(s).`);
+      }
+
       // Sauvegarder aussi les embeddings
       const embeddingsDir = path.join(notebooksDir, "embeddings");
       if (fs.existsSync(embeddingsDir)) {
@@ -198,7 +206,11 @@ export class BackupService {
               const content = fs.readFileSync(path.join(embeddingsDir, file), "utf-8");
               fs.writeFileSync(path.join(embBackupDir, file), content, "utf-8");
               totalSize += Buffer.byteLength(content, "utf-8");
-            } catch { /* skip */ }
+            } catch (e: any) {
+              this.lastBackupTimestamps = previousTimestamps;
+              fs.rmSync(backupPath, { recursive: true, force: true });
+              throw new Error(`Backup embeddings incomplet (${file}) : ${e.message}`);
+            }
           }
         }
       }
