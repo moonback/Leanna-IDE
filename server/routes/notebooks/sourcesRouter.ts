@@ -456,25 +456,25 @@ export function createSourcesRouter(upload: multer.Multer): Router {
 
       const markdown = mdLines.join("\n");
       const sourceTitle = title?.trim() || `Codebase — ${workspaceName}`;
-      const buffer = Buffer.from(markdown, "utf-8");
-      const source = await sourceIngester.ingestFromBuffer(
-        buffer,
-        sourceTitle,
-        "text/markdown",
-        notebookId
-      );
-      notebookManager.addSource(notebookId, source);
+      const source = await enqueueSourceIngestion({
+        notebookId,
+        kind: "buffer",
+        buffer: Buffer.from(markdown, "utf-8"),
+        fileName: sourceTitle,
+        mimeType: "text/markdown",
+      });
 
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
+          language: source.language,
         },
         stats: {
           filesCollected: collectedFiles.length,
@@ -483,7 +483,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
