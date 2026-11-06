@@ -72,3 +72,21 @@ test("ProcessingQueue persists tasks waiting for retry backoff", async () => {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("ProcessingQueue.waitForTask resolves when a queued task completes", async () => {
+  const queue = new ProcessingQueue<{ value: number }>({ concurrency: 1 });
+  queue.setHandler(async task => ({ doubled: task.payload.value * 2 }));
+  const task = queue.enqueue("wait-complete", "test", { value: 21 });
+  assert.ok(task);
+  const completed = await queue.waitForTask(task.id);
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.result, { doubled: 42 });
+});
+
+test("ProcessingQueue.waitForTask rejects when a queued task fails permanently", async () => {
+  const queue = new ProcessingQueue({ concurrency: 1, maxRetries: 1 });
+  queue.setHandler(async () => { throw new Error("terminal failure"); });
+  const task = queue.enqueue("wait-failed", "test", {});
+  assert.ok(task);
+  await assert.rejects(queue.waitForTask(task.id), /terminal failure/);
+});
