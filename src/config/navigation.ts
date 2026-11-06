@@ -18,7 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, Milestone, FlaskConical, Network, HelpCircle, Gauge,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History,
-  Braces, BarChart2,
+  Braces, BarChart2, MessagesSquare,
 } from 'lucide-react';
 
 export const ROUTES = {
@@ -43,6 +43,7 @@ export const ROUTES = {
   history: '/history',
   lists: '/lists',
   observability: '/observability',
+  voiceDuo: '/voice-duo',
 } as const;
 
 export type NavId =
@@ -51,7 +52,7 @@ export type NavId =
   | 'agent-swarm' | 'explainability' | 'autonomy'
   | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
   | 'memories' | 'history' | 'lists'
-  | 'observability';
+  | 'observability' | 'voice-duo';
 
 export interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
@@ -77,6 +78,7 @@ export const NAV_ITEMS: Record<NavId, NavItem> = {
   // la collision visuelle avec l'icône de l'IDE (Code2).
   'lists':              { id: 'lists',              path: ROUTES.lists,             label: 'Snippets',        icon: Braces },
   'observability':      { id: 'observability',      path: ROUTES.observability,     label: 'Observabilité',   icon: BarChart2 },
+  'voice-duo':          { id: 'voice-duo',          path: ROUTES.voiceDuo,          label: 'Duo vocal',       icon: MessagesSquare },
 };
 
 const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
@@ -90,7 +92,7 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: 'pilotage', label: 'Pilotage',
     items: [NAV_ITEMS['pilotage']] },
   { id: 'travail', label: 'Travail',
-    items: pick('ide', 'notebooks', 'documents', 'github', 'automation') },
+    items: pick('ide', 'notebooks', 'documents', 'github', 'automation', 'voice-duo') },
   { id: 'memoire', label: 'Mémoire',
     items: pick('memories', 'history', 'lists') },
   { id: 'systeme', label: 'Système',
