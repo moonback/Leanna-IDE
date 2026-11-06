@@ -919,23 +919,25 @@ function ImportDropzone({ onImported }: { onImported: () => void }) {
     setResult(null);
     try {
       const parsed: unknown = JSON.parse(await file.text());
-      const packages = Array.isArray(parsed) ? parsed : [parsed];
+      const packages: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
       if (packages.length === 0 || packages.length > 20) {
         throw new Error("Le fichier doit contenir entre 1 et 20 paquets.");
       }
-      const invalid = packages.find((pkg) =>
-        !pkg || typeof pkg !== "object" || Array.isArray(pkg)
-        || typeof pkg.name !== "string" || pkg.name.trim().length < 2
-        || typeof pkg.description !== "string" || pkg.description.trim().length < 10
-        || typeof pkg.author !== "string" || !["agent", "skill", "bundle"].includes(pkg.type)
-      );
+      const invalid = packages.find((pkg: unknown) => {
+        if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return true;
+        const candidate = pkg as Record<string, unknown>;
+        return typeof candidate.name !== "string" || candidate.name.trim().length < 2
+          || typeof candidate.description !== "string" || candidate.description.trim().length < 10
+          || typeof candidate.author !== "string"
+          || typeof candidate.type !== "string" || !["agent", "skill", "bundle"].includes(candidate.type);
+      });
       if (invalid) {
         throw new Error("Le fichier contient un paquet incomplet ou un format non pris en charge. Aucun paquet n'a été importé.");
       }
 
       let installed = 0;
       const errors: string[] = [];
-      for (const pkg of packages) {
+      for (const pkg of packages as Array<Record<string, any>>) {
         // Le paquet importé est d'abord republié dans le registre local :
         // l'API valide le schéma et recalcule son analyse de sécurité.
         const published = await publishPackage(pkg);
