@@ -168,6 +168,16 @@ export class ExecutionLedger {
     return [...this.index.values()].filter((e) => e.status === "unknown");
   }
 
+  /** Entrées d'une mission, utilisées pour réconcilier un crash avec ses checkpoints. */
+  listByMission(missionId: string): LedgerEntry[] {
+    return [...this.index.values()].filter((entry) => entry.missionId === missionId);
+  }
+
+  /** Effets de bord dont le résultat est incertain pour une mission donnée. */
+  listUnknownSideEffects(missionId: string): LedgerEntry[] {
+    return this.listByMission(missionId).filter((entry) => entry.status === "unknown" && entry.sideEffect);
+  }
+
   private stub(key: string): LedgerEntry {
     return {
       idempotencyKey: key,
