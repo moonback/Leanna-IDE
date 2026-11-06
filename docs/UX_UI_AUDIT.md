@@ -572,3 +572,34 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier les identifiants personnalisés avec espaces périphériques, champ vide, slash fournisseur/modèle, suffixe de variante et longueur maximale.
 - Vérifier qu'une clé absente ou un modèle vide bloque le test avec un message explicite.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les deux tests dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-cinquième passe — Fiabilité des garde-fous et du rollback
+
+### Constats vérifiés
+
+- Le hook partagé `useSafeguardsConfig` lançait la persistance depuis un updater React, sans attendre la réponse HTTP et en ignorant les erreurs réseau/serveur.
+- Plusieurs changements rapprochés pouvaient envoyer des snapshots concurrents et finir par persister un état plus ancien que celui affiché.
+- Le chargement de la configuration traitait une réponse HTTP non réussie comme une configuration par défaut, sans expliquer la panne.
+- La liste des checkpoints transformait une erreur API en liste vide, ce qui faisait croire qu'aucun checkpoint n'existait.
+- La validation manuelle ne contrôlait ni le statut HTTP ni la structure de la réponse et ne disposait pas de verrou synchrone contre les doubles lancements.
+- Le résultat de validation revenait automatiquement à l'état neutre après cinq secondes, masquant parfois le résultat avant que l'utilisateur ait pu le lire.
+- Le retour arrière ne protégeait pas le gestionnaire par un verrou synchrone et le rafraîchissement des checkpoints n'était pas attendu.
+
+### Corrections appliquées
+
+- Persistance des paramètres hors de l'updater React, avec une file séquentielle pour préserver l'ordre des changements rapides.
+- Vérification HTTP et gestion des réponses JSON invalides pour la lecture et l'écriture de la configuration.
+- Exposition des erreurs de sauvegarde et de chargement dans l'interface, avec action de rechargement.
+- États d'erreur distincts pour la liste des checkpoints, avec action Réessayer au lieu d'un état vide trompeur.
+- Verrou synchrone pour empêcher les validations manuelles concurrentes et vérification de la réponse serveur.
+- Le résultat de validation reste visible jusqu'à la prochaine tentative ; les échecs détaillés sont affichés.
+- Verrou synchrone du rollback et attente du rafraîchissement de la liste après l'opération.
+
+### Validation restante
+
+- Basculer rapidement plusieurs garde-fous et vérifier que les POST sont séquentiels et que le dernier état choisi est celui conservé côté serveur.
+- Simuler HTTP 500 et une panne réseau lors du chargement et de la sauvegarde de la configuration ; vérifier le message et le rechargement.
+- Simuler une réponse JSON invalide ou un tableau de checkpoints absent ; vérifier l'état d'erreur et le bouton Réessayer.
+- Double-cliquer sur Validation manuelle et vérifier qu'une seule requête part ; tester réponses success, échec métier, HTTP 500 et JSON invalide.
+- Confirmer puis annuler un rollback ; vérifier qu'une seule mutation est lancée, que le retour est signalé correctement et que la liste est rafraîchie.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
