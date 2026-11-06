@@ -141,17 +141,19 @@ export class ProcessingQueue<T = unknown> {
   }
 
   /** Persiste atomiquement la file en attente. */
-  private persistPending(): void {
+  private persistPending(): boolean {
     const file = this.config.persistenceFile;
-    if (!file) return;
+    if (!file) return true;
     const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(temp, JSON.stringify({ version: 1, tasks: [...this.queue, ...this.retrying.values()] }), "utf-8");
       fs.renameSync(temp, file);
+      return true;
     } catch (error: any) {
       try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch { /* best effort */ }
       log.error(`Échec de persistance de la queue : ${error.message}`);
+      return false;
     }
   }
 
@@ -191,7 +193,11 @@ export class ProcessingQueue<T = unknown> {
     // Insérer selon la priorité
     const insertIndex = this.findInsertIndex(task.priority);
     this.queue.splice(insertIndex, 0, task);
-    this.persistPending();
+    if (!this.persistPending()) {
+      this.queue = this.queue.filter(queued => queued.id !== task.id);
+      log.error(`Tâche rejetée car sa persistance a échoué: ${id}`);
+      return null;
+    }
 
     log.info(`📥 Tâche ajoutée: ${type} (${id}) [${task.priority}] — queue: ${this.queue.length}`);
 
