@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { IndexingMonitor } from './IndexingMonitor.js';
@@ -25,7 +25,7 @@ describe('IndexingMonitor', () => {
       },
       {
         match: '/sources/source-ko/retry',
-        respond: () => jsonResponse({ status: 'accepted', sourceId: 'source-ko' }, 202),
+        respond: () => jsonResponse({ status: 'accepted', sourceId: 'source-ko' }, { status: 202 }),
       },
     ], () => jsonResponse({}));
 
