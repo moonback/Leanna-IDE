@@ -574,3 +574,23 @@ Validation locale requise :
 - L'historique multi-tentatives n'est pas encore conservé : seules la dernière erreur, la date de mise à jour, le compteur et la prochaine échéance sont disponibles.
 - Le panneau est intégré au Studio desktop large ; son accessibilité dans une disposition étroite/mobile reste à examiner.
 - Les tests UI, le typecheck et les tests serveur doivent être exécutés localement avant de considérer cette passe comme validée.
+
+### Dixième passe — raccordement des uploads à la queue persistée
+
+- Les routes d'upload simple et multiple passent désormais par `sourceProcessingQueue` au lieu d'appeler directement `SourceIngester`.
+- Le contrat HTTP des uploads existants est conservé : la route attend la fin du traitement et renvoie les métadonnées de source habituelles. Le lot multiple utilise la concurrence configurée de la queue et conserve un résultat individuel par fichier.
+- Ajout de `waitForTask()` dans `ProcessingQueue` pour attendre un état terminal sans rater une tâche terminée entre l'enqueue et l'abonnement.
+- Ajout d'une route de consultation `GET /:id/sources/tasks/:taskId` pour les tâches encore présentes dans le registre en mémoire, notamment celles créées par `upload-queued`.
+- Le handler de queue retourne les métadonnées nécessaires à la compatibilité des réponses upload.
+- Le handler vérifie à nouveau l'appartenance du notebook au workspace actif avant d'exécuter une tâche restaurée.
+- Les échéances de retry sont maintenant persistées dans `nextAttemptAt` et respectées après redémarrage au lieu de relancer immédiatement tous les backoffs.
+- Tests unitaires ajoutés pour `waitForTask()` et le respect de l'échéance de backoff restaurée.
+
+**Limites restantes :**
+
+- Les entrées URL, texte collé, conversion de notes et documents générés n'utilisent pas encore toutes la queue ; l'intégration de cette passe couvre les uploads de fichiers simple/multiple et l'endpoint upload-queued déjà existant.
+- `waitForTask()` conserve le comportement HTTP synchrone pour ne pas casser les clients existants. Un client perdant sa connexion lors d'un redémarrage devra consulter le notebook après reprise ; la réponse terminale de tâche n'est pas encore conservée dans un journal durable.
+- `GET /:id/sources/tasks/:taskId` expose le statut en mémoire ; il ne constitue pas un historique durable des tâches terminées.
+- Les tâches en cours au moment d'un crash ne sont pas rejouées automatiquement, car leur effet peut être partiel. Seules les tâches pending/retrying persistées sont restaurées.
+- La queue est partagée globalement par le processus ; l'isolation workspace est revalidée à l'exécution, mais un modèle de queue partitionnée par workspace reste préférable si plusieurs espaces doivent être traités simultanément.
+- Les commandes `npm run typecheck`, les tests ciblés et `npm run lint:eslint:notebooks` restent à exécuter localement.
