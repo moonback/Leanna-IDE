@@ -53,7 +53,8 @@ export function createVoiceDuoRouter(getProfile: () => ProfileConfig): Router {
     const leannaVoice = safeName(profile.aiVoice, "Aoede");
     const roxaneVoice = safeName((profile as ProfileConfig & { duoVoice?: string }).duoVoice, "Kore");
     const lang = language || profile.language || "fr";
-    const transcript = history.map(item => ({
+    const usefulHistory = history.length && history[history.length - 1].speaker === "user" && history[history.length - 1].text === message ? history.slice(0, -1) : history;
+    const transcript = usefulHistory.map(item => ({
       role: item.speaker === "user" ? "Utilisateur" : item.speaker === "leanna" ? leannaName : roxaneName,
       content: item.text,
     }));
