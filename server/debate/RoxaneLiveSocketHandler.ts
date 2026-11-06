@@ -66,9 +66,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     const connectSession = async (role: 'leanna' | 'roxane') => {
       const voiceName = role === 'roxane' ? config.voice : (profile.aiVoice || 'Aoede');
-      const liveModel = role === 'roxane' && config.provider === 'gemini' && /-live(?:-|$)/i.test(config.model)
-        ? config.model
-        : 'gemini-3.8-live';
+      const liveModel = role === 'roxane' ? config.model : 'gemini-3.8-live';
       const session = await deps.createGeminiAI().live.connect({
         model: liveModel,
         config: {
@@ -163,6 +161,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
       if (deps.activeGeminiSessions.size >= 16) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
       if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
+      if (!/-live(?:-|$)/i.test(config.model)) { send({ type: 'error', message: 'Choisis un identifiant de modèle compatible Gemini Live dans les réglages de Roxane.' }); return; }
       topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
       context = typeof message.context === 'string' ? message.context.slice(-MAX_CONTEXT) : '';
       if (!topic) { send({ type: 'error', message: 'Le sujet du débat est obligatoire.' }); return; }
