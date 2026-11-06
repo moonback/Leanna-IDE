@@ -579,7 +579,7 @@ export function useLiveAPI() {
       // « Roxane, donne ton avis ». La session Live de Leanna reste ouverte.
       const voiceCommand = String(msg.user_text).trim();
       roxaneVoiceCommandBufferRef.current = `${roxaneVoiceCommandBufferRef.current} ${voiceCommand}`.slice(-500);
-      const trigger = roxaneVoiceCommandBufferRef.current.match(/\broxane\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
+      const trigger = roxaneVoiceCommandBufferRef.current.match(/.*\broxane\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
       if (trigger) {
         roxaneVoiceCommandBufferRef.current = '';
         const recentContext = transcript.slice(-24).map(entry =>
