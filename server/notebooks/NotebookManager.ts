@@ -108,6 +108,7 @@ export class NotebookManager {
 
   constructor() {
     this.loadAll();
+    void this.recoverPendingSourceIndexes();
   }
 
   // ─── Chargement / Persistence ────────────────────────────────────────────
@@ -316,6 +317,9 @@ export class NotebookManager {
           }
         }
         Object.assign(source, sameOrigin);
+        if (sameOrigin.indexingStatus !== "indexed") {
+          void this.indexSourceChunks(notebookId, sameOrigin.id);
+        }
         log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
         void embeddingStore.indexChunks(
           sameOrigin.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
@@ -333,6 +337,9 @@ export class NotebookManager {
         id: sameOrigin.id,
         notebookId,
         addedAt: sameOrigin.addedAt,
+        indexingStatus: "pending",
+        indexingError: undefined,
+        indexingUpdatedAt: new Date().toISOString(),
         chunks: source.chunks.map(chunk => ({
           ...chunk,
           id: randomUUID(),
@@ -358,11 +365,7 @@ export class NotebookManager {
       // le compteur de génération de l'EmbeddingStore.
       Object.assign(source, sameOrigin);
       embeddingStore.removeSource(sameOrigin.id, notebookId);
-      void embeddingStore.indexChunks(
-        sameOrigin.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
-        sameOrigin.id,
-        notebookId
-      ).catch(error => log.warn(`Réindexation de la source remplacée impossible: ${error.message}`));
+      void this.indexSourceChunks(notebookId, sameOrigin.id);
 
       chatResponseCache.invalidateNotebook(notebookId);
       ragSearchCache.invalidateNotebook(notebookId);
@@ -370,6 +373,9 @@ export class NotebookManager {
       return notebook;
     }
 
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    source.indexingUpdatedAt = new Date().toISOString();
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
 
@@ -383,16 +389,66 @@ export class NotebookManager {
       throw new Error("La source n'a pas pu être enregistrée durablement ; indexation annulée.");
     }
 
-    void embeddingStore.indexChunks(
-      source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
-      source.id,
-      notebookId
-    ).catch(error => log.warn(`Indexation différée des embeddings échouée pour ${source.id}: ${error.message}`));
+    void this.indexSourceChunks(notebookId, source.id);
 
     chatResponseCache.invalidateNotebook(notebookId);
     ragSearchCache.invalidateNotebook(notebookId);
     log.info(`📄 Source ajoutée au notebook "${notebook.title}": "${source.title}"`);
     return notebook;
+  }
+
+
+  /**
+   * Indexe une source et persiste son état. Une opération interrompue reste
+   * marquée pending ; elle pourra être reprise au prochain démarrage.
+   */
+  private async indexSourceChunks(notebookId: string, sourceId: string): Promise<void> {
+    const notebook = this.notebooks.get(notebookId);
+    const source = notebook?.sources.find(item => item.id === sourceId);
+    if (!notebook || !source) return;
+
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    source.indexingUpdatedAt = new Date().toISOString();
+    if (!this.flushNotebook(notebook)) {
+      log.warn(`Impossible de persister l'état pending de l'indexation source ${sourceId}`);
+      return;
+    }
+
+    try {
+      const indexed = await embeddingStore.indexChunks(
+        source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+        source.id,
+        notebookId
+      );
+      source.indexingStatus = indexed >= source.chunks.length ? "indexed" : "partial";
+      source.indexingError = indexed >= source.chunks.length
+        ? undefined
+        : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`;
+      source.indexingUpdatedAt = new Date().toISOString();
+      this.flushNotebook(notebook);
+      if (source.indexingStatus !== "indexed") {
+        log.warn(`Indexation partielle de la source ${sourceId}: ${source.indexingError}`);
+      }
+    } catch (error: any) {
+      source.indexingStatus = "failed";
+      source.indexingError = String(error?.message || error).slice(0, 500);
+      source.indexingUpdatedAt = new Date().toISOString();
+      this.flushNotebook(notebook);
+      log.warn(`Indexation échouée pour source ${sourceId}: ${source.indexingError}`);
+    }
+  }
+
+  /** Reprend au démarrage uniquement les sources explicitement non indexées. */
+  private async recoverPendingSourceIndexes(): Promise<void> {
+    for (const notebook of this.notebooks.values()) {
+      for (const source of notebook.sources) {
+        if (source.indexingStatus === "pending" || source.indexingStatus === "failed" || source.indexingStatus === "partial") {
+          log.info(`♻️ Reprise de l'indexation source ${source.id} (${source.indexingStatus})`);
+          await this.indexSourceChunks(notebook.id, source.id);
+        }
+      }
+    }
   }
 
   removeSource(notebookId: string, sourceId: string): boolean {
