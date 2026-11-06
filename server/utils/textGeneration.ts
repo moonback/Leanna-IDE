@@ -467,7 +467,7 @@ function recordUsage(
   outputText: string,
   meta: AttemptMeta,
   streamed: boolean,
-  extra: { kind?: CallKind; units?: number; unit?: BillingUnit } = {},
+  extra: { kind?: CallKind; units?: number; unit?: BillingUnit; agentRole?: string } = {},
 ): { tokenUsage: NonNullable<GenerateTextResult['tokenUsage']>; costUsd: number } {
   const ctx = getTelemetryContext();
   const estimated = !usage;
@@ -485,7 +485,7 @@ function recordUsage(
   const costUsd = telemetryService.recordTokenUsage({
     missionId: ctx.missionId,
     taskId: ctx.taskId,
-    agentRole: ctx.agentRole,
+    agentRole: extra.agentRole ?? ctx.agentRole,
     toolName: ctx.toolName,
     provider,
     model,
@@ -623,14 +623,14 @@ export function recordModelCallFailure(provider: Provider, model: string, error:
   recordFailure(provider, model, error, {});
 }
 
-function recordFailure(provider: Provider, model: string, error: unknown, meta: AttemptMeta): void {
+function recordFailure(provider: Provider, model: string, error: unknown, meta: AttemptMeta, agentRole?: string): void {
   const ctx = getTelemetryContext();
   telemetryService.recordFailedCall({
     provider,
     model,
     missionId: ctx.missionId,
     taskId: ctx.taskId,
-    agentRole: ctx.agentRole,
+    agentRole: agentRole ?? ctx.agentRole,
     isFallback: meta.isFallback,
     error: ((error as Error)?.message ?? String(error)).slice(0, 300),
   });
@@ -736,7 +736,7 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
       config: geminiConfig(options),
     });
   } catch (error) {
-    recordFailure('gemini', model, error, {});
+    recordFailure('gemini', model, error, {}, options.agentRole);
     throw error;
   }
 
@@ -762,7 +762,7 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
     }
   } catch (error) {
     // Flux interrompu : la partie déjà générée est facturée — on la comptabilise.
-    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true);
+    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true, { agentRole: options.agentRole });
     throw error;
   }
 
@@ -860,7 +860,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       }
     }
 
-    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
+    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true, { agentRole: options.agentRole });
     options.onDone?.(fullText);
     return fullText;
   } catch (e: any) {
@@ -869,7 +869,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       // Réponse acceptée puis flux coupé/annulé : la génération partielle est facturée.
       recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
     } else {
-      recordFailure('openrouter', model, e, {});
+      recordFailure('openrouter', model, e, {}, options.agentRole);
     }
     if (e.name === 'AbortError') {
       options.onDone?.(``);
@@ -940,7 +940,7 @@ async function generateWithGemini(options: GenerateTextOptions, meta: AttemptMet
     }
 
     const { tokenUsage, costUsd } = recordUsage(
-      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), promptChars(options), text, meta, false,
+      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), promptChars(options), text, meta, false, { agentRole: options.agentRole },
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);
@@ -959,7 +959,7 @@ async function generateWithGemini(options: GenerateTextOptions, meta: AttemptMet
       ...(meta.isFallback ? { isFallback: true } : {}),
     };
   } catch (error) {
-    recordFailure('gemini', model, error, meta);
+    recordFailure('gemini', model, error, meta, options.agentRole);
     span.recordException(error as Error);
     span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
     span.end();
@@ -1039,7 +1039,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     const text = data.choices?.[0]?.message?.content || '';
 
     const { tokenUsage, costUsd } = recordUsage(
-      'openrouter', model, normalizeOpenRouterUsage(data.usage), promptChars(options), text, meta, false,
+      'openrouter', model, normalizeOpenRouterUsage(data.usage), promptChars(options), text, meta, false, { agentRole: options.agentRole },
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);
@@ -1054,7 +1054,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
   } catch (e: any) {
     clearTimeout(timeoutId);
 
-    recordFailure('openrouter', model, e, meta);
+    recordFailure('openrouter', model, e, meta, options.agentRole);
     span.recordException(e);
     span.setStatus({ code: 2, message: e.message }); // ERROR
     span.end();
