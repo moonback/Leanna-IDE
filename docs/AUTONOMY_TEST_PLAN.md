@@ -1,3 +1,13 @@
+> **Statut au 2026-11-06 : plan de test historique, pas certificat de conformité.**
+> Les critères ci-dessous sont des objectifs de validation ; ils ne sont pas exécutés
+> automatiquement à chaque mission. Les contrôles `verify_file`, `verify_typecheck`,
+> `run_tests` et la gouvernance Supervisor sont des chemins distincts, certains opt-in.
+> Vérifier le plan contre `server/runtime/agentic/AgenticRuntime.ts`,
+> `server/mission/Executor.ts` et `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md` avant
+> de l'utiliser comme protocole de recette.
+>
+> ---
+>
 # PLAN DE TEST DE L'AUTONOMIE — Leanna v1.4.0
 
 Ce document spécifie le plan de test exhaustif de la boucle agentique et de l'autonomie réelle de Leanna, conformément aux exigences de certification de production.
