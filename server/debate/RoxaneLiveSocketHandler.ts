@@ -28,6 +28,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     let lastRoxaneText = '';
     let topic = '';
     let context = '';
+    const transcript: Array<{ speaker: 'leanna' | 'roxane' | 'user'; text: string; round: number }> = [];
     const send = (payload: unknown) => {
       if (!closed && client.readyState === WebSocket.OPEN) {
         try { client.send(JSON.stringify(payload)); } catch { /* disconnected */ }
@@ -102,6 +103,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
               currentText = '';
               if (role === 'leanna') {
                 lastLeannaText = completed;
+                transcript.push({ speaker: 'leanna', text: completed, round: rounds });
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
                   active = 'roxane';
@@ -112,6 +114,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 } else send({ type: 'debate_complete' });
               } else {
                 lastRoxaneText = completed;
+                transcript.push({ speaker: 'roxane', text: completed, round: rounds });
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
                 rounds += 1;
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
@@ -121,7 +124,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                     turnComplete: true,
                   });
                 } else {
-                  send({ type: 'debate_complete', lastLeannaText, lastRoxaneText });
+                  send({ type: 'debate_complete', lastLeannaText, lastRoxaneText, turns: transcript });
                 }
               }
             }
@@ -196,6 +199,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       }
       if (message.type === 'user_interjection' && typeof message.text === 'string' && message.text.trim()) {
         const text = message.text.trim().slice(0, 3000);
+        transcript.push({ speaker: 'user', text, round: rounds });
         send({ type: 'user_interjection', text });
         const target = active === 'leanna' ? leanna : roxane;
         target?.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `L'utilisateur interrompt le débat et précise : ${text}. Réponds directement à cette intervention avant de poursuivre.` }] }], turnComplete: true });
