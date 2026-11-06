@@ -124,11 +124,21 @@ export class CompositeMissionStore implements MissionStatePort {
   }
 
   async load(missionId: string): Promise<MissionState | null> {
-    for (const s of this.active()) {
-      const found = await s.load(missionId);
-      if (found) return found;
-    }
-    return null;
+    // A composite read must not blindly trust store order: the local copy can
+    // lag behind Supabase (or vice versa) after a partial write. Read all active
+    // replicas and return the newest state, matching listByStatus semantics.
+    const snapshots = await Promise.all(
+      this.active().map(async (store) => {
+        try {
+          return await store.load(missionId);
+        } catch {
+          return null;
+        }
+      })
+    );
+    return snapshots
+      .filter((state): state is MissionState => state !== null)
+      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))[0] ?? null;
   }
 
   /**
