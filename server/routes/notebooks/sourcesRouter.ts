@@ -105,7 +105,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       const results = await Promise.all(validated.map(async ({ file, validation }) => {
         const filename = validation.valid
           ? validation.fileName
-          : path.basename(file.originalname.replace(/\\\\/g, "/"));
+          : path.basename(file.originalname.replace(/\\/g, "/"));
         if (!validation.valid) {
           return { filename, status: "error" as const, error: validation.error || "Fichier invalide." };
         }
@@ -206,7 +206,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       }));
       const invalidFile = validatedFiles.find(item => !item.validation.valid);
       if (invalidFile) {
-        res.status(400).json({ error: invalidFile.validation.error, fileName: path.basename(invalidFile.file.originalname.replace(/\\\\/g, "/")) });
+        res.status(400).json({ error: invalidFile.validation.error, fileName: path.basename(invalidFile.file.originalname.replace(/\\/g, "/")) });
         return;
       }
 
