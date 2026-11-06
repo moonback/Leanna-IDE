@@ -52,6 +52,7 @@ export default function HistoryView() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -114,6 +115,8 @@ export default function HistoryView() {
 
   const handleSelect = useCallback(async (id: string) => {
     setSelectedId(id);
+    setMessages([]);
+    setMessagesError(null);
     setLoadingMessages(true);
     try {
       const res = await fetch(`/api/conversations/${id}?limit=200`);
@@ -121,7 +124,8 @@ export default function HistoryView() {
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (!Array.isArray(data.messages)) throw new Error('Réponse invalide : messages indisponibles.');
       setMessages(data.messages);
-    } catch {
+    } catch (error) {
+      setMessagesError(error instanceof Error ? error.message : 'Impossible de charger cette conversation.');
       toastError('Impossible de charger la conversation');
     } finally {
       setLoadingMessages(false);
@@ -395,7 +399,7 @@ export default function HistoryView() {
 
         {/* Right — Conversation detail */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {selectedId && messages.length > 0 ? (
+          {selectedId ? (
             <>
               {/* Conversation header */}
               <div className="flex-shrink-0 px-6 py-4 border-b" style={{ borderColor: 'var(--notebook-border)', backgroundColor: 'var(--notebook-surface-elevated)' }}>
@@ -437,7 +441,29 @@ export default function HistoryView() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar">
-                <MessageList messages={messages} loadingMessages={loadingMessages} />
+                {loadingMessages ? (
+                  <MessageList messages={[]} loadingMessages />
+                ) : messagesError ? (
+                  <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                    <p className="max-w-md text-sm" style={{ color: 'var(--color-error)' }}>{messagesError}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(selectedId)}
+                      className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold"
+                      style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" /> Réessayer
+                    </button>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                    <MessageSquare className="h-8 w-8" style={{ color: 'var(--text-dimmed)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Aucun message dans cette conversation</p>
+                    <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>Cette conversation ne contient pas encore de message archivé.</p>
+                  </div>
+                ) : (
+                  <MessageList messages={messages} loadingMessages={false} />
+                )}
               </div>
             </>
           ) : (
