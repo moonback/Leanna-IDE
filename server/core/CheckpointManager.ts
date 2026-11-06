@@ -400,6 +400,20 @@ export class CheckpointManager {
     return this.checkpoints.get(id);
   }
 
+  /** Checkpoints ouverts associés à une mission, pour réconciliation au démarrage. */
+  listOpenForMission(missionId: string): Checkpoint[] {
+    return [...this.checkpoints.values()]
+      .filter((checkpoint) => checkpoint.missionId === missionId && checkpoint.status === "open")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  /** Tous les checkpoints d'une mission, y compris les transactions terminées. */
+  listForMission(missionId: string): Checkpoint[] {
+    return [...this.checkpoints.values()]
+      .filter((checkpoint) => checkpoint.missionId === missionId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   /**
    * Indique si les fichiers d'un checkpoint ont changé depuis le snapshot
    * (comparaison de hash) — utile pour la phase VERIFY.
