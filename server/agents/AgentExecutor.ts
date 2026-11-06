@@ -12,7 +12,7 @@
  */
 import { createHash } from "crypto";
 import type { AgentTask } from "./types.js";
-import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
+import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import { PromptBuilder } from "./PromptBuilder.js";
 import { GeneratedFileWriter } from "./GeneratedFileWriter.js";
 import { ResultParser } from "./ResultParser.js";
@@ -361,6 +361,8 @@ export class AgentExecutor implements AgentTaskRunner {
         () => this.executeTask(task),
       ),
       task.id,
+      task.role,
+      getAgentDefinition(task.role)?.maxConcurrency ?? 1,
     );
   }
 
