@@ -2366,9 +2366,12 @@ Terminal PTY interactif.
 ## Tests d'intégration
 
 Les endpoints REST disposent de tests d'intégration dans `server/routes/*.test.ts`
-(**24 fichiers** au 2026-10-15). Le tableau par routeur ci-dessous est **indicatif**
-(décomptes par domaine) ; la suite backend complète totalise **1460 cas sur 184
-fichiers · 0 échec** (`npm test`).
+(**24 fichiers** recensés dans l'arborescence actuelle). Le tableau par routeur
+ci-dessous est **indicatif** (décomptes par domaine). L'inventaire global du dépôt
+recense actuellement **193 fichiers de test backend**. La dernière exécution
+documentée de `npm test` date du **2026-10-15** : **1460 cas sur 174 suites,
+0 échec** (184 fichiers à cette date) ; ce résultat n'a pas été recalculé sur le
+HEAD actuel.
 
 ### Tests par routeur
 
