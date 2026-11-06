@@ -2195,6 +2195,7 @@ export async function executeLiveToolCall(
   voiceName = 'Aoede',
   supervisor = new Supervisor(),
   mode: 'ask' | 'full' = 'full',
+  toolTracker: ToolCallTracker = new ToolCallTracker(),
 ): Promise<void> {
   await handleToolCall(
     toolCall,
@@ -2208,6 +2209,6 @@ export async function executeLiveToolCall(
     undefined,
     undefined,
     undefined,
-    new ToolCallTracker(),
+    toolTracker,
   );
 }
