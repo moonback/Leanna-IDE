@@ -86,18 +86,29 @@ backupService.start();
 
 // Configurer le handler de la queue de processing des sources
 sourceProcessingQueue.setHandler(async (task, onProgress) => {
-  const { notebookId, fileName, mimeType, buffer } = task.payload;
+  const payload = task.payload as {
+    notebookId: string;
+    kind?: "buffer" | "url";
+    fileName?: string;
+    mimeType?: string;
+    buffer?: Buffer | Uint8Array;
+    url?: string;
+  };
+  const { notebookId } = payload;
   if (!notebookManager.getNotebook(notebookId, SELF_ROOT || undefined)) {
     throw new Error("Notebook introuvable dans le workspace actif ; tâche d'ingestion refusée.");
   }
   onProgress(10);
 
-  const source = await sourceIngester.ingestFromBuffer(
-    Buffer.from(buffer),
-    fileName,
-    mimeType,
-    notebookId
-  );
+  // Les anciennes tâches persistées sans kind restent compatibles (upload binaire).
+  const source = payload.kind === "url"
+    ? await sourceIngester.ingestFromURL(String(payload.url || ""), notebookId)
+    : await sourceIngester.ingestFromBuffer(
+        Buffer.from(payload.buffer || []),
+        String(payload.fileName || "Source"),
+        String(payload.mimeType || "text/plain"),
+        notebookId
+      );
   onProgress(70);
 
   notebookManager.addSource(notebookId, source);
