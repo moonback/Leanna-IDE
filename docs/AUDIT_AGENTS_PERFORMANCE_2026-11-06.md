@@ -456,3 +456,16 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 - Tests ajoutés pour la sélection par rôle, le repli sur le modèle global et la priorité de la surcharge explicite.
 
 **Limite :** cette passe ne crée pas de sélection automatique par complexité, coût ou latence. Elle rend opérationnelle la configuration par agent déjà exposée dans le profil ; le routage adaptatif nécessitera des benchmarks fiables et une politique activable explicitement.
+
+
+### Routage adaptatif OpenRouter — première version contrôlée
+
+- Ajout de `server/utils/modelRouter.ts` : sélection déterministe parmi les modèles candidats explicitement configurés. La politique estime les tokens d'entrée/sortie selon la taille du prompt et la complexité (`simple`, `standard`, `complex`).
+- Le score combine le coût estimé depuis `resolvePricing`, les échecs récents par modèle/rôle et la latence médiane observée. La latence est conservée en mémoire (50 derniers appels par modèle) et mesurée sur les appels texte non-streamés ; elle n'est pas persistée entre redémarrages.
+- Les modèles dont la tarification tombe sur `DEFAULT_PRICING` sont exclus du choix automatique. Au moins deux candidats doivent avoir un tarif connu ; sinon le modèle global reste utilisé. Aucun prix n'est inventé.
+- Le mode est opt-in via `agents.modelRouting.enabled`, désactivé par défaut. `agents.modelRouting.candidates` contient les IDs de modèles supplémentaires ; le modèle global est ajouté automatiquement comme candidat.
+- Une surcharge explicite `openrouterModel` ou un modèle fixé sur un agent personnalisé garde la priorité. Le provider n'est jamais changé par le routeur. Le routage est appliqué à `generateText` (pas encore au flux `generateTextStream`).
+- Le profil UI OpenRouter expose l'activation et la liste des candidats. La télémétrie attribue désormais aussi les appels et échecs au rôle explicitement transmis, pour alimenter l'historique par rôle même hors contexte asynchrone.
+- Tests ajoutés pour le coût, la complexité, les échecs, la latence, l'exclusion des tarifs inconnus, les priorités manuelles et l'attribution du rôle.
+
+**Limites connues :** les tarifs de `MODEL_PRICING` restent une configuration locale à maintenir et ne garantissent pas la facture OpenRouter. La réussite d'un appel ne mesure pas sa qualité sémantique : la politique ne prétend donc pas apprendre quel modèle « code mieux ». La latence est locale au processus et le streaming n'est pas encore routé automatiquement.
