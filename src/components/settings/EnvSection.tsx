@@ -274,11 +274,12 @@ export function EnvSection() {
     savingRef.current = true;
     setSaving(true);
     setFeedback(null);
+    const submittedEdits = { ...edits };
     try {
       const res = await fetch('/api/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: edits }),
+        body: JSON.stringify({ updates: submittedEdits }),
       });
       const data = await res.json().catch(() => null) as (EnvApiResponse & { applied?: string[]; rejected?: string[] }) | null;
       if (!res.ok || !data || data.status !== 'success') {
@@ -287,7 +288,7 @@ export function EnvSection() {
       if (data.status === 'success') {
         if (data.sections) setSections(data.sections);
         const rejectedKeys = new Set(data.rejected ?? []);
-        setEdits(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => rejectedKeys.has(key))));
+        setEdits(prev => Object.fromEntries(Object.entries(prev).filter(([key, value]) => rejectedKeys.has(key) || value !== submittedEdits[key])));
         setRevealed({});
         const n = data.applied?.length ?? 0;
         setFeedback({
@@ -637,7 +638,7 @@ export function EnvSection() {
                               <div className="flex flex-col gap-1.5">
                                 <div className="flex items-center gap-1.5">
                                   <div className="flex-1">
-                                    {isRevealed(v.key) ? (
+                                    {isRevealed(v.key) && !(v.key in edits) ? (
                                       <TextInput
                                         value={currentValue(v)}
                                         onChange={(val) => setValue(v.key, val)}
@@ -653,7 +654,7 @@ export function EnvSection() {
                                   </div>
                                   <IconButton
                                     onClick={() => revealSecret(v.key)}
-                                    disabled={revealing.has(v.key) || (v.key in edits)}
+                                    disabled={revealing.has(v.key)}
                                     title={isRevealed(v.key) ? 'Masquer la valeur' : 'Révéler / déchiffrer'}
                                   >
                                     {revealing.has(v.key)
