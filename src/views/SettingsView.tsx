@@ -204,6 +204,7 @@ export default function SettingsView() {
           autoMuteEnabled: profile.autoMuteEnabled, autoMuteTimeout: profile.autoMuteTimeout,
           vadEnabled: profile.vadEnabled, vadThreshold: profile.vadThreshold,
           vadSilenceDuration: profile.vadSilenceDuration,
+          voiceAlwaysOn: profile.voiceAlwaysOn,
           temperature: profile.temperature, topP: profile.topP,
           textProvider: profile.textProvider, openrouterModel: profile.openrouterModel,
           openrouterImageModel: profile.openrouterImageModel,
@@ -213,14 +214,17 @@ export default function SettingsView() {
           customSystemPrompt: profile.customSystemPrompt,
         }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json().catch(() => null) as { success?: boolean; error?: string } | null;
+      if (!response.ok || !result || result.success !== true) {
+        throw new Error(result?.error || `HTTP ${response.status} — réponse de synchronisation invalide`);
+      }
       success('Paramètres sauvegardés ✓');
       // Notifier la session live de se reconnecter pour prendre en compte
       // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
       window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
-    } catch {
+    } catch (err) {
       toastError(savedLocally
-        ? 'Paramètres enregistrés localement, mais synchronisation serveur impossible'
+        ? `Paramètres enregistrés localement, mais synchronisation serveur impossible${err instanceof Error ? ` : ${err.message}` : ''}`
         : 'Impossible d’enregistrer les paramètres localement');
     } finally {
       savingRef.current = false;
@@ -238,9 +242,23 @@ export default function SettingsView() {
       variant: 'danger',
     });
     if (!confirmed || savingRef.current) return;
-    reset();
-    success('Paramètres réinitialisés');
-  }, [confirm, reset, success]);
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await reset();
+      window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
+      success('Paramètres réinitialisés et synchronisés ✓');
+    } catch (err) {
+      toastError(
+        err instanceof Error
+          ? `Paramètres réinitialisés localement, mais synchronisation serveur impossible : ${err.message}`
+          : 'Paramètres réinitialisés localement, mais synchronisation serveur impossible',
+      );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }, [confirm, reset, success, toastError]);
 
   // Filter groups and items based on search query
   const filteredNavGroups = useMemo(() => {
