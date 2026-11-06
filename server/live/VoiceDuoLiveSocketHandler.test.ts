@@ -65,6 +65,7 @@ test("voice duo live: opens two independent sessions and alternates bounded turn
     createGeminiAI: () => fakeAI as any,
     activeGeminiSessions: activeSessions,
     skillManager: {
+      loadCustomSkills: async () => [],
       getToolDeclarations: () => [
         { name: "read_project_file", description: "Read a project file", parameters: { type: "OBJECT", properties: {} } },
         { name: "run_project_command", description: "Run a project command", parameters: { type: "OBJECT", properties: {} } },
