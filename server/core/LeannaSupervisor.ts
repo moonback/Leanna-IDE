@@ -32,6 +32,7 @@ import {
 import { DurableMissionStore } from "./DurableMissionStore.js";
 import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine, type EvidenceInput, type EvidenceBundle } from "./EvidenceEngine.js";
+import { ExecutionLedger } from "./ExecutionLedger.js";
 
 /** Décision de récupération à quatre niveaux (audit §17). */
 export type RecoveryDecision = "retry" | "repair" | "replan" | "escalate";
@@ -98,6 +99,7 @@ export interface SupervisorConfig {
   checkpoints: CheckpointManager;
   /** Moteur de preuve (défaut: local .Leanna). */
   evidence: EvidenceEngine;
+  ledger: ExecutionLedger;
   /**
    * Durée max d'une tentative du runner (ms). 0 = illimité (défaut).
    * Un dépassement est traité comme une tentative échouée (rollback + récup).
@@ -123,6 +125,7 @@ export class LeannaSupervisor {
   private readonly store: DurableMissionStore;
   private readonly checkpoints: CheckpointManager;
   private readonly evidence: EvidenceEngine;
+  private readonly ledger: ExecutionLedger;
   private readonly runnerTimeoutMs: number;
 
   constructor(config: Partial<SupervisorConfig> = {}) {
@@ -130,6 +133,7 @@ export class LeannaSupervisor {
     this.store = config.missionStore ?? new DurableMissionStore();
     this.checkpoints = config.checkpoints ?? new CheckpointManager();
     this.evidence = config.evidence ?? new EvidenceEngine();
+    this.ledger = config.ledger ?? new ExecutionLedger();
     this.runnerTimeoutMs = config.runnerTimeoutMs ?? 0;
   }
 
@@ -187,6 +191,23 @@ export class LeannaSupervisor {
     if (machine.isTerminal()) {
       return { missionId, finalState: machine.current, attempts: 0 };
     }
+    if (machine.current === "RECOVERY_REQUIRED") {
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, recoveryReason: "Cette mission est mise en quarantaine et nécessite une réconciliation explicite." };
+    }
+    const interruptedStates = new Set<MissionLifecycleState>(["RUNNING", "VERIFYING", "RECOVERING", "COMMITTING"]);
+    const openCheckpoints = this.checkpoints.listOpenForMission(missionId);
+    const unknownEffects = this.ledger.listUnknownSideEffects(missionId);
+    if (machine.currentAttempt || interruptedStates.has(machine.current) || openCheckpoints.length > 0 || unknownEffects.length > 0) {
+      const checkpointIds = openCheckpoints.map((checkpoint) => checkpoint.id);
+      const reason = [
+        machine.currentAttempt ? `tentative ${machine.currentAttempt.attempt} interrompue (${machine.currentAttempt.phase})` : undefined,
+        checkpointIds.length ? `${checkpointIds.length} checkpoint(s) ouvert(s): ${checkpointIds.join(", ")}` : undefined,
+        unknownEffects.length ? `${unknownEffects.length} effet(s) de bord au statut inconnu dans le ledger` : undefined,
+        interruptedStates.has(machine.current) ? `état durable interrompu: ${machine.current}` : undefined,
+      ].filter(Boolean).join(" ; ") || "État transactionnel incomplet.";
+      this.safeAdvance(machine, "RECOVERY_REQUIRED", reason);
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryReason: reason };
+    }
 
     // Ramener la machine à READY depuis n'importe quel état repris, par des
     // transitions légales (une reprise peut arriver en RUNNING/VERIFYING/… après
@@ -236,6 +257,8 @@ export class LeannaSupervisor {
         missionId,
         label: `attempt-${attempt}`,
       });
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "prepared", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
 
       // Exécution bornée par un timeout optionnel. Un dépassement ou une
       // exception sont traités comme une tentative échouée.
@@ -249,6 +272,8 @@ export class LeannaSupervisor {
           this.checkpoints.capturePath(checkpoint.id, target);
         }
       };
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "executing", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
       const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
 
       // A timed-out runner may ignore AbortSignal. Never race a live writer
@@ -256,7 +281,7 @@ export class LeannaSupervisor {
       // checkpoint open for explicit reconciliation instead.
       if (outcome.executionStopped === false) {
         this.advance(machine, "RECOVERING", "runner did not stop after timeout");
-        this.advance(machine, "ESCALATED", "rollback withheld while runner may still be active");
+        this.advance(machine, "RECOVERY_REQUIRED", "rollback withheld while runner may still be active");
         return {
           missionId,
           finalState: machine.current,
@@ -264,10 +289,13 @@ export class LeannaSupervisor {
           evidence: lastEvidence,
           rollbackComplete: false,
           residualFiles: ["<runner encore actif : rollback différé pour éviter une course d'écriture>"],
+          recoveryReason: "Le runner peut encore écrire. Le checkpoint reste ouvert et toute reprise est bloquée.",
         };
       }
 
       // VERIFY : la PREUVE prime sur ce que le runner "dit".
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "verifying", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
       this.advance(machine, "VERIFYING", "evaluate evidence");
 
       // ── try/finally (audit, point 5) ──────────────────────────────────────
@@ -287,16 +315,24 @@ export class LeannaSupervisor {
 
         if (proven) {
           // COMMIT : on fige le checkpoint (rollback désormais interdit).
+          machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "committing", updatedAt: new Date().toISOString() });
+          this.store.save(machine);
           this.advance(machine, "COMMITTING", "evidence establishes success");
           this.checkpoints.commit(checkpoint.id);
+          machine.setActiveAttempt(undefined);
+          this.store.save(machine);
           this.advance(machine, "COMPLETED", "committed");
           return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
         }
 
         // ÉCHEC → RECOVER. On annule les effets de cette tentative (rollback des
         // fichiers déclarés) avant de décider de la suite.
+        machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "rolling_back", updatedAt: new Date().toISOString() });
+        this.store.save(machine);
         this.advance(machine, "RECOVERING", outcome.error ?? "evidence failed");
         this.checkpoints.rollback(checkpoint.id);
+        machine.setActiveAttempt(undefined);
+        this.store.save(machine);
         rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
         if (rollbackResidualFiles.length > 0) {
           throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
