@@ -901,27 +901,29 @@ export const StatusBar = memo(function StatusBar({
         <span className="lea-statusbar__beam" aria-hidden="true" />
         {/* ─── Zone gauche : statuts en permanence visibles ──────────────── */}
         <div className="flex items-center gap-1">
-          {/* Gemini Live Connection Status */}
-          <button
-            type="button"
-            className={PILL}
-            style={{ color: 'var(--text-secondary)' }}
-            title={`Statut Gemini Live : ${CONNECTION_LABEL[status] ?? status}`}
-          >
-            {status === 'connected' ? (
-              <Wifi size={13} style={{ color: 'var(--color-success)' }} />
-            ) : status === 'connecting' ? (
-              <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--color-warning)' }} />
-            ) : (
-              <WifiOff size={13} style={{ color: 'var(--text-muted)' }} />
-            )}
-            <span
-              className="truncate max-w-[110px]"
-              style={{ color: status === 'connected' ? 'var(--color-success)' : undefined }}
+          {/* Gemini Live — n'afficher que les états actifs (connexion ou connecté).
+              L'état idle ne doit pas encombrer la barre avec « Hors ligne ». */}
+          {status !== 'idle' && (
+            <button
+              type="button"
+              className={PILL}
+              style={{ color: 'var(--text-secondary)' }}
+              title={`Statut Gemini Live : ${CONNECTION_LABEL[status] ?? status}`}
+              aria-label={`Statut Gemini Live : ${CONNECTION_LABEL[status] ?? status}`}
             >
-              <RollingValue value={CONNECTION_LABEL[status] ?? status} />
-            </span>
-          </button>
+              {status === 'connected' ? (
+                <Wifi size={13} style={{ color: 'var(--color-success)' }} />
+              ) : (
+                <LoaderCircle size={13} className="animate-spin" style={{ color: 'var(--color-warning)' }} />
+              )}
+              <span
+                className="truncate max-w-[110px]"
+                style={{ color: status === 'connected' ? 'var(--color-success)' : undefined }}
+              >
+                <RollingValue value={CONNECTION_LABEL[status] ?? status} />
+              </span>
+            </button>
+          )}
           {/* Sandbox — dot + label */}
           <button
             type="button"
