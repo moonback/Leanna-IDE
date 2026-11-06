@@ -148,7 +148,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
               send({ type: "speaker", speaker, name: names[speaker], state: "thinking", turn: 0 });
             }
             const outputText = (content as any)?.outputTranscription?.text;
-            if (typeof outputText === "string" && outputText.trim()) {
+            if (!suppressOutputUntilUserText && typeof outputText === "string" && outputText.trim()) {
               append(speaker, outputText);
               send({ type: "transcript", speaker, name: names[speaker], text: outputText });
             }
@@ -157,7 +157,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
                 try { client.send(Buffer.from(part.inlineData.data, "base64"), { binary: true }); }
                 catch { /* client disconnected */ }
               }
-              if (part.text) send({ type: "text", speaker, name: names[speaker], text: part.text });
+              if (part.text && !suppressOutputUntilUserText) send({ type: "text", speaker, name: names[speaker], text: part.text });
             }
             if (content?.turnComplete) {
               send({ type: "turn_complete", speaker });
