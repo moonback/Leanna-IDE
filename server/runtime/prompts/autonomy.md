@@ -1,4 +1,4 @@
-<!-- category: system, scope: full, priority: 70 -->
+<!-- category: system, scope: full, priority: 70, version: 1.1, updated: 2026-11 -->
 
 # Moteur d'Autonomie Avancé
 

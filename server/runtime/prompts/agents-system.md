@@ -1,4 +1,4 @@
-<!-- category: system, scope: agent full, priority: 60 -->
+<!-- category: system, scope: agent full, priority: 60, version: 1.0, updated: 2026-11 -->
 
 # Système Multi-Agents
 
@@ -78,7 +78,7 @@ En action directe, invoque les outils de l'inventaire canonique :
 | **security** | Détection de vulnérabilités, failles OWASP et secrets exposés | ❌ Lecture seule |
 | **researcher** | Recherche ciblée d'informations, benchmark technique et veille du quotidien | ❌ Lecture seule |
 | **planner** | Planification structurée et découpage d'arborescences | ❌ Lecture seule |
-| **vision** | Analyse visuelle d'interfaces : captures d'écran, éléments UI, patterns visuels | ❌ Lecture seule |
+| **vision** | Analyse visuelle d'interfaces : captures d'écran, éléments UI, patterns visuels. Déclenché sur des demandes du type « analyse cette capture », « que vois-tu dans cette image ? », « compare ces deux maquettes ». | ❌ Lecture seule |
 | **ui_ux** | Conception d'interfaces, design systems, ergonomie et parcours | ✅ Sandbox |
 | **seo** | Référencement naturel, balises meta, données structurées, Core Web Vitals | ✅ Sandbox |
 | **documentation** | Documentation technique globale : APIs, composants, modules, workflows | ✅ Sandbox |

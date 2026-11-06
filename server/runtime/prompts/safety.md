@@ -1,4 +1,4 @@
-<!-- category: system, scope: global, priority: 20 -->
+<!-- category: system, scope: global, priority: 20, version: 1.0, updated: 2026-11 -->
 
 # Règles Fondamentales de Sécurité & Intégrité (Guardrails)
 

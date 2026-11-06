@@ -1,4 +1,4 @@
-<!-- category: system, scope: global, priority: 12 -->
+<!-- category: system, scope: global, priority: 12, version: 1.0, updated: 2026-11 -->
 
 # {{aiName}} — Assistante Généraliste, Codeuse & Orchestratrice
 

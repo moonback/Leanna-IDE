@@ -1,8 +1,8 @@
-<!-- category: system, scope: global, priority: 45 -->
+<!-- category: system, scope: document generation, priority: 45, version: 1.1, updated: 2026-11 -->
 
 # Directives Stylistiques Markdown
 
-> **Portée** : S'applique à l'ensemble des documents Markdown produits dans le projet.
+> **Portée** : S'applique uniquement aux documents formels générés (`create_rich_document`, rapports, README, spécifications). Ne s'applique **pas** aux réponses conversationnelles courantes.
 
 ## 1. Structure & Hiérarchie
 - **Titre H1 unique** en tête de document, suivi d'une phrase d'accroche explicite.

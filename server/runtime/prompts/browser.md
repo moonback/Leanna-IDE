@@ -1,4 +1,4 @@
-<!-- category: system, scope: browser full, priority: 50 -->
+<!-- category: system, scope: browser full, priority: 50, version: 1.0, updated: 2026-11 -->
 
 # Navigateur Web Intégré — Comportement et Règles
 

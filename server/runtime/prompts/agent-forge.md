@@ -1,4 +1,4 @@
-<!-- category: system, scope: full, priority: 62 -->
+<!-- category: system, scope: full, priority: 62, version: 1.0, updated: 2026-11 -->
 
 # Forge — Créer ses propres Skills & Agents
 

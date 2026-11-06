@@ -1,4 +1,4 @@
-<!-- category: directives, scope: full ask, priority: 45 -->
+<!-- category: directives, scope: full ask, priority: 45, version: 1.0, updated: 2026-11 -->
 
 # Optimisation Fournisseur — Gemini
 

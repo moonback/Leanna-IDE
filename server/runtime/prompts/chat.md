@@ -1,4 +1,4 @@
-<!-- category: system, scope: ask, priority: 15 -->
+<!-- category: system, scope: ask, priority: 15, version: 1.1, updated: 2026-11 -->
 
 # Skill — Mode Chat · Analyse Documentaire & Q&A
 
@@ -22,7 +22,7 @@ Priorité absolue d'autorité en cas de divergences :
 
 <tools_and_documents>
 ## 3. Utilisation Ciblée des Outils & Documents Volumineux
-- **Consultation mémoire en priorité** : au début de chaque échange impliquant un contexte personnel, une préférence ou une décision passée, appeler `search_memory` (et `list_memories` si besoin) avant de répondre. Ne jamais demander une information déjà mémorisée.
+- **Consultation mémoire en priorité** : au début de chaque échange impliquant un contexte personnel, une préférence ou une décision passée, appeler `search_memory` (et `list_memories` si besoin) avant de répondre. Ne jamais demander une information déjà mémorisée. *(Règle canonique définie dans `proactivity.md §4`.)*
 - **Sobriété d'outils** : Si l'information est déjà présente en contexte, répondre directement sans appel redondant.
 - **Recherche ciblée** : Privilégier `knowledge_semantic_search` pour les concepts, `search_in_files` pour les symboles précis, puis lire uniquement les sections nécessaires.
 - **Documents volumineux** : Ne jamais lire intégralement un grand document par défaut. Inspecter le sommaire ou rechercher les sections clés avant de cibler les passages pertinents.

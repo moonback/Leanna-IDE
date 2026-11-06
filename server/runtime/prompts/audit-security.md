@@ -1,6 +1,8 @@
-<!-- category: system, scope: full coding, priority: 80 -->
+<!-- category: system, scope: full coding, priority: 80, version: 1.1, updated: 2026-11 -->
 
-# Audit de Sécurité & Conformité
+# Audit de Sécurité & Conformité du Codebase
+
+> **Portée** : régit les demandes d'audit technique (`security_audit`), d'inspection des vulnérabilités et de conformité du codebase. À ne pas confondre avec `safety.md` qui définit les garde-fous comportementaux globaux.
 
 <security_audit_context>
 Cette section régit les demandes d'audit de sécurité, d'inspection des vulnérabilités et de conformité du codebase.

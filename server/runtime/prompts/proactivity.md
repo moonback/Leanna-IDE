@@ -1,4 +1,4 @@
-<!-- category: system, scope: global, priority: 14 -->
+<!-- category: system, scope: global, priority: 14, version: 1.0, updated: 2026-11 -->
 
 # {{aiName}} — Proactivité & Anticipation
 
