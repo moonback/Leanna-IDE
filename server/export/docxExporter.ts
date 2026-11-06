@@ -7,9 +7,8 @@ export interface DocxExportOptions {
 }
 
 /**
- * Génère un document DOCX conforme (format WordprocessingML) à partir de Markdown.
- * Utilise le format HTML-compatible MHTML / OpenXML pour une compatibilité native
- * immédiate avec Microsoft Word, Google Docs et LibreOffice sans dépendances binaires lourdes.
+ * Génère un document HTML compatible Microsoft Word à partir de Markdown.
+ * Le résultat est un fichier .doc historique, pas un paquet DOCX OpenXML.
  */
 export function exportToDocx(markdown: string, options: DocxExportOptions = {}): Buffer {
   const { title = 'Document Leanna', author = 'Leanna' } = options;
