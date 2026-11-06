@@ -16,7 +16,6 @@ export interface RoxaneAIConfig {
   useSpeech: boolean;
   maxRounds: number;
   maxDurationSeconds: number;
-  autoCreateTasks: boolean;
 }
 
 export interface DebateTurn {
@@ -49,7 +48,6 @@ export const DEFAULT_ROXANE_CONFIG: RoxaneAIConfig = {
   useSpeech: true,
   maxRounds: 3,
   maxDurationSeconds: 600,
-  autoCreateTasks: false,
 };
 
 export function normalizeRoxaneConfig(value: unknown): RoxaneAIConfig {
@@ -73,7 +71,6 @@ export function normalizeRoxaneConfig(value: unknown): RoxaneAIConfig {
     maxDurationSeconds: Math.round(bounded(raw.maxDurationSeconds, base.maxDurationSeconds, 60, 1800)),
     enabled: raw.enabled !== false,
     useSpeech: raw.useSpeech !== false,
-    autoCreateTasks: raw.autoCreateTasks === true,
     language: typeof raw.language === 'string' ? raw.language.slice(0, 12) : base.language,
     responseStyle: raw.responseStyle === 'concise' || raw.responseStyle === 'detailed' ? raw.responseStyle : 'balanced',
   };
