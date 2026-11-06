@@ -193,7 +193,7 @@ export class LeannaSupervisor {
       return { missionId, finalState: machine.current, attempts: 0 };
     }
     if (machine.current === "RECOVERY_REQUIRED") {
-      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, recoveryReason: "Cette mission est mise en quarantaine et nécessite une réconciliation explicite." };
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryRequired: true, recoveryReason: "Cette mission est mise en quarantaine et nécessite une réconciliation explicite." };
     }
     const interruptedStates = new Set<MissionLifecycleState>(["RUNNING", "VERIFYING", "RECOVERING", "COMMITTING"]);
     const openCheckpoints = this.checkpoints.listOpenForMission(missionId);
@@ -357,21 +357,35 @@ export class LeannaSupervisor {
           this.advance(machine, "READY", `recovery=${decision}, ready to retry`);
         }
       } catch (err) {
-        // Rollback best-effort pour ne pas laisser d'effets de bord orphelins.
+        // A failed/partial rollback is not an ordinary mission failure: preserve
+        // the transaction context and require explicit reconciliation.
+        let rollbackSucceeded = false;
         try {
           this.checkpoints.rollback(checkpoint.id);
+          rollbackSucceeded = true;
+          machine.setActiveAttempt(undefined);
+          this.store.save(machine);
         } catch {
-          /* Une nouvelle tentative peut encore restaurer les fichiers restants. */
+          /* Keep the active attempt and open checkpoint as recovery evidence. */
         }
         try {
           rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
         } catch {
           rollbackResidualFiles = ["<état du checkpoint indisponible>"];
         }
-        // Transition de secours vers FAILED (toujours légale depuis les états
-        // transitoires), avec persistance garantie.
-        this.safeAdvance(machine, "FAILED", `supervisor error: ${(err as Error).message}`);
-        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
+        const recoveryRequired = !rollbackSucceeded || rollbackResidualFiles.length > 0;
+        const target: MissionLifecycleState = recoveryRequired ? "RECOVERY_REQUIRED" : "FAILED";
+        this.safeAdvance(machine, target, `supervisor error: ${(err as Error).message}`);
+        return {
+          missionId,
+          finalState: machine.current,
+          attempts: attempt,
+          evidence: lastEvidence,
+          rollbackComplete: rollbackSucceeded && rollbackResidualFiles.length === 0,
+          recoveryRequired,
+          recoveryReason: recoveryRequired ? "Rollback incomplet ou état du checkpoint incertain : intervention de réconciliation requise." : undefined,
+          residualFiles: rollbackResidualFiles,
+        };
       }
     }
 
