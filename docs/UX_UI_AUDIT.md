@@ -266,3 +266,24 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Ouvrir Documents avec un lecteur d'écran et vérifier l'annonce de l'onglet actif.
 - Ouvrir Paramètres avec une section inconnue dans l'URL et une valeur périmée dans le stockage local ; vérifier le repli sur une section valide.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis effectuer les contrôles visuels dans Electron. Ces validations locales ne sont pas disponibles via l'accès GitHub utilisé pour ces changements.
+
+
+## Douzième passe — Adaptation des cartes de tâches planifiées
+
+### Constat vérifié
+
+- La vue Automatisations utilisait une carte de tâche en ligne permanente : contenu descriptif et groupe de trois actions partageaient la même rangée, sans point de rupture responsive.
+- Sur une fenêtre étroite ou avec une sidebar ouverte, les métadonnées de planification pouvaient également dépasser la largeur disponible puisqu'elles étaient forcées sur une seule ligne.
+
+### Correction appliquée
+
+- Les cartes passent en disposition verticale sur les petits écrans, puis retrouvent leur disposition horizontale à partir du breakpoint `sm`.
+- Les actions restent regroupées, alignées à droite sur petit écran et replacées naturellement à côté du contenu sur écran plus large.
+- Les métadonnées peuvent revenir à la ligne et utilisent une largeur maximale contrainte au conteneur.
+
+### Validation restante
+
+- Tester les cartes avec un nom long, une description longue et une date de prochaine exécution complète.
+- Vérifier les largeurs étroites, intermédiaires et larges, avec sidebar globale ouverte et repliée.
+- Confirmer que les trois actions restent accessibles au clavier et que leurs zones de clic ne se chevauchent pas.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le rendu dans Electron.
