@@ -124,7 +124,7 @@ export async function synthesizeLiveDebate(
   const config = normalizeRoxaneConfig(profile.roxane ?? DEFAULT_ROXANE_CONFIG);
   const transcript = turns.slice(0, 32).map(turn =>
     `${turn.speaker.toUpperCase()} : ${String(turn.text).slice(0, 5000)}`
-  ).join('\\n\\n');
+  ).join('\n\n');
   const prompt = `Analyse le débat vocal ci-dessous et retourne UNIQUEMENT un objet JSON valide, sans markdown, avec exactement cette structure :
 {
   "recommendation": "synthèse courte et équilibrée",
@@ -140,7 +140,7 @@ ${transcript}`;
   const result = await ask(
     'leanna',
     prompt,
-    leannaPrompt(profile) + '\\nTu synthétises avec neutralité et tu distingues strictement les propositions des décisions humaines.',
+    leannaPrompt(profile) + '\nTu synthétises avec neutralité et tu distingues strictement les propositions des décisions humaines.',
     profile,
     config,
   );
