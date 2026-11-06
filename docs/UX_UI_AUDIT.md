@@ -175,3 +175,18 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier que les états vides ne s'affichent qu'après une réponse valide contenant une liste vide.
 - Vérifier les retours toast et les confirmations de suppression dans Electron.
 - Lancer typecheck, tests UI et ui:audit dans l'environnement local ; ces commandes n'ont pas été exécutées via l'accès GitHub.
+
+## Septième passe — Bibliothèque de snippets
+
+### Constats vérifiés
+
+- La liste des snippets utilisait déjà le statut HTTP pour valider la réponse, mais un échec de chargement laissait l'interface présenter une liste vide comme si elle était réellement vide.
+
+### Correction appliquée
+
+- La réponse doit maintenant contenir une liste valide ; un échec conserve un état d'erreur explicite et propose un réessai. L'état vide n'est affiché qu'après un chargement valide sans résultat.
+
+### Validation restante
+
+- Tester une liste vide valide, une erreur HTTP et une réponse JSON sans tableau de snippets.
+- Vérifier le réessai après rétablissement du serveur et la conservation du snippet sélectionné.
