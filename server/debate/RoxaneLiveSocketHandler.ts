@@ -194,7 +194,19 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     };
 
     client.on('message', (raw, isBinary) => {
-      if (isBinary) return; // microphone non ouvert dans ce protocole; les interventions sont transmises en texte.
+      if (isBinary) {
+        const target = active === 'leanna' ? leanna : roxane;
+        if (target && !closed) {
+          try {
+            target.sendRealtimeInput({
+              audio: { data: Buffer.from(raw as Buffer).toString('base64'), mimeType: 'audio/pcm;rate=16000' },
+            });
+          } catch (error) {
+            console.warn('[RoxaneLive] Microphone frame rejected:', error instanceof Error ? error.message : String(error));
+          }
+        }
+        return;
+      }
       let message: any;
       try { message = JSON.parse(raw.toString()); } catch { send({ type: 'error', message: 'Message WebSocket invalide.' }); return; }
       if (message.type === 'start') { void start(message); return; }
