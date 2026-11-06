@@ -1071,7 +1071,9 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
               hero
               glow={!connected}
             />
-            <div className="lea-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* auto-fit : suit la largeur RÉELLE de la scène (explorateur, dock
+                droit et chat la réduisent), pas celle de la fenêtre. */}
+            <div className="lea-stagger grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
               <ActionCard
                 icon={Bot} title="Agents" description="Flotte et activité"
                 onClick={handleOpenAgents} reduceMotion={reduceMotion}

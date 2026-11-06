@@ -66,7 +66,7 @@ function buildItems(): PaletteItem[] {
   for (const g of NAV_GROUPS) {
     for (const it of g.items) {
       items.push({
-        id: it.id, label: it.label, group: g.label, path: it.path, icon: it.icon,
+        id: it.id, label: it.label, group: g.label || 'Navigation', path: it.path, icon: it.icon,
         keywords: KEYWORDS[it.id] ?? '',
       });
     }

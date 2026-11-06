@@ -101,7 +101,7 @@ const VARIANT_STYLES: Record<ButtonVariant, string> = {
 
 const SIZE_STYLES: Record<ButtonSize, { cls: string; iconSize: number }> = {
   xs: { cls: 'h-6    px-2   text-xs  gap-1',  iconSize: 12 },
-  sm: { cls: 'h-[30px] px-3 text-sm  gap-1.5', iconSize: 14 },
+  sm: { cls: 'h-7    px-3   text-sm  gap-1.5', iconSize: 14 }, // = --control-h-sm (en-têtes, toolbars)
   md: { cls: 'h-9    px-4   text-sm  gap-2',  iconSize: 14 },
   lg: { cls: 'h-11   px-5   text-base gap-2', iconSize: 16 },
 };

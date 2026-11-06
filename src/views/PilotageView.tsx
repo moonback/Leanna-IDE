@@ -142,13 +142,13 @@ export default function PilotageView() {
   const Icon = currentTabMeta.icon;
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {/* ── Shared header ────────────────────────────────────────────────── */}
       <ViewHeader
         title="Pilotage"
         icon={Icon}
         description={currentTabMeta.description}
-        badge="Mission Control"
+        badge={currentTabMeta.label}
       />
 
       {/* ── Tab bar ──────────────────────────────────────────────────────── */}
@@ -160,7 +160,7 @@ export default function PilotageView() {
       >
         <Tabs.List
           aria-label="Vues Pilotage"
-          className="flex-shrink-0 overflow-x-auto px-4 lg:px-6"
+          className="flex-shrink-0 overflow-x-auto px-2"
         >
           {TABS.map(({ value, label, icon: TabIcon }) => (
             <Tabs.Tab

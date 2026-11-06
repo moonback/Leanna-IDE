@@ -34,6 +34,7 @@ import { useConfirm } from './ui/ConfirmDialog.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
 import { NAV_GROUPS, type NavItem } from '../config/navigation.js';
 import type { UnifiedSidebarProps } from './sidebar/types.js';
+import { useMediaQuery } from '../views/orb/liveUi.js';
 // @ts-ignore - Asset handled by bundler
 import logoDark from '../../assets/images/icon-sombre.png';
 
@@ -54,8 +55,9 @@ interface ToolGroup { id: string; label: string; items: ToolItem[] }
 
 const COLLAPSE_KEY = 'leanna_global_sidebar_collapsed';
 const GROUPS_KEY = 'leanna_global_sidebar_closed_groups';
-const WIDTH_COLLAPSED = 60;
-const WIDTH_EXPANDED = 252;
+// Doivent rester alignés sur --rail-w / --rail-w-open (styles/glass.css).
+const WIDTH_COLLAPSED = 56;
+const WIDTH_EXPANDED = 232;
 const HOVER_IN_MS = 110;
 const HOVER_OUT_MS = 220;
 
@@ -64,6 +66,9 @@ function buildToolGroups(props: GlobalSidebarProps): ToolGroup[] {
   const p = props as unknown as Record<string, unknown>;
   const connected = Boolean(props.assistantConnected);
   const groups: ToolGroup[] = [];
+  // Sections à un seul outil (Explorateur, Recherche, Terminal, GitHub…) :
+  // regroupées sous un seul en-tête au lieu d'un titre répétant l'item.
+  const essentials: ToolItem[] = [];
 
   for (const section of sidebarSections) {
     const items: ToolItem[] = [];
@@ -78,8 +83,10 @@ function buildToolGroups(props: GlobalSidebarProps): ToolGroup[] {
         items.push({ id: leaf.id, label: leaf.label, icon: leaf.icon, active, disabled, onClick });
       }
     }
-    if (items.length > 0) groups.push({ id: section.id, label: section.label ?? '', items });
+    if (items.length === 1) essentials.push(items[0]);
+    else if (items.length > 1) groups.push({ id: section.id, label: section.label ?? '', items });
   }
+  if (essentials.length > 0) groups.unshift({ id: 'ide-essentials', label: 'Espace de travail', items: essentials });
   return groups;
 }
 
@@ -119,15 +126,15 @@ function useTooltip(label: string, enabled: boolean, reduceMotion: boolean) {
       : createPortal(
           <AnimatePresence>
             {pos && enabled && (
-              <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 100, pointerEvents: 'none' }} className="-translate-y-1/2">
+              <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 'var(--z-tooltip)', pointerEvents: 'none' }} className="-translate-y-1/2">
                 <motion.div
                   role="tooltip"
                   initial={reduceMotion ? false : { opacity: 0, x: -6, scale: 0.97 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -4 }}
                   transition={{ duration: reduceMotion ? 0 : 0.14, ease: [0.22, 1, 0.36, 1] }}
-                  className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium shadow-lg"
-                  style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', border: '1px solid var(--border-base)' }}
+                  className="glass-float whitespace-nowrap px-2.5 py-1.5 text-xs font-medium"
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   {label}
                 </motion.div>
@@ -181,9 +188,13 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   }, []);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const collapsed = pinnedCollapsed && !hovered;
+  /* Fenêtre étroite : le rail se replie de lui-même (sans toucher à la
+     préférence persistée) pour laisser la place à l'éditeur et aux panneaux. */
+  const narrowWindow = useMediaQuery('(max-width: 1100px)');
+  const railCollapsed = pinnedCollapsed || narrowWindow;
+  const collapsed = railCollapsed && !hovered;
   /** Dépliée au survol par-dessus le contenu (et non épinglée ouverte). */
-  const overlay = pinnedCollapsed && hovered;
+  const overlay = railCollapsed && hovered;
 
   /* Halo de survol partagé. */
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -285,23 +296,18 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
         <motion.div
           className="relative h-full flex-shrink-0"
           initial={false}
-          animate={{ width: pinnedCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+          animate={{ width: railCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
           transition={spring}
         >
           <motion.nav
             ref={navRef}
             aria-label="Navigation Leanna"
-            className="lea-sidebar absolute inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r"
+            className="lea-sidebar absolute inset-y-0 left-0 flex flex-col overflow-hidden"
             data-overlay={overlay ? 'true' : undefined}
             initial={false}
-            animate={{
-              width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
-              boxShadow: overlay
-                ? '18px 0 48px -16px rgba(0,0,0,0.5), 1px 0 0 0 rgba(0,0,0,0)'
-                : '0 0 0 0 rgba(0,0,0,0), 0 0 0 0 rgba(0,0,0,0)',
-            }}
+            animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
             transition={spring}
-            style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
+            style={{ zIndex: 'var(--z-sidebar)' }}
             onPointerEnter={() => schedule(true, HOVER_IN_MS)}
             onPointerLeave={() => { schedule(false, HOVER_OUT_MS); setHoverId(null); }}
             onFocusCapture={(e) => {
@@ -314,20 +320,14 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
           >
             {/* Marque + bouton d'épinglage */}
             <div
-              className={`relative flex flex-shrink-0 items-center gap-2.5 px-3 ${collapsed ? 'justify-center' : ''}`}
-              style={{
-                height: 60,
-                background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 7%, transparent) 0%, transparent 100%)',
-              }}
+              className={`lea-sidebar__brand relative flex flex-shrink-0 items-center gap-2.5 px-3 ${collapsed ? 'justify-center' : ''}`}
             >
               <motion.span
                 aria-hidden
                 whileHover={reduceMotion ? undefined : { rotate: -8, scale: 1.08 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-                className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl"
-                style={{
-                  boxShadow: '0 2px 10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.1)',
-                }}
+                className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                style={{ boxShadow: '0 2px 10px var(--accent-glow)' }}
               >
                 <img src={logoDark} alt="Leanna" className="h-full w-full object-contain" draggable={false} />
               </motion.span>
@@ -341,7 +341,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                   </span>
                 </span>
               </FadeSlide>
-              {!collapsed && (
+              {/* Épinglage sans effet en fenêtre étroite (repli automatique) : masqué. */}
+              {!collapsed && !narrowWindow && (
                 <IconButton
                   label={pinnedCollapsed ? 'Épingler la navigation (Ctrl+B)' : 'Réduire automatiquement (Ctrl+B)'}
                   onClick={() => setPinnedCollapsed((c) => !c)}
@@ -378,8 +379,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             )}
 
             {!collapsed && (
-              <div className="lea-sidebar__search mx-2 mb-2 flex h-9 flex-shrink-0 items-center gap-2 rounded-lg px-3">
-                <Search size={15} aria-hidden />
+              <div className="lea-sidebar__search mx-2 mb-1 flex h-8 flex-shrink-0 items-center gap-2 rounded-lg px-2.5">
+                <Search size={14} aria-hidden />
                 <input
                   type="search"
                   value={navQuery}
@@ -461,7 +462,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             </div>
 
             {/* Pied : présence vocale + changer de projet + paramètres */}
-            <div className="mt-auto flex-shrink-0 border-t px-2 py-1" style={{ borderColor: 'var(--border-base)' }}>
+            <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 flex-col gap-0.5 px-2 py-2">
               <NavButton
                 item={{ id: 'orb-live', path: '', label: 'Présence vocale', icon: Radio }}
                 active={false}
@@ -474,18 +475,12 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 collapsed={collapsed}
                 onClick={handleSwitchWorkspace}
               />
-              <div className="flex items-center gap-1">
-                <div className="min-w-0 flex-1">
-                  <NavButton
-                    item={{ id: 'settings', path: '/settings', label: 'Paramètres', icon: Settings }}
-                    active={pathname === '/settings'}
-                    collapsed={collapsed}
-                    onClick={() => navigate('/settings')}
-                  />
-                </div>
-                
-              </div>
-              
+              <NavButton
+                item={{ id: 'settings', path: '/settings', label: 'Paramètres', icon: Settings }}
+                active={pathname === '/settings'}
+                collapsed={collapsed}
+                onClick={() => navigate('/settings')}
+              />
             </div>
 
             {/* Marqueur de thème (invisible, garde le thème réactif pour l'outillage) */}
@@ -573,7 +568,7 @@ function Group({
           type="button"
           onClick={() => onToggle(id)}
           aria-expanded={open}
-          className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1.5 pt-3 text-left ${FOCUS_RING}`}
+          className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1 pt-2.5 text-left ${FOCUS_RING}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
@@ -657,7 +652,7 @@ function NavButton({
         onFocus={() => { setHoverId(item.id); tip.show(); }}
         onBlur={() => { setHoverId(null); tip.hide(); }}
         whileTap={reduceMotion || disabled ? undefined : { scale: 0.97 }}
-        className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
+        className={`relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
         style={{ color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
       >
         {/* Halo de survol : un seul élément qui glisse d'un item à l'autre */}
@@ -698,7 +693,7 @@ function NavButton({
             filter: active ? 'drop-shadow(0 0 6px color-mix(in srgb, var(--accent-primary) 55%, transparent))' : undefined,
           }}
         >
-          <Icon size={18} />
+          <Icon size={16} />
         </motion.span>
 
         <span className="relative z-10 flex min-w-0 flex-1 items-center">
@@ -800,11 +795,11 @@ function IdeAssistantBlock({
           aria-label="Connecter l'assistant IA"
           whileHover={reduceMotion ? undefined : { scale: 1.02, y: -1 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          className={`group/cta relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-3 py-2.5 text-xs font-bold tracking-wide ${FOCUS_RING}`}
+          className={`group/cta relative flex h-9 w-full items-center justify-center gap-2 overflow-hidden rounded-lg px-3 text-xs font-semibold ${FOCUS_RING}`}
           style={{
             background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%)',
             color: 'var(--bg-base)',
-            boxShadow: '0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2)',
+            boxShadow: '0 4px 16px -4px var(--accent-glow)',
           }}
         >
           {!reduceMotion && (
@@ -836,12 +831,11 @@ function IdeAssistantBlock({
       initial={reduceMotion ? false : { opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="mx-2 mb-2 flex-shrink-0 overflow-hidden rounded-xl border shadow-sm"
-      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-base)' }}
+      className="glass-card mx-2 mb-2 flex-shrink-0 overflow-hidden"
     >
       <div
         className="flex items-center justify-between gap-2 border-b px-3 py-2"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)' }}
+        style={{ borderColor: 'var(--glass-stroke)' }}
       >
         <div className="flex min-w-0 items-center gap-2">
           <span className="relative flex h-2 w-2 flex-shrink-0 items-center justify-center" aria-hidden>

@@ -79,7 +79,7 @@ export default function ObservabilityView() {
   const maxAgentCost = dashboard?.byAgent[0]?.cost ?? 1;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col overflow-hidden">
       <ViewHeader
         {...viewHeaderProps('observability')}
         description="Coûts, tokens et traces OpenTelemetry en temps réel"
@@ -131,7 +131,7 @@ export default function ObservabilityView() {
       {/* Tabs */}
       <div
         className="flex border-b"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+        style={{ borderColor: 'var(--border-base)' }}
       >
         {([
           { key: 'overview', label: 'Vue d\'ensemble', icon: TrendingUp },

@@ -189,13 +189,8 @@ function ModalRoot({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: duration.base, ease: ease.outQuart } }}
             exit={{ opacity: 0, transition: { duration: duration.exit, ease: ease.inQuart } }}
-            className="fixed inset-0 flex items-center justify-center p-4"
-            style={{
-              zIndex,
-              backgroundColor: 'var(--overlay-veil)',
-              backdropFilter: 'blur(6px) saturate(120%)',
-              WebkitBackdropFilter: 'blur(6px) saturate(120%)',
-            }}
+            className="glass-veil fixed inset-0 flex items-center justify-center p-4"
+            style={{ zIndex }}
             {...(backdropProps as unknown as HTMLMotionProps<'div'>)}
           >
             {/* Boîte */}
@@ -211,15 +206,15 @@ function ModalRoot({
               aria-labelledby={title ? titleId : undefined}
               aria-describedby={ariaDescribedBy ?? descId}
               className={clsx(
-                'relative flex flex-col w-full rounded-2xl shadow-2xl lea-dialog',
+                'glass-modal relative flex flex-col w-full lea-dialog',
                 'outline-none',
                 className,
               )}
               style={{
                 maxWidth: SIZE_VAR[size],
                 maxHeight: 'calc(100dvh - 32px)',
-                backgroundColor: 'var(--bg-panel)',
-                border: `1px solid ${toneStyle.border}`,
+                // Ton neutre : bordure du niveau L5 ; tons sémantiques : teintée.
+                borderColor: tone === 'default' ? undefined : toneStyle.border,
                 color: 'var(--text-primary)',
               }}
               // Empêcher que le clic à l'intérieur de la boîte

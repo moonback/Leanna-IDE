@@ -94,7 +94,7 @@ export default function ExplainabilityView({ embedded = false }: { embedded?: bo
   const risk = p ? RISK_META[p.riskLevel] : null;
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('explainability')}

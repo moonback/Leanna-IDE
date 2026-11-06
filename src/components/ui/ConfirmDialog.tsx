@@ -120,21 +120,13 @@ function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
       {/* Modal Overlay */}
       {state.open && (
         <div
-          className="fixed inset-0 flex items-center justify-center"
-          style={{
-            zIndex: 'var(--z-modal)' as any,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(2px)',
-          }}
+          className="glass-veil fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 'var(--z-modal)' as any }}
           onClick={handleBackdrop}
         >
           <div
-            className="w-full max-w-sm rounded-xl border p-5 shadow-2xl"
-            style={{
-              backgroundColor: 'var(--bg-panel)',
-              borderColor: 'var(--border-base)',
-              color: 'var(--text-primary)',
-            }}
+            className="glass-modal w-full max-w-sm p-5"
+            style={{ color: 'var(--text-primary)' }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-dialog-title"

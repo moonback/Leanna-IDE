@@ -256,7 +256,7 @@ export default function MissionTimelineView({ embedded = false }: { embedded?: b
   const hasTimeline = !!timeline && visibleEvents.length > 0;
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('mission-timeline')}

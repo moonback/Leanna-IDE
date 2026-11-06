@@ -33,7 +33,7 @@ export default function AutonomyView({ embedded = false }: { embedded?: boolean 
   const approvals = usePendingApprovals();
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('autonomy')}

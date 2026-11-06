@@ -60,15 +60,16 @@ export function ExplorerDock({ width, onWidthChange, children }: ExplorerDockPro
 
   return (
     <div className="relative flex h-full flex-shrink-0">
-      {children(width)}
+      {/* Vitre séparée (styles/glass.css §8) — l'arrondi rogne le contenu. */}
+      <div className="lea-explorer-pane flex h-full">{children(width)}</div>
 
-      {/* Poignée de redimensionnement (bord droit) */}
+      {/* Poignée de redimensionnement : centrée dans l'interstice du shell */}
       <div
         role="separator"
         aria-orientation="vertical"
         aria-label="Redimensionner l'explorateur"
-        className="group absolute top-0 bottom-0 right-0 z-10 w-1 cursor-col-resize hover:bg-[var(--accent-primary)]"
-        style={{ opacity: resizing ? 0.5 : undefined }}
+        className="group absolute top-3 bottom-3 w-1 cursor-col-resize rounded-full hover:bg-[var(--accent-primary)]"
+        style={{ right: 'calc(var(--shell-gap) / -2 - 2px)', zIndex: 'var(--z-sticky)', opacity: resizing ? 0.5 : undefined }}
         onMouseDown={handleResizeStart}
         title="Redimensionner"
       >

@@ -157,16 +157,17 @@ export function SidePanel({
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={clsx(
               'flex flex-col h-full',
-              overlay ? 'fixed z-50 top-0 bottom-0 shadow-2xl' : 'relative',
+              overlay ? 'glass-float fixed z-50 top-0 bottom-0' : 'relative',
               overlay && position === 'right' && 'right-0',
               overlay && position === 'left' && 'left-0',
               className,
             )}
             style={{
               width,
-              backgroundColor: 'var(--bg-panel)',
-              borderLeft: position === 'right' ? '1px solid var(--border-base)' : undefined,
-              borderRight: position === 'left' ? '1px solid var(--border-base)' : undefined,
+              // Docké : panneau L2 ; en overlay : la classe .glass-float fournit fond/flou.
+              backgroundColor: overlay ? undefined : 'var(--glass-panel)',
+              borderLeft: position === 'right' ? '1px solid var(--glass-stroke)' : undefined,
+              borderRight: position === 'left' ? '1px solid var(--glass-stroke)' : undefined,
             }}
             role="complementary"
             aria-label={title}

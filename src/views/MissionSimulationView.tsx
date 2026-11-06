@@ -133,7 +133,7 @@ export default function MissionSimulationView({ embedded = false }: { embedded?:
   const risk = report ? RISK_META[report.riskLevel] : null;
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('mission-simulation')}

@@ -103,10 +103,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 animate={{ opacity: 1, x: 0,  scale: 1    }}
                 exit={{    opacity: 0, x: 40, scale: 0.96 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-2xl backdrop-blur-sm shadow-2xl"
+                className="glass-float pointer-events-auto flex items-start gap-3 px-4 py-3"
                 style={{
-                  backgroundColor: c.bg,
-                  border: `1px solid ${c.border}`,
+                  // Teinte sémantique posée sur la vitre flottante (L4).
+                  background: `linear-gradient(${c.bg}, ${c.bg}), var(--glass-float)`,
+                  borderColor: c.border,
                   minWidth: 260,
                   maxWidth: 320,
                 }}

@@ -155,18 +155,14 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
             transition={{ duration: 0.12, ease: 'easeOut' }}
             className={clsx(
               'absolute pointer-events-none',
-              'whitespace-nowrap px-2.5 py-1.5 rounded-lg',
+              'glass-float whitespace-nowrap px-2.5 py-1.5',
               'text-xs font-medium',
-              'shadow-lg backdrop-blur-sm',
               'flex items-center gap-2',
               positionStyles[position],
             )}
             style={{
               zIndex: 'var(--z-tooltip)' as any,
-              backgroundColor: 'var(--bg-elevated)',
               color: 'var(--text-primary)',
-              border: '1px solid var(--border-base)',
-              boxShadow: 'var(--shadow-lg)',
             }}
           >
             <span>{content}</span>
@@ -185,9 +181,9 @@ export const Tooltip = forwardRef<HTMLElement, TooltipProps>(function Tooltip(
             <span
               className={clsx('absolute w-[6px] h-[6px]', arrowStyles[position])}
               style={{
-                backgroundColor: 'var(--bg-elevated)',
-                borderRight: '1px solid var(--border-base)',
-                borderBottom: '1px solid var(--border-base)',
+                backgroundColor: 'var(--glass-float)',
+                borderRight: '1px solid var(--glass-stroke)',
+                borderBottom: '1px solid var(--glass-stroke)',
               }}
               aria-hidden
             />

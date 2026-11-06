@@ -126,7 +126,7 @@ export default function AgentSwarmView({ embedded = false }: { embedded?: boolea
   }, [composition]);
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('agent-swarm')}

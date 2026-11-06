@@ -87,11 +87,12 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
  * (la page à onglets fusionnée — étape 3).
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: 'workspace', label: 'Workspace', items: pick('ide') },
-  { id: 'orchestration', label: 'Pilotage & IA', items: pick('pilotage', 'agent-swarm', 'autonomy', 'explainability') },
+  // Les deux espaces de travail principaux, sans en-tête de groupe.
+  { id: 'workspace', label: '', items: pick('ide', 'pilotage') },
+  { id: 'agents', label: 'Agents', items: pick('agent-swarm', 'autonomy', 'explainability') },
   { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
-  { id: 'automation', label: 'Automatisation', items: pick('automation') },
-  { id: 'system', label: 'Système', items: pick('observability') },
+  // Ex-groupes « Automatisation » et « Système » à un seul item : fusionnés.
+  { id: 'operations', label: 'Opérations', items: pick('automation', 'observability') },
 ];
 
 /** Titre + icône d'un <ViewHeader>, identiques au libellé de la sidebar. */

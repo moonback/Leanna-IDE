@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { Button } from '../components/ui/Button.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useToast } from '../components/ui/Toast.js';
 import {
@@ -243,42 +244,43 @@ export default function SettingsView() {
   const active = getActiveLabel(activeSection);
 
   return (
-    <div className="h-full flex overflow-hidden font-sans text-xs" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+    <div className="h-full flex flex-col overflow-hidden font-sans text-xs" style={{ color: 'var(--text-primary)' }}>
 
-      {/* ── Left Sidebar Nav ── */}
-      <nav
-        className="flex flex-col flex-shrink-0 select-none"
-        style={{
-          width: 260,
-          backgroundColor: 'var(--bg-sidebar)',
-          borderRight: '1px solid var(--border-base)',
-        }}
-      >
-        {/* Title */}
-        <div className="px-4.5 pt-4 pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      {/* En-tête unique, pleine largeur : la page s'appelle « Paramètres », la
+          section active est en badge et sa description en ligne. */}
+      <ViewHeader
+        title="Paramètres"
+        icon={Settings2}
+        badge={active.label}
+        description={getSectionDescription(activeSection)}
+        actions={
+          <>
             <Tooltip
               content="Retour"
               as="button"
               onClick={() => navigate(-1)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--ctrl-hover)]"
+              className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--glass-hover)]"
             >
               <ArrowLeft className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
             </Tooltip>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>
-                Paramètres
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                Personnalisation du workspace
-              </p>
-            </div>
-          </div>
-          
-        </div>
+            <Button variant="secondary" size="sm" onClick={handleReset} iconLeft={<RotateCcw className="h-3.5 w-3.5" />}>
+              <span className="hidden sm:inline">Réinitialiser</span>
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSave} disabled={saving} iconLeft={<Save className="h-3.5 w-3.5" />}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </>
+        }
+      />
 
+      <div className="flex min-h-0 flex-1">
+      {/* ── Navigation des sections ── */}
+      <nav
+        className="flex flex-col flex-shrink-0 select-none"
+        style={{ width: 232, borderRight: '1px solid var(--glass-stroke)' }}
+      >
         {/* Search input */}
-        <div className="px-3 pb-4">
+        <div className="px-3 pb-3 pt-3">
           <div className="relative flex items-center">
             <Search className="absolute left-2.5 h-3.5 w-3.5 opacity-50" style={{ color: 'var(--text-muted)' }} />
             <input
@@ -406,39 +408,8 @@ export default function SettingsView() {
 
       {/* ── Main content area ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-
-        <ViewHeader
-          title={active.label}
-          icon={active.Icon}
-          description={getSectionDescription(activeSection)}
-          badge="Paramètres"
-          actions={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
-                style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)' }}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Réinitialiser</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {saving ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-            </div>
-          }
-        />
-
         {/* Settings editor canvas */}
-        <main className="flex-1 overflow-y-auto px-5 py-6 custom-scrollbar lg:px-8" style={{ backgroundColor: 'var(--bg-base)' }}>
+        <main className="flex-1 overflow-y-auto px-5 py-5 custom-scrollbar lg:px-8">
           <div className="mx-auto max-w-7xl">
             {/* Components render */}
             <AnimatePresence mode="wait">
@@ -474,6 +445,7 @@ export default function SettingsView() {
             </AnimatePresence>
           </div>
         </main>
+      </div>
       </div>
     </div>
   );

@@ -1,0 +1,403 @@
+/**
+ * glass.css — Système « Full Glass » de Leanna (source unique)
+ *
+ * Identité : des vitres sombres (ou laiteuses en clair) posées sur une
+ * atmosphère statique. Le verre structure l'espace — rail, scène, panneaux,
+ * popovers, modales — il n'habille pas chaque élément.
+ *
+ * Six niveaux de surface :
+ *   L0  --atmo-*            arrière-plan atmosphérique (statique, jamais animé)
+ *   L1  --glass-stage       scène principale (rail de nav, zone de page)
+ *   L2  --glass-panel       panneaux secondaires (explorateur, docks, listes)
+ *   L3  --glass-card        cartes et widgets posés SUR un panneau
+ *   L4  --glass-float       menus, popovers, tooltips (avec flou)
+ *   L5  --glass-modal       modales et overlays (avec flou)
+ *
+ * Performance : L1–L3 sont translucides SANS backdrop-filter (leur fond est
+ * l'atmosphère statique : un flou n'y changerait rien, il coûterait juste).
+ * Seuls L4/L5 — petits, éphémères, posés sur du contenu vivant — floutent.
+ * Monaco, le terminal et les webviews ne sont jamais sous un backdrop-filter.
+ *
+ * Tous les jetons dérivés existent pour les 5 thèmes : les valeurs par défaut
+ * (:root) sont calculées à partir des jetons de base du thème courant ; dark,
+ * light et high-contrast sont ensuite réglés à la main.
+ */
+
+/* ═══════════════════════════════════════════════
+   1. GÉOMÉTRIE — grille 4 px, dimensions du shell
+═══════════════════════════════════════════════ */
+:root {
+  --shell-gap: 8px;            /* écart entre les vitres du shell */
+  --header-h: 52px;            /* hauteur unique des en-têtes de page */
+  --rail-w: 56px;              /* rail de navigation replié */
+  --rail-w-open: 232px;        /* rail déplié */
+  --control-h: 32px;           /* boutons / champs standard */
+  --control-h-sm: 28px;        /* boutons compacts (headers, toolbars) */
+  --nav-item-h: 34px;
+
+  /* Rayons — hiérarchie par niveau */
+  --r-control: 8px;            /* boutons, inputs, badges carrés */
+  --r-card: 12px;              /* cartes, widgets */
+  --r-surface: 14px;           /* scène, rail, panneaux */
+  --r-float: 12px;             /* popovers, menus, tooltips */
+  --r-modal: 18px;             /* modales */
+
+  /* Flou — trois intensités seulement */
+  --blur-float: 18px;
+  --blur-modal: 24px;
+  --blur-veil: 6px;
+
+  /* Mouvement */
+  --ease-glass: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ═══════════════════════════════════════════════
+   2. JETONS DÉRIVÉS — défauts pour tous les thèmes
+═══════════════════════════════════════════════ */
+:root {
+  --atmo-base: var(--bg-base);
+  --atmo-glow-a: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  --atmo-glow-b: color-mix(in srgb, var(--accent-secondary) 10%, transparent);
+
+  --glass-stage:  color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  --glass-panel:  color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+  --glass-card:   color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --glass-float:  color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  --glass-modal:  color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  --glass-hover:  var(--bg-hover);
+  --glass-active: var(--bg-active);
+
+  --glass-stroke:        color-mix(in srgb, var(--border-base) 80%, transparent);
+  --glass-stroke-strong: var(--border-strong);
+  --glass-edge:          inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+  --glass-shadow:        0 1px 2px rgba(0, 0, 0, 0.18), 0 10px 30px -12px rgba(0, 0, 0, 0.35);
+  --glass-shadow-float:  0 12px 40px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark — encre profonde, vitres fumées, liseré spéculaire discret */
+:root[data-theme="dark"] {
+  --atmo-base: #07080c;
+  --atmo-glow-a: rgba(110, 168, 254, 0.13);
+  --atmo-glow-b: rgba(157, 140, 255, 0.08);
+
+  --glass-stage:  rgba(19, 20, 27, 0.78);
+  --glass-panel:  rgba(26, 27, 36, 0.62);
+  --glass-card:   rgba(255, 255, 255, 0.028);
+  --glass-float:  rgba(24, 25, 34, 0.84);
+  --glass-modal:  rgba(22, 23, 31, 0.92);
+  --glass-hover:  rgba(255, 255, 255, 0.055);
+  --glass-active: rgba(255, 255, 255, 0.09);
+
+  --glass-stroke:        rgba(255, 255, 255, 0.075);
+  --glass-stroke-strong: rgba(255, 255, 255, 0.14);
+  --glass-edge:          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-shadow:        0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+  --glass-shadow-float:  0 18px 48px -10px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Light — porcelaine teintée (le blanc pur rendrait le verre invisible) */
+:root[data-theme="light"] {
+  --atmo-base: #e9edf4;
+  --atmo-glow-a: rgba(37, 99, 235, 0.10);
+  --atmo-glow-b: rgba(124, 58, 237, 0.06);
+
+  --glass-stage:  rgba(255, 255, 255, 0.72);
+  --glass-panel:  rgba(255, 255, 255, 0.58);
+  --glass-card:   rgba(255, 255, 255, 0.62);
+  --glass-float:  rgba(255, 255, 255, 0.86);
+  --glass-modal:  rgba(255, 255, 255, 0.94);
+  --glass-hover:  rgba(15, 23, 42, 0.045);
+  --glass-active: rgba(15, 23, 42, 0.08);
+
+  --glass-stroke:        rgba(15, 23, 42, 0.08);
+  --glass-stroke-strong: rgba(15, 23, 42, 0.16);
+  --glass-edge:          inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-shadow:        0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -16px rgba(15, 23, 42, 0.18);
+  --glass-shadow-float:  0 16px 40px -10px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+/* High contrast — surfaces opaques, aucun flou, bordures pleines */
+:root[data-theme="high-contrast"] {
+  --atmo-glow-a: transparent;
+  --atmo-glow-b: transparent;
+  --glass-stage: #000000;
+  --glass-panel: #000000;
+  --glass-card: #000000;
+  --glass-float: #000000;
+  --glass-modal: #000000;
+  --glass-stroke: #ffffff;
+  --glass-stroke-strong: #ffffff;
+  --glass-edge: inset 0 0 0 transparent;
+  --glass-shadow: none;
+  --glass-shadow-float: none;
+  --blur-float: 0px;
+  --blur-modal: 0px;
+  --blur-veil: 0px;
+}
+
+/* ═══════════════════════════════════════════════
+   3. ATMOSPHÈRE (L0) — statique, peinte une fois
+═══════════════════════════════════════════════ */
+html, body { background: var(--atmo-base); }
+
+.app-layout {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  gap: var(--shell-gap);
+  padding: var(--shell-gap);
+  background:
+    radial-gradient(60rem 40rem at 8% -10%, var(--atmo-glow-a), transparent 70%),
+    radial-gradient(50rem 36rem at 105% 110%, var(--atmo-glow-b), transparent 70%),
+    var(--atmo-base);
+}
+/* Aucune animation de fond : l'ancien calque (halos blur(80px) en dérive
+   permanente) forçait le recalcul des surfaces translucides à chaque frame. */
+
+/* ═══════════════════════════════════════════════
+   4. SCÈNE (L1) — zone de page
+═══════════════════════════════════════════════ */
+.app-content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-surface);
+  background: var(--glass-stage);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+
+/* L'IDE compose ses propres vitres (rail, explorateur, scène) : la zone de
+   page devient un simple conteneur transparent. */
+.app-content:has(> .app-route-frame .Leanna-shell) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.app-route-frame {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: transparent;
+  isolation: isolate;
+}
+
+/* ═══════════════════════════════════════════════
+   5. RAIL DE NAVIGATION (GlobalSidebar)
+═══════════════════════════════════════════════ */
+.lea-sidebar {
+  border-radius: var(--r-surface);
+  background: var(--glass-stage);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+/* Dépliée au survol par-dessus le contenu : devient une vitre flottante. */
+.lea-sidebar[data-overlay="true"] {
+  background: var(--glass-float);
+  backdrop-filter: blur(var(--blur-float)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur-float)) saturate(140%);
+  box-shadow: var(--glass-edge), var(--glass-shadow-float);
+}
+.lea-sidebar__brand { height: var(--header-h); }
+.lea-sidebar__search {
+  color: var(--text-muted);
+  background: var(--glass-card);
+  border: 1px solid var(--glass-stroke);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.lea-sidebar__search:focus-within {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--glass-stroke));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+.lea-sidebar__search input { color: var(--text-primary); }
+.lea-sidebar [data-nav-item] { min-height: var(--nav-item-h); border-radius: var(--r-control); }
+.lea-sidebar__active {
+  background: color-mix(in srgb, var(--accent-primary) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+.lea-sidebar__bar { background: var(--accent-primary); box-shadow: 0 0 10px var(--accent-glow); }
+.lea-sidebar__sep { background: var(--glass-stroke); }
+.lea-sidebar__footer { border-top: 1px solid var(--glass-stroke); }
+
+/* ═══════════════════════════════════════════════
+   6. EN-TÊTE DE PAGE UNIFIÉ (ViewHeader)
+═══════════════════════════════════════════════ */
+.lea-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  height: var(--header-h);
+  padding-inline: 16px 12px;
+  border-bottom: 1px solid var(--glass-stroke);
+}
+.lea-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+/* Priorité de rétrécissement : la description tronque d'abord, puis la raison
+   de la pastille d'état ; le titre reste toujours lisible. */
+.lea-header__main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lea-header__title {
+  flex-shrink: 0;
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.lea-header__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lea-header__badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+.lea-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.lea-header__sep { width: 1px; height: 20px; background: var(--glass-stroke); flex-shrink: 0; }
+
+/* Pastille d'état agent (anciennement une barre pleine largeur au-dessus
+   de chaque page) — compacte, dans l'en-tête. */
+.lea-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-h-sm);
+  flex: 0 1 auto;
+  max-width: 320px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--glass-card);
+  border: 1px solid var(--glass-stroke);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.lea-status-pill:hover { background: var(--glass-hover); border-color: var(--glass-stroke-strong); }
+.lea-status-pill:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .lea-header__desc { display: none; }
+  .lea-status-pill__reason { display: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   7. PRIMITIVES DE SURFACE (utilisées par ui/*)
+═══════════════════════════════════════════════ */
+.glass-panel {
+  background: var(--glass-panel);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--r-surface);
+  box-shadow: var(--glass-edge);
+}
+.glass-card {
+  background: var(--glass-card);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--r-card);
+  box-shadow: var(--glass-edge);
+}
+.glass-float {
+  background: var(--glass-float);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--r-float);
+  box-shadow: var(--glass-edge), var(--glass-shadow-float);
+  backdrop-filter: blur(var(--blur-float)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur-float)) saturate(140%);
+}
+.glass-modal {
+  background: var(--glass-modal);
+  border: 1px solid var(--glass-stroke-strong);
+  border-radius: var(--r-modal);
+  box-shadow: var(--glass-edge), var(--glass-shadow-float);
+  backdrop-filter: blur(var(--blur-modal)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur-modal)) saturate(150%);
+}
+.glass-veil {
+  background: var(--overlay-veil);
+  backdrop-filter: blur(var(--blur-veil));
+  -webkit-backdrop-filter: blur(var(--blur-veil));
+}
+.glass-divider { height: 1px; background: var(--glass-stroke); border: 0; }
+
+/* Ancienne utilité .glass / .glass-strong : réalignée sur les niveaux. */
+.glass { background: var(--glass-float); border: 1px solid var(--glass-stroke); backdrop-filter: blur(var(--blur-float)); -webkit-backdrop-filter: blur(var(--blur-float)); }
+.glass-strong { background: var(--glass-modal); border: 1px solid var(--glass-stroke-strong); box-shadow: var(--glass-edge), var(--glass-shadow-float); backdrop-filter: blur(var(--blur-modal)); -webkit-backdrop-filter: blur(var(--blur-modal)); }
+
+/* ═══════════════════════════════════════════════
+   8. SHELL IDE — rail | explorateur | scène
+═══════════════════════════════════════════════ */
+.Leanna-shell {
+  gap: var(--shell-gap);
+  background: transparent;
+}
+.Leanna-workspace {
+  border-radius: var(--r-surface);
+  overflow: hidden;
+  background: var(--glass-stage);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+.lea-explorer-pane {
+  border-radius: var(--r-surface);
+  overflow: hidden;
+  background: var(--glass-stage);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+
+/* ═══════════════════════════════════════════════
+   9. RÉDUCTION DU MOUVEMENT & PETITES FENÊTRES
+═══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .lea-sidebar__search, .lea-status-pill { transition: none; }
+}
+
+/* Fenêtres étroites ou basses : on resserre la grille du shell. */
+@media (max-width: 900px), (max-height: 640px) {
+  :root { --shell-gap: 6px; --header-h: 46px; }
+}

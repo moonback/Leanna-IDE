@@ -10,6 +10,37 @@ Tous les nouveaux composants doivent respecter ces conventions. Toute exception 
 
 ---
 
+## 0. Full Glass — système de surfaces (v3, novembre 2026)
+
+Source unique : `src/styles/glass.css` (importé en dernier par `index.css`).
+Défini pour les 5 thèmes ; `high-contrast` repasse en surfaces opaques sans flou.
+
+### Niveaux
+
+| Niveau | Jeton | Classe | Usage | Flou |
+|---|---|---|---|---|
+| L0 | `--atmo-base`, `--atmo-glow-a/b` | `.app-layout` | Atmosphère statique (jamais animée) | — |
+| L1 | `--glass-stage` | `.app-content`, `.lea-sidebar`, `.Leanna-workspace`, `.lea-explorer-pane` | Vitres du shell (rail, scène) | non |
+| L2 | `--glass-panel` | `.glass-panel`, `<SidePanel>` docké | Panneaux secondaires | non |
+| L3 | `--glass-card` | `.glass-card`, `<Panel>` | Cartes / widgets posés sur une vitre | non |
+| L4 | `--glass-float` | `.glass-float` (tooltips, toasts, menus, rail en overlay) | Flottants | `--blur-float` |
+| L5 | `--glass-modal` + `.glass-veil` | `<Modal>`, `<ConfirmDialog>` | Modales | `--blur-modal` |
+
+Bordures : `--glass-stroke` / `--glass-stroke-strong`. Liseré spéculaire : `--glass-edge` (inset). Ombres : `--glass-shadow`, `--glass-shadow-float`.
+
+**Règle de performance** : seuls L4/L5 utilisent `backdrop-filter`. L1–L3 sont translucides au-dessus d'une atmosphère statique (un flou n'y changerait rien). Monaco, le terminal et les webviews ne sont jamais sous un `backdrop-filter`.
+
+### Géométrie (grille 4 px)
+
+`--shell-gap` 8 px (6 px en petite fenêtre) · `--header-h` 52 px (46 px) · `--rail-w` 56 / `--rail-w-open` 232 · `--control-h` 32 · `--control-h-sm` 28 (= `<Button size="sm">`) · `--nav-item-h` 34.
+Rayons : `--r-control` 8 · `--r-card` 12 · `--r-float` 12 · `--r-surface` 14 · `--r-modal` 18.
+
+### En-tête unifié
+
+Toute page utilise `<ViewHeader>` (`.lea-header`) : une ligne de `--header-h` — icône · titre · badge · description en ligne | pastille d'état agent (`<AgentStatusPill>`) · séparateur · actions. Les vues embarquées (`embedded`) n'affichent pas de header. L'IDE n'en a pas : onglets + barre d'état en tiennent lieu.
+
+---
+
 ## 1. Principes fondamentaux
 
 Le design system repose sur quelques principes simples :
@@ -995,7 +1026,6 @@ Fichiers : `src/styles/motion-pro.css` (CSS) · `src/lib/motion.ts` (miroir JS p
 
 | Élément | Où | Effet |
 |---|---|---|
-| `<AmbientBackdrop />` | `main.tsx` (1er enfant de `.app-layout`) | Halos d'accent qui dérivent lentement |
 | `<RouteProgress />` | `main.tsx` | Barre d'accent 2 px à chaque changement de vue |
 | `usePointerSpotlight()` | `Layout` | Halo qui suit le curseur sur `.card-interactive`, `.notebook-*-card`, `[data-spotlight]` |
 | `pageVariants` | `AnimatedRoutes` | Montée + léger zoom à l'entrée, sortie vers le haut |

@@ -73,78 +73,7 @@
    les utilitaires Tailwind `transition-*` ne sont plus écrasés.
 ═══════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════
-   3. FOND AMBIANT (AmbientBackdrop.tsx)
-   Trois halos flous qui dérivent très lentement derrière l'app.
-   Calque fixe, sans pointeur, animé uniquement en transform.
-═══════════════════════════════════════════════ */
-.lea-ambient {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: var(--ambient-opacity);
-  contain: strict;
-}
-
-.lea-ambient__blob {
-  position: absolute;
-  width: 46vmax;
-  height: 46vmax;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.22;
-  will-change: transform;
-}
-
-.lea-ambient__blob--a {
-  top: -22vmax;
-  left: -12vmax;
-  background: radial-gradient(circle at center, var(--accent-primary), transparent 65%);
-  animation: lea-drift-a var(--dur-ambient) ease-in-out infinite alternate;
-}
-
-.lea-ambient__blob--b {
-  right: -16vmax;
-  top: 18vh;
-  background: radial-gradient(circle at center, var(--accent-secondary, #c792ea), transparent 65%);
-  opacity: 0.14;
-  animation: lea-drift-b calc(var(--dur-ambient) * 1.25) ease-in-out infinite alternate;
-}
-
-.lea-ambient__blob--c {
-  bottom: -26vmax;
-  left: 30vw;
-  background: radial-gradient(circle at center, color-mix(in srgb, var(--accent-primary) 60%, var(--color-success, #3ecf8e)), transparent 65%);
-  opacity: 0.12;
-  animation: lea-drift-c calc(var(--dur-ambient) * 1.5) ease-in-out infinite alternate;
-}
-
-@keyframes lea-drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(14vw, 10vh, 0) scale(1.15); }
-}
-@keyframes lea-drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to   { transform: translate3d(-12vw, 14vh, 0) scale(0.9); }
-}
-@keyframes lea-drift-c {
-  from { transform: translate3d(0, 0, 0) scale(0.95); }
-  to   { transform: translate3d(-10vw, -12vh, 0) scale(1.1); }
-}
-
-/* Le calque ambiant passe SOUS le contenu sans toucher au positionnement
-   des enfants : .app-layout devient un contexte d'empilement isolé et le
-   halo (fixe) y prend un z-index négatif. */
-.app-layout { isolation: isolate; }
-.app-layout > .lea-ambient { z-index: -1; }
-
-/* Laisse transparaître le halo dans les interstices du shell IDE
-   (le fond reste à 92 % opaque — lisibilité intacte). */
-.Leanna-shell {
-  background-color: color-mix(in srgb, var(--ide-shell-bg) 92%, transparent) !important;
-}
+/* 3. FOND AMBIANT : remplacé par l'atmosphère statique de styles/glass.css §3. */
 
 /* ═══════════════════════════════════════════════
    4. BARRE DE PROGRESSION DE NAVIGATION (RouteProgress.tsx)
@@ -354,7 +283,6 @@
    9. ACCESSIBILITÉ
 ═══════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-  .lea-ambient { display: none; }
   :is(.card-interactive, .notebook-studio-card, .notebook-note-card, [data-spotlight]):hover:not(:disabled) { background-image: none; }
   .lea-btn:not(:disabled):hover,
   .lea-btn:not(:disabled):active { transform: none; }
@@ -363,14 +291,10 @@
   .lea-gradient-text, .lea-glow-border::before, .lea-live-dot::after { animation: none !important; }
 }
 
-:root[data-theme="high-contrast"] .lea-ambient,
 :root[data-theme="high-contrast"] .lea-btn--primary::after,
 :root[data-theme="high-contrast"] .lea-glow-border::before { display: none; }
 :root[data-theme="high-contrast"] :is(.card-interactive, .notebook-studio-card, .notebook-note-card, [data-spotlight]):hover:not(:disabled) {
   background-image: none;
-}
-:root[data-theme="high-contrast"] .Leanna-shell {
-  background-color: var(--ide-shell-bg) !important;
 }
 :root[data-theme="high-contrast"] .lea-gradient-text {
   background: none;

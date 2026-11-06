@@ -211,18 +211,24 @@ export default function GitHubView() {
 
   // ─── Loading / No repo state ──────────────────────────────────────────
 
+  // États de détection / absence de repo : même en-tête que la page chargée.
   if (detecting) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3" style={{ backgroundColor: 'var(--bg-base)' }}>
-        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Détection du repo GitHub…</p>
+      <div className="flex h-full flex-col">
+        <ViewHeader icon={Github} title="GitHub" description="Détection du dépôt du workspace…" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Détection du repo GitHub…</p>
+        </div>
       </div>
     );
   }
 
   if (noRepo || !repoInfo) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+      <div className="flex h-full flex-col">
+      <ViewHeader icon={Github} title="GitHub" description="Commits, issues et pull requests du dépôt courant" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center"
           style={{ backgroundColor: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}
@@ -244,13 +250,14 @@ export default function GitHubView() {
           <RefreshCw size={14} /> Réessayer
         </button>
       </div>
+      </div>
     );
   }
 
   // ─── Main render ──────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ─────────────────────────────────────────── */}
       <ViewHeader
         icon={Github}

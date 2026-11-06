@@ -1,71 +1,49 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { AgentStatusPill } from '../AgentStatusBar.js';
 
 interface ViewHeaderProps {
   /** Main title of the view */
   title: string;
   /** Lucide icon component */
   icon: LucideIcon;
-  /** Short description below the title */
+  /** Short description, inline after the title (hidden on narrow windows) */
   description?: string;
   /** Badge text next to the title */
   badge?: string;
   /** Actions rendered on the right side */
   actions?: React.ReactNode;
+  /** Agent status pill (what Leanna is doing now). Default: shown. */
+  showStatus?: boolean;
 }
 
 /**
- * Unified header component for all views.
- * Ensures consistent design across the entire app.
+ * En-tête unifié de toutes les pages (styles : .lea-header, styles/glass.css §6).
+ *
+ * Une seule ligne de hauteur fixe (--header-h) : icône · titre · badge ·
+ * description | état agent · actions. La description est en ligne plutôt que
+ * sur une seconde ligne, et l'état agent (ex-barre pleine largeur) vit ici.
  */
-export function ViewHeader({ title, icon: Icon, description, badge, actions }: ViewHeaderProps) {
+export function ViewHeader({ title, icon: Icon, description, badge, actions, showStatus = true }: ViewHeaderProps) {
   return (
-    <header
-      className="flex min-h-[68px] flex-shrink-0 items-center gap-3 border-b px-4 py-3 sm:gap-4 sm:px-5 lg:px-7"
-      style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
-    >
-      {/* Left — Icon + Title + Badge + Description */}
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
-        <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: 'var(--accent-subtle)' }}
-        >
-          <Icon aria-hidden="true" className="h-4 w-4" style={{ color: 'var(--accent-secondary)' }} />
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1
-              className="truncate text-sm font-semibold tracking-tight sm:text-[15px]"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {title}
-            </h1>
-            {badge && (
-              <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium leading-none whitespace-nowrap"
-                style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-secondary)' }}
-              >
-                {badge}
-              </span>
-            )}
-          </div>
-          {description && (
-            <p
-              className="mt-0.5 truncate text-xs"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {description}
-            </p>
-          )}
-        </div>
+    <header className="lea-header">
+      <div className="lea-header__icon">
+        <Icon aria-hidden="true" size={15} />
       </div>
 
-      {/* Right — Actions */}
+      <div className="lea-header__main">
+        <h1 className="lea-header__title">{title}</h1>
+        {badge && <span className="lea-header__badge self-center">{badge}</span>}
+        {description && <p className="lea-header__desc min-w-0">{description}</p>}
+      </div>
+
+      {showStatus && <AgentStatusPill />}
+
       {actions && (
-        <div className="flex max-w-[55%] flex-shrink-0 items-center justify-end gap-1.5 sm:max-w-none sm:gap-2">
-          {actions}
-        </div>
+        <>
+          {showStatus && <span className="lea-header__sep" aria-hidden />}
+          <div className="lea-header__actions">{actions}</div>
+        </>
       )}
     </header>
   );

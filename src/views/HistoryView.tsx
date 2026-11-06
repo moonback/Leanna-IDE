@@ -142,7 +142,7 @@ export default function HistoryView() {
   }, [conversations.length, confirm, success, toastError]);
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--notebook-canvas, var(--bg-base))' }}>
+    <div className="h-full flex flex-col">
       {/* Header */}
       <ViewHeader
         {...viewHeaderProps('history')}

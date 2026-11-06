@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code2 } from 'lucide-react';
-import { ViewHeader } from '../components/ui/ViewHeader.js';
 // Monaco Editor - lazy loaded to reduce initial bundle
 // Pass the bundled monaco instance directly to avoid CDN loader (fixes CSP violations)
 const MonacoEditor = lazy(() =>
@@ -922,7 +920,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="Leanna-shell flex h-full" style={{ backgroundColor: 'var(--ide-shell-bg)', color: 'var(--text-primary)', width: showChat && chatFullscreen ? '50vw' : showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+    <div className="Leanna-shell flex h-full" style={{ color: 'var(--text-primary)', width: showChat && chatFullscreen ? '50vw' : showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
 
       {/* Sidebar — nouvelle GlobalSidebar en mode IDE (outils-panneaux) */}
       <GlobalSidebar
@@ -1060,12 +1058,8 @@ export default function IdeView() {
 
       {/* Editor Area */}
       <div className="Leanna-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
-        <ViewHeader
-          title={activeFile?.name || 'Espace de développement'}
-          icon={Code2}
-          description={activeFile?.path || 'Workspace de développement Leanna'}
-          badge={connected ? 'IA connectée' : 'IA déconnectée'}
-        />
+        {/* Pas de <ViewHeader> ici : nom/chemin du fichier sont déjà dans les
+            onglets et la barre d'état, l'état IA dans le rail. */}
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
         {!showSandbox && !showHistory && !showAutomation && !showMemory && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs

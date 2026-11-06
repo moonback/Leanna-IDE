@@ -85,7 +85,6 @@ export default function MemoriesView() {
   return (
     <div
       className="h-full flex flex-col"
-      style={{ backgroundColor: 'var(--bg-base)' }}
     >
       {/* Header */}
       <ViewHeader

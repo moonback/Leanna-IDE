@@ -161,7 +161,7 @@ export default function DocumentsView() {
   const [activeTab, setActiveTab] = useState<Tab>('stats');
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="h-full flex flex-col">
       {/* Header */}
       <ViewHeader
         {...viewHeaderProps('documents')}
@@ -172,7 +172,7 @@ export default function DocumentsView() {
       {/* Tabs */}
       <div
         className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b lg:px-7"
-        style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
+        style={{ borderColor: 'var(--border-base)' }}
       >
         {([
           { key: 'stats' as Tab, icon: BarChart3, label: 'Tableau de bord' },

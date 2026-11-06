@@ -158,7 +158,7 @@ export default function MissionControlView({ embedded = false }: { embedded?: bo
   }, [confirm, health]);
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-col">
       {!embedded && (
         <ViewHeader
           {...viewHeaderProps('mission-control')}

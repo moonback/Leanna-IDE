@@ -26,10 +26,8 @@ import { installIdeRemoteForwarder, installIdeRemoteReceiver } from './lib/ideRe
 import { Loader2, X } from 'lucide-react';
 import { GlobalSidebar } from './components/GlobalSidebar.js';
 import { ROUTES } from './config/navigation.js';
-import { AgentStatusBar } from './components/AgentStatusBar.js';
 import { GlobalCommandPalette } from './components/GlobalCommandPalette.js';
 import { ConnectionBanner } from './components/ui/ConnectionBanner.js';
-import { AmbientBackdrop } from './components/ui/AmbientBackdrop.js';
 import { RouteProgress } from './components/ui/RouteProgress.js';
 import { usePointerSpotlight } from './hooks/usePointerSpotlight.js';
 import { pageVariants } from './lib/motion.js';
@@ -470,7 +468,7 @@ function ScreenShareSourcePicker() {
 
 function LoadingFallback() {
   return (
-    <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div className="flex h-full flex-1 items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Chargement…</span>
@@ -495,12 +493,8 @@ function NavSidebar() {
   return <GlobalSidebar />;
 }
 
-/** Persistent agent status strip — hidden on the IDE (it has its own StatusBar). */
-function GlobalAgentStatusBar() {
-  const { pathname } = useLocation();
-  if (pathname === '/' || pathname === '/ide') return null;
-  return <AgentStatusBar />;
-}
+/* L'état agent n'est plus une barre pleine largeur : c'est une pastille dans
+   l'en-tête unifié (<ViewHeader> → <AgentStatusPill>). */
 
 // ── Animated route transitions (Phase 3.5) ─────────────────────────────────
 function AnimatedRoutes() {
@@ -724,14 +718,12 @@ function Layout() {
         onScreenShareChange={handleScreenShareChange}
       >
         <div className="app-layout">
-          <AmbientBackdrop />
           <RouteProgress />
           <a className="skip-navigation-link" href="#main-content">Passer la navigation</a>
           <NavSidebar />
           <main id="main-content" className="app-content" tabIndex={-1}>
             <IdeNavigationBridge />
             <ConnectionBanner />
-            <GlobalAgentStatusBar />
             <AnimatedRoutes />
           </main>
         </div>

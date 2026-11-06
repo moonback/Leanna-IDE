@@ -3,6 +3,7 @@
 @import "./styles/pro-polish.css";
 @import "./styles/motion-pro.css";
 @import "./styles/workspace-pro.css";
+@import "./styles/glass.css";
 @theme {
   /* Typography */
 --font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -140,13 +141,15 @@
 :root[data-theme="dark"] {
   /* Surfaces — neutral near-black, aligned with the sober IDE shell (#09090b).
      No more navy tint: a calm, modern base that lets accent colours breathe. */
-  --bg-base:       #0a0a0c;
-  --bg-secondary:  #121216;
-  --bg-panel:      rgba(20, 20, 26, 0.95);
+  /* Full Glass : légèrement relevées pour que cartes et panneaux se lisent
+     un cran AU-DESSUS de la scène vitrée (--glass-stage, styles/glass.css). */
+  --bg-base:       #0e0f14;  /* « puits » (champs, zones encastrées) ; le fond de page est --atmo-base */
+  --bg-secondary:  #15161d;
+  --bg-panel:      rgba(27, 28, 37, 0.94);
   --bg-ctrl:       rgba(16, 16, 21, 0.95);
   --bg-sidebar:    rgba(10, 10, 12, 0.98);
   --bg-input:      rgba(38, 38, 46, 0.55);
-  --bg-elevated:   #17171d;
+  --bg-elevated:   #1c1d25;
   /* Interactive surface overlays (hover / active) — theme-aware, replaces
      the hardcoded `bg-white/N` overlays that broke on light themes. */
   --bg-hover:      rgba(255, 255, 255, 0.06);
@@ -246,7 +249,7 @@
 
   /* Surfaces — clean whites with warmth */
   --bg-base:       #ffffff;
-  --bg-secondary:  #eceef3;
+  --bg-secondary:  #f3f5f9;
   --bg-panel:      rgba(255, 255, 255, 0.92);
   --bg-ctrl:       rgba(255, 255, 255, 0.98);
   --bg-sidebar:    rgba(249, 250, 252, 0.98);
@@ -1162,32 +1165,7 @@ button {
 /* ═══════════════════════════════════════════════
    PAGE LAYOUT (with sidebar)
 ═══════════════════════════════════════════════ */
-.app-layout {
-  display: flex;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--bg-base);
-}
-.app-content {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  position: relative;
-  background: transparent;
-}
-
-/* Shared page frame: every route inherits the same workspace surface and sizing.
-   Individual modules may still provide their own contextual sub-navigation. */
-.app-route-frame {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  color: var(--text-primary);
-  background: var(--bg-base);
-  isolation: isolate;
-}
+/* .app-layout / .app-content / .app-route-frame : voir styles/glass.css §3–4. */
 .app-content > main,
 .app-content > section {
   max-width: var(--premium-content-max);
@@ -1208,19 +1186,7 @@ button {
 /* ═══════════════════════════════════════════════
    GLASS MORPHISM UTILITY
 ═══════════════════════════════════════════════ */
-.glass {
-  background: color-mix(in srgb, var(--glass-bg) 88%, var(--bg-panel));
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-}
-.glass-strong {
-  background: color-mix(in srgb, var(--glass-bg) 94%, var(--bg-panel));
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid var(--border-base);
-  box-shadow: var(--shadow-sm);
-}
+/* .glass / .glass-strong : redéfinies par niveaux dans styles/glass.css §7. */
 
 
 
@@ -2828,15 +2794,7 @@ button {
   --ide-sidebar-item-bg: #0d0d0d;
   --ide-shell-border: #ffffff;
 }
-.Leanna-shell {
-  background:
-    radial-gradient(circle at 50% -18%, color-mix(in srgb, var(--accent-primary) 4%, transparent), transparent 28rem),
-    var(--ide-shell-bg);
-}
-.Leanna-workspace {
-  background: var(--ide-panel-bg);
-  border-color: var(--ide-shell-border);
-}
+/* .Leanna-shell / .Leanna-workspace : vitres du shell IDE, voir styles/glass.css §8. */
 .Leanna-sidebar button:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
@@ -2897,7 +2855,6 @@ button {
   --premium-divider: #ffffff;
 }
 
-:root[data-theme="high-contrast"] .Leanna-shell,
 :root[data-theme="high-contrast"] body {
   background: var(--bg-base);
 }
@@ -2942,27 +2899,4 @@ button {
 }
 
 
-/* Sidebar redesign v2 — restrained workspace navigation */
-.lea-sidebar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 3%, var(--bg-secondary)) 0%, var(--bg-secondary) 180px) !important;
-  border-right-color: color-mix(in srgb, var(--border-base) 82%, transparent) !important;
-}
-.lea-sidebar__search {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--bg-input) 78%, transparent);
-  border: 1px solid var(--border-base);
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-.lea-sidebar__search:focus-within {
-  color: var(--accent-primary);
-  border-color: color-mix(in srgb, var(--accent-primary) 58%, var(--border-base));
-  background: var(--bg-panel);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
-}
-.lea-sidebar__search input { color: var(--text-primary); }
-.lea-sidebar [data-nav-item] { min-height: 40px; border-radius: 9px; }
-.lea-sidebar [data-nav-item][aria-current="page"] { font-weight: 600; }
-@media (max-width: 768px) {
-  .lea-sidebar { width: min(88vw, 320px) !important; }
-}
-@media (prefers-reduced-motion: reduce) { .lea-sidebar__search { transition: none; } }
+/* Rail de navigation (.lea-sidebar*) : voir styles/glass.css §5. */
