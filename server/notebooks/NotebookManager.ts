@@ -155,7 +155,7 @@ export class NotebookManager {
   private flushNotebook(notebook: Notebook): boolean {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(notebook.id)) {
       log.warn("Persistence refusée : identifiant de notebook invalide.");
-      return;
+      return false;
     }
     ensureDataDir();
     const filePath = getNotebookPath(notebook.id);
