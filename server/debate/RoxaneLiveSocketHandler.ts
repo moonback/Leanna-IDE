@@ -22,6 +22,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     let roxane: any = null;
     let closed = false;
     let started = false;
+    let finished = false;
     let active: 'leanna' | 'roxane' = 'leanna';
     let rounds = 0;
     let currentText = '';
@@ -117,7 +118,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                     turns: [{ role: 'user', parts: [{ text: `Leanna vient de dire : ${completed || '(réponse vocale sans transcription)'}\nRéponds directement à son argument, puis donne ton avis à l'utilisateur.` }] }],
                     turnComplete: true,
                   });
-                } else send({ type: 'debate_complete', turns: transcript });
+                } else { finished = true; send({ type: 'debate_complete', turns: transcript }); }
               } else {
                 lastRoxaneText = completed;
                 transcript.push({ speaker: 'roxane', text: completed, round: rounds + 1 });
@@ -130,6 +131,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                     turnComplete: true,
                   });
                 } else {
+                  finished = true;
                   send({ type: 'debate_complete', lastLeannaText, lastRoxaneText, turns: transcript });
                 }
               }
@@ -200,6 +202,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     client.on('message', (raw, isBinary) => {
       if (isBinary) {
+        if (finished) return;
         const target = active === 'leanna' ? leanna : roxane;
         if (target && !closed) {
           try {
@@ -220,7 +223,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
         closeSessions();
         return;
       }
-      if (message.type === 'user_interjection' && typeof message.text === 'string' && message.text.trim()) {
+      if (message.type === 'user_interjection' && !finished && typeof message.text === 'string' && message.text.trim()) {
         const text = message.text.trim().slice(0, 3000);
         if (transcript.length < 32) transcript.push({ speaker: 'user', text, round: rounds + 1 });
         send({ type: 'user_interjection', text });
