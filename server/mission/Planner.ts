@@ -146,7 +146,16 @@ export class Planner {
     const durableFailing = this.durableFailingSkillNames(availableSkills);
     const toExclude = new Set<string>([...durableFailing, failedAction.skillName]);
     const filtered = availableSkills.filter((s) => !toExclude.has(s));
-    const filteredSkills = filtered.length > 0 ? filtered : availableSkills;
+    // Si toutes les options ont été écartées, ne réintroduire qu'un seul
+    // fallback non durablement défaillant (même s'il vient d'échouer ici).
+    // Si tous les outils sont durablement défaillants, conserver une seule
+    // option plutôt que de rendre le plan impossible.
+    const nonDurableFallback = availableSkills.filter((s) => !durableFailing.includes(s));
+    const filteredSkills = filtered.length > 0
+      ? filtered
+      : nonDurableFallback.length > 0
+        ? [nonDurableFallback[0]]
+        : availableSkills.slice(0, 1);
 
     // Ajouter une hypothèse corrective
     mission.addHypothesis(
