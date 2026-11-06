@@ -756,7 +756,7 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 
 - Validation commune du corps, du Markdown non vide, de la limite de 2 Mio, des titres et noms de fichiers (longueur et caractères de contrôle).
 - Normalisation Unicode des noms de téléchargement, suppression des caractères spéciaux et génération d'un en-tête Content-Disposition avec nom ASCII de repli et paramètre UTF-8.
-- Rejet explicite des thèmes et formats inconnus ; validation stricte de l'identifiant notebook avant accès au gestionnaire.
+- Rejet explicite des thèmes et formats inconnus ; validation stricte de l'identifiant notebook avant accès au gestionnaire. L'alias historique `docx` reste accepté en entrée pour compatibilité, mais produit explicitement un fichier Word HTML `.doc`.
 - Limitation de la taille du contenu assemblé à partir d'un notebook.
 - Échappement des blocs HTML bruts du Markdown dans les exporteurs HTML et Word ; les éléments Markdown structurés restent convertis normalement.
 - Messages d'erreur serveur stabilisés et absence de détails internes renvoyés au client.
