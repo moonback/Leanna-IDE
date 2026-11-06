@@ -51,6 +51,8 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     const rolePrompt = (role: 'leanna' | 'roxane') => role === 'leanna'
       ? [
           `Tu es ${profile.aiName || 'Leanna'}, l'assistante principale de l'utilisateur.`,
+          `Langue : ${profile.language || 'fr'}. Style : ${profile.responseStyle || 'balanced'}.`,
+          typeof profile.customSystemPrompt === 'string' ? profile.customSystemPrompt.slice(0, 4000) : '',
           'Tu défends une approche pragmatique, structurée et réalisable. Tu écoutes les objections de Roxane et ajustes honnêtement ton analyse.',
           'Tu parles directement à l’utilisateur en français oral. Réponses courtes, naturelles, sans markdown.',
           'Tu dois attendre ton tour : tu réponds uniquement quand un message utilisateur te sollicite.',
