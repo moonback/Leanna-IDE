@@ -14,7 +14,7 @@
 import type { PlannedAction, MissionPlan } from "./types.js";
 import type { SkillScorer } from "./SkillScorer.js";
 import { telemetryService } from "../observability/TelemetryService.js";
-import { getActiveProvider } from "../utils/textGeneration.js";
+import { getActiveModel } from "../utils/textGeneration.js";
 
 // ─── Constantes de tarification ───────────────────────────────────────────────
 
@@ -23,11 +23,6 @@ const ESTIMATED_INPUT_TOKENS_PER_CALL = 1_800;
 
 /** Tokens supplémentaires pour la planification elle-même (analyse + décomposition LLM). */
 const PLANNING_OVERHEAD_TOKENS = 2_400;
-
-/** Modèle utilisé par défaut si le provider actif est Gemini. */
-const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
-/** Modèle utilisé par défaut si le provider actif est OpenRouter. */
-const DEFAULT_OPENROUTER_MODEL = "google/gemini-3.6-flash";
 
 // ─── Seuils de niveau de risque ───────────────────────────────────────────────
 
@@ -131,9 +126,7 @@ export class PlanEstimator {
 
   /** Calcule le coût USD en utilisant la tarification réelle du modèle actif. */
   private toCost(inputTokens: number, outputTokens: number): number {
-    const provider = getActiveProvider();
-    const model = provider === "gemini" ? DEFAULT_GEMINI_MODEL : DEFAULT_OPENROUTER_MODEL;
-    return telemetryService.calculateCost(model, inputTokens, outputTokens);
+    return telemetryService.calculateCost(getActiveModel(), inputTokens, outputTokens);
   }
 
   // ─── Durée ─────────────────────────────────────────────────────────────────
