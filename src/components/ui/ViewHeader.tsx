@@ -45,7 +45,7 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions, sho
       {actions && (
         <>
           {showStatus && <span className="lea-header__sep" aria-hidden="true" />}
-          <div className="lea-header__actions" role="toolbar" aria-label={`Actions de ${title}`}>
+          <div className="lea-header__actions" role="group" aria-label={`Actions de ${title}`}>
             {actions}
           </div>
         </>
