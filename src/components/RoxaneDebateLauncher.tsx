@@ -14,6 +14,8 @@ export function RoxaneDebateLauncher() {
   const [liveStatus, setLiveStatus] = useState('idle');
   const [liveTurns, setLiveTurns] = useState<Turn[]>([]);
   const [interjection, setInterjection] = useState('');
+  const [approvedTasks, setApprovedTasks] = useState('');
+  const [missionStatus, setMissionStatus] = useState('');
   const liveSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioScheduleRef = useRef(0);
@@ -56,7 +58,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const run = async () => {
-    setError(''); setLiveTurns([]); setBusy(true); setLiveStatus('connecting');
+    setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setBusy(true); setLiveStatus('connecting');
     try {
       const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(`${scheme}//${window.location.host}/roxane-live`);
@@ -109,6 +111,22 @@ export function RoxaneDebateLauncher() {
     }
   };
 
+  const createApprovedMissions = async () => {
+    const tasks = approvedTasks.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean).slice(0, 5)
+      .map(title => ({ title: title.slice(0, 160), description: title, priority: 'medium' }));
+    if (tasks.length === 0) { setMissionStatus('Ajoute au moins une tâche, une par ligne.'); return; }
+    setMissionStatus('Création des missions…');
+    try {
+      const response = await fetch('/api/debate/decisions/create-missions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved: true, tasks }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Création impossible');
+      setMissionStatus(`${data.created?.length || 0} mission(s) créée(s). ${data.failed?.length ? `${data.failed.length} échec(s).` : ''}`);
+    } catch (e) { setMissionStatus(e instanceof Error ? e.message : 'Erreur lors de la création'); }
+  };
+
   const stopLive = () => {
     if (liveSocketRef.current?.readyState === WebSocket.OPEN) liveSocketRef.current.send(JSON.stringify({ type: 'interrupt' }));
     liveSocketRef.current?.close(); liveSocketRef.current = null;
@@ -138,6 +156,12 @@ export function RoxaneDebateLauncher() {
               <div className="mb-2 text-xs font-bold" style={{ color: turn.speaker === 'roxane' ? '#a78bfa' : turn.speaker === 'user' ? '#10b981' : '#38bdf8' }}>{turn.speaker === 'roxane' ? 'ROXANE' : turn.speaker === 'user' ? 'TOI' : 'LEANNA'}</div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.text}</p>
             </article>)}
+            {liveStatus === 'complete' && <div className="space-y-2 rounded-xl border p-4" style={{ borderColor: 'rgba(16,185,129,.35)' }}>
+              <h4 className="text-sm font-semibold">Valider des tâches dans Mission System</h4>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Relis les échanges, puis saisis les tâches que tu approuves, une par ligne. Rien n’est créé sans ce clic explicite.</p>
+              <textarea value={approvedTasks} onChange={e => setApprovedTasks(e.target.value)} placeholder="Ex. : Auditer les dépendances du module vocal&#10;Ajouter les tests d'interruption audio" className="min-h-20 w-full rounded-xl border p-3 text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/>
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{missionStatus}</span><button onClick={createApprovedMissions} disabled={!approvedTasks.trim()} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#059669' }}>Approuver et créer les missions</button></div>
+            </div>}
             {liveStatus !== 'complete' && liveStatus !== 'interrupted' && <div className="flex gap-2"><input value={interjection} onChange={e => setInterjection(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendInterjection(); }} placeholder="Interromps et donne ton avis…" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/><button onClick={sendInterjection} disabled={!interjection.trim()} className="rounded-xl px-3 py-2 text-white" style={{ background: '#7650c9' }}><Send className="h-4 w-4"/></button></div>}
           </section>}
 
