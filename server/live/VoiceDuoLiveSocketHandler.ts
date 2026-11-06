@@ -132,7 +132,6 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
               chainActive = false;
               advancing = false;
               send({ type: "interrupted", speaker });
-              return;
             }
             const inputText = (content as any)?.inputTranscription?.text;
             if (typeof inputText === "string" && inputText.trim()) {
