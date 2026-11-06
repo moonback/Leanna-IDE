@@ -84,6 +84,9 @@ const NAV_GROUPS = [
 
 const SECURE_ITEMS = new Set(['selfroot-settings', 'safeguards-settings', 'env-settings']);
 const LAST_SECTION_KEY = 'Leanna-settings-last-section';
+const VALID_SECTION_IDS = new Set(NAV_GROUPS.flatMap(group => group.items.map(item => item.id)));
+const DEFAULT_SECTION = 'profile-settings';
+const isValidSection = (id: string | null | undefined): id is string => Boolean(id && VALID_SECTION_IDS.has(id));
 
 function getActiveLabel(id: string) {
   for (const g of NAV_GROUPS) {
@@ -125,20 +128,31 @@ export default function SettingsView() {
   // Section initiale : URL > dernière section mémorisée > profil.
   const [activeSection, setActiveSection] = useState(() => {
     const fromUrl = searchParams.get('section');
-    if (fromUrl) return fromUrl;
+    if (isValidSection(fromUrl)) return fromUrl;
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(LAST_SECTION_KEY);
-      if (stored) return stored;
+      if (isValidSection(stored)) return stored;
     }
-    return 'profile-settings';
+    return DEFAULT_SECTION;
   });
   const [searchQuery, setSearchQuery] = useState('');
 
   // Suit les changements d'URL (navigation router-aware).
   useEffect(() => {
     const sec = searchParams.get('section');
-    if (sec && sec !== activeSection) setActiveSection(sec);
-  }, [searchParams, activeSection]);
+    if (isValidSection(sec)) {
+      if (sec !== activeSection) setActiveSection(sec);
+      return;
+    }
+    if (sec !== null) {
+      // Une URL périmée ne doit jamais laisser la zone de réglages vide.
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('section', activeSection);
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, activeSection, setSearchParams]);
 
   // Change de section : met à jour l'état, l'URL et la mémoire locale.
   const selectSection = useCallback((id: string) => {
