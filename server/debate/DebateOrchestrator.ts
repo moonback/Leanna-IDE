@@ -107,3 +107,58 @@ export async function runDebate(profile: Profile, request: DebateRunRequest) {
     config: { leannaModel: firstLeanna.model, roxaneModel: firstRoxane.model, roxaneProvider: config.provider },
   };
 }
+
+export interface DebateSynthesis {
+  recommendation: string;
+  agreements: string[];
+  disagreements: string[];
+  decisions: string[];
+  tasks: Array<{ title: string; description: string; priority: 'low' | 'medium' | 'high' | 'critical' }>;
+}
+
+export async function synthesizeLiveDebate(
+  profile: Profile,
+  topic: string,
+  turns: Array<{ speaker: 'leanna' | 'roxane' | 'user'; text: string }>,
+): Promise<DebateSynthesis> {
+  const config = normalizeRoxaneConfig(profile.roxane ?? DEFAULT_ROXANE_CONFIG);
+  const transcript = turns.slice(0, 32).map(turn =>
+    `${turn.speaker.toUpperCase()} : ${String(turn.text).slice(0, 5000)}`
+  ).join('\\n\\n');
+  const prompt = `Analyse le débat vocal ci-dessous et retourne UNIQUEMENT un objet JSON valide, sans markdown, avec exactement cette structure :
+{
+  "recommendation": "synthèse courte et équilibrée",
+  "agreements": ["points réellement partagés"],
+  "disagreements": ["désaccords qui restent ouverts"],
+  "decisions": ["décisions que l'utilisateur a explicitement prises; tableau vide si aucune"],
+  "tasks": [{"title":"titre actionnable","description":"description concrète et vérifiable","priority":"low|medium|high|critical"}]
+}
+N'invente aucune décision de l'utilisateur. Les suggestions des IA ne sont pas des décisions approuvées. Ne propose que 3 à 5 tâches utiles, directement liées au débat. Si aucune tâche n'est justifiée, retourne un tableau vide.
+SUJET : ${topic.slice(0, 3000)}
+TRANSCRIPTION :
+${transcript}`;
+  const result = await ask(
+    'leanna',
+    prompt,
+    leannaPrompt(profile) + '\\nTu synthétises avec neutralité et tu distingues strictement les propositions des décisions humaines.',
+    profile,
+    config,
+  );
+  const cleaned = result.text.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');
+  const parsed = JSON.parse(cleaned) as Partial<DebateSynthesis>;
+  const priorities = ['low', 'medium', 'high', 'critical'];
+  return {
+    recommendation: typeof parsed.recommendation === 'string' ? parsed.recommendation.slice(0, 4000) : '',
+    agreements: Array.isArray(parsed.agreements) ? parsed.agreements.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
+    disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
+    decisions: Array.isArray(parsed.decisions) ? parsed.decisions.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
+    tasks: Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, 5).flatMap(task => {
+      if (!task || typeof task.title !== 'string' || typeof task.description !== 'string') return [];
+      return [{
+        title: task.title.trim().slice(0, 160),
+        description: task.description.trim().slice(0, 4000),
+        priority: priorities.includes(task.priority as string) ? task.priority as DebateSynthesis['tasks'][number]['priority'] : 'medium',
+      }];
+    }) : [],
+  };
+}
