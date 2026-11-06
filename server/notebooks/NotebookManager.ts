@@ -107,6 +107,8 @@ export class NotebookManager {
   private persistTimers: Map<string, NodeJS.Timeout> = new Map();
   /** Empêche deux reprises concurrentes d'écrire un statut d'indexation obsolète. */
   private sourceIndexRuns: Map<string, number> = new Map();
+  /** Une seule indexation active par couple notebook/source (single-flight). */
+  private sourceIndexInFlight: Map<string, Promise<void>> = new Map();
   private sourceIndexRetryTimers: Map<string, NodeJS.Timeout> = new Map();
   private static readonly MAX_SOURCE_INDEX_ATTEMPTS = 5;
   private static readonly SOURCE_INDEX_RETRY_BASE_MS = 5_000;
@@ -403,7 +405,19 @@ export class NotebookManager {
    * Indexe une source et persiste son état. Une opération interrompue reste
    * marquée pending ; elle pourra être reprise au prochain démarrage.
    */
-  private async indexSourceChunks(notebookId: string, sourceId: string): Promise<void> {
+  private indexSourceChunks(notebookId: string, sourceId: string): Promise<void> {
+    const runKey = `${notebookId}:${sourceId}`;
+    const inFlight = this.sourceIndexInFlight.get(runKey);
+    if (inFlight) return inFlight;
+    const run = this.performSourceIndexChunks(notebookId, sourceId);
+    this.sourceIndexInFlight.set(runKey, run);
+    void run.finally(() => {
+      if (this.sourceIndexInFlight.get(runKey) === run) this.sourceIndexInFlight.delete(runKey);
+    });
+    return run;
+  }
+
+  private async performSourceIndexChunks(notebookId: string, sourceId: string): Promise<void> {
     const notebook = this.notebooks.get(notebookId);
     const source = notebook?.sources.find(item => item.id === sourceId);
     if (!notebook || !source) return;
@@ -417,8 +431,9 @@ export class NotebookManager {
     const runId = (this.sourceIndexRuns.get(runKey) ?? 0) + 1;
     this.sourceIndexRuns.set(runKey, runId);
     const expectedContentHash = source.contentHash;
-
-    source.indexingAttempts = (source.indexingAttempts ?? 0) + 1;
+    const startedAt = Date.now();
+    const attempt = (source.indexingAttempts ?? 0) + 1;
+    source.indexingAttempts = attempt;
     source.indexingStatus = "pending";
     source.indexingError = undefined;
     source.indexingNextRetryAt = undefined;
@@ -443,6 +458,11 @@ export class NotebookManager {
       }
 
       const complete = indexed >= source.chunks.length;
+      this.appendSourceIndexHistory(source, {
+        attempt, at: new Date().toISOString(), outcome: complete ? "indexed" : "partial",
+        category: complete ? "none" : "transient", durationMs: Date.now() - startedAt,
+        message: complete ? undefined : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`,
+      });
       source.indexingStatus = complete ? "indexed" : "partial";
       source.indexingError = complete
         ? undefined
@@ -456,13 +476,36 @@ export class NotebookManager {
         || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
         return;
       }
+      const errorMessage = String(error?.message || error).slice(0, 500);
+      const category = this.classifySourceIndexError(error);
+      this.appendSourceIndexHistory(source, {
+        attempt, at: new Date().toISOString(), outcome: "failed", category,
+        durationMs: Date.now() - startedAt, message: errorMessage,
+      });
       source.indexingStatus = "failed";
-      source.indexingError = String(error?.message || error).slice(0, 500);
+      source.indexingError = errorMessage;
       source.indexingUpdatedAt = new Date().toISOString();
-      this.scheduleSourceIndexRetry(notebookId, source);
+      if (category === "transient") this.scheduleSourceIndexRetry(notebookId, source);
+      else source.indexingNextRetryAt = undefined;
       this.flushNotebook(notebook);
       log.warn(`Indexation échouée pour source ${sourceId}: ${source.indexingError}`);
     }
+  }
+
+  private appendSourceIndexHistory(source: Source, entry: NonNullable<Source["indexingHistory"]>[number]): void {
+    source.indexingHistory = [...(source.indexingHistory ?? []), entry].slice(-10);
+  }
+
+  /** Les erreurs de configuration/données ne doivent pas consommer des retries réseau. */
+  private classifySourceIndexError(error: unknown): "transient" | "permanent" {
+    const value = error as { code?: string; status?: number; statusCode?: number; message?: string };
+    const status = Number(value?.status ?? value?.statusCode);
+    const code = String(value?.code ?? "").toUpperCase();
+    const message = String(value?.message ?? error).toLowerCase();
+    if (["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "EPIPE"].includes(code)) return "transient";
+    if (status === 408 || status === 425 || status === 429 || status >= 500) return "transient";
+    if (/timeout|timed out|rate.?limit|temporar|network|socket|unavailable|overloaded|fetch failed/.test(message)) return "transient";
+    return "permanent";
   }
 
   private scheduleSourceIndexRetry(notebookId: string, source: Source): void {
@@ -498,7 +541,7 @@ export class NotebookManager {
     partial: number;
     failed: number;
     attempts: number;
-    sources: Array<Pick<Source, "id" | "title" | "type" | "indexingStatus" | "indexingError" | "indexingUpdatedAt" | "indexingAttempts" | "indexingNextRetryAt">>;
+    sources: Array<Pick<Source, "id" | "title" | "type" | "indexingStatus" | "indexingError" | "indexingUpdatedAt" | "indexingAttempts" | "indexingNextRetryAt" | "indexingHistory">>;
   } | undefined {
     const notebook = this.notebooks.get(notebookId);
     if (!notebook) return undefined;
@@ -511,6 +554,7 @@ export class NotebookManager {
       indexingUpdatedAt: source.indexingUpdatedAt,
       indexingAttempts: source.indexingAttempts ?? 0,
       indexingNextRetryAt: source.indexingNextRetryAt,
+      indexingHistory: source.indexingHistory ?? [],
     }));
     return {
       total: sources.length,
