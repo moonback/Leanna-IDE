@@ -35,6 +35,7 @@ test("replan drops a durably-failing tool while keeping at least one option", as
 
 
 test("replan excludes the just-failed skill immediately when an alternative exists", async () => {
+  const strategy = createTestStrategy();
   const planner = new Planner(new SkillScorer(), strategy);
   const mission = new Mission("t", "corriger le bug", "high", {
     ...DEFAULT_MISSION_CONFIG,
@@ -67,6 +68,7 @@ test("replan excludes the just-failed skill immediately when an alternative exis
 });
 
 test("replan never removes every tool (keeps availability if all are failing)", async () => {
+  const strategy = createTestStrategy();
   for (let i = 0; i < 5; i++) strategy.recordSkillOutcome("only_tool", false, 100);
 
   const planner = new Planner(new SkillScorer(), strategy);
