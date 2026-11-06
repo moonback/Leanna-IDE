@@ -194,11 +194,15 @@ export class ProcessingQueue<T = unknown> {
   /** Annule une tâche en attente */
   cancel(taskId: string): boolean {
     const index = this.queue.findIndex(t => t.id === taskId);
-    if (index !== -1) {
-      const task = this.queue[index];
+    if (index !== -1 || this.retrying.has(taskId)) {
+      const task = index !== -1 ? this.queue[index] : this.retrying.get(taskId)!;
+      const retryTimer = this.retryTimers.get(taskId);
+      if (retryTimer) clearTimeout(retryTimer);
+      this.retryTimers.delete(taskId);
+      this.retrying.delete(taskId);
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
-      this.queue.splice(index, 1);
+      if (index !== -1) this.queue.splice(index, 1);
       this.completed.push(task);
       this.persistPending();
       this.emit(taskId, task);
@@ -250,11 +254,16 @@ export class ProcessingQueue<T = unknown> {
         const delay = this.config.retryBaseDelayMs * Math.pow(2, task.attempts - 1);
 
         log.info(`🔄 Retry dans ${delay}ms...`);
-        setTimeout(() => {
+        this.retrying.set(task.id, task);
+        this.persistPending();
+        const retryTimer = setTimeout(() => {
+          this.retryTimers.delete(task.id);
+          this.retrying.delete(task.id);
           this.queue.unshift(task); // Remettre en tête
           this.persistPending();
           this.processNext();
         }, delay);
+        this.retryTimers.set(task.id, retryTimer);
       } else {
         task.status = "failed";
         task.error = e.message;
@@ -312,6 +321,7 @@ export class ProcessingQueue<T = unknown> {
   getTask(taskId: string): QueueTask<T> | undefined {
     return (
       this.queue.find(t => t.id === taskId) ??
+      this.retrying.get(taskId) ??
       this.processing.get(taskId) ??
       this.completed.find(t => t.id === taskId)
     );
@@ -338,7 +348,7 @@ export class ProcessingQueue<T = unknown> {
 
   /** Tâches en attente */
   getPending(): QueueTask<T>[] {
-    return [...this.queue];
+    return [...this.queue, ...this.retrying.values()];
   }
 
   // ─── Utilitaires ───────────────────────────────────────────────────────────
@@ -370,6 +380,16 @@ export class ProcessingQueue<T = unknown> {
     }
     this.completed.push(...this.queue);
     this.queue = [];
+    for (const [taskId, timer] of this.retryTimers) {
+      clearTimeout(timer);
+      this.retryTimers.delete(taskId);
+    }
+    for (const task of this.retrying.values()) {
+      task.status = "cancelled";
+      task.completedAt = new Date().toISOString();
+      this.completed.push(task);
+    }
+    this.retrying.clear();
     this.persistPending();
     this.trimCompleted();
     log.info("🧹 Queue vidée");
