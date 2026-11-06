@@ -161,7 +161,7 @@ ${transcript}`;
   const priorities = ['low', 'medium', 'high', 'critical'];
   return {
     recommendation: typeof parsed.recommendation === 'string' ? parsed.recommendation.slice(0, 4000) : '',
-    agreements: Array.isArray(parsed.agreements) ? parsed.agreements.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
+    agreements: Array.isArray(parsed.agreements) ? parsed.agreements.filter((v): v is string => typeof v === 'string').slice(0, 10).map(v => v.slice(0, 800)) : [],
     disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
     tasks: Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, 5).flatMap(task => {
