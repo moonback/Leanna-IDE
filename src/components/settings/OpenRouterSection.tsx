@@ -523,7 +523,7 @@ export function OpenRouterSection() {
                     </label>
                     <textarea
                       value={routing.candidates.join('\n')}
-                      onChange={event => updateRouting({ ...routing, candidates: event.target.value.split(/[\\n,;]+/).map(value => value.trim()).filter(Boolean).slice(0, 20) })}
+                      onChange={event => updateRouting({ ...routing, candidates: event.target.value.split(/[\n,;]+/).map(value => value.trim()).filter(Boolean).slice(0, 20) })}
                       rows={3}
                       spellCheck={false}
                       placeholder={'openai/gpt-4o-mini\nanthropic/claude-3.5-sonnet'}
