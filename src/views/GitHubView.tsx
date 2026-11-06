@@ -92,6 +92,7 @@ export default function GitHubView() {
   const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
   const [detecting, setDetecting] = useState(true);
   const [noRepo, setNoRepo] = useState(false);
+  const [detectionError, setDetectionError] = useState<string | null>(null);
 
   const [tab, setTab] = useState<Tab>('commits');
   const [loading, setLoading] = useState(false);
@@ -110,17 +111,19 @@ export default function GitHubView() {
   const detectRepo = useCallback(async () => {
     setDetecting(true);
     setNoRepo(false);
+    setDetectionError(null);
     setError(null);
     try {
       const res = await fetch('/api/github/current-repo');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.status === 'success' && data.owner && data.repo) {
         setRepoInfo({ owner: data.owner, repo: data.repo, full_name: data.full_name, remoteUrl: data.remoteUrl });
       } else {
         setNoRepo(true);
       }
-    } catch {
-      setNoRepo(true);
+    } catch (e) {
+      setDetectionError(e instanceof Error ? e.message : 'Erreur pendant la détection du dépôt.');
     } finally {
       setDetecting(false);
     }
@@ -138,8 +141,9 @@ export default function GitHubView() {
       const params = new URLSearchParams({ owner: repoInfo.owner, repo: repoInfo.repo });
       const res = await fetch(`/api/github/issues?${params}`);
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
-      setIssues(data.issues || []);
+      if (!res.ok || data.error) { setError(data.error || `HTTP ${res.status}`); return; }
+      if (!Array.isArray(data.issues)) throw new Error('Réponse GitHub invalide : liste des issues absente.');
+      setIssues(data.issues);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -155,8 +159,9 @@ export default function GitHubView() {
       const params = new URLSearchParams({ owner: repoInfo.owner, repo: repoInfo.repo });
       const res = await fetch(`/api/github/pulls?${params}`);
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
-      setPrs(data.pull_requests || []);
+      if (!res.ok || data.error) { setError(data.error || `HTTP ${res.status}`); return; }
+      if (!Array.isArray(data.pull_requests)) throw new Error('Réponse GitHub invalide : liste des pull requests absente.');
+      setPrs(data.pull_requests);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -170,8 +175,9 @@ export default function GitHubView() {
     try {
       const res = await fetch('/api/github/commits?limit=30');
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
-      setCommits(data.commits || []);
+      if (!res.ok || data.error) { setError(data.error || `HTTP ${res.status}`); return; }
+      if (!Array.isArray(data.commits)) throw new Error('Réponse GitHub invalide : liste des commits absente.');
+      setCommits(data.commits);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -184,7 +190,7 @@ export default function GitHubView() {
     try {
       const res = await fetch(`/api/github/commits/${hash}`);
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
+      if (!res.ok || data.error) { setError(data.error || `HTTP ${res.status}`); return; }
       setSelectedCommit(data);
     } catch (e: any) {
       setError(e.message);
@@ -219,6 +225,22 @@ export default function GitHubView() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
           <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Détection du repo GitHub…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (detectionError) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <ViewHeader icon={Github} title="GitHub" description="Impossible de vérifier le dépôt du workspace" />
+        <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <AlertCircle size={28} style={{ color: 'var(--color-error)' }} />
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>La détection GitHub a échoué</p>
+          <p className="max-w-md text-xs" style={{ color: 'var(--text-muted)' }}>{detectionError}</p>
+          <button type="button" onClick={detectRepo} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+            <RefreshCw size={14} /> Réessayer
+          </button>
         </div>
       </div>
     );
@@ -528,7 +550,14 @@ export default function GitHubView() {
                 <div
                   key={issue.number}
                   onClick={() => openExternal(issue.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      openExternal(issue.html_url);
+                    }
+                  }}
+                  tabIndex={0}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`Issue #${issue.number}: ${issue.title}`}
@@ -572,7 +601,14 @@ export default function GitHubView() {
                 <div
                   key={pr.number}
                   onClick={() => openExternal(pr.html_url)}
-                  className="flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] cursor-pointer"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      openExternal(pr.html_url);
+                    }
+                  }}
+                  tabIndex={0}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-[var(--bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
                   style={{ borderColor: 'var(--border-base)' }}
                   role="link"
                   aria-label={`PR #${pr.number}: ${pr.title}`}

@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Send } from 'lucide-react';
 import { useFileMention } from '../../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../../hooks/useSlashCommand.js';
@@ -43,6 +43,7 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const reduceMotion = !!useReducedMotion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -314,7 +315,7 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
                 >
                   <BreathingDots
                     color={isBusy ? 'var(--accent-primary)' : 'var(--color-success)'}
-                    reduceMotion={false}
+                    reduceMotion={reduceMotion}
                     size={4}
                   />
                   {isBusy ? 'En cours…' : isTyping ? 'Frappe…' : 'Connecté'}

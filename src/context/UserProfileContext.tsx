@@ -199,7 +199,9 @@ function syncProfileToServer(profile: UserProfile): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).then(() => undefined).catch(() => undefined);
+  }).then(response => {
+    if (!response.ok) throw new Error(`Profile sync failed: HTTP ${response.status}`);
+  });
 }
 
 interface ProfileContextValue {

@@ -16,6 +16,7 @@ import {
 } from '../../utils/templateVariables.js';
 import { useToast } from '../ui/Toast.js';
 import { useProfile } from '../../context/UserProfileContext.js';
+import { useOverlay } from '../../hooks/useOverlay.js';
 
 interface Props {
   isOpen: boolean;
@@ -44,6 +45,11 @@ export function TemplateSelectorModal({
 }: Props) {
   const { success } = useToast();
   const { profile } = useProfile();
+  const { containerRef, backdropProps } = useOverlay<HTMLDivElement>({
+    open: isOpen,
+    onClose,
+    disableBackdropClick: true,
+  });
 
   const [selectedCategory, setSelectedCategory] = useState<string>('Tout');
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,8 +135,12 @@ export function TemplateSelectorModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" {...backdropProps}>
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="template-selector-title"
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -148,14 +158,15 @@ export function TemplateSelectorModal({
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-bold">Bibliothèque de Templates & Modèles</h2>
+                <h2 id="template-selector-title" className="text-lg font-bold">Bibliothèque de Templates & Modèles</h2>
                 <p className="text-xs text-[var(--text-muted)]">
                   Sélectionnez un modèle, personnalisez les variables dynamiques et insérez-le directement.
                 </p>
               </div>
             </div>
-            <button
+            <button type="button"
               onClick={onClose}
+              aria-label="Fermer la bibliothèque de modèles"
               className="p-2 rounded-lg hover:bg-[var(--bg-active)] text-[var(--text-muted)] hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
@@ -182,7 +193,7 @@ export function TemplateSelectorModal({
               {/* Category pills */}
               <div className="flex flex-wrap gap-1.5 pb-1">
                 {categories.map(cat => (
-                  <button
+                  <button type="button"
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all ${
@@ -202,7 +213,7 @@ export function TemplateSelectorModal({
                   const IconComp = ICON_MAP[template.iconName] || FileText;
                   const isActive = template.id === activeTemplateId;
                   return (
-                    <button
+                    <button type="button"
                       key={template.id}
                       onClick={() => setActiveTemplateId(template.id)}
                       className={`w-full text-left p-3 rounded-xl border transition-all flex flex-col gap-1.5 ${
@@ -234,7 +245,7 @@ export function TemplateSelectorModal({
               {/* Tabs header */}
               <div className="px-6 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
                 <div className="flex items-center gap-2">
-                  <button
+                  <button type="button"
                     onClick={() => setActiveTab('variables')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === 'variables'
@@ -245,7 +256,7 @@ export function TemplateSelectorModal({
                     <Edit3 className="w-3.5 h-3.5" />
                     Variables dynamiques ({activeVariables.length})
                   </button>
-                  <button
+                  <button type="button"
                     onClick={() => setActiveTab('preview')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === 'preview'
@@ -259,7 +270,7 @@ export function TemplateSelectorModal({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
+                  <button type="button"
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] border text-[var(--text-primary)] transition-all"
                     style={{ borderColor: 'var(--border-base)' }}
@@ -267,7 +278,7 @@ export function TemplateSelectorModal({
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     {copied ? 'Copié' : 'Copier'}
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleDownload}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] border text-[var(--text-primary)] transition-all"
                     style={{ borderColor: 'var(--border-base)' }}
@@ -314,13 +325,13 @@ export function TemplateSelectorModal({
                   {activeTemplate.suggestedFilename}
                 </span>
                 <div className="flex items-center gap-3">
-                  <button
+                  <button type="button"
                     onClick={onClose}
                     className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all"
                   >
                     Annuler
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleApply}
                     className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white transition-all shadow-md active:scale-95"
                     style={{ backgroundColor: 'var(--accent-primary)' }}

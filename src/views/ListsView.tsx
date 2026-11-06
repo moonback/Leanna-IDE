@@ -25,6 +25,7 @@ export default function ListsView() {
   const [snippets, setSnippets] = useState<SnippetSummary[]>([]);
   const [selected, setSelected] = useState<SnippetDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [newName, setNewName] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -46,15 +47,17 @@ export default function ListsView() {
 
   const loadSnippets = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch('/api/lists');
       const data = await res.json();
-      if (res.ok && data.status === 'success') {
-        setSnippets(data.lists || []);
+      if (res.ok && data.status === 'success' && Array.isArray(data.lists)) {
+        setSnippets(data.lists);
       } else {
         throw new Error(data.error || 'Unable to load snippets');
       }
     } catch (e) {
+      setLoadError('Impossible de charger les snippets. Vérifiez la connexion au serveur puis réessayez.');
       toastError('Impossible de charger les snippets');
     } finally {
       setLoading(false);
@@ -228,7 +231,13 @@ export default function ListsView() {
               </div>
 
               <div className="space-y-1.5">
-                {filteredSnippets.map(snippet => (
+                {loadError && (
+                  <div role="alert" className="rounded-xl border border-dashed px-3 py-6 text-center" style={{ borderColor: 'var(--border-base)' }}>
+                    <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>{loadError}</p>
+                    <button type="button" onClick={loadSnippets} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>Réessayer</button>
+                  </div>
+                )}
+                {!loadError && filteredSnippets.map(snippet => (
                   <button
                     key={snippet.name}
                     type="button"
@@ -251,7 +260,7 @@ export default function ListsView() {
                     </div>
                   </button>
                 ))}
-                {filteredSnippets.length === 0 && (
+                {filteredSnippets.length === 0 && !loadError && (
                   <div className="rounded-xl border border-dashed px-3 py-6 text-center text-xs" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-muted)', borderColor: 'var(--border-base)' }}>
                     {snippets.length === 0 ? 'Aucun snippet trouvé. Crée ton premier snippet.' : 'Aucun résultat pour cette recherche.'}
                   </div>

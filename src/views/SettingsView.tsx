@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { Button } from '../components/ui/Button.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useToast } from '../components/ui/Toast.js';
@@ -83,6 +84,9 @@ const NAV_GROUPS = [
 
 const SECURE_ITEMS = new Set(['selfroot-settings', 'safeguards-settings', 'env-settings']);
 const LAST_SECTION_KEY = 'Leanna-settings-last-section';
+const VALID_SECTION_IDS = new Set(NAV_GROUPS.flatMap(group => group.items.map(item => item.id)));
+const DEFAULT_SECTION = 'profile-settings';
+const isValidSection = (id: string | null | undefined): id is string => Boolean(id && VALID_SECTION_IDS.has(id));
 
 function getActiveLabel(id: string) {
   for (const g of NAV_GROUPS) {
@@ -117,26 +121,39 @@ export default function SettingsView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, save, reset } = useProfile();
   const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Section initiale : URL > dernière section mémorisée > profil.
   const [activeSection, setActiveSection] = useState(() => {
     const fromUrl = searchParams.get('section');
-    if (fromUrl) return fromUrl;
+    if (isValidSection(fromUrl)) return fromUrl;
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(LAST_SECTION_KEY);
-      if (stored) return stored;
+      if (isValidSection(stored)) return stored;
     }
-    return 'profile-settings';
+    return DEFAULT_SECTION;
   });
   const [searchQuery, setSearchQuery] = useState('');
 
   // Suit les changements d'URL (navigation router-aware).
   useEffect(() => {
     const sec = searchParams.get('section');
-    if (sec && sec !== activeSection) setActiveSection(sec);
-  }, [searchParams, activeSection]);
+    if (isValidSection(sec)) {
+      if (sec !== activeSection) setActiveSection(sec);
+      return;
+    }
+    if (sec !== null) {
+      // Une URL périmée ne doit jamais laisser la zone de réglages vide.
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('section', activeSection);
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, activeSection, setSearchParams]);
 
   // Change de section : met à jour l'état, l'URL et la mémoire locale.
   const selectSection = useCallback((id: string) => {
@@ -169,10 +186,16 @@ export default function SettingsView() {
   }, []);
 
   const handleSave = useCallback(async () => {
+    // Le verrou ref protège aussi les clics rapprochés avant le prochain rendu React.
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    let savedLocally = false;
     try {
+      // Le profil reste disponible localement même si le serveur est temporairement indisponible.
       save();
-      await fetch('/api/profile', {
+      savedLocally = true;
+      const response = await fetch('/api/profile', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           aiName: profile.aiName, aiVoice: profile.aiVoice,
@@ -190,18 +213,34 @@ export default function SettingsView() {
           customSystemPrompt: profile.customSystemPrompt,
         }),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       success('Paramètres sauvegardés ✓');
       // Notifier la session live de se reconnecter pour prendre en compte
       // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
       window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
-    } catch { toastError('Erreur lors de la sauvegarde'); }
-    finally { setSaving(false); }
+    } catch {
+      toastError(savedLocally
+        ? 'Paramètres enregistrés localement, mais synchronisation serveur impossible'
+        : 'Impossible d’enregistrer les paramètres localement');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }, [save, profile, success, toastError]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    if (savingRef.current) return;
+    const confirmed = await confirm({
+      title: 'Réinitialiser les paramètres ?',
+      message: 'Tous les réglages du profil seront remplacés par leurs valeurs par défaut. Cette action ne peut pas être annulée.',
+      confirmLabel: 'Réinitialiser',
+      cancelLabel: 'Conserver mes réglages',
+      variant: 'danger',
+    });
+    if (!confirmed || savingRef.current) return;
     reset();
     success('Paramètres réinitialisés');
-  }, [reset, success]);
+  }, [confirm, reset, success]);
 
   // Filter groups and items based on search query
   const filteredNavGroups = useMemo(() => {
@@ -244,7 +283,7 @@ export default function SettingsView() {
   const active = getActiveLabel(activeSection);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden font-sans text-xs" style={{ color: 'var(--text-primary)' }}>
+    <div className="settings-view h-full flex flex-col overflow-hidden font-sans text-xs" style={{ color: 'var(--text-primary)' }}>
 
       {/* En-tête unique, pleine largeur : la page s'appelle « Paramètres », la
           section active est en badge et sa description en ligne. */}
@@ -263,7 +302,7 @@ export default function SettingsView() {
             >
               <ArrowLeft className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
             </Tooltip>
-            <Button variant="secondary" size="sm" onClick={handleReset} iconLeft={<RotateCcw className="h-3.5 w-3.5" />}>
+            <Button variant="secondary" size="sm" onClick={handleReset} disabled={saving} iconLeft={<RotateCcw className="h-3.5 w-3.5" />}>
               <span className="hidden sm:inline">Réinitialiser</span>
             </Button>
             <Button variant="primary" size="sm" onClick={handleSave} disabled={saving} iconLeft={<Save className="h-3.5 w-3.5" />}>
@@ -276,7 +315,7 @@ export default function SettingsView() {
       <div className="flex min-h-0 flex-1">
       {/* ── Navigation des sections ── */}
       <nav
-        className="flex flex-col flex-shrink-0 select-none"
+        className="settings-nav flex flex-col flex-shrink-0 select-none"
         style={{ width: 232, borderRight: '1px solid var(--glass-stroke)' }}
       >
         {/* Search input */}

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { AgentStatusPill } from '../AgentStatusBar.js';
+import '../../styles/ux-refinements.css';
 
 interface ViewHeaderProps {
   /** Main title of the view */
@@ -18,31 +19,35 @@ interface ViewHeaderProps {
 }
 
 /**
- * En-tête unifié de toutes les pages (styles : .lea-header, styles/glass.css §6).
- *
- * Une seule ligne de hauteur fixe (--header-h) : icône · titre · badge ·
- * description | état agent · actions. La description est en ligne plutôt que
- * sur une seconde ligne, et l'état agent (ex-barre pleine largeur) vit ici.
+ * En-tête partagé des vues.
+ * Le titre conserve toujours la priorité ; la description et les éléments
+ * secondaires se contractent avant les actions principales.
  */
 export function ViewHeader({ title, icon: Icon, description, badge, actions, showStatus = true }: ViewHeaderProps) {
   return (
-    <header className="lea-header">
-      <div className="lea-header__icon">
-        <Icon aria-hidden="true" size={15} />
+    <header className="lea-header" aria-label={`En-tête de la page : ${title}`}>
+      <div className="lea-header__icon" aria-hidden="true">
+        <Icon size={15} />
       </div>
 
       <div className="lea-header__main">
         <h1 className="lea-header__title">{title}</h1>
         {badge && <span className="lea-header__badge self-center">{badge}</span>}
-        {description && <p className="lea-header__desc min-w-0">{description}</p>}
+        {description && (
+          <p className="lea-header__desc min-w-0" title={description}>
+            {description}
+          </p>
+        )}
       </div>
 
       {showStatus && <AgentStatusPill />}
 
       {actions && (
         <>
-          {showStatus && <span className="lea-header__sep" aria-hidden />}
-          <div className="lea-header__actions">{actions}</div>
+          {showStatus && <span className="lea-header__sep" aria-hidden="true" />}
+          <div className="lea-header__actions" role="group" aria-label={`Actions de ${title}`}>
+            {actions}
+          </div>
         </>
       )}
     </header>

@@ -45,6 +45,7 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   const prefersReducedMotion = useReducedMotion();
   const [notebooks, setNotebooks] = useState<NotebookSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGitHubImport, setShowGitHubImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,10 +73,13 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
 
   const loadNotebooks = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await api<{ notebooks?: NotebookSummary[] }>('/api/notebooks');
-      setNotebooks(data.notebooks || []);
-    } catch {
+      if (!Array.isArray(data.notebooks)) throw new Error('Réponse invalide : liste des notebooks absente.');
+      setNotebooks(data.notebooks);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Impossible de charger les notebooks.');
       toastError('Impossible de charger les notebooks');
     } finally {
       setLoading(false);
@@ -267,6 +271,11 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
               </div>
             ))}
           </div>
+        ) : loadError ? (
+          <div role="alert" className="notebook-card flex flex-col items-center gap-3 rounded-xl px-6 py-16 text-center">
+            <p className="max-w-lg text-sm text-[var(--text-muted)]">{loadError}</p>
+            <NbButton variant="secondary" onClick={loadNotebooks}>Réessayer</NbButton>
+          </div>
         ) : notebooks.length === 0 ? (
           /* ─── Empty state ─── */
           <motion.div
@@ -328,6 +337,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     delay: i < 12 ? i * 0.02 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
+                  onKeyDown={event => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectNotebook(nb.id);
+                    }
+                  }}
+                  role="group"
+                  tabIndex={0}
+                  aria-label={`Notebook : ${nb.title}`}
                   data-spotlight
                   data-interactive="true"
                   className="notebook-card group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-xl py-3 pl-5 pr-3 hover:shadow-md"
@@ -402,6 +421,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     delay: i < 12 ? i * 0.03 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
+                  onKeyDown={event => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectNotebook(nb.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ouvrir le notebook ${nb.title}`}
                   data-spotlight
                   data-interactive="true"
                   className="notebook-card group relative flex cursor-pointer flex-col overflow-hidden rounded-xl hover:shadow-lg"

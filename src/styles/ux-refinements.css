@@ -1,0 +1,99 @@
+/**
+ * Ajustements transversaux UX — couche additive au système Full Glass.
+ * Ne redéfinit pas les surfaces ni les couleurs : utilise les tokens existants.
+ */
+
+/* Un header doit préserver les actions principales sans pousser le titre hors écran. */
+.lea-header__main {
+  flex: 1 1 0%;
+}
+
+.lea-header__actions {
+  max-width: min(48vw, 560px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.lea-header__actions::-webkit-scrollbar {
+  display: none;
+}
+
+.lea-header__actions > * {
+  flex-shrink: 0;
+}
+
+/* Sur fenêtre compacte, réduire les éléments secondaires avant le titre. */
+@media (max-width: 720px) {
+  .lea-header {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .lea-header__title {
+    max-width: 24ch;
+  }
+
+  .lea-header__actions {
+    max-width: 42vw;
+    gap: 4px;
+  }
+
+  .lea-header__sep,
+  .lea-status-pill {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .lea-header {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .lea-header__icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .lea-header__title {
+    max-width: 18ch;
+    font-size: 13px;
+  }
+
+  .lea-header__badge {
+    display: none;
+  }
+
+  .lea-header__actions {
+    max-width: 46vw;
+  }
+}
+
+
+/* La navigation des paramètres reste présente sans monopoliser la largeur utile. */
+.settings-view .settings-nav {
+  width: clamp(184px, 19vw, 232px) !important;
+}
+
+@media (max-width: 900px) {
+  .settings-view .settings-nav {
+    width: 176px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-view .settings-nav {
+    width: 148px !important;
+  }
+
+  .settings-view .settings-nav > div:first-child {
+    padding-inline: 8px;
+  }
+
+  .settings-view .settings-nav button {
+    gap: 6px;
+    padding-inline: 7px;
+  }
+}

@@ -161,7 +161,7 @@ export default function DocumentsView() {
   const [activeTab, setActiveTab] = useState<Tab>('stats');
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Header */}
       <ViewHeader
         {...viewHeaderProps('documents')}
@@ -171,6 +171,8 @@ export default function DocumentsView() {
 
       {/* Tabs */}
       <div
+        role="tablist"
+        aria-label="Sections des documents et connaissances"
         className="flex items-center gap-1 px-5 py-2 flex-shrink-0 border-b lg:px-7"
         style={{ borderColor: 'var(--border-base)' }}
       >
@@ -182,6 +184,10 @@ export default function DocumentsView() {
         ]).map(({ key, icon: Icon, label }) => (
           <button
             key={key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === key}
+            tabIndex={activeTab === key ? 0 : -1}
             onClick={() => setActiveTab(key)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
@@ -217,6 +223,7 @@ function DocumentsTab() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [workspaceDocuments, setWorkspaceDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultItem[] | null>(null);
@@ -232,15 +239,16 @@ function DocumentsTab() {
         fetch(`/api/documents${params}`),
         fetch('/api/knowledge/documents'),
       ]);
-      if (docsRes.ok) {
-        const data = await docsRes.json();
-        setDocuments(data.documents || []);
+      if (!docsRes.ok || !wsDocsRes.ok) throw new Error('Réponse API invalide');
+      const [data, wsData] = await Promise.all([docsRes.json(), wsDocsRes.json()]);
+      if (!Array.isArray(data.documents) || !Array.isArray(wsData.documents)) {
+        throw new Error('Format de données invalide');
       }
-      if (wsDocsRes.ok) {
-        const wsData = await wsDocsRes.json();
-        setWorkspaceDocuments(wsData.documents || []);
-      }
+      setDocuments(data.documents);
+      setWorkspaceDocuments(wsData.documents);
+      setLoadError(null);
     } catch (e: any) {
+      setLoadError(e?.message || 'Impossible de charger les documents');
       toastError('Impossible de charger les documents');
     } finally {
       setLoading(false);
@@ -252,8 +260,9 @@ function DocumentsTab() {
       const res = await fetch('/api/documents/collections');
       if (!res.ok) return;
       const data = await res.json();
-      setCollections(data.collections || []);
-    } catch { /* ignore */ }
+      if (!Array.isArray(data.collections)) throw new Error('Format de collections invalide');
+      setCollections(data.collections);
+    } catch { /* Les collections restent facultatives ; la liste principale expose ses propres erreurs. */ }
   }, []);
 
   useEffect(() => { loadDocuments(); loadCollections(); }, [loadDocuments, loadCollections]);
@@ -556,7 +565,14 @@ function DocumentsTab() {
 
       {/* Document list */}
       {!searchResults && (
-        loading ? (
+        loadError ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3" role="alert">
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>{loadError}</p>
+            <button type="button" onClick={loadDocuments} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+              <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+            </button>
+          </div>
+        ) : loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement...</p>
@@ -723,6 +739,7 @@ function MemoryTab() {
   const { confirm } = useConfirm();
   const [facts, setFacts] = useState<UnifiedFact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newFact, setNewFact] = useState({ content: '', category: 'fact' });
@@ -732,11 +749,14 @@ function MemoryTab() {
     try {
       // Charger TOUS les faits des documents (sans filtre)
       const docRes = await fetch('/api/documents/facts/list');
-      const docData = docRes.ok ? await docRes.json() : { facts: [] };
+      if (!docRes.ok) throw new Error('Impossible de charger les faits documentaires');
+      const docData = await docRes.json();
       
       // Charger TOUS les faits de la mémoire projet (sans filtre)
       const projRes = await fetch('/api/knowledge/memory');
-      const projData = projRes.ok ? await projRes.json() : { facts: [] };
+      if (!projRes.ok) throw new Error('Impossible de charger la mémoire projet');
+      const projData = await projRes.json();
+      if (!Array.isArray(docData.facts) || !Array.isArray(projData.facts)) throw new Error('Format de mémoire invalide');
       
       // Convertir les faits documents en UnifiedFact
       const documentFacts: UnifiedFact[] = (docData.facts || []).map((f: FactItem) => ({
@@ -765,7 +785,9 @@ function MemoryTab() {
       }
       
       setFacts(allFacts);
-    } catch {
+      setLoadError(null);
+    } catch (error: any) {
+      setLoadError(error?.message || 'Impossible de charger les faits');
       toastError('Impossible de charger les faits');
     } finally {
       setLoading(false);
@@ -816,7 +838,8 @@ function MemoryTab() {
     });
     if (!confirmed) return;
     try {
-      await fetch(`/api/documents/facts/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/documents/facts/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setFacts(prev => prev.filter(f => f.id !== id));
       success('Fait supprimé');
     } catch {
@@ -920,6 +943,13 @@ function MemoryTab() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
         </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3" role="alert">
+          <p className="text-sm" style={{ color: 'var(--color-error)' }}>{loadError}</p>
+          <button type="button" onClick={loadFacts} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+            <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+          </button>
+        </div>
       ) : facts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Brain className="w-10 h-10" style={{ color: 'var(--text-dimmed, #888)' }} />
@@ -1011,6 +1041,7 @@ function RelationsTab() {
   const { error: toastError } = useToast();
   const [relations, setRelations] = useState<RelationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadRelations = useCallback(async () => {
     setLoading(true);
@@ -1018,8 +1049,11 @@ function RelationsTab() {
       const res = await fetch('/api/documents/relations/list');
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRelations(data.relations || []);
-    } catch {
+      if (!Array.isArray(data.relations)) throw new Error('Format de relations invalide');
+      setRelations(data.relations);
+      setLoadError(null);
+    } catch (error: any) {
+      setLoadError(error?.message || 'Impossible de charger les relations');
       toastError('Impossible de charger les relations');
     } finally {
       setLoading(false);
@@ -1064,6 +1098,13 @@ function RelationsTab() {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3" role="alert">
+          <p className="text-sm" style={{ color: 'var(--color-error)' }}>{loadError}</p>
+          <button type="button" onClick={loadRelations} className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+            <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+          </button>
         </div>
       ) : relations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">

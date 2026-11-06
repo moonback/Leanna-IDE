@@ -195,6 +195,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Centre = discussion par défaut (comme NotebookLM) ; 'sources' ouvre le
   // gestionnaire d'ajout de sources (upload, URL, texte, GitHub, codebase).
   const [activeTab, setActiveTab] = useState<Tab>('chat');
@@ -214,11 +215,13 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   const loadNotebook = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await api<{ notebook: NotebookData }>(`/api/notebooks/${notebookId}`);
+      if (!data.notebook || data.notebook.id !== notebookId || !Array.isArray(data.notebook.sources) || !Array.isArray(data.notebook.notes)) {
+        throw new Error('Les données du notebook sont incomplètes ou invalides.');
+      }
       setNotebook(data.notebook);
-    } catch (e) {
-      toastError(e instanceof Error ? e.message : 'Notebook introuvable');
     } finally {
       setLoading(false);
     }
@@ -275,10 +278,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (loading || !notebook) {
+  if (loading) {
     return (
       <div className="notebook-workspace h-full flex flex-col">
-        {/* Skeleton header */}
         <div className="notebook-header flex-shrink-0 justify-start gap-3 bg-[var(--notebook-surface-elevated)]" aria-hidden="true">
           <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
           <div className="h-10 w-10 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
@@ -287,9 +289,21 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             <div className="h-3 w-64 animate-pulse rounded-full bg-[var(--notebook-surface-muted)]" />
           </div>
         </div>
-        {/* Skeleton content */}
-        <div className="flex-1">
-          <SourcesPanelSkeleton />
+        <div className="flex-1"><SourcesPanelSkeleton /></div>
+      </div>
+    );
+  }
+
+  if (loadError || !notebook) {
+    return (
+      <div className="notebook-workspace flex h-full flex-col overflow-hidden">
+        <ViewHeader title="Notebook indisponible" icon={BookOpen} description="Le contenu de ce notebook n’a pas pu être chargé." actions={<NbButton variant="ghost" icon={ArrowLeft} onClick={onBack}>Retour</NbButton>} />
+        <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="max-w-lg text-sm text-[var(--text-muted)]">{loadError || 'Ce notebook est introuvable ou n’est plus accessible.'}</p>
+          <div className="flex items-center gap-2">
+            <NbButton variant="secondary" icon={RefreshCw} onClick={loadNotebook}>Réessayer</NbButton>
+            <NbButton variant="ghost" onClick={onBack}>Retour à la bibliothèque</NbButton>
+          </div>
         </div>
       </div>
     );

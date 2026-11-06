@@ -11,7 +11,7 @@
  * - Aperçu de la structure des fichiers et progression d'ingestion
  */
 
-import { useState, useCallback, useEffect, useMemo, useId } from 'react';
+import { useState, useCallback, useEffect, useMemo, useId, useRef } from 'react';
 import {
   Search, Github, Loader2, XCircle, AlertCircle,
   FileCode, FolderOpen, Star, GitFork,
@@ -160,6 +160,8 @@ export function GitHubRepositoryImportModal({
 
   // Création d'un nouveau notebook
   const [creatingNotebook, setCreatingNotebook] = useState(false);
+  const [creatingNotebookRequest, setCreatingNotebookRequest] = useState(false);
+  const createNotebookRequestRef = useRef(false);
   const [newNotebookTitle, setNewNotebookTitle] = useState('');
 
   // Options d'ingestion
@@ -432,6 +434,9 @@ export function GitHubRepositoryImportModal({
   // ─── 7. Création de notebook rapide ──────────────────────────────────────
 
   const handleCreateNotebook = async () => {
+    if (createNotebookRequestRef.current) return;
+    createNotebookRequestRef.current = true;
+    setCreatingNotebookRequest(true);
     const title = newNotebookTitle.trim() || `Import - ${selectedRepo?.repo || 'GitHub'}`;
     try {
       const data = await api<{ notebook?: Notebook }>('/api/notebooks', {
@@ -448,9 +453,14 @@ export function GitHubRepositoryImportModal({
         setCreatingNotebook(false);
         setNewNotebookTitle('');
         success(`Notebook « ${title} » créé avec succès !`);
+      } else {
+        toastError('Le serveur n’a pas renvoyé le notebook créé.');
       }
     } catch (e: unknown) {
       toastError(`Erreur de création : ${errorMessage(e)}`);
+    } finally {
+      createNotebookRequestRef.current = false;
+      setCreatingNotebookRequest(false);
     }
   };
 
@@ -631,9 +641,9 @@ export function GitHubRepositoryImportModal({
           </div>
 
           {/* ─── Main Content Split ────────────────────────────────────── */}
-          <div className="flex-1 overflow-hidden flex">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
             {/* ─── Colonne de Gauche : Sélecteur de Dépôt (44%) ─────────── */}
-            <div className="w-[44%] border-r border-[var(--notebook-border)] flex flex-col bg-[var(--notebook-canvas)]">
+            <div className="flex max-h-[42%] min-h-0 w-full min-w-0 flex-col border-b border-[var(--notebook-border)] bg-[var(--notebook-canvas)] md:max-h-none md:w-[44%] md:border-b-0 md:border-r">
               {/* Segmented Tab Controls */}
               <div className="p-4 pb-2 border-b border-[var(--notebook-border)]">
                 <div className="notebook-segmented grid grid-cols-3 text-xs font-medium">
@@ -997,7 +1007,7 @@ export function GitHubRepositoryImportModal({
             </div>
 
             {/* ─── Colonne de Droite : Hub de Configuration & Ingestion (56%) ── */}
-            <div className="w-[56%] flex flex-col bg-[var(--notebook-surface)]">
+            <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col bg-[var(--notebook-surface)] md:w-[56%]">
               {!selectedRepo ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                   <div className="w-16 h-16 rounded-xl flex items-center justify-center bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)] mb-4">
@@ -1086,10 +1096,10 @@ export function GitHubRepositoryImportModal({
                               placeholder={`Import ${selectedRepo.repo}`}
                               className="notebook-input flex-1 text-xs"
                             />
-                            <NbButton variant="primary" size="sm" onClick={handleCreateNotebook}>
+                            <NbButton variant="primary" size="sm" onClick={handleCreateNotebook} loading={creatingNotebookRequest} disabled={creatingNotebookRequest}>
                               Créer
                             </NbButton>
-                            <NbButton variant="ghost" size="sm" onClick={() => setCreatingNotebook(false)}>
+                            <NbButton variant="ghost" size="sm" onClick={() => setCreatingNotebook(false)} disabled={creatingNotebookRequest}>
                               Annuler
                             </NbButton>
                           </div>

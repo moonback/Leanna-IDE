@@ -11,6 +11,7 @@ import {
 import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
 import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
+import { useOverlay } from '../hooks/useOverlay.js';
 // @ts-ignore - Asset handled by bundler
 import logo from '../../assets/images/icon-sombre.png';
 
@@ -212,17 +213,6 @@ export function StartupProjectModal() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaces.length]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || cloneStatus === 'cloning' || loading || forceSelection) return;
-      handleClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, cloneStatus, loading, currentPath, forceSelection]);
 
   useEffect(() => {
     const handleOpenModal = async (e: Event) => {
@@ -516,6 +506,13 @@ export function StartupProjectModal() {
     else window.close();
   };
 
+  const { containerRef, backdropProps } = useOverlay<HTMLDivElement>({
+    open: isOpen,
+    onClose: handleClose,
+    disableEscape: cloneStatus === 'cloning' || loading || forceSelection,
+    disableBackdropClick: forceSelection,
+  });
+
   const handleOpenSettings = () => {
     cancelAutoReopen();
     returningFromSettingsRef.current = true;
@@ -565,7 +562,7 @@ export function StartupProjectModal() {
         transition={OVERLAY_FADE}
         className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden"
         style={{ zIndex: 'var(--z-modal)', backgroundColor: 'rgba(4, 6, 10, 0.88)', backdropFilter: 'blur(20px)' }}
-        onClick={!forceSelection ? handleClose : undefined}
+        {...backdropProps}
       >
         {/* Atmospheric glows */}
         {!shouldReduceMotion && (
@@ -587,6 +584,7 @@ export function StartupProjectModal() {
 
         {/* Modal */}
         <motion.div
+          ref={containerRef}
           {...cardMotionProps}
           transition={MODAL_SPRING}
           role="dialog"

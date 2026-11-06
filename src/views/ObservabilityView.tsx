@@ -34,36 +34,44 @@ export default function ObservabilityView() {
   const [runtime, setRuntime] = useState<{ available: boolean; snapshot: RuntimeSnapshot | null }>({ available: false, snapshot: null });
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<'overview' | 'health' | 'usage' | 'budget'>('overview');
   const [period, setPeriod] = useState<'day' | 'hour'>('day');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const [dashRes, usageRes, runtimeRes, healthRes] = await Promise.all([
+      setLoadError(null);
+      const responses = await Promise.all([
         fetch(`/api/observability/dashboard?period=${period}`),
         fetch('/api/observability/usage?limit=100'),
         fetch('/api/observability/runtime'),
         fetch('/api/observability/health'),
       ]);
-      if (dashRes.ok) {
-        const data = await dashRes.json();
-        if (data.success) setDashboard(data.dashboard);
+      const [dashData, usageData, runtimeData, healthData] = await Promise.all(
+        responses.map(async response => {
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+          if (!data || data.success !== true) throw new Error(data?.error || 'Réponse API invalide');
+          return data;
+        }),
+      );
+      if (!dashData.dashboard || !Array.isArray(dashData.dashboard.byModel) ||
+          !Array.isArray(dashData.dashboard.byAgent) || !Array.isArray(dashData.dashboard.byMission) ||
+          !dashData.dashboard.overview) {
+        throw new Error('Réponse du tableau de bord incomplète.');
       }
-      if (usageRes.ok) {
-        const data = await usageRes.json();
-        if (data.success) setRecords(data.records.reverse());
-      }
-      if (runtimeRes.ok) {
-        const data = await runtimeRes.json();
-        if (data.success) setRuntime({ available: !!data.available, snapshot: data.snapshot ?? null });
-      }
-      if (healthRes.ok) {
-        const data = await healthRes.json();
-        if (data.success) setHealth({ status: data.status, telemetry: data.telemetry });
-      }
-    } catch {
-      toastError('Impossible de charger les données d\'observabilité.');
+      if (!Array.isArray(usageData.records)) throw new Error('Historique de consommation invalide.');
+      if (!runtimeData || typeof runtimeData.available !== 'boolean') throw new Error('État du runtime invalide.');
+      if (!healthData.telemetry) throw new Error('État de santé indisponible.');
+      setDashboard(dashData.dashboard);
+      setRecords([...usageData.records].reverse());
+      setRuntime({ available: runtimeData.available, snapshot: runtimeData.snapshot ?? null });
+      setHealth({ status: healthData.status, telemetry: healthData.telemetry });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      setLoadError(`Impossible de charger toutes les données d’observabilité : ${message}`);
+      toastError('Impossible de charger les données d’observabilité.');
     } finally {
       setLoading(false);
     }
@@ -105,6 +113,8 @@ export default function ObservabilityView() {
               {(['day', 'hour'] as const).map(p => (
                 <button
                   key={p}
+                  type="button"
+                  aria-pressed={period === p}
                   onClick={() => setPeriod(p)}
                   className="px-3 py-1.5 font-medium transition-colors"
                   style={{
@@ -117,6 +127,7 @@ export default function ObservabilityView() {
               ))}
             </div>
             <button
+              type="button"
               onClick={fetchDashboard}
               className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--bg-secondary)]"
               style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
@@ -132,6 +143,8 @@ export default function ObservabilityView() {
       <div
         className="flex border-b"
         style={{ borderColor: 'var(--border-base)' }}
+        role="tablist"
+        aria-label="Sections de l’observabilité"
       >
         {([
           { key: 'overview', label: 'Vue d\'ensemble', icon: TrendingUp },
@@ -141,6 +154,9 @@ export default function ObservabilityView() {
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
             onClick={() => setTab(key)}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors"
             style={{
@@ -163,7 +179,16 @@ export default function ObservabilityView() {
           </div>
         )}
 
-        {!loading && tab === 'overview' && (
+        {!loading && loadError && (
+          <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border p-5 text-center" style={{ borderColor: 'var(--color-error)', backgroundColor: 'var(--bg-panel)' }}>
+            <p className="max-w-2xl text-xs" style={{ color: 'var(--text-muted)' }}>{loadError}</p>
+            <button type="button" onClick={() => { setLoading(true); void fetchDashboard(); }} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+              <RefreshCw className="h-3.5 w-3.5" /> Réessayer
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadError && tab === 'overview' && (
           <>
             {/* Overview cards */}
             <div className="lea-stagger grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -297,12 +322,12 @@ export default function ObservabilityView() {
         )}
 
         {/* Santé & fiabilité tab (métriques runtime réelles) */}
-        {!loading && tab === 'health' && (
+        {!loading && !loadError && tab === 'health' && (
           <RuntimeHealthPanel snapshot={runtime.snapshot} available={runtime.available} />
         )}
 
         {/* Usage history tab */}
-        {!loading && tab === 'usage' && (
+        {!loading && !loadError && tab === 'usage' && (
           <div
             className="rounded-xl border overflow-hidden"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
@@ -361,7 +386,7 @@ export default function ObservabilityView() {
         )}
 
         {/* Budget tab */}
-        {!loading && tab === 'budget' && <BudgetPanel />}
+        {!loading && !loadError && tab === 'budget' && <BudgetPanel />}
       </div>
     </div>
   );
