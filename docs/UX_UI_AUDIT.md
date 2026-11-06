@@ -287,3 +287,26 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier les largeurs étroites, intermédiaires et larges, avec sidebar globale ouverte et repliée.
 - Confirmer que les trois actions restent accessibles au clavier et que leurs zones de clic ne se chevauchent pas.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le rendu dans Electron.
+
+
+## Treizième passe — États de détail de l'historique
+
+### Constat vérifié
+
+- Le panneau de détail de l'historique n'était rendu que lorsque la conversation sélectionnée contenait au moins un message.
+- Une conversation vide restait donc présentée comme « Chargement… » même après la fin de la requête.
+- En cas d'échec de récupération des messages, seul un toast était affiché ; le panneau ne proposait pas de récupération locale et pouvait conserver un état de détail incohérent.
+
+### Correction appliquée
+
+- Le détail s'affiche dès qu'une conversation est sélectionnée, indépendamment du nombre de messages.
+- Le chargement, l'erreur et l'état réellement vide disposent de rendus distincts.
+- L'erreur de détail propose un réessai directement dans le panneau.
+- Les messages précédents sont effacés au début d'une nouvelle sélection pour éviter d'afficher temporairement le contenu d'une autre conversation.
+
+### Validation restante
+
+- Ouvrir une conversation contenant des messages, une conversation vide et une conversation dont l'endpoint renvoie HTTP 500.
+- Vérifier le réessai après rétablissement de l'API et l'absence de messages appartenant à la sélection précédente.
+- Tester les changements rapides de sélection pendant le chargement.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le parcours dans Electron.
