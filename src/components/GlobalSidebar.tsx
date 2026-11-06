@@ -410,7 +410,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
               {mode === 'ide' && visibleNavGroups.map((group, gi) => (
                 <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
-                  open={!closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                  open={Boolean(normalizedQuery) || !closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
                   hasActive={group.items.some((item) => isActive(item.path))}>
                   {group.items.map((item) => (
                     <li key={item.id}>
@@ -427,7 +427,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       label={group.label}
                       first={gi === 0}
                       collapsed={collapsed}
-                      open={!closedGroups[group.id]}
+                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
                       onToggle={toggleGroup}
                       count={group.items.length}
                       hasActive={group.items.some((i) => i.active)}
@@ -453,7 +453,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       label={group.label}
                       first={gi === 0}
                       collapsed={collapsed}
-                      open={!closedGroups[group.id]}
+                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
                       onToggle={toggleGroup}
                       count={group.items.length}
                       hasActive={group.items.some((i) => isActive(i.path))}
