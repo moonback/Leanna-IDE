@@ -80,7 +80,10 @@ test('custom agent model overrides the profile model without overriding an expli
     textProvider: 'openrouter',
     openrouterApiKey: 'sk-test',
     openrouterModel: 'openai/gpt-6-luna',
-    agents: { customAgents: [{ role: 'coder', model: 'cohere/north-mini-code:free' }] },
+    agents: {
+      customAgents: [{ role: 'coder', model: 'cohere/north-mini-code:free' }],
+      modelRouting: { enabled: true, candidates: ['openai/gpt-4o-mini'] },
+    },
   });
   assert.equal(getActiveModel('coder'), 'cohere/north-mini-code:free');
   assert.equal(getActiveModel('reviewer'), 'openai/gpt-6-luna');
