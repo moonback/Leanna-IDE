@@ -29,6 +29,9 @@ function run(text: string, options: { bold?: boolean; italic?: boolean; code?: b
 function inline(tokens: Token[] = [], links: string[] = [], flags: { bold?: boolean; italic?: boolean; strike?: boolean } = {}): string {
   return tokens.map((token) => {
     switch (token.type) {
+      case 'paragraph':
+      case 'heading':
+        return inline(token.tokens ?? [], links, flags);
       case 'text':
       case 'escape':
         return token.tokens ? inline(token.tokens, links, flags) : run(token.text ?? '', flags);
@@ -97,16 +100,21 @@ function renderTokens(tokens: Token[], links: string[], listDepth = 0): string {
       case 'list': {
         const ordered = Boolean(token.ordered);
         return (token.items ?? []).map((item: Token) => {
-          const itemRuns = inline(item.tokens ?? [{ type: 'text', text: item.text ?? '' }], links);
+          const itemTokens: Token[] = item.tokens ?? [{ type: 'text', text: item.text ?? '' }];
+          const inlineTokens = itemTokens.filter(part => part.type !== 'list');
+          const nestedLists = itemTokens.filter(part => part.type === 'list');
+          const itemRuns = inline(inlineTokens, links);
           const numId = ordered ? '2' : '1';
           const first = paragraph(itemRuns, undefined, `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${numId}"/></w:numPr>`);
-          return first + (item.items?.length ? renderTokens(item.items, links, listDepth + 1) : '');
+          return first + renderTokens(nestedLists, links, listDepth + 1);
         }).join('');
       }
       case 'table':
         return renderTable(token, links);
-      case 'code':
-        return paragraph(run(token.text ?? '', { code: true }), 'CodeBlock');
+      case 'code': {
+        const codeRuns = String(token.text ?? '').split(/\\r?\\n/).map((line, index) => `${index ? '<w:r><w:br/></w:r>' : ''}${run(line, { code: true })}`).join('');
+        return paragraph(codeRuns, 'CodeBlock');
+      }
       case 'hr':
         return paragraph('', undefined, '<w:pBdr><w:bottom w:val="single" w:sz="8" w:color="CBD5E1"/></w:pBdr>');
       case 'space':
