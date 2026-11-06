@@ -11,7 +11,7 @@
  * - Aperçu de la structure des fichiers et progression d'ingestion
  */
 
-import { useState, useCallback, useEffect, useMemo, useId } from 'react';
+import { useState, useCallback, useEffect, useMemo, useId, useRef } from 'react';
 import {
   Search, Github, Loader2, XCircle, AlertCircle,
   FileCode, FolderOpen, Star, GitFork,
@@ -160,6 +160,8 @@ export function GitHubRepositoryImportModal({
 
   // Création d'un nouveau notebook
   const [creatingNotebook, setCreatingNotebook] = useState(false);
+  const [creatingNotebookRequest, setCreatingNotebookRequest] = useState(false);
+  const createNotebookRequestRef = useRef(false);
   const [newNotebookTitle, setNewNotebookTitle] = useState('');
 
   // Options d'ingestion
@@ -432,6 +434,9 @@ export function GitHubRepositoryImportModal({
   // ─── 7. Création de notebook rapide ──────────────────────────────────────
 
   const handleCreateNotebook = async () => {
+    if (createNotebookRequestRef.current) return;
+    createNotebookRequestRef.current = true;
+    setCreatingNotebookRequest(true);
     const title = newNotebookTitle.trim() || `Import - ${selectedRepo?.repo || 'GitHub'}`;
     try {
       const data = await api<{ notebook?: Notebook }>('/api/notebooks', {
@@ -448,9 +453,14 @@ export function GitHubRepositoryImportModal({
         setCreatingNotebook(false);
         setNewNotebookTitle('');
         success(`Notebook « ${title} » créé avec succès !`);
+      } else {
+        toastError('Le serveur n’a pas renvoyé le notebook créé.');
       }
     } catch (e: unknown) {
       toastError(`Erreur de création : ${errorMessage(e)}`);
+    } finally {
+      createNotebookRequestRef.current = false;
+      setCreatingNotebookRequest(false);
     }
   };
 
@@ -1086,10 +1096,10 @@ export function GitHubRepositoryImportModal({
                               placeholder={`Import ${selectedRepo.repo}`}
                               className="notebook-input flex-1 text-xs"
                             />
-                            <NbButton variant="primary" size="sm" onClick={handleCreateNotebook}>
+                            <NbButton variant="primary" size="sm" onClick={handleCreateNotebook} loading={creatingNotebookRequest} disabled={creatingNotebookRequest}>
                               Créer
                             </NbButton>
-                            <NbButton variant="ghost" size="sm" onClick={() => setCreatingNotebook(false)}>
+                            <NbButton variant="ghost" size="sm" onClick={() => setCreatingNotebook(false)} disabled={creatingNotebookRequest}>
                               Annuler
                             </NbButton>
                           </div>
