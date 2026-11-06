@@ -115,6 +115,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 transcript.push({ speaker: 'leanna', text: completed, round: rounds + 1 });
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
+                  try { leanna?.sendRealtimeInput({ audioStreamEnd: true }); } catch { /* best effort */ }
                   active = 'roxane';
                   roxane?.sendClientContent({
                     turns: [{ role: 'user', parts: [{ text: `Leanna vient de dire : ${completed || '(réponse vocale sans transcription)'}\nRéponds directement à son argument, puis donne ton avis à l'utilisateur.` }] }],
@@ -127,6 +128,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 rounds += 1;
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
+                  try { roxane?.sendRealtimeInput({ audioStreamEnd: true }); } catch { /* best effort */ }
                   active = 'leanna';
                   leanna?.sendClientContent({
                     turns: [{ role: 'user', parts: [{ text: `Roxane vient de répondre : ${completed || '(réponse vocale sans transcription)'}\nRéponds à son objection et poursuis le débat avec une proposition améliorée.` }] }],
@@ -227,6 +229,11 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       let message: any;
       try { message = JSON.parse(raw.toString()); } catch { send({ type: 'error', message: 'Message WebSocket invalide.' }); return; }
       if (message.type === 'start') { void start(message); return; }
+      if (message.type === 'mic_stop' && !finished) {
+        const target = active === 'leanna' ? leanna : roxane;
+        try { target?.sendRealtimeInput({ audioStreamEnd: true }); } catch { /* best effort */ }
+        return;
+      }
       if (message.type === 'interrupt') {
         send({ type: 'interrupted_by_user' });
         closeSessions();
