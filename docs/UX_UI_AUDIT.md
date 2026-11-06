@@ -449,3 +449,27 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier que l'utilisateur ne peut pas fermer le dialogue de création standard pendant la requête et que le bouton Annuler du formulaire GitHub est désactivé pendant la création.
 - Vérifier le comportement si le serveur renvoie une réponse 2xx sans objet `notebook`.
 - Exécuter typecheck, tests UI, lint et `ui:audit`; ces validations ne sont pas exécutables via l'accès GitHub seul.
+
+
+## Vingtième passe — Adaptation responsive de l'import GitHub
+
+### Constats vérifiés
+
+- Le panneau d'import GitHub imposait deux colonnes fixes de 44 % et 56 % quelle que soit la largeur de la fenêtre.
+- Sur une petite fenêtre Electron ou une largeur proche du mobile, les deux panneaux devenaient trop étroits pour les onglets, les listes de dépôts, les champs et les contrôles de configuration.
+- Les conteneurs flex n'explicitaient pas tous `min-width: 0` et `min-height: 0`, ce qui pouvait provoquer des débordements au lieu d'un défilement interne.
+
+### Corrections appliquées
+
+- Le layout passe en pile verticale sous le breakpoint `md`, et conserve les deux colonnes sur les fenêtres plus larges.
+- Le sélecteur de dépôts occupe toute la largeur et une hauteur maximale de 42 % en mode étroit ; le panneau de configuration récupère l'espace restant.
+- Les proportions 44/56 % sont conservées sur desktop.
+- Ajout de contraintes `min-w-0` et `min-h-0` aux conteneurs principaux pour laisser les zones de contenu défiler sans élargir le dialogue.
+
+### Validation restante
+
+- Tester des fenêtres Electron de 360, 480, 768, 1024 et 1440 px de largeur.
+- Vérifier que les trois onglets, les cartes de dépôts, le formulaire de lien direct, les filtres et le footer restent utilisables.
+- Vérifier que les zones de liste et de configuration défilent indépendamment et que le footer d'import reste visible.
+- Tester avec une hauteur de fenêtre réduite et avec la modale de configuration du token ouverte au-dessus.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis vérifier le rendu dans Electron.
