@@ -54,6 +54,7 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Dans les onglets éditeur, conservation des actions contextuelles (aperçu Markdown/HTML) et de l'enregistrement à portée immédiate ; minimap, retour à la ligne, formatage et modèles sont regroupés dans un menu « Plus ».
 - Ajout d'états accessibles pour les options activables et fermeture du menu par Échap ou clic extérieur.
 - Les onglets de fichiers reçoivent un libellé accessible et une interaction clavier.
+- La palette de commandes accepte maintenant des actions contextuelles fournies par l'IDE : explorateur, recherche, terminal, GitHub, sandbox, workflows, agents, missions et paramètres.
 
 ### À vérifier ensuite dans Electron
 
