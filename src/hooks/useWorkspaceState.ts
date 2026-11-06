@@ -22,7 +22,8 @@ export function useWorkspaceState() {
     setLoading(true);
     try {
       const token = localStorage.getItem('Leanna_api_token');
-      const headers = token ? { 'x-Leanna-token': token } : {};
+      const headers: Record<string, string> = {};
+      if (token) headers['x-Leanna-token'] = token;
 
       const [wsRes, statusRes] = await Promise.all([
         fetch('/api/workspace', { headers }),
