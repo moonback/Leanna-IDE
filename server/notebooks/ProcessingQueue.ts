@@ -10,6 +10,8 @@
  *   - Statistiques (temps moyen, erreurs, débit)
  */
 
+import fs from "fs";
+import path from "path";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ProcessingQueue");
@@ -50,6 +52,8 @@ export interface QueueConfig {
   retryBaseDelayMs: number;
   /** Taille maximale de la queue */
   maxQueueSize: number;
+  /** Fichier de reprise des tâches en attente (payloads JSON-serialisables). */
+  persistenceFile?: string;
 }
 
 export interface QueueStats {
@@ -84,7 +88,9 @@ export class ProcessingQueue<T = unknown> {
       maxRetries: config?.maxRetries ?? 3,
       retryBaseDelayMs: config?.retryBaseDelayMs ?? 1000,
       maxQueueSize: config?.maxQueueSize ?? 100,
+      persistenceFile: config?.persistenceFile,
     };
+    this.restorePending();
   }
 
   // ─── Configuration ─────────────────────────────────────────────────────────
@@ -92,6 +98,46 @@ export class ProcessingQueue<T = unknown> {
   /** Définit le handler qui traite les tâches */
   setHandler(handler: TaskHandler<T>): void {
     this.handler = handler;
+    this.processNext();
+  }
+
+  /** Recharge uniquement les tâches en attente. Les tâches en cours au crash
+   * ne sont pas rejouées automatiquement : leur effet externe peut être partiel. */
+  private restorePending(): void {
+    const file = this.config.persistenceFile;
+    if (!file || !fs.existsSync(file)) return;
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
+      if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as any).tasks)) {
+        throw new Error("Format de queue invalide.");
+      }
+      const restored = (parsed as any).tasks.filter((task: any) =>
+        task && typeof task.id === "string" && typeof task.type === "string"
+        && ["urgent", "normal", "low"].includes(task.priority)
+        && task.status === "pending" && Number.isInteger(task.attempts)
+        && Number.isInteger(task.maxAttempts) && task.maxAttempts > task.attempts
+        && typeof task.createdAt === "string" && task.payload !== undefined
+      ).slice(0, this.config.maxQueueSize) as QueueTask<T>[];
+      this.queue = restored;
+      log.info(`♻️ ${restored.length} tâche(s) en attente restaurée(s)`);
+    } catch (error: any) {
+      log.error(`Impossible de restaurer la queue persistée : ${error.message}`);
+    }
+  }
+
+  /** Persiste atomiquement la file en attente. */
+  private persistPending(): void {
+    const file = this.config.persistenceFile;
+    if (!file) return;
+    const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(temp, JSON.stringify({ version: 1, tasks: this.queue }), "utf-8");
+      fs.renameSync(temp, file);
+    } catch (error: any) {
+      try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch { /* best effort */ }
+      log.error(`Échec de persistance de la queue : ${error.message}`);
+    }
   }
 
   // ─── Ajout de tâches ───────────────────────────────────────────────────────
@@ -130,6 +176,7 @@ export class ProcessingQueue<T = unknown> {
     // Insérer selon la priorité
     const insertIndex = this.findInsertIndex(task.priority);
     this.queue.splice(insertIndex, 0, task);
+    this.persistPending();
 
     log.info(`📥 Tâche ajoutée: ${type} (${id}) [${task.priority}] — queue: ${this.queue.length}`);
 
@@ -148,6 +195,7 @@ export class ProcessingQueue<T = unknown> {
       task.completedAt = new Date().toISOString();
       this.queue.splice(index, 1);
       this.completed.push(task);
+      this.persistPending();
       this.emit(taskId, task);
       log.info(`❌ Tâche annulée: ${taskId}`);
       return true;
@@ -166,6 +214,7 @@ export class ProcessingQueue<T = unknown> {
     task.status = "processing";
     task.startedAt = new Date().toISOString();
     task.attempts++;
+    this.persistPending();
     this.processing.set(task.id, task);
 
     this.emit(task.id, task);
@@ -198,6 +247,7 @@ export class ProcessingQueue<T = unknown> {
         log.info(`🔄 Retry dans ${delay}ms...`);
         setTimeout(() => {
           this.queue.unshift(task); // Remettre en tête
+          this.persistPending();
           this.processNext();
         }, delay);
       } else {
@@ -212,6 +262,7 @@ export class ProcessingQueue<T = unknown> {
         this.completed.push(task);
         this.trimCompleted();
       }
+      this.persistPending();
       this.emit(task.id, task);
     }
 
@@ -314,6 +365,7 @@ export class ProcessingQueue<T = unknown> {
     }
     this.completed.push(...this.queue);
     this.queue = [];
+    this.persistPending();
     this.trimCompleted();
     log.info("🧹 Queue vidée");
   }
@@ -328,7 +380,13 @@ export interface SourceProcessingPayload {
   buffer: Buffer;
 }
 
+const NOTEBOOK_DATA_DIR = path.join(
+  process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd(),
+  ".Leanna", "notebooks"
+);
+
 export const sourceProcessingQueue = new ProcessingQueue<SourceProcessingPayload>({
+  persistenceFile: path.join(NOTEBOOK_DATA_DIR, "source-processing-queue.json"),
   concurrency: 2,
   maxRetries: 3,
   retryBaseDelayMs: 2000,
