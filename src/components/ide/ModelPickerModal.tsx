@@ -442,18 +442,16 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
           style={{ borderBottom: '1px solid var(--border-base)' }}
         >
           {headerContent}
-          {onClose && (
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={saving}
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)] flex-shrink-0"
-              style={{ color: 'var(--text-muted)' }}
-              aria-label="Fermer"
-            >
-              <X size={15} />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saving}
+            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)] flex-shrink-0"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Fermer"
+          >
+            <X size={15} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-3 py-3">
