@@ -84,11 +84,24 @@ export function validateOrchestrationPlan(plan: OrchestrationPlan): void {
   if (issues.length) throw new InvalidOrchestrationPlanError(issues);
 }
 
+export interface TaskSchedulerOptions {
+  /** Maximum number of tasks started concurrently by one orchestration. */
+  maxConcurrentTasks?: number;
+}
+
 export class TaskScheduler {
+  private readonly maxConcurrentTasks: number;
+
   constructor(
     private executor: TaskRunner,
-    private notifier?: ProgressNotifier
-  ) {}
+    private notifier?: ProgressNotifier,
+    options: TaskSchedulerOptions = {}
+  ) {
+    this.maxConcurrentTasks = options.maxConcurrentTasks ?? 4;
+    if (!Number.isInteger(this.maxConcurrentTasks) || this.maxConcurrentTasks < 1) {
+      throw new RangeError("maxConcurrentTasks doit être un entier supérieur ou égal à 1");
+    }
+  }
 
   /** Remplace le moteur d'exécution (bascule vers le runtime agentique). */
   setRunner(runner: TaskRunner): void {
@@ -165,10 +178,17 @@ export class TaskScheduler {
         continue;
       }
 
-      log.info(`[${orchShortId}] Lancement de ${ready.length} tâche(s) en parallèle`);
+      // Limiter la rafale de tâches prêtes : un plan volumineux ne doit pas
+      // déclencher un nombre illimité d'appels LLM/outils simultanés.
+      const batch = ready.slice(0, this.maxConcurrentTasks);
+      log.info(
+        `[${orchShortId}] Lancement de ${batch.length}/${ready.length} tâche(s) prêtes ` +
+        `(concurrence max: ${this.maxConcurrentTasks})`
+      );
 
-      // Lancer les tâches prêtes en parallèle
-      const executions = ready.map(async (task) => {
+      // Le lot suivant sera sélectionné à l'itération suivante, après mise à jour
+      // des statuts et des dépendances du lot courant.
+      const executions = batch.map(async (task) => {
         const taskShortId = task.id.slice(0, 8);
         const agentName = getAgentDefinition(task.role)?.name ?? task.role;
         // Injecter les résultats des dépendances dans le contexte
