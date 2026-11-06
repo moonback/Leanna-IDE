@@ -212,3 +212,27 @@ Le Supervisor inspecte les checkpoints ouverts avant toute reprise. Si un checkp
 - Un test simule un crash après écriture et avant décision : le runner ne doit pas être rappelé et aucun rollback automatique ne doit être tenté.
 
 Cette passe est un garde-fou fail-closed, pas encore un orchestrateur complet. La réconciliation manuelle du checkpoint et du ledger, le verrou inter-processus, le journal de tentative atomique et la comparaison des empreintes externes restent à implémenter. Tests/typecheck non exécutés depuis la session GitHub.
+
+## Passe R0 — journal de tentative et quarantaine après crash (2026-11-06)
+
+### Modifications appliquées
+
+- Le snapshot durable de mission conserve maintenant `activeAttempt` : numéro de tentative, identifiant du checkpoint, phase transactionnelle (`prepared`, `executing`, `verifying`, `committing`, `rolling_back`) et horodatage.
+- Le Supervisor persiste ce contexte avant le runner, avant la vérification, avant le commit et avant le rollback. Le contexte n'est effacé qu'après la finalisation de la transaction fichier.
+- Le nouvel état non terminal `RECOVERY_REQUIRED` permet de distinguer une mission récupérable automatiquement d'une mission dont les effets sont ambigus.
+- Au redémarrage, le Supervisor examine l'état de la machine, les tentatives encore actives, les checkpoints ouverts et les entrées `unknown` à effet de bord du `ExecutionLedger`.
+- Toute incohérence place la mission en quarantaine. Le runner n'est pas rappelé automatiquement. Un timeout avec runner toujours actif aboutit également à `RECOVERY_REQUIRED`, sans rollback concurrent.
+- Le `CheckpointManager` expose les checkpoints ouverts et l'historique de checkpoints par mission ; le ledger expose les entrées et effets inconnus par mission.
+
+### Tests ajoutés (non exécutés dans cette session)
+
+- Redémarrage simulé avec checkpoint ouvert et tentative `executing` : la mission doit être mise en quarantaine et le runner ne doit jamais être rappelé.
+- Redémarrage avec action externe `started` devenue `unknown` dans le ledger : la mission doit être mise en quarantaine sans rejouer l'action.
+
+### Limites explicites
+
+- Cette passe privilégie la sûreté : elle détecte et bloque les reprises ambiguës, mais ne restaure pas encore automatiquement un checkpoint ouvert. La réconciliation/compensation doit être une opération explicite, après vérification que l'ancien runner est arrêté.
+- Le verrou inter-processus/lease exclusif n'est pas encore implémenté. Deux processus démarrant simultanément peuvent encore lire le même état avant qu'un mécanisme de lease ne les sérialise.
+- La détection d'écritures externes concurrentes reste à renforcer par comparaison d'empreintes et politique de conflit. Un rollback automatique ne doit jamais écraser silencieusement une modification extérieure.
+- Les effets externes (API, base de données, Git distant, commandes système) ne sont pas annulables par un checkpoint fichier. Ils nécessitent des contrats de compensation ou une réconciliation métier.
+- Les tests, le typecheck et la CI n'ont pas été exécutés depuis cette session GitHub. Aucune validation d'exécution n'est revendiquée.
