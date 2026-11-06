@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Globe, Zap, Check, AlertCircle, Search, Filter, X } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -198,10 +198,12 @@ export const OPENROUTER_IMAGE_MODELS = [
 export function OpenRouterSection() {
   const { profile, setField } = useProfile();
   const [testing, setTesting] = useState(false);
+  const testingRef = useRef(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [testMessage, setTestMessage] = useState<string>('');
   // Test du modèle d'image (indépendant du test texte).
   const [testingImage, setTestingImage] = useState(false);
+  const testingImageRef = useRef(false);
   const [imageTestResult, setImageTestResult] = useState<'success' | 'error' | null>(null);
   const [imageTestMessage, setImageTestMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -240,6 +242,16 @@ export function OpenRouterSection() {
   }, [profile.openrouterApiKey, profile.openrouterImageModel]);
 
   const testConnection = async () => {
+    if (testingRef.current) return;
+    const apiKey = profile.openrouterApiKey.trim();
+    const model = profile.openrouterModel.trim();
+    if (!apiKey || !model) {
+      setTestResult('error');
+      setTestMessage(!apiKey ? 'Renseignez une clé API OpenRouter.' : 'Renseignez un ID de modèle.');
+      return;
+    }
+
+    testingRef.current = true;
     setTesting(true);
     setTestResult(null);
     setTestMessage('');
@@ -247,12 +259,12 @@ export function OpenRouterSection() {
       const res = await fetch('/api/openrouter/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: profile.openrouterApiKey,
-          model: profile.openrouterModel,
-        }),
+        body: JSON.stringify({ apiKey, model }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || typeof data !== 'object') {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Le serveur a répondu HTTP ${res.status}.`);
+      }
       if (data.status === 'success') {
         setTestResult('success');
         const reply = typeof data.reply === 'string' ? data.reply.trim() : '';
@@ -265,11 +277,22 @@ export function OpenRouterSection() {
       setTestResult('error');
       setTestMessage(e?.message || 'Connexion échouée.');
     } finally {
+      testingRef.current = false;
       setTesting(false);
     }
   };
 
   const testImageModel = async () => {
+    if (testingImageRef.current) return;
+    const apiKey = profile.openrouterApiKey.trim();
+    const model = profile.openrouterImageModel.trim();
+    if (!apiKey || !model) {
+      setImageTestResult('error');
+      setImageTestMessage(!apiKey ? 'Renseignez une clé API OpenRouter.' : 'Renseignez un ID de modèle image.');
+      return;
+    }
+
+    testingImageRef.current = true;
     setTestingImage(true);
     setImageTestResult(null);
     setImageTestMessage('');
@@ -277,12 +300,12 @@ export function OpenRouterSection() {
       const res = await fetch('/api/openrouter/test-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: profile.openrouterApiKey,
-          model: profile.openrouterImageModel,
-        }),
+        body: JSON.stringify({ apiKey, model }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || typeof data !== 'object') {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Le serveur a répondu HTTP ${res.status}.`);
+      }
       if (data.status === 'success') {
         setImageTestResult('success');
         const size = typeof data.sizeKB === 'number' ? ` (${data.sizeKB} Ko)` : '';
@@ -295,6 +318,7 @@ export function OpenRouterSection() {
       setImageTestResult('error');
       setImageTestMessage(e?.message || 'Génération échouée.');
     } finally {
+      testingImageRef.current = false;
       setTestingImage(false);
     }
   };
@@ -355,7 +379,7 @@ export function OpenRouterSection() {
                   type="button"
                   whileTap={{ scale: 0.95 }}
                   onClick={testConnection}
-                  disabled={testing || !profile.openrouterApiKey}
+                  disabled={testing || !profile.openrouterApiKey.trim() || !profile.openrouterModel.trim()}
                   className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                   style={{ backgroundColor: testResult === 'success' ? 'var(--color-success)' : testResult === 'error' ? 'var(--color-error)' : 'var(--accent-primary)' }}
                 >
@@ -482,6 +506,9 @@ export function OpenRouterSection() {
                 type="text"
                 value={profile.openrouterModel}
                 onChange={e => setField('openrouterModel', e.target.value)}
+                onBlur={e => setField('openrouterModel', e.currentTarget.value.trim())}
+                maxLength={200}
+                aria-label="ID du modèle OpenRouter"
                 placeholder="ex: anthropic/claude-sonnet-4"
                 className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
                 style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
@@ -514,7 +541,7 @@ export function OpenRouterSection() {
             type="button"
             whileTap={{ scale: 0.95 }}
             onClick={testImageModel}
-            disabled={testingImage || !profile.openrouterImageModel?.trim()}
+            disabled={testingImage || !profile.openrouterApiKey.trim() || !profile.openrouterImageModel?.trim()}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
             style={{ backgroundColor: imageTestResult === 'success' ? 'var(--color-success)' : imageTestResult === 'error' ? 'var(--color-error)' : 'var(--accent-primary)' }}
           >
@@ -580,6 +607,9 @@ export function OpenRouterSection() {
           type="text"
           value={profile.openrouterImageModel}
           onChange={e => setField('openrouterImageModel', e.target.value)}
+          onBlur={e => setField('openrouterImageModel', e.currentTarget.value.trim())}
+          maxLength={200}
+          aria-label="ID du modèle OpenRouter pour les images"
           placeholder="ex: google/gemini-3.6-flash-image"
           className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
           style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}

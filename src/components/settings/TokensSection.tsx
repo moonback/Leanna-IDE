@@ -16,6 +16,8 @@ interface GeminiKeyInfo {
 export function TokensSection() {
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tokensLoadError, setTokensLoadError] = useState<string | null>(null);
+  const [geminiLoadError, setGeminiLoadError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,6 +29,10 @@ export function TokensSection() {
   const [newKeyValue, setNewKeyValue] = useState('');
   const [newKeyLabel, setNewKeyLabel] = useState('');
   const [addingKey, setAddingKey] = useState(false);
+  const [busyGeminiIndex, setBusyGeminiIndex] = useState<number | null>(null);
+  const savingRef = useRef(false);
+  const addingKeyRef = useRef(false);
+  const busyGeminiRef = useRef(false);
 
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,75 +51,75 @@ export function TokensSection() {
 
   const fetchTokens = async () => {
     setLoading(true);
+    setTokensLoadError(null);
     try {
       const res = await fetch('/api/tokens');
       const data = await res.json();
-      if (data.status === 'success') setTokens(data.tokens);
-    } catch { setTokens([]); }
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.tokens)) throw new Error(data.error || ('Chargement impossible (HTTP ' + res.status + ')'));
+      setTokens(data.tokens);
+    } catch (error) { setTokensLoadError(error instanceof Error ? error.message : 'Impossible de charger les tokens'); }
     finally { setLoading(false); }
   };
 
   const fetchGeminiKeys = async () => {
+    setGeminiLoadError(null);
     try {
       const res = await fetch('/api/gemini-keys');
       const data = await res.json();
-      if (data.status === 'success') setGeminiKeys(data.keys);
-    } catch { setGeminiKeys([]); }
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.keys)) throw new Error(data.error || ('Chargement impossible (HTTP ' + res.status + ')'));
+      setGeminiKeys(data.keys);
+    } catch (error) { setGeminiLoadError(error instanceof Error ? error.message : 'Impossible de charger le pool Gemini'); }
   };
 
   const handleSave = async (key: string) => {
-    setSaving(true); setFeedback(null);
+    if (savingRef.current || !editValue.trim()) return;
+    savingRef.current = true; setSaving(true); setFeedback(null);
     try {
-      const res = await fetch('/api/tokens', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: editValue }),
-      });
+      const res = await fetch('/api/tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: editValue.trim() }) });
       const data = await res.json();
-      if (data.status === 'success') {
-        setFeedback({ type: 'success', message: `${key} mis à jour` });
-        setEditingKey(null); setEditValue(''); fetchTokens(); fetchGeminiKeys();
-      } else { setFeedback({ type: 'error', message: data.error || 'Erreur' }); }
-    } catch (e: any) { setFeedback({ type: 'error', message: e.message || 'Erreur réseau' }); }
-    finally { setSaving(false); }
+      if (!res.ok || data.status !== 'success') throw new Error(data.error || ('Enregistrement impossible (HTTP ' + res.status + ')'));
+      setFeedback({ type: 'success', message: key + ' mis à jour' }); setEditingKey(null); setEditValue('');
+      await Promise.all([fetchTokens(), fetchGeminiKeys()]);
+    } catch (error) { setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Erreur réseau lors de la sauvegarde' }); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const handleAddGeminiKey = async () => {
-    if (!newKeyValue.trim()) return;
-    setAddingKey(true); setFeedback(null);
+    const key = newKeyValue.trim();
+    if (!key || addingKeyRef.current) return;
+    addingKeyRef.current = true; setAddingKey(true); setFeedback(null);
     try {
-      const res = await fetch('/api/gemini-keys', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: newKeyValue.trim(), label: newKeyLabel.trim() || undefined }),
-      });
+      const res = await fetch('/api/gemini-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, label: newKeyLabel.trim() || undefined }) });
       const data = await res.json();
-      if (data.status === 'success') {
-        setGeminiKeys(data.keys);
-        setNewKeyValue(''); setNewKeyLabel(''); setShowAddKey(false);
-        setFeedback({ type: 'success', message: 'Clé Gemini ajoutée au pool' });
-      } else {
-        setFeedback({ type: 'error', message: data.error || 'Erreur' });
-      }
-    } catch (e: any) { setFeedback({ type: 'error', message: e.message || 'Erreur réseau' }); }
-    finally { setAddingKey(false); }
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.keys)) throw new Error(data.error || ('Ajout impossible (HTTP ' + res.status + ')'));
+      setGeminiKeys(data.keys); setGeminiLoadError(null); setNewKeyValue(''); setNewKeyLabel(''); setShowAddKey(false);
+      setFeedback({ type: 'success', message: 'Clé Gemini ajoutée au pool' });
+    } catch (error) { setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Erreur réseau lors de l’ajout' }); }
+    finally { addingKeyRef.current = false; setAddingKey(false); }
   };
 
   const handleRemoveGeminiKey = async (index: number) => {
+    if (busyGeminiRef.current) return;
+    const key = geminiKeys.find(item => item.index === index);
+    if (!key || !window.confirm('Supprimer la clé « ' + key.label + ' » du pool Gemini ? Cette action est irréversible.')) return;
+    busyGeminiRef.current = true; setBusyGeminiIndex(index); setFeedback(null);
     try {
-      const res = await fetch(`/api/gemini-keys/${index}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setGeminiKeys(data.keys);
-        setFeedback({ type: 'success', message: 'Clé supprimée du pool' });
-      }
-    } catch (e: any) { setFeedback({ type: 'error', message: e.message || 'Erreur' }); }
+      const res = await fetch('/api/gemini-keys/' + index, { method: 'DELETE' }); const data = await res.json();
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.keys)) throw new Error(data.error || ('Suppression impossible (HTTP ' + res.status + ')'));
+      setGeminiKeys(data.keys); setFeedback({ type: 'success', message: 'Clé supprimée du pool' });
+    } catch (error) { setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Erreur réseau lors de la suppression' }); }
+    finally { busyGeminiRef.current = false; setBusyGeminiIndex(null); }
   };
 
   const handleToggleGeminiKey = async (index: number) => {
+    if (busyGeminiRef.current) return;
+    busyGeminiRef.current = true; setBusyGeminiIndex(index); setFeedback(null);
     try {
-      const res = await fetch(`/api/gemini-keys/${index}/toggle`, { method: 'PATCH' });
-      const data = await res.json();
-      if (data.status === 'success') setGeminiKeys(data.keys);
-    } catch (e: any) { setFeedback({ type: 'error', message: e.message || 'Erreur' }); }
+      const res = await fetch('/api/gemini-keys/' + index + '/toggle', { method: 'PATCH' }); const data = await res.json();
+      if (!res.ok || data.status !== 'success' || !Array.isArray(data.keys)) throw new Error(data.error || ('Modification impossible (HTTP ' + res.status + ')'));
+      setGeminiKeys(data.keys);
+    } catch (error) { setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Erreur réseau lors de la modification' }); }
+    finally { busyGeminiRef.current = false; setBusyGeminiIndex(null); }
   };
 
   if (loading) {
@@ -136,6 +142,7 @@ export function TokensSection() {
     >
       {/* ─── Gemini Key Pool ─── */}
       <div className="mb-4 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
+        {geminiLoadError && <div role="alert" className="mb-3 rounded-lg px-3 py-2 text-xs" style={{ color: 'var(--color-error)', backgroundColor: 'var(--color-error-subtle)' }}>Impossible de charger le pool Gemini : {geminiLoadError} <button type="button" className="ml-2 underline" onClick={fetchGeminiKeys}>Réessayer</button></div>}
         <div className="flex items-center justify-between mb-2">
           <div>
             <div className="flex items-center gap-2">
@@ -155,7 +162,7 @@ export function TokensSection() {
               Rotation automatique en cas de rate-limit (429)
             </p>
           </div>
-          <motion.button type="button" onClick={() => setShowAddKey(!showAddKey)}
+          <motion.button type="button" disabled={addingKey} onClick={() => setShowAddKey(!showAddKey)}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-white"
             style={{ backgroundColor: 'var(--accent-primary)' }}>
@@ -220,7 +227,7 @@ export function TokensSection() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button type="button" onClick={() => handleToggleGeminiKey(gk.index)}
+                  <button type="button" disabled={busyGeminiIndex !== null} onClick={() => handleToggleGeminiKey(gk.index)}
                     title={gk.disabled ? 'Activer' : 'Désactiver'}
                     className="p-1 rounded transition-colors hover:bg-[color-mix(in_srgb,var(--text-muted)_10%,transparent)]">
                     {gk.disabled 
@@ -228,7 +235,7 @@ export function TokensSection() {
                       : <ToggleRight size={14} style={{ color: 'var(--color-success)' }} />
                     }
                   </button>
-                  <button type="button" onClick={() => handleRemoveGeminiKey(gk.index)}
+                  <button type="button" disabled={busyGeminiIndex !== null} onClick={() => handleRemoveGeminiKey(gk.index)}
                     title="Supprimer"
                     className="p-1 rounded transition-colors hover:bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]">
                     <Trash2 size={12} style={{ color: 'var(--color-error)' }} />
@@ -241,6 +248,7 @@ export function TokensSection() {
       </div>
 
       {/* ─── Other Tokens ─── */}
+      {tokensLoadError && <div role="alert" className="mb-3 rounded-lg px-3 py-2 text-xs" style={{ color: "var(--color-error)", backgroundColor: "var(--color-error-subtle)" }}>Impossible de charger les tokens : {tokensLoadError} <button type="button" className="ml-2 underline" onClick={fetchTokens}>Réessayer</button></div>}
       <div className="grid grid-cols-1 gap-3 pr-1 sm:grid-cols-2">
         {tokens.map(token => (
           <div key={token.key} className="rounded-xl p-3"

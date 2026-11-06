@@ -519,3 +519,356 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Double-cliquer sur Appliquer et vérifier qu'une seule requête est envoyée.
 - Vérifier les variantes modale et panneau docké, notamment la fermeture Escape et le bouton Fermer pendant la synchronisation.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-troisième passe — Robustesse de la gestion des clés API
+
+### Constats vérifiés
+
+- Les chargements de `/api/tokens` et `/api/gemini-keys` ignoraient les statuts HTTP non réussis et pouvaient présenter un échec réseau comme une liste vide.
+- Les mutations des clés Gemini (ajout, activation/désactivation, suppression) ne vérifiaient pas systématiquement `response.ok` et pouvaient échouer sans retour visible.
+- Les opérations d'ajout, de suppression et d'activation ne disposaient pas toutes d'un verrou synchrone contre les interactions répétées.
+- La suppression d'une clé Gemini se faisait sans confirmation.
+
+### Corrections appliquées
+
+- Contrôle des statuts HTTP, du statut applicatif et de la structure des données retournées avant de mettre à jour l'interface.
+- États d'erreur distincts pour le chargement des tokens et du pool Gemini, avec action de nouvelle tentative.
+- Verrous synchrones anti-double soumission pour l'enregistrement des tokens, l'ajout de clé et les mutations du pool Gemini.
+- Désactivation des actions concurrentes du pool pendant une mutation.
+- Confirmation explicite avant suppression d'une clé Gemini.
+- Les erreurs réseau et serveur sont désormais exposées dans l'interface au lieu d'être silencieusement ignorées.
+
+### Validation restante
+
+- Simuler HTTP 401/403/500 et une réponse JSON invalide pour les deux endpoints de lecture ; vérifier que l'erreur et l'action Réessayer sont visibles et qu'aucune liste vide trompeuse n'est affichée.
+- Simuler HTTP 500 et une panne réseau sur l'ajout, l'activation, la désactivation et la suppression ; vérifier le message et la possibilité de réessayer.
+- Double-cliquer sur Ajouter et sur les actions du pool ; vérifier qu'une seule requête de mutation est envoyée.
+- Annuler puis confirmer la suppression ; vérifier qu'aucune requête DELETE ne part après annulation.
+- Vérifier le comportement de l'interface pendant une mutation et après démontage de la page.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-quatrième passe — Validation et tests OpenRouter
+
+### Constats vérifiés
+
+- Les tests de connexion texte et de génération d'image interprétaient le JSON sans vérifier le statut HTTP ; une réponse 401/500 pouvait être présentée comme une erreur applicative générique.
+- Une réponse non JSON provoquait une exception de parsing, sans message orienté utilisateur.
+- Les gestionnaires reposaient uniquement sur l'état React pour empêcher les doubles lancements ; deux événements rapprochés pouvaient démarrer plusieurs tests avant le rendu suivant.
+- Le test texte pouvait être lancé avec un identifiant de modèle vide ou composé d'espaces ; les identifiants personnalisés n'étaient pas normalisés à la sortie du champ.
+- Le test du modèle image ne vérifiait pas explicitement la présence de la clé API.
+
+### Corrections appliquées
+
+- Contrôle de `response.ok` et validation minimale de la réponse JSON pour les deux endpoints OpenRouter.
+- Messages explicites pour les réponses HTTP non réussies et les réponses non JSON.
+- Verrous synchrones via `useRef` pour empêcher les tests texte et image concurrents.
+- Vérification des champs obligatoires avant chaque test ; les valeurs transmises au serveur sont nettoyées avec `trim()`.
+- Normalisation des identifiants de modèles personnalisés au blur, limite de saisie à 200 caractères et libellés accessibles sur les deux champs.
+
+### Validation restante
+
+- Simuler HTTP 401, 429 et 500, une panne réseau et une réponse HTML/non JSON sur les deux endpoints.
+- Double-cliquer rapidement sur les deux boutons de test et vérifier qu'une seule requête part pour chaque type de test.
+- Vérifier les identifiants personnalisés avec espaces périphériques, champ vide, slash fournisseur/modèle, suffixe de variante et longueur maximale.
+- Vérifier qu'une clé absente ou un modèle vide bloque le test avec un message explicite.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les deux tests dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-cinquième passe — Fiabilité des garde-fous et du rollback
+
+### Constats vérifiés
+
+- Le hook partagé `useSafeguardsConfig` lançait la persistance depuis un updater React, sans attendre la réponse HTTP et en ignorant les erreurs réseau/serveur.
+- Plusieurs changements rapprochés pouvaient envoyer des snapshots concurrents et finir par persister un état plus ancien que celui affiché.
+- Le chargement de la configuration traitait une réponse HTTP non réussie comme une configuration par défaut, sans expliquer la panne.
+- La liste des checkpoints transformait une erreur API en liste vide, ce qui faisait croire qu'aucun checkpoint n'existait.
+- La validation manuelle ne contrôlait ni le statut HTTP ni la structure de la réponse et ne disposait pas de verrou synchrone contre les doubles lancements.
+- Le résultat de validation revenait automatiquement à l'état neutre après cinq secondes, masquant parfois le résultat avant que l'utilisateur ait pu le lire.
+- Le retour arrière ne protégeait pas le gestionnaire par un verrou synchrone et le rafraîchissement des checkpoints n'était pas attendu.
+
+### Corrections appliquées
+
+- Persistance des paramètres hors de l'updater React, avec une file séquentielle pour préserver l'ordre des changements rapides.
+- Vérification HTTP et gestion des réponses JSON invalides pour la lecture et l'écriture de la configuration.
+- Exposition des erreurs de sauvegarde et de chargement dans l'interface, avec action de rechargement.
+- États d'erreur distincts pour la liste des checkpoints, avec action Réessayer au lieu d'un état vide trompeur.
+- Verrou synchrone pour empêcher les validations manuelles concurrentes et vérification de la réponse serveur.
+- Le résultat de validation reste visible jusqu'à la prochaine tentative ; les échecs détaillés sont affichés.
+- Verrou synchrone du rollback et attente du rafraîchissement de la liste après l'opération.
+
+### Validation restante
+
+- Basculer rapidement plusieurs garde-fous et vérifier que les POST sont séquentiels et que le dernier état choisi est celui conservé côté serveur.
+- Simuler HTTP 500 et une panne réseau lors du chargement et de la sauvegarde de la configuration ; vérifier le message et le rechargement.
+- Simuler une réponse JSON invalide ou un tableau de checkpoints absent ; vérifier l'état d'erreur et le bouton Réessayer.
+- Double-cliquer sur Validation manuelle et vérifier qu'une seule requête part ; tester réponses success, échec métier, HTTP 500 et JSON invalide.
+- Confirmer puis annuler un rollback ; vérifier qu'une seule mutation est lancée, que le retour est signalé correctement et que la liste est rafraîchie.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-sixième passe — Sécurité d'affichage et fiabilité des variables d'environnement
+
+### Constats vérifiés
+
+- Le chargement et la révélation des secrets ne contrôlaient pas systématiquement le statut HTTP ; une réponse serveur non JSON pouvait masquer la nature de l'erreur.
+- Le bouton de rechargement pouvait effacer les modifications non enregistrées sans confirmation.
+- La sauvegarde ne vérifiait que le statut applicatif et pouvait interpréter une réponse HTTP d'erreur comme un succès si le corps contenait un statut trompeur.
+- Les réponses partielles contenant des clés rejetées effaçaient toutes les modifications locales, y compris les champs refusés.
+- Les champs restaient éditables pendant une sauvegarde ; une modification faite pendant la requête pouvait être supprimée par le nettoyage de l'état après succès.
+- Lorsqu'un secret était modifié après révélation, le composant pouvait basculer vers un champ texte sans mécanisme de masquage local ; le bouton de masquage était désactivé pendant l'édition.
+
+### Corrections appliquées
+
+- Vérification HTTP et parsing JSON défensif pour le chargement, la révélation et la sauvegarde.
+- Messages d'erreur distincts pour les réponses invalides, les erreurs HTTP et les pannes réseau.
+- Confirmation explicite avant un rechargement manuel qui abandonnerait des modifications non enregistrées.
+- Verrou synchrone contre les doubles sauvegardes et contre les demandes de révélation concurrentes pour une même clé.
+- Conservation des modifications rejetées par le serveur et affichage d'un retour d'erreur explicite au lieu de les perdre silencieusement.
+- Conservation des nouvelles modifications saisies pendant une sauvegarde, en comparant l'état courant au snapshot réellement envoyé.
+- Les secrets en cours d'édition restent dans un champ masquable (type password par défaut) ; le contrôle de masquage/révélation reste disponible pendant l'édition.
+
+### Validation restante
+
+- Simuler GET /api/env et GET /api/env/reveal/:key en HTTP 401/500, réponse HTML/non JSON et panne réseau.
+- Simuler POST /api/env en HTTP 500, réponse JSON invalide, succès complet et succès partiel avec clés rejetées.
+- Modifier un champ pendant une sauvegarde lente ; vérifier que la nouvelle valeur reste en attente après la réponse.
+- Cliquer deux fois rapidement sur Enregistrer et sur Révéler ; vérifier une seule requête par action.
+- Modifier un secret après l'avoir révélé ; vérifier qu'il est masqué par défaut et que l'utilisateur peut le révéler/masquer explicitement.
+- Cliquer sur Recharger avec des modifications en attente, confirmer puis annuler ; vérifier la conservation ou l'abandon attendu.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis tester les parcours secrets dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-septième passe — Cohérence de persistance du profil et des préférences
+
+### Constats vérifiés
+
+- La sauvegarde du profil contrôlait le statut HTTP, mais pas le contrat JSON `{ success: true }` renvoyé par la route serveur ; une réponse HTTP 200 avec un corps applicatif en erreur pouvait être annoncée comme réussie.
+- Le paramètre « Présence vocale continue » (`voiceAlwaysOn`) était modifiable dans l'interface mais absent du payload manuel de sauvegarde et de la liste des champs synchronisés par le contexte.
+- La réinitialisation supprimait uniquement la copie locale : le profil serveur conservait ses anciennes valeurs et pouvait les réappliquer au prochain chargement.
+- La réinitialisation n'était pas protégée par le verrou de sauvegarde pendant son opération asynchrone et ne notifiait pas les sessions actives après synchronisation.
+
+### Corrections appliquées
+
+- La synchronisation centralisée du profil vérifie désormais le statut HTTP, parse défensivement le JSON et exige `success === true`.
+- Le champ `voiceAlwaysOn` est inclus dans les champs synchronisés et dans la sauvegarde manuelle.
+- La réinitialisation écrit les valeurs par défaut dans le stockage local puis les synchronise avec `/api/profile`.
+- Le bouton de réinitialisation utilise le même verrou que la sauvegarde, affiche un état occupé et distingue le succès complet d'un échec de synchronisation.
+- Une notification de changement des paramètres est émise après la réinitialisation synchronisée afin que les sessions actives puissent se reconnecter.
+
+### Validation restante
+
+- Sauvegarder le profil avec une réponse serveur `200 { success: false }`, une réponse non JSON, une erreur HTTP et une panne réseau ; aucun de ces cas ne doit afficher un succès.
+- Modifier `voiceAlwaysOn`, sauvegarder, redémarrer l'application et vérifier que l'option reste cohérente côté UI et runtime.
+- Réinitialiser le profil, vérifier les valeurs par défaut en local et via `GET /api/profile`, puis redémarrer.
+- Simuler une panne serveur pendant la réinitialisation : les valeurs locales doivent rester réinitialisées et l'interface doit signaler clairement la synchronisation incomplète.
+- Vérifier que le bouton reste désactivé pendant la sauvegarde/réinitialisation et que la session vocale est reconnectée après succès.
+- Exécuter typecheck, lint, tests du profil et tests de parcours Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-huitième passe — Fiabilité et périmètre des suppressions de données
+
+### Constats vérifiés
+
+- Les suppressions de conversations et les purges sélectives lisaient le JSON sans vérifier le statut HTTP ; une réponse HTTP d'erreur ou un corps non JSON pouvait produire un message trompeur.
+- Le vidage mémoire ne validait pas le compteur retourné et ne distinguait pas explicitement les erreurs HTTP des réponses métier.
+- Le scope `memories` de `DELETE /api/data/all` supprimait toutes les lignes de la table, alors que la route dédiée limite la suppression au projet actif. La sélection multiple pouvait donc avoir un périmètre plus large que le parcours dédié.
+- Les actions de purge s'appuyaient principalement sur l'état React pour éviter les doubles clics ; aucun verrou synchrone ne protégeait les requêtes avant le rendu suivant.
+- La route de purge sélective ignorait silencieusement les scopes invalides lorsqu'au moins un scope valide était fourni.
+
+### Corrections appliquées
+
+- Ajout d'un parseur de réponse API défensif : contrôle HTTP, gestion des réponses non JSON et validation de l'objet JSON avant lecture des champs.
+- Vérification du contrat applicatif et du compteur pour les suppressions de conversations, mémoires et scopes sélectionnés ; les erreurs serveur sont affichées au lieu d'être interprétées comme des succès.
+- Ajout de verrous synchrones pour les actions de suppression des conversations, mémoires et sélections. Le stockage local conserve également son verrou anti-double déclenchement.
+- Alignement du scope sélectif `memories` sur le projet actif, avec invalidation du cache mémoire après suppression.
+- Rejet HTTP 400 de toute sélection vide, de tout corps `scopes` mal formé et de toute sélection contenant un scope inconnu ou mal typé ; une requête explicite invalide ne peut plus retomber sur la purge globale.
+- Le message de réussite du vidage mémoire précise désormais qu'il concerne le projet actif.
+
+### Validation restante
+
+- Vérifier les réponses de `DELETE /api/memories/all` : succès avec compteur numérique, HTTP 400 (aucun projet actif), HTTP 500, panne réseau et JSON invalide.
+- Purger le scope `memories` seul puis avec d'autres scopes ; vérifier que seules les mémoires du projet actif sont supprimées et que les mémoires d'un autre projet restent intactes.
+- Envoyer un tableau vide, un champ `scopes` non tableau, ou un scope valide accompagné d'un scope inconnu/non textuel ; vérifier que l'API répond HTTP 400 et ne lance aucune suppression.
+- Double-cliquer rapidement sur chacune des actions ; vérifier qu'une seule opération est déclenchée.
+- Tester les réponses de purge complète et partielle (HTTP 200/207), vérifier le détail des scopes supprimés et les erreurs par scope.
+- Vérifier que le stockage local ne se vide qu'après confirmation, que l'annulation ne déclenche rien et que le rechargement intervient après succès.
+- Exécuter typecheck, lint, tests API/UI et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-neuvième passe — Intégrité des sauvegardes, import et restauration
+
+### Constats vérifiés
+
+- Le routeur de sauvegarde acceptait des identifiants de backup et de notebook sans validation de format avant leur utilisation par le service de fichiers.
+- La restauration d'un notebook copiait le fichier sans vérifier préalablement que son JSON était valide et cohérent avec l'identifiant demandé.
+- Les métadonnées des sauvegardes étaient parsées puis utilisées sans contrôle de leur structure, de leur date, de leurs compteurs ou de la cohérence entre l'identifiant du dossier et celui du document.
+- La création d'un backup comptabilisait le nombre de fichiers candidats plutôt que le nombre de notebooks effectivement copiés et validés.
+- La configuration de rotation acceptait des intervalles et des nombres de backups non bornés.
+- L'import Marketplace lisait le JSON puis appelait directement l'installation avec l'identifiant fourni. Un fichier exporté depuis un autre registre n'était donc pas réellement importé : son identifiant n'existait pas nécessairement dans le registre local.
+- L'import ne limitait pas la taille du fichier ni le nombre de paquets et ne validait pas suffisamment leur structure avant de commencer les mutations.
+
+### Corrections appliquées
+
+- Validation stricte des identifiants backup-* et des identifiants de notebook avant tout accès aux chemins de restauration.
+- Vérification que le dossier de sauvegarde résolu reste dans le répertoire de backups.
+- Validation des métadonnées : identifiant correspondant au dossier, date exploitable, compteurs entiers non négatifs et liste d'identifiants valide. Les métadonnées corrompues sont ignorées.
+- Validation du JSON du notebook et de la cohérence de son identifiant avant restauration.
+- Validation des embeddings présents avant le remplacement des fichiers courants ; écriture des fichiers restaurés via fichiers temporaires puis renommage.
+- Comptage des notebooks effectivement validés et copiés lors de la création d'une sauvegarde.
+- Bornes de configuration : intervalle de 60 secondes à 30 jours, rotation de 1 à 100 sauvegardes et booléen strict pour l'activation.
+- Contrats HTTP de sauvegarde renforcés : corps JSON, identifiants, compteurs de restauration et propriétés de configuration validés ; les restaurations partielles renvoient HTTP 207.
+- Import Marketplace réellement fonctionnel : contrôle du format, taille maximale de 5 Mo, maximum de 20 paquets, validation structurelle de l'ensemble du fichier et prévalidation serveur de tous les paquets (schéma Zod + analyse de sécurité) avant toute écriture. Les paquets sont ensuite republiés dans le registre local puis installés ; les erreurs partielles sont remontées.
+
+### Fichiers concernés
+
+- server/notebooks/BackupService.ts
+- server/notebooks/BackupService.test.ts
+- server/routes/notebooks/backupRouter.ts
+- server/routes/notebooks/backupRouter.test.ts
+- src/components/panels/MarketplacePanel.tsx
+
+### Vérifications automatisées ajoutées
+
+- Refus des identifiants de restauration contenant un chemin.
+- Ignorance des métadonnées invalides ou incohérentes.
+- Refus des identifiants de notebook mal typés.
+- Refus des intervalles et limites de rotation hors bornes.
+- Refus des propriétés inconnues et des configurations vides.
+
+### Validation restante
+
+- Exécuter les tests BackupService.test.ts et backupRouter.test.ts, puis typecheck, lint et tests complets.
+- Vérifier une restauration valide avec et sans embeddings, puis une sauvegarde contenant un notebook JSON corrompu.
+- Simuler une erreur d'écriture disque et vérifier qu'aucun backup incomplet n'est annoncé comme complet.
+- Importer un paquet exporté depuis un autre profil, un JSON mal formé, un tableau vide, un tableau de 21 paquets et un paquet signalé par l'analyse de sécurité.
+- Vérifier le résultat d'un import partiel et empêcher une double importation déclenchée par des événements rapprochés.
+- Tester les exports PDF/DOCX/HTML et les téléchargements Marketplace avec des noms contenant guillemets, caractères Unicode et caractères de contrôle.
+- Vérifier manuellement dans Electron les confirmations, états de progression, retours d'erreur et téléchargements.
+- Les commandes locales et les parcours Electron ne sont pas exécutés par l'accès GitHub seul ; aucune réussite de typecheck ou de CI n'est revendiquée ici.
+
+
+## Trentième passe — Sécurisation des exports et cohérence des formats
+
+### Constats vérifiés
+
+- Les routes d'export acceptaient des champs de métadonnées sans limites explicites et ne validaient pas les thèmes ou formats demandés.
+- Le nom de fichier était assemblé directement depuis le titre ou le nom fourni ; le format de l'en-tête de téléchargement n'était pas normalisé de manière uniforme.
+- Les convertisseurs Markdown vers HTML et Word laissaient passer les blocs HTML bruts issus du Markdown, ce qui pouvait produire du contenu actif dans les fichiers exportés.
+- La route notebook retombait implicitement sur PDF pour tout format inconnu et ne validait pas l'identifiant avant lecture.
+- L'export Word nommé DOCX ne génère pas un paquet OpenXML DOCX : il produit un document HTML compatible Word avec le type MIME `application/msword`. Le téléchargement est donc nommé `.doc` pour ne pas annoncer un format binaire inexistant.
+
+### Corrections appliquées
+
+- Validation commune du corps, du Markdown non vide, de la limite de 2 Mio, des titres et noms de fichiers (longueur et caractères de contrôle).
+- Normalisation Unicode des noms de téléchargement, suppression des caractères spéciaux et génération d'un en-tête Content-Disposition avec nom ASCII de repli et paramètre UTF-8.
+- Rejet explicite des thèmes et formats inconnus ; validation stricte de l'identifiant notebook avant accès au gestionnaire. L'alias historique `docx` reste accepté en entrée pour compatibilité, mais produit explicitement un fichier Word HTML `.doc`.
+- Limitation de la taille du contenu assemblé à partir d'un notebook.
+- Échappement des blocs HTML bruts du Markdown dans les exporteurs HTML et Word ; les éléments Markdown structurés restent convertis normalement.
+- Messages d'erreur serveur stabilisés et absence de détails internes renvoyés au client.
+
+### Fichiers concernés
+
+- server/routes/export.ts
+- server/routes/export.test.ts
+- server/export/htmlExporter.ts
+- server/export/docxExporter.ts
+
+### Vérifications automatisées ajoutées
+
+- Refus des thèmes inconnus, noms avec caractères de contrôle et Markdown dépassant 2 Mio.
+- Refus des identifiants notebook contenant un chemin et des formats notebook inconnus.
+
+### Limites et validation restante
+
+- Le format Word historique reste un HTML compatible Word (.doc), pas un véritable DOCX OpenXML. Une migration réelle nécessitera une dépendance DOCX dédiée et la mise à jour des interfaces qui affichent actuellement DOCX.
+- L'échappement des balises HTML brutes protège le rendu HTML exporté ; il ne constitue pas une politique complète de désinfection de contenu externe pour tous les consommateurs Markdown de l'application.
+- Exécuter les tests export, typecheck, lint et tests complets ; vérifier l'ouverture des fichiers PDF, DOC et HTML dans les applications cibles et les téléchargements sur Windows/Electron.
+- Ces commandes et vérifications Electron ne sont pas exécutées via le connecteur GitHub seul.
+
+
+## Trente-et-unième passe — Génération DOCX OpenXML native
+
+### Constat
+
+- L'exporteur nommé `exportToDocx` produisait un document HTML Word-compatible. Il ne contenait ni conteneur ZIP, ni parties WordprocessingML et ne constituait donc pas un DOCX conforme.
+
+### Corrections appliquées
+
+- Remplacement de l'export HTML par un générateur OpenXML : paquet ZIP avec `[Content_Types].xml`, relations, `word/document.xml`, styles, numérotation et propriétés principales.
+- Conversion des titres, paragraphes, emphases, code inline, blocs de code, listes ordonnées/non ordonnées, tableaux, citations et liens HTTP(S) cliquables.
+- Échappement XML des contenus et métadonnées ; les blocs HTML bruts sont traités comme du texte.
+- Export HTTP `/api/export/docx` et export de notebooks en DOCX avec extension et type MIME OpenXML corrects. L'ancien format `doc` du parcours notebook est conservé comme alias vers le DOCX.
+- Tests de structure ZIP, présence des parties OpenXML, conversion des éléments Markdown, liens et échappement.
+
+### Fichiers concernés
+
+- `server/export/docxExporter.ts`
+- `server/export/docxExporter.test.ts`
+- `server/routes/export.ts`
+
+### Validation restante
+
+- Exécuter les tests DOCX et routes export, `npm run typecheck`, `npm run typecheck:test`, lint et tests complets.
+- Ouvrir les fichiers générés avec Microsoft Word et LibreOffice ; vérifier les tableaux multi-colonnes, listes imbriquées, caractères Unicode et documents volumineux.
+- Le générateur ZIP/OpenXML est volontairement autonome et doit faire l'objet d'une validation d'interopérabilité réelle avant de déclarer la compatibilité Word comme certifiée.
+- Les validations locales/Electron ne sont pas exécutées par le connecteur GitHub seul.
+
+
+## Trente-deuxième passe — Validation des imports documentaires
+
+### Constats vérifiés
+
+- Le point d'entrée `/api/documents/upload` acceptait des fichiers jusqu'à 50 Mio alors que le traitement en mémoire n'avait pas de limite cohérente avec le circuit d'analyse.
+- Le filtre d'upload acceptait certaines extensions (dont DOCX et images) que `ContentExtractor.extractFromBuffer` ne savait pas réellement décoder : ces contenus pouvaient être interprétés comme du texte UTF-8.
+- Le MIME fourni par le client était accepté sans contrôle de cohérence avec l'extension ni vérification de signature PDF.
+- Le nom original pouvait contenir des séparateurs de chemin et des caractères de contrôle avant d'être utilisé comme titre/source du document.
+
+### Corrections appliquées
+
+- Ajout de `server/utils/documentUploadValidation.ts` comme contrat de validation unique pour le circuit Document Knowledge.
+- Limite explicite à 10 Mio et un seul fichier par requête.
+- Formats limités aux types réellement décodés par l'extracteur Buffer : PDF, TXT, Markdown et HTML. DOCX et images sont retirés de ce point d'entrée tant qu'un extracteur adapté n'est pas implémenté.
+- Cohérence extension/MIME vérifiée ; signature `%PDF-` obligatoire pour les PDF.
+- Rejet des fichiers vides, des contenus binaires/UTF-8 invalides et des tailles hors limite.
+- Normalisation du nom de fichier (basename, suppression des caractères de contrôle, longueur bornée).
+- Limitation des tags importés à 30 entrées non vides.
+- Tests unitaires ciblant les formats acceptés, MIME incohérent, faux PDF, données binaires, fichier vide, dépassement de taille et nom contenant un chemin.
+
+### Fichiers concernés
+
+- `server/utils/documentUploadValidation.ts`
+- `server/utils/documentUploadValidation.test.ts`
+- `server/routes/documents.ts`
+
+### Limites et validation restante
+
+- Cette passe sécurise `/api/documents/upload` uniquement. Les routes `/api/upload-document` et `/api/notebooks/:id/sources/upload*` ont des pipelines distincts et nécessitent une harmonisation dédiée ; elles ne doivent pas être considérées comme couvertes par ce validateur.
+- La signature PDF confirme le type probable, pas l'innocuité du document ni sa structure complète. L'analyse PDF doit rester traitée comme une opération sur entrée non fiable.
+- Les tests ajoutés n'ont pas été exécutés via l'accès GitHub. Exécuter `npx tsx --test server/utils/documentUploadValidation.test.ts`, `npm run typecheck`, `npm run typecheck:test` et la suite serveur.
+- Vérifier également le comportement HTTP du middleware Multer pour les extensions rejetées et les dépassements de taille dans l'application réelle.
+
+
+## Trente-troisième passe — Sécurisation des imports multimodaux et Notebook
+
+### Corrections appliquées
+
+- Le circuit `/api/upload-document` valide désormais le couple extension/MIME et les signatures binaires des PDF, JPEG, PNG et WebP avant extraction ou appel au modèle.
+- Les fichiers texte de ce circuit sont soumis à un décodage UTF-8 strict ; les fichiers vides, binaires, mal encodés et les images dont la signature ne correspond pas sont rejetés.
+- Les noms utilisés dans les prompts, les réponses et le DocumentStore sont normalisés pour supprimer les chemins et caractères de contrôle.
+- Le middleware Notebook limite chaque fichier à 10 Mio, limite le nombre de fichiers à 10 et n'accepte plus que PDF, TXT, Markdown, HTML, PNG, JPEG et WebP.
+- Les routes Notebook single, multi et queued utilisent maintenant le même validateur de contenu : signature PDF, signatures raster, MIME cohérent, UTF-8 strict, nom nettoyé et limite par fichier.
+- Les lots multi et queued sont bornés à 50 Mio au total ; la route queued refuse le lot entier si un fichier est invalide afin d'éviter une mise en queue partielle inattendue.
+- DOCX, DOC, RTF, CSV, JSON, YAML, GIF, BMP et SVG ne sont plus annoncés comme formats importables par le middleware Notebook, car le pipeline `SourceIngester.ingestFromBuffer` ne possède pas d'extracteur dédié fiable pour ces formats.
+- Tests unitaires ajoutés pour les signatures d'images, PDF, MIME, encodage, fichiers vides et dépassements de taille.
+
+### Fichiers concernés
+
+- `server/utils/documentUploadValidation.ts`
+- `server/utils/documentUploadValidation.test.ts`
+- `server/utils/notebookSourceUploadValidation.ts`
+- `server/utils/notebookSourceUploadValidation.test.ts`
+- `server/routes/upload-document.ts`
+- `server/routes/notebooks/index.ts`
+- `server/routes/notebooks/sourcesRouter.ts`
+
+### Limites et validations restantes
+
+- La limite de 50 Mio par lot est contrôlée après réception des buffers : la mémoire maximale théorique reste bornée par 10 fichiers de 10 Mio avant ce contrôle. Une limite cumulative au niveau du stockage Multer nécessiterait un stockage temporaire/streaming ou un middleware dédié.
+- La validation de signature est une vérification de format, pas une analyse antivirus ni une garantie d'innocuité. Les parseurs PDF et les modèles vision continuent à traiter des données non fiables.
+- Les erreurs Multer de taille/nombre/filtre doivent être vérifiées en intégration HTTP : elles sont émises avant l'entrée dans les handlers et leur statut dépend du middleware d'erreurs Express global.
+- Exécuter `npx tsx --test server/utils/documentUploadValidation.test.ts server/utils/notebookSourceUploadValidation.test.ts`, `npx tsx --test server/routes/upload-document.test.ts`, `npm run typecheck` et `npm run typecheck:test`. Ces commandes n'ont pas été exécutées par le connecteur GitHub.

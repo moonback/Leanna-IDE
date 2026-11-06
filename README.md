@@ -1849,7 +1849,7 @@ src/components/github/ · src/views/GitHubView.tsx
 |---|---|---|
 | HTML | `htmlExporter.ts` | `exportToStandaloneHtml` (marked → HTML autonome, thèmes clair/sombre) |
 | PDF | `pdfExporter.ts` | `exportToPdf` via Puppeteer → Buffer |
-| DOCX | `docxExporter.ts` | `exportToDocx` (OpenXML/MHTML compatible Word, sans binaire lourd) |
+| DOCX | `docxExporter.ts` | `exportToDocx` (paquet ZIP OpenXML natif, titres, listes, tableaux, liens et styles) |
 
 <br>
 

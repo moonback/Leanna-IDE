@@ -19,7 +19,9 @@ export function exportToStandaloneHtml(markdown: string, options: HtmlExportOpti
     headerDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }),
   } = options;
 
-  const contentHtml = marked.parse(markdown || '', { async: false }) as string;
+  const renderer = new marked.Renderer();
+  renderer.html = ({ text }) => escapeHtml(text);
+  const contentHtml = marked.parse(markdown || '', { async: false, renderer }) as string;
 
   const isDark = theme === 'dark';
   const bgColor = isDark ? '#0f172a' : '#ffffff';

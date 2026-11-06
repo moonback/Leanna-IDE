@@ -16,6 +16,31 @@ import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("NotebookBackup");
 
+const SAFE_BACKUP_ID = /^backup-[0-9]+$/;
+const SAFE_NOTEBOOK_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
+function isValidBackupId(value: string): boolean {
+  return SAFE_BACKUP_ID.test(value);
+}
+
+function isValidNotebookId(value: string): boolean {
+  return SAFE_NOTEBOOK_ID.test(value);
+}
+
+function isValidBackupMetadata(value: unknown, directoryName: string): value is BackupMetadata {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const meta = value as Partial<BackupMetadata>;
+  return meta.id === directoryName
+    && isValidBackupId(String(meta.id ?? ""))
+    && typeof meta.timestamp === "string"
+    && Number.isFinite(Date.parse(meta.timestamp))
+    && Number.isSafeInteger(meta.notebookCount) && (meta.notebookCount ?? -1) >= 0
+    && Number.isSafeInteger(meta.totalSources) && (meta.totalSources ?? -1) >= 0
+    && Number.isSafeInteger(meta.totalSizeBytes) && (meta.totalSizeBytes ?? -1) >= 0
+    && Array.isArray(meta.incrementalIds)
+    && meta.incrementalIds.every((id) => typeof id === "string" && isValidNotebookId(id));
+}
+
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 interface BackupConfig {
@@ -133,6 +158,7 @@ export class BackupService {
       let totalSize = 0;
       let totalSources = 0;
       const incrementalIds: string[] = [];
+      const previousTimestamps = new Map(this.lastBackupTimestamps);
 
       for (const file of modifiedFiles) {
         const sourcePath = path.join(notebooksDir, file);
@@ -140,19 +166,30 @@ export class BackupService {
 
         try {
           const content = fs.readFileSync(sourcePath, "utf-8");
+          const notebookId = file.slice(0, -".json".length);
+          if (!isValidNotebookId(notebookId)) throw new Error("Identifiant de notebook invalide.");
+          const notebook = JSON.parse(content);
+          if (!notebook || typeof notebook !== "object" || Array.isArray(notebook)
+            || (notebook.id !== undefined && notebook.id !== notebookId)
+            || (notebook.sources !== undefined && !Array.isArray(notebook.sources))) {
+            throw new Error("Structure du notebook invalide.");
+          }
+
           fs.writeFileSync(destPath, content, "utf-8");
           totalSize += Buffer.byteLength(content, "utf-8");
-
-          // Compter les sources
-          const notebook = JSON.parse(content);
-          totalSources += notebook.sources?.length || 0;
-          incrementalIds.push(file.replace(".json", ""));
-
-          // Mettre à jour le timestamp
+          totalSources += notebook.sources?.length ?? 0;
+          incrementalIds.push(notebookId);
           this.lastBackupTimestamps.set(file, new Date().toISOString());
         } catch (e: any) {
           log.warn(`Erreur copie notebook ${file}: ${e.message}`);
         }
+      }
+
+      // Une sauvegarde partielle ne doit jamais être annoncée comme complète.
+      if (incrementalIds.length !== modifiedFiles.length) {
+        this.lastBackupTimestamps = previousTimestamps;
+        fs.rmSync(backupPath, { recursive: true, force: true });
+        throw new Error(`Backup incomplet : ${incrementalIds.length}/${modifiedFiles.length} notebook(s) validé(s).`);
       }
 
       // Sauvegarder aussi les embeddings
@@ -169,7 +206,11 @@ export class BackupService {
               const content = fs.readFileSync(path.join(embeddingsDir, file), "utf-8");
               fs.writeFileSync(path.join(embBackupDir, file), content, "utf-8");
               totalSize += Buffer.byteLength(content, "utf-8");
-            } catch { /* skip */ }
+            } catch (e: any) {
+              this.lastBackupTimestamps = previousTimestamps;
+              fs.rmSync(backupPath, { recursive: true, force: true });
+              throw new Error(`Backup embeddings incomplet (${file}) : ${e.message}`);
+            }
           }
         }
       }
@@ -178,7 +219,7 @@ export class BackupService {
       const metadata: BackupMetadata = {
         id: backupId,
         timestamp: new Date().toISOString(),
-        notebookCount: modifiedFiles.length,
+        notebookCount: incrementalIds.length,
         totalSources,
         totalSizeBytes: totalSize,
         incrementalIds,
@@ -219,8 +260,8 @@ export class BackupService {
       const metaPath = path.join(this.config.backupDir, entry.name, "_metadata.json");
       if (fs.existsSync(metaPath)) {
         try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as BackupMetadata;
-          backups.push(meta);
+          const meta: unknown = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+          if (isValidBackupMetadata(meta, entry.name)) backups.push(meta);
         } catch { /* skip corrupted */ }
       }
     }
@@ -230,8 +271,14 @@ export class BackupService {
 
   /** Restaure un notebook depuis un backup spécifique */
   restoreNotebook(backupId: string, notebookId: string): boolean {
-    const backupPath = path.join(this.config.backupDir, backupId);
-    if (!fs.existsSync(backupPath)) {
+    if (!isValidBackupId(backupId) || !isValidNotebookId(notebookId)) {
+      log.error("Identifiant de backup ou de notebook invalide.");
+      return false;
+    }
+
+    const backupPath = path.resolve(this.config.backupDir, backupId);
+    const backupRoot = path.resolve(this.config.backupDir) + path.sep;
+    if (!backupPath.startsWith(backupRoot) || !fs.existsSync(backupPath) || !fs.statSync(backupPath).isDirectory()) {
       log.error(`Backup introuvable: ${backupId}`);
       return false;
     }
@@ -245,13 +292,33 @@ export class BackupService {
 
     const destPath = path.join(this.getNotebooksDir(), notebookFile);
     try {
-      fs.copyFileSync(sourcePath, destPath);
+      const notebook = JSON.parse(fs.readFileSync(sourcePath, "utf-8"));
+      if (!notebook || typeof notebook !== "object" || Array.isArray(notebook)
+        || (notebook.id !== undefined && notebook.id !== notebookId)
+        || (notebook.sources !== undefined && !Array.isArray(notebook.sources))) {
+        throw new Error("Le contenu du notebook sauvegardé est invalide.");
+      }
 
-      // Restaurer aussi les embeddings si disponibles
+      // Valider toutes les pièces avant de remplacer le moindre fichier courant.
       const embSource = path.join(backupPath, "embeddings", notebookFile);
+      let embeddingContent: string | null = null;
       if (fs.existsSync(embSource)) {
-        const embDest = path.join(this.getNotebooksDir(), "embeddings", notebookFile);
-        fs.copyFileSync(embSource, embDest);
+        embeddingContent = fs.readFileSync(embSource, "utf-8");
+        JSON.parse(embeddingContent);
+      }
+
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      const tempDest = `${destPath}.restore-${process.pid}-${Date.now()}.tmp`;
+      fs.writeFileSync(tempDest, JSON.stringify(notebook), "utf-8");
+      fs.renameSync(tempDest, destPath);
+
+      if (embeddingContent !== null) {
+        const embDir = path.join(this.getNotebooksDir(), "embeddings");
+        fs.mkdirSync(embDir, { recursive: true });
+        const embDest = path.join(embDir, notebookFile);
+        const tempEmb = `${embDest}.restore-${process.pid}-${Date.now()}.tmp`;
+        fs.writeFileSync(tempEmb, embeddingContent, "utf-8");
+        fs.renameSync(tempEmb, embDest);
       }
 
       log.info(`♻️ Notebook ${notebookId} restauré depuis ${backupId}`);
@@ -264,8 +331,10 @@ export class BackupService {
 
   /** Restaure tous les notebooks d'un backup */
   restoreAll(backupId: string): { restored: number; errors: number } {
-    const backupPath = path.join(this.config.backupDir, backupId);
-    if (!fs.existsSync(backupPath)) {
+    if (!isValidBackupId(backupId)) return { restored: 0, errors: 1 };
+    const backupPath = path.resolve(this.config.backupDir, backupId);
+    const backupRoot = path.resolve(this.config.backupDir) + path.sep;
+    if (!backupPath.startsWith(backupRoot) || !fs.existsSync(backupPath) || !fs.statSync(backupPath).isDirectory()) {
       return { restored: 0, errors: 1 };
     }
 
@@ -342,6 +411,17 @@ export class BackupService {
 
   /** Met à jour la configuration */
   updateConfig(updates: Partial<BackupConfig>): void {
+    if (updates.intervalMs !== undefined
+      && (!Number.isSafeInteger(updates.intervalMs) || updates.intervalMs < 60_000 || updates.intervalMs > 30 * 24 * 60 * 60 * 1000)) {
+      throw new RangeError("intervalMs doit être un entier compris entre 60 000 ms et 30 jours.");
+    }
+    if (updates.maxBackups !== undefined
+      && (!Number.isSafeInteger(updates.maxBackups) || updates.maxBackups < 1 || updates.maxBackups > 100)) {
+      throw new RangeError("maxBackups doit être un entier compris entre 1 et 100.");
+    }
+    if (updates.enabled !== undefined && typeof updates.enabled !== "boolean") {
+      throw new TypeError("enabled doit être un booléen.");
+    }
     if (updates.intervalMs !== undefined) this.config.intervalMs = updates.intervalMs;
     if (updates.maxBackups !== undefined) this.config.maxBackups = updates.maxBackups;
     if (updates.enabled !== undefined) this.config.enabled = updates.enabled;

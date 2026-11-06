@@ -187,7 +187,7 @@ function load(): UserProfile {
 const SERVER_SYNCED_KEYS: (keyof UserProfile)[] = [
   'aiName', 'aiVoice', 'userName', 'userRole', 'language', 'responseStyle',
   'autoMuteEnabled', 'autoMuteTimeout', 'vadEnabled', 'vadThreshold',
-  'vadSilenceDuration', 'temperature', 'topP',
+  'vadSilenceDuration', 'voiceAlwaysOn', 'temperature', 'topP',
   'textProvider', 'openrouterModel', 'openrouterImageModel', 'notebookModel',
   'agents', 'reasoningEnabled', 'customSystemPrompt',
 ];
@@ -199,8 +199,11 @@ function syncProfileToServer(profile: UserProfile): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).then(response => {
-    if (!response.ok) throw new Error(`Profile sync failed: HTTP ${response.status}`);
+  }).then(async response => {
+    const data = await response.json().catch(() => null) as { success?: boolean; error?: string } | null;
+    if (!response.ok || !data || data.success !== true) {
+      throw new Error(data?.error || `Profile sync failed: HTTP ${response.status}`);
+    }
   });
 }
 
@@ -216,7 +219,7 @@ interface ProfileContextValue {
    * synchro serveur.
    */
   applyAndSave: (patch: Partial<UserProfile>) => Promise<void>;
-  reset: () => void;
+  reset: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextValue>({
@@ -224,7 +227,7 @@ const ProfileContext = createContext<ProfileContextValue>({
   setField: () => {},
   save: () => {},
   applyAndSave: () => Promise.resolve(),
-  reset: () => {},
+  reset: () => Promise.resolve(),
 });
 
 export function useProfile() {
@@ -268,9 +271,12 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     return syncProfileToServer(resolved);
   }, [profile]);
 
-  const reset = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+  const reset = useCallback((): Promise<void> => {
+    // Persist explicit defaults locally first; server sync failure is surfaced
+    // to the caller without reverting the local reset.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PROFILE));
     setProfile({ ...DEFAULT_PROFILE });
+    return syncProfileToServer(DEFAULT_PROFILE);
   }, []);
 
   const value = useMemo(() => ({ 

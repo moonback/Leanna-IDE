@@ -251,3 +251,56 @@ test('stop: idempotent et sans erreur même sans timer actif', () => {
     h.cleanup();
   }
 });
+
+
+test('restore: refuse les identifiants contenant un chemin', () => {
+  const h = setup();
+  try {
+    assert.equal(h.service.restoreNotebook('../outside', 'nb-x'), false);
+    assert.deepEqual(h.service.restoreAll('../outside'), { restored: 0, errors: 1 });
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('listBackups: ignore les métadonnées invalides ou incohérentes', () => {
+  const h = setup();
+  try {
+    const invalidDir = path.join(h.backupDir, 'backup-123');
+    fs.mkdirSync(invalidDir, { recursive: true });
+    fs.writeFileSync(path.join(invalidDir, '_metadata.json'), JSON.stringify({
+      id: 'backup-999',
+      timestamp: 'not-a-date',
+      notebookCount: -1,
+      totalSources: 0,
+      totalSizeBytes: 0,
+      incrementalIds: [],
+    }));
+    assert.deepEqual(h.service.listBackups(), []);
+  } finally {
+    h.cleanup();
+  }
+});
+
+
+test('backup: refuse un notebook JSON corrompu sans conserver de backup partiel', async () => {
+  const h = setup();
+  try {
+    fs.writeFileSync(path.join(h.notebooksDir, 'nb-corrupt.json'), '{invalid json', 'utf-8');
+    await assert.rejects(() => h.service.runBackup(), /Backup incomplet/);
+    assert.deepEqual(h.service.listBackups(), []);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('backup config: refuse les intervalles et rotations hors limites', () => {
+  const h = setup();
+  try {
+    assert.throws(() => h.service.updateConfig({ intervalMs: 1 }), /intervalMs/);
+    assert.throws(() => h.service.updateConfig({ maxBackups: 0 }), /maxBackups/);
+    assert.throws(() => h.service.updateConfig({ maxBackups: 101 }), /maxBackups/);
+  } finally {
+    h.cleanup();
+  }
+});

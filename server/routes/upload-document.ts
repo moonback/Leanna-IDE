@@ -6,12 +6,13 @@ import { ProfileConfig } from '../prompts/systemInstruction.js';
 import { scanPromptInjection } from '../utils/promptInjectionGuard.js';
 import { createLogger } from '../utils/logger.js';
 import { getDocumentStore } from '../knowledge/DocumentStore.js';
+import { validateMultimodalDocumentUpload, MAX_DOCUMENT_UPLOAD_BYTES } from '../utils/documentUploadValidation.js';
 
 const log = createLogger('UploadDocumentRoute');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: MAX_DOCUMENT_UPLOAD_BYTES, files: 1 },
 });
 const uploadLimiter = createRateLimiter(10, 60_000);
 
@@ -38,11 +39,12 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
       }
 
       const file = req.file;
-      const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/markdown'];
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        res.status(400).json({ error: 'Unsupported file type. Please upload PDF, images, or text files.' });
+      const validation = validateMultimodalDocumentUpload(file.originalname, file.mimetype, file.buffer);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error });
         return;
       }
+      const safeFileName = validation.fileName;
 
       let extractedText = '';
       let analysisPrompt = '';
@@ -62,7 +64,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
           ? safeExtractedText.slice(0, maxChars) + '\n\n[… texte tronqué …]'
           : safeExtractedText;
         analysisPrompt = [
-          `Voici le contenu textuel extrait d'un document PDF intitulé "${file.originalname}" (${pageCount} pages):`,
+          `Voici le contenu textuel extrait d'un document PDF intitulé "${safeFileName}" (${pageCount} pages):`,
           '',
           textForAnalysis,
           '',
@@ -73,7 +75,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
         extractedText = file.buffer.toString('utf-8');
         promptInjection = scanPromptInjection(extractedText);
         analysisPrompt = [
-          `Voici le contenu d'un fichier texte "${file.originalname}":`,
+          `Voici le contenu d'un fichier texte "${safeFileName}":`,
           '',
           promptInjection.sanitizedText.slice(0, 80_000),
           '',
@@ -88,14 +90,14 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
       // never be forwarded to a model without an explicit user decision.
       if (promptInjection.blocked) {
         log.warn('High-risk document rejected before model analysis', {
-          fileName: file.originalname,
+          fileName: safeFileName,
           mimeType: file.mimetype,
           riskScore: promptInjection.riskScore,
           findings: promptInjection.findings.map((finding) => finding.pattern),
         });
         res.status(422).json({
           error: 'Document potentiellement malveillant : analyse automatique refusée.',
-          fileName: file.originalname,
+          fileName: safeFileName,
           promptInjection: {
             riskScore: promptInjection.riskScore,
             blocked: true,
@@ -184,7 +186,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
       }
 
       documentContextStore.push({
-        fileName: file.originalname,
+        fileName: safeFileName,
         summary,
         extractedText: extractedText.slice(0, 20_000),
         uploadedAt: new Date().toISOString(),
@@ -195,7 +197,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
       try {
         const docStore = getDocumentStore();
         docStore.addDocument({
-          fileName: file.originalname,
+          fileName: safeFileName,
           mimeType: file.mimetype,
           summary,
           extractedText: extractedText.slice(0, 30_000),
@@ -209,7 +211,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
 
       res.json({
         summary,
-        fileName: file.originalname,
+        fileName: safeFileName,
         mimeType: file.mimetype,
         extractedTextLength: extractedText.length,
         provider,
