@@ -487,7 +487,7 @@ export class NotebookManager {
 
   // ─── Stats ───────────────────────────────────────────────────────────────
 
-  getStats(): {
+  getStats(workspaceId?: string): {
     totalNotebooks: number;
     totalSources: number;
     totalNotes: number;
@@ -499,7 +499,10 @@ export class NotebookManager {
     let totalChunks = 0;
     let totalWords = 0;
 
-    for (const nb of this.notebooks.values()) {
+    const scopedNotebooks = Array.from(this.notebooks.values()).filter(
+      nb => workspaceId === undefined || nb.workspaceId === workspaceId
+    );
+    for (const nb of scopedNotebooks) {
       totalSources += nb.sources.length;
       totalNotes += nb.notes.length;
       for (const src of nb.sources) {
@@ -509,7 +512,7 @@ export class NotebookManager {
     }
 
     return {
-      totalNotebooks: this.notebooks.size,
+      totalNotebooks: scopedNotebooks.length,
       totalSources,
       totalNotes,
       totalChunks,
