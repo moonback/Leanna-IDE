@@ -54,6 +54,11 @@ export function EditorTabs({
 }: EditorTabsProps) {
   const [showMore, setShowMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMore = () => {
+    setShowMore(false);
+    moreButtonRef.current?.focus();
+  };
 
   useEffect(() => {
     if (!showMore) return;
@@ -61,7 +66,10 @@ export function EditorTabs({
       if (event.target instanceof Node && !moreRef.current?.contains(event.target)) setShowMore(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setShowMore(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMore();
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -200,6 +208,7 @@ export function EditorTabs({
         </button>
 
         <button
+          ref={moreButtonRef}
           type="button"
           onClick={() => setShowMore((value) => !value)}
           className={iconButton}
@@ -220,7 +229,7 @@ export function EditorTabs({
             <button
               type="button"
               aria-pressed={showMinimap}
-              onClick={() => { onToggleMinimap(); setShowMore(false); }}
+              onClick={() => { onToggleMinimap(); closeMore(); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
             >
@@ -231,7 +240,7 @@ export function EditorTabs({
             <button
               type="button"
               aria-pressed={wordWrap}
-              onClick={() => { onToggleWordWrap(); setShowMore(false); }}
+              onClick={() => { onToggleWordWrap(); closeMore(); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
             >
@@ -242,7 +251,7 @@ export function EditorTabs({
             <div className="my-1 h-px" style={{ background: 'var(--border-base)' }} />
             <button
               type="button"
-              onClick={() => { onFormat(); setShowMore(false); }}
+              onClick={() => { onFormat(); closeMore(); }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--text-primary)' }}
             >
@@ -253,7 +262,7 @@ export function EditorTabs({
             {onOpenTemplates && (
               <button
                 type="button"
-                onClick={() => { onOpenTemplates(); setShowMore(false); }}
+                onClick={() => { onOpenTemplates(); closeMore(); }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
                 style={{ color: 'var(--text-primary)' }}
               >
