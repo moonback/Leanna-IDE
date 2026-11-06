@@ -320,10 +320,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               <FadeSlide show={!collapsed} className="min-w-0 flex-1" reduceMotion={reduceMotion}>
                 <span className="flex flex-col leading-tight">
                   <span className="block truncate text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                    Leanna{mode === 'ide' ? ' · IDE' : ''}
+                    Leanna
                   </span>
                   <span className="block truncate text-xs font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
-                    {mode === 'ide' ? 'Espace de travail' : 'Centre de pilotage'}
+                    Navigation unifiée
                   </span>
                 </span>
               </FadeSlide>
@@ -375,6 +375,17 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
             {/* Navigation groupée (routes) ou outils (IDE) */}
             <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
+              {mode === 'ide' && NAV_GROUPS.map((group, gi) => (
+                <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
+                  open={!closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                  hasActive={group.items.some((item) => isActive(item.path))}>
+                  {group.items.map((item) => (
+                    <li key={item.id}>
+                      <NavButton item={item} active={isActive(item.path)} collapsed={collapsed} onClick={() => navigate(item.path)} />
+                    </li>
+                  ))}
+                </Group>
+              ))}
               {mode === 'ide'
                 ? toolGroups.map((group, gi) => (
                     <Group

@@ -488,11 +488,10 @@ function FloatingOrbWrapper() {
 function NavSidebar() {
   const { pathname } = useLocation();
   const isIde = pathname === '/' || pathname === '/ide';
-  const isSettings = pathname === '/settings';
 
-  // Don't show on IDE (IdeView monte sa propre GlobalSidebar en variant='ide')
-  // Don't show on Settings (SettingsView has its own left nav)
-  if (isIde || isSettings) return null;
+  // L'IDE monte sa variante de sidebar, enrichie de ses outils contextuels.
+  // Toutes les autres pages, y compris Paramètres, utilisent la même sidebar globale.
+  if (isIde) return null;
   return <GlobalSidebar />;
 }
 
@@ -510,7 +509,7 @@ function AnimatedRoutes() {
   // Entrée : montée + défloutage (360 ms, décélération) ; sortie plus courte
   // vers le haut (150 ms, accélération). Voir src/lib/motion.ts.
   const wrap = (node: React.ReactNode) => (
-    <motion.div className="h-full" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+    <motion.div className="app-route-frame h-full min-w-0 overflow-hidden" variants={pageVariants} initial="initial" animate="animate" exit="exit">
       <Suspense fallback={<LoadingFallback />}>{node}</Suspense>
     </motion.div>
   );
