@@ -44,6 +44,15 @@ export interface Source {
   indexingAttempts?: number;
   /** Prochaine tentative automatique (backoff durable). */
   indexingNextRetryAt?: string;
+  /** Historique borné des 10 dernières tentatives d’indexation. */
+  indexingHistory?: Array<{
+    attempt: number;
+    at: string;
+    outcome: "indexed" | "partial" | "failed";
+    category: "none" | "transient" | "permanent";
+    durationMs: number;
+    message?: string;
+  }>;
   /** Texte brut extrait */
   rawText: string;
   /** HTML brut original (pour sources HTML uniquement) */
