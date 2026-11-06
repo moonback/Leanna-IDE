@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Code2 } from 'lucide-react';
+import { ViewHeader } from '../components/ui/ViewHeader.js';
 // Monaco Editor - lazy loaded to reduce initial bundle
 // Pass the bundled monaco instance directly to avoid CDN loader (fixes CSP violations)
 const MonacoEditor = lazy(() =>
@@ -1058,6 +1060,12 @@ export default function IdeView() {
 
       {/* Editor Area */}
       <div className="Leanna-workspace flex flex-1 flex-col min-w-0 min-h-0 relative">
+        <ViewHeader
+          title={activeFile?.name || 'Espace de développement'}
+          icon={Code2}
+          description={activeFile?.path || 'Workspace de développement Leanna'}
+          badge={connected ? 'IA connectée' : 'IA déconnectée'}
+        />
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
         {!showSandbox && !showHistory && !showAutomation && !showMemory && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs
