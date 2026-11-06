@@ -64,7 +64,27 @@ export class NotebookManager {
       for (const file of files) {
         try {
           const raw = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
-          const notebook = JSON.parse(raw) as Notebook;
+          const parsed: unknown = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            throw new Error("Structure JSON invalide.");
+          }
+          const candidate = parsed as Partial<Notebook>;
+          const fileId = file.slice(0, -".json".length);
+          if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(fileId)
+            || candidate.id !== fileId
+            || typeof candidate.title !== "string"
+            || typeof candidate.description !== "string"
+            || !Array.isArray(candidate.sources)
+            || !Array.isArray(candidate.notes)
+            || !Array.isArray(candidate.generatedDocuments)
+            || !Array.isArray(candidate.audioOverviews)
+            || !Array.isArray(candidate.chatHistory)
+            || typeof candidate.createdAt !== "string"
+            || typeof candidate.updatedAt !== "string") {
+            throw new Error("Schéma notebook invalide ou identifiant incohérent.");
+          }
+          // Compatibilité avec les notebooks historiques : les threads sont facultatifs.
+          const notebook = { ...candidate, chatThreads: Array.isArray(candidate.chatThreads) ? candidate.chatThreads : undefined } as Notebook;
           this.notebooks.set(notebook.id, notebook);
         } catch (e: any) {
           log.warn(`Erreur chargement notebook ${file}: ${e.message}`);
@@ -93,14 +113,26 @@ export class NotebookManager {
     this.persistTimers.set(notebook.id, timer);
   }
 
-  /** Écrit immédiatement le notebook sur disque (async, non-bloquant). */
+  /**
+   * Écriture atomique : le fichier temporaire est entièrement écrit avant le
+   * rename. Un arrêt ou une erreur pendant l'écriture ne laisse pas un JSON tronqué.
+   */
   private flushNotebook(notebook: Notebook): void {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(notebook.id)) {
+      log.warn("Persistence refusée : identifiant de notebook invalide.");
+      return;
+    }
     ensureDataDir();
     const filePath = getNotebookPath(notebook.id);
-    fs.writeFile(filePath, JSON.stringify(notebook, null, 2), "utf-8", (err) => {
-      if (err) log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
-      else log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté`);
-    });
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      fs.writeFileSync(tempPath, JSON.stringify(notebook, null, 2), "utf-8");
+      fs.renameSync(tempPath, filePath);
+      log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté atomiquement`);
+    } catch (err: any) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
+      log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
+    }
   }
 
   /** Public persist — save a notebook to disk (used by routes for direct mutations) */
@@ -167,8 +199,14 @@ export class NotebookManager {
     return notebook;
   }
 
-  getNotebook(id: string): Notebook | undefined {
-    return this.notebooks.get(id);
+  getNotebook(id: string, workspaceId?: string): Notebook | undefined {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) return undefined;
+    const notebook = this.notebooks.get(id);
+    if (!notebook) return undefined;
+    // Lorsqu'un workspace est fourni, aucun notebook d'un autre workspace
+    // (ni notebook historique sans workspace) ne doit être exposé.
+    if (workspaceId !== undefined && notebook.workspaceId !== workspaceId) return undefined;
+    return notebook;
   }
 
   getAllNotebooks(workspaceId?: string): Notebook[] {
