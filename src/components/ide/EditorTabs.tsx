@@ -88,7 +88,7 @@ export function EditorTabs({
       }}
     >
       {/* Onglets : zone scrollable indépendante de la barre d'actions */}
-      <div className="flex flex-1 h-full min-w-0 overflow-x-auto overflow-y-hidden custom-scrollbar" role="tablist" aria-label="Fichiers ouverts">
+      <div className="flex flex-1 h-full min-w-0 overflow-x-auto overflow-y-hidden custom-scrollbar" role="group" aria-label="Fichiers ouverts">
         {openFiles.map((file) => {
           const isActive = activePath === file.path;
           const isBrowserTab = file.type === 'browser';
@@ -100,9 +100,10 @@ export function EditorTabs({
           return (
             <div
               key={file.path}
-              role="tab"
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
+              role="group"
+              aria-label={`Onglet ${displayName}${isActive ? ", actif" : ""}`}
+              aria-current={isActive ? "page" : undefined}
+              tabIndex={0}
               className="group flex items-center gap-2 h-full px-3 sm:px-4 text-sm cursor-pointer relative border-r transition-colors duration-150"
               style={{
                 borderColor: 'var(--border-base)',
@@ -210,7 +211,7 @@ export function EditorTabs({
           className={iconButton}
           title="Autres options de l'éditeur"
           aria-label="Autres options de l'éditeur"
-          aria-haspopup="true"
+          aria-controls="editor-tabs-more-options"
           aria-expanded={showMore}
         >
           <MoreHorizontal size={15} style={{ color: showMore ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -218,6 +219,7 @@ export function EditorTabs({
 
         {showMore && (
           <div
+            id="editor-tabs-more-options"
             role="group"
             aria-label="Options de l'éditeur"
             className="glass-float absolute right-1 top-[calc(100%+6px)] z-[var(--z-popover)] min-w-[220px] p-1.5 shadow-xl"
@@ -258,7 +260,6 @@ export function EditorTabs({
             {onOpenTemplates && (
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => { onOpenTemplates(); setShowMore(false); }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
                 style={{ color: 'var(--text-primary)' }}
