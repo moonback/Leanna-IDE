@@ -116,6 +116,8 @@ export interface ProfileConfig {
   aiVoice?: string;
   duoName?: string;
   duoRole?: string;
+  /** Voix TTS dédiée à la seconde IA du duo vocal. */
+  duoVoice?: string;
   language?: Language;
   responseStyle?: ResponseStyle;
   workspace?: string;
