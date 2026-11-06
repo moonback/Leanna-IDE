@@ -435,3 +435,12 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 **Pourquoi c'est important :** un fallback automatique sur 401/403 peut masquer une clé révoquée, une permission insuffisante ou une mauvaise configuration en envoyant la même tâche à un fournisseur différent. Le comportement doit privilégier la transparence et l'action corrective plutôt qu'une réussite apparente.
 
 **Validation à exécuter en CI :** `server/utils/textGeneration.telemetry.test.ts`, puis typecheck et suite serveur. Les tests ne sont pas exécutés depuis cette session GitHub.
+
+
+### Phase suivante — estimation alignée sur le modèle réellement sélectionné
+
+- Ajout de `getActiveModel()` dans `server/utils/textGeneration.ts` : expose le modèle effectif du profil (modèle OpenRouter personnalisé ou défaut Gemini/OpenRouter).
+- `PlanEstimator` utilise maintenant ce modèle pour calculer le coût estimé. Il ne suppose plus que tout profil OpenRouter utilise `google/gemini-3.6-flash`, ce qui sous-estimait ou surestimait les missions lorsque l'utilisateur sélectionnait un autre modèle.
+- Tests ajoutés pour le modèle OpenRouter personnalisé, la valeur OpenRouter vide et le défaut Gemini.
+
+**Limite conservée volontairement :** ce changement aligne le coût estimé sur le modèle de profil actif ; il ne choisit pas encore automatiquement un modèle selon la complexité. Les tarifs `MODEL_PRICING` restent des valeurs configurées et non certifiées par rapport à la facture fournisseur.
