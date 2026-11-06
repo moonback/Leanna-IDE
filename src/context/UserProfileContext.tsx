@@ -124,6 +124,8 @@ const DEFAULT_PROFILE: UserProfile = {
   userRole:      '',
   aiName:        'Leanna',
   aiVoice:       'Aoede',
+  duoName:       'Roxane',
+  duoVoice:      'Kore',
   language:      'fr',
   responseStyle: 'balanced',
   // Auto Mute
