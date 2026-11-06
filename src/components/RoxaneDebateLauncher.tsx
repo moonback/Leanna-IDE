@@ -112,6 +112,8 @@ export function RoxaneDebateLauncher() {
         if (msg.type === 'debate_complete') {
           window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } }));
           stopMicrophone();
+          liveSocketRef.current?.close();
+          liveSocketRef.current = null;
           const turns = Array.isArray(msg.turns) ? msg.turns : [];
           setLiveTurns(turns.map((turn: any, index: number) => ({ ...turn, id: 'live-' + Date.now() + '-' + index })));
           setBusy(true);
