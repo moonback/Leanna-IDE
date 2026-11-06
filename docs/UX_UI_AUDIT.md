@@ -519,3 +519,30 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Double-cliquer sur Appliquer et vérifier qu'une seule requête est envoyée.
 - Vérifier les variantes modale et panneau docké, notamment la fermeture Escape et le bouton Fermer pendant la synchronisation.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-troisième passe — Robustesse de la gestion des clés API
+
+### Constats vérifiés
+
+- Les chargements de `/api/tokens` et `/api/gemini-keys` ignoraient les statuts HTTP non réussis et pouvaient présenter un échec réseau comme une liste vide.
+- Les mutations des clés Gemini (ajout, activation/désactivation, suppression) ne vérifiaient pas systématiquement `response.ok` et pouvaient échouer sans retour visible.
+- Les opérations d'ajout, de suppression et d'activation ne disposaient pas toutes d'un verrou synchrone contre les interactions répétées.
+- La suppression d'une clé Gemini se faisait sans confirmation.
+
+### Corrections appliquées
+
+- Contrôle des statuts HTTP, du statut applicatif et de la structure des données retournées avant de mettre à jour l'interface.
+- États d'erreur distincts pour le chargement des tokens et du pool Gemini, avec action de nouvelle tentative.
+- Verrous synchrones anti-double soumission pour l'enregistrement des tokens, l'ajout de clé et les mutations du pool Gemini.
+- Désactivation des actions concurrentes du pool pendant une mutation.
+- Confirmation explicite avant suppression d'une clé Gemini.
+- Les erreurs réseau et serveur sont désormais exposées dans l'interface au lieu d'être silencieusement ignorées.
+
+### Validation restante
+
+- Simuler HTTP 401/403/500 et une réponse JSON invalide pour les deux endpoints de lecture ; vérifier que l'erreur et l'action Réessayer sont visibles et qu'aucune liste vide trompeuse n'est affichée.
+- Simuler HTTP 500 et une panne réseau sur l'ajout, l'activation, la désactivation et la suppression ; vérifier le message et la possibilité de réessayer.
+- Double-cliquer sur Ajouter et sur les actions du pool ; vérifier qu'une seule requête de mutation est envoyée.
+- Annuler puis confirmer la suppression ; vérifier qu'aucune requête DELETE ne part après annulation.
+- Vérifier le comportement de l'interface pendant une mutation et après démontage de la page.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
