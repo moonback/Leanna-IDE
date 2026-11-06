@@ -167,3 +167,36 @@ Le runner fourni par `Executor.runSupervised` écoute désormais le signal du Su
 - Le runner Executor finalise encore son agrégat interne ; le Supervisor ne possède donc pas encore l'autorité unique sur retry/replan.
 - Si un skill ignore lui-même le signal et continue après escalade, le workspace n'est pas encore verrouillé par un lease exclusif. Le résultat expose le danger, mais un verrou inter-processus et une procédure de réconciliation restent nécessaires.
 - Les tests n'ont pas été exécutés depuis la session GitHub ; aucune réussite de CI/typecheck n'est revendiquée.
+
+
+## Passe checkpoint P0 — raccordement au vrai ToolRegistry (2026-11-06)
+
+### Correction appliquée
+
+Le callback du Supervisor est maintenant propagé sur le chemin d'exécution réel :
+
+`LeannaSupervisor.beforeToolCall`
+→ `Executor.runSupervised`
+→ `Executor.executeAction`
+→ `SkillHandlerOptions.beforeExecute`
+→ `SkillManagerV2.handleToolCall`
+→ `ToolRegistry.call`
+→ hook juste avant le handler.
+
+Le hook `ToolRegistry.beforeExecute` s'exécute après les contrôles d'autorisation et d'idempotence, immédiatement avant le handler. Les lectures ne déclenchent pas de capture. Les outils de mutation du workspace sont explicitement identifiés : écriture, modification, patch, création de dossier, renommage/déplacement, suppression de fichier et suppression de dossier.
+
+### Résolution des chemins
+
+- Les chemins planifiés et les chemins découverts au moment de l'appel sont résolus depuis `SELF_ROOT`, jamais depuis `process.cwd()`.
+- Les cibles lexicalement hors workspace, racines du workspace et chemins sans projet actif sont refusés.
+- Les renommages capturent source et destination avant l'appel du handler.
+- Les suppressions de dossiers passent par la capture récursive du CheckpointManager.
+- Si la capture préalable échoue, le callback lève une erreur et le handler n'est pas exécuté.
+
+### Limites restantes
+
+- Le contrôle de périmètre lexical ne remplace pas une vérification `realpath` au niveau du CheckpointManager. Les outils d'écriture doivent conserver leurs propres contrôles anti-symlink et anti-traversal ; un durcissement commun du FileGateway reste recommandé.
+- La liste des outils de mutation est explicite. Tout nouvel outil capable d'écrire dans le workspace doit être ajouté à `CHECKPOINT_WRITE_TOOLS` et à son résolveur de cible, ou être refusé en mode supervisé.
+- La transaction ne capture pas encore les effets externes (DB, API, commandes système, services distants). Ces opérations nécessitent une compensation ou un contrat idempotent ; un rollback fichier ne peut pas les annuler.
+- Le verrouillage exclusif inter-processus et la réconciliation durable des checkpoints après crash restent à implémenter.
+- Les tests/typecheck/CI n'ont pas été exécutés depuis cette session GitHub.
