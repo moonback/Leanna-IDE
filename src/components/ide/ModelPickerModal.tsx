@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Zap, Check, BrainCircuit, X, Image as ImageIcon, BookOpen, MessageSquare } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
@@ -6,6 +6,7 @@ import { OPENROUTER_MODELS, OPENROUTER_IMAGE_MODELS } from '../settings/OpenRout
 import type { AIProvider } from '../../context/UserProfileContext.js';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
+import { useToast } from '../ui/Toast.js';
 
 interface ModelPickerModalProps {
   onClose: () => void;
@@ -17,6 +18,12 @@ type PickerTab = 'text' | 'image' | 'notebook';
 
 export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked = false }: ModelPickerModalProps) {
   const { profile, applyAndSave } = useProfile();
+  const { error: toastError } = useToast();
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const handleClose = useCallback(() => {
+    if (!savingRef.current) onClose();
+  }, [onClose]);
   const [activeTab, setActiveTab] = useState<PickerTab>('text');
 
   // ── État Texte / Chat ─────────────────────────────────────────────────────
@@ -49,7 +56,10 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
     m.id.toLowerCase().includes(notebookSearch.toLowerCase())
   );
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     const patch: Partial<typeof profile> = {
       // Texte / Chat
       textProvider: selectedProvider,
@@ -61,13 +71,18 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
     if (selectedProvider === 'openrouter') {
       patch.openrouterModel = selectedModel;
     }
-    // Applique + persiste (localStorage + serveur) immédiatement, puis notifie
-    // la session live de se reconnecter pour prendre en compte le nouveau modèle.
-    void applyAndSave(patch).then(() => {
+    try {
+      // Ne fermer qu'après confirmation de la synchronisation serveur.
+      await applyAndSave(patch);
       window.dispatchEvent(new CustomEvent('Leanna-settings-saved', { detail: { requiresReconnect: true } }));
-    });
-    onClose();
-  }, [profile, selectedProvider, selectedModel, selectedImageModel, selectedNotebookModel, applyAndSave, onClose]);
+      onClose();
+    } catch {
+      toastError('Échec de l’enregistrement du modèle. La fenêtre reste ouverte pour réessayer.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }, [profile, selectedProvider, selectedModel, selectedImageModel, selectedNotebookModel, applyAndSave, onClose, toastError]);
 
   const currentModelName = selectedProvider === 'openrouter'
     ? (OPENROUTER_MODELS.find(m => m.id === selectedModel)?.name || selectedModel.split('/').pop())
@@ -413,8 +428,8 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
 
   const footerActions = (
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Annuler</Button>
-          <Button variant="primary" size="sm" onClick={handleConfirm}>Appliquer</Button>
+          <Button variant="ghost" size="sm" onClick={handleClose} disabled={saving}>Annuler</Button>
+          <Button variant="primary" size="sm" onClick={handleConfirm} disabled={saving}>{saving ? "Enregistrement…" : "Appliquer"}</Button>
         </div>
   );
 
@@ -430,7 +445,8 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
           {onClose && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
+              disabled={saving}
               className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-active)] flex-shrink-0"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Fermer"
@@ -456,7 +472,7 @@ export const ModelPickerModal = memo(function ModelPickerModal({ onClose, docked
   }
 
   return (
-    <Modal open onClose={onClose} size="md" tone="default">
+    <Modal open onClose={handleClose} size="md" tone="default">
       <Modal.Header>
         {headerContent}
       </Modal.Header>
