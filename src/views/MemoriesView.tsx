@@ -31,7 +31,8 @@ export default function MemoriesView() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch('/api/memories')
+    // limit élevé : la recherche est locale et le compteur doit refléter le vrai total.
+    fetch('/api/memories?limit=500')
       .then(r => r.json())
       .then(d => setMemories(d.memories || []))
       .catch(() => toastError('Impossible de charger les souvenirs'))
@@ -63,7 +64,7 @@ export default function MemoriesView() {
     if (memories.length === 0) return;
     const confirmed = await confirm({
       title: 'Effacer tous les souvenirs',
-      message: `Supprimer les ${memories.length} souvenir${memories.length > 1 ? 's' : ''} de Leanna ? Cette action est irréversible.`,
+      message: 'Supprimer les souvenirs du projet actif ? Les souvenirs globaux (partagés entre projets) sont conservés. Cette action est irréversible.',
       confirmLabel: 'Tout effacer',
       cancelLabel: 'Annuler',
       variant: 'danger',
@@ -72,15 +73,16 @@ export default function MemoriesView() {
     setClearingAll(true);
     try {
       const res = await fetch('/api/memories/all', { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      setMemories([]);
-      success('Tous les souvenirs ont été effacés');
-    } catch {
-      toastError('Impossible d\'effacer les souvenirs');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error);
+      success(`${data.deleted ?? 0} souvenir(s) du projet effacé(s)`);
+      load(); // les mémoires globales (partagées entre projets) sont conservées
+    } catch (e) {
+      toastError((e as Error).message || 'Impossible d\'effacer les souvenirs');
     } finally {
       setClearingAll(false);
     }
-  }, [memories.length, confirm, success, toastError]);
+  }, [memories.length, confirm, success, toastError, load]);
 
   return (
     <div

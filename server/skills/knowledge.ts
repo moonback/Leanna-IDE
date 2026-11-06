@@ -897,6 +897,10 @@ export const knowledgeSkill: Skill = {
           confidence: validated.confidence,
           sourceFile: validated.source_file,
         });
+        if (!id) {
+          // addFact renvoie "" pour un doublon ou un fait de qualité insuffisante.
+          return { status: "rejected", error: "Fait non ajouté : doublon ou qualité insuffisante (min. 20 caractères)." };
+        }
         projectMemory.save();
 
         return {

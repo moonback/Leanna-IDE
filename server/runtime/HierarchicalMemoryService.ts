@@ -90,6 +90,14 @@ export class HierarchicalMemoryService {
     this.eventBus = options.eventBus;
   }
 
+  /**
+   * Branche le palier session sur la Memory du runtime : sans cela le singleton
+   * utilisé par l'API et le skill lisait une Memory vide, jamais alimentée.
+   */
+  attachSessionStore(store: Memory): void {
+    this.sessionStore = store;
+  }
+
   // ─── Helpers Supabase ────────────────────────────────────────────────────────
 
   private getSupabaseClient(): SupabaseClient | null {
@@ -410,7 +418,8 @@ export class HierarchicalMemoryService {
               this.projectStore.save();
             }
           } else {
-            id = randomUUID();
+            // Rejeté par le filtre qualité (ex: < 20 caractères) : ne pas inventer un id fantôme.
+            throw new Error("Fait projet rejeté : contenu trop court ou jugé bruyant (min. 20 caractères).");
           }
         }
 
@@ -572,8 +581,12 @@ export class HierarchicalMemoryService {
       case "longterm": {
         const supabase = this.getSupabaseClient();
         if (!supabase) return false;
-        const { error } = await supabase.from("memories").delete().eq("id", id);
-        return !error;
+        // Même isolation que le skill memory : projet actif + globales.
+        const projectId = getActiveProjectId();
+        let q = supabase.from("memories").delete().eq("id", id);
+        if (projectId) q = q.in("project_id", [projectId, ""]);
+        const { data, error } = await q.select("id");
+        return !error && Array.isArray(data) && data.length > 0;
       }
     }
   }

@@ -120,6 +120,7 @@ export class ProjectMemory {
   }
 
   private loadFromDisk(): void {
+    this._indexDirty = true; // les faits sont remplacés : l'index BM25 doit suivre
     try {
       const storePath = getStorePath();
       if (fs.existsSync(storePath)) {
@@ -926,6 +927,7 @@ export class ProjectMemory {
   clear(): void {
     this.facts.clear();
     this.dirty = true;
+    this._indexDirty = true;
     log.info("🧹 Mémoire réinitialisée");
   }
 

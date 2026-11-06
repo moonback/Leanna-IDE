@@ -9,6 +9,11 @@ import { getActiveProjectId } from "../utils/selfRoot.js";
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+/** Invalide le cache de recherche (à appeler après toute écriture hors skill, ex: routes REST). */
+export function invalidateMemoryCache(): void {
+  memoryCache.clear();
+}
+
 /**
  * Embedding via le pool de clés : rotation sur 429/503, et une clé refusée en 401
  * (ex: jeton « AQ. » → ACCESS_TOKEN_TYPE_UNSUPPORTED) est exclue des embeddings.
@@ -216,6 +221,8 @@ export const memorySkill: Skill = {
         if (!embedding) return { error: "Erreur lors de la génération de l'embedding." };
 
         const projectId = getActiveProjectId();
+        // Toute écriture rend les recherches en cache potentiellement obsolètes.
+        memoryCache.clear();
 
         // Déduplication : similaire + tag commun → mise à jour (scoped projet)
         const similar = await findSimilarMemory(supabase, embedding, validated.tags, projectId);
@@ -226,7 +233,8 @@ export const memorySkill: Skill = {
               content: validated.content,
               tags: validated.tags,
               embedding,
-              project_id: projectId,
+              // project_id volontairement conservé : une mémoire globale ('')
+              // ne doit pas disparaître des autres projets lors d'une mise à jour.
               updated_at: new Date().toISOString(),
             })
             .eq("id", similar.id)

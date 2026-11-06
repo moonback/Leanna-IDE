@@ -62,20 +62,37 @@ const STOP_WORDS = new Set([
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class DocumentMemory {
-  private store: DocumentKnowledgeStore;
+  private _store!: DocumentKnowledgeStore;
+  /** Chemin d'où provient `_store` : les écritures y retournent, jamais vers un autre projet. */
+  private loadedFrom = "";
+  private _saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /** Index inversé : mot → Set<documentId | factId> */
   private invertedIndex: Map<string, Set<string>> = new Map();
 
   constructor() {
-    this.store = this.load();
-    this.rebuildIndex();
+    // Chargement paresseux : à l'import, aucun projet n'est encore actif.
+  }
+
+  /**
+   * Store du workspace courant. Recharge quand SELF_ROOT change (comme
+   * StrategyMemory) ; sans cela le store chargé à l'import écrasait le
+   * DocumentKnowledge.json du projet activé ensuite.
+   */
+  private get store(): DocumentKnowledgeStore {
+    const target = getStorePath();
+    if (target !== this.loadedFrom) {
+      if (this._saveTimeout && this.loadedFrom) this.save(); // flush vers l'ancien chemin
+      this.loadedFrom = target;
+      this._store = this.load(target);
+      this.rebuildIndex();
+    }
+    return this._store;
   }
 
   // ─── Persistence ──────────────────────────────────────────────────────────
 
-  private load(): DocumentKnowledgeStore {
-    const storePath = getStorePath();
+  private load(storePath: string): DocumentKnowledgeStore {
     try {
       if (fs.existsSync(storePath)) {
         const raw = fs.readFileSync(storePath, "utf-8");
@@ -105,15 +122,21 @@ export class DocumentMemory {
   }
 
   save(): void {
+    if (this._saveTimeout) { clearTimeout(this._saveTimeout); this._saveTimeout = null; }
+    if (!this.loadedFrom) return; // rien n'a été chargé, rien à écrire
     try {
-      const storePath = getStorePath();
+      const storePath = this.loadedFrom;
       const dir = path.dirname(storePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      this.store.stats = this.computeStats(this.store.documents, this.store.facts, this.store.relations);
-      this.store.lastUpdated = new Date().toISOString();
-      fs.writeFileSync(storePath, JSON.stringify(this.store, null, 2), "utf-8");
+      const store = this._store;
+      store.stats = this.computeStats(store.documents, store.facts, store.relations);
+      store.lastUpdated = new Date().toISOString();
+      // Écriture atomique (tmp + rename), comme ProjectMemory.
+      const tmpPath = `${storePath}.tmp_${Date.now()}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+      fs.renameSync(tmpPath, storePath);
     } catch (e: any) {
       log.error("Erreur écriture store:", e.message);
     }
@@ -121,8 +144,8 @@ export class DocumentMemory {
 
   private markDirty(): void {
     // Auto-save différé (debounce simple)
-    if ((this as any)._saveTimeout) clearTimeout((this as any)._saveTimeout);
-    (this as any)._saveTimeout = setTimeout(() => this.save(), 2000);
+    if (this._saveTimeout) clearTimeout(this._saveTimeout);
+    this._saveTimeout = setTimeout(() => this.save(), 2000);
   }
 
   // ─── Index inversé ────────────────────────────────────────────────────────

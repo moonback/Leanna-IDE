@@ -13,6 +13,7 @@
  */
 
 import { AgentRuntime } from "./AgentRuntime.js";
+import { hierarchicalMemoryService } from "./HierarchicalMemoryService.js";
 import { createAgentRuntime, type AgenticRuntime, type AgentBudget } from "./agentic/index.js";
 import { SkillManagerV2 } from "./compat/SkillManagerV2.js";
 import { PromptRegistry } from "./PromptRegistry.js";
@@ -183,6 +184,8 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
   const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
   const dryRun = config.dryRun ?? DryRunController.fromEnv();
   const runtime = new AgentRuntime(config.runtime, { permissionPolicy, dryRun });
+  // Le palier session de l'API/skill hiérarchique doit lire la vraie Memory du runtime.
+  hierarchicalMemoryService.attachSessionStore(runtime.memory);
 
   // 1.5. Préparer l'AgentOrchestrator (l'initialisation de la flotte se fera après configuration du runner agentique)
   const { agentOrchestrator } = await import("../agents/AgentOrchestrator.js");
@@ -297,6 +300,7 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   const permissionPolicy = config.permissionPolicy ?? PermissionPolicy.fromEnv();
   const dryRun = config.dryRun ?? DryRunController.fromEnv();
   const runtime = new AgentRuntime(config.runtime, { permissionPolicy, dryRun });
+  hierarchicalMemoryService.attachSessionStore(runtime.memory);
   const skillManager = new SkillManagerV2({
     eventBus: runtime.events,
     registry: runtime.tools,

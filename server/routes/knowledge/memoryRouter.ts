@@ -49,6 +49,11 @@ router.post('/memory', (req: Request, res: Response) => {
       sourceFile,
       confidence: confidence ?? 0.5,
     });
+    // addFact renvoie "" si le fait est rejeté (trop court/bruyant) ou doublon.
+    if (!id) {
+      return res.status(409).json({ error: 'Fait rejeté : doublon ou qualité insuffisante (min. 20 caractères).' });
+    }
+    projectMemory.save();
     return res.json({ status: 'success', id });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -82,6 +87,7 @@ router.put('/memory/:id', (req: Request, res: Response) => {
     if (!updated) {
       return res.status(404).json({ error: 'Fait mémoire introuvable.' });
     }
+    projectMemory.save();
     return res.json({ status: 'success' });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -95,6 +101,7 @@ router.delete('/memory/:id', (req: Request, res: Response) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Fait mémoire introuvable.' });
     }
+    projectMemory.save();
     return res.json({ status: 'success' });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });

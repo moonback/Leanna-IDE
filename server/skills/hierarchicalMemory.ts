@@ -9,6 +9,7 @@ export const hierarchicalMemorySkill: Skill = {
     hierarchical_memory_search: ["read"],
     hierarchical_memory_stats: ["read"],
     hierarchical_memory_store: ["write"],
+    hierarchical_memory_promote: ["write"],
   },
   metadata: {
     version: "1.0.0",

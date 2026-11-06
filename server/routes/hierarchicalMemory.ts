@@ -6,6 +6,9 @@ import {
 
 const router = Router();
 
+const TIERS: HierarchicalTier[] = ["session", "project", "longterm"];
+const isTier = (t: unknown): t is HierarchicalTier => TIERS.includes(t as HierarchicalTier);
+
 // GET /api/memory/hierarchical/stats
 router.get("/stats", async (_req: Request, res: Response) => {
   try {
@@ -50,6 +53,7 @@ router.get("/search", async (req: Request, res: Response) => {
 router.get("/list", async (req: Request, res: Response) => {
   try {
     const tier = (req.query.tier as HierarchicalTier) || "session";
+    if (!isTier(tier)) return res.status(400).json({ success: false, error: "Tier invalide" });
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
@@ -67,6 +71,7 @@ router.post("/store", async (req: Request, res: Response) => {
     if (!tier || !content) {
       return res.status(400).json({ success: false, error: "Les champs 'tier' et 'content' sont requis." });
     }
+    if (!isTier(tier)) return res.status(400).json({ success: false, error: "Tier invalide" });
 
     const item = await hierarchicalMemoryService.store(tier as HierarchicalTier, {
       key,
@@ -92,6 +97,10 @@ router.post("/promote", async (req: Request, res: Response) => {
         success: false,
         error: "Les champs 'id', 'fromTier' et 'toTier' sont obligatoires.",
       });
+    }
+    // Promotion uniquement vers le haut : session→project|longterm, project→longterm.
+    if (!["session", "project"].includes(fromTier) || !["project", "longterm"].includes(toTier)) {
+      return res.status(400).json({ success: false, error: "Promotion invalide (session→project|longterm, project→longterm)." });
     }
 
     const item = await hierarchicalMemoryService.promote(
