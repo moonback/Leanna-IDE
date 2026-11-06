@@ -1,39 +1,51 @@
-# Duo vocal multi-IA
+# Duo vocal multi-IA — Gemini Live
 
-## Fonctionnement
+## Architecture
 
-La page `/voice-duo` propose une conversation vocale entre l'assistant principal et une seconde IA configurable (nom et voix). Le navigateur capture la parole avec Web Speech API, puis appelle `POST /api/voice-duo/turn`. Le serveur génère un échange alterné et synthétise chaque intervention en PCM 24 kHz mono. Le client lit les segments dans l'ordre et conserve un historique court partagé.
+La page `/voice-duo` ouvre un WebSocket authentifié sur `/voice-duo-live`. Le serveur crée **deux sessions Gemini Live indépendantes** sur `gemini-3.8-live` :
+
+- **Leanna** : persona principale, voix `aiVoice`.
+- **Roxane** : persona critique et complémentaire, voix `duoVoice`.
+
+Chaque session conserve son propre état conversationnel côté Gemini. L'orchestrateur maintient un transcript partagé borné et transmet à chaque IA les interventions récentes de l'utilisateur et de l'autre IA avant de lui donner la parole. Une seule session est autorisée à produire de l'audio vers le client à un instant donné : les sorties ne se chevauchent donc pas.
+
+## Flux audio temps réel
+
+- Micro navigateur → AudioWorklet / pipeline `useAudio` → PCM16 mono 16 kHz → WebSocket.
+- Serveur → session Gemini Live du speaker actif via `sendRealtimeInput`.
+- Gemini Live → PCM audio 24 kHz → WebSocket binaire → `useAudio.playAudioChunk`.
+- Transcriptions d'entrée/sortie → événements JSON étiquetés par speaker → transcript UI.
+- Le microphone reste actif pendant la lecture. L'echo cancellation et le VAD réduisent le retour acoustique ; Gemini Live détecte l'activité utilisateur et émet l'événement `interrupted`. Le client coupe alors immédiatement la file audio et l'orchestrateur invalide le tour autonome en cours.
+
+## Mode libre et arbitrage
+
+Après la réponse de l'IA active, l'orchestrateur donne la parole à l'autre session en lui injectant le contexte commun. Les deux sessions peuvent ainsi se répondre, nuancer ou contredire leurs analyses. Les tours autonomes sont limités à quatre par prise de parole utilisateur ; une nouvelle intervention humaine interrompt la chaîne et réinitialise ce budget. Cette borne évite une boucle autonome et des coûts illimités.
 
 ## Configuration
 
 Dans **Paramètres → Assistant IA** :
-- Nom et voix de Leanna : configuration existante.
-- Nom et voix de la seconde IA : `duoName` et `duoVoice`.
-- Valeurs par défaut : Roxane / Kore.
+- Nom et voix de Leanna : `aiName`, `aiVoice`.
+- Nom et voix de la seconde IA : `duoName`, `duoVoice`.
+- Valeurs initiales : Leanna / Aoede et Roxane / Kore.
 
-Les deux champs sont stockés dans le profil local et synchronisés avec `/api/profile`.
+Les noms et voix sont chargés depuis le profil courant. Les voix doivent appartenir au catalogue Gemini Live accepté par le modèle sélectionné.
 
-## Limites et sécurité
+## Sécurité et cycle de vie
 
-- Les échanges autonomes sont bornés à quatre interventions par prise de parole utilisateur. Cela évite une boucle infinie et borne les coûts LLM/TTS.
-- Le microphone utilise la reconnaissance vocale native du navigateur (Chrome/Edge recommandés). Sa disponibilité et sa qualité dépendent du navigateur et de ses autorisations.
-- L'audio généré est PCM 24 kHz ; si le TTS échoue, le client utilise SpeechSynthesis comme solution de secours.
-- Les requêtes passent par l'authentification API existante. Les prompts et historiques sont bornés en taille.
-- L'interruption arrête la lecture en cours ; le contrôle **Terminer** coupe la reconnaissance vocale et la lecture.
-- La page n'utilise pas une seconde session Gemini Live persistante : les tours sont générés par appels texte puis TTS. Le mode libre est donc un dialogue alterné borné, et non deux flux audio simultanés.
+- WebSocket `/voice-duo-live` authentifié avec le cookie `Leanna_token`, comme `/live` et `/notebook-live`.
+- Les deux sessions sont enregistrées dans `activeGeminiSessions` et fermées au disconnect ou au shutdown.
+- Le serveur limite le transcript à 24 entrées et tronque chaque intervention.
+- Les événements de connexion, erreurs, fermeture, durée de session et usage modèle sont journalisés sans exposer les clés API ni les données audio brutes.
 
-## API
+## API et compatibilité
 
-`POST /api/voice-duo/turn`
+- WebSocket temps réel : `/voice-duo-live` (protocole audio binaire PCM16 16 kHz entrant / PCM 24 kHz sortant ; événements JSON `ready`, `speaker`, `transcript`, `interrupted`, `turn_complete`, `session_error`).
+- L'ancien endpoint `POST /api/voice-duo/turn` est conservé temporairement pour compatibilité, mais la nouvelle interface ne l'utilise plus.
 
-```json
-{
-  "message": "Que penses-tu de cette idée ?",
-  "history": [],
-  "maxTurns": 4,
-  "includeAudio": true,
-  "language": "fr"
-}
-```
+## Validation
 
-Chaque message retourné contient `speaker`, `name`, `text` et `audio` (base64 PCM, éventuellement null si le TTS est indisponible).
+À exécuter dans le dépôt :
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- Test manuel Chrome/Edge : démarrage des deux sessions, prise de parole de chaque IA, interruption pendant chaque voix, reprise utilisateur, reset, déconnexion et shutdown.
