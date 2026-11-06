@@ -43,10 +43,12 @@ export default function VoiceDuoView() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const playbackRef = useRef<AbortController | null>(null);
+  const speakingRef = useRef(false);
   const historyRef = useRef<Array<{speaker:"user"|"leanna"|"roxane";text:string}>>([]);
   const activeRef = useRef(false);
 
   const stopPlayback = useCallback(() => {
+    speakingRef.current = false;
     playbackRef.current?.abort();
     playbackRef.current = null;
   }, []);
@@ -56,6 +58,7 @@ export default function VoiceDuoView() {
     audioContextRef.current = context;
     if (context.state === "suspended") await context.resume();
     const controller = new AbortController();
+    speakingRef.current = true;
     playbackRef.current = controller;
     for (const item of items) {
       if (controller.signal.aborted || !activeRef.current) break;
@@ -72,11 +75,12 @@ export default function VoiceDuoView() {
       }
     }
     if (playbackRef.current === controller) playbackRef.current = null;
+    speakingRef.current = false;
   }, [profile.language]);
 
   const handleUtterance = useCallback(async (raw: string) => {
     const text = raw.trim();
-    if (!text || !activeRef.current) return;
+    if (!text || !activeRef.current || speakingRef.current) return;
     stopPlayback();
     window.speechSynthesis?.cancel();
     historyRef.current.push({ speaker: "user", text });
