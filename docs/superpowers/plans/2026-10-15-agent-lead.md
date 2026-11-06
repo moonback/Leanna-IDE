@@ -1,3 +1,12 @@
+> **Statut au 2026-11-06 : IMPLÉMENTÉ dans le code.** Les modules `server/agents/lead/`
+> sont présents (`AgentLead`, `AgentSelector`, `StageArbiter`, `StopController`) et
+> les tests d'intégration/unitaires correspondants existent. Ce fichier est conservé comme
+> trace du plan d'implémentation ; ne pas relancer les tâches cochées sans comparer le code.
+> Référence : `server/agents/lead/AgentLead.ts`, `AgentLead.test.ts`,
+> `AgentLead.integration.test.ts`.
+>
+> ---
+>
 # Agent Lead — plan d'implémentation
 
 > **Pour les agents d'exécution :** SOUS-SKILL REQUIS : utiliser superpowers:subagent-driven-development (recommandé) ou superpowers:executing-plans pour exécuter ce plan tâche par tâche. Les étapes utilisent la syntaxe de case à cocher (`- [ ]`) pour le suivi.
