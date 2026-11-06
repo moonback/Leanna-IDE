@@ -120,6 +120,7 @@ export function useLiveAPI() {
   // Ref to track isBusy without creating stale closures in audio callbacks
   const isBusyRef = useRef(false);
   const pendingSourcesRef = useRef<ContextSource[]>([]);
+  const roxaneVoiceCommandBufferRef = useRef('');
   useEffect(() => {
     isBusyRef.current = isBusy;
   }, [isBusy]);
@@ -577,8 +578,10 @@ export function useLiveAPI() {
       // Déclencheur vocal contextuel : « Roxane, rejoins-nous » ou
       // « Roxane, donne ton avis ». La session Live de Leanna reste ouverte.
       const voiceCommand = String(msg.user_text).trim();
-      const trigger = voiceCommand.match(/\\broxane\\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
+      roxaneVoiceCommandBufferRef.current = `${roxaneVoiceCommandBufferRef.current} ${voiceCommand}`.slice(-500);
+      const trigger = roxaneVoiceCommandBufferRef.current.match(/\\broxane\\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
       if (trigger) {
+        roxaneVoiceCommandBufferRef.current = '';
         const recentContext = transcript.slice(-24).map(entry =>
           `${entry.role === 'user' ? 'UTILISATEUR' : 'LEANNA'} : ${entry.text}`
         ).join('\\n\\n');
