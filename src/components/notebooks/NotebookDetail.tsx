@@ -29,6 +29,7 @@ import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
 import { NbButton, NbIconButton } from './ui/primitives.js';
+import { ViewHeader } from '../ui/ViewHeader.js';
 
 interface NotebookData {
   id: string;
@@ -435,57 +436,19 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   return (
     <NotebookLiveProvider notebookId={notebookId}>
     <div className="notebook-workspace h-full flex flex-col overflow-hidden">
-      {/* ─── Header ─────────────────────────────────────────── */}
-      <header
-        className="notebook-header flex-shrink-0"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <NbIconButton
-            icon={ArrowLeft}
-            label="Retour aux notebooks"
-            onClick={onBack}
-            className="transition-transform active:scale-90"
-          />
-
-          <div
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-base"
-            style={{ backgroundColor: `color-mix(in srgb, ${notebook.color || 'var(--notebook-accent)'} 14%, transparent)`, color: notebook.color }}
-            aria-hidden="true"
-          >
-            {notebook.icon || <BookOpen className="h-4 w-4" />}
+      <ViewHeader
+        title={notebook.title}
+        icon={BookOpen}
+        description={notebook.description || `${notebook.sources.length} source${notebook.sources.length > 1 ? 's' : ''} · ${notebook.notes.length} note${notebook.notes.length > 1 ? 's' : ''}`}
+        badge={indexingProgress.active ? `Indexation ${indexingProgress.done}/${indexingProgress.total}` : 'Notebook'}
+        actions={
+          <div className="flex items-center gap-2">
+            <NbIconButton icon={ArrowLeft} label="Retour aux notebooks" onClick={onBack} className="transition-transform active:scale-90" />
+            <div className="hidden md:flex"><NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} /></div>
+            <NbIconButton icon={RefreshCw} label="Actualiser" onClick={loadNotebook} className="transition-transform active:scale-90" />
           </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="notebook-title truncate notebook-heading">{notebook.title}</h1>
-              {indexingProgress.active && (
-                <span className="notebook-pill">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {indexingProgress.done}/{indexingProgress.total}
-                </span>
-              )}
-            </div>
-            <p className="notebook-subtitle truncate">
-              {notebook.description || `${notebook.sources.length} source${notebook.sources.length > 1 ? 's' : ''} · ${notebook.notes.length} note${notebook.notes.length > 1 ? 's' : ''}`}
-            </p>
-          </div>
-        </div>
-
-        {/* Right actions */}
-        <div className="flex flex-shrink-0 items-center gap-2">
-          {/* Assistant vocal — consomme la session partagée via NotebookLiveProvider :
-              reste connecté quelle que soit la vue centrale affichée. */}
-          <div className="hidden md:flex">
-            <NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} />
-          </div>
-          <NbIconButton
-            icon={RefreshCw}
-            label="Actualiser"
-            onClick={loadNotebook}
-            className="transition-transform active:scale-90"
-          />
-        </div>
-      </header>
+        }
+      />
 
       {/* ─── Indexing Progress ─────────────────────────────── */}
       <AnimatePresence>
