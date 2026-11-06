@@ -89,6 +89,7 @@ test('custom agent model overrides the profile model without overriding an expli
   await generateText({ prompt: 'code task', agentRole: 'coder' });
   await generateText({ prompt: 'explicit override', agentRole: 'coder', openrouterModel: 'openai/gpt-6-luna-pro' });
   assert.deepEqual(requestedModels, ['cohere/north-mini-code:free', 'openai/gpt-6-luna-pro']);
+  assert.deepEqual(telemetryService.getUsageRecords().map((record) => record.agentRole), ['coder', 'coder']);
 });
 
 test('adaptive routing is opt-in and explicit model overrides remain pinned', async () => {
@@ -102,6 +103,7 @@ test('adaptive routing is opt-in and explicit model overrides remain pinned', as
   await generateText({ prompt: 'short task', agentRole: 'reviewer' });
   await generateText({ prompt: 'pinned task', agentRole: 'reviewer', openrouterModel: 'anthropic/claude-3.5-sonnet' });
   assert.deepEqual(requestedModels, ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet']);
+  assert.deepEqual(telemetryService.getUsageRecords().map((record) => record.agentRole), ['reviewer', 'reviewer']);
 });
 
 test('getActiveModel follows the selected OpenRouter model and safe defaults', () => {
