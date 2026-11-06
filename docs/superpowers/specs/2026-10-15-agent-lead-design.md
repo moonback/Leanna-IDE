@@ -1,3 +1,9 @@
+> **Statut au 2026-11-06 : implémentation présente.** La spec décrit la conception ayant
+> conduit aux modules `server/agents/lead/`. Elle est conservée comme décision de conception
+> et ne doit plus être lue comme un chantier en attente de développement.
+>
+> ---
+>
 # Agent Lead — chef d'orchestre intelligent (design)
 
 Date : 2026-10-15 · Statut : validé en conception, en attente de revue de la spec.
