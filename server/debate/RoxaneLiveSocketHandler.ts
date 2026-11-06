@@ -141,6 +141,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     const start = async (message: any) => {
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
+      if (deps.activeGeminiSessions.size >= 16) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
       if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
       topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
       context = typeof message.context === 'string' ? message.context.slice(-MAX_CONTEXT) : '';
