@@ -67,3 +67,47 @@ test("TaskExecutionLimiter removes a cancelled waiter without starting it later"
   assert.equal(limiter.activeCount, 0);
   assert.equal(limiter.pendingCount, 0);
 });
+
+test("role quotas prevent overbooking without blocking other roles", async () => {
+  const limiter = new TaskExecutionLimiter(2);
+  let releaseCoder!: () => void;
+  let releaseReviewer!: () => void;
+  const started: string[] = [];
+
+  const coderOne = limiter.run(async () => {
+    started.push("coder-1");
+    await new Promise<void>((resolve) => { releaseCoder = resolve; });
+  }, "coder-1", "coder", 1);
+  const reviewerOne = limiter.run(async () => {
+    started.push("reviewer-1");
+    await new Promise<void>((resolve) => { releaseReviewer = resolve; });
+  }, "reviewer-1", "reviewer", 1);
+
+  await Promise.resolve();
+  const coderTwo = limiter.run(async () => { started.push("coder-2"); }, "coder-2", "coder", 1);
+  const reviewerTwo = limiter.run(async () => { started.push("reviewer-2"); }, "reviewer-2", "reviewer", 1);
+  await Promise.resolve();
+
+  assert.equal(limiter.getActiveCount("coder"), 1);
+  assert.equal(limiter.getActiveCount("reviewer"), 1);
+  assert.equal(limiter.pendingCount, 2);
+
+  // Free a global slot while coder is still at its per-role ceiling.
+  releaseReviewer();
+  await reviewerOne;
+  await Promise.resolve();
+  assert.ok(started.includes("reviewer-2"), "an eligible role must not be blocked by an older saturated-role waiter");
+  assert.ok(!started.includes("coder-2"), "coder must stay within its role limit");
+
+  releaseCoder();
+  await Promise.all([coderOne, coderTwo, reviewerTwo]);
+  assert.equal(limiter.activeCount, 0);
+  assert.equal(limiter.getActiveCount("coder"), 0);
+  assert.equal(limiter.getActiveCount("reviewer"), 0);
+  assert.equal(limiter.pendingCount, 0);
+});
+
+test("TaskExecutionLimiter rejects invalid per-role capacity", async () => {
+  const limiter = new TaskExecutionLimiter(2);
+  await assert.rejects(limiter.run(async () => undefined, "bad-role-limit", "coder", 0), /roleLimit/);
+});
