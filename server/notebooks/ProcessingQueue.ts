@@ -75,6 +75,9 @@ type TaskHandler<T> = (task: QueueTask<T>, onProgress: (pct: number) => void) =>
 export class ProcessingQueue<T = unknown> {
   private queue: QueueTask<T>[] = [];
   private processing: Map<string, QueueTask<T>> = new Map();
+  /** Tâches en backoff : elles restent durables et annulables pendant le délai. */
+  private retrying: Map<string, QueueTask<T>> = new Map();
+  private retryTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private completed: QueueTask<T>[] = [];
   private handler: TaskHandler<T> | null = null;
   private config: QueueConfig;
@@ -109,7 +112,7 @@ export class ProcessingQueue<T = unknown> {
     if (!file || !fs.existsSync(file)) return;
     try {
       const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
-      if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as any).tasks)) {
+      if (!parsed || typeof parsed !== "object" || (parsed as any).version !== 1 || !Array.isArray((parsed as any).tasks)) {
         throw new Error("Format de queue invalide.");
       }
       const restored = (parsed as any).tasks.filter((task: any) =>
@@ -134,7 +137,7 @@ export class ProcessingQueue<T = unknown> {
     const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(temp, JSON.stringify({ version: 1, tasks: this.queue }), "utf-8");
+      fs.writeFileSync(temp, JSON.stringify({ version: 1, tasks: [...this.queue, ...this.retrying.values()] }), "utf-8");
       fs.renameSync(temp, file);
     } catch (error: any) {
       try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch { /* best effort */ }
@@ -152,13 +155,13 @@ export class ProcessingQueue<T = unknown> {
     options?: { priority?: TaskPriority; maxAttempts?: number }
   ): QueueTask<T> | null {
     // Vérifier la taille de la queue
-    if (this.queue.length >= this.config.maxQueueSize) {
+    if (this.queue.length + this.retrying.size >= this.config.maxQueueSize) {
       log.warn(`Queue pleine (${this.config.maxQueueSize} tâches). Tâche rejetée: ${id}`);
       return null;
     }
 
     // Vérifier les doublons
-    if (this.queue.some(t => t.id === id) || this.processing.has(id)) {
+    if (this.queue.some(t => t.id === id) || this.processing.has(id) || this.retrying.has(id)) {
       log.warn(`Tâche déjà en queue/processing: ${id}`);
       return null;
     }
@@ -317,7 +320,7 @@ export class ProcessingQueue<T = unknown> {
   /** Statistiques globales de la queue */
   getStats(): QueueStats {
     return {
-      pending: this.queue.length,
+      pending: this.queue.length + this.retrying.size,
       processing: this.processing.size,
       completed: this.completed.filter(t => t.status === "completed").length,
       failed: this.completed.filter(t => t.status === "failed").length,
