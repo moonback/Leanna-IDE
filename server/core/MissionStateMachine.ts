@@ -111,7 +111,6 @@ export function toGoalStatus(
     case "RECOVERY_REQUIRED":
     case "WAITING_APPROVAL":
     case "PAUSED":
-    case "RECOVERY_REQUIRED":
     case "ESCALATED":
       return "blocked";
     case "COMPLETED":
