@@ -133,3 +133,22 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier le chat plein écran avec et sans sidebar, puis revenir au mode docké et confirmer le calcul de largeur.
 - Parcourir Documents, Historique et Mémoire avec une fenêtre courte et une fenêtre étroite : le scroll doit rester dans la zone de contenu, sans débordement vertical du header.
 - Vérifier que les vues Notebooks liste et détail conservent un seul header chacune.
+
+
+## Cinquième passe — Statut de connexion et signalétique inactive
+
+### Correction demandée
+
+- La barre d'état affichait systématiquement l'état Gemini Live `idle` sous le libellé « Hors ligne », même lorsque l'utilisateur n'avait pas démarré de session vocale.
+- Le type `ConnectionStatus` de `useLiveAPI` confirme trois états : `idle`, `connecting` et `connected`.
+
+### Correction appliquée
+
+- Le badge Gemini Live est désormais masqué lorsque le statut est `idle`.
+- Il apparaît pendant la connexion (`Connexion…`) et une fois connecté (`Connectée`).
+- Le cas `idle` n'affiche plus d'icône Wi-Fi barré ni le texte « Hors ligne » dans la StatusBar.
+
+### Validation restante
+
+- Vérifier visuellement les trois états : idle (aucun badge), connecting (indicateur animé), connected (indicateur vert).
+- Confirmer que les autres indicateurs de la barre (Sandbox, MCP, Telegram) restent indépendants du statut Gemini Live.
