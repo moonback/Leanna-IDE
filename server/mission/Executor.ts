@@ -3045,6 +3045,8 @@ export interface SkillHandlerOptions {
   signal?: AbortSignal;
   /** Étape de mission (clé d'idempotence) transmise au ToolRegistry. */
   idempotencyScope?: { missionId: string; stepId: string };
+  /** Called by ToolRegistry after guards and immediately before a side effect. */
+  beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }
 
 /** Handler pour exécuter un skill */
