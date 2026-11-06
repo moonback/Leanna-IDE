@@ -22,7 +22,10 @@ test("replan drops a durably-failing tool while keeping at least one option", as
   for (let i = 0; i < 5; i++) strategy.recordSkillOutcome("unreliable_tool", false, 100);
 
   const planner = new Planner(new SkillScorer(), strategy);
-  const mission = new Mission("t", "corriger le bug", "high", { ...DEFAULT_MISSION_CONFIG });
+  const mission = new Mission("t", "corriger le bug", "high", {
+    ...DEFAULT_MISSION_CONFIG,
+    minSkillScore: 0,
+  });
   const goalId = mission.rootGoal.id;
 
   const available = ["reliable_tool", "unreliable_tool"];
@@ -31,6 +34,7 @@ test("replan drops a durably-failing tool while keeping at least one option", as
   const actions = await planner.replan(mission, goalId, failed, "boom", available);
   const usedSkills = new Set(actions.map((a) => a.skillName));
   assert.equal(usedSkills.has("unreliable_tool"), false, "durably-failing tool must be excluded on replan");
+  assert.ok(usedSkills.has("reliable_tool"), "keep exactly the non-durable fallback when all other tools are excluded");
 });
 
 
