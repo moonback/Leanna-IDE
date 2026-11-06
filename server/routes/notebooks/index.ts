@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import { MAX_NOTEBOOK_SOURCE_BYTES } from "../../utils/notebookSourceUploadValidation.js";
 
 import { createNotebookPromptsRouter } from "./promptsRouter.js";
 import { createNotebooksCrudRouter } from "./notebooksCrudRouter.js";
@@ -15,20 +16,14 @@ import { createBackupRouter } from "./backupRouter.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: MAX_NOTEBOOK_SOURCE_BYTES, files: 10, fields: 20 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(pdf|txt|md|html|docx|doc|rtf|csv|json|yaml|yml|png|jpg|jpeg|gif|webp|bmp|svg)$/i;
-    if (
-      file.originalname.match(allowed) ||
-      file.mimetype.startsWith("text/") ||
-      file.mimetype.startsWith("image/") ||
-      file.mimetype === "application/pdf" ||
-      file.mimetype === "application/json"
-    ) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Type non supporté: ${file.mimetype}`));
+    const allowed = /\\.(pdf|txt|md|markdown|html|htm|png|jpg|jpeg|webp)$/i;
+    if (!allowed.test(file.originalname)) {
+      cb(new Error("Format non pris en charge. Utilisez PDF, TXT, Markdown, HTML, PNG, JPEG ou WebP."));
+      return;
     }
+    cb(null, true);
   },
 });
 
