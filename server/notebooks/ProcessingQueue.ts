@@ -327,6 +327,43 @@ export class ProcessingQueue<T = unknown> {
     );
   }
 
+  /**
+   * Attend le résultat terminal d'une tâche. L'abonnement est posé avant la
+   * seconde lecture pour ne pas perdre une fin de traitement très rapide.
+   */
+  waitForTask(taskId: string): Promise<QueueTask<T>> {
+    const isTerminal = (task: QueueTask<T> | undefined): task is QueueTask<T> =>
+      !!task && ["completed", "failed", "cancelled"].includes(task.status);
+
+    const initial = this.getTask(taskId);
+    if (!initial) return Promise.reject(new Error(`Tâche introuvable : ${taskId}`));
+    if (isTerminal(initial)) {
+      return initial.status === "completed"
+        ? Promise.resolve(initial)
+        : Promise.reject(new Error(initial.error || `Tâche ${taskId} ${initial.status}.`));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let unsubscribe = () => {};
+      const finish = (task: QueueTask<T>) => {
+        if (settled || !isTerminal(task)) return;
+        settled = true;
+        unsubscribe();
+        if (task.status === "completed") resolve(task);
+        else reject(new Error(task.error || `Tâche ${taskId} ${task.status}.`));
+      };
+      unsubscribe = this.onUpdate(taskId, finish);
+      const current = this.getTask(taskId);
+      if (current) finish(current);
+      else {
+        settled = true;
+        unsubscribe();
+        reject(new Error(`Tâche introuvable : ${taskId}`));
+      }
+    });
+  }
+
   /** Statistiques globales de la queue */
   getStats(): QueueStats {
     return {
