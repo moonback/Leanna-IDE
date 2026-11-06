@@ -509,7 +509,7 @@ function AnimatedRoutes() {
   // Entrée : montée + défloutage (360 ms, décélération) ; sortie plus courte
   // vers le haut (150 ms, accélération). Voir src/lib/motion.ts.
   const wrap = (node: React.ReactNode) => (
-    <motion.div className="h-full" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+    <motion.div className="app-route-frame h-full min-w-0 overflow-hidden" variants={pageVariants} initial="initial" animate="animate" exit="exit">
       <Suspense fallback={<LoadingFallback />}>{node}</Suspense>
     </motion.div>
   );
