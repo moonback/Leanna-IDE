@@ -423,3 +423,15 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 - Tests ajoutés pour les plafonds globaux, les quotas par rôle, l'équité entre rôles, la libération après exception, les capacités invalides et l'annulation d'un waiter.
 
 **Limite connue à traiter ensuite :** les quotas par fournisseur/modèle LLM ne sont pas encore centralisés. Plusieurs rôles peuvent utiliser le même fournisseur ; il faut donc ajouter un plafond fournisseur distinct, configurable et compatible avec les limites de débit réelles des API.
+
+
+### Phase suivante — fiabilité du failover LLM
+
+- `generateText()` ne déclenche plus de fallback inter-fournisseur sur les erreurs HTTP client permanentes : 400, 401, 403, 404, etc.
+- Les erreurs transitoires restent éligibles au fallback : 408, 409, 425, 429, 5xx, erreurs réseau et timeouts sans statut HTTP.
+- Les erreurs 4xx permanentes ne font plus augmenter le compteur du circuit breaker : une clé invalide ou une requête mal formée ne doit pas faire croire que le fournisseur est en panne.
+- Tests de non-régression ajoutés pour vérifier qu'un 401 ne bascule pas silencieusement vers l'autre fournisseur et qu'un 429 conserve le failover.
+
+**Pourquoi c'est important :** un fallback automatique sur 401/403 peut masquer une clé révoquée, une permission insuffisante ou une mauvaise configuration en envoyant la même tâche à un fournisseur différent. Le comportement doit privilégier la transparence et l'action corrective plutôt qu'une réussite apparente.
+
+**Validation à exécuter en CI :** `server/utils/textGeneration.telemetry.test.ts`, puis typecheck et suite serveur. Les tests ne sont pas exécutés depuis cette session GitHub.
