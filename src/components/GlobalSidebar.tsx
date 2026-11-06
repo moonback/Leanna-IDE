@@ -27,11 +27,10 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import type { LucideIcon } from 'lucide-react';
 import {
   Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio, Search,
+  Power, MessageCircle, Mic, MicOff, Bot, FolderInput, Radio, Search,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
-import { useAgentStatus } from '../hooks/useAgentStatus.js';
 import { sidebarSections } from '../config/ideSidebarConfig.js';
 import { NAV_GROUPS, type NavItem } from '../config/navigation.js';
 import type { UnifiedSidebarProps } from './sidebar/types.js';
@@ -154,7 +153,6 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   const reduceMotion = useReducedMotion() ?? false;
   const { theme } = useTheme();
   const { confirm } = useConfirm();
-  const agent = useAgentStatus();
   const navRef = useRef<HTMLElement>(null);
 
   /* Préférence persistée : repliée par défaut (hors survol). */
@@ -361,16 +359,6 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 </IconButton>
               )}
             </div>
-
-            {/* Pastille d'état de l'agent (IDE) — clic = Mission Control */}
-            {mode === 'ide' && (
-              <AgentPill
-                agent={agent}
-                collapsed={collapsed}
-                reduceMotion={reduceMotion}
-                onClick={() => navigate('/pilotage')}
-              />
-            )}
 
             {/* Bloc assistant (IDE) */}
             {mode === 'ide' && (
@@ -736,86 +724,6 @@ function NavButton({
 }
 
 /** Pastille d'état de l'agent — clic = retour à Mission Control. */
-function AgentPill({
-  agent, collapsed, reduceMotion, onClick,
-}: { agent: ReturnType<typeof useAgentStatus>; collapsed: boolean; reduceMotion: boolean; onClick: () => void }) {
-  const progress = typeof agent.progress === 'number' ? Math.min(1, Math.max(0, agent.progress)) : null;
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      title="Ouvrir Mission Control"
-      aria-label={`État de Leanna : ${agent.label}. Ouvrir Mission Control.`}
-      whileHover={reduceMotion ? undefined : { x: 2 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-      className={`group/pill mx-2 mb-2 mt-1 flex flex-shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:border-[var(--accent-primary)] ${collapsed ? 'justify-center' : ''}${agent.active && !reduceMotion ? ' lea-glow-border' : ''} ${FOCUS_RING}`}
-      style={{
-        background: 'linear-gradient(180deg, var(--bg-panel) 0%, color-mix(in srgb, var(--bg-panel) 70%, var(--bg-secondary)) 100%)',
-        border: '1px solid var(--border-base)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-      }}
-    >
-      <span className="relative flex h-2.5 w-2.5 flex-shrink-0 items-center justify-center" aria-hidden>
-        {agent.active && !reduceMotion && (
-          <motion.span
-            className="absolute inline-flex h-full w-full rounded-full"
-            style={{ backgroundColor: agent.color }}
-            animate={{ opacity: [0.55, 0, 0.55], scale: [1, 2.4, 1] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        )}
-        <motion.span
-          className="relative inline-flex h-2 w-2 rounded-full"
-          animate={{ backgroundColor: agent.color }}
-          transition={{ duration: 0.4 }}
-        />
-      </span>
-
-      <FadeSlide show={!collapsed} className="min-w-0 flex-1 text-left" reduceMotion={reduceMotion}>
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={agent.label}
-            initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16 }}
-            className="block"
-          >
-            <span className="block truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{agent.label}</span>
-            <span className="block truncate text-xs" style={{ color: 'var(--text-muted)' }}>{agent.reason}</span>
-          </motion.span>
-        </AnimatePresence>
-        {progress !== null && (
-          <span
-            className="mt-1.5 block h-1 w-full overflow-hidden rounded-full"
-            style={{ backgroundColor: 'var(--border-base)' }}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(progress * 100)}
-          >
-            <motion.span
-              className="block h-full rounded-full"
-              initial={false}
-              animate={{ width: `${Math.round(progress * 100)}%`, backgroundColor: agent.color }}
-              transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 160, damping: 24 }}
-            />
-          </span>
-        )}
-      </FadeSlide>
-
-      {!collapsed && (
-        <ArrowLeft
-          size={13}
-          className="flex-shrink-0 transition-transform group-hover/pill:-translate-x-0.5"
-          style={{ color: 'var(--text-dimmed)' }}
-          aria-hidden
-        />
-      )}
-    </motion.button>
-  );
-}
-
 /** Bouton d'action compact (défini hors du composant : pas de remontage à chaque rendu).
  *  Tooltip rendu en portail (jamais coupé par l'overflow de la barre), état
  *  désactivé explicite et retour tactile respectant prefers-reduced-motion. */
