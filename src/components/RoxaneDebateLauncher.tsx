@@ -172,6 +172,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const stopMicrophone = () => {
+    if (liveSocketRef.current?.readyState === WebSocket.OPEN) liveSocketRef.current.send(JSON.stringify({ type: 'mic_stop' }));
     if (inputProcessorRef.current) {
       inputProcessorRef.current.onaudioprocess = null;
       inputProcessorRef.current.disconnect();
@@ -200,7 +201,7 @@ export function RoxaneDebateLauncher() {
       const context = new AudioContext({ sampleRate: 16000 });
       await context.resume();
       const source = context.createMediaStreamSource(stream);
-      const processor = context.createScriptProcessor(4096, 1, 1);
+      const processor = context.createScriptProcessor(2048, 1, 1);
       const mute = context.createGain();
       mute.gain.value = 0;
       processor.onaudioprocess = event => {
