@@ -180,7 +180,7 @@ export default function ObservabilityView() {
           </div>
         )}
 
-        {!loading && tab === 'overview' && (
+        {!loading && !loadError && tab === 'overview' && (
           <>
             {/* Overview cards */}
             <div className="lea-stagger grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -314,12 +314,12 @@ export default function ObservabilityView() {
         )}
 
         {/* Santé & fiabilité tab (métriques runtime réelles) */}
-        {!loading && tab === 'health' && (
+        {!loading && !loadError && tab === 'health' && (
           <RuntimeHealthPanel snapshot={runtime.snapshot} available={runtime.available} />
         )}
 
         {/* Usage history tab */}
-        {!loading && tab === 'usage' && (
+        {!loading && !loadError && tab === 'usage' && (
           <div
             className="rounded-xl border overflow-hidden"
             style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
@@ -378,7 +378,7 @@ export default function ObservabilityView() {
         )}
 
         {/* Budget tab */}
-        {!loading && tab === 'budget' && <BudgetPanel />}
+        {!loading && !loadError && tab === 'budget' && <BudgetPanel />}
       </div>
     </div>
   );
