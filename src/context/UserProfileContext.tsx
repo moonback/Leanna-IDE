@@ -189,7 +189,7 @@ function load(): UserProfile {
 // la source de vérité pour l'application réelle des modèles (texte, image,
 // notebook) ; localStorage ne sert qu'au rendu de l'UI.
 const SERVER_SYNCED_KEYS: (keyof UserProfile)[] = [
-  'aiName', 'aiVoice', 'userName', 'userRole', 'language', 'responseStyle',
+  'aiName', 'aiVoice', 'duoName', 'duoVoice', 'userName', 'userRole', 'language', 'responseStyle',
   'autoMuteEnabled', 'autoMuteTimeout', 'vadEnabled', 'vadThreshold',
   'vadSilenceDuration', 'temperature', 'topP',
   'textProvider', 'openrouterModel', 'openrouterImageModel', 'notebookModel',
