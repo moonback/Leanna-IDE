@@ -530,3 +530,30 @@ Validation locale à ajouter :
 - retry d'une source n'affectant pas les autres sources ;
 - import identique ne déclenchant qu'une seule indexation ;
 - réindexation globale passant par le pipeline et les statuts durables.
+
+
+### Huitième passe — panneau UI de supervision de l'indexation
+
+| Sujet | État | Détail |
+|---|---|---|
+| Intégration UI | Implémentée | Nouveau panneau `IndexingMonitor` intégré comme onglet « Indexation » du Studio Notebook, sans ajouter une page de navigation distincte. |
+| Données réelles | Implémentées | Le panneau consomme `GET /:id/embeddings/indexing-status` et affiche les compteurs agrégés et l'état de chaque source. |
+| Actualisation | Implémentée | Rafraîchissement périodique toutes les 5 secondes, avec bouton d'actualisation manuelle et nettoyage du timer au démontage. |
+| Retry individuel | Implémenté | Le bouton « Réessayer » appelle uniquement l'endpoint de retry de la source sélectionnée ; l'action affiche son état occupé et les erreurs API. |
+| Réindexation globale | Implémentée | Action explicite « Réindexer toutes les sources », désactivée si le notebook est vide ou si une demande est déjà en cours. |
+| Diagnostic | Implémenté | Affichage du statut, du type, du nombre de tentatives, de la dernière erreur, de la dernière mise à jour et de la prochaine échéance lorsqu'elle existe. |
+| Tests UI | Ajoutés | Test de caractérisation des compteurs, de l'affichage d'une erreur et du retry ciblé sans relance d'une source déjà indexée. |
+
+**Limites fonctionnelles à ne pas masquer :**
+- Le backend ne fournit actuellement que le statut d'indexation vectorielle. Le panneau ne prétend donc pas mesurer l'extraction, le découpage ou la génération de résumé.
+- Il n'existe pas encore d'historique durable de toutes les tentatives : seule la dernière erreur, le compteur et les échéances courantes sont exposés.
+- Le rafraîchissement est un polling HTTP toutes les 5 secondes, pas un flux temps réel WebSocket/SSE.
+- Les sources historiques sans statut sont affichées « Non vérifiée » ; elles ne sont pas automatiquement considérées comme indexées.
+- La réindexation globale relance le pipeline de toutes les sources. Elle peut entraîner un coût d'embedding et doit rester une action volontaire.
+
+Validation locale requise :
+- `npm run typecheck`
+- `npm run test:ui -- src/components/notebooks/IndexingMonitor.test.tsx`
+- `npm run lint:eslint:notebooks`
+- vérifier le polling, le démontage du composant, les réponses 202, les erreurs 4xx/5xx et le comportement sur notebook vide.
+- vérifier visuellement l'onglet sur largeur standard et étroite du panneau Studio.
