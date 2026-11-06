@@ -12,7 +12,6 @@ import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { fetchYouTubeTranscript } from "./youtubeTranscript.js";
 import { generateText } from "../utils/textGeneration.js";
-import { embeddingStore } from "./EmbeddingStore.js";
 import path from "path";
 import type { Source, SourceChunk, SourceType } from "./types.js";
 
@@ -410,14 +409,9 @@ export class SourceIngester {
     // Détection de langue (par défaut anglais pour le code)
     const language = 'en';
 
-    // Lancer en parallèle : résumé LLM + vectorisation des chunks
-    const chunkPayload = chunks.map(c => ({ id: c.id, content: c.content }));
-
-    const [{ summary, keywords }] = await Promise.all([
-      this.generateGitHubSummary(rawText, title, repoData),
-      embeddingStore.indexChunks(chunkPayload, id, notebookId)
-        .catch(e => log.warn(`Embedding indexation partielle: ${e.message}`)),
-    ]);
+    // L'ingester reste sans effet secondaire : la source doit être enregistrée
+    // durablement par NotebookManager avant toute indexation vectorielle.
+    const { summary, keywords } = await this.generateGitHubSummary(rawText, title, repoData);
 
     const source: Source = {
       id,
@@ -550,15 +544,9 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     // Détection de langue simple
     const language = this.detectLanguage(rawText);
 
-    // Lancer en parallèle : résumé LLM + vectorisation des chunks
-    // Les deux sont indépendants — inutile d'attendre l'un avant l'autre.
-    const chunkPayload = chunks.map(c => ({ id: c.id, content: c.content }));
-
-    const [{ summary, keywords }] = await Promise.all([
-      this.generateSummaryAndKeywords(rawText, title),
-      embeddingStore.indexChunks(chunkPayload, id, notebookId)
-        .catch(e => log.warn(`Embedding indexation partielle: ${e.message}`)),
-    ]);
+    // L'ingester ne déclenche pas l'indexation : NotebookManager persiste
+    // d'abord la source, puis lance l'indexation de manière récupérable.
+    const { summary, keywords } = await this.generateSummaryAndKeywords(rawText, title);
 
     const source: Source = {
       id,
