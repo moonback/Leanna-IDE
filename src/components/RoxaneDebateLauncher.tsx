@@ -28,6 +28,7 @@ export function RoxaneDebateLauncher() {
       const detail = (event as CustomEvent).detail;
       if (typeof detail?.topic === 'string') setTopic(detail.topic);
       if (typeof detail?.context === 'string') setContext(detail.context);
+      setLiveStatus('idle');
       setOpen(true);
     };
     window.addEventListener('Leanna-start-roxane-debate', openPanel);
@@ -194,7 +195,7 @@ export function RoxaneDebateLauncher() {
         </div>
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-4" style={{ borderColor: 'var(--border-base)' }}>
           <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>{speaking ? <><AudioLines className="h-4 w-4 text-violet-400"/>Lecture Live</> : liveStatus === 'live' ? 'Deux sessions Live connectées' : 'Intervention utilisateur prioritaire'}</div>
-          <div className="flex gap-2">{(busy || liveStatus === 'live') && <button onClick={stopLive} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}><Square className="h-3.5 w-3.5"/>Arrêter le débat</button>}<button onClick={close} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Fermer</button>{liveStatus === 'idle' && <button onClick={run} disabled={busy || !topic.trim()} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#7650c9' }}><Send className="h-3.5 w-3.5"/>{busy ? 'Connexion…' : 'Lancer le débat vocal'}</button>}</div>
+          <div className="flex gap-2">{(busy || liveStatus === 'live') && <button onClick={stopLive} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}><Square className="h-3.5 w-3.5"/>Arrêter le débat</button>}{(liveStatus === 'complete' || liveStatus === 'interrupted' || liveStatus === 'error') && <button onClick={() => { setLiveStatus('idle'); setLiveTurns([]); setSynthesis(null); setApprovedTasks(''); setError(''); }} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Nouveau débat</button>}<button onClick={close} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}>Fermer</button>{liveStatus === 'idle' && <button onClick={run} disabled={busy || !topic.trim()} className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#7650c9' }}><Send className="h-3.5 w-3.5"/>{busy ? 'Connexion…' : 'Lancer le débat vocal'}</button>}</div>
         </footer>
       </div>
     </div>}
