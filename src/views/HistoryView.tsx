@@ -52,16 +52,26 @@ export default function HistoryView() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     fetch('/api/conversations?limit=50')
-      .then(r => r.json())
-      .then(d => setConversations(d.conversations || []))
-      .catch(() => toastError('Impossible de charger l\'historique'))
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        if (!Array.isArray(data.conversations)) throw new Error('Réponse invalide : historique indisponible.');
+        return data;
+      })
+      .then(d => setConversations(d.conversations))
+      .catch(() => {
+        setLoadError('Impossible de charger l’historique. Vérifiez la connexion au serveur puis réessayez.');
+        toastError('Impossible de charger l\'historique');
+      })
       .finally(() => setLoading(false));
   }, [toastError]);
 
@@ -108,7 +118,9 @@ export default function HistoryView() {
     try {
       const res = await fetch(`/api/conversations/${id}?limit=200`);
       const data = await res.json();
-      setMessages(data.messages || []);
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!Array.isArray(data.messages)) throw new Error('Réponse invalide : messages indisponibles.');
+      setMessages(data.messages);
     } catch {
       toastError('Impossible de charger la conversation');
     } finally {
@@ -244,6 +256,11 @@ export default function HistoryView() {
                   <RefreshCw className="w-4 h-4 animate-spin" style={{ color: 'var(--text-dimmed)' }} />
                 </div>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Chargement...</p>
+              </div>
+            ) : loadError ? (
+              <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{loadError}</p>
+                <button type="button" onClick={load} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>Réessayer</button>
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
