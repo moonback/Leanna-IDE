@@ -14,7 +14,7 @@
 
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { AgentResult, AgentTask as AgenticTask, AgentBudget, RuntimePhase } from "../runtime/agentic/types.js";
-import { getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
+import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles.js";
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import type { CoreKernel } from "../core/kernel.js";
@@ -97,7 +97,12 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
    * en respectant le contrat de `AgentExecutor.execute`.
    */
   async execute(task: AgentTask): Promise<void> {
-    return agentTaskExecutionLimiter.run(() => this.executeWithPermit(task), task.id);
+    return agentTaskExecutionLimiter.run(
+      () => this.executeWithPermit(task),
+      task.id,
+      task.role,
+      getAgentDefinition(task.role)?.maxConcurrency ?? 1,
+    );
   }
 
   private async executeWithPermit(task: AgentTask): Promise<void> {
