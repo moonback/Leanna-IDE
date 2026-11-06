@@ -413,12 +413,12 @@ Les modifications et les tests ont été enregistrés sur la branche GitHub. L'e
 Étendre la gouvernance de concurrence au-delà d'une orchestration isolée : limites partagées entre orchestrations, quotas par rôle et par fournisseur LLM, annulation et libération garanties des créneaux, puis métriques p50/p95 et coût par tâche réussie.
 
 
-### Phase 0 — complément : limiteur global partagé
+### Phase 0 — complément : limiteur global centralisé
 
-- Nouveau `TaskExecutionLimiter` FIFO, partagé entre les instances de `TaskScheduler` et la délégation directe de `AgentOrchestrator`.
+- Nouveau `TaskExecutionLimiter` FIFO, appelé à la frontière de `AgentExecutor.execute()` et `AgentRuntimeExecutor.execute()`. Les chemins `TaskScheduler`, délégation directe et flotte autonome qui utilisent ces exécuteurs partagent donc le même budget.
 - Plafond global du processus : **8 tâches actives** ; plafond local inchangé : **4 tâches par orchestration**.
 - Les créneaux sont transmis directement au prochain élément de la file afin d'éviter une course entre libération et nouvelle arrivée.
-- Annulation d'une tâche encore en file : le limiteur retire le waiter ; une tâche annulée ne peut donc pas démarrer ultérieurement par erreur.
-- Tests ajoutés pour le plafond entre plusieurs schedulers, la libération après exception, la capacité invalide et l'annulation d'un waiter.
+- Annulation d'une tâche encore en file : `cancel()` retire le waiter ; une tâche annulée ne peut donc pas démarrer ultérieurement par erreur. `AgentOrchestrator.cancelTask()` relaie l'annulation à l'exécuteur.
+- Tests ajoutés pour le plafond concurrent, la libération après exception, la capacité invalide et l'annulation d'un waiter.
 
-**Périmètre restant à intégrer :** les chemins d'exécution directs de la flotte autonome qui appellent le runner sans passer par `TaskScheduler` ou `AgentOrchestrator.delegateTask` ne sont pas encore tous raccordés au limiteur. La limite de 8 est donc garantie pour les deux chemins intégrés, pas encore comme invariant universel de toute la flotte. La prochaine étape doit centraliser le contrôle à la frontière commune `AgentTaskRunner` / exécuteurs, en préservant l'annulation et le swap legacy/runtime.
+**Limite connue à traiter ensuite :** le plafond global n'est pas encore décliné en quotas par rôle ou fournisseur LLM. La vérification `maxConcurrency` de la délégation directe observe les tâches déjà actives, mais ne réserve pas encore de capacité par rôle pour les tâches en file. Une file très chargée peut donc dépasser le quota de rôle au moment où plusieurs tâches deviennent actives. Il faut ajouter une réservation atomique par rôle sans affamer les autres rôles.
