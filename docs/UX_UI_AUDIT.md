@@ -740,3 +740,42 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Tester les exports PDF/DOCX/HTML et les téléchargements Marketplace avec des noms contenant guillemets, caractères Unicode et caractères de contrôle.
 - Vérifier manuellement dans Electron les confirmations, états de progression, retours d'erreur et téléchargements.
 - Les commandes locales et les parcours Electron ne sont pas exécutés par l'accès GitHub seul ; aucune réussite de typecheck ou de CI n'est revendiquée ici.
+
+
+## Trentième passe — Sécurisation des exports et cohérence des formats
+
+### Constats vérifiés
+
+- Les routes d'export acceptaient des champs de métadonnées sans limites explicites et ne validaient pas les thèmes ou formats demandés.
+- Le nom de fichier était assemblé directement depuis le titre ou le nom fourni ; le format de l'en-tête de téléchargement n'était pas normalisé de manière uniforme.
+- Les convertisseurs Markdown vers HTML et Word laissaient passer les blocs HTML bruts issus du Markdown, ce qui pouvait produire du contenu actif dans les fichiers exportés.
+- La route notebook retombait implicitement sur PDF pour tout format inconnu et ne validait pas l'identifiant avant lecture.
+- L'export Word nommé DOCX ne génère pas un paquet OpenXML DOCX : il produit un document HTML compatible Word avec le type MIME `application/msword`. Le téléchargement est donc nommé `.doc` pour ne pas annoncer un format binaire inexistant.
+
+### Corrections appliquées
+
+- Validation commune du corps, du Markdown non vide, de la limite de 2 Mio, des titres et noms de fichiers (longueur et caractères de contrôle).
+- Normalisation Unicode des noms de téléchargement, suppression des caractères spéciaux et génération d'un en-tête Content-Disposition avec nom ASCII de repli et paramètre UTF-8.
+- Rejet explicite des thèmes et formats inconnus ; validation stricte de l'identifiant notebook avant accès au gestionnaire.
+- Limitation de la taille du contenu assemblé à partir d'un notebook.
+- Échappement des blocs HTML bruts du Markdown dans les exporteurs HTML et Word ; les éléments Markdown structurés restent convertis normalement.
+- Messages d'erreur serveur stabilisés et absence de détails internes renvoyés au client.
+
+### Fichiers concernés
+
+- server/routes/export.ts
+- server/routes/export.test.ts
+- server/export/htmlExporter.ts
+- server/export/docxExporter.ts
+
+### Vérifications automatisées ajoutées
+
+- Refus des thèmes inconnus, noms avec caractères de contrôle et Markdown dépassant 2 Mio.
+- Refus des identifiants notebook contenant un chemin et des formats notebook inconnus.
+
+### Limites et validation restante
+
+- Le format Word historique reste un HTML compatible Word (.doc), pas un véritable DOCX OpenXML. Une migration réelle nécessitera une dépendance DOCX dédiée et la mise à jour des interfaces qui affichent actuellement DOCX.
+- L'échappement des balises HTML brutes protège le rendu HTML exporté ; il ne constitue pas une politique complète de désinfection de contenu externe pour tous les consommateurs Markdown de l'application.
+- Exécuter les tests export, typecheck, lint et tests complets ; vérifier l'ouverture des fichiers PDF, DOC et HTML dans les applications cibles et les téléchargements sur Windows/Electron.
+- Ces commandes et vérifications Electron ne sont pas exécutées via le connecteur GitHub seul.
