@@ -142,7 +142,7 @@ export class Planner {
     // réintroduire immédiatement le même outil laisse le Planner reconstruire
     // exactement le plan qui vient d'échouer. On l'écarte donc pour ce tour,
     // ainsi que les outils durablement peu fiables. Si aucune alternative
-    // n'existe, on conserve le dernier outil disponible plutôt que de bloquer.
+    // n'existe, on conserve une seule option de repli plutôt que de bloquer.
     const durableFailing = this.durableFailingSkillNames(availableSkills);
     const toExclude = new Set<string>([...durableFailing, failedAction.skillName]);
     const filtered = availableSkills.filter((s) => !toExclude.has(s));
