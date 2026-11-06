@@ -155,6 +155,8 @@ export interface ProfileConfig {
    * de sorte que Leanna l'applique sans avoir à appeler l'outil explicitement.
    */
   autoSkill?: string;
+  /** Configuration indépendante de la seconde IA Roxane. */
+  roxane?: import('../../debate/types.js').RoxaneAIConfig;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
