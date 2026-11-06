@@ -103,6 +103,8 @@ export interface AgentsConfig {
   enabled: boolean;
   /** Liste des rôles autorisés. Si vide/undefined et enabled=true, tous sont actifs */
   allowedRoles?: AgentRole[];
+  /** Agents personnalisés définis dans le profil utilisateur. */
+  customAgents?: Array<{ role: string; model?: string }>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
