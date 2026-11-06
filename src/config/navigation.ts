@@ -12,11 +12,10 @@
  *  - `NAV_GROUPS`        regroupement affiché dans la GlobalSidebar
  *  - `viewHeaderProps()` titre + icône d'un <ViewHeader> (cohérents avec la sidebar)
  *
- * Déplacer une page (étape 3 : fusion des vues Pilotage) = modifier ici.
+ * Déplacer une page = modifier ici.
  */
 import type { LucideIcon } from 'lucide-react';
 import {
-  LayoutDashboard, Milestone,
   Code2, Zap, NotebookPen, FileText, Github, BrainCircuit, History,
   Braces, BarChart2,
 } from 'lucide-react';
@@ -25,16 +24,6 @@ export const ROUTES = {
   home: '/',
   ide: '/ide',
   settings: '/settings',
-  // ── Pilotage hub (étape 3 : 6 vues fusionnées) ───────────────────────
-  pilotage: '/pilotage',
-  // Anciens chemins (vues retirées ou fusionnées) — alias redirigeant vers /pilotage
-  missionControl:    '/mission-control',
-  missionTimeline:   '/mission-timeline',
-  missionSimulation: '/mission-simulation',
-  agentSwarm:        '/agent-swarm',
-  explainability:    '/explainability',
-  autonomy:          '/autonomy',
-  // ────────────────────────────────────────────────────────────────────
   automation: '/automation',
   notebooks: '/notebooks',
   documents: '/documents',
@@ -46,8 +35,6 @@ export const ROUTES = {
 } as const;
 
 export type NavId =
-  | 'pilotage'
-  | 'mission-timeline'
   | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
   | 'memories' | 'history' | 'lists'
   | 'observability';
@@ -56,10 +43,6 @@ export interface NavItem { id: string; path: string; label: string; icon: Lucide
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_ITEMS: Record<NavId, NavItem> = {
-  // ── Pilotage hub ──────────────────────────────────────────────────────
-  'pilotage':           { id: 'pilotage',           path: ROUTES.pilotage,          label: 'Missions',        icon: LayoutDashboard },
-  // Individual nav items (still used by viewHeaderProps + deep-link redirects)
-  'mission-timeline':   { id: 'mission-timeline',   path: ROUTES.missionTimeline,   label: 'Missions',        icon: Milestone },
   'ide':                { id: 'ide',                path: ROUTES.ide,               label: 'IDE',             icon: Code2 },
   'automation':         { id: 'automation',         path: ROUTES.automation,        label: 'Automatisations', icon: Zap },
   'notebooks':          { id: 'notebooks',          path: ROUTES.notebooks,         label: 'Notebooks',       icon: NotebookPen },
@@ -74,14 +57,10 @@ export const NAV_ITEMS: Record<NavId, NavItem> = {
 
 const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
 
-/**
- * Regroupement par intention.
- * « Pilotage » est maintenant une entrée unique qui pointe vers /pilotage
- * (la page à onglets fusionnée — étape 3).
- */
+/** Regroupement par intention. */
 export const NAV_GROUPS: NavGroup[] = [
-  // Les deux espaces de travail principaux, sans en-tête de groupe.
-  { id: 'workspace', label: '', items: pick('ide', 'pilotage') },
+  // Espace de travail principal, sans en-tête de groupe.
+  { id: 'workspace', label: '', items: pick('ide') },
   { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
   // Ex-groupes « Automatisation » et « Système » à un seul item : fusionnés.
   { id: 'operations', label: 'Opérations', items: pick('automation', 'observability') },

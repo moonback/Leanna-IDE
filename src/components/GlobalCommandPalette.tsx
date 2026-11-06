@@ -29,7 +29,6 @@ interface PaletteItem {
 
 /** Synonymes pour retrouver une page par son intention, pas seulement son nom. */
 const KEYWORDS: Record<string, string> = {
-  pilotage: 'missions agents swarm autonomie simulation pourquoi explication tableau de bord',
   ide: 'code editeur terminal fichiers projet developpement',
   notebooks: 'notes sources rag recherche cahier',
   documents: 'knowledge fichiers pdf base connaissance',

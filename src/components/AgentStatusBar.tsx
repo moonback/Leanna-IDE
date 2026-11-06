@@ -1,10 +1,8 @@
 import { useReducedMotion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
 import {
   Brain, Cog, ShieldCheck, Gauge, CircleDot, AlertTriangle, Clock, CheckCircle2,
 } from 'lucide-react';
 import { useAgentStatus, type AgentState } from '../hooks/useAgentStatus.js';
-import { ROUTES } from '../config/navigation.js';
 
 /**
  * AgentStatusPill — ce que fait Leanna et pourquoi (task-ui.md §4).
@@ -12,7 +10,7 @@ import { ROUTES } from '../config/navigation.js';
  * Auparavant une barre pleine largeur empilée au-dessus de chaque page ; c'est
  * désormais une pastille compacte dans l'en-tête unifié (<ViewHeader>), ce qui
  * rend une ligne entière à chaque page. Lecture seule, dérivée de
- * useAgentStatus ; clic → Pilotage (Missions). Masquée quand Leanna est inactive
+ * useAgentStatus. Masquée quand Leanna est inactive
  * ET hors ligne (rien à dire).
  */
 
@@ -30,7 +28,6 @@ const STATE_ICON: Record<AgentState, React.FC<{ size?: number; style?: React.CSS
 export function AgentStatusPill() {
   const reduceMotion = useReducedMotion();
   const status = useAgentStatus();
-  const navigate = useNavigate();
 
   if (!status.active && !status.connected) return null;
 
@@ -39,10 +36,9 @@ export function AgentStatusPill() {
   const pct = typeof status.progress === 'number' ? Math.round(status.progress * 100) : null;
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate(ROUTES.pilotage)}
-      aria-label={`État de Leanna : ${status.label}. ${status.reason}. Ouvrir le pilotage des missions.`}
+    <div
+      role="status"
+      aria-label={`État de Leanna : ${status.label}. ${status.reason}.`}
       className="lea-status-pill min-w-0"
     >
       <span className="relative flex h-2 w-2 flex-shrink-0 items-center justify-center" aria-hidden>
@@ -62,6 +58,6 @@ export function AgentStatusPill() {
       {!status.connected && (
         <span className="flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>hors ligne</span>
       )}
-    </button>
+    </div>
   );
 }

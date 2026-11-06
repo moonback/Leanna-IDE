@@ -42,7 +42,6 @@ const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
-const PilotageView = lazy(() => import('./views/PilotageView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 import { dedupKeyFor } from './lib/fetchDedup.js';
@@ -523,19 +522,7 @@ function AnimatedRoutes() {
         <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
         <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
 
-        {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
-        <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
-        {/* Old routes — backward-compatible deep links (navigate(ROUTES.missionTimeline) etc.) */}
-        <Route path={ROUTES.autonomy}          element={<Navigate to="/pilotage"                     replace />} />
-        <Route path={ROUTES.missionControl}    element={<Navigate to="/pilotage"                     replace />} />
-        <Route path={ROUTES.missionTimeline}   element={<Navigate to="/pilotage"                     replace />} />
-        {/* Vues Simulation / Agent Swarm / Pourquoi ? retirées : anciens liens → Pilotage */}
-        <Route path={ROUTES.missionSimulation} element={<Navigate to="/pilotage"                     replace />} />
-        <Route path={ROUTES.agentSwarm}        element={<Navigate to="/pilotage"                     replace />} />
-        <Route path={ROUTES.explainability}    element={<Navigate to="/pilotage"                     replace />} />
-        {/* ──────────────────────────────────────────────────────────────────── */}
-
-        {/* URL inconnue : retour à l'IDE au lieu d'une page blanche */}
+        {/* URL inconnue (dont les anciens /pilotage, /mission-*) : retour à l'IDE */}
         <Route path="*" element={<Navigate to={ROUTES.ide} replace />} />
       </Routes>
     </AnimatePresence>
