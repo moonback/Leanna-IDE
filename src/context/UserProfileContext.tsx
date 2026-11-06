@@ -69,6 +69,8 @@ export interface UserProfile {
   // AI identity
   aiName:        string;   // Nom de l'IA (ex: "Leanna")
   aiVoice:       string;   // Voix Gemini Live (ex: "Aoede")
+  duoName:       string;
+  duoVoice:      string;
   // Behaviour
   language:      Language;
   responseStyle: ResponseStyle;
