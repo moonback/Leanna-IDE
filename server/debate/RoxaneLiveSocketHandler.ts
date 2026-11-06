@@ -98,6 +98,11 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 send({ type: 'transcript_delta', speaker: role, text: output });
               }
             }
+            const inputTranscript = (message.serverContent as any)?.inputTranscription?.text;
+            if (typeof inputTranscript === 'string' && inputTranscript.trim()) {
+              if (transcript.length < 32) transcript.push({ speaker: 'user', text: inputTranscript.trim().slice(0, 3000), round: rounds + 1 });
+              send({ type: 'user_transcript', text: inputTranscript });
+            }
             if (message.serverContent?.interrupted) send({ type: 'interrupted', speaker: role });
             if (message.serverContent?.turnComplete && active === role) {
               const completed = currentText.trim();
