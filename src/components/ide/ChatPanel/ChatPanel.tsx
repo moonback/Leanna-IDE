@@ -28,6 +28,7 @@ import { useChatScroll } from './useChatScroll.js';
 import { usePinnedMessages } from './usePinnedMessages.js';
 import { useChatSearch } from './useChatSearch.js';
 import { buildProactiveSuggestions } from './proactiveSuggestions.js';
+import VoiceDuoView from '../../../views/VoiceDuoView.js';
 
 /**
  * Panneau de conversation flottant / ancré de Leanna.
@@ -62,6 +63,7 @@ export function ChatPanel({
   const [fullscreen, setFullscreen] = useState(false);
   const [showInput, setShowInput] = useState<boolean>(() => readJSON(STORAGE_KEYS.showInput, false));
   const [showMenu, setShowMenu] = useState(false);
+  const [showVoiceDuo, setShowVoiceDuo] = useState(false);
   const [showPromptInspector, setShowPromptInspector] = useState(false);
   const [showChangeLog, setShowChangeLog] = useState(false);
 
@@ -423,6 +425,8 @@ export function ChatPanel({
           showClose={!!onClose}
           dragHandlers={dragHandlers}
           onToggleMute={toggleMute}
+          onToggleVoiceDuo={() => setShowVoiceDuo(value => !value)}
+          voiceDuoOpen={showVoiceDuo}
           onToggleInput={() => setShowInput(s => !s)}
           onToggleMenu={() => setShowMenu(v => !v)}
           onToggleSearch={() => { toggleSearch(); setShowMenu(false); }}
@@ -531,6 +535,23 @@ export function ChatPanel({
             )}
           </>
         )}
+
+        {/* Duo vocal intégré au ChatPanel : les deux sessions restent dans l'IDE. */}
+        <AnimatePresence>
+          {showVoiceDuo && (
+            <motion.div
+              key="voice-duo-overlay"
+              initial={{ opacity: 0, scale: 0.985 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: reduceMotion ? 0 : 0.16 }}
+              className="absolute inset-0 z-[80] overflow-hidden"
+              style={{ backgroundColor: 'var(--bg-panel)' }}
+            >
+              <VoiceDuoView embedded onClose={() => setShowVoiceDuo(false)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </>
   );
