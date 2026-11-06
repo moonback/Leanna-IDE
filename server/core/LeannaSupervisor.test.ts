@@ -7,6 +7,8 @@ import { LeannaSupervisor, type MissionRunner } from "./LeannaSupervisor.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
 import { CheckpointManager, makeNodeFileGateway, type FileGateway } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
+import { MissionStateMachine } from "./MissionStateMachine.js";
+import { ExecutionLedger } from "./ExecutionLedger.js";
 
 function memGateway(initial: Record<string, string> = {}): FileGateway & { store: Map<string, string> } {
   const store = new Map<string, string>(Object.entries(initial));
@@ -255,6 +257,41 @@ test("a runner that exceeds the timeout counts as a failed attempt", async () =>
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("a runner that ignores AbortSignal is quarantined and never raced with rollback", async () => {
+  const gw = memGateway({ "a.ts": "original" });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 1,
+    runnerTimeoutMs: 20,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: gw, dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+
+  const runner: MissionRunner = async () => {
+    // Deliberately ignore AbortSignal and mutate after the timeout grace period.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    gw.write("a.ts", "late-write");
+    return { success: true };
+  };
+
+  const result = await sup.runMission({
+    missionId: "m-timeout-ignores-abort",
+    goal: "must not race rollback",
+    runner,
+    plannedFiles: ["a.ts"],
+  });
+
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(result.rollbackComplete, false);
+  assert.match(result.residualFiles?.[0] ?? "", /runner encore actif/);
+  assert.equal(gw.store.get("a.ts"), "original", "rollback must be withheld while runner is active");
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(gw.store.get("a.ts"), "late-write", "late side effect is surfaced, not overwritten by a racing rollback");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("WAITING_APPROVAL: a refused approval escalates without running", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
   const sup = new LeannaSupervisor({
@@ -401,4 +438,113 @@ test("supervisor rolls back a recursively deleted directory discovered at tool t
 
   fs.rmSync(workspace, { recursive: true, force: true });
   fs.rmSync(stateDir, { recursive: true, force: true });
+});
+
+test("an open checkpoint after restart blocks automatic replay and marks recovery required", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-recovery-"));
+  const missions = new DurableMissionStore(path.join(dir, "missions"));
+  const checkpointsDir = path.join(dir, "checkpoints");
+  const gateway = memGateway({ "a.ts": "before-crash" });
+  const checkpoints = new CheckpointManager({ gateway, dirOverride: checkpointsDir });
+  const { MissionStateMachine } = await import("./MissionStateMachine.js");
+  const machine = new MissionStateMachine("m-crash");
+  machine.transition("PLANNING"); machine.transition("READY"); machine.transition("RUNNING");
+  missions.save(machine);
+  const checkpoint = checkpoints.snapshot(["a.ts"], { missionId: "m-crash", label: "attempt-1" });
+  gateway.write("a.ts", "possibly-applied");
+  const restarted = new LeannaSupervisor({ maxAttempts: 2, missionStore: missions,
+    checkpoints: new CheckpointManager({ gateway, dirOverride: checkpointsDir }),
+    evidence: new EvidenceEngine(path.join(dir, "evidence")) });
+  let runnerCalled = false;
+  const result = await restarted.runMission({ missionId: "m-crash", goal: "do not replay uncertain work",
+    runner: async () => { runnerCalled = true; return { success: true }; } });
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(result.attempts, 0);
+  assert.equal(runnerCalled, false);
+  assert.equal(gateway.store.get("a.ts"), "possibly-applied");
+  assert.equal(checkpoints.get(checkpoint.id)?.status, "open");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("crash recovery quarantines an interrupted attempt instead of replaying it", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-crash-recovery-"));
+  const missionDir = path.join(dir, "missions");
+  const checkpointDir = path.join(dir, "checkpoints");
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  const store = new DurableMissionStore(missionDir);
+  const checkpoints = new CheckpointManager({ gateway: memGateway({ "a.ts": "before" }), dirOverride: checkpointDir });
+  const ledger = new ExecutionLedger(ledgerPath);
+  const checkpoint = checkpoints.snapshot(["a.ts"], { missionId: "m-crash", label: "attempt-2" });
+  const machine = new MissionStateMachine("m-crash");
+  machine.transition("PLANNING");
+  machine.transition("READY");
+  machine.transition("RUNNING");
+  machine.setActiveAttempt({
+    attempt: 2,
+    checkpointId: checkpoint.id,
+    phase: "executing",
+    updatedAt: new Date().toISOString(),
+  });
+  store.save(machine);
+
+  // Simulate a process restart: all durable stores are rehydrated from disk.
+  const restartedStore = new DurableMissionStore(missionDir);
+  const restartedCheckpoints = new CheckpointManager({ gateway: memGateway({ "a.ts": "after-crash" }), dirOverride: checkpointDir });
+  const restartedLedger = new ExecutionLedger(ledgerPath);
+  const supervisor = new LeannaSupervisor({
+    maxAttempts: 3,
+    missionStore: restartedStore,
+    checkpoints: restartedCheckpoints,
+    evidence: new EvidenceEngine(path.join(dir, "evidence")),
+    ledger: restartedLedger,
+  });
+  let executions = 0;
+  const result = await supervisor.runMission({
+    missionId: "m-crash",
+    goal: "recover safely",
+    runner: async () => {
+      executions++;
+      return { success: true, evidence: { testsExecuted: [{ name: "must-not-run", passed: true }] } };
+    },
+  });
+
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(executions, 0, "an interrupted side-effecting attempt must never be replayed automatically");
+  assert.equal(restartedStore.load("m-crash")?.current, "RECOVERY_REQUIRED");
+  assert.equal(restartedCheckpoints.listOpenForMission("m-crash").length, 1);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("an unknown side effect in the durable ledger blocks automatic mission replay", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-ledger-recovery-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  const initialLedger = new ExecutionLedger(ledgerPath);
+  initialLedger.begin({ missionId: "m-ledger-unknown", stepId: "step-1", tool: "publish_release", args: { tag: "v1" } }, true);
+  const restoredLedger = new ExecutionLedger(ledgerPath);
+  const store = new DurableMissionStore(path.join(dir, "missions"));
+  const machine = new MissionStateMachine("m-ledger-unknown");
+  machine.transition("PLANNING");
+  machine.transition("READY");
+  store.save(machine);
+  const supervisor = new LeannaSupervisor({
+    missionStore: store,
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "checkpoints") }),
+    evidence: new EvidenceEngine(path.join(dir, "evidence")),
+    ledger: restoredLedger,
+  });
+  let executions = 0;
+  const result = await supervisor.runMission({
+    missionId: "m-ledger-unknown",
+    goal: "do not duplicate external effect",
+    runner: async () => { executions++; return { success: true }; },
+  });
+
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(executions, 0);
+
+  fs.rmSync(dir, { recursive: true, force: true });
 });

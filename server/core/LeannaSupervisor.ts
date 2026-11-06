@@ -32,6 +32,8 @@ import {
 import { DurableMissionStore } from "./DurableMissionStore.js";
 import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine, type EvidenceInput, type EvidenceBundle } from "./EvidenceEngine.js";
+import { ExecutionLedger } from "./ExecutionLedger.js";
+import { MissionExecutionLease } from "./MissionExecutionLease.js";
 
 /** Décision de récupération à quatre niveaux (audit §17). */
 export type RecoveryDecision = "retry" | "repair" | "replan" | "escalate";
@@ -51,6 +53,8 @@ export interface RunnerOutcome {
   suggestedRecovery?: RecoveryDecision;
   /** Message d'erreur éventuel. */
   error?: string;
+  /** False when a timed-out runner did not stop within the abort grace period. */
+  executionStopped?: boolean;
 }
 
 /** Fonction d'exécution d'une mission (le moteur réel — agentique/mission). */
@@ -96,6 +100,7 @@ export interface SupervisorConfig {
   checkpoints: CheckpointManager;
   /** Moteur de preuve (défaut: local .Leanna). */
   evidence: EvidenceEngine;
+  ledger: ExecutionLedger;
   /**
    * Durée max d'une tentative du runner (ms). 0 = illimité (défaut).
    * Un dépassement est traité comme une tentative échouée (rollback + récup).
@@ -113,6 +118,8 @@ export interface SupervisedResult {
   rollbackComplete?: boolean;
   /** Files still differing from the pre-attempt snapshot after rollback retries. */
   residualFiles?: string[];
+  recoveryRequired?: boolean;
+  recoveryReason?: string;
 }
 
 export class LeannaSupervisor {
@@ -120,6 +127,7 @@ export class LeannaSupervisor {
   private readonly store: DurableMissionStore;
   private readonly checkpoints: CheckpointManager;
   private readonly evidence: EvidenceEngine;
+  private readonly ledger: ExecutionLedger;
   private readonly runnerTimeoutMs: number;
 
   constructor(config: Partial<SupervisorConfig> = {}) {
@@ -127,6 +135,7 @@ export class LeannaSupervisor {
     this.store = config.missionStore ?? new DurableMissionStore();
     this.checkpoints = config.checkpoints ?? new CheckpointManager();
     this.evidence = config.evidence ?? new EvidenceEngine();
+    this.ledger = config.ledger ?? new ExecutionLedger();
     this.runnerTimeoutMs = config.runnerTimeoutMs ?? 0;
   }
 
@@ -146,7 +155,17 @@ export class LeannaSupervisor {
    * moteur réel ; le Supervisor décide de l'état, des snapshots/rollbacks, de la
    * preuve et de la récupération.
    */
-  async runMission(params: {
+  /** Serialize mission execution across processes before reading or mutating lifecycle state. */
+  async runMission(params: Parameters<LeannaSupervisor["runMissionLocked"]>[0]): Promise<SupervisedResult> {
+    const lease = MissionExecutionLease.acquire(params.missionId);
+    try {
+      return await this.runMissionLocked(params);
+    } finally {
+      lease.release();
+    }
+  }
+
+  private async runMissionLocked(params: {
     missionId: string;
     goal: string;
     runner: MissionRunner;
@@ -172,6 +191,23 @@ export class LeannaSupervisor {
     // Déjà terminale : rien à relancer, on renvoie l'état final tel quel.
     if (machine.isTerminal()) {
       return { missionId, finalState: machine.current, attempts: 0 };
+    }
+    if (machine.current === "RECOVERY_REQUIRED") {
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryRequired: true, recoveryReason: "Cette mission est mise en quarantaine et nécessite une réconciliation explicite." };
+    }
+    const interruptedStates = new Set<MissionLifecycleState>(["RUNNING", "VERIFYING", "RECOVERING", "COMMITTING"]);
+    const openCheckpoints = this.checkpoints.listOpenForMission(missionId);
+    const unknownEffects = this.ledger.listUnknownSideEffects(missionId);
+    if (machine.currentAttempt || interruptedStates.has(machine.current) || openCheckpoints.length > 0 || unknownEffects.length > 0) {
+      const checkpointIds = openCheckpoints.map((checkpoint) => checkpoint.id);
+      const reason = [
+        machine.currentAttempt ? `tentative ${machine.currentAttempt.attempt} interrompue (${machine.currentAttempt.phase})` : undefined,
+        checkpointIds.length ? `${checkpointIds.length} checkpoint(s) ouvert(s): ${checkpointIds.join(", ")}` : undefined,
+        unknownEffects.length ? `${unknownEffects.length} effet(s) de bord au statut inconnu dans le ledger` : undefined,
+        interruptedStates.has(machine.current) ? `état durable interrompu: ${machine.current}` : undefined,
+      ].filter(Boolean).join(" ; ") || "État transactionnel incomplet.";
+      this.safeAdvance(machine, "RECOVERY_REQUIRED", reason);
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryRequired: true, recoveryReason: reason };
     }
 
     // Ramener la machine à READY depuis n'importe quel état repris, par des
@@ -222,6 +258,8 @@ export class LeannaSupervisor {
         missionId,
         label: `attempt-${attempt}`,
       });
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "prepared", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
 
       // Exécution bornée par un timeout optionnel. Un dépassement ou une
       // exception sont traités comme une tentative échouée.
@@ -235,9 +273,31 @@ export class LeannaSupervisor {
           this.checkpoints.capturePath(checkpoint.id, target);
         }
       };
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "executing", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
       const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
 
+      // A timed-out runner may ignore AbortSignal. Never race a live writer
+      // against checkpoint rollback: quarantine the mission and leave the
+      // checkpoint open for explicit reconciliation instead.
+      if (outcome.executionStopped === false) {
+        this.advance(machine, "RECOVERING", "runner did not stop after timeout");
+        this.advance(machine, "RECOVERY_REQUIRED", "rollback withheld while runner may still be active");
+        return {
+          missionId,
+          finalState: machine.current,
+          attempts: attempt,
+          evidence: lastEvidence,
+          rollbackComplete: false,
+          residualFiles: ["<runner encore actif : rollback différé pour éviter une course d'écriture>"],
+          recoveryRequired: true,
+          recoveryReason: "Le runner peut encore écrire. Le checkpoint reste ouvert et toute reprise est bloquée.",
+        };
+      }
+
       // VERIFY : la PREUVE prime sur ce que le runner "dit".
+      machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "verifying", updatedAt: new Date().toISOString() });
+      this.store.save(machine);
       this.advance(machine, "VERIFYING", "evaluate evidence");
 
       // ── try/finally (audit, point 5) ──────────────────────────────────────
@@ -257,16 +317,24 @@ export class LeannaSupervisor {
 
         if (proven) {
           // COMMIT : on fige le checkpoint (rollback désormais interdit).
+          machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "committing", updatedAt: new Date().toISOString() });
+          this.store.save(machine);
           this.advance(machine, "COMMITTING", "evidence establishes success");
           this.checkpoints.commit(checkpoint.id);
+          machine.setActiveAttempt(undefined);
+          this.store.save(machine);
           this.advance(machine, "COMPLETED", "committed");
           return { missionId, finalState: machine.current, attempts: attempt, evidence: bundle };
         }
 
         // ÉCHEC → RECOVER. On annule les effets de cette tentative (rollback des
         // fichiers déclarés) avant de décider de la suite.
+        machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "rolling_back", updatedAt: new Date().toISOString() });
+        this.store.save(machine);
         this.advance(machine, "RECOVERING", outcome.error ?? "evidence failed");
         this.checkpoints.rollback(checkpoint.id);
+        machine.setActiveAttempt(undefined);
+        this.store.save(machine);
         rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
         if (rollbackResidualFiles.length > 0) {
           throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
@@ -289,21 +357,35 @@ export class LeannaSupervisor {
           this.advance(machine, "READY", `recovery=${decision}, ready to retry`);
         }
       } catch (err) {
-        // Rollback best-effort pour ne pas laisser d'effets de bord orphelins.
+        // A failed/partial rollback is not an ordinary mission failure: preserve
+        // the transaction context and require explicit reconciliation.
+        let rollbackSucceeded = false;
         try {
           this.checkpoints.rollback(checkpoint.id);
+          rollbackSucceeded = true;
+          machine.setActiveAttempt(undefined);
+          this.store.save(machine);
         } catch {
-          /* Une nouvelle tentative peut encore restaurer les fichiers restants. */
+          /* Keep the active attempt and open checkpoint as recovery evidence. */
         }
         try {
           rollbackResidualFiles = this.checkpoints.changedFiles(checkpoint.id);
         } catch {
           rollbackResidualFiles = ["<état du checkpoint indisponible>"];
         }
-        // Transition de secours vers FAILED (toujours légale depuis les états
-        // transitoires), avec persistance garantie.
-        this.safeAdvance(machine, "FAILED", `supervisor error: ${(err as Error).message}`);
-        return { missionId, finalState: machine.current, attempts: attempt, evidence: lastEvidence, rollbackComplete: rollbackResidualFiles.length === 0, residualFiles: rollbackResidualFiles };
+        const recoveryRequired = !rollbackSucceeded || rollbackResidualFiles.length > 0;
+        const target: MissionLifecycleState = recoveryRequired ? "RECOVERY_REQUIRED" : "FAILED";
+        this.safeAdvance(machine, target, `supervisor error: ${(err as Error).message}`);
+        return {
+          missionId,
+          finalState: machine.current,
+          attempts: attempt,
+          evidence: lastEvidence,
+          rollbackComplete: rollbackSucceeded && rollbackResidualFiles.length === 0,
+          recoveryRequired,
+          recoveryReason: recoveryRequired ? "Rollback incomplet ou état du checkpoint incertain : intervention de réconciliation requise." : undefined,
+          residualFiles: rollbackResidualFiles,
+        };
       }
     }
 
@@ -354,6 +436,9 @@ export class LeannaSupervisor {
         case "RECOVERING":
           this.advance(machine, "READY", "recovered to ready");
           break;
+        case "RECOVERY_REQUIRED":
+          // Explicit operator reconciliation is required; never auto-resume.
+          return;
         case "WAITING_APPROVAL":
         case "PAUSED":
           this.advance(machine, "READY", "resume to ready");
@@ -380,26 +465,63 @@ export class LeannaSupervisor {
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // Convert rejection into a settled outcome immediately so a runner that
+    // finishes after timeout cannot create an unhandled rejection.
+    const execution = Promise.resolve()
+      .then(() => runner({ ...ctx, signal: controller.signal }))
+      .then(
+        (outcome) => ({ kind: "settled" as const, outcome }),
+        (err) => ({
+          kind: "settled" as const,
+          outcome: { success: false, error: (err as Error)?.message ?? String(err) } satisfies RunnerOutcome,
+        })
+      );
 
     try {
-      if (this.runnerTimeoutMs > 0) {
-        const timeout = new Promise<RunnerOutcome>((resolve) => {
-          timer = setTimeout(() => {
-            try { controller.abort(new Error("runner timeout")); } catch { /* best-effort */ }
-            resolve({ success: false, error: `runner timeout after ${this.runnerTimeoutMs}ms` });
-          }, this.runnerTimeoutMs);
-          if (typeof timer.unref === "function") timer.unref();
-        });
-        return await Promise.race([
-          runner({ ...ctx, signal: controller.signal }),
-          timeout,
-        ]);
+      if (this.runnerTimeoutMs <= 0) {
+        return (await execution).outcome;
       }
-      return await runner({ ...ctx, signal: controller.signal });
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
+
+      const timed = await Promise.race([
+        execution,
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          timer = setTimeout(() => resolve({ kind: "timeout" }), this.runnerTimeoutMs);
+        }),
+      ]);
+
+      if (timed.kind === "settled") return timed.outcome;
+
+      const timeoutError = `runner timeout after ${this.runnerTimeoutMs}ms`;
+      controller.abort(new Error(timeoutError));
+
+      // AbortSignal is cooperative. Wait briefly for the runner to acknowledge
+      // it; if it does not, do NOT rollback while its side effects may continue.
+      const stopped = await Promise.race([
+        execution,
+        new Promise<{ kind: "grace-expired" }>((resolve) => {
+          graceTimer = setTimeout(() => resolve({ kind: "grace-expired" }), 250);
+        }),
+      ]);
+
+      if (stopped.kind === "settled") {
+        return {
+          ...stopped.outcome,
+          success: false,
+          error: timeoutError,
+          executionStopped: true,
+        };
+      }
+
+      return {
+        success: false,
+        error: `${timeoutError}; runner ignored AbortSignal during 250ms grace period`,
+        executionStopped: false,
+      };
     } finally {
       if (timer) clearTimeout(timer);
+      if (graceTimer) clearTimeout(graceTimer);
     }
   }
 

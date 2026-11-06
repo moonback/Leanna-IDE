@@ -26,6 +26,8 @@ import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
 import { supervisionEnabledFromEnv } from "../core/supervisionConfig.js";
+import * as path from "node:path";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 // Plafond de caractères appliqué à chaque résultat d'action quand il est résumé
 // pour la preuve passée au vérificateur LLM. 300 (ancienne valeur codée en dur)
@@ -115,6 +117,8 @@ export class Executor {
    * exécution directe (chemin par défaut inchangé).
    */
   private supervisor: LeannaSupervisor | null = null;
+  /** Pre-write checkpoint hooks scoped by mission ID. */
+  private readonly supervisorWriteHooks = new Map<string, (toolName: string, args: Record<string, unknown>) => Promise<void>>();
 
   /**
    * Active le mode supervisé. Par défaut lu depuis `LEANNA_SUPERVISED`
@@ -249,6 +253,13 @@ export class Executor {
     "write_project_file", "modify_project_file", "patch_project_file",
     "create_project_directory", "rename_project_file",
   ];
+
+  /** Tools whose handlers mutate workspace paths and require a pre-write snapshot. */
+  private static readonly CHECKPOINT_WRITE_TOOLS = new Set([
+    "write_project_file", "modify_project_file", "apply_patch", "patch_project_file",
+    "create_project_directory", "rename_project_file", "delete_project_file",
+    "delete_project_folder",
+  ]);
 
   /**
    * Nombre d'actions d'exploration consécutives (sans aucune écriture réussie)
@@ -694,18 +705,45 @@ export class Executor {
   private async runSupervised(mission: Mission, availableSkills: string[]): Promise<void> {
     const supervisor = this.supervisor!;
 
+    // Resolve every planned path against the exact active workspace before the
+    // initial snapshot; relative paths against process.cwd() are not safe here.
+    const resolveWorkspaceTarget = (target: string): string => {
+      if (!SELF_ROOT) throw new Error("Checkpoint refused: no active workspace.");
+      const absolute = path.resolve(SELF_ROOT, target);
+      const relative = path.relative(SELF_ROOT, absolute);
+      if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+        throw new Error("Checkpoint refused: target outside workspace (" + target + ").");
+      }
+      return absolute;
+    };
     // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
-    const plannedFiles = this.collectPlannedFiles(mission);
+    const plannedFiles = this.collectPlannedFiles(mission).map(resolveWorkspaceTarget);
 
-    const runner = async (): Promise<RunnerOutcome> => {
-      // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
-      // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
-      await this.executeMission(mission, availableSkills);
-      const outcome = this.buildMissionOutcome(mission);
-      // executeMission finalise la mission (retry/replan internes épuisés) : une
-      // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
-      if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
-      return outcome;
+    const runner: MissionRunner = async ({ signal, beforeToolCall }) => {
+      if (beforeToolCall) this.supervisorWriteHooks.set(mission.id, beforeToolCall);
+      // Relayer l'annulation du Supervisor au contrôleur réellement transmis
+      // aux skills. Sans ce pont, son AbortSignal ne pouvait pas interrompre
+      // l'action en cours dans l'Executor.
+      const abortFromSupervisor = () => {
+        mission.cancel("Annulation demandée par le Supervisor (timeout/arrêt).");
+        this.abortMission(mission.id, "Annulation demandée par le Supervisor.");
+      };
+      if (signal?.aborted) abortFromSupervisor();
+      else signal?.addEventListener("abort", abortFromSupervisor, { once: true });
+
+      try {
+        // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
+        // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
+        await this.executeMission(mission, availableSkills);
+        const outcome = this.buildMissionOutcome(mission);
+        // executeMission finalise la mission (retry/replan internes épuisés) : une
+        // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
+        if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
+        return outcome;
+      } finally {
+        signal?.removeEventListener("abort", abortFromSupervisor);
+        this.supervisorWriteHooks.delete(mission.id);
+      }
     };
 
     const result = await supervisor.runMission({
@@ -713,6 +751,18 @@ export class Executor {
       goal: mission.getState().title,
       runner,
       plannedFiles,
+      resolveWriteTargets: (toolName, args) => {
+        const targets: string[] = [];
+        const singlePath = typeof args.path === "string" ? args.path : undefined;
+        const pathTools = ["write_project_file", "modify_project_file", "apply_patch", "patch_project_file", "delete_project_file", "delete_project_folder", "create_project_directory"];
+        if (pathTools.includes(toolName) && singlePath) targets.push(singlePath);
+        if (toolName === "rename_project_file") {
+          if (typeof args.oldPath === "string") targets.push(args.oldPath);
+          if (typeof args.newPath === "string") targets.push(args.newPath);
+        }
+        if (targets.length === 0) throw new Error("Checkpoint refused: no write target for " + toolName + ".");
+        return targets.map(resolveWorkspaceTarget);
+      },
     });
 
     this.emit("mission_supervised", {
@@ -1815,6 +1865,15 @@ export class Executor {
       result = await this.skillHandler!(action.skillName, action.args, {
         dryRun,
         signal,
+        beforeExecute: this.supervisorWriteHooks.has(mission.id)
+          ? async (toolName, args) => {
+              // Read-only tools must not be asked for write targets.
+              if (!Executor.CHECKPOINT_WRITE_TOOLS.has(toolName)) return;
+              const hook = this.supervisorWriteHooks.get(mission.id);
+              if (!hook) throw new Error("Checkpoint hook indisponible : écriture supervisée bloquée.");
+              await hook(toolName, args);
+            }
+          : undefined,
         // Une action planifiée = une étape : sa reprise après crash est
         // dédoublonnée (ou bloquée si son effet est incertain) par le ledger.
         idempotencyScope: { missionId: mission.id, stepId: action.id },
@@ -2998,6 +3057,8 @@ export interface SkillHandlerOptions {
   signal?: AbortSignal;
   /** Étape de mission (clé d'idempotence) transmise au ToolRegistry. */
   idempotencyScope?: { missionId: string; stepId: string };
+  /** Called by ToolRegistry after guards and immediately before a side effect. */
+  beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
 }
 
 /** Handler pour exécuter un skill */

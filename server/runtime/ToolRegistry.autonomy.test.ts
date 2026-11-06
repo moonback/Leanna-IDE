@@ -77,6 +77,23 @@ test("beforeExecute runs after authorization and immediately before the side eff
   assert.deepEqual(order, ["before:write_project_file:src/new.ts", "handler"]);
 });
 
+test("a failed pre-write checkpoint blocks the handler", async () => {
+  const registry = new ToolRegistry({
+    permissionPolicy: PermissionPolicy.fromEnv({ Leanna_PERMISSION_MODE: "off" } as NodeJS.ProcessEnv),
+  });
+  let handlerCalled = false;
+  registry.register({
+    declaration: { name: "write_project_file", description: "écrit", parameters: {} },
+    permissions: ["write"],
+    handler: async () => { handlerCalled = true; return { ok: true }; },
+  });
+
+  await assert.rejects(registry.call("write_project_file", { path: "src/new.ts" }, {
+    retries: 0,
+    beforeExecute: async () => { throw new Error("checkpoint persistence failed"); },
+  }), /checkpoint persistence failed/);
+  assert.equal(handlerCalled, false, "the side effect must not run without a durable pre-write snapshot");
+});
 test("beforeExecute is not called when authorization denies the write", async () => {
   const registry = new ToolRegistry({
     permissionPolicy: new PermissionPolicy({ mode: "enforce", granted: ["read"] }),

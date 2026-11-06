@@ -21,6 +21,7 @@ export type MissionLifecycleState =
   | "RUNNING"
   | "VERIFYING"
   | "RECOVERING"
+  | "RECOVERY_REQUIRED"
   | "WAITING_APPROVAL"
   | "PAUSED"
   | "COMMITTING"
@@ -42,15 +43,16 @@ export const TERMINAL_STATES: ReadonlySet<MissionLifecycleState> = new Set([
  * `CANCELLED` est atteignable depuis tout état non terminal (annulation user).
  */
 const TRANSITIONS: Readonly<Record<MissionLifecycleState, readonly MissionLifecycleState[]>> = {
-  CREATED: ["PLANNING", "CANCELLED"],
-  PLANNING: ["READY", "FAILED", "ESCALATED", "CANCELLED"],
-  READY: ["RUNNING", "PAUSED", "CANCELLED"],
-  RUNNING: ["VERIFYING", "RECOVERING", "WAITING_APPROVAL", "PAUSED", "FAILED", "CANCELLED"],
-  VERIFYING: ["COMMITTING", "RECOVERING", "RUNNING", "FAILED", "CANCELLED"],
-  RECOVERING: ["RUNNING", "READY", "PLANNING", "ESCALATED", "FAILED", "CANCELLED"],
-  WAITING_APPROVAL: ["RUNNING", "PAUSED", "ESCALATED", "CANCELLED"],
-  PAUSED: ["RUNNING", "READY", "CANCELLED"],
-  COMMITTING: ["COMPLETED", "RECOVERING", "FAILED", "CANCELLED"],
+  CREATED: ["PLANNING", "CANCELLED", "RECOVERY_REQUIRED"],
+  PLANNING: ["READY", "FAILED", "ESCALATED", "CANCELLED", "RECOVERY_REQUIRED"],
+  READY: ["RUNNING", "PAUSED", "CANCELLED", "RECOVERY_REQUIRED"],
+  RUNNING: ["VERIFYING", "RECOVERING", "WAITING_APPROVAL", "PAUSED", "FAILED", "CANCELLED", "RECOVERY_REQUIRED"],
+  VERIFYING: ["COMMITTING", "RECOVERING", "RUNNING", "FAILED", "CANCELLED", "RECOVERY_REQUIRED"],
+  RECOVERING: ["RUNNING", "READY", "PLANNING", "RECOVERY_REQUIRED", "ESCALATED", "FAILED", "CANCELLED"],
+  RECOVERY_REQUIRED: ["RECOVERING", "ESCALATED", "CANCELLED"],
+  WAITING_APPROVAL: ["RUNNING", "PAUSED", "ESCALATED", "CANCELLED", "RECOVERY_REQUIRED"],
+  PAUSED: ["RUNNING", "READY", "CANCELLED", "RECOVERY_REQUIRED"],
+  COMMITTING: ["COMPLETED", "RECOVERING", "RECOVERY_REQUIRED", "FAILED", "CANCELLED"],
   COMPLETED: [],
   FAILED: [],
   ESCALATED: [],
@@ -66,12 +68,20 @@ export interface MissionTransition {
 }
 
 /** Snapshot sérialisable de l'état durable d'une mission. */
+export interface MissionAttemptContext {
+  attempt: number;
+  checkpointId: string;
+  phase: "prepared" | "executing" | "verifying" | "committing" | "rolling_back";
+  updatedAt: string;
+}
+
 export interface MissionLifecycleSnapshot {
   missionId: string;
   state: MissionLifecycleState;
   createdAt: string;
   updatedAt: string;
   history: MissionTransition[];
+  activeAttempt?: MissionAttemptContext;
 }
 
 export class IllegalTransitionError extends Error {
@@ -98,6 +108,7 @@ export function toGoalStatus(
     case "RECOVERING":
     case "COMMITTING":
       return "in_progress";
+    case "RECOVERY_REQUIRED":
     case "WAITING_APPROVAL":
     case "PAUSED":
     case "ESCALATED":
@@ -121,16 +132,18 @@ export class MissionStateMachine {
   private readonly history: MissionTransition[];
   private readonly createdAt: string;
   private updatedAt: string;
+  private activeAttempt?: MissionAttemptContext;
 
   constructor(
     readonly missionId: string,
     initial: MissionLifecycleState = "CREATED",
-    restored?: Pick<MissionLifecycleSnapshot, "createdAt" | "updatedAt" | "history">
+    restored?: Pick<MissionLifecycleSnapshot, "createdAt" | "updatedAt" | "history" | "activeAttempt">
   ) {
     this.state = initial;
     this.history = restored?.history ? [...restored.history] : [];
     this.createdAt = restored?.createdAt ?? new Date().toISOString();
     this.updatedAt = restored?.updatedAt ?? this.createdAt;
+    this.activeAttempt = restored?.activeAttempt ? { ...restored.activeAttempt } : undefined;
   }
 
   /** Restaure une machine depuis un snapshot durable (reprise après crash). */
@@ -139,6 +152,7 @@ export class MissionStateMachine {
       createdAt: snapshot.createdAt,
       updatedAt: snapshot.updatedAt,
       history: snapshot.history,
+      activeAttempt: snapshot.activeAttempt,
     });
   }
 
@@ -170,6 +184,16 @@ export class MissionStateMachine {
     return this.state;
   }
 
+  /** Persiste le contexte transactionnel courant sans transition métier. */
+  setActiveAttempt(context?: MissionAttemptContext): void {
+    this.activeAttempt = context ? { ...context, updatedAt: new Date().toISOString() } : undefined;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  get currentAttempt(): MissionAttemptContext | undefined {
+    return this.activeAttempt ? { ...this.activeAttempt } : undefined;
+  }
+
   /** Produit un snapshot sérialisable de l'état courant. */
   snapshot(): MissionLifecycleSnapshot {
     return {
@@ -178,6 +202,7 @@ export class MissionStateMachine {
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       history: [...this.history],
+      ...(this.activeAttempt ? { activeAttempt: { ...this.activeAttempt } } : {}),
     };
   }
 }
