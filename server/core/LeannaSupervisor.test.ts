@@ -437,3 +437,30 @@ test("supervisor rolls back a recursively deleted directory discovered at tool t
   fs.rmSync(workspace, { recursive: true, force: true });
   fs.rmSync(stateDir, { recursive: true, force: true });
 });
+
+test("an open checkpoint after restart blocks automatic replay and marks recovery required", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-recovery-"));
+  const missions = new DurableMissionStore(path.join(dir, "missions"));
+  const checkpointsDir = path.join(dir, "checkpoints");
+  const gateway = memGateway({ "a.ts": "before-crash" });
+  const checkpoints = new CheckpointManager({ gateway, dirOverride: checkpointsDir });
+  const { MissionStateMachine } = await import("./MissionStateMachine.js");
+  const machine = new MissionStateMachine("m-crash");
+  machine.transition("PLANNING"); machine.transition("READY"); machine.transition("RUNNING");
+  missions.save(machine);
+  const checkpoint = checkpoints.snapshot(["a.ts"], { missionId: "m-crash", label: "attempt-1" });
+  gateway.write("a.ts", "possibly-applied");
+  const restarted = new LeannaSupervisor({ maxAttempts: 2, missionStore: missions,
+    checkpoints: new CheckpointManager({ gateway, dirOverride: checkpointsDir }),
+    evidence: new EvidenceEngine(path.join(dir, "evidence")) });
+  let runnerCalled = false;
+  const result = await restarted.runMission({ missionId: "m-crash", goal: "do not replay uncertain work",
+    runner: async () => { runnerCalled = true; return { success: true }; } });
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(result.attempts, 0);
+  assert.equal(runnerCalled, false);
+  assert.equal(gateway.store.get("a.ts"), "possibly-applied");
+  assert.equal(checkpoints.get(checkpoint.id)?.status, "open");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
