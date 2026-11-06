@@ -105,6 +105,8 @@ export interface AgentsConfig {
   allowedRoles?: AgentRole[];
   /** Agents personnalisés définis dans le profil utilisateur. */
   customAgents?: Array<{ role: string; model?: string }>;
+  /** Routage adaptatif OpenRouter, désactivé par défaut. */
+  modelRouting?: { enabled?: boolean; candidates?: string[] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
