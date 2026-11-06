@@ -45,7 +45,6 @@ export default function VoiceDuoView() {
   const playbackRef = useRef<AbortController | null>(null);
   const historyRef = useRef<Array<{speaker:"user"|"leanna"|"roxane";text:string}>>([]);
   const activeRef = useRef(false);
-  const busyRef = useRef(false);
 
   const stopPlayback = useCallback(() => {
     playbackRef.current?.abort();
@@ -83,7 +82,6 @@ export default function VoiceDuoView() {
     historyRef.current.push({ speaker: "user", text });
     historyRef.current = historyRef.current.slice(-20);
     setMessages(prev => [...prev, { speaker: "leanna", name: "Vous", text } as DuoMessage]);
-    busyRef.current = true;
     setBusy(true);
     setError("");
     setStatus("Leanna et Roxane réfléchissent…");
@@ -91,7 +89,7 @@ export default function VoiceDuoView() {
       const response = await fetch("/api/voice-duo/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: historyRef.current, maxTurns: 2, includeAudio: true, language: profile.language }),
+        body: JSON.stringify({ message: text, history: historyRef.current, maxTurns: 4, includeAudio: true, language: profile.language }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur du dialogue vocal");
@@ -109,7 +107,6 @@ export default function VoiceDuoView() {
         setStatus("Une erreur est survenue");
       }
     } finally {
-      busyRef.current = false;
       setBusy(false);
     }
   }, [profile.language, speak, stopPlayback]);
@@ -160,7 +157,6 @@ export default function VoiceDuoView() {
     stopPlayback();
     window.speechSynthesis?.cancel();
     setBusy(false);
-    busyRef.current = false;
     setStatus("Conversation arrêtée");
   }, [stopPlayback]);
 
