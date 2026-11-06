@@ -255,6 +255,41 @@ test("a runner that exceeds the timeout counts as a failed attempt", async () =>
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("a runner that ignores AbortSignal is quarantined and never raced with rollback", async () => {
+  const gw = memGateway({ "a.ts": "original" });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
+  const sup = new LeannaSupervisor({
+    maxAttempts: 1,
+    runnerTimeoutMs: 20,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: gw, dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+  });
+
+  const runner: MissionRunner = async () => {
+    // Deliberately ignore AbortSignal and mutate after the timeout grace period.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    gw.write("a.ts", "late-write");
+    return { success: true };
+  };
+
+  const result = await sup.runMission({
+    missionId: "m-timeout-ignores-abort",
+    goal: "must not race rollback",
+    runner,
+    plannedFiles: ["a.ts"],
+  });
+
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(result.rollbackComplete, false);
+  assert.match(result.residualFiles?.[0] ?? "", /runner encore actif/);
+  assert.equal(gw.store.get("a.ts"), "original", "rollback must be withheld while runner is active");
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(gw.store.get("a.ts"), "late-write", "late side effect is surfaced, not overwritten by a racing rollback");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("WAITING_APPROVAL: a refused approval escalates without running", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-sup-"));
   const sup = new LeannaSupervisor({
