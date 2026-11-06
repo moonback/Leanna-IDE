@@ -841,3 +841,34 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - La signature PDF confirme le type probable, pas l'innocuité du document ni sa structure complète. L'analyse PDF doit rester traitée comme une opération sur entrée non fiable.
 - Les tests ajoutés n'ont pas été exécutés via l'accès GitHub. Exécuter `npx tsx --test server/utils/documentUploadValidation.test.ts`, `npm run typecheck`, `npm run typecheck:test` et la suite serveur.
 - Vérifier également le comportement HTTP du middleware Multer pour les extensions rejetées et les dépassements de taille dans l'application réelle.
+
+
+## Trente-troisième passe — Sécurisation des imports multimodaux et Notebook
+
+### Corrections appliquées
+
+- Le circuit `/api/upload-document` valide désormais le couple extension/MIME et les signatures binaires des PDF, JPEG, PNG et WebP avant extraction ou appel au modèle.
+- Les fichiers texte de ce circuit sont soumis à un décodage UTF-8 strict ; les fichiers vides, binaires, mal encodés et les images dont la signature ne correspond pas sont rejetés.
+- Les noms utilisés dans les prompts, les réponses et le DocumentStore sont normalisés pour supprimer les chemins et caractères de contrôle.
+- Le middleware Notebook limite chaque fichier à 10 Mio, limite le nombre de fichiers à 10 et n'accepte plus que PDF, TXT, Markdown, HTML, PNG, JPEG et WebP.
+- Les routes Notebook single, multi et queued utilisent maintenant le même validateur de contenu : signature PDF, signatures raster, MIME cohérent, UTF-8 strict, nom nettoyé et limite par fichier.
+- Les lots multi et queued sont bornés à 50 Mio au total ; la route queued refuse le lot entier si un fichier est invalide afin d'éviter une mise en queue partielle inattendue.
+- DOCX, DOC, RTF, CSV, JSON, YAML, GIF, BMP et SVG ne sont plus annoncés comme formats importables par le middleware Notebook, car le pipeline `SourceIngester.ingestFromBuffer` ne possède pas d'extracteur dédié fiable pour ces formats.
+- Tests unitaires ajoutés pour les signatures d'images, PDF, MIME, encodage, fichiers vides et dépassements de taille.
+
+### Fichiers concernés
+
+- `server/utils/documentUploadValidation.ts`
+- `server/utils/documentUploadValidation.test.ts`
+- `server/utils/notebookSourceUploadValidation.ts`
+- `server/utils/notebookSourceUploadValidation.test.ts`
+- `server/routes/upload-document.ts`
+- `server/routes/notebooks/index.ts`
+- `server/routes/notebooks/sourcesRouter.ts`
+
+### Limites et validations restantes
+
+- La limite de 50 Mio par lot est contrôlée après réception des buffers : la mémoire maximale théorique reste bornée par 10 fichiers de 10 Mio avant ce contrôle. Une limite cumulative au niveau du stockage Multer nécessiterait un stockage temporaire/streaming ou un middleware dédié.
+- La validation de signature est une vérification de format, pas une analyse antivirus ni une garantie d'innocuité. Les parseurs PDF et les modèles vision continuent à traiter des données non fiables.
+- Les erreurs Multer de taille/nombre/filtre doivent être vérifiées en intégration HTTP : elles sont émises avant l'entrée dans les handlers et leur statut dépend du middleware d'erreurs Express global.
+- Exécuter `npx tsx --test server/utils/documentUploadValidation.test.ts server/utils/notebookSourceUploadValidation.test.ts`, `npx tsx --test server/routes/upload-document.test.ts`, `npm run typecheck` et `npm run typecheck:test`. Ces commandes n'ont pas été exécutées par le connecteur GitHub.
