@@ -40,6 +40,8 @@ Ouvre deux sessions Gemini Live indépendantes : l'assistant principal (`aiName`
 - Sortie audio : frames binaires PCM 24 kHz, une seule IA à la fois.
 - Événements JSON serveur : `connecting`, `ready`, `speaker`, `user_text`, `transcript`, `turn_complete`, `interrupted`, `listening`, `session_error`.
 - Messages JSON client : `{"type":"text","text":"..."}` (entrée texte de secours), `{"type":"interrupt"}`, `{"type":"reset"}`.
+- Les deux sessions reçoivent les déclarations d'outils du `SkillManagerV2`. Les appels sont dispatchés par le pipeline sécurisé partagé de `/live` (`executeLiveToolCall`) : guards workspace/sandbox, mode Ask, Supervisor, context gate, anti-injection, retries et auto-verify.
+- Les lots d'outils sont sérialisés entre les deux sessions pour protéger le workspace. Les outils MCP chargés et les custom skills sont inclus selon le profil et la configuration.
 - L'orchestrateur partage le transcript récent et limite à quatre les tours autonomes par prise de parole utilisateur. Une interruption humaine invalide le tour en cours et rend la priorité à l'utilisateur.
 
 Voir [docs/VOICE_DUO.md](docs/VOICE_DUO.md) pour le protocole et le cycle de vie détaillés.
