@@ -697,15 +697,29 @@ export class Executor {
     // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
     const plannedFiles = this.collectPlannedFiles(mission);
 
-    const runner = async (): Promise<RunnerOutcome> => {
-      // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
-      // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
-      await this.executeMission(mission, availableSkills);
-      const outcome = this.buildMissionOutcome(mission);
-      // executeMission finalise la mission (retry/replan internes épuisés) : une
-      // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
-      if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
-      return outcome;
+    const runner: MissionRunner = async ({ signal }) => {
+      // Relayer l'annulation du Supervisor au contrôleur réellement transmis
+      // aux skills. Sans ce pont, son AbortSignal ne pouvait pas interrompre
+      // l'action en cours dans l'Executor.
+      const abortFromSupervisor = () => {
+        mission.cancel("Annulation demandée par le Supervisor (timeout/arrêt).");
+        this.abortMission(mission.id, "Annulation demandée par le Supervisor.");
+      };
+      if (signal?.aborted) abortFromSupervisor();
+      else signal?.addEventListener("abort", abortFromSupervisor, { once: true });
+
+      try {
+        // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
+        // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
+        await this.executeMission(mission, availableSkills);
+        const outcome = this.buildMissionOutcome(mission);
+        // executeMission finalise la mission (retry/replan internes épuisés) : une
+        // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
+        if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
+        return outcome;
+      } finally {
+        signal?.removeEventListener("abort", abortFromSupervisor);
+      }
     };
 
     const result = await supervisor.runMission({
