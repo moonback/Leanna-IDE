@@ -245,3 +245,6 @@ Cette passe est un garde-fou fail-closed, pas encore un orchestrateur complet. L
 - Une deuxième exécution de la même mission est refusée tant que le premier processus détient le lease.
 - Un lease n'est automatiquement récupéré que si son propriétaire est sur le même hôte et que son PID est démontrablement arrêté. Les verrous distants, illisibles ou ambigus sont conservés (fail-closed).
 - Tests ajoutés pour la contention, la libération par token propriétaire et la récupération d'un PID mort. Ils ne sont pas exécutés dans cette session.
+
+- Un rollback qui échoue, ou dont les fichiers résiduels ne correspondent pas au snapshot, ne termine plus la mission en simple `FAILED` : il la place en `RECOVERY_REQUIRED` et conserve le contexte de tentative lorsque la transaction n'a pas pu être restaurée.
+- Une mission déjà en quarantaine renvoie explicitement `recoveryRequired: true` et ne relance pas le runner.
