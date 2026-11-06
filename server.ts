@@ -735,7 +735,7 @@ async function startServer() {
   app.use("/api/observability", observabilityRouter);
 
   app.use("/api", createProfileRouter(() => currentProfile, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile, getWorkspaceRoot, updateEnvFile));
-  app.use("/api/debate", createDebateRouter(() => currentProfile as any, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile));
+  app.use("/api/debate", createDebateRouter(() => currentProfile as any, (p) => { currentProfile = p; setTextGenerationProfile(p); }, saveProfile, (name: string, args: any) => skillManager.handleToolCall(name, args)));
   app.use("/api", createTokensRouter(updateEnvFile, async () => { await loadGeminiKeys(); }));
   app.use("/api/openrouter", createOpenRouterRouter(() => currentProfile));
   app.use("/api/tokens", createTokensOptimizationRouter(() => currentProfile, getWorkspaceRoot));
