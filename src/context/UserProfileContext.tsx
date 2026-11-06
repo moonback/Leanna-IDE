@@ -187,7 +187,7 @@ function load(): UserProfile {
 const SERVER_SYNCED_KEYS: (keyof UserProfile)[] = [
   'aiName', 'aiVoice', 'userName', 'userRole', 'language', 'responseStyle',
   'autoMuteEnabled', 'autoMuteTimeout', 'vadEnabled', 'vadThreshold',
-  'vadSilenceDuration', 'temperature', 'topP',
+  'vadSilenceDuration', 'voiceAlwaysOn', 'temperature', 'topP',
   'textProvider', 'openrouterModel', 'openrouterImageModel', 'notebookModel',
   'agents', 'reasoningEnabled', 'customSystemPrompt',
 ];
