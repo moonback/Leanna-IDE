@@ -121,7 +121,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                     turns: [{ role: 'user', parts: [{ text: `Leanna vient de dire : ${completed || '(réponse vocale sans transcription)'}\nRéponds directement à son argument, puis donne ton avis à l'utilisateur.` }] }],
                     turnComplete: true,
                   });
-                } else { finished = true; send({ type: 'debate_complete', turns: transcript }); }
+                } else { finished = true; send({ type: 'debate_complete', turns: transcript }); closeSessions(); }
               } else {
                 lastRoxaneText = completed;
                 if (transcript.length < 32) transcript.push({ speaker: 'roxane', text: completed, round: rounds + 1 });
@@ -137,6 +137,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 } else {
                   finished = true;
                   send({ type: 'debate_complete', lastLeannaText, lastRoxaneText, turns: transcript });
+                  closeSessions();
                 }
               }
             }
