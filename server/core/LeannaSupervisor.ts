@@ -33,6 +33,7 @@ import { DurableMissionStore } from "./DurableMissionStore.js";
 import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine, type EvidenceInput, type EvidenceBundle } from "./EvidenceEngine.js";
 import { ExecutionLedger } from "./ExecutionLedger.js";
+import { MissionExecutionLease } from "./MissionExecutionLease.js";
 
 /** Décision de récupération à quatre niveaux (audit §17). */
 export type RecoveryDecision = "retry" | "repair" | "replan" | "escalate";
@@ -154,7 +155,17 @@ export class LeannaSupervisor {
    * moteur réel ; le Supervisor décide de l'état, des snapshots/rollbacks, de la
    * preuve et de la récupération.
    */
-  async runMission(params: {
+  /** Serialize mission execution across processes before reading or mutating lifecycle state. */
+  async runMission(params: Parameters<LeannaSupervisor["runMissionLocked"]>[0]): Promise<SupervisedResult> {
+    const lease = MissionExecutionLease.acquire(params.missionId);
+    try {
+      return await this.runMissionLocked(params);
+    } finally {
+      lease.release();
+    }
+  }
+
+  private async runMissionLocked(params: {
     missionId: string;
     goal: string;
     runner: MissionRunner;
