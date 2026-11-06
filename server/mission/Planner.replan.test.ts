@@ -39,6 +39,41 @@ test("replan drops a durably-failing tool while keeping at least one option", as
   cleanup();
 });
 
+
+test("replan excludes the just-failed skill immediately when an alternative exists", async () => {
+  cleanup();
+  const planner = new Planner(new SkillScorer());
+  const mission = new Mission("t", "corriger le bug", "high", {
+    ...DEFAULT_MISSION_CONFIG,
+    minSkillScore: 0,
+  });
+  const goalId = mission.rootGoal.id;
+  const failed = {
+    id: "failed-action",
+    skillName: "failed_tool",
+    args: {},
+    rationale: "previous strategy",
+    score: 40,
+    order: 1,
+    status: "failed" as const,
+  };
+
+  const actions = await planner.replan(
+    mission,
+    goalId,
+    failed,
+    "outil indisponible",
+    ["failed_tool", "alternative_tool"],
+  );
+
+  assert.ok(actions.length > 0, "an alternative should produce a replacement plan");
+  assert.ok(
+    actions.every((action) => action.skillName !== "failed_tool"),
+    "the first replan must not immediately select the tool that just failed",
+  );
+  cleanup();
+});
+
 test("replan never removes every tool (keeps availability if all are failing)", async () => {
   cleanup();
   for (let i = 0; i < 5; i++) strategyMemory.recordSkillOutcome("only_tool", false, 100);
