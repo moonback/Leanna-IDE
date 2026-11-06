@@ -70,6 +70,8 @@ export function selectAdaptiveModel(input: AdaptiveModelInput): AdaptiveModelDec
     }];
   });
 
+  // Never call it adaptive if fewer than two candidates have usable prices.
+  if (ranked.length < 2) return undefined;
   ranked.sort((a, b) => a.score - b.score);
   return ranked[0];
 }
