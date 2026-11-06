@@ -4,6 +4,7 @@ import type { ProfileConfig } from "../prompts/systemInstruction.js";
 import { recordModelCallUsage } from "../utils/textGeneration.js";
 import type { SkillManagerV2 } from "../runtime/compat/SkillManagerV2.js";
 import { Supervisor } from "../autonomy/index.js";
+import { ToolCallTracker } from "./toolExecution.js";
 import { executeLiveToolCall, type LiveSocketDeps } from "./LiveSocketHandler.js";
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from "../routes/browser.js";
 
@@ -42,6 +43,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     const language = profile.language || "fr";
     const sessions = new Map<Speaker, LiveSession>();
     const supervisor = new Supervisor();
+    const toolTracker = new ToolCallTracker();
     // Les deux IA partagent une file d’exécution : aucune écriture workspace
     // concurrente ne peut être lancée par les deux sessions en parallèle.
     let toolExecutionQueue: Promise<void> = Promise.resolve();
@@ -194,12 +196,17 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
                 promptCharCount: 0, outputText: "", toolName: `voice_duo_${speaker}`, kind: "live",
               });
             }
+            const cancelledIds = (message as any).toolCallCancellation?.ids;
+            if (Array.isArray(cancelledIds) && cancelledIds.length > 0) {
+              const cancelled = toolTracker.cancel(cancelledIds);
+              if (cancelled.length > 0) send({ type: "tool_cancelled", speaker, ids: cancelled });
+            }
             if (message.toolCall && sessionRef) {
               send({ type: "tool_call", speaker, calls: message.toolCall.functionCalls?.map((call: any) => ({ id: call.id, name: call.name })) ?? [] });
               const toolSession = sessionRef;
               toolExecutionQueue = toolExecutionQueue.then(async () => {
                 if (closed) return;
-                await executeLiveToolCall(message.toolCall, toolSession, client, liveToolDeps, voices[speaker], supervisor, profileMode);
+                await executeLiveToolCall(message.toolCall, toolSession, client, liveToolDeps, voices[speaker], supervisor, profileMode, toolTracker);
                 send({ type: "tool_batch_complete", speaker });
               }).catch(error => {
                 console.error(`[VoiceDuoLive][${speaker}] Tool execution failed`, error);
