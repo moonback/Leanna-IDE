@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_ROXANE_CONFIG, normalizeRoxaneConfig } from './types.js';
+import { normalizeRoxaneConfig } from './types.js';
 
 test('normalizeRoxaneConfig supplies safe defaults', () => {
   const config = normalizeRoxaneConfig(undefined);
