@@ -153,7 +153,12 @@ export class ProcessingQueue<T = unknown> {
         && Number.isInteger(task.maxAttempts)
         && typeof task.createdAt === "string"
         && typeof task.completedAt === "string"
-      ).slice(-200).map((task: QueueTask<T>) => ({ ...task, payload: undefined as T }));
+      ).slice(-200).map((task: QueueTask<T>) => ({
+        ...task,
+        payload: task.payload && typeof task.payload === "object" && "notebookId" in task.payload
+          ? { notebookId: (task.payload as { notebookId: string }).notebookId } as T
+          : undefined as T,
+      }));
       log.info(`♻️ ${restored.length} tâche(s) en attente et ${this.completed.length} résultat(s) historique(s) restaurés`);
     } catch (error: any) {
       log.error(`Impossible de restaurer la queue persistée : ${error.message}`);
