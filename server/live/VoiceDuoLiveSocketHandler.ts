@@ -254,8 +254,12 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
           // exige de fermer les deux sessions et d'en ouvrir de nouvelles.
           client.close(1000, "Conversation reset");
         } else if (msg.type === "interrupt") {
-          // Le barge-in effectif est déclenché par l'audio micro envoyé en continu
-          // à la session active ; ce message coupe la lecture côté client.
+          // Le VAD local coupe la lecture avant même que Gemini confirme le
+          // barge-in. Invalider immédiatement tout tour autonome en attente.
+          chainId += 1;
+          chainActive = false;
+          advancing = false;
+          suppressOutputUntilUserText = true;
           send({ type: "interrupt_ack", speaker: activeSpeaker });
         }
       } catch (error) {
