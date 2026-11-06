@@ -95,6 +95,7 @@ export function RoxaneDebateLauncher() {
             const binary = atob(msg.data); const samples = new Int16Array(binary.length / 2);
             for (let i = 0; i < samples.length; i++) samples[i] = (binary.charCodeAt(i * 2) | (binary.charCodeAt(i * 2 + 1) << 8));
             const ctx = audioContextRef.current ?? new AudioContext({ sampleRate: 24000 }); audioContextRef.current = ctx;
+            void ctx.resume();
             const buffer = ctx.createBuffer(1, samples.length, 24000); const channel = buffer.getChannelData(0);
             for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
             const source = ctx.createBufferSource(); source.buffer = buffer; source.connect(ctx.destination);
