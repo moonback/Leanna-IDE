@@ -9,7 +9,7 @@ import type { OpenFile } from '../../types/ide.js';
 function getHostnameDisplay(url: string): string {
   try {
     const urlObj = new URL(url);
-    return urlObj.hostname.replace(/^www\\./, '');
+    return urlObj.hostname.replace(/^www\./, '');
   } catch {
     return url;
   }
