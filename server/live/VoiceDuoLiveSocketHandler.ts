@@ -38,7 +38,6 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     let chainId = 0;
     let autonomousTurns = 0;
     let chainActive = false;
-    let userUtterancePending = false;
     let advancing = false;
     let closed = false;
     const startedAt = Date.now();
@@ -127,13 +126,17 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
             }
             const content = message.serverContent;
             if (content?.interrupted) {
+              // Invalider le tour autonome en cours : la voix de l’utilisateur
+              // reprend la priorité et aucun ancien tour ne doit repartir.
+              chainId += 1;
+              chainActive = false;
+              advancing = false;
               send({ type: "interrupted", speaker });
               return;
             }
             const inputText = (content as any)?.inputTranscription?.text;
             if (typeof inputText === "string" && inputText.trim()) {
               append("user", inputText);
-              userUtterancePending = true;
               chainId += 1;
               chainActive = true;
               autonomousTurns = 0;
@@ -156,8 +159,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
             if (content?.turnComplete) {
               send({ type: "turn_complete", speaker });
               const last = [...history].reverse().find(item => item.speaker === speaker);
-              if (chainActive && !advancing && last?.text && (userUtterancePending || !userUtterancePending)) {
-                userUtterancePending = false;
+              if (chainActive && !advancing && last?.text) {
                 advancing = true;
                 void nextTurn(speaker, last.text, chainId);
               } else if (!chainActive) {
@@ -179,14 +181,30 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
       });
     };
 
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      chainId += 1;
+      for (const session of sessions.values()) {
+        try { session.close(); } catch { /* ignore */ }
+        deps.activeGeminiSessions.delete(session);
+      }
+      sessions.clear();
+      console.info("[VoiceDuoLive] Dual session closed", { durationMs: Date.now() - startedAt, turns: history.length });
+    };
+    client.on("close", cleanup);
+    client.on("error", cleanup);
+
     send({ type: "connecting", model: MODEL, speakers: names });
     try {
-      const [leanna, roxane] = await Promise.all([connectSpeaker("leanna"), connectSpeaker("roxane")]);
-      if (closed) { leanna.close(); roxane.close(); return; }
+      const leanna = await connectSpeaker("leanna");
       sessions.set("leanna", leanna);
-      sessions.set("roxane", roxane);
       deps.activeGeminiSessions.add(leanna);
+      if (closed) { cleanup(); return; }
+      const roxane = await connectSpeaker("roxane");
+      sessions.set("roxane", roxane);
       deps.activeGeminiSessions.add(roxane);
+      if (closed) { cleanup(); return; }
       send({ type: "ready", model: MODEL, sessions: [
         { speaker: "leanna", name: names.leanna, voice: voices.leanna },
         { speaker: "roxane", name: names.roxane, voice: voices.roxane },
@@ -220,7 +238,6 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
         if (msg.type === "text" && typeof msg.text === "string" && msg.text.trim()) {
           chainId += 1;
           chainActive = true;
-          userUtterancePending = true;
           autonomousTurns = 0;
           advancing = false;
           append("user", msg.text);
@@ -233,7 +250,6 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
           chainId += 1;
           chainActive = false;
           autonomousTurns = 0;
-          userUtterancePending = false;
           advancing = false;
           history.length = 0;
           activeSpeaker = "leanna";
@@ -248,18 +264,6 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
       }
     });
 
-    const cleanup = () => {
-      if (closed) return;
-      closed = true;
-      chainId += 1;
-      for (const session of sessions.values()) {
-        try { session.close(); } catch { /* ignore */ }
-        deps.activeGeminiSessions.delete(session);
-      }
-      sessions.clear();
-      console.info("[VoiceDuoLive] Dual session closed", { durationMs: Date.now() - startedAt, turns: history.length });
-    };
-    client.on("close", cleanup);
-    client.on("error", cleanup);
+
   });
 }
