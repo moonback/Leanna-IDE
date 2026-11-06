@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
-import { notebookManager, sourceIngester } from "../../notebooks/index.js";
+import { notebookManager } from "../../notebooks/index.js";
+import { enqueueSourceIngestion } from "../../notebooks/queueSourceIngestion.js";
 import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createNotesRouter(): Router {
@@ -91,20 +92,20 @@ export function createNotesRouter(): Router {
       }
 
       const markdown = `# ${note.title || "Note"}\n\n${content}`;
-      const source = await sourceIngester.ingestFromBuffer(
-        Buffer.from(markdown, "utf-8"),
-        title,
-        "text/markdown",
+      const source = await enqueueSourceIngestion({
         notebookId,
-      );
-      notebookManager.addSource(notebookId, source);
+        kind: "buffer",
+        buffer: Buffer.from(markdown, "utf-8"),
+        fileName: title,
+        mimeType: "text/markdown",
+      });
 
       res.json({
         status: "success",
-        source: { id: source.id, title: source.title, type: source.type, chunksCount: source.chunks.length },
+        source: { id: source.sourceId, title: source.title, type: source.type, chunksCount: source.chunksCount },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
