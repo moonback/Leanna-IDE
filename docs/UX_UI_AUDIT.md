@@ -211,3 +211,21 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier qu'une bibliothèque vide valide reste distincte d'une panne API, et qu'un notebook supprimé affiche bien « introuvable ».
 - Vérifier les changements de workspace, le retour navigateur et le réessai après rétablissement du serveur.
 - Exécuter typecheck, tests UI et audit visuel dans Electron ; ces validations locales n'ont pas été exécutées via GitHub.
+
+## Neuvième passe — Navigation clavier des Notebooks et sémantique des onglets
+
+### Constats vérifiés
+
+- Les cartes de notebooks en vue liste et grille déclenchaient l'ouverture au clic, mais n'exposaient pas de parcours clavier équivalent. Elles contiennent également des actions secondaires ; elles ne doivent donc pas être transformées en boutons englobants qui imbriqueraient des contrôles interactifs.
+- Les onglets d'Observabilité étaient visuellement sélectionnés sans exposer `role=tablist`, `role=tab` ni `aria-selected` aux technologies d'assistance.
+
+### Corrections appliquées
+
+- Les cartes liste/grille des notebooks sont désormais focalisables et activables avec Entrée ou Espace, tout en conservant les contrôles secondaires internes et une sémantique de groupe.
+- Les onglets Observabilité exposent leur rôle et leur état sélectionné ; les boutons de période exposent leur état `aria-pressed`. Les contrôles ont des types explicites.
+
+### Validation restante
+
+- Parcourir les deux modes d'affichage des notebooks uniquement au clavier, vérifier Entrée/Espace, et vérifier que le bouton de suppression interne reste indépendant.
+- Vérifier la lecture des onglets et du sélecteur de période avec un lecteur d'écran.
+- Exécuter typecheck, tests UI et audit visuel Electron ; aucune exécution locale n'est disponible depuis l'accès GitHub utilisé pour ces modifications.
