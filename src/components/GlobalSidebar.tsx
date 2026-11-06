@@ -156,7 +156,7 @@ export type GlobalSidebarProps = { variant?: 'global' | 'ide' } & Partial<Omit<U
 export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   const mode: 'global' | 'ide' = props.variant === 'ide' ? 'ide' : 'global';
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const reduceMotion = useReducedMotion() ?? false;
   const { theme } = useTheme();
   const { confirm } = useConfirm();
@@ -229,8 +229,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   }, []);
 
   const isActive = useCallback(
-    (path: string) => (path === '/ide' ? pathname === '/' || pathname === '/ide' : pathname === path),
-    [pathname],
+    (path: string) => (path === '/ide'
+      ? (pathname === '/' || pathname === '/ide') && !search.includes('page=')
+      : pathname + search === path),
+    [pathname, search],
   );
 
   /* Changer de projet racine : ferme les onglets, désactive le workspace, ouvre la modale. */

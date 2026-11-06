@@ -42,17 +42,20 @@ export type NavId =
 export interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
+/** Page affichée DANS l'IDE (zone d'édition, comme Knowledge) — lue par IdeView via `?page=`. */
+export const inIde = (id: NavId) => `${ROUTES.ide}?page=${id}`;
+
 export const NAV_ITEMS: Record<NavId, NavItem> = {
   'ide':                { id: 'ide',                path: ROUTES.ide,               label: 'IDE',             icon: Code2 },
-  'automation':         { id: 'automation',         path: ROUTES.automation,        label: 'Automatisations', icon: Zap },
-  'notebooks':          { id: 'notebooks',          path: ROUTES.notebooks,         label: 'Notebooks',       icon: NotebookPen },
-  'documents':          { id: 'documents',          path: ROUTES.documents,         label: 'Documents',       icon: FileText },
+  'automation':         { id: 'automation',         path: inIde('automation'),      label: 'Automatisations', icon: Zap },
+  'notebooks':          { id: 'notebooks',          path: inIde('notebooks'),       label: 'Notebooks',       icon: NotebookPen },
+  'documents':          { id: 'documents',          path: inIde('documents'),       label: 'Documents',       icon: FileText },
   'github':             { id: 'github',             path: ROUTES.github,            label: 'GitHub',          icon: Github },
-  'memories':           { id: 'memories',           path: ROUTES.memories,          label: 'Mémoire',         icon: BrainCircuit },
-  'history':            { id: 'history',            path: ROUTES.history,           label: 'Historique',      icon: History },
+  'memories':           { id: 'memories',           path: inIde('memories'),        label: 'Mémoire',         icon: BrainCircuit },
+  'history':            { id: 'history',            path: inIde('history'),         label: 'Historique',      icon: History },
 
-  'lists':              { id: 'lists',              path: ROUTES.lists,             label: 'Snippets',        icon: Braces },
-  'observability':      { id: 'observability',      path: ROUTES.observability,     label: 'Observabilité',   icon: BarChart2 },
+  'lists':              { id: 'lists',              path: inIde('lists'),           label: 'Snippets',        icon: Braces },
+  'observability':      { id: 'observability',      path: inIde('observability'),   label: 'Observabilité',   icon: BarChart2 },
 };
 
 const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);

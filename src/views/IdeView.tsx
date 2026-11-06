@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense, type ComponentType } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 // Monaco Editor - lazy loaded to reduce initial bundle
 // Pass the bundled monaco instance directly to avoid CDN loader (fixes CSP violations)
 const MonacoEditor = lazy(() =>
@@ -17,6 +17,16 @@ const VisionPanel = lazy(() => import('../components/panels/VisionPanel.js').the
 const GitHubPanel = lazy(() => import('../components/ide/GitHubPanel.js').then(m => ({ default: m.GitHubPanel })));
 const DocumentsView = lazy(() => import('./DocumentsView.js'));
 const NotebooksView = lazy(() => import('./NotebooksView.js'));
+/** Pages de la sidebar globale affichées dans la zone d'édition (`/ide?page=<id>`), comme Knowledge. */
+const INLINE_PAGES: Record<string, ComponentType> = {
+  memories: lazy(() => import('./MemoriesView.js')),
+  notebooks: NotebooksView,
+  documents: DocumentsView,
+  lists: lazy(() => import('./ListsView.js')),
+  history: lazy(() => import('./HistoryView.js')),
+  automation: lazy(() => import('./AutomationView.js')),
+  observability: lazy(() => import('./ObservabilityView.js')),
+};
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
 import type { RichDocument } from '../components/ide/RichDocumentViewer.js';
 import { IdeModal, type ModalMode } from '../components/ide/IdeModal.js';
@@ -227,11 +237,25 @@ export default function IdeView() {
   const [showHistory, setShowHistory] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const inlinePageId = searchParams.get('page');
+  const InlinePage = (inlinePageId && INLINE_PAGES[inlinePageId]) || null;
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalDocked, setTerminalDocked] = useState(true); // Par défaut docké en bas
   const terminalRef = useRef<TerminalPanelHandle | null>(null);
   const [selfEditingFile, setSelfEditingFile] = useState<string | null>(null);
   const [richDocument, setRichDocument] = useState<RichDocument | null>(null);
+  // Une page inline (?page=) et les panneaux plein écran s'excluent : ouvrir l'un ferme l'autre.
+  useEffect(() => {
+    if (!InlinePage) return;
+    setShowSandbox(false); setShowKnowledge(false); setShowNotebooks(false); setShowHistory(false);
+    setShowAutomation(false); setShowMemory(false); setShowGitHub(false); setShowBrowser(false); setRichDocument(null);
+  }, [InlinePage]);
+  const fullPanelOpen = showSandbox || showKnowledge || showNotebooks || showHistory || showAutomation
+    || showMemory || showGitHub || showBrowser || !!richDocument;
+  useEffect(() => {
+    if (fullPanelOpen) setSearchParams((p) => { p.delete('page'); return p; }, { replace: true });
+  }, [fullPanelOpen, setSearchParams]);
   const [cursorPosition, setCursorPosition] = useState<{ line: number; column: number } | null>(null);
 
   // ── Zone droite unifiée : un seul panneau à la fois (mutual exclusion) ──────
@@ -1061,7 +1085,7 @@ export default function IdeView() {
         {/* Pas de <ViewHeader> ici : nom/chemin du fichier sont déjà dans les
             onglets et la barre d'état, l'état IA dans le rail. */}
         {/* Tab Bar — masqué quand un panneau plein-écran est actif */}
-        {!showSandbox && !showHistory && !showAutomation && !showMemory && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
+        {!InlinePage && !showSandbox && !showHistory && !showAutomation && !showMemory && !showKnowledge && !showNotebooks && !(showBrowser && !fileSystem.activePath) && (
           <EditorTabs
             openFiles={fileSystem.openFiles}
             activePath={fileSystem.activePath}
@@ -1148,7 +1172,11 @@ export default function IdeView() {
                           fullWidth
                         />
                       </div>
-                      {showBrowser ? null : showSandbox ? (
+                      {showBrowser ? null : InlinePage ? (
+                        <Suspense fallback={<div className="flex flex-1 items-center justify-center"><div className="text-sm" style={{color: 'var(--text-muted)'}}>Chargement…</div></div>}>
+                          <InlinePage />
+                        </Suspense>
+                      ) : showSandbox ? (
                         <SandboxWorkspace
                           view={sandboxView}
                           selectedFile={selectedSandboxDiffFile}
