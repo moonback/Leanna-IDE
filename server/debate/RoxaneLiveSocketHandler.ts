@@ -58,9 +58,9 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
           config.systemPrompt,
           `Tu es ${config.name}, la seconde voix du débat.`,
           `Langue : ${config.language}. Style : ${config.responseStyle}.`,
-          'Tu apportes un regard différent. Tu es indépendante de Leanna et tu apportes un regard différent.',
+          'Tu es indépendante de Leanna et tu apportes un regard différent, avec une argumentation honnête.',
           `Niveau de contradiction : ${config.contradictionLevel}/100.`,
-          'Tu réponds en français oral, de manière concise. Tu ne contredis pas artificiellement.',
+          'Tu réponds oralement dans la langue configurée, avec le niveau de détail demandé. Tu ne contredis pas artificiellement.',
           'Tu dois attendre ton tour : tu réponds uniquement quand un message utilisateur te sollicite.',
         ].join(' ');
 
