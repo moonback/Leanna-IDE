@@ -150,11 +150,12 @@ function isSafeMainTarget(mainFile: string): boolean {
   return true;
 }
 
-function assertMainTargetAllowed(mainFile: string, relativePath: string): void {
+/** `allowCritical` : uniquement sur confirmation explicite de l'utilisateur dans l'UI. */
+function assertMainTargetAllowed(mainFile: string, relativePath: string, allowCritical = false): void {
   if (isWriteForbidden(mainFile)) {
     throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", `Synchronisation refusée : cible protégée (${relativePath}).`);
   }
-  if (isCriticalFile(mainFile)) {
+  if (!allowCritical && isCriticalFile(mainFile)) {
     throw new SandboxGuardError("SANDBOX_PATH_ESCAPE", `Synchronisation refusée : fichier critique (${relativePath}). Utilisez une confirmation explicite.`);
   }
   if (!isSafeMainTarget(mainFile)) {
@@ -468,7 +469,9 @@ export function markFileModified(relativePath: string): void {
  * et annule (rollback) toutes les modifications si une seule copie échoue.
  * Retourne la liste des fichiers copiés.
  */
-export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
+type SyncResult = { synced: string[]; skipped?: Array<{ path: string; reason: string; critical?: boolean }>; checkpointHash: string | null; rolledBack: boolean; error?: string };
+
+export async function syncToMain(options: { confirmCritical?: boolean } = {}): Promise<SyncResult> {
   // Mutex : empêcher deux synchronisations concurrentes (Audit §7)
   if (syncLock) {
     return {
@@ -483,14 +486,14 @@ export async function syncToMain(): Promise<{ synced: string[]; checkpointHash: 
   syncLock = new Promise<void>((r) => { resolve = r; });
 
   try {
-    return await syncToMainInternal();
+    return await syncToMainInternal(options.confirmCritical === true);
   } finally {
     syncLock = null;
     resolve!();
   }
 }
 
-async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash: string | null; rolledBack: boolean; error?: string }> {
+async function syncToMainInternal(allowCritical: boolean): Promise<SyncResult> {
   if (!isSandboxActive()) {
     return {
       synced: [],
@@ -504,23 +507,37 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
   }
 
   let checkpointHash: string | null = null;
-  let modifiedList: string[];
-  try {
-    // Ne jamais faire confiance au set seul : chaque entrée est revalidée par
-    // le SandboxGuard avant qu'une synchronisation puisse toucher le principal.
-    modifiedList = [...sandboxModifiedFiles].map(getCanonicalSandboxRelativePath);
-  } catch (error: any) {
+  const modifiedList: string[] = [];
+  const skipped: NonNullable<SyncResult["skipped"]> = [];
+  // Ne jamais faire confiance au set seul : chaque entrée est revalidée par
+  // le SandboxGuard avant qu'une synchronisation puisse toucher le principal.
+  // Une cible refusée (fichier critique, protégé…) reste en attente sans
+  // bloquer les autres — sinon le rollback global annulait tout en silence.
+  for (const entry of sandboxModifiedFiles) {
+    try {
+      const relPath = getCanonicalSandboxRelativePath(entry);
+      assertMainTargetAllowed(path.join(SELF_ROOT, relPath), relPath, allowCritical);
+      modifiedList.push(relPath);
+    } catch (error: any) {
+      const critical = !isWriteForbidden(path.join(SELF_ROOT, entry)) && isCriticalFile(path.join(SELF_ROOT, entry));
+      skipped.push({ path: entry, reason: error?.message ?? "Chemin sandbox invalide.", ...(critical ? { critical: true } : {}) });
+    }
+  }
+  if (modifiedList.length === 0) {
     return {
       synced: [],
+      skipped,
       checkpointHash: null,
       rolledBack: false,
-      error: error?.message ?? "Chemin sandbox invalide.",
+      error: skipped.length > 0
+        ? `Aucun fichier appliqué : ${skipped.map((s) => s.reason).join(" ; ")}`
+        : undefined,
     };
   }
 
   try {
     const { createCheckpoint } = await import("./checkpoint.js");
-    checkpointHash = await createCheckpoint(`avant sync sandbox (${sandboxModifiedFiles.size} fichiers)`);
+    checkpointHash = await createCheckpoint(`avant sync sandbox (${modifiedList.length} fichiers)`);
   } catch (e) { console.warn("[Sandbox] Création du checkpoint échouée (non bloquant):", (e as Error).message); }
 
   const applied: string[] = [];
@@ -530,7 +547,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
     for (const relPath of modifiedList) {
       const sandboxFile = assertSandboxReady(relPath);
       const mainFile = path.join(SELF_ROOT, relPath);
-      assertMainTargetAllowed(mainFile, relPath);
+      assertMainTargetAllowed(mainFile, relPath, allowCritical);
 
       const mainExisted = fs.existsSync(mainFile);
       const sandboxExisted = fs.existsSync(sandboxFile);
@@ -564,7 +581,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
       }
     }
 
-    sandboxModifiedFiles.clear();
+    for (const relPath of modifiedList) sandboxModifiedFiles.delete(relPath);
     lastSyncTimestamp = Date.now();
     // git_status vise le dépôt principal, jamais le sandbox : toute synchronisation
     // réussie invalide son cache immédiatement.
@@ -575,8 +592,8 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
       console.warn("[Sandbox] Invalidation du cache Git ignorée:", (error as Error).message);
     }
 
-    console.log(`[Sandbox] Sync → principal: ${applied.length} fichier(s) appliqué(s)`);
-    return { synced: applied, checkpointHash, rolledBack: false };
+    console.log(`[Sandbox] Sync → principal: ${applied.length} fichier(s) appliqué(s), ${skipped.length} ignoré(s)`);
+    return { synced: applied, skipped, checkpointHash, rolledBack: false };
   } catch (e: any) {
     console.error(`[Sandbox] Échec sync après ${applied.length} fichier(s) — rollback en cours:`, e.message);
 
@@ -608,6 +625,7 @@ async function syncToMainInternal(): Promise<{ synced: string[]; checkpointHash:
 
     return {
       synced: [],
+      skipped,
       checkpointHash,
       rolledBack: true,
       error: errorMsg,
@@ -643,7 +661,7 @@ export async function discardSandbox(): Promise<void> {
  * Accepte un fichier individuel du sandbox → l'applique au repo principal.
  * Retire le fichier de la liste des modifications en attente.
  */
-export async function acceptFile(relPath: string): Promise<{ applied: boolean }> {
+export async function acceptFile(relPath: string, confirmCritical = false): Promise<{ applied: boolean; critical?: boolean; reason?: string }> {
   let normalized: string;
   let sandboxFile: string;
   try {
@@ -659,10 +677,11 @@ export async function acceptFile(relPath: string): Promise<{ applied: boolean }>
 
   const mainFile = path.join(SELF_ROOT, normalized);
   try {
-    assertMainTargetAllowed(mainFile, normalized);
+    assertMainTargetAllowed(mainFile, normalized, confirmCritical);
   } catch (error: any) {
     console.warn(`[Sandbox] Acceptation refusée pour ${normalized}:`, error.message);
-    return { applied: false };
+    const critical = !isWriteForbidden(mainFile) && isCriticalFile(mainFile);
+    return { applied: false, reason: error.message, ...(critical ? { critical: true } : {}) };
   }
 
   try {

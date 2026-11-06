@@ -250,7 +250,7 @@ export function createSandboxRouter(): Router {
   });
 
   // POST /api/sandbox/sync — synchronise sandbox → repo principal
-  router.post('/sync', async (_req: Request, res: Response): Promise<void> => {
+  router.post('/sync', async (req: Request, res: Response): Promise<void> => {
     try {
       const validation = await validateSandbox();
       if (!validation.valid && validation.errorCount > 0) {
@@ -272,7 +272,12 @@ export function createSandboxRouter(): Router {
         });
         return;
       }
-      const result = await syncToMain();
+      const result = await syncToMain({ confirmCritical: req.body?.confirmCritical === true });
+      // Un sync refusé ou annulé (rollback) ne doit jamais être présenté comme un succès.
+      if (result.error) {
+        res.status(409).json({ status: 'error', ...result });
+        return;
+      }
       res.json({ status: 'success', ...result });
     } catch (e: any) {
       res.status(500).json({ status: 'error', error: e.message });
@@ -291,7 +296,7 @@ export function createSandboxRouter(): Router {
         res.status(404).json({ error: 'Fichier exclu du comparateur.' });
         return;
       }
-      const result = await acceptFile(filePath);
+      const result = await acceptFile(filePath, req.body?.confirmCritical === true);
       let postValidation = null;
       if (isSandboxActive()) {
         try { postValidation = await validateSandbox(); } catch { /* ignore */ }
@@ -299,6 +304,7 @@ export function createSandboxRouter(): Router {
       res.json({
         status: result.applied ? 'success' : 'not_found',
         ...result,
+        ...(result.reason ? { error: result.reason } : {}),
         postValidation: postValidation ? {
           valid: postValidation.valid,
           errorCount: postValidation.errorCount,

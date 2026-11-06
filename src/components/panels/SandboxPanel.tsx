@@ -197,7 +197,10 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
           stopResetTimer();
           setResetProgress(100);
         }
-        setFeedback({ type: 'success', msg: actionMessages[action] || 'OK' });
+        const skipped: Array<{ reason: string }> = Array.isArray(data.skipped) ? data.skipped : [];
+        setFeedback(skipped.length > 0
+          ? { type: 'error', msg: `${data.synced?.length ?? 0} fichier(s) appliqué(s), ${skipped.length} non appliqué(s) : ${skipped.map(s => s.reason).join(' ; ')}` }
+          : { type: 'success', msg: actionMessages[action] || 'OK' });
         window.dispatchEvent(new CustomEvent('Leanna-sandbox-changed'));
         setShowCodeInput(false);
         setSecurityCode('');
@@ -216,6 +219,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
         setFeedback({ type: 'error', msg: data.error || 'Erreur' });
       }
       await fetchStatus();
+      return data;
     } catch (e: any) {
       setFeedback({ type: 'error', msg: e.message || 'Erreur réseau' });
     } finally {
@@ -228,6 +232,15 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     }
   }, [fetchStatus]);
 
+  // Les fichiers critiques (server.ts, .env…) ne passent qu'après une confirmation explicite.
+  const confirmCriticalFiles = useCallback((paths: string[]) => confirm({
+    title: `Appliquer ${paths.length > 1 ? `${paths.length} fichiers critiques` : 'un fichier critique'} ?`,
+    message: `${paths.join(', ')} ${paths.length > 1 ? 'sont protégés' : 'est protégé'} : ces fichiers touchent la sécurité ou le démarrage de l’application. Vérifiez le diff avant de confirmer.`,
+    confirmLabel: 'Appliquer quand même',
+    cancelLabel: 'Annuler',
+    variant: 'danger',
+  }), [confirm]);
+
   // Actions groupées irréversibles : toujours confirmées
   const handleSyncAll = useCallback(async () => {
     const n = status?.modifiedCount ?? 0;
@@ -238,8 +251,15 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
       cancelLabel: 'Annuler',
       variant: 'warning',
     });
-    if (ok) void doAction('sync');
-  }, [confirm, doAction, status?.modifiedCount]);
+    if (!ok) return;
+    const data = await doAction('sync');
+    const critical: string[] = (Array.isArray(data?.skipped) ? data.skipped : [])
+      .filter((s: { critical?: boolean }) => s.critical)
+      .map((s: { path: string }) => s.path);
+    if (critical.length > 0 && await confirmCriticalFiles(critical)) {
+      await doAction('sync', 'POST', { confirmCritical: true });
+    }
+  }, [confirm, confirmCriticalFiles, doAction, status?.modifiedCount]);
 
   const handleDiscardAll = useCallback(async () => {
     const n = status?.modifiedCount ?? 0;
@@ -268,13 +288,19 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     }
     setFileBusy(path);
     setFeedback(null);
-    try {
+    const post = async (confirmCritical: boolean) => {
       const res = await fetch(`/api/sandbox/${kind === 'accept' ? 'accept-file' : 'reject-file'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ path, ...(confirmCritical ? { confirmCritical: true } : {}) }),
       });
-      const data = await res.json().catch(() => ({}));
+      return { res, data: await res.json().catch(() => ({})) };
+    };
+    try {
+      let { res, data } = await post(false);
+      if (kind === 'accept' && data.critical === true && await confirmCriticalFiles([path])) {
+        ({ res, data } = await post(true));
+      }
       const done = kind === 'accept' ? data.applied === true : data.reverted === true;
       if (res.ok && data.status === 'success' && done) {
         setFeedback({ type: 'success', msg: kind === 'accept' ? `${name} appliqué au projet` : `${name} rejeté` });
@@ -287,7 +313,7 @@ export function SandboxPanel({ onOpenDiff }: SandboxPanelProps) {
     } finally {
       setFileBusy(null);
     }
-  }, [confirm]);
+  }, [confirm, confirmCriticalFiles]);
 
   const copySandboxPath = useCallback(() => {
     if (!status?.path) return;
