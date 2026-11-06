@@ -23,6 +23,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     let closed = false;
     let started = false;
     let finished = false;
+    let durationTimer: ReturnType<typeof setTimeout> | null = null;
     let active: 'leanna' | 'roxane' = 'leanna';
     let rounds = 0;
     let currentText = '';
@@ -39,6 +40,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     const closeSessions = () => {
       if (closed) return;
       closed = true;
+      if (durationTimer) { clearTimeout(durationTimer); durationTimer = null; }
       for (const session of [leanna, roxane]) {
         if (!session) continue;
         try { session.close(); } catch { /* already closed */ }
@@ -54,7 +56,9 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
         ].join(' ')
       : [
           config.systemPrompt,
-          'Tu es la seconde voix du débat. Tu es indépendante de Leanna et tu apportes un regard différent.',
+          `Tu es ${config.name}, la seconde voix du débat.`,
+          `Langue : ${config.language}. Style : ${config.responseStyle}.`,
+          'Tu apportes un regard différent. Tu es indépendante de Leanna et tu apportes un regard différent.',
           `Niveau de contradiction : ${config.contradictionLevel}/100.`,
           'Tu réponds en français oral, de manière concise. Tu ne contredis pas artificiellement.',
           'Tu dois attendre ton tour : tu réponds uniquement quand un message utilisateur te sollicite.',
@@ -186,6 +190,12 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
           return;
         }
         send({ type: 'ready', topic, models: { leanna: 'gemini-3.8-live', roxane: config.model } });
+        durationTimer = setTimeout(() => {
+          if (finished || closed) return;
+          finished = true;
+          send({ type: 'debate_complete', turns: transcript, reason: 'time_limit' });
+          closeSessions();
+        }, config.maxDurationSeconds * 1000);
         active = 'leanna';
         rounds = 1;
         currentText = '';
