@@ -21,7 +21,7 @@ function safeText(value: unknown, fallback: string, maxLength: number): string |
   return value.trim() || fallback;
 }
 
-function safeDownloadName(value: string, extension: 'pdf' | 'doc' | 'html'): { header: string; filename: string } {
+function safeDownloadName(value: string, extension: 'pdf' | 'doc' | 'docx' | 'html'): { header: string; filename: string } {
   const base = value
     .normalize('NFKC')
     .replace(/\.[a-z0-9]{1,8}$/i, '')
@@ -69,20 +69,20 @@ export function createExportRouter(): Router {
     }
   });
 
-  // Le format Word historique est du HTML compatible Word (.doc), pas un paquet OpenXML .docx.
+  // Exporte un véritable document Word OpenXML.
   router.post('/docx', (req: Request, res: Response) => {
     const payload = validatePayload(req.body);
     if (!payload) return sendValidationError(res, 'markdown, title ou filename invalide (markdown requis, 2 Mio maximum).');
     try {
       const buffer = exportToDocx(payload.markdown, { title: payload.title });
-      const download = safeDownloadName(payload.filename, 'doc');
-      res.setHeader('Content-Type', 'application/msword');
+      const download = safeDownloadName(payload.filename, 'docx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', download.header);
       res.setHeader('Content-Length', buffer.length);
       return res.send(buffer);
     } catch (error) {
       console.error('[Export] Erreur export Word:', error);
-      return res.status(500).json({ status: 'error', error: 'Erreur lors de la génération du document Word.' });
+      return res.status(500).json({ status: 'error', error: 'Erreur lors de la génération du DOCX.' });
     }
   });
 
@@ -134,7 +134,7 @@ export function createExportRouter(): Router {
 
       const title = safeText(notebook.title, 'Notebook', MAX_TITLE_LENGTH);
       if (!title) return sendValidationError(res, 'Titre du notebook invalide.');
-      const extension = format === 'docx' ? 'doc' : format as 'pdf' | 'doc' | 'html';
+      const extension = format === 'doc' || format === 'docx' ? 'docx' : format as 'pdf' | 'html';
       const download = safeDownloadName(title, extension);
       if (format === 'html') {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
