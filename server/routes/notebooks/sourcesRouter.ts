@@ -2,18 +2,35 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
+import { randomUUID } from "crypto";
+import { notebookManager, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
+import { enqueueSourceIngestion } from "../../notebooks/queueSourceIngestion.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { validateNotebookSourceUpload, MAX_NOTEBOOK_BATCH_BYTES } from "../../utils/notebookSourceUploadValidation.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();
 
+  // Refuser les identifiants appartenant à un autre workspace avant toute
+  // lecture, mutation, génération, export ou réindexation.
+  router.use("/:id", (req: Request, res: Response, next) => {
+    // Préserver les endpoints statiques qui partagent le premier segment.
+    if (req.params.id === "sandbox") {
+      next();
+      return;
+    }
+    if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
+      res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
+      return;
+    }
+    next();
+  });
+
   router.post("/:id/sources/upload", upload.single("file"), async (req: Request, res: Response): Promise<void> => {
     try {
       const notebookId = req.params.id;
-      const notebook = notebookManager.getNotebook(notebookId);
-      if (!notebook) {
+      if (!notebookManager.getNotebook(notebookId)) {
         res.status(404).json({ error: "Notebook introuvable." });
         return;
       }
@@ -27,25 +44,34 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         res.status(400).json({ error: validation.error });
         return;
       }
-      const source = await sourceIngester.ingestFromBuffer(
-        req.file.buffer,
-        validation.fileName,
-        validation.mimeType,
-        notebookId
-      );
 
-      notebookManager.addSource(notebookId, source);
+      const taskId = `src-${randomUUID()}`;
+      const task = sourceProcessingQueue.enqueue(taskId, "source-ingest", {
+        notebookId,
+        fileName: validation.fileName,
+        mimeType: validation.mimeType,
+        buffer: req.file.buffer,
+      });
+      if (!task) {
+        res.status(503).json({ error: "La file d'ingestion est pleine. Réessayez dans quelques instants." });
+        return;
+      }
 
+      const completed = await sourceProcessingQueue.waitForTask(task.id);
+      const source = completed.result as {
+        sourceId: string; title: string; type: string; summary: string;
+        keywords: string[]; language: string; chunksCount: number; wordCount: number;
+      };
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
           language: source.language,
         },
       });
@@ -57,8 +83,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
   router.post("/:id/sources/upload-multi", upload.array("files", 10), async (req: Request, res: Response): Promise<void> => {
     try {
       const notebookId = req.params.id;
-      const notebook = notebookManager.getNotebook(notebookId);
-      if (!notebook) {
+      if (!notebookManager.getNotebook(notebookId)) {
         res.status(404).json({ error: "Notebook introuvable." });
         return;
       }
@@ -68,58 +93,58 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         res.status(400).json({ error: "Aucun fichier fourni." });
         return;
       }
-
       const totalBytes = files.reduce((total, file) => total + file.size, 0);
       if (totalBytes > MAX_NOTEBOOK_BATCH_BYTES) {
         res.status(413).json({ error: "Le lot dépasse la limite totale de 50 Mio." });
         return;
       }
 
-      const results: Array<{
-        filename: string;
-        status: "success" | "error";
-        source?: any;
-        error?: string;
-      }> = [];
+      const validated = files.map(file => ({
+        file,
+        validation: validateNotebookSourceUpload(file.originalname, file.mimetype, file.buffer),
+      }));
+      const results = await Promise.all(validated.map(async ({ file, validation }) => {
+        const filename = validation.valid
+          ? validation.fileName
+          : path.basename(file.originalname.replace(/\\/g, "/"));
+        if (!validation.valid) {
+          return { filename, status: "error" as const, error: validation.error || "Fichier invalide." };
+        }
 
-      for (const file of files) {
         try {
-          const validation = validateNotebookSourceUpload(file.originalname, file.mimetype, file.buffer);
-          if (!validation.valid) throw new Error(validation.error || "Fichier invalide.");
-          const source = await sourceIngester.ingestFromBuffer(
-            file.buffer,
-            validation.fileName,
-            validation.mimeType,
-            notebookId
-          );
-          notebookManager.addSource(notebookId, source);
-
-          results.push({
-            filename: validation.fileName,
-            status: "success",
+          const task = sourceProcessingQueue.enqueue(`src-${randomUUID()}`, "source-ingest", {
+            notebookId,
+            fileName: validation.fileName,
+            mimeType: validation.mimeType,
+            buffer: file.buffer,
+          });
+          if (!task) throw new Error("La file d'ingestion est pleine.");
+          const completed = await sourceProcessingQueue.waitForTask(task.id);
+          const source = completed.result as {
+            sourceId: string; title: string; type: string; summary: string;
+            keywords: string[]; language: string; chunksCount: number; wordCount: number;
+          };
+          return {
+            filename,
+            status: "success" as const,
             source: {
-              id: source.id,
+              id: source.sourceId,
               title: source.title,
               type: source.type,
               summary: source.summary,
               keywords: source.keywords,
               wordCount: source.wordCount,
-              chunksCount: source.chunks.length,
+              chunksCount: source.chunksCount,
               language: source.language,
             },
-          });
-        } catch (e: any) {
-          results.push({
-            filename: path.basename(file.originalname.replace(/\\\\/g, "/")),
-            status: "error",
-            error: e.message,
-          });
+          };
+        } catch (error: any) {
+          return { filename, status: "error" as const, error: error?.message || "Échec de l'ingestion." };
         }
-      }
+      }));
 
-      const successCount = results.filter(r => r.status === "success").length;
-      const errorCount = results.filter(r => r.status === "error").length;
-
+      const successCount = results.filter(result => result.status === "success").length;
+      const errorCount = results.length - successCount;
       res.json({
         status: errorCount === 0 ? "success" : (successCount > 0 ? "partial" : "error"),
         total: files.length,
@@ -130,6 +155,30 @@ export function createSourcesRouter(upload: multer.Multer): Router {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  router.get("/:id/sources/tasks/:taskId", (req: Request, res: Response): void => {
+    const task = sourceProcessingQueue.getTask(req.params.taskId);
+    if (!task || task.payload?.notebookId !== req.params.id) {
+      res.status(404).json({ error: "Tâche introuvable." });
+      return;
+    }
+    res.json({
+      status: "success",
+      task: {
+        id: task.id,
+        type: task.type,
+        status: task.status,
+        progress: task.progress,
+        attempts: task.attempts,
+        maxAttempts: task.maxAttempts,
+        error: task.error,
+        createdAt: task.createdAt,
+        startedAt: task.startedAt,
+        completedAt: task.completedAt,
+        result: task.result,
+      },
+    });
   });
 
   router.post("/:id/sources/upload-queued", upload.array("files", 20), (req: Request, res: Response): void => {
@@ -158,7 +207,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       }));
       const invalidFile = validatedFiles.find(item => !item.validation.valid);
       if (invalidFile) {
-        res.status(400).json({ error: invalidFile.validation.error, fileName: path.basename(invalidFile.file.originalname.replace(/\\\\/g, "/")) });
+        res.status(400).json({ error: invalidFile.validation.error, fileName: path.basename(invalidFile.file.originalname.replace(/\\/g, "/")) });
         return;
       }
 
@@ -166,7 +215,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       const taskIds: string[] = [];
 
       for (const { file, validation } of validatedFiles) {
-        const taskId = `src-${notebookId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const taskId = `src-${randomUUID()}`;
         const task = sourceProcessingQueue.enqueue(
           taskId,
           "source-ingest",
@@ -210,24 +259,22 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
-      const source = await sourceIngester.ingestFromURL(url, notebookId);
-      notebookManager.addSource(notebookId, source);
-
+      const source = await enqueueSourceIngestion({ notebookId, kind: "url", url });
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
           language: source.language,
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
@@ -246,29 +293,28 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
-      const buffer = Buffer.from(content, "utf-8");
-      const source = await sourceIngester.ingestFromBuffer(
-        buffer,
-        title || "Note collée",
-        "text/plain",
-        notebookId
-      );
-      notebookManager.addSource(notebookId, source);
-
+      const source = await enqueueSourceIngestion({
+        notebookId,
+        kind: "buffer",
+        buffer: Buffer.from(content, "utf-8"),
+        fileName: title || "Note collée",
+        mimeType: "text/plain",
+      });
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
+          language: source.language,
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
@@ -410,25 +456,25 @@ export function createSourcesRouter(upload: multer.Multer): Router {
 
       const markdown = mdLines.join("\n");
       const sourceTitle = title?.trim() || `Codebase — ${workspaceName}`;
-      const buffer = Buffer.from(markdown, "utf-8");
-      const source = await sourceIngester.ingestFromBuffer(
-        buffer,
-        sourceTitle,
-        "text/markdown",
-        notebookId
-      );
-      notebookManager.addSource(notebookId, source);
+      const source = await enqueueSourceIngestion({
+        notebookId,
+        kind: "buffer",
+        buffer: Buffer.from(markdown, "utf-8"),
+        fileName: sourceTitle,
+        mimeType: "text/markdown",
+      });
 
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
+          language: source.language,
         },
         stats: {
           filesCollected: collectedFiles.length,
@@ -437,7 +483,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 

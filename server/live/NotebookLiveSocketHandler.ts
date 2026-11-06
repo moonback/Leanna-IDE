@@ -32,6 +32,7 @@ import { recordModelCallUsage } from '../utils/textGeneration.js';
 import type { GeneratedDocType } from '../notebooks/types.js';
 import type { ProfileConfig } from '../prompts/systemInstruction.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 export interface NotebookLiveSocketDeps {
   getCurrentProfile: () => ProfileConfig;
@@ -189,7 +190,7 @@ export function attachNotebookLiveWebSocket(
       return;
     }
 
-    const notebook = notebookManager.getNotebook(notebookId);
+    const notebook = notebookManager.getNotebook(notebookId, SELF_ROOT || undefined);
     if (!notebook) {
       sendJson({ error: 'Notebook introuvable.' });
       clientWs.close();
@@ -198,7 +199,7 @@ export function attachNotebookLiveWebSocket(
 
     // ── Exécution d'une recherche RAG sur les sources du notebook ──────────
     const runNotebookSearch = async (query: string): Promise<{ context: string; citations: NotebookCitation[] }> => {
-      const nb = notebookManager.getNotebook(notebookId);
+      const nb = notebookManager.getNotebook(notebookId, SELF_ROOT || undefined);
       if (!nb || nb.sources.length === 0) {
         return { context: 'Aucune source disponible dans ce notebook.', citations: [] };
       }
@@ -338,7 +339,7 @@ export function attachNotebookLiveWebSocket(
               response: { success: false, error: `Type de document non supporté : "${docType}".` },
             });
           } else {
-            const nb = notebookManager.getNotebook(notebookId);
+            const nb = notebookManager.getNotebook(notebookId, SELF_ROOT || undefined);
             if (!nb || nb.sources.length === 0) {
               responses.push({
                 id: call.id,

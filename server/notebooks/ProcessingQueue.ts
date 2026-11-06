@@ -10,7 +10,10 @@
  *   - Statistiques (temps moyen, erreurs, débit)
  */
 
+import fs from "fs";
+import path from "path";
 import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("ProcessingQueue");
 
@@ -37,6 +40,8 @@ export interface QueueTask<T = unknown> {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  /** Date de reprise après backoff, persistée pour survivre au redémarrage. */
+  nextAttemptAt?: string;
   /** Progression (0-100) */
   progress: number;
 }
@@ -50,6 +55,8 @@ export interface QueueConfig {
   retryBaseDelayMs: number;
   /** Taille maximale de la queue */
   maxQueueSize: number;
+  /** Fichier de reprise des tâches en attente (payloads JSON-serialisables). */
+  persistenceFile?: string;
 }
 
 export interface QueueStats {
@@ -70,6 +77,9 @@ type TaskHandler<T> = (task: QueueTask<T>, onProgress: (pct: number) => void) =>
 export class ProcessingQueue<T = unknown> {
   private queue: QueueTask<T>[] = [];
   private processing: Map<string, QueueTask<T>> = new Map();
+  /** Tâches en backoff : elles restent durables et annulables pendant le délai. */
+  private retrying: Map<string, QueueTask<T>> = new Map();
+  private retryTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private completed: QueueTask<T>[] = [];
   private handler: TaskHandler<T> | null = null;
   private config: QueueConfig;
@@ -84,7 +94,9 @@ export class ProcessingQueue<T = unknown> {
       maxRetries: config?.maxRetries ?? 3,
       retryBaseDelayMs: config?.retryBaseDelayMs ?? 1000,
       maxQueueSize: config?.maxQueueSize ?? 100,
+      persistenceFile: config?.persistenceFile,
     };
+    this.restorePending();
   }
 
   // ─── Configuration ─────────────────────────────────────────────────────────
@@ -92,6 +104,99 @@ export class ProcessingQueue<T = unknown> {
   /** Définit le handler qui traite les tâches */
   setHandler(handler: TaskHandler<T>): void {
     this.handler = handler;
+    for (const task of this.retrying.values()) this.scheduleRetry(task);
+    this.processNext();
+  }
+
+  /** Recharge uniquement les tâches en attente. Les tâches en cours au crash
+   * ne sont pas rejouées automatiquement : leur effet externe peut être partiel. */
+  private restorePending(): void {
+    const file = this.config.persistenceFile;
+    if (!file || !fs.existsSync(file)) return;
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"), (_key, value) => {
+        if (value && typeof value === "object"
+          && value.__leannaSerializedBuffer === true
+          && typeof value.base64 === "string") {
+          return Buffer.from(value.base64, "base64");
+        }
+        return value;
+      });
+      if (!parsed || typeof parsed !== "object" || ![1, 2].includes((parsed as any).version) || !Array.isArray((parsed as any).tasks)) {
+        throw new Error("Format de queue invalide.");
+      }
+      const restored = (parsed as any).tasks.filter((task: any) =>
+        task && typeof task.id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(task.id)
+        && typeof task.type === "string"
+        && ["urgent", "normal", "low"].includes(task.priority)
+        && task.status === "pending" && Number.isInteger(task.attempts)
+        && Number.isInteger(task.maxAttempts) && task.maxAttempts > task.attempts
+        && typeof task.createdAt === "string" && task.payload !== undefined
+      ).slice(0, this.config.maxQueueSize) as QueueTask<T>[];
+      for (const task of restored) {
+        if (task.nextAttemptAt && Number.isFinite(Date.parse(task.nextAttemptAt)) && Date.parse(task.nextAttemptAt) > Date.now()) {
+          this.retrying.set(task.id, task);
+        } else {
+          delete task.nextAttemptAt;
+          this.queue.push(task);
+        }
+      }
+
+      const history = Array.isArray((parsed as any).history) ? (parsed as any).history : [];
+      this.completed = history.filter((task: any) =>
+        task && typeof task.id === "string"
+        && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(task.id)
+        && typeof task.type === "string"
+        && ["urgent", "normal", "low"].includes(task.priority)
+        && ["completed", "failed", "cancelled"].includes(task.status)
+        && Number.isInteger(task.attempts)
+        && Number.isInteger(task.maxAttempts)
+        && typeof task.createdAt === "string"
+        && typeof task.completedAt === "string"
+      ).slice(-200).map((task: QueueTask<T>) => ({
+        ...task,
+        payload: task.payload && typeof task.payload === "object" && "notebookId" in task.payload
+          ? { notebookId: (task.payload as { notebookId: string }).notebookId } as T
+          : undefined as T,
+      }));
+      log.info(`♻️ ${restored.length} tâche(s) en attente et ${this.completed.length} résultat(s) historique(s) restaurés`);
+    } catch (error: any) {
+      log.error(`Impossible de restaurer la queue persistée : ${error.message}`);
+    }
+  }
+
+  /** Persiste atomiquement la file en attente. */
+  private persistPending(): boolean {
+    const file = this.config.persistenceFile;
+    if (!file) return true;
+    const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(temp, JSON.stringify(
+        { version: 2, tasks: [...this.queue, ...this.retrying.values()], history: this.completed.slice(-200).map(task => ({
+          ...task,
+          // Garder seulement l'identifiant du notebook pour autoriser la consultation
+          // après redémarrage, sans conserver les buffers ou le contenu des sources.
+          payload: task.payload && typeof task.payload === "object" && "notebookId" in task.payload
+            ? { notebookId: (task.payload as { notebookId: string }).notebookId }
+            : undefined,
+        })) },
+        (_key, value) => {
+          // Buffer.toJSON() s'exécute avant le replacer : compresser son enveloppe
+          // en base64 évite un tableau JSON d'octets plusieurs fois plus volumineux.
+          if (value && typeof value === "object" && value.type === "Buffer" && Array.isArray(value.data)) {
+            return { __leannaSerializedBuffer: true, base64: Buffer.from(value.data).toString("base64") };
+          }
+          return value;
+        }
+      ), "utf-8");
+      fs.renameSync(temp, file);
+      return true;
+    } catch (error: any) {
+      try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch { /* best effort */ }
+      log.error(`Échec de persistance de la queue : ${error.message}`);
+      return false;
+    }
   }
 
   // ─── Ajout de tâches ───────────────────────────────────────────────────────
@@ -104,13 +209,13 @@ export class ProcessingQueue<T = unknown> {
     options?: { priority?: TaskPriority; maxAttempts?: number }
   ): QueueTask<T> | null {
     // Vérifier la taille de la queue
-    if (this.queue.length >= this.config.maxQueueSize) {
+    if (this.queue.length + this.retrying.size >= this.config.maxQueueSize) {
       log.warn(`Queue pleine (${this.config.maxQueueSize} tâches). Tâche rejetée: ${id}`);
       return null;
     }
 
     // Vérifier les doublons
-    if (this.queue.some(t => t.id === id) || this.processing.has(id)) {
+    if (this.queue.some(t => t.id === id) || this.processing.has(id) || this.retrying.has(id)) {
       log.warn(`Tâche déjà en queue/processing: ${id}`);
       return null;
     }
@@ -130,6 +235,11 @@ export class ProcessingQueue<T = unknown> {
     // Insérer selon la priorité
     const insertIndex = this.findInsertIndex(task.priority);
     this.queue.splice(insertIndex, 0, task);
+    if (!this.persistPending()) {
+      this.queue = this.queue.filter(queued => queued.id !== task.id);
+      log.error(`Tâche rejetée car sa persistance a échoué: ${id}`);
+      return null;
+    }
 
     log.info(`📥 Tâche ajoutée: ${type} (${id}) [${task.priority}] — queue: ${this.queue.length}`);
 
@@ -142,12 +252,17 @@ export class ProcessingQueue<T = unknown> {
   /** Annule une tâche en attente */
   cancel(taskId: string): boolean {
     const index = this.queue.findIndex(t => t.id === taskId);
-    if (index !== -1) {
-      const task = this.queue[index];
+    if (index !== -1 || this.retrying.has(taskId)) {
+      const task = index !== -1 ? this.queue[index] : this.retrying.get(taskId)!;
+      const retryTimer = this.retryTimers.get(taskId);
+      if (retryTimer) clearTimeout(retryTimer);
+      this.retryTimers.delete(taskId);
+      this.retrying.delete(taskId);
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
-      this.queue.splice(index, 1);
+      if (index !== -1) this.queue.splice(index, 1);
       this.completed.push(task);
+      this.persistPending();
       this.emit(taskId, task);
       log.info(`❌ Tâche annulée: ${taskId}`);
       return true;
@@ -157,6 +272,20 @@ export class ProcessingQueue<T = unknown> {
 
   // ─── Processing ────────────────────────────────────────────────────────────
 
+  /** Les erreurs de validation ne doivent pas être rejouées comme des pannes réseau. */
+  private isRetryableError(error: unknown): boolean {
+    const value = error as { retryable?: boolean; code?: string; status?: number; statusCode?: number; message?: string };
+    if (typeof value?.retryable === "boolean") return value.retryable;
+    const code = String(value?.code ?? "").toUpperCase();
+    const status = Number(value?.status ?? value?.statusCode);
+    const message = String(value?.message ?? error).toLowerCase();
+
+    if (["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "EPIPE"].includes(code)) return true;
+    if (status === 408 || status === 425 || status === 429 || status >= 500) return true;
+    if (status >= 400 && status < 500) return false;
+    return /timeout|timed out|temporar|rate.?limit|network|socket|unavailable|overloaded|fetch failed/.test(message);
+  }
+
   private async processNext(): Promise<void> {
     if (!this.handler) return;
     if (this.processing.size >= this.config.concurrency) return;
@@ -164,8 +293,10 @@ export class ProcessingQueue<T = unknown> {
 
     const task = this.queue.shift()!;
     task.status = "processing";
+    delete task.nextAttemptAt;
     task.startedAt = new Date().toISOString();
     task.attempts++;
+    this.persistPending();
     this.processing.set(task.id, task);
 
     this.emit(task.id, task);
@@ -189,17 +320,17 @@ export class ProcessingQueue<T = unknown> {
     } catch (e: any) {
       log.error(`❌ Erreur tâche ${task.id} (tentative ${task.attempts}/${task.maxAttempts}): ${e.message}`);
 
-      if (task.attempts < task.maxAttempts) {
+      if (task.attempts < task.maxAttempts && this.isRetryableError(e)) {
         // Retry avec backoff exponentiel
         task.status = "pending";
         task.progress = 0;
         const delay = this.config.retryBaseDelayMs * Math.pow(2, task.attempts - 1);
 
+        task.nextAttemptAt = new Date(Date.now() + delay).toISOString();
         log.info(`🔄 Retry dans ${delay}ms...`);
-        setTimeout(() => {
-          this.queue.unshift(task); // Remettre en tête
-          this.processNext();
-        }, delay);
+        this.retrying.set(task.id, task);
+        this.persistPending();
+        this.scheduleRetry(task);
       } else {
         task.status = "failed";
         task.error = e.message;
@@ -212,6 +343,7 @@ export class ProcessingQueue<T = unknown> {
         this.completed.push(task);
         this.trimCompleted();
       }
+      this.persistPending();
       this.emit(task.id, task);
     }
 
@@ -220,6 +352,23 @@ export class ProcessingQueue<T = unknown> {
   }
 
   // ─── Événements ────────────────────────────────────────────────────────────
+
+  /** Programme une reprise en respectant l'échéance persistée. */
+  private scheduleRetry(task: QueueTask<T>): void {
+    if (this.retryTimers.has(task.id)) return;
+    const dueAt = task.nextAttemptAt ? Date.parse(task.nextAttemptAt) : Date.now();
+    const delay = Math.max(0, dueAt - Date.now());
+    const retryTimer = setTimeout(() => {
+      this.retryTimers.delete(task.id);
+      this.retrying.delete(task.id);
+      delete task.nextAttemptAt;
+      const index = this.findInsertIndex(task.priority);
+      this.queue.splice(index, 0, task);
+      this.persistPending();
+      this.processNext();
+    }, delay);
+    this.retryTimers.set(task.id, retryTimer);
+  }
 
   /** S'abonner aux mises à jour d'une tâche */
   onUpdate(taskId: string, callback: (task: QueueTask<T>) => void): () => void {
@@ -256,15 +405,53 @@ export class ProcessingQueue<T = unknown> {
   getTask(taskId: string): QueueTask<T> | undefined {
     return (
       this.queue.find(t => t.id === taskId) ??
+      this.retrying.get(taskId) ??
       this.processing.get(taskId) ??
       this.completed.find(t => t.id === taskId)
     );
   }
 
+  /**
+   * Attend le résultat terminal d'une tâche. L'abonnement est posé avant la
+   * seconde lecture pour ne pas perdre une fin de traitement très rapide.
+   */
+  waitForTask(taskId: string): Promise<QueueTask<T>> {
+    const isTerminal = (task: QueueTask<T> | undefined): task is QueueTask<T> =>
+      !!task && ["completed", "failed", "cancelled"].includes(task.status);
+
+    const initial = this.getTask(taskId);
+    if (!initial) return Promise.reject(new Error(`Tâche introuvable : ${taskId}`));
+    if (isTerminal(initial)) {
+      return initial.status === "completed"
+        ? Promise.resolve(initial)
+        : Promise.reject(new Error(initial.error || `Tâche ${taskId} ${initial.status}.`));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let unsubscribe = () => {};
+      const finish = (task: QueueTask<T>) => {
+        if (settled || !isTerminal(task)) return;
+        settled = true;
+        unsubscribe();
+        if (task.status === "completed") resolve(task);
+        else reject(new Error(task.error || `Tâche ${taskId} ${task.status}.`));
+      };
+      unsubscribe = this.onUpdate(taskId, finish);
+      const current = this.getTask(taskId);
+      if (current) finish(current);
+      else {
+        settled = true;
+        unsubscribe();
+        reject(new Error(`Tâche introuvable : ${taskId}`));
+      }
+    });
+  }
+
   /** Statistiques globales de la queue */
   getStats(): QueueStats {
     return {
-      pending: this.queue.length,
+      pending: this.queue.length + this.retrying.size,
       processing: this.processing.size,
       completed: this.completed.filter(t => t.status === "completed").length,
       failed: this.completed.filter(t => t.status === "failed").length,
@@ -282,7 +469,7 @@ export class ProcessingQueue<T = unknown> {
 
   /** Tâches en attente */
   getPending(): QueueTask<T>[] {
-    return [...this.queue];
+    return [...this.queue, ...this.retrying.values()];
   }
 
   // ─── Utilitaires ───────────────────────────────────────────────────────────
@@ -314,6 +501,17 @@ export class ProcessingQueue<T = unknown> {
     }
     this.completed.push(...this.queue);
     this.queue = [];
+    for (const [taskId, timer] of this.retryTimers) {
+      clearTimeout(timer);
+      this.retryTimers.delete(taskId);
+    }
+    for (const task of this.retrying.values()) {
+      task.status = "cancelled";
+      task.completedAt = new Date().toISOString();
+      this.completed.push(task);
+    }
+    this.retrying.clear();
+    this.persistPending();
     this.trimCompleted();
     log.info("🧹 Queue vidée");
   }
@@ -323,12 +521,21 @@ export class ProcessingQueue<T = unknown> {
 
 export interface SourceProcessingPayload {
   notebookId: string;
-  fileName: string;
-  mimeType: string;
-  buffer: Buffer;
+  /** Absent sur les tâches upload historiques : elles sont interprétées comme buffer. */
+  kind?: "buffer" | "url";
+  fileName?: string;
+  mimeType?: string;
+  buffer?: Buffer;
+  url?: string;
 }
 
+const NOTEBOOK_DATA_DIR = path.join(
+  process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd(),
+  ".Leanna", "notebooks"
+);
+
 export const sourceProcessingQueue = new ProcessingQueue<SourceProcessingPayload>({
+  persistenceFile: path.join(NOTEBOOK_DATA_DIR, "source-processing-queue.json"),
   concurrency: 2,
   maxRetries: 3,
   retryBaseDelayMs: 2000,

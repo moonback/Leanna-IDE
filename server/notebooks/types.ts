@@ -33,6 +33,26 @@ export interface Source {
   type: SourceType;
   /** URL ou chemin d'origine */
   origin: string;
+  /** Empreinte SHA-256 du texte extrait, utilisée pour la déduplication. */
+  contentHash?: string;
+  /** État durable de l'indexation vectorielle de cette version de source. */
+  indexingStatus?: "pending" | "indexed" | "partial" | "failed" | "unknown";
+  /** Dernière erreur d'indexation, sans contenu sensible du document. */
+  indexingError?: string;
+  indexingUpdatedAt?: string;
+  /** Nombre de tentatives d'indexation de cette version de source. */
+  indexingAttempts?: number;
+  /** Prochaine tentative automatique (backoff durable). */
+  indexingNextRetryAt?: string;
+  /** Historique borné des 10 dernières tentatives d’indexation. */
+  indexingHistory?: Array<{
+    attempt: number;
+    at: string;
+    outcome: "indexed" | "partial" | "failed";
+    category: "none" | "transient" | "permanent";
+    durationMs: number;
+    message?: string;
+  }>;
   /** Texte brut extrait */
   rawText: string;
   /** HTML brut original (pour sources HTML uniquement) */
@@ -78,6 +98,8 @@ export interface Source {
 
 export interface Notebook {
   id: string;
+  /** Version du schéma persisté ; absente uniquement sur les anciens fichiers avant migration. */
+  schemaVersion?: number;
   /** Chemin absolu du workspace auquel appartient ce notebook. Undefined = global (rétrocompatibilité). */
   workspaceId?: string;
   title: string;

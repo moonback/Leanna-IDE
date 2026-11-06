@@ -3,6 +3,7 @@ import { exportToPdf } from '../export/pdfExporter.js';
 import { exportToDocx } from '../export/docxExporter.js';
 import { exportToStandaloneHtml } from '../export/htmlExporter.js';
 import { notebookManager } from '../notebooks/index.js';
+import { SELF_ROOT } from '../utils/selfRoot.js';
 
 const MAX_MARKDOWN_LENGTH = 2 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 200;
@@ -113,7 +114,7 @@ export function createExportRouter(): Router {
     if (typeof theme !== 'string' || !THEMES.has(theme)) return sendValidationError(res, 'Thème HTML invalide.');
 
     try {
-      const notebook = notebookManager.getNotebook(id);
+      const notebook = notebookManager.getNotebook(id, SELF_ROOT || undefined);
       if (!notebook) return res.status(404).json({ status: 'error', error: 'Notebook introuvable.' });
 
       let markdown = `# 📓 ${notebook.title || 'Notebook'}\n\n`;

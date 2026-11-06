@@ -4,9 +4,20 @@ import fs from "fs";
 import { notebookManager, contentGenerator } from "../../notebooks/index.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { getProjectRoot } from "../../utils/pathUtils.js";
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createAudioRouter(): Router {
   const router = Router();
+
+  // Refuser les identifiants appartenant à un autre workspace avant toute
+  // lecture, mutation, génération, export ou réindexation.
+  router.use("/:id", (req: Request, res: Response, next) => {
+    if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
+      res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
+      return;
+    }
+    next();
+  });
 
   router.post("/:id/audio-overview", async (req: Request, res: Response): Promise<void> => {
     try {

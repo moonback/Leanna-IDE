@@ -10,6 +10,7 @@
  */
 
 import fs from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
@@ -38,7 +39,13 @@ function isValidBackupMetadata(value: unknown, directoryName: string): value is 
     && Number.isSafeInteger(meta.totalSources) && (meta.totalSources ?? -1) >= 0
     && Number.isSafeInteger(meta.totalSizeBytes) && (meta.totalSizeBytes ?? -1) >= 0
     && Array.isArray(meta.incrementalIds)
-    && meta.incrementalIds.every((id) => typeof id === "string" && isValidNotebookId(id));
+    && meta.incrementalIds.every((id) => typeof id === "string" && isValidNotebookId(id))
+    && (meta.checksums === undefined || (
+      !!meta.checksums && typeof meta.checksums === "object" && !Array.isArray(meta.checksums)
+      && Object.entries(meta.checksums).every(([file, checksum]) =>
+        /^(?:embeddings\/)?[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.json$/.test(file)
+        && typeof checksum === "string" && /^[a-f0-9]{64}$/.test(checksum))
+    ));
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -61,6 +68,12 @@ interface BackupMetadata {
   totalSources: number;
   totalSizeBytes: number;
   incrementalIds: string[];
+  /** SHA-256 des fichiers présents dans cette sauvegarde (optionnel pour compatibilité historique). */
+  checksums?: Record<string, string>;
+}
+
+function sha256(content: string): string {
+  return createHash("sha256").update(content, "utf-8").digest("hex");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -158,6 +171,7 @@ export class BackupService {
       let totalSize = 0;
       let totalSources = 0;
       const incrementalIds: string[] = [];
+      const checksums: Record<string, string> = {};
       const previousTimestamps = new Map(this.lastBackupTimestamps);
 
       for (const file of modifiedFiles) {
@@ -176,6 +190,7 @@ export class BackupService {
           }
 
           fs.writeFileSync(destPath, content, "utf-8");
+          checksums[file] = sha256(content);
           totalSize += Buffer.byteLength(content, "utf-8");
           totalSources += notebook.sources?.length ?? 0;
           incrementalIds.push(notebookId);
@@ -205,6 +220,7 @@ export class BackupService {
             try {
               const content = fs.readFileSync(path.join(embeddingsDir, file), "utf-8");
               fs.writeFileSync(path.join(embBackupDir, file), content, "utf-8");
+              checksums[`embeddings/${file}`] = sha256(content);
               totalSize += Buffer.byteLength(content, "utf-8");
             } catch (e: any) {
               this.lastBackupTimestamps = previousTimestamps;
@@ -223,6 +239,7 @@ export class BackupService {
         totalSources,
         totalSizeBytes: totalSize,
         incrementalIds,
+        checksums,
       };
 
       fs.writeFileSync(
@@ -292,7 +309,16 @@ export class BackupService {
 
     const destPath = path.join(this.getNotebooksDir(), notebookFile);
     try {
-      const notebook = JSON.parse(fs.readFileSync(sourcePath, "utf-8"));
+      const notebookContent = fs.readFileSync(sourcePath, "utf-8");
+      const metadataPath = path.join(backupPath, "_metadata.json");
+      const backupMetadata: unknown = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
+      if (!isValidBackupMetadata(backupMetadata, backupId)) {
+        throw new Error("Métadonnées de sauvegarde invalides.");
+      }
+      if (backupMetadata.checksums && backupMetadata.checksums[notebookFile] !== sha256(notebookContent)) {
+        throw new Error("Checksum SHA-256 du notebook invalide : sauvegarde corrompue.");
+      }
+      const notebook = JSON.parse(notebookContent);
       if (!notebook || typeof notebook !== "object" || Array.isArray(notebook)
         || (notebook.id !== undefined && notebook.id !== notebookId)
         || (notebook.sources !== undefined && !Array.isArray(notebook.sources))) {
@@ -304,6 +330,10 @@ export class BackupService {
       let embeddingContent: string | null = null;
       if (fs.existsSync(embSource)) {
         embeddingContent = fs.readFileSync(embSource, "utf-8");
+        if (backupMetadata.checksums
+          && backupMetadata.checksums[`embeddings/${notebookFile}`] !== sha256(embeddingContent)) {
+          throw new Error("Checksum SHA-256 des embeddings invalide : sauvegarde corrompue.");
+        }
         JSON.parse(embeddingContent);
       }
 

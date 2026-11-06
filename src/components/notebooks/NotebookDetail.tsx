@@ -11,7 +11,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus,
+  ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
   Save,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ import { NotesPanel, type NoteEditorData } from './NotesPanel.js';
 import { GeneratePanel } from './GeneratePanel.js';
 import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
+import { IndexingMonitor } from './IndexingMonitor.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
 import { NbButton, NbIconButton } from './ui/primitives.js';
 import { ViewHeader } from '../ui/ViewHeader.js';
@@ -47,7 +48,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
+type StudioTab = 'notes' | 'generate' | 'audio' | 'history' | 'indexing';
 
 interface Props {
   notebookId: string;
@@ -271,6 +272,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
+        if (e.key === '7') { e.preventDefault(); setStudioTab('indexing'); setStudioOpen(true); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
       }
     };
@@ -314,12 +316,14 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
+    { key: 'indexing', icon: Activity, label: 'Indexation' },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
     notes: 'Ctrl+3 / ⌘3',
     generate: 'Ctrl+4 / ⌘4',
     audio: 'Ctrl+5 / ⌘5',
     history: 'Ctrl+6 / ⌘6',
+    indexing: 'Ctrl+7 / ⌘7',
   };
 
   // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
@@ -353,6 +357,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       </div>
       <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
         <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+      </div>
+      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'indexing' ? 'block' : 'none' }}>
+        <IndexingMonitor notebookId={notebookId} />
       </div>
     </>
   );

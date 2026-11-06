@@ -104,6 +104,10 @@ export class EmbeddingStore {
   private loadedNotebooks: Map<string, { accessedAt: number; vectorCount: number }> = new Map();
   /** Timers de debounce par notebookId pour la persistence async */
   private persistTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  /** Version monotone empêchant une ancienne écriture async d'écraser un flush plus récent. */
+  private persistVersions: Map<string, number> = new Map();
+  /** Génération par source : invalide les embeddings d'une ingestion devenue obsolète. */
+  private sourceGenerations: Map<string, number> = new Map();
 
   constructor(options?: { maxVectorsInMemory?: number }) {
     this.maxVectorsInMemory = options?.maxVectorsInMemory ?? 50_000;
@@ -238,9 +242,29 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
-    fs.writeFile(filePath, JSON.stringify(index), "utf-8", (err) => {
-      if (err) log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${err.message}`);
-      else log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (${entries.length} vecteurs)`);
+    const version = (this.persistVersions.get(notebookId) ?? 0) + 1;
+    this.persistVersions.set(notebookId, version);
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${version}`;
+    fs.writeFile(tempPath, JSON.stringify(index), "utf-8", (writeError) => {
+      if (writeError) {
+        log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${writeError.message}`);
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        return;
+      }
+      // Une écriture plus récente a été planifiée entre-temps : ne jamais
+      // publier cet instantané obsolète sur le fichier final.
+      if (this.persistVersions.get(notebookId) !== version) {
+        try { fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        return;
+      }
+      fs.rename(tempPath, filePath, (renameError) => {
+        if (renameError) {
+          log.warn(`Erreur publication index ${notebookId.slice(0, 8)}: ${renameError.message}`);
+          try { fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        } else {
+          log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté atomiquement (${entries.length} vecteurs)`);
+        }
+      });
     });
   }
 
@@ -256,9 +280,6 @@ export class EmbeddingStore {
       if (entry.notebookId === notebookId) entries.push(entry);
     }
 
-    // Rien à écrire : ne pas créer de fichier vide inutile.
-    if (entries.length === 0) return;
-
     const index: EmbeddingIndex = {
       version: 1,
       model: EMBEDDING_MODEL,
@@ -267,10 +288,15 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
+    // Invalider toute écriture async antérieure avant de publier l'instantané sync.
+    this.persistVersions.set(notebookId, (this.persistVersions.get(notebookId) ?? 0) + 1);
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     try {
-      fs.writeFileSync(filePath, JSON.stringify(index), "utf-8");
-      log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté (sync, ${entries.length} vecteurs)`);
+      fs.writeFileSync(tempPath, JSON.stringify(index), "utf-8");
+      fs.renameSync(tempPath, filePath);
+      log.debug(`💾 Notebook ${notebookId.slice(0, 8)} persisté atomiquement (sync, ${entries.length} vecteurs)`);
     } catch (err: any) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
       log.warn(`Erreur persistence sync notebook ${notebookId.slice(0, 8)}: ${err.message}`);
     }
   }
@@ -283,7 +309,7 @@ export class EmbeddingStore {
     for (const [notebookId, timer] of this.persistTimers) {
       clearTimeout(timer);
       this.persistTimers.delete(notebookId);
-      this.flushNotebook(notebookId);
+      this.flushNotebookSync(notebookId);
     }
   }
 
@@ -385,9 +411,23 @@ export class EmbeddingStore {
 
     // S'assurer que le notebook est en mémoire avant de dédupliquer
     this.ensureNotebookLoaded(notebookId);
+    const sourceGenerationKey = `${notebookId}:${sourceId}`;
+    const sourceGeneration = this.sourceGenerations.get(sourceGenerationKey) ?? 0;
 
-    // Filtrer les chunks déjà vectorisés (évite les appels API redondants)
-    const newChunks = chunks.filter(c => !this.vectors.has(c.id));
+    // Un chunk n'est réutilisable que si son vecteur appartient bien à
+    // cette source ET à ce notebook. Un ID déjà présent avec un autre
+    // propriétaire est une collision/incohérence, pas un cache hit.
+    const newChunks = chunks.filter(c => {
+      const existing = this.vectors.get(c.id);
+      if (!existing) return true;
+      if (existing.notebookId !== notebookId) {
+        throw new Error(`Le chunk ${c.id} est déjà associé à un autre notebook.`);
+      }
+      if (existing.sourceId === sourceId) return false;
+      log.warn(`Propriétaire embedding incohérent pour chunk ${c.id.slice(0, 8)} : remplacement`);
+      this.vectors.delete(c.id);
+      return true;
+    });
 
     if (newChunks.length === 0) {
       log.info(`⏭️ Tous les chunks déjà vectorisés pour source ${sourceId.slice(0, 8)}, skip`);
@@ -405,6 +445,13 @@ export class EmbeddingStore {
     const texts = newChunks.map(c => c.content.slice(0, 2048));
 
     const vectors = await this.embedTexts(texts);
+
+    // Une source peut avoir été remplacée pendant l'appel réseau. Ne jamais
+    // publier les vecteurs calculés pour son ancienne version.
+    if ((this.sourceGenerations.get(sourceGenerationKey) ?? 0) !== sourceGeneration) {
+      log.info(`⏭️ Indexation obsolète ignorée pour source ${sourceId.slice(0, 8)}`);
+      return 0;
+    }
 
     let indexed = 0;
     for (let i = 0; i < newChunks.length; i++) {
@@ -432,12 +479,67 @@ export class EmbeddingStore {
    * Supprime tous les embeddings d'une source.
    */
   removeSource(sourceId: string, notebookId: string): void {
+    const generationKey = `${notebookId}:${sourceId}`;
+    this.sourceGenerations.set(generationKey, (this.sourceGenerations.get(generationKey) ?? 0) + 1);
     const toDelete: string[] = [];
+    this.ensureNotebookLoaded(notebookId);
     for (const [chunkId, entry] of this.vectors) {
-      if (entry.sourceId === sourceId) toDelete.push(chunkId);
+      if (entry.sourceId === sourceId && entry.notebookId === notebookId) toDelete.push(chunkId);
     }
     for (const id of toDelete) this.vectors.delete(id);
     this.persistNotebook(notebookId);
+  }
+
+  /**
+   * Compare l'index vectoriel au corpus réellement enregistré et répare les écarts.
+   * Les embeddings sans chunk source sont supprimés ; les vecteurs manquants ou
+   * attribués au mauvais propriétaire sont recalculés. Cette opération est
+   * incrémentale et ne réindexe pas les chunks déjà cohérents.
+   */
+  async reconcileNotebook(
+    sources: Array<{ id: string; chunks: Array<{ id: string; content: string }> }>,
+    notebookId: string
+  ): Promise<{ expected: number; before: number; removed: number; indexed: number; missing: number }> {
+    this.ensureNotebookLoaded(notebookId);
+
+    const expected = new Map<string, string>();
+    for (const source of sources) {
+      for (const chunk of source.chunks || []) {
+        const owner = expected.get(chunk.id);
+        if (owner && owner !== source.id) {
+          throw new Error(`Identifiant de chunk partagé entre deux sources : ${chunk.id}`);
+        }
+        expected.set(chunk.id, source.id);
+      }
+    }
+
+    const before = [...this.vectors.values()].filter(entry => entry.notebookId === notebookId).length;
+    let removed = 0;
+    for (const [chunkId, entry] of this.vectors) {
+      if (entry.notebookId !== notebookId) continue;
+      const expectedOwner = expected.get(chunkId);
+      if (!expectedOwner || expectedOwner !== entry.sourceId) {
+        this.vectors.delete(chunkId);
+        removed++;
+      }
+    }
+
+    let indexed = 0;
+    for (const source of sources) {
+      indexed += await this.indexChunks(
+        (source.chunks || []).map(chunk => ({ id: chunk.id, content: chunk.content })),
+        source.id,
+        notebookId
+      );
+    }
+
+    const missing = [...expected.keys()].filter(chunkId => {
+      const entry = this.vectors.get(chunkId);
+      return !entry || entry.notebookId !== notebookId || expected.get(chunkId) !== entry.sourceId;
+    }).length;
+    if (removed > 0 || indexed > 0) this.persistNotebook(notebookId);
+
+    return { expected: expected.size, before, removed, indexed, missing };
   }
 
   /**
@@ -457,6 +559,10 @@ export class EmbeddingStore {
     }
     for (const id of toDelete) this.vectors.delete(id);
     this.loadedNotebooks.delete(notebookId);
+
+    // Invalider les écritures déjà lancées : elles ne doivent pas recréer
+    // l'index après la suppression du notebook.
+    this.persistVersions.set(notebookId, (this.persistVersions.get(notebookId) ?? 0) + 1);
 
     const filePath = this.getIndexPath(notebookId);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

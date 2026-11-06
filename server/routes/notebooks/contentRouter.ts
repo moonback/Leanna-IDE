@@ -1,7 +1,8 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import { notebookManager, contentGenerator, sourceIngester } from "../../notebooks/index.js";
+import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import { enqueueSourceIngestion } from "../../notebooks/queueSourceIngestion.js";
 import type { GeneratedDocType, ReportSuggestion } from "../../notebooks/types.js";
 import { buildRevealPresentation, countSlides } from "./slidesTheme.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
@@ -28,9 +29,20 @@ const GENERATABLE_TYPES: GeneratedDocType[] = [
   "report-business", "report-market", "report-technical", "report-competitive", "report-financial",
   "report-marketing", "report-product", "report-risk", "report-executive", "report-project",
 ];
+import { SELF_ROOT } from "../../utils/selfRoot.js";
 
 export function createContentRouter(): Router {
   const router = Router();
+
+  // Refuser les identifiants appartenant à un autre workspace avant toute
+  // lecture, mutation, génération, export ou réindexation.
+  router.use("/:id", (req: Request, res: Response, next) => {
+    if (!notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined)) {
+      res.status(404).json({ error: "Notebook introuvable dans le workspace actif." });
+      return;
+    }
+    next();
+  });
 
   router.post("/:id/generate", async (req: Request, res: Response): Promise<void> => {
     try {
@@ -221,30 +233,29 @@ export function createContentRouter(): Router {
         return;
       }
 
-      const buffer = Buffer.from(content, "utf-8");
-      const source = await sourceIngester.ingestFromBuffer(
-        buffer,
-        title,
-        "text/markdown",
+      const source = await enqueueSourceIngestion({
         notebookId,
-      );
-      notebookManager.addSource(notebookId, source);
+        kind: "buffer",
+        buffer: Buffer.from(content, "utf-8"),
+        fileName: title,
+        mimeType: "text/markdown",
+      });
 
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
           language: source.language,
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 

@@ -5,7 +5,7 @@
  * ajout/suppression de sources, gestion des notes.
  */
 
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "../utils/logger.js";
@@ -34,6 +34,61 @@ function getNotebookPath(id: string): string {
   return path.join(DATA_DIR, `${id}.json`);
 }
 
+const CURRENT_NOTEBOOK_SCHEMA_VERSION = 1;
+
+/**
+ * Migre les enregistrements historiques avant de les exposer au reste du
+ * système. Les migrations sont monotones : une version inconnue plus récente
+ * est refusée plutôt que réécrite avec perte.
+ */
+function migrateNotebookRecord(value: unknown, fileId: string): Notebook {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Structure JSON invalide.");
+  }
+
+  const record = { ...(value as Record<string, unknown>) };
+  let version = record.schemaVersion === undefined ? 0 : record.schemaVersion;
+  if (!Number.isInteger(version) || typeof version !== "number" || version < 0) {
+    throw new Error("Version de schéma invalide.");
+  }
+  if (version > CURRENT_NOTEBOOK_SCHEMA_VERSION) {
+    throw new Error(`Schéma notebook ${version} non pris en charge (maximum ${CURRENT_NOTEBOOK_SCHEMA_VERSION}).`);
+  }
+
+  // v0 -> v1 : normaliser les champs optionnels des notebooks historiques.
+  if (version < 1) {
+    record.description = typeof record.description === "string" ? record.description : "";
+    record.sources = Array.isArray(record.sources) ? record.sources : [];
+    record.notes = Array.isArray(record.notes) ? record.notes : [];
+    record.generatedDocuments = Array.isArray(record.generatedDocuments) ? record.generatedDocuments : [];
+    record.audioOverviews = Array.isArray(record.audioOverviews) ? record.audioOverviews : [];
+    record.chatHistory = Array.isArray(record.chatHistory) ? record.chatHistory : [];
+    record.chatThreads = Array.isArray(record.chatThreads) ? record.chatThreads : [];
+    record.color = typeof record.color === "string" ? record.color : COLORS[0];
+    record.icon = typeof record.icon === "string" ? record.icon : ICONS[0];
+    record.schemaVersion = 1;
+    version = 1;
+  }
+
+  if (version !== CURRENT_NOTEBOOK_SCHEMA_VERSION
+    || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(fileId)
+    || record.id !== fileId
+    || typeof record.title !== "string"
+    || typeof record.description !== "string"
+    || !Array.isArray(record.sources)
+    || !Array.isArray(record.notes)
+    || !Array.isArray(record.generatedDocuments)
+    || !Array.isArray(record.audioOverviews)
+    || !Array.isArray(record.chatHistory)
+    || typeof record.createdAt !== "string"
+    || typeof record.updatedAt !== "string"
+    || (record.workspaceId !== undefined && typeof record.workspaceId !== "string")) {
+    throw new Error("Schéma notebook invalide ou identifiant incohérent.");
+  }
+
+  return record as unknown as Notebook;
+}
+
 // ─── Couleurs et icônes par défaut ───────────────────────────────────────────
 
 const COLORS = ["#60a5fa", "#34d399", "#fbbf24", "#a78bfa", "#f87171", "#06b6d4", "#f472b6", "#818cf8"];
@@ -50,9 +105,18 @@ export class NotebookManager {
   private notebooks: Map<string, Notebook> = new Map();
   /** Timers de debounce pour la persistence asynchrone */
   private persistTimers: Map<string, NodeJS.Timeout> = new Map();
+  /** Empêche deux reprises concurrentes d'écrire un statut d'indexation obsolète. */
+  private sourceIndexRuns: Map<string, number> = new Map();
+  /** Une seule indexation active par couple notebook/source (single-flight). */
+  private sourceIndexInFlight: Map<string, Promise<void>> = new Map();
+  private sourceIndexRetryTimers: Map<string, NodeJS.Timeout> = new Map();
+  private static readonly MAX_SOURCE_INDEX_ATTEMPTS = 5;
+  private static readonly SOURCE_INDEX_RETRY_BASE_MS = 5_000;
+  private static readonly SOURCE_INDEX_RETRY_MAX_MS = 5 * 60_000;
 
   constructor() {
     this.loadAll();
+    void this.recoverPendingSourceIndexes();
   }
 
   // ─── Chargement / Persistence ────────────────────────────────────────────
@@ -64,7 +128,7 @@ export class NotebookManager {
       for (const file of files) {
         try {
           const raw = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
-          const notebook = JSON.parse(raw) as Notebook;
+          const notebook = migrateNotebookRecord(JSON.parse(raw), file.slice(0, -".json".length));
           this.notebooks.set(notebook.id, notebook);
         } catch (e: any) {
           log.warn(`Erreur chargement notebook ${file}: ${e.message}`);
@@ -93,14 +157,29 @@ export class NotebookManager {
     this.persistTimers.set(notebook.id, timer);
   }
 
-  /** Écrit immédiatement le notebook sur disque (async, non-bloquant). */
-  private flushNotebook(notebook: Notebook): void {
+  /**
+   * Écriture atomique : le fichier temporaire est entièrement écrit avant le
+   * rename. Un arrêt ou une erreur pendant l'écriture ne laisse pas un JSON tronqué.
+   */
+  private flushNotebook(notebook: Notebook): boolean {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(notebook.id)) {
+      log.warn("Persistence refusée : identifiant de notebook invalide.");
+      return false;
+    }
     ensureDataDir();
     const filePath = getNotebookPath(notebook.id);
-    fs.writeFile(filePath, JSON.stringify(notebook, null, 2), "utf-8", (err) => {
-      if (err) log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
-      else log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté`);
-    });
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      notebook.schemaVersion = CURRENT_NOTEBOOK_SCHEMA_VERSION;
+      fs.writeFileSync(tempPath, JSON.stringify(notebook, null, 2), "utf-8");
+      fs.renameSync(tempPath, filePath);
+      log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté atomiquement`);
+      return true;
+    } catch (err: any) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
+      log.warn(`Erreur persistence notebook ${notebook.id.slice(0, 8)}: ${err.message}`);
+      return false;
+    }
   }
 
   /** Public persist — save a notebook to disk (used by routes for direct mutations) */
@@ -147,6 +226,7 @@ export class NotebookManager {
 
     const notebook: Notebook = {
       id,
+      schemaVersion: CURRENT_NOTEBOOK_SCHEMA_VERSION,
       ...(workspaceId ? { workspaceId } : {}),
       title,
       description,
@@ -167,8 +247,14 @@ export class NotebookManager {
     return notebook;
   }
 
-  getNotebook(id: string): Notebook | undefined {
-    return this.notebooks.get(id);
+  getNotebook(id: string, workspaceId?: string): Notebook | undefined {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) return undefined;
+    const notebook = this.notebooks.get(id);
+    if (!notebook) return undefined;
+    // Lorsqu'un workspace est fourni, aucun notebook d'un autre workspace
+    // (ni notebook historique sans workspace) ne doit être exposé.
+    if (workspaceId !== undefined && notebook.workspaceId !== workspaceId) return undefined;
+    return notebook;
   }
 
   getAllNotebooks(workspaceId?: string): Notebook[] {
@@ -203,6 +289,7 @@ export class NotebookManager {
 
     this.notebooks.delete(id);
     this.remove(id);
+    for (const source of notebook.sources) this.cancelSourceIndexRetry(id, source.id);
 
     // Nettoyer tous les embeddings du notebook
     embeddingStore.removeNotebook(id);
@@ -217,14 +304,318 @@ export class NotebookManager {
     const notebook = this.notebooks.get(notebookId);
     if (!notebook) return undefined;
 
+    const contentHash = createHash("sha256").update(source.rawText || "", "utf-8").digest("hex");
+    source.contentHash = contentHash;
+    const normalizeOrigin = (origin: string) => origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    const normalizedOrigin = normalizeOrigin(source.origin);
+    const sameOrigin = notebook.sources.find(existing =>
+      existing.type === source.type && normalizeOrigin(existing.origin) === normalizedOrigin
+    );
+
+    if (sameOrigin) {
+      const existingHash = sameOrigin.contentHash
+        || createHash("sha256").update(sameOrigin.rawText || "", "utf-8").digest("hex");
+
+      if (existingHash === contentHash) {
+        if (!sameOrigin.contentHash) {
+          sameOrigin.contentHash = contentHash;
+          notebook.updatedAt = new Date().toISOString();
+          if (!this.flushNotebook(notebook)) {
+            delete sameOrigin.contentHash;
+            throw new Error("Impossible de persister l'empreinte de la source existante.");
+          }
+        }
+        Object.assign(source, sameOrigin);
+        if (sameOrigin.indexingStatus !== "indexed") {
+          void this.indexSourceChunks(notebookId, sameOrigin.id);
+        }
+        log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
+        return notebook;
+      }
+
+      // Préparer une nouvelle version sans modifier l'objet canonique avant
+      // que le nouveau document puisse être publié durablement.
+      const previous = { ...sameOrigin };
+      const replacementSource: Source = {
+        ...source,
+        id: sameOrigin.id,
+        notebookId,
+        addedAt: sameOrigin.addedAt,
+        indexingStatus: "pending",
+        indexingError: undefined,
+        indexingUpdatedAt: new Date().toISOString(),
+        chunks: source.chunks.map(chunk => ({
+          ...chunk,
+          id: randomUUID(),
+          sourceId: sameOrigin.id,
+        })),
+      };
+
+      Object.assign(sameOrigin, replacementSource);
+      notebook.updatedAt = new Date().toISOString();
+      const pendingTimer = this.persistTimers.get(notebookId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.persistTimers.delete(notebookId);
+      }
+
+      if (!this.flushNotebook(notebook)) {
+        Object.assign(sameOrigin, previous);
+        throw new Error("Le remplacement n'a pas pu être enregistré durablement ; l'ancienne source est conservée.");
+      }
+
+      // La nouvelle version est durable. Invalider maintenant les vecteurs
+      // de l'ancienne version ; les indexations en vol sont clôturées par
+      // le compteur de génération de l'EmbeddingStore.
+      Object.assign(source, sameOrigin);
+      embeddingStore.removeSource(sameOrigin.id, notebookId);
+      void this.indexSourceChunks(notebookId, sameOrigin.id, true);
+
+      chatResponseCache.invalidateNotebook(notebookId);
+      ragSearchCache.invalidateNotebook(notebookId);
+      log.info(`🔄 Source mise à jour à origine constante: "${sameOrigin.title}" (${sameOrigin.id})`);
+      return notebook;
+    }
+
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    source.indexingUpdatedAt = new Date().toISOString();
     notebook.sources.push(source);
     notebook.updatedAt = new Date().toISOString();
-    this.persist(notebook);
-    // Les sources ont changé : les réponses chat/RAG en cache ne sont plus fiables.
+
+    const pendingTimer = this.persistTimers.get(notebookId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.persistTimers.delete(notebookId);
+    }
+    if (!this.flushNotebook(notebook)) {
+      notebook.sources.pop();
+      throw new Error("La source n'a pas pu être enregistrée durablement ; indexation annulée.");
+    }
+
+    void this.indexSourceChunks(notebookId, source.id);
+
     chatResponseCache.invalidateNotebook(notebookId);
     ragSearchCache.invalidateNotebook(notebookId);
     log.info(`📄 Source ajoutée au notebook "${notebook.title}": "${source.title}"`);
     return notebook;
+  }
+
+
+  /**
+   * Indexe une source et persiste son état. Une opération interrompue reste
+   * marquée pending ; elle pourra être reprise au prochain démarrage.
+   */
+  private indexSourceChunks(notebookId: string, sourceId: string, force = false): Promise<void> {
+    const runKey = `${notebookId}:${sourceId}`;
+    const inFlight = this.sourceIndexInFlight.get(runKey);
+    if (inFlight && !force) return inFlight;
+    const run = inFlight
+      ? inFlight.catch(() => undefined).then(() => this.performSourceIndexChunks(notebookId, sourceId))
+      : this.performSourceIndexChunks(notebookId, sourceId);
+    this.sourceIndexInFlight.set(runKey, run);
+    const cleanup = () => {
+      if (this.sourceIndexInFlight.get(runKey) === run) this.sourceIndexInFlight.delete(runKey);
+    };
+    void run.then(cleanup, cleanup);
+    return run;
+  }
+
+  private async performSourceIndexChunks(notebookId: string, sourceId: string): Promise<void> {
+    const notebook = this.notebooks.get(notebookId);
+    const source = notebook?.sources.find(item => item.id === sourceId);
+    if (!notebook || !source) return;
+
+    const runKey = `${notebookId}:${sourceId}`;
+    const existingTimer = this.sourceIndexRetryTimers.get(runKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.sourceIndexRetryTimers.delete(runKey);
+    }
+    const runId = (this.sourceIndexRuns.get(runKey) ?? 0) + 1;
+    this.sourceIndexRuns.set(runKey, runId);
+    const expectedContentHash = source.contentHash;
+    const startedAt = Date.now();
+    const attempt = (source.indexingAttempts ?? 0) + 1;
+    source.indexingAttempts = attempt;
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    source.indexingNextRetryAt = undefined;
+    source.indexingUpdatedAt = new Date().toISOString();
+    if (!this.flushNotebook(notebook)) {
+      log.warn(`Impossible de persister l'état pending de l'indexation source ${sourceId}`);
+      return;
+    }
+
+    try {
+      // Retirer les vecteurs d'une version précédente avant de reconstruire
+      // l'index de la version courante.
+      embeddingStore.removeSource(source.id, notebookId);
+      const indexed = await embeddingStore.indexChunks(
+        source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
+        source.id,
+        notebookId
+      );
+      if (this.sourceIndexRuns.get(runKey) !== runId
+        || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
+        return;
+      }
+
+      const complete = indexed >= source.chunks.length;
+      this.appendSourceIndexHistory(source, {
+        attempt, at: new Date().toISOString(), outcome: complete ? "indexed" : "partial",
+        category: complete ? "none" : "transient", durationMs: Date.now() - startedAt,
+        message: complete ? undefined : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`,
+      });
+      source.indexingStatus = complete ? "indexed" : "partial";
+      source.indexingError = complete
+        ? undefined
+        : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`;
+      source.indexingUpdatedAt = new Date().toISOString();
+      if (!complete) this.scheduleSourceIndexRetry(notebookId, source);
+      this.flushNotebook(notebook);
+      if (!complete) log.warn(`Indexation partielle de la source ${sourceId}: ${source.indexingError}`);
+    } catch (error: any) {
+      if (this.sourceIndexRuns.get(runKey) !== runId
+        || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
+        return;
+      }
+      const errorMessage = String(error?.message || error).slice(0, 500);
+      const category = this.classifySourceIndexError(error);
+      this.appendSourceIndexHistory(source, {
+        attempt, at: new Date().toISOString(), outcome: "failed", category,
+        durationMs: Date.now() - startedAt, message: errorMessage,
+      });
+      source.indexingStatus = "failed";
+      source.indexingError = errorMessage;
+      source.indexingUpdatedAt = new Date().toISOString();
+      if (category === "transient") this.scheduleSourceIndexRetry(notebookId, source);
+      else source.indexingNextRetryAt = undefined;
+      this.flushNotebook(notebook);
+      log.warn(`Indexation échouée pour source ${sourceId}: ${source.indexingError}`);
+    }
+  }
+
+  private appendSourceIndexHistory(source: Source, entry: NonNullable<Source["indexingHistory"]>[number]): void {
+    source.indexingHistory = [...(source.indexingHistory ?? []), entry].slice(-10);
+  }
+
+  /** Les erreurs de configuration/données ne doivent pas consommer des retries réseau. */
+  private classifySourceIndexError(error: unknown): "transient" | "permanent" {
+    const value = error as { code?: string; status?: number; statusCode?: number; message?: string };
+    const status = Number(value?.status ?? value?.statusCode);
+    const code = String(value?.code ?? "").toUpperCase();
+    const message = String(value?.message ?? error).toLowerCase();
+    if (["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "EPIPE"].includes(code)) return "transient";
+    if (status === 408 || status === 425 || status === 429 || status >= 500) return "transient";
+    if (/timeout|timed out|rate.?limit|temporar|network|socket|unavailable|overloaded|fetch failed/.test(message)) return "transient";
+    return "permanent";
+  }
+
+  private scheduleSourceIndexRetry(notebookId: string, source: Source): void {
+    const attempts = source.indexingAttempts ?? 0;
+    if (attempts >= NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
+      source.indexingNextRetryAt = undefined;
+      log.warn(`Nombre maximal de tentatives atteint pour source ${source.id}`);
+      return;
+    }
+
+    const delay = Math.min(
+      NotebookManager.SOURCE_INDEX_RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1),
+      NotebookManager.SOURCE_INDEX_RETRY_MAX_MS
+    );
+    const nextRetryAt = new Date(Date.now() + delay);
+    source.indexingNextRetryAt = nextRetryAt.toISOString();
+    const key = `${notebookId}:${source.id}`;
+    const oldTimer = this.sourceIndexRetryTimers.get(key);
+    if (oldTimer) clearTimeout(oldTimer);
+    const timer = setTimeout(() => {
+      this.sourceIndexRetryTimers.delete(key);
+      void this.indexSourceChunks(notebookId, source.id);
+    }, delay);
+    timer.unref?.();
+    this.sourceIndexRetryTimers.set(key, timer);
+  }
+
+  /** Statut agrégé, destiné au panneau de supervision Notebook. */
+  getSourceIndexingStatus(notebookId: string): {
+    total: number;
+    indexed: number;
+    pending: number;
+    partial: number;
+    failed: number;
+    attempts: number;
+    sources: Array<Pick<Source, "id" | "title" | "type" | "indexingStatus" | "indexingError" | "indexingUpdatedAt" | "indexingAttempts" | "indexingNextRetryAt" | "indexingHistory">>;
+  } | undefined {
+    const notebook = this.notebooks.get(notebookId);
+    if (!notebook) return undefined;
+    const sources = notebook.sources.map(source => ({
+      id: source.id,
+      title: source.title,
+      type: source.type,
+      indexingStatus: source.indexingStatus ?? "unknown",
+      indexingError: source.indexingError,
+      indexingUpdatedAt: source.indexingUpdatedAt,
+      indexingAttempts: source.indexingAttempts ?? 0,
+      indexingNextRetryAt: source.indexingNextRetryAt,
+      indexingHistory: source.indexingHistory ?? [],
+    }));
+    return {
+      total: sources.length,
+      indexed: sources.filter(source => source.indexingStatus === "indexed").length,
+      pending: sources.filter(source => source.indexingStatus === "pending").length,
+      partial: sources.filter(source => source.indexingStatus === "partial").length,
+      failed: sources.filter(source => source.indexingStatus === "failed").length,
+      attempts: sources.reduce((sum, source) => sum + source.indexingAttempts, 0),
+      sources,
+    };
+  }
+
+  /** Relance manuellement une source, en réinitialisant son budget de retry. */
+  retrySourceIndexing(notebookId: string, sourceId: string): boolean {
+    const source = this.notebooks.get(notebookId)?.sources.find(item => item.id === sourceId);
+    if (!source) return false;
+    source.indexingAttempts = 0;
+    source.indexingNextRetryAt = undefined;
+    source.indexingStatus = "pending";
+    source.indexingError = undefined;
+    void this.indexSourceChunks(notebookId, sourceId, true);
+    return true;
+  }
+
+  /** Reprend au démarrage uniquement les sources explicitement non indexées. */
+  private async recoverPendingSourceIndexes(): Promise<void> {
+    for (const notebook of this.notebooks.values()) {
+      for (const source of notebook.sources) {
+        if (source.indexingStatus === "pending") {
+          // Un état pending au démarrage correspond à une opération interrompue.
+          await this.indexSourceChunks(notebook.id, source.id);
+        } else if (source.indexingStatus === "failed" || source.indexingStatus === "partial") {
+          const retryAt = source.indexingNextRetryAt ? Date.parse(source.indexingNextRetryAt) : 0;
+          if (Number.isFinite(retryAt) && retryAt > Date.now()) {
+            const delay = retryAt - Date.now();
+            const key = `${notebook.id}:${source.id}`;
+            const timer = setTimeout(() => {
+              this.sourceIndexRetryTimers.delete(key);
+              void this.indexSourceChunks(notebook.id, source.id);
+            }, delay);
+            timer.unref?.();
+            this.sourceIndexRetryTimers.set(key, timer);
+          } else if (source.indexingHistory?.[source.indexingHistory.length - 1]?.category !== "permanent"
+            && (source.indexingAttempts ?? 0) < NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
+            await this.indexSourceChunks(notebook.id, source.id);
+          }
+        }
+      }
+    }
+  }
+
+  private cancelSourceIndexRetry(notebookId: string, sourceId: string): void {
+    const key = `${notebookId}:${sourceId}`;
+    const timer = this.sourceIndexRetryTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.sourceIndexRetryTimers.delete(key);
+    this.sourceIndexRuns.set(key, (this.sourceIndexRuns.get(key) ?? 0) + 1);
   }
 
   removeSource(notebookId: string, sourceId: string): boolean {
@@ -235,6 +626,7 @@ export class NotebookManager {
     if (index === -1) return false;
 
     notebook.sources.splice(index, 1);
+    this.cancelSourceIndexRetry(notebookId, sourceId);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
 
@@ -449,7 +841,7 @@ export class NotebookManager {
 
   // ─── Stats ───────────────────────────────────────────────────────────────
 
-  getStats(): {
+  getStats(workspaceId?: string): {
     totalNotebooks: number;
     totalSources: number;
     totalNotes: number;
@@ -461,7 +853,10 @@ export class NotebookManager {
     let totalChunks = 0;
     let totalWords = 0;
 
-    for (const nb of this.notebooks.values()) {
+    const scopedNotebooks = Array.from(this.notebooks.values()).filter(
+      nb => workspaceId === undefined || nb.workspaceId === workspaceId
+    );
+    for (const nb of scopedNotebooks) {
       totalSources += nb.sources.length;
       totalNotes += nb.notes.length;
       for (const src of nb.sources) {
@@ -471,7 +866,7 @@ export class NotebookManager {
     }
 
     return {
-      totalNotebooks: this.notebooks.size,
+      totalNotebooks: scopedNotebooks.length,
       totalSources,
       totalNotes,
       totalChunks,
