@@ -114,7 +114,14 @@ export class ProcessingQueue<T = unknown> {
     const file = this.config.persistenceFile;
     if (!file || !fs.existsSync(file)) return;
     try {
-      const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
+      const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"), (_key, value) => {
+        if (value && typeof value === "object"
+          && value.__leannaSerializedBuffer === true
+          && typeof value.base64 === "string") {
+          return Buffer.from(value.base64, "base64");
+        }
+        return value;
+      });
       if (!parsed || typeof parsed !== "object" || (parsed as any).version !== 1 || !Array.isArray((parsed as any).tasks)) {
         throw new Error("Format de queue invalide.");
       }
@@ -147,7 +154,17 @@ export class ProcessingQueue<T = unknown> {
     const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(temp, JSON.stringify({ version: 1, tasks: [...this.queue, ...this.retrying.values()] }), "utf-8");
+      fs.writeFileSync(temp, JSON.stringify(
+        { version: 1, tasks: [...this.queue, ...this.retrying.values()] },
+        (_key, value) => {
+          // Buffer.toJSON() s'exécute avant le replacer : compresser son enveloppe
+          // en base64 évite un tableau JSON d'octets plusieurs fois plus volumineux.
+          if (value && typeof value === "object" && value.type === "Buffer" && Array.isArray(value.data)) {
+            return { __leannaSerializedBuffer: true, base64: Buffer.from(value.data).toString("base64") };
+          }
+          return value;
+        }
+      ), "utf-8");
       fs.renameSync(temp, file);
       return true;
     } catch (error: any) {
