@@ -26,6 +26,7 @@ const INLINE_PAGES: Record<string, ComponentType> = {
   history: lazy(() => import('./HistoryView.js')),
   automation: lazy(() => import('./AutomationView.js')),
   observability: lazy(() => import('./ObservabilityView.js')),
+  settings: lazy(() => import('./SettingsView.js')),
 };
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
 import type { RichDocument } from '../components/ide/RichDocumentViewer.js';
@@ -102,7 +103,7 @@ export default function IdeView() {
 
   // Settings navigation handler
   const openSettings = useCallback(
-    (section?: string) => navigate(section ? `/settings?section=${section}` : '/settings'),
+    (section?: string) => navigate(section ? `/ide?page=settings&section=${section}` : '/ide?page=settings'),
     [navigate],
   );
 

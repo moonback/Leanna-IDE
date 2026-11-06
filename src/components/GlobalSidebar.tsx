@@ -399,45 +399,65 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
             {/* Navigation groupée (routes) ou outils (IDE) */}
             <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
-              {mode === 'ide' && visibleNavGroups.map((group, gi) => (
-                <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
-                  open={Boolean(normalizedQuery) || !closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
-                  hasActive={group.items.some((item) => isActive(item.path))}>
-                  {group.items.map((item) => (
-                    <li key={item.id}>
-                      <NavButton item={item} active={isActive(item.path)} collapsed={collapsed} onClick={() => navigate(item.path)} />
-                    </li>
-                  ))}
-                </Group>
-              ))}
-              {mode === 'ide'
-                ? visibleToolGroups.map((group, gi) => (
-                    <Group
-                      key={group.id}
-                      id={group.id}
-                      label={group.label}
-                      first={gi === 0}
-                      collapsed={collapsed}
-                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
-                      onToggle={toggleGroup}
-                      count={group.items.length}
-                      hasActive={group.items.some((i) => i.active)}
-                    >
-                      {group.items.map((item) => (
-                        <li key={item.id}>
-                          <NavButton
-                            item={{ id: item.id, path: '', label: item.label, icon: item.icon }}
-                            active={item.active}
-                            toggle
-                            disabled={item.disabled}
-                            collapsed={collapsed}
-                            onClick={item.onClick}
-                          />
-                        </li>
-                      ))}
-                    </Group>
-                  ))
-                : visibleNavGroups.map((group, gi) => (
+              {mode === 'ide' && (() => {
+                // Sépare le groupe "Espace de travail" (ide-essentials) des autres toolGroups
+                const workspaceGroup = visibleToolGroups.find((g) => g.id === 'ide-essentials');
+                const otherToolGroups = visibleToolGroups.filter((g) => g.id !== 'ide-essentials');
+
+                const renderNavGroup = (group: typeof visibleNavGroups[0], gi: number) => (
+                  <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
+                    open={Boolean(normalizedQuery) || !closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                    hasActive={group.items.some((item) => isActive(item.path))}>
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <NavButton item={item} active={isActive(item.path)} collapsed={collapsed} onClick={() => navigate(item.path)} />
+                      </li>
+                    ))}
+                  </Group>
+                );
+
+                const renderToolGroup = (group: typeof visibleToolGroups[0], gi: number) => (
+                  <Group
+                    key={group.id}
+                    id={group.id}
+                    label={group.label}
+                    first={gi === 0}
+                    collapsed={collapsed}
+                    open={Boolean(normalizedQuery) || !closedGroups[group.id]}
+                    onToggle={toggleGroup}
+                    count={group.items.length}
+                    hasActive={group.items.some((i) => i.active)}
+                  >
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <NavButton
+                          item={{ id: item.id, path: '', label: item.label, icon: item.icon }}
+                          active={item.active}
+                          toggle
+                          disabled={item.disabled}
+                          collapsed={collapsed}
+                          onClick={item.onClick}
+                        />
+                      </li>
+                    ))}
+                  </Group>
+                );
+
+                return (
+                  <>
+                    {/* IDE (groupe workspace) en premier */}
+                    {visibleNavGroups.slice(0, 1).map((g, i) => renderNavGroup(g, i))}
+                    {/* Espace de travail (Explorateur, Recherche, Terminal, GitHub) juste après IDE */}
+                    {workspaceGroup && renderToolGroup(workspaceGroup, 0)}
+                    {/* Reste des navGroups (Connaissances, Opérations…) */}
+                    {visibleNavGroups.slice(1).map((g, i) => renderNavGroup(g, i + 1))}
+                    {/* Autres toolGroups (CI/CD, Données, Outils…) */}
+                    {otherToolGroups.map((g, i) => renderToolGroup(g, i + 1))}
+                  </>
+                );
+              })()}
+              {mode !== 'ide'
+                ? visibleNavGroups.map((group, gi) => (
                     <Group
                       key={group.id}
                       id={group.id}
@@ -455,7 +475,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                         </li>
                       ))}
                     </Group>
-                  ))}
+                  ))
+                : null}
               {normalizedQuery && visibleNavGroups.length === 0 && visibleToolGroups.length === 0 && !collapsed && (
                 <p className="px-3 py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
                   Aucun élément ne correspond à « {navQuery} ».
@@ -478,10 +499,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 onClick={handleSwitchWorkspace}
               />
               <NavButton
-                item={{ id: 'settings', path: '/settings', label: 'Paramètres', icon: Settings }}
-                active={pathname === '/settings'}
+                item={{ id: 'settings', path: '/ide?page=settings', label: 'Paramètres', icon: Settings }}
+                active={pathname === '/settings' || search.includes('page=settings')}
                 collapsed={collapsed}
-                onClick={() => navigate('/settings')}
+                onClick={() => navigate('/ide?page=settings')}
               />
             </div>
 
@@ -893,4 +914,4 @@ function IdeAssistantBlock({
       </div>
     </motion.div>
   );
-}
+}

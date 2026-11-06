@@ -71,7 +71,7 @@ function buildItems(): PaletteItem[] {
     }
   }
   items.push({
-    id: 'settings', label: 'Paramètres', group: 'Système', path: ROUTES.settings,
+    id: 'settings', label: 'Paramètres', group: 'Système', path: `${ROUTES.ide}?page=settings`,
     icon: Settings, keywords: KEYWORDS.settings,
   });
   return items;
