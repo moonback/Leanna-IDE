@@ -10,7 +10,6 @@ import type {
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
 import { TaskScheduler, validateOrchestrationPlan, type TaskRunner } from "./TaskScheduler.js";
-import { agentTaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
@@ -241,7 +240,7 @@ export class AgentOrchestrator {
     agentPersistence.saveTask(task).catch(() => {});
 
     // Lancer l'exécution en arrière-plan
-    agentTaskExecutionLimiter.run(() => this.executor.execute(task), task.id).catch((err) => {
+    this.executor.execute(task).catch((err) => {
       if (task.status !== "cancelled") {
         log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
       }
@@ -651,7 +650,7 @@ export class AgentOrchestrator {
     if (task.status === "pending") {
       // Retirer également la tâche de la file du limiteur global : sinon elle
       // pourrait démarrer plus tard après que l'interface l'a marquée annulée.
-      agentTaskExecutionLimiter.cancel(taskId);
+      // L'exécuteur central retire la tâche de sa file si elle attend un créneau.
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
       task.result = {
