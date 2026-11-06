@@ -678,9 +678,8 @@ export class AgentOrchestrator {
         task.completedAt = new Date().toISOString();
         task.result = {
           success: false,
-          outcome: "failed",
-          summary: `Tâche "${task.title}" annulée par l'utilisateur`,
           outcome: "cancelled",
+          summary: `Tâche "${task.title}" annulée par l'utilisateur`,
         error: "cancelled_by_user",
           durationMs: 0,
         };
