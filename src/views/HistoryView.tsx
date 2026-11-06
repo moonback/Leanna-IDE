@@ -142,7 +142,7 @@ export default function HistoryView() {
   }, [conversations.length, confirm, success, toastError]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Header */}
       <ViewHeader
         {...viewHeaderProps('history')}
