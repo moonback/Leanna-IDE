@@ -1,3 +1,12 @@
+> **Statut au 2026-11-06 : audit de photographie, non source de vérité actuelle.**
+> Cette analyse décrit une passe antérieure de l'architecture agents. Pour les chemins
+> réellement utilisés et les options de gouvernance, consulter
+> `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md` (2026-10-25) et
+> `docs/AUTONOMY_RUNTIME_MAP.md` (2026-11-06). Les comptes de prompts, capacités et
+> composants de ce document ne doivent pas être repris sans revalidation.
+>
+> ---
+>
 # Analyse de l'architecture des agents Leanna
 
 > Périmètre : runtime agentique, orchestration multi-agents, prompts système (chat + agents), autorisations d'outils, et l'UI de suivi des missions.
