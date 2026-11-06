@@ -37,14 +37,14 @@ test('adaptive routing selects the lowest estimated cost among priced candidates
 });
 
 test('complex tasks increase the impact of historical failures', () => {
-  const candidates = ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini'];
+  const candidates = ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o'];
   const usage = [
-    success('openai/gpt-4o-mini'), success('openai/gpt-4o-mini'), success('openai/gpt-4o-mini'),
+    success('openai/gpt-4o'), success('openai/gpt-4o'), success('openai/gpt-4o'),
     success('anthropic/claude-3.5-sonnet'), success('anthropic/claude-3.5-sonnet'),
     success('anthropic/claude-3.5-sonnet'),
   ];
   const failures = [
-    failure('openai/gpt-4o-mini'), failure('openai/gpt-4o-mini'), failure('openai/gpt-4o-mini'),
+    failure('openai/gpt-4o'), failure('openai/gpt-4o'), failure('openai/gpt-4o'),
   ];
   const result = selectAdaptiveModel({
     candidates,
