@@ -545,14 +545,17 @@ export function OpenRouterSection() {
                 type="text"
                 value={profile.openrouterModel}
                 onChange={e => setField('openrouterModel', e.target.value)}
-                onBlur={e => setField('openrouterModel', e.currentTarget.value.trim())}
+                onBlur={e => {
+                  setField('openrouterModel', e.currentTarget.value.trim());
+                  e.currentTarget.style.borderColor = 'var(--border-base)';
+                }}
                 maxLength={200}
                 aria-label="ID du modèle OpenRouter"
                 placeholder="ex: anthropic/claude-sonnet-4"
                 className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
                 style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
                 onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+
               />
               {isCustomModel && profile.openrouterModel.trim() && (
                 <span className="mt-1 flex items-center gap-1 text-xs" style={{ color: 'var(--accent-primary)' }}>
@@ -646,14 +649,17 @@ export function OpenRouterSection() {
           type="text"
           value={profile.openrouterImageModel}
           onChange={e => setField('openrouterImageModel', e.target.value)}
-          onBlur={e => setField('openrouterImageModel', e.currentTarget.value.trim())}
+          onBlur={e => {
+            setField('openrouterImageModel', e.currentTarget.value.trim());
+            e.currentTarget.style.borderColor = 'var(--border-base)';
+          }}
           maxLength={200}
           aria-label="ID du modèle OpenRouter pour les images"
           placeholder="ex: google/gemini-3.6-flash-image"
           className="mt-2 w-full rounded-lg px-3 py-2 text-xs font-mono outline-none transition-all duration-200"
           style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
           onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-base)'; }}
+
         />
       </Field>
 
