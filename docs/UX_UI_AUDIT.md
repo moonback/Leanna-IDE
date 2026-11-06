@@ -190,3 +190,24 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 
 - Tester une liste vide valide, une erreur HTTP et une réponse JSON sans tableau de snippets.
 - Vérifier le réessai après rétablissement du serveur et la conservation du snippet sélectionné.
+
+## Huitième passe — Observabilité et Notebooks
+
+### Constats vérifiés
+
+- Observabilité : les réponses HTTP non réussies ou les payloads incomplets de ses quatre endpoints pouvaient être ignorés, puis interprétés comme des métriques à zéro ou des tableaux vides. Le rafraîchissement manuel ne proposait pas d'état de récupération visible.
+- Bibliothèque Notebooks : un échec de chargement pouvait laisser apparaître l'état vide « Créez votre premier notebook ».
+- Détail Notebook : après un échec de récupération, le composant conservait le squelette car `notebook` restait nul ; aucun chemin de récupération n'était proposé.
+
+### Corrections appliquées
+
+- Observabilité : validation des quatre réponses (HTTP, indicateur `success`, structures attendues), erreur explicite avec bouton de réessai et masquage des métriques/états vides pendant une erreur de chargement.
+- Bibliothèque Notebooks : validation du tableau retourné et affichage d'un état d'erreur avec réessai, distinct de la bibliothèque réellement vide.
+- Détail Notebook : validation de l'identifiant et des collections minimales ; le squelette n'est affiché que pendant le chargement. Une erreur ou un notebook introuvable affiche une page récupérable avec réessai et retour à la bibliothèque.
+
+### Validation restante
+
+- Simuler séparément HTTP 500, JSON invalide, `success: false` et payload incomplet pour les quatre endpoints d'observabilité.
+- Vérifier qu'une bibliothèque vide valide reste distincte d'une panne API, et qu'un notebook supprimé affiche bien « introuvable ».
+- Vérifier les changements de workspace, le retour navigateur et le réessai après rétablissement du serveur.
+- Exécuter typecheck, tests UI et audit visuel dans Electron ; ces validations locales n'ont pas été exécutées via GitHub.
