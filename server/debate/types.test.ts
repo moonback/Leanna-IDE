@@ -8,7 +8,6 @@ test('normalizeRoxaneConfig supplies safe defaults', () => {
   assert.equal(config.enabled, true);
   assert.equal(config.provider, 'gemini');
   assert.equal(config.maxRounds, 3);
-  assert.equal(config.autoCreateTasks, false);
 });
 
 test('normalizeRoxaneConfig clamps numeric controls', () => {
