@@ -332,7 +332,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
       const { Executor, MissionStore, LocalMissionStore, CompositeMissionStore, AutonomyPolicy } = missionModule;
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
-      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string } }) =>
+      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string }; beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void> }) =>
         // L'Executor applique lui-même le curseur d'autonomie et obtient l'approbation.
         sm.handleToolCall(name, args, undefined, { ...opts, autonomyApproved: true }));
 
