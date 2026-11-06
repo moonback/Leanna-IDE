@@ -64,7 +64,7 @@ test("ProcessingQueue persists tasks waiting for retry backoff", async () => {
     assert.equal(queue.getPending().length, 1);
     assert.equal(queue.getTask("retry-task")?.status, "pending");
 
-    const restarted = new ProcessingQueue<{ value: string }>({ persistenceFile });
+    const restarted = new ProcessingQueue<{ value: string; notebookId: string }>({ persistenceFile });
     assert.equal(restarted.getPending().length, 1);
     assert.equal(restarted.getPending()[0].id, "retry-task");
     assert.equal(restarted.getPending()[0].attempts, 1);
@@ -126,9 +126,9 @@ test("ProcessingQueue restores terminal task results from durable history", asyn
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-notebook-queue-history-"));
   const persistenceFile = path.join(directory, "queue.json");
   try {
-    const queue = new ProcessingQueue<{ value: string }>({ persistenceFile });
+    const queue = new ProcessingQueue<{ value: string; notebookId: string }>({ persistenceFile });
     queue.setHandler(async task => ({ accepted: task.payload.value, sourceId: "source-42" }));
-    const task = queue.enqueue("durable-result", "source-ingest", { value: "persist me" });
+    const task = queue.enqueue("durable-result", "source-ingest", { value: "persist me", notebookId: "nb-history" });
     assert.ok(task);
     const completed = await queue.waitForTask(task.id);
     assert.equal(completed.status, "completed");
@@ -138,7 +138,7 @@ test("ProcessingQueue restores terminal task results from durable history", asyn
     assert.ok(restored, "terminal task must remain discoverable after restart");
     assert.equal(restored.status, "completed");
     assert.deepEqual(restored.result, { accepted: "persist me", sourceId: "source-42" });
-    assert.equal(restored.payload, undefined, "terminal history must not retain the original upload payload");
+    assert.deepEqual(restored.payload, { notebookId: "nb-history" }, "terminal history must retain only the notebook scope, not the original payload");
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
