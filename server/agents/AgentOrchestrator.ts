@@ -648,9 +648,8 @@ export class AgentOrchestrator {
     if (!task) return false;
 
     if (task.status === "pending") {
-      // Retirer également la tâche de la file du limiteur global : sinon elle
-      // pourrait démarrer plus tard après que l'interface l'a marquée annulée.
       // L'exécuteur central retire la tâche de sa file si elle attend un créneau.
+      this.executor.cancel(taskId);
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
       task.result = {
