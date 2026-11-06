@@ -600,3 +600,12 @@ Compléments de la dixième passe :
 - Les buffers sont sérialisés en base64 plutôt qu'en tableaux JSON d'octets, puis restaurés en véritables `Buffer`.
 - Les erreurs permanentes (validation et 4xx) ne consomment plus de tentatives automatiques ; les erreurs réseau usuelles, timeouts et HTTP 408/425/429/5xx sont retentées.
 - La persistance des transitions après acceptation initiale reste best-effort et les tâches `processing` ne sont pas récupérées après crash : ces limites sont explicites dans le compte rendu de passe.
+
+### Onzième passe — pipeline d'ingestion unifié et historique durable
+
+- Centralisation des soumissions via `enqueueSourceIngestion()` ; les imports URL, texte collé, codebase, conversion de notes et promotion de documents générés rejoignent désormais la queue commune, comme les uploads simple/multiple.
+- Le handler central traite les payloads URL ou buffer, revalide le workspace actif, ajoute la source et invalide les caches.
+- Persistance version 2 avec compatibilité lecture version 1 ; conservation des 200 derniers résultats terminaux et restauration au redémarrage.
+- Les payloads terminés ne conservent que `notebookId` afin de garder le contrôle d'accès au statut sans archiver le contenu des sources.
+- Test ajouté pour la restauration d'un résultat terminal après redémarrage.
+- Limites : tâches `processing` toujours non récupérées après crash ; endpoints HTTP encore synchrones ; historique borné ; progression non détaillée par sous-étape ; queue globale au processus.
