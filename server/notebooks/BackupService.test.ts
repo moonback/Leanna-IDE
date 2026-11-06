@@ -297,7 +297,7 @@ test('backup: refuse un notebook JSON corrompu sans conserver de backup partiel'
 test('backup config: refuse les intervalles et rotations hors limites', () => {
   const h = setup();
   try {
-    assert.throws(() => h.service.updateConfig({ intervalMs: 1 }), /intervalle/);
+    assert.throws(() => h.service.updateConfig({ intervalMs: 1 }), /intervalMs/);
     assert.throws(() => h.service.updateConfig({ maxBackups: 0 }), /maxBackups/);
     assert.throws(() => h.service.updateConfig({ maxBackups: 101 }), /maxBackups/);
   } finally {
