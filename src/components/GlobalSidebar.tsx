@@ -182,11 +182,26 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   /* Survol / focus avec intention (délais) → déplie en overlay. */
   const [hovered, setHovered] = useState(false);
   const timer = useRef<number | undefined>(undefined);
+  /* Après un clic « Réduire », la souris est encore sur la barre : on ignore le
+     survol jusqu'à ce qu'elle sorte, sinon la barre resterait dépliée en
+     overlay par-dessus le contenu central. */
+  const suppressHover = useRef(false);
   const schedule = useCallback((value: boolean, delay: number) => {
     window.clearTimeout(timer.current);
+    if (value && suppressHover.current) return;
     timer.current = window.setTimeout(() => setHovered(value), delay);
   }, []);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  /** Bascule épinglée ↔ réduite ; en réduisant, referme aussi l'overlay de survol. */
+  const togglePinned = useCallback(() => {
+    if (!pinnedCollapsed) {
+      window.clearTimeout(timer.current);
+      suppressHover.current = true;
+      setHovered(false);
+    }
+    setPinnedCollapsed(!pinnedCollapsed);
+  }, [pinnedCollapsed]);
 
   /* Fenêtre étroite : le rail se replie de lui-même (sans toucher à la
      préférence persistée) pour laisser la place à l'éditeur et aux panneaux. */
@@ -207,11 +222,11 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.monaco-editor'))) return;
       e.preventDefault();
-      setPinnedCollapsed((c) => !c);
+      togglePinned();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [togglePinned]);
 
   /* Navigation clavier ↑ ↓ Home End entre les items. */
   const onNavKeyDown = useCallback((e: ReactKeyboardEvent<HTMLElement>) => {
@@ -292,13 +307,13 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
   return (
     <SidebarContext.Provider value={ctx}>
       <LayoutGroup id="leanna-global-sidebar">
-        {/* Emplacement réservé : il ne suit que l'état ÉPINGLÉ. Le dépliage au
-            survol se fait en overlay par-dessus le contenu — sans redimensionner
-            la page ni l'éditeur à chaque passage de la souris. */}
+        {/* Emplacement réservé : suit la largeur RÉELLE de la barre (y compris le
+            dépliage au survol), pour que le contenu central soit poussé et jamais
+            masqué derrière la navigation. */}
         <motion.div
           className="relative h-full flex-shrink-0"
           initial={false}
-          animate={{ width: railCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+          animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
           transition={spring}
         >
           <motion.nav
@@ -311,7 +326,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
             transition={spring}
             style={{ zIndex: 'var(--z-sidebar)' }}
             onPointerEnter={() => schedule(true, HOVER_IN_MS)}
-            onPointerLeave={() => { schedule(false, HOVER_OUT_MS); setHoverId(null); }}
+            onPointerLeave={() => { suppressHover.current = false; schedule(false, HOVER_OUT_MS); setHoverId(null); }}
             onFocusCapture={(e) => {
               if ((e.target as HTMLElement).matches?.(':focus-visible')) schedule(true, 0);
             }}
@@ -347,7 +362,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               {!collapsed && !narrowWindow && (
                 <IconButton
                   label={pinnedCollapsed ? 'Épingler la navigation (Ctrl+B)' : 'Réduire automatiquement (Ctrl+B)'}
-                  onClick={() => setPinnedCollapsed((c) => !c)}
+                  onClick={togglePinned}
                   tooltipEnabled={false}
                 >
                   <motion.span
