@@ -574,6 +574,23 @@ export function useLiveAPI() {
     }
     if (msg.user_text) {
       addTranscript('user', msg.user_text);
+      // Déclencheur vocal contextuel : « Roxane, rejoins-nous » ou
+      // « Roxane, donne ton avis ». La session Live de Leanna reste ouverte.
+      const voiceCommand = String(msg.user_text).trim();
+      const trigger = voiceCommand.match(/\\broxane\\b[, ]*(rejoins[- ]nous|rejoins|donne ton avis|viens débattre|lance un débat|organise un débat)(.*)$/i);
+      if (trigger) {
+        const recentContext = transcript.slice(-24).map(entry =>
+          `${entry.role === 'user' ? 'UTILISATEUR' : 'LEANNA'} : ${entry.text}`
+        ).join('\\n\\n');
+        const requestedTopic = trigger[2]?.replace(/^[\\s:,.!?-]+/, '').trim();
+        window.dispatchEvent(new CustomEvent('Leanna-start-roxane-debate', {
+          detail: {
+            topic: requestedTopic || 'Débattre de la dernière idée de la conversation',
+            context: recentContext.slice(-14000),
+          },
+        }));
+        addLog('🎙️ Déclencheur vocal Roxane détecté — ouverture du débat avec le contexte récent.', 'info');
+      }
     }
     if (msg.token_usage) {
       addTokenUsage(msg.token_usage);
@@ -627,6 +644,7 @@ export function useLiveAPI() {
     updatePromptContext,
     clearTokenUsage,
     recordLatency,
+    transcript,
   ]);
 
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
