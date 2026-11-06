@@ -482,6 +482,10 @@ export class EmbeddingStore {
     for (const id of toDelete) this.vectors.delete(id);
     this.loadedNotebooks.delete(notebookId);
 
+    // Invalider les écritures déjà lancées : elles ne doivent pas recréer
+    // l'index après la suppression du notebook.
+    this.persistVersions.set(notebookId, (this.persistVersions.get(notebookId) ?? 0) + 1);
+
     const filePath = this.getIndexPath(notebookId);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
