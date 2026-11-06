@@ -3,7 +3,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
+import { notebookManager, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
+import { enqueueSourceIngestion } from "../../notebooks/queueSourceIngestion.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { validateNotebookSourceUpload, MAX_NOTEBOOK_BATCH_BYTES } from "../../utils/notebookSourceUploadValidation.js";
 import { SELF_ROOT } from "../../utils/selfRoot.js";
@@ -258,24 +259,22 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
-      const source = await sourceIngester.ingestFromURL(url, notebookId);
-      notebookManager.addSource(notebookId, source);
-
+      const source = await enqueueSourceIngestion({ notebookId, kind: "url", url });
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
           language: source.language,
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
@@ -294,29 +293,28 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
-      const buffer = Buffer.from(content, "utf-8");
-      const source = await sourceIngester.ingestFromBuffer(
-        buffer,
-        title || "Note collée",
-        "text/plain",
-        notebookId
-      );
-      notebookManager.addSource(notebookId, source);
-
+      const source = await enqueueSourceIngestion({
+        notebookId,
+        kind: "buffer",
+        buffer: Buffer.from(content, "utf-8"),
+        fileName: title || "Note collée",
+        mimeType: "text/plain",
+      });
       res.json({
         status: "success",
         source: {
-          id: source.id,
+          id: source.sourceId,
           title: source.title,
           type: source.type,
           summary: source.summary,
           keywords: source.keywords,
           wordCount: source.wordCount,
-          chunksCount: source.chunks.length,
+          chunksCount: source.chunksCount,
+          language: source.language,
         },
       });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(e.statusCode || 500).json({ error: e.message });
     }
   });
 
