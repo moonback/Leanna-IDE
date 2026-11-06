@@ -121,6 +121,9 @@ export function EditorTabs({
               }}
               onClick={() => onSelectTab(file.path)}
               onKeyDown={(event) => {
+                // Le bouton de fermeture est un contrôle enfant indépendant :
+                // son Entrée/Espace ne doit pas aussi sélectionner l'onglet.
+                if (event.target !== event.currentTarget) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   onSelectTab(file.path);
