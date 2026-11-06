@@ -13,6 +13,7 @@
 import fs from "fs";
 import path from "path";
 import { createLogger } from "../utils/logger.js";
+import { SELF_ROOT } from "../utils/selfRoot.js";
 
 const log = createLogger("ProcessingQueue");
 
@@ -381,7 +382,7 @@ export interface SourceProcessingPayload {
 }
 
 const NOTEBOOK_DATA_DIR = path.join(
-  process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd(),
+  process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || SELF_ROOT || process.cwd(),
   ".Leanna", "notebooks"
 );
 
