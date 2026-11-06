@@ -329,3 +329,28 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Parcourir les cartes Issues et Pull Requests au clavier ; vérifier l'ordre de focus, l'annonce du nom accessible et l'ouverture par Entrée.
 - Vérifier le comportement d'ouverture externe dans Electron et dans le navigateur.
 - Exécuter typecheck, tests UI, lint et `ui:audit`.
+
+
+## Quinzième passe — Comportement accessible des confirmations
+
+### Constats vérifiés
+
+- `ConfirmDialog` implémentait son propre voile et son propre dialogue, indépendamment du composant partagé `Modal`.
+- Il n'utilisait donc pas le mécanisme commun de piège de focus, de restitution du focus, de gestionnaire Escape empilé ni de verrouillage du défilement.
+- Le clic sur le voile était géré par une comparaison `target/currentTarget`, sans la protection commune contre les glisser-déposer qui commencent dans le dialogue.
+- Les boutons ne déclaraient pas explicitement `type="button"`, ce qui pouvait provoquer une soumission implicite lorsqu'un fournisseur de confirmation était rendu dans un contexte de formulaire.
+
+### Corrections appliquées
+
+- `ConfirmDialog` utilise désormais le composant partagé `Modal` : gestion du focus, retour au déclencheur, Escape, clic voile sécurisé et verrouillage du défilement sont centralisés.
+- Le titre et le message restent associés au dialogue via `aria-labelledby` et `aria-describedby`.
+- Le bouton Annuler reçoit le focus initial via l'ordre naturel des contrôles ; les deux actions déclarent explicitement `type="button"` et disposent d'un indicateur de focus visible.
+- Les variantes visuelles danger/avertissement/conformation sont conservées.
+
+### Validation restante
+
+- Vérifier dans Electron et au clavier que le focus entre dans la confirmation, reste piégé, puis revient au déclencheur après Annuler, Confirmer ou Escape.
+- Vérifier que seul le dialogue supérieur réagit à Escape lorsqu'une confirmation est empilée sur une autre modale.
+- Vérifier que cliquer dans le dialogue ne ferme pas la confirmation et qu'un glisser-déposer commencé dans le dialogue puis terminé sur le voile ne la ferme pas.
+- Vérifier que l'ouverture/fermeture restaure correctement le scroll de la page et qu'aucune soumission de formulaire n'est déclenchée par les actions de confirmation.
+- Exécuter typecheck, tests UI, lint et `ui:audit`. Ces validations locales ne sont pas exécutables via l'accès GitHub utilisé pour cette modification.
