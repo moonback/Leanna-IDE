@@ -414,9 +414,10 @@ export class NotebookManager {
       ? inFlight.catch(() => undefined).then(() => this.performSourceIndexChunks(notebookId, sourceId))
       : this.performSourceIndexChunks(notebookId, sourceId);
     this.sourceIndexInFlight.set(runKey, run);
-    void run.finally(() => {
+    const cleanup = () => {
       if (this.sourceIndexInFlight.get(runKey) === run) this.sourceIndexInFlight.delete(runKey);
-    });
+    };
+    void run.then(cleanup, cleanup);
     return run;
   }
 
