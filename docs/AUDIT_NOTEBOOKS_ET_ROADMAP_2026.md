@@ -439,6 +439,17 @@ Cette section suit les corrections effectivement apportées après l'audit. Elle
 - Vérifier le chemin de stockage dans Electron et en mode serveur.
 
 
+### Troisième passe — réconciliation des embeddings
+
+| Sujet | État | Détail |
+|---|---|---|
+| A09 — Propriété des vecteurs | Corrigé dans le chemin d'indexation | Un chunk déjà présent n'est ignoré que si son embedding appartient au même notebook et à la même source. Un propriétaire incohérent est supprimé puis recalculé. |
+| A09 — Suppression ciblée | Renforcé | La suppression d'une source ne retire désormais que les vecteurs appartenant à cette source ET au notebook ciblé. |
+| A09 — Réparation du corpus | Implémenté | Nouvelle méthode `EmbeddingStore.reconcileNotebook()` : compare les chunks attendus aux embeddings existants, supprime les vecteurs orphelins/mal attribués, indexe les chunks manquants et retourne un rapport (`expected`, `before`, `removed`, `indexed`, `missing`). |
+| A09 — API de maintenance | Implémenté | Nouvelle route `POST /:id/embeddings/reconcile`, protégée par le middleware workspace existant. Un résultat `partial` signale les embeddings qui restent indisponibles après tentative de réparation. |
+
+**Limites à valider :** la réconciliation s'appuie sur les sources déjà présentes dans le fichier notebook ; elle ne restaure pas une source perdue. Les embeddings sont persistés avec le mécanisme asynchrone existant. `embedTexts()` convertit actuellement les erreurs de batch en vecteurs vides : le rapport `missing` les rend visibles, mais une politique de retry avec backoff et un statut durable par chunk restent à construire. Aucun test automatisé dédié à cette passe n'a encore été exécuté.
+
 ### Contrôle des routes statiques
 
 Le middleware d'isolation est placé avant les routes métier. Les segments réservés `stats`, `sandbox` et `embeddings` sont explicitement laissés aux endpoints statiques correspondants (`/stats/global`, `/sandbox/folders`, `/embeddings/memory`) afin que le garde workspace ne les interprète pas comme des identifiants de notebook.
