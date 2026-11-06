@@ -945,7 +945,7 @@ export default function IdeView() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="Leanna-shell flex h-full" style={{ color: 'var(--text-primary)', width: showChat && chatFullscreen ? '50vw' : showChat && chatDocked ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+    <div className="Leanna-shell flex h-full" style={{ color: 'var(--text-primary)', width: showChat && chatDocked && !chatFullscreen ? `calc(100% - ${chatWidth}px)` : '100%', transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)' }}>
 
       {/* Sidebar — nouvelle GlobalSidebar en mode IDE (outils-panneaux) */}
       <GlobalSidebar
