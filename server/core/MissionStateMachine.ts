@@ -25,7 +25,6 @@ export type MissionLifecycleState =
   | "WAITING_APPROVAL"
   | "PAUSED"
   | "COMMITTING"
-  | "RECOVERY_REQUIRED"
   | "COMPLETED"
   | "FAILED"
   | "ESCALATED"
@@ -54,7 +53,6 @@ const TRANSITIONS: Readonly<Record<MissionLifecycleState, readonly MissionLifecy
   WAITING_APPROVAL: ["RUNNING", "PAUSED", "ESCALATED", "CANCELLED", "RECOVERY_REQUIRED"],
   PAUSED: ["RUNNING", "READY", "CANCELLED", "RECOVERY_REQUIRED"],
   COMMITTING: ["COMPLETED", "RECOVERING", "RECOVERY_REQUIRED", "FAILED", "CANCELLED"],
-  RECOVERY_REQUIRED: ["RECOVERING", "ESCALATED", "CANCELLED"],
   COMPLETED: [],
   FAILED: [],
   ESCALATED: [],
@@ -108,9 +106,9 @@ export function toGoalStatus(
     case "RUNNING":
     case "VERIFYING":
     case "RECOVERING":
-    case "RECOVERY_REQUIRED":
     case "COMMITTING":
       return "in_progress";
+    case "RECOVERY_REQUIRED":
     case "WAITING_APPROVAL":
     case "PAUSED":
     case "ESCALATED":
