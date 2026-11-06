@@ -418,3 +418,21 @@ Cette section suit les corrections effectivement apportées après l'audit. Elle
 - Exécuter `tsc --noEmit`, les tests ciblés et la suite notebooks complète dans l'environnement du dépôt.
 
 **Important :** l'isolation appliquée compare le `workspaceId` du notebook à `SELF_ROOT`. Les notebooks historiques sans workspace sont donc volontairement masqués lorsqu'un workspace actif est défini ; leur migration ou réaffectation doit être prévue avant déploiement si ces données doivent rester accessibles.
+
+
+### Deuxième passe — migrations et reprise de file
+
+| Sujet | État | Détail |
+|---|---|---|
+| A02 — Versionnement du schéma | Partiel renforcé | Ajout de `schemaVersion` et migration v0 → v1 au chargement. Les champs historiques facultatifs sont normalisés ; une version future inconnue est refusée sans réécriture destructive. |
+| Queue de traitement | Partiel | La file des sources persiste atomiquement les tâches encore en attente et les recharge au démarrage. Les payloads Buffer sont sérialisés via JSON et restent compatibles avec `Buffer.from`. |
+
+**Limite de reprise volontaire :** seules les tâches encore en attente sont restaurées. Une tâche déjà en cours au moment du crash n'est pas rejouée automatiquement, car son effet peut être partiellement appliqué (ingestion, indexation ou ajout de source). La rejouer sans clé d'idempotence durable pourrait créer des doublons. La reprise exactement-une-fois nécessite une clé d'ingestion persistée de bout en bout et une transaction coordonnant source, embeddings et état de tâche.
+
+### Validation locale complémentaire
+
+- Vérifier la migration v0 → v1 sur des fixtures issues de notebooks réels.
+- Vérifier le refus d'un `schemaVersion` supérieur sans modification du fichier d'origine.
+- Redémarrer le serveur avec des tâches pending et vérifier leur reprise.
+- Simuler un arrêt avec une tâche processing et confirmer qu'elle n'est pas silencieusement rejouée.
+- Vérifier le chemin de stockage dans Electron et en mode serveur.
