@@ -48,7 +48,6 @@ export default function ObservabilityView() {
         fetch('/api/observability/runtime'),
         fetch('/api/observability/health'),
       ]);
-      const [dashRes, usageRes, runtimeRes, healthRes] = responses;
       const [dashData, usageData, runtimeData, healthData] = await Promise.all(
         responses.map(async response => {
           const data = await response.json();
