@@ -10,7 +10,7 @@ x-leanna-token: <Leanna_API_TOKEN>
 
 Le token est défini dans `.env` (ou auto-généré au premier démarrage). La comparaison est effectuée en temps constant (`crypto.timingSafeEqual`) pour prévenir les timing attacks.
 
-Les WebSockets `/live`, `/notebook-live`, `/sandbox-watch` et `/autonomy` valident le token via le **cookie** `Leanna_token`, posé automatiquement par le premier appel REST authentifié.
+Les WebSockets `/live`, `/notebook-live`, `/voice-duo-live`, `/sandbox-watch` et `/autonomy` valident le token via le **cookie** `Leanna_token`, posé automatiquement par le premier appel REST authentifié.
 
 **Codes HTTP communs :**
 
@@ -26,6 +26,23 @@ Les WebSockets `/live`, `/notebook-live`, `/sandbox-watch` et `/autonomy` valide
 | `429` | Trop de requêtes (rate limit) |
 | `500` | Erreur interne serveur |
 | `503` | Service indisponible (sandbox non prêt, Supabase non configuré) |
+
+---
+
+## WebSocket — Duo vocal multi-IA
+
+### `WS /voice-duo-live`
+
+Ouvre deux sessions Gemini Live indépendantes : l'assistant principal (`aiName` / `aiVoice`) et la seconde IA (`duoName` / `duoVoice`).
+
+- Authentification : cookie `Leanna_token`.
+- Entrée audio : frames binaires PCM16 mono 16 kHz.
+- Sortie audio : frames binaires PCM 24 kHz, une seule IA à la fois.
+- Événements JSON serveur : `connecting`, `ready`, `speaker`, `user_text`, `transcript`, `turn_complete`, `interrupted`, `listening`, `session_error`.
+- Messages JSON client : `{"type":"text","text":"..."}` (entrée texte de secours), `{"type":"interrupt"}`, `{"type":"reset"}`.
+- L'orchestrateur partage le transcript récent et limite à quatre les tours autonomes par prise de parole utilisateur. Une interruption humaine invalide le tour en cours et rend la priorité à l'utilisateur.
+
+Voir [docs/VOICE_DUO.md](docs/VOICE_DUO.md) pour le protocole et le cycle de vie détaillés.
 
 ---
 
