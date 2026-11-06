@@ -807,3 +807,37 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Ouvrir les fichiers générés avec Microsoft Word et LibreOffice ; vérifier les tableaux multi-colonnes, listes imbriquées, caractères Unicode et documents volumineux.
 - Le générateur ZIP/OpenXML est volontairement autonome et doit faire l'objet d'une validation d'interopérabilité réelle avant de déclarer la compatibilité Word comme certifiée.
 - Les validations locales/Electron ne sont pas exécutées par le connecteur GitHub seul.
+
+
+## Trente-deuxième passe — Validation des imports documentaires
+
+### Constats vérifiés
+
+- Le point d'entrée `/api/documents/upload` acceptait des fichiers jusqu'à 50 Mio alors que le traitement en mémoire n'avait pas de limite cohérente avec le circuit d'analyse.
+- Le filtre d'upload acceptait certaines extensions (dont DOCX et images) que `ContentExtractor.extractFromBuffer` ne savait pas réellement décoder : ces contenus pouvaient être interprétés comme du texte UTF-8.
+- Le MIME fourni par le client était accepté sans contrôle de cohérence avec l'extension ni vérification de signature PDF.
+- Le nom original pouvait contenir des séparateurs de chemin et des caractères de contrôle avant d'être utilisé comme titre/source du document.
+
+### Corrections appliquées
+
+- Ajout de `server/utils/documentUploadValidation.ts` comme contrat de validation unique pour le circuit Document Knowledge.
+- Limite explicite à 10 Mio et un seul fichier par requête.
+- Formats limités aux types réellement décodés par l'extracteur Buffer : PDF, TXT, Markdown et HTML. DOCX et images sont retirés de ce point d'entrée tant qu'un extracteur adapté n'est pas implémenté.
+- Cohérence extension/MIME vérifiée ; signature `%PDF-` obligatoire pour les PDF.
+- Rejet des fichiers vides, des contenus binaires/UTF-8 invalides et des tailles hors limite.
+- Normalisation du nom de fichier (basename, suppression des caractères de contrôle, longueur bornée).
+- Limitation des tags importés à 30 entrées non vides.
+- Tests unitaires ciblant les formats acceptés, MIME incohérent, faux PDF, données binaires, fichier vide, dépassement de taille et nom contenant un chemin.
+
+### Fichiers concernés
+
+- `server/utils/documentUploadValidation.ts`
+- `server/utils/documentUploadValidation.test.ts`
+- `server/routes/documents.ts`
+
+### Limites et validation restante
+
+- Cette passe sécurise `/api/documents/upload` uniquement. Les routes `/api/upload-document` et `/api/notebooks/:id/sources/upload*` ont des pipelines distincts et nécessitent une harmonisation dédiée ; elles ne doivent pas être considérées comme couvertes par ce validateur.
+- La signature PDF confirme le type probable, pas l'innocuité du document ni sa structure complète. L'analyse PDF doit rester traitée comme une opération sur entrée non fiable.
+- Les tests ajoutés n'ont pas été exécutés via l'accès GitHub. Exécuter `npx tsx --test server/utils/documentUploadValidation.test.ts`, `npm run typecheck`, `npm run typecheck:test` et la suite serveur.
+- Vérifier également le comportement HTTP du middleware Multer pour les extensions rejetées et les dépassements de taille dans l'application réelle.
