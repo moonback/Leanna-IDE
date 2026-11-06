@@ -45,6 +45,7 @@ const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
 const PilotageView = lazy(() => import('./views/PilotageView.js'));
+const VoiceDuoView = lazy(() => import('./views/VoiceDuoView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 import { dedupKeyFor } from './lib/fetchDedup.js';
@@ -529,6 +530,7 @@ function AnimatedRoutes() {
         <Route path={ROUTES.documents}     element={wrap(<DocumentsView />)} />
         <Route path={ROUTES.notebooks}     element={wrap(<NotebooksView />)} />
         <Route path={ROUTES.observability} element={wrap(<ObservabilityView />)} />
+        <Route path={ROUTES.voiceDuo} element={wrap(<VoiceDuoView />)} />
 
         {/* ── Pilotage hub (étape 3) ──────────────────────────────────────────── */}
         <Route path={ROUTES.pilotage}      element={wrap(<PilotageView />)} />
