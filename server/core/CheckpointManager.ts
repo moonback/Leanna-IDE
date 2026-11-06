@@ -177,7 +177,7 @@ export class CheckpointManager {
    * Les dossiers vides sont conservés et les liens symboliques refusés.
    */
   captureDirectory(id: string, directoryPath: string): void {
-    this.requireOpen(id);
+    const cp = this.requireOpen(id);
     const normalized = path.resolve(directoryPath);
     const isDirectory = this.gateway.isDirectory;
     const listDirectory = this.gateway.listDirectory;
