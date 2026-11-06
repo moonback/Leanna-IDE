@@ -16,6 +16,7 @@ export function RoxaneDebateLauncher() {
   const [interjection, setInterjection] = useState('');
   const [approvedTasks, setApprovedTasks] = useState('');
   const [missionStatus, setMissionStatus] = useState('');
+  const [synthesis, setSynthesis] = useState<any>(null);
   const liveSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioScheduleRef = useRef(0);
@@ -58,7 +59,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const run = async () => {
-    setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setBusy(true); setLiveStatus('connecting');
+    setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setSynthesis(null); setBusy(true); setLiveStatus('connecting');
     try {
       const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = new WebSocket(`${scheme}//${window.location.host}/roxane-live`);
@@ -94,7 +95,22 @@ export function RoxaneDebateLauncher() {
             source.onended = () => { if (ctx.currentTime >= audioScheduleRef.current - 0.04) setSpeaking(false); };
           } catch (e) { console.warn('[RoxaneLive] Audio decode failed', e); }
         }
-        if (msg.type === 'debate_complete') { setBusy(false); setLiveStatus('complete'); }
+        if (msg.type === 'debate_complete') {
+          const turns = Array.isArray(msg.turns) ? msg.turns : [];
+          setLiveTurns(turns.map((turn: any, index: number) => ({ ...turn, id: 'live-' + Date.now() + '-' + index })));
+          setBusy(true);
+          setLiveStatus('synthesizing');
+          fetch('/api/debate/synthesize-live', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, turns }),
+          }).then(async response => {
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Synthèse indisponible');
+            setSynthesis(data.synthesis);
+            setApprovedTasks((data.synthesis?.tasks || []).map((task: any) => task.title + ' | ' + task.description + ' | ' + task.priority).join('\n'));
+          }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
+            .finally(() => { setBusy(false); setLiveStatus('complete'); });
+        }
         if (msg.type === 'interrupted_by_user') { setBusy(false); setSpeaking(false); setLiveStatus('interrupted'); }
       };
       socket.onerror = () => { setError('Connexion WebSocket Roxane impossible.'); setBusy(false); setLiveStatus('error'); };
@@ -112,8 +128,11 @@ export function RoxaneDebateLauncher() {
   };
 
   const createApprovedMissions = async () => {
-    const tasks = approvedTasks.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean).slice(0, 5)
-      .map(title => ({ title: title.slice(0, 160), description: title, priority: 'medium' }));
+    const tasks = approvedTasks.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 5)
+      .map(line => {
+        const [title, description, priority] = line.split('|').map(part => part.trim());
+        return { title: (title || '').slice(0, 160), description: (description || title || '').slice(0, 4000), priority: priority || 'medium' };
+      });
     if (tasks.length === 0) { setMissionStatus('Ajoute au moins une tâche, une par ligne.'); return; }
     setMissionStatus('Création des missions…');
     try {
@@ -148,7 +167,7 @@ export function RoxaneDebateLauncher() {
         </header>
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {!result && liveStatus === 'idle' && <><label className="block space-y-2 text-sm font-medium">Quel sujet veux-tu débattre ?<textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex. : Faut-il refondre l’architecture mémoire de mon projet ?" className="min-h-24 w-full rounded-xl border p-3 text-sm outline-none" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/></label><label className="block space-y-2 text-sm">Contexte de la conversation (facultatif)<textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Colle ici les éléments de la conversation à transmettre aux deux IA…" className="min-h-24 w-full rounded-xl border p-3 text-sm outline-none" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/></label><div className="flex flex-wrap gap-2"><button onClick={startRecognition} disabled={listening || busy} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-base)' }}><Mic className="h-4 w-4"/>Dicter le sujet</button>{listening && <button onClick={() => recognitionRef.current?.stop?.()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"><MicOff className="h-4 w-4"/>Arrêter la dictée</button>}</div></>}
-          {busy && <div className="rounded-xl p-5 text-center text-sm" style={{ background: 'var(--bg-secondary)' }}><AudioLines className="mx-auto mb-2 h-6 w-6 animate-pulse text-violet-400"/>Connexion des deux sessions Gemini Live…</div>}
+          {busy && <div className="rounded-xl p-5 text-center text-sm" style={{ background: 'var(--bg-secondary)' }}><AudioLines className="mx-auto mb-2 h-6 w-6 animate-pulse text-violet-400"/>{liveStatus === 'synthesizing' ? 'Leanna prépare les décisions et les tâches proposées…' : 'Connexion des deux sessions Gemini Live…'}</div>}
           {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400">{error}</p>}
           {liveTurns.length > 0 && <section className="space-y-3">
             <div className="flex items-center justify-between"><h3 className="font-semibold text-sm">Conversation en direct</h3><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{liveStatus === 'complete' ? 'Débat terminé' : liveStatus === 'interrupted' ? 'Interrompu' : 'Gemini Live'}</span></div>
@@ -156,9 +175,16 @@ export function RoxaneDebateLauncher() {
               <div className="mb-2 text-xs font-bold" style={{ color: turn.speaker === 'roxane' ? '#a78bfa' : turn.speaker === 'user' ? '#10b981' : '#38bdf8' }}>{turn.speaker === 'roxane' ? 'ROXANE' : turn.speaker === 'user' ? 'TOI' : 'LEANNA'}</div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.text}</p>
             </article>)}
+            {synthesis && <section className="space-y-2 rounded-xl border p-4" style={{ borderColor: 'rgba(16,185,129,.35)' }}>
+              <h4 className="text-sm font-semibold">Synthèse de Leanna</h4>
+              <p className="text-sm">{synthesis.recommendation}</p>
+              {Array.isArray(synthesis.agreements) && synthesis.agreements.length > 0 && <div><p className="text-xs font-semibold">Accords</p><ul className="list-disc pl-5 text-xs">{synthesis.agreements.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
+              {Array.isArray(synthesis.disagreements) && synthesis.disagreements.length > 0 && <div><p className="text-xs font-semibold">Désaccords à arbitrer</p><ul className="list-disc pl-5 text-xs">{synthesis.disagreements.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
+              {Array.isArray(synthesis.decisions) && synthesis.decisions.length > 0 && <div><p className="text-xs font-semibold">Décisions explicitement relevées</p><ul className="list-disc pl-5 text-xs">{synthesis.decisions.map((item: string, i: number) => <li key={i}>{item}</li>)}</ul></div>}
+            </section>}
             {liveStatus === 'complete' && <div className="space-y-2 rounded-xl border p-4" style={{ borderColor: 'rgba(16,185,129,.35)' }}>
               <h4 className="text-sm font-semibold">Valider des tâches dans Mission System</h4>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Relis les échanges, puis saisis les tâches que tu approuves, une par ligne. Rien n’est créé sans ce clic explicite.</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Vérifie ou modifie les propositions (format : titre | description | priorité). Une tâche par ligne. Rien n’est créé sans ton clic explicite.</p>
               <textarea value={approvedTasks} onChange={e => setApprovedTasks(e.target.value)} placeholder="Ex. : Auditer les dépendances du module vocal&#10;Ajouter les tests d'interruption audio" className="min-h-20 w-full rounded-xl border p-3 text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/>
               <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{missionStatus}</span><button onClick={createApprovedMissions} disabled={!approvedTasks.trim()} className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#059669' }}>Approuver et créer les missions</button></div>
             </div>}
