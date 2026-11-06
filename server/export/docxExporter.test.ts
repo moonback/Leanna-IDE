@@ -67,6 +67,10 @@ test('docxExporter: creates a valid OpenXML package with formatted Markdown cont
   assert.ok(document.includes('Spécification Technique'));
   assert.ok(document.includes('Valeur A'));
   assert.ok(document.includes('answer = 42;'));
+  assert.ok(document.includes('Premier élément'));
+  assert.ok(document.includes('Deuxième élément'));
+  assert.ok(document.includes('Étape une'));
+  assert.ok(document.includes('Étape deux'));
   assert.ok(document.includes('<w:hyperlink r:id="rIdLink1">'));
   assert.ok(document.includes('<w:numId w:val="1"/>'));
   assert.ok(document.includes('<w:numId w:val="2"/>'));
