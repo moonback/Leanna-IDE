@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FileText } from 'lucide-react';
 import { KnowledgeHealthDashboard } from '../knowledge/KnowledgeHealthDashboard.js';
-import { Section, ToggleSwitch } from './SettingsPrimitives.js';
+import { ToggleSwitch } from './SettingsPrimitives.js';
 import { useToast } from '../ui/Toast.js';
 
 /**
@@ -67,18 +67,24 @@ function DocumentExtractionToggle() {
   }, [enabled, saving, success, toastError]);
 
   return (
-    <Section
-      icon={FileText}
-      title="Extraction documentaire"
-      description="Indexation automatique des documents du workspace (.md, .txt, .pdf, .csv…) dans le DocumentStore."
-    >
+    <div className="flex items-center justify-between gap-4 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)' }}>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <FileText size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+        <div className="min-w-0">
+          <span className="text-sm font-medium leading-none" style={{ color: 'var(--text-primary)' }}>
+            Extraction documentaire
+          </span>
+          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+            Indexation auto .md · .txt · .pdf · .csv → DocumentStore
+          </p>
+        </div>
+      </div>
       <ToggleSwitch
         value={enabled}
         onChange={handleChange}
-        label={loading ? 'Chargement…' : 'Extraction automatique'}
-        hint="Désactivée, le code reste indexé mais aucun document n'est extrait ni écrit dans documents.json. Réactivée, une ré-extraction est relancée immédiatement."
+        label={loading ? 'Chargement…' : ''}
       />
-    </Section>
+    </div>
   );
 }
 
