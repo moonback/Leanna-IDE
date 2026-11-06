@@ -425,3 +425,27 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Ouvrir la confirmation Quitter depuis le sélecteur et vérifier que seul l'overlay supérieur réagit à Escape, puis que le focus revient au sélecteur.
 - Vérifier clic sur voile, drag depuis le panneau vers le voile, verrouillage/restauration du scroll et tailles de fenêtre réduites.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le parcours complet de démarrage dans Electron.
+
+
+## Dix-neuvième passe — Prévention des doubles créations dans Notebooks
+
+### Constats vérifiés
+
+- `CreateNotebookModal` utilisait un état `creating` pour l'indicateur visuel, mais son gestionnaire ne disposait pas de verrou synchrone. Deux événements rapprochés avant le prochain rendu React pouvaient donc lancer deux requêtes POST.
+- La fermeture et le bouton Annuler restaient accessibles pendant la création, ce qui permettait de quitter le parcours alors que la requête était encore en cours.
+- Dans `GitHubRepositoryImportModal`, la création rapide de notebook ne disposait d'aucun état de traitement ni de garde anti-double soumission. Un double clic pouvait créer plusieurs notebooks ; l'absence de notebook dans la réponse serveur n'était pas signalée.
+
+### Corrections appliquées
+
+- Ajout d'un verrou `useRef` synchrone dans les deux gestionnaires de création.
+- `CreateNotebookModal` bloque les déclenchements concurrents, désactive Annuler et ignore la fermeture de la modale pendant la requête.
+- La création rapide depuis l'import GitHub affiche maintenant un état de chargement, désactive les actions concurrentes et libère systématiquement le verrou dans `finally`.
+- Une réponse API sans objet `notebook` déclenche désormais un message d'erreur explicite au lieu de laisser le formulaire sans retour.
+
+### Validation restante
+
+- Tester double clic rapide sur Créer dans les deux parcours et vérifier qu'une seule requête POST est envoyée.
+- Vérifier que le verrou est libéré après succès et après erreur réseau/serveur, puis qu'une nouvelle tentative fonctionne.
+- Vérifier que l'utilisateur ne peut pas fermer le dialogue de création standard pendant la requête et que le bouton Annuler du formulaire GitHub est désactivé pendant la création.
+- Vérifier le comportement si le serveur renvoie une réponse 2xx sans objet `notebook`.
+- Exécuter typecheck, tests UI, lint et `ui:audit`; ces validations ne sont pas exécutables via l'accès GitHub seul.
