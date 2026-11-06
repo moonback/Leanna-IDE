@@ -26,10 +26,12 @@ import { strategyMemory } from "../knowledge/StrategyMemory.js";
  */
 export class Planner {
   private scorer: SkillScorer;
+  private readonly strategy: typeof strategyMemory;
   private llmDecompose: DecomposeFunction | null = null;
 
-  constructor(scorer: SkillScorer) {
+  constructor(scorer: SkillScorer, strategy: typeof strategyMemory = strategyMemory) {
     this.scorer = scorer;
+    this.strategy = strategy;
   }
 
   /**
@@ -258,7 +260,7 @@ RÉPONDS EN JSON STRICT:
   private durableFailingSkillNames(availableSkills: string[]): string[] {
     try {
       const available = new Set(availableSkills);
-      return strategyMemory
+      return this.strategy
         .getFailingSkills()
         .map((s) => s.skillName)
         .filter((name) => available.has(name));
@@ -276,7 +278,7 @@ RÉPONDS EN JSON STRICT:
     let failing: { skillName: string; recentSuccessRate: number; totalCalls: number }[] = [];
     try {
       const available = new Set(availableSkills);
-      failing = strategyMemory
+      failing = this.strategy
         .getFailingSkills()
         .filter((s) => available.has(s.skillName));
     } catch {
