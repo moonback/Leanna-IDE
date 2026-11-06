@@ -62,6 +62,8 @@ export interface UseAudioOptions {
   vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
   /** Appelé une seule fois par utterance quand le VAD détecte le silence long (étape A). */
   onVadSilence?: () => void;
+  /** Appelé une fois au début d’une prise de parole détectée (barge-in local). */
+  onVadSpeech?: () => void;
   /**
    * Appelé une seule fois quand le premier chunk audio de réponse est programmé
    * pour lecture via source.start (étape F — PROGRAMMATION, pas audibilité).
@@ -83,6 +85,7 @@ export function useAudio({
   vadThreshold = 35,
   vadSilenceDuration = 800,
   onVadSilence,
+  onVadSpeech,
   onFirstAudioScheduled,
 }: UseAudioOptions) {
   const [muted, setMuted] = useState(false);
@@ -101,7 +104,9 @@ export function useAudio({
   const vadSilenceDurationRef = useRef(vadSilenceDuration);
   // Callback étape A (sonde latence) — ne se déclenche qu'une fois par utterance
   const onVadSilenceRef = useRef<(() => void) | undefined>(onVadSilence);
+  const onVadSpeechRef = useRef<(() => void) | undefined>(onVadSpeech);
   const vadSilenceFiredRef = useRef(false); // garde pour n'appeler qu'une fois
+  const vadSpeechFiredRef = useRef(false);
   // Callback étape F (sonde latence) — premier chunk audio programmé pour lecture
   const onFirstAudioScheduledRef = useRef<UseAudioOptions['onFirstAudioScheduled']>(onFirstAudioScheduled);
   const firstAudioScheduledFiredRef = useRef(false);
@@ -113,6 +118,7 @@ export function useAudio({
   vadThresholdRef.current = vadThreshold;
   vadSilenceDurationRef.current = vadSilenceDuration;
   onVadSilenceRef.current = onVadSilence;
+  onVadSpeechRef.current = onVadSpeech;
   onFirstAudioScheduledRef.current = onFirstAudioScheduled;
 
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
@@ -355,6 +361,10 @@ export function useAudio({
           if (amplitude > vadThresholdRef.current) {
             vadSilenceStartRef.current = null;
             vadSilenceFiredRef.current = false; // voix détectée → réarmer la sonde A
+            if (!vadSpeechFiredRef.current) {
+              vadSpeechFiredRef.current = true;
+              onVadSpeechRef.current?.();
+            }
             onAudioData(floatToPcm16(channelData));
             resetAutoMute();
           } else {
@@ -368,6 +378,7 @@ export function useAudio({
             } else {
               // Silence long → ne rien envoyer (économie de bande passante).
               // Étape A : fin de capture audio — on marque UNE SEULE fois par utterance.
+              vadSpeechFiredRef.current = false;
               if (!vadSilenceFiredRef.current) {
                 vadSilenceFiredRef.current = true;
                 onVadSilenceRef.current?.();
@@ -456,6 +467,7 @@ export function useAudio({
 
     inputAmplitudeRef.current = 0;
     outputAmplitudeRef.current = 0;
+    vadSpeechFiredRef.current = false;
   }, [clearAutoMuteTimer]);
 
   // Cleanup on unmount
