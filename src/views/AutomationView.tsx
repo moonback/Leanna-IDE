@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { WorkflowsPanel, WorkflowViewModel } from '../components/panels/WorkflowsPanel.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { useToast } from '../components/ui/Toast.js';
+import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { viewHeaderProps } from '../config/navigation.js';
 
 interface ScheduledTask {
@@ -17,7 +18,9 @@ interface ScheduledTask {
 }
 
 export default function AutomationView() {
-  const { error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm } = useConfirm();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'workflows' | 'tasks'>('workflows');
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowViewModel[]>([]);
@@ -27,10 +30,12 @@ export default function AutomationView() {
     try {
       const response = await fetch('/api/automation/scheduled-tasks');
       const data = await response.json();
-      if (data.status === 'success') {
-        setTasks(data.tasks);
+      if (!response.ok || data.status !== 'success' || !Array.isArray(data.tasks)) {
+        throw new Error(data.error || `HTTP ${response.status}`);
       }
+      setTasks(data.tasks);
     } catch (error) {
+      setLoadError('Impossible de charger les tâches planifiées. Vérifiez la connexion au serveur puis réessayez.');
       toastError('Impossible de charger les tâches planifiées');
       console.error('Erreur lors de la récupération des tâches:', error);
     }
@@ -40,10 +45,12 @@ export default function AutomationView() {
     try {
       const response = await fetch('/api/workflows');
       const data = await response.json();
-      if (data.status === 'success' && Array.isArray(data.workflows)) {
-        setWorkflows(data.workflows);
+      if (!response.ok || data.status !== 'success' || !Array.isArray(data.workflows)) {
+        throw new Error(data.error || `HTTP ${response.status}`);
       }
+      setWorkflows(data.workflows);
     } catch (error) {
+      setLoadError('Impossible de charger les workflows. Vérifiez la connexion au serveur puis réessayez.');
       toastError('Impossible de charger les workflows');
       console.error('Erreur lors de la récupération des workflows:', error);
     }
@@ -53,6 +60,7 @@ export default function AutomationView() {
     const loadData = async () => {
       setLoading(true);
       try {
+        setLoadError(null);
         await Promise.all([fetchTasks(), fetchWorkflows()]);
       } finally {
         setLoading(false);
@@ -68,31 +76,50 @@ export default function AutomationView() {
   }, []);
 
   const toggleTask = async (id: string, currentlyEnabled: boolean) => {
+    const action = currentlyEnabled ? 'pause' : 'resume';
     try {
-      const action = currentlyEnabled ? 'pause' : 'resume';
-      await fetch(`/api/automation/scheduled-tasks/${id}/${action}`, { method: 'POST' });
-      fetchTasks();
+      const response = await fetch(`/api/automation/scheduled-tasks/${id}/${action}`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') throw new Error(data.error || `HTTP ${response.status}`);
+      toastSuccess(currentlyEnabled ? 'Tâche mise en pause' : 'Tâche activée');
+      await fetchTasks();
     } catch (error) {
-      const action = currentlyEnabled ? 'pause' : 'resume';
       console.error(`Erreur lors du changement d'état (${action}) de la tâche:`, error);
+      toastError(error instanceof Error ? error.message : 'Impossible de modifier cette tâche');
     }
   };
 
   const runNow = async (id: string) => {
     try {
-      await fetch(`/api/automation/scheduled-tasks/${id}/run`, { method: 'POST' });
-      fetchTasks();
+      const response = await fetch(`/api/automation/scheduled-tasks/${id}/run`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') throw new Error(data.error || `HTTP ${response.status}`);
+      toastSuccess('Exécution de la tâche déclenchée');
+      await fetchTasks();
     } catch (error) {
       console.error('Erreur lors de l’exécution immédiate:', error);
+      toastError(error instanceof Error ? error.message : 'Impossible de lancer cette tâche');
     }
   };
 
   const deleteTask = async (id: string) => {
+    const confirmed = await confirm({
+      title: 'Supprimer cette tâche planifiée',
+      message: 'Cette action est irréversible. La tâche sera supprimée définitivement.',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
-      await fetch(`/api/automation/scheduled-tasks/${id}`, { method: 'DELETE' });
-      fetchTasks();
+      const response = await fetch(`/api/automation/scheduled-tasks/${id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') throw new Error(data.error || `HTTP ${response.status}`);
+      toastSuccess('Tâche supprimée');
+      await fetchTasks();
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
+      toastError(error instanceof Error ? error.message : 'Impossible de supprimer cette tâche');
     }
   };
 
@@ -131,7 +158,12 @@ export default function AutomationView() {
       />
 
       <main className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-7">
-        {loading ? (
+        {loadError && !loading ? (
+          <div role="alert" className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-2xl border border-[var(--color-error)]/30 bg-[var(--bg-panel)] p-8 text-center">
+            <p className="text-sm font-medium text-[var(--text-primary)]">{loadError}</p>
+            <button type="button" onClick={() => { setLoadError(null); setLoading(true); Promise.all([fetchTasks(), fetchWorkflows()]).finally(() => setLoading(false)); }} className="rounded-lg border border-[var(--border-base)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-ctrl)]">Réessayer</button>
+          </div>
+        ) : loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chargement des automatisations...</p>
@@ -183,17 +215,17 @@ export default function AutomationView() {
                 </div>
                 
                 <div className="flex items-center gap-2.5 flex-shrink-0">
-                  <button onClick={() => runNow(task.id)} 
+                  <button type="button" aria-label={`Lancer ${task.name} maintenant`} onClick={() => runNow(task.id)} 
                     className="p-3 rounded-xl transition-colors hover:bg-[var(--ctrl-hover)] text-[var(--ctrl-icon)] hover:text-[var(--accent-primary)] bg-[var(--bg-ctrl)] border border-[var(--border-base)]"
                     title="Lancer maintenant">
                     <Play className="w-5 h-5" />
                   </button>
-                  <button onClick={() => toggleTask(task.id, task.enabled)} 
+                  <button type="button" aria-label={task.enabled ? `Mettre ${task.name} en pause` : `Activer ${task.name}`} onClick={() => toggleTask(task.id, task.enabled)} 
                     className="p-3 rounded-xl transition-colors hover:bg-[var(--ctrl-hover)] text-[var(--ctrl-icon)] hover:text-[var(--accent-primary)] bg-[var(--bg-ctrl)] border border-[var(--border-base)]"
                     title={task.enabled ? 'Désactiver' : 'Activer'}>
                     {task.enabled ? <Pause className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                   </button>
-                  <button onClick={() => deleteTask(task.id)} 
+                  <button type="button" aria-label={`Supprimer ${task.name}`} onClick={() => deleteTask(task.id)} 
                     className="p-3 rounded-xl transition-colors hover:bg-[var(--ctrl-hover)] text-[var(--color-error)] hover:bg-[var(--color-error)]/10 bg-[var(--bg-ctrl)] border border-[var(--border-base)]"
                     title="Supprimer">
                     <Trash2 className="w-5 h-5" />
