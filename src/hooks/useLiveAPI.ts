@@ -257,6 +257,25 @@ export function useLiveAPI() {
       },
     });
 
+  // Pendant un débat Roxane, la capture audio de la session principale Leanna
+  // est suspendue afin que le microphone ne soit pas envoyé à trois sessions.
+  const muteBeforeRoxaneRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const handleRoxaneState = (event: Event) => {
+      const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
+      if (active) {
+        if (muteBeforeRoxaneRef.current === null) muteBeforeRoxaneRef.current = muted;
+        if (!muted) toggleMute();
+      } else if (muteBeforeRoxaneRef.current !== null) {
+        const restoreMuted = muteBeforeRoxaneRef.current;
+        if (muted !== restoreMuted) toggleMute();
+        muteBeforeRoxaneRef.current = null;
+      }
+    };
+    window.addEventListener('Leanna-roxane-debate-state', handleRoxaneState);
+    return () => window.removeEventListener('Leanna-roxane-debate-state', handleRoxaneState);
+  }, [muted, toggleMute]);
+
   // Define onMessage handler for WS events
   const handleWebSocketMessage = useCallback((msg: any) => {
     if (msg.type === 'prompt_debug') {
@@ -586,6 +605,7 @@ export function useLiveAPI() {
           `${entry.role === 'user' ? 'UTILISATEUR' : 'LEANNA'} : ${entry.text}`
         ).join('\n\n');
         const requestedTopic = trigger[2]?.replace(/^[\s:,.!?-]+/, '').trim();
+        window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: true } }));
         window.dispatchEvent(new CustomEvent('Leanna-start-roxane-debate', {
           detail: {
             topic: requestedTopic || 'Débattre de la dernière idée de la conversation',
