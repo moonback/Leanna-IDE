@@ -120,6 +120,69 @@ export default function VoiceDuoView() {
             setStatus("Une session vocale rencontre un problème");
           } else if (msg.type === "session_closed") {
             setError(`La session ${msg.speaker} s'est déconnectée.`);
+          } else if (msg.type === "ide-action" && msg.action) {
+            const action = msg.action;
+            window.dispatchEvent(new CustomEvent("Leanna-action", { detail: action }));
+            const browserEvents: Record<string, string> = {
+              "browser-scroll": "Leanna-browser-scroll",
+              "browser-back": "Leanna-browser-control",
+              "browser-forward": "Leanna-browser-control",
+              "browser-reload": "Leanna-browser-control",
+              "browser-read-request": "Leanna-browser-read-request",
+              "browser-click": "Leanna-browser-click",
+              "browser-type": "Leanna-browser-type",
+              "browser-snapshot": "Leanna-browser-snapshot",
+              "browser-inspect": "Leanna-browser-inspect",
+              "browser-get-links": "Leanna-browser-get-links",
+              "browser-mouse-move": "Leanna-browser-mouse-move",
+              "browser-accessibility-snapshot": "Leanna-browser-accessibility-snapshot",
+              "browser-click-by-role": "Leanna-browser-click-by-role",
+              "browser-type-by-label": "Leanna-browser-type-by-label",
+              "browser-wait-for": "Leanna-browser-wait-for",
+              "browser-get-element-text": "Leanna-browser-get-element-text",
+              "browser-get-element-attribute": "Leanna-browser-get-element-attribute",
+              "browser-fill-form": "Leanna-browser-fill-form",
+              "browser-select-option": "Leanna-browser-select-option",
+              "browser-get-console": "Leanna-browser-get-console",
+              "browser-capture": "Leanna-browser-capture",
+              "browser-new-tab": "Leanna-browser-new-tab",
+              "open-rich-document": "Leanna-open-rich-document",
+            };
+            const eventName = browserEvents[action.type];
+            if (eventName) {
+              const detail = action.type === "browser-read-request"
+                ? { requestId: action.requestId, selector: action.selector ?? null }
+                : action;
+              window.dispatchEvent(new CustomEvent(eventName, { detail }));
+            }
+          } else if (msg.tool_start) {
+            const tool = String(msg.tool_start);
+            setStatus(`${msg.speaker === "roxane" ? profile.duoName || "Roxane" : profile.aiName || "Leanna"} exécute ${tool}…`);
+            window.dispatchEvent(new CustomEvent("Leanna-tool-start", { detail: { tool, args: msg.args } }));
+            const ideTools = ["list_project_files", "read_project_file", "write_project_file", "modify_project_file", "search_in_files", "open_project_file", "open_ide", "create_project_directory", "rename_project_file", "delete_project_file", "delete_project_folder", "analyze_project_file", "get_workspace_info", "generate_codebase_markdown"];
+            if (ideTools.includes(tool)) window.dispatchEvent(new CustomEvent("Leanna-action", { detail: { type: "open-ide" } }));
+          } else if (msg.tool_used) {
+            window.dispatchEvent(new CustomEvent("Leanna-tool-done", { detail: { tool: msg.tool_used, info: msg.info, result: msg.result } }));
+            if (msg.tool_used === "security_audit" && msg.result) {
+              window.dispatchEvent(new CustomEvent("Leanna-security-audit-report", { detail: msg.result }));
+            }
+            setStatus(`Action terminée : ${msg.tool_used}`);
+          } else if (msg.type === "agent_event") {
+            window.dispatchEvent(new CustomEvent("Leanna-agent-event", { detail: msg }));
+          } else if (msg.type === "mission_event") {
+            window.dispatchEvent(new CustomEvent("Leanna-mission-event", { detail: msg }));
+          } else if (msg.type === "build-status") {
+            window.dispatchEvent(new CustomEvent("Leanna-build-status", { detail: msg }));
+          } else if (msg.type === "knowledge_progress") {
+            window.dispatchEvent(new CustomEvent("Leanna-knowledge-progress", { detail: msg }));
+          } else if (msg.type === "save-rich-document-result") {
+            window.dispatchEvent(new CustomEvent("Leanna-save-rich-document-result", { detail: msg }));
+          } else if (msg.type === "browser-read-request" && msg.requestId) {
+            window.dispatchEvent(new CustomEvent("Leanna-browser-read-request", {
+              detail: { requestId: msg.requestId, selector: msg.selector ?? null },
+            }));
+          } else if (msg.type === "confirm-critical-edit" && msg.requestId) {
+            window.dispatchEvent(new CustomEvent("Leanna-confirm-critical-edit", { detail: msg }));
           }
         } catch (e) {
           console.warn("[VoiceDuo] Message serveur invalide", e);
