@@ -377,3 +377,27 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier que le scroll arrière-plan est bloqué puis restauré, et qu'un clic sur le voile ne ferme pas l'assistant.
 - Vérifier le comportement lorsque l'assistant apparaît alors qu'un autre overlay est actif.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis contrôler le parcours de démarrage dans Electron.
+
+
+## Dix-septième passe — Accessibilité de la bibliothèque de modèles
+
+### Constats vérifiés
+
+- `TemplateSelectorModal` utilisait un overlay et un panneau visuel sans rôle `dialog`, sans `aria-modal` ni nom accessible associé.
+- La fenêtre ne réutilisait pas le gestionnaire commun de focus et ne proposait pas de fermeture avec Escape.
+- Les boutons ne déclaraient pas leur type ; le bouton de fermeture n'avait pas de nom accessible explicite.
+
+### Corrections appliquées
+
+- Ajout du rôle dialogue modal et association du titre avec `aria-labelledby`.
+- Utilisation de `useOverlay` pour le piège de focus, la restitution du focus, Escape et le verrouillage du scroll.
+- Le clic sur le voile conserve le comportement existant (ne ferme pas la bibliothèque).
+- Tous les boutons déclarent `type="button"` et le bouton de fermeture expose un libellé accessible.
+
+### Validation restante
+
+- Ouvrir la bibliothèque, vérifier le focus initial, le confinement du focus, la fermeture Escape et la restitution du focus.
+- Vérifier que le clic sur le voile ne ferme pas la bibliothèque et que le scroll arrière-plan est restauré à la fermeture.
+- Vérifier les boutons de catégories, de sélection, d'onglet, de copie, de téléchargement et d'application au clavier.
+- Tester le rendu sur petite fenêtre : la bibliothèque utilise actuellement une largeur latérale minimale de 300 px et une hauteur de 85 vh ; vérifier qu'aucun panneau ni contrôle ne devient inaccessible.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron.
