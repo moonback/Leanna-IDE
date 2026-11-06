@@ -38,6 +38,30 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - La navigation interne des paramètres réduit sa largeur sur les fenêtres intermédiaires et étroites.
 - Les règles de couleurs, de surfaces et de flou restent pilotées par les tokens Full Glass existants.
 
+## Deuxième passe — IDE et commandes contextuelles
+
+### Constats vérifiés
+
+- La sidebar IDE mélange les destinations de pages (`NAV_GROUPS`) et les outils qui ouvrent des panneaux (`ideSidebarConfig`). C'est un choix utile, mais une même destination peut se retrouver dans les deux sources.
+- GitHub est un outil direct du rail IDE et était aussi présent dans le menu « Outils » de la barre de statut : deux accès concurrents pour la même action.
+- La barre d'onglets de l'éditeur affichait simultanément la minimap, le retour à la ligne, le formatage, les modèles, l'aperçu contextuel et l'enregistrement. Ces options n'ont pas toutes la même fréquence.
+- Le dock droit est déjà mutuellement exclusif ; conserver cette règle évite l'empilement de panneaux qui réduit la zone de code.
+
+### Décisions appliquées dans cette passe
+
+- GitHub reste disponible comme destination globale hors IDE, mais son entrée de navigation est filtrée dans le contexte IDE où il existe déjà comme outil direct.
+- Suppression du doublon GitHub dans le menu secondaire de la barre de statut.
+- Dans les onglets éditeur, conservation des actions contextuelles (aperçu Markdown/HTML) et de l'enregistrement à portée immédiate ; minimap, retour à la ligne, formatage et modèles sont regroupés dans un menu « Plus ».
+- Ajout d'états accessibles pour les options activables et fermeture du menu par Échap ou clic extérieur.
+- Les onglets de fichiers reçoivent un libellé accessible et une interaction clavier.
+
+### À vérifier ensuite dans Electron
+
+- Le menu « Plus » doit rester dans les limites de la zone éditeur aux résolutions étroites et au bord droit.
+- Le focus clavier doit rester logique entre les onglets, leur bouton de fermeture et les actions de l'éditeur.
+- Le menu « Outils » de la barre de statut reste une modale personnalisée : vérifier le piège de focus, le retour du focus au déclencheur et le comportement à Échap avant de décider de la remplacer par un drawer.
+- La palette de commandes actuelle expose un noyau de commandes, pas encore la totalité des outils IDE annoncés par la configuration de sidebar. Ne pas la présenter comme un accès universel tant que les actions ne sont pas réellement enregistrées.
+
 ## Architecture UX cible
 
 - **Navigation globale** : destinations de premier niveau uniquement, groupées par intention ; ne pas exposer les outils contextuels de l'IDE comme des pages.
