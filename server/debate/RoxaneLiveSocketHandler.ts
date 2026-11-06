@@ -112,7 +112,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
               currentText = '';
               if (role === 'leanna') {
                 lastLeannaText = completed;
-                transcript.push({ speaker: 'leanna', text: completed, round: rounds + 1 });
+                if (transcript.length < 32) transcript.push({ speaker: 'leanna', text: completed, round: rounds + 1 });
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
                   try { leanna?.sendRealtimeInput({ audioStreamEnd: true }); } catch { /* best effort */ }
@@ -124,7 +124,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
                 } else { finished = true; send({ type: 'debate_complete', turns: transcript }); }
               } else {
                 lastRoxaneText = completed;
-                transcript.push({ speaker: 'roxane', text: completed, round: rounds + 1 });
+                if (transcript.length < 32) transcript.push({ speaker: 'roxane', text: completed, round: rounds + 1 });
                 send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 rounds += 1;
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
@@ -144,6 +144,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
           onerror: (error: unknown) => {
             console.error(`[RoxaneLive][${role}] Gemini session error`, error);
             send({ type: 'error', message: `Erreur de la session vocale ${role === 'roxane' ? 'Roxane' : 'Leanna'}.` });
+            closeSessions();
           },
           onclose: () => {
             if (!closed) {
@@ -161,7 +162,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       if (started) { send({ type: 'error', message: 'Cette connexion de débat a déjà démarré.' }); return; }
       started = true;
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
-      if (deps.activeGeminiSessions.size >= 16) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
+      if (deps.activeGeminiSessions.size >= 15) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
       if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
       if (!/-live(?:-|$)/i.test(config.model)) { send({ type: 'error', message: 'Choisis un identifiant de modèle compatible Gemini Live dans les réglages de Roxane.' }); return; }
       topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
