@@ -21,6 +21,7 @@ import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { randomUUID } from "node:crypto";
 import { createLogger } from "../utils/logger.js";
+import { agentTaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 
 const log = createLogger("AgentRuntimeExecutor");
 
@@ -86,7 +87,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
    */
   cancel(taskId: string): boolean {
     const controller = this.active.get(taskId);
-    if (!controller) return false;
+    if (!controller) return agentTaskExecutionLimiter.cancel(taskId);
     controller.abort();
     return true;
   }
@@ -96,6 +97,10 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
    * en respectant le contrat de `AgentExecutor.execute`.
    */
   async execute(task: AgentTask): Promise<void> {
+    return agentTaskExecutionLimiter.run(() => this.executeWithPermit(task), task.id);
+  }
+
+  private async executeWithPermit(task: AgentTask): Promise<void> {
     const shortId = task.id.slice(0, 8);
 
     if (!hasAgent(task.role)) {
