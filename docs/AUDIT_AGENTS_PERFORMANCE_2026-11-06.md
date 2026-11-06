@@ -392,3 +392,22 @@ Ne pas optimiser les tokens au détriment des preuves, de la sécurité ou du ta
 ---
 
 **Recommandation finale :** commencer par la Phase 0. Le meilleur gain immédiat pour Leanna est une flotte dont la sélection est fondée sur des résultats propres à chaque rôle, dont la concurrence est maîtrisée et dont chaque succès repose sur un niveau de preuve explicite. L'ajout de nouveaux agents ne devrait intervenir qu'après cette mise à niveau.
+
+
+---
+
+## Suivi d'implémentation — 2026-11-06
+
+### Réalisé sur `audit/agents-performance-2026-11-06`
+
+- **Scoring Contract-Net corrigé** : `ContractNetNegotiator` ne réutilise plus le taux de succès global du bus comme proxy de fiabilité. Il consulte `StrategyMemory` pour les capacités effectivement requises par la tâche, applique un a priori neutre (2 succès / 2 échecs) et conserve une confiance de 0,5 sans historique exploitable.
+- **Concurrence bornée** : `TaskScheduler` accepte `maxConcurrentTasks` (défaut : 4), valide la configuration et traite les tâches prêtes par lots. Les dépendances restent évaluées entre les lots.
+- **Tests ajoutés** : confiance neutre / positive / négative du Contract-Net ; plafond de concurrence, drainage des tâches prêtes et rejet d'une limite invalide.
+
+### Vérification
+
+Les modifications et les tests ont été enregistrés sur la branche GitHub. L'exécution locale de TypeScript, des tests Node et des benchmarks n'est pas disponible dans cette session : ces contrôles restent à exécuter dans l'environnement du dépôt ou par CI avant toute fusion.
+
+### Prochaine étape
+
+Étendre la gouvernance de concurrence au-delà d'une orchestration isolée : limites partagées entre orchestrations, quotas par rôle et par fournisseur LLM, annulation et libération garanties des créneaux, puis métriques p50/p95 et coût par tâche réussie.
