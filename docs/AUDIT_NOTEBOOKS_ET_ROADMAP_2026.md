@@ -485,3 +485,23 @@ Tests locaux à ajouter/exécuter avant de retirer le statut draft :
 - indexation ancienne retardée : ses vecteurs ne sont pas publiés après remplacement ;
 - réconciliation après interruption entre publication source et indexation : aucun ancien chunk restant, nouveaux chunks indexés ;
 - même origine avec un type différent : comportement d'ajout distinct inchangé.
+
+
+### Sixième passe — état durable et reprise de l'indexation des sources
+
+| Sujet | État | Détail |
+|---|---|---|
+| État d'indexation | Implémenté | Chaque source peut persister `indexingStatus` (`pending`, `indexed`, `partial`, `failed`), `indexingUpdatedAt` et une erreur bornée. Les anciens notebooks restent compatibles : ces champs sont facultatifs. |
+| Ordre durable | Renforcé | L'état `pending` est écrit dans le notebook avant l'appel d'embedding. L'état final n'est publié qu'après le résultat de l'indexation. |
+| Reprise au démarrage | Implémenté | Au chargement du NotebookManager, les sources explicitement `pending`, `partial` ou `failed` sont reprises séquentiellement. Les tâches ne sont pas rejouées aveuglément : seule l'indexation vectorielle, conçue comme idempotente par ID de chunk, est relancée. |
+| Nettoyage de version | Renforcé | Avant une réindexation, les embeddings déjà attribués à la source sont supprimés. Cela retire également les anciens IDs de chunks si le processus s'est arrêté après la publication du remplacement mais avant le nettoyage des vecteurs. |
+| Visibilité opérationnelle | Implémenté côté modèle | L'état et la dernière erreur sont persistés avec la source ; l'interface et les endpoints de statut ne sont pas encore raccordés à ces champs. |
+
+**Limites :** les embeddings et le notebook restent deux fichiers distincts, sans transaction disque commune. Une interruption pendant la suppression/réindexation laisse la source en `pending` et sera réparée au prochain démarrage. Les reprises sont séquentielles et peuvent ralentir le démarrage avec un grand nombre de sources en attente. Une erreur d'embedding batch qui retourne des vecteurs vides produit un état `partial`, puis sera retentée au prochain démarrage ; aucun backoff persistant ni compteur de tentatives dédié par source n'est encore ajouté. Les notebooks historiques dont le champ d'état est absent ne sont pas automatiquement réindexés, afin d'éviter un coût massif inattendu ; un import identique ou une réconciliation manuelle peut déclencher la réparation. Aucun test automatisé ni typecheck n'a été exécuté dans cette session.
+
+Validation locale recommandée :
+- créer une source et vérifier que `pending` est durable avant l'appel embedding puis `indexed` après succès ;
+- simuler un crash avec `pending` et vérifier la reprise au redémarrage ;
+- simuler un remplacement interrompu après flush source mais avant suppression vectorielle, puis vérifier l'absence des anciens chunk IDs après reprise ;
+- simuler une réponse embedding partielle et vérifier `partial`, puis le retry ;
+- vérifier qu'une source historique sans état n'est pas réindexée automatiquement.
