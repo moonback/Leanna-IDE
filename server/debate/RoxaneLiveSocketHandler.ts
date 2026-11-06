@@ -1,0 +1,182 @@
+import { WebSocket, WebSocketServer } from 'ws';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import type { ProfileConfig } from '../prompts/systemInstruction.js';
+import { normalizeRoxaneConfig } from './types.js';
+import { recordModelCallUsage } from '../utils/textGeneration.js';
+
+interface Deps {
+  getProfile: () => ProfileConfig & Record<string, any>;
+  createGeminiAI: () => GoogleGenAI;
+  activeGeminiSessions: Set<any>;
+}
+
+const MAX_TOPIC = 3000;
+const MAX_CONTEXT = 14000;
+const MAX_TURNS = 8;
+
+export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): void {
+  wss.on('connection', (client: WebSocket) => {
+    const profile = deps.getProfile();
+    const config = normalizeRoxaneConfig(profile.roxane);
+    let leanna: any = null;
+    let roxane: any = null;
+    let closed = false;
+    let active: 'leanna' | 'roxane' = 'leanna';
+    let rounds = 0;
+    let currentText = '';
+    let lastLeannaText = '';
+    let lastRoxaneText = '';
+    let topic = '';
+    let context = '';
+    const send = (payload: unknown) => {
+      if (!closed && client.readyState === WebSocket.OPEN) {
+        try { client.send(JSON.stringify(payload)); } catch { /* disconnected */ }
+      }
+    };
+    const closeSessions = () => {
+      if (closed) return;
+      closed = true;
+      for (const session of [leanna, roxane]) {
+        if (!session) continue;
+        try { session.close(); } catch { /* already closed */ }
+        deps.activeGeminiSessions.delete(session);
+      }
+      send({ type: 'closed' });
+    };
+    const rolePrompt = (role: 'leanna' | 'roxane') => role === 'leanna'
+      ? [
+          `Tu es ${profile.aiName || 'Leanna'}, l'assistante principale de l'utilisateur.`,
+          'Tu défends une approche pragmatique, structurée et réalisable. Tu écoutes les objections de Roxane et ajustes honnêtement ton analyse.',
+          'Tu parles directement à l’utilisateur en français oral. Réponses courtes, naturelles, sans markdown.',
+          'Tu dois attendre ton tour : tu réponds uniquement quand un message utilisateur te sollicite.',
+        ].join(' ')
+      : [
+          config.systemPrompt,
+          'Tu es la seconde voix du débat. Tu es indépendante de Leanna et tu apportes un regard différent.',
+          `Niveau de contradiction : ${config.contradictionLevel}/100.`,
+          'Tu réponds en français oral, de manière concise. Tu ne contredis pas artificiellement.',
+          'Tu dois attendre ton tour : tu réponds uniquement quand un message utilisateur te sollicite.',
+        ].join(' ');
+
+    const connectSession = async (role: 'leanna' | 'roxane') => {
+      const voiceName = role === 'roxane' ? config.voice : (profile.aiVoice || 'Aoede');
+      const session = await deps.createGeminiAI().live.connect({
+        model: 'gemini-3.8-live',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          temperature: role === 'roxane' ? config.temperature : (profile.temperature ?? 0.7),
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+          systemInstruction: { parts: [{ text: rolePrompt(role) }] },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+        },
+        callbacks: {
+          onmessage: (message: LiveServerMessage) => {
+            if (message.usageMetadata) {
+              recordModelCallUsage({
+                provider: 'gemini', model: 'gemini-3.8-live', rawUsage: message.usageMetadata,
+                promptCharCount: 0, outputText: '', toolName: `roxane_debate_live_${role}`, kind: 'live',
+              });
+            }
+            if (active === role) {
+              const parts = message.serverContent?.modelTurn?.parts ?? [];
+              for (const part of parts) {
+                const audio = part.inlineData?.data;
+                if (audio) send({ type: 'audio', speaker: role, data: audio, mimeType: part.inlineData?.mimeType || 'audio/pcm;rate=24000' });
+              }
+              const output = (message.serverContent as any)?.outputTranscription?.text;
+              if (typeof output === 'string' && output) {
+                currentText += output;
+                send({ type: 'transcript_delta', speaker: role, text: output });
+              }
+            }
+            if (message.serverContent?.interrupted) send({ type: 'interrupted', speaker: role });
+            if (message.serverContent?.turnComplete && active === role) {
+              const completed = currentText.trim();
+              currentText = '';
+              if (role === 'leanna') {
+                lastLeannaText = completed;
+                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
+                if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
+                  active = 'roxane';
+                  roxane?.sendClientContent({
+                    turns: [{ role: 'user', parts: [{ text: `Leanna vient de dire : ${completed || '(réponse vocale sans transcription)'}\nRéponds directement à son argument, puis donne ton avis à l'utilisateur.` }] }],
+                    turnComplete: true,
+                  });
+                } else send({ type: 'debate_complete' });
+              } else {
+                lastRoxaneText = completed;
+                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
+                rounds += 1;
+                if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
+                  active = 'leanna';
+                  leanna?.sendClientContent({
+                    turns: [{ role: 'user', parts: [{ text: `Roxane vient de répondre : ${completed || '(réponse vocale sans transcription)'}\nRéponds à son objection et poursuis le débat avec une proposition améliorée.` }] }],
+                    turnComplete: true,
+                  });
+                } else {
+                  send({ type: 'debate_complete', lastLeannaText, lastRoxaneText });
+                }
+              }
+            }
+          },
+          onerror: (error: unknown) => {
+            console.error(`[RoxaneLive][${role}] Gemini session error`, error);
+            send({ type: 'error', message: `Erreur de la session vocale ${role === 'roxane' ? 'Roxane' : 'Leanna'}.` });
+          },
+          onclose: () => {
+            if (!closed) send({ type: 'session_closed', speaker: role });
+          },
+        },
+      });
+      deps.activeGeminiSessions.add(session);
+      return session;
+    };
+
+    const start = async (message: any) => {
+      if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
+      topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
+      context = typeof message.context === 'string' ? message.context.slice(-MAX_CONTEXT) : '';
+      if (!topic) { send({ type: 'error', message: 'Le sujet du débat est obligatoire.' }); return; }
+      send({ type: 'status', status: 'connecting' });
+      try {
+        [leanna, roxane] = await Promise.all([connectSession('leanna'), connectSession('roxane')]);
+        if (closed) { closeSessions(); return; }
+        send({ type: 'ready', topic, models: { leanna: 'gemini-3.8-live', roxane: config.model } });
+        active = 'leanna';
+        rounds = 1;
+        currentText = '';
+        leanna.sendClientContent({
+          turns: [{ role: 'user', parts: [{ text: `Sujet à débattre : ${topic}\nContexte récent de la conversation :\n${context || '(aucun)'}\n\nPrésente ta première analyse à voix haute en moins de 90 secondes. Adresse-toi à l'utilisateur.` }] }],
+          turnComplete: true,
+        });
+      } catch (error) {
+        console.error('[RoxaneLive] Impossible de créer les deux sessions Gemini Live', error);
+        send({ type: 'error', message: 'Impossible de démarrer les deux sessions Gemini Live. Vérifie les clés et le modèle Live.' });
+        closeSessions();
+      }
+    };
+
+    client.on('message', (raw, isBinary) => {
+      if (isBinary) return; // microphone non ouvert dans ce protocole; les interventions sont transmises en texte.
+      let message: any;
+      try { message = JSON.parse(raw.toString()); } catch { send({ type: 'error', message: 'Message WebSocket invalide.' }); return; }
+      if (message.type === 'start') { void start(message); return; }
+      if (message.type === 'interrupt') {
+        send({ type: 'interrupted_by_user' });
+        closeSessions();
+        return;
+      }
+      if (message.type === 'user_interjection' && typeof message.text === 'string' && message.text.trim()) {
+        const text = message.text.trim().slice(0, 3000);
+        send({ type: 'user_interjection', text });
+        const target = active === 'leanna' ? leanna : roxane;
+        target?.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `L'utilisateur interrompt le débat et précise : ${text}. Réponds directement à cette intervention avant de poursuivre.` }] }], turnComplete: true });
+      }
+    });
+
+    client.on('close', closeSessions);
+    client.on('error', (error) => { console.error('[RoxaneLive] WebSocket client error', error); closeSessions(); });
+    client.on('close', () => { closed = true; });
+  });
+}
