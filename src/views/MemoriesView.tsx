@@ -86,7 +86,7 @@ export default function MemoriesView() {
 
   return (
     <div
-      className="h-full flex flex-col"
+      className="flex h-full min-h-0 flex-col overflow-hidden"
     >
       {/* Header */}
       <ViewHeader
