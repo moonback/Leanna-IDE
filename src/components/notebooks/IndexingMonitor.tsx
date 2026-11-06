@@ -14,6 +14,14 @@ interface IndexSource {
   indexingUpdatedAt?: string;
   indexingAttempts: number;
   indexingNextRetryAt?: string;
+  indexingHistory?: Array<{
+    attempt: number;
+    at: string;
+    outcome: 'indexed' | 'partial' | 'failed';
+    category: 'none' | 'transient' | 'permanent';
+    durationMs: number;
+    message?: string;
+  }>;
 }
 interface IndexingSnapshot {
   total: number;
@@ -161,6 +169,23 @@ export function IndexingMonitor({ notebookId }: { notebookId: string }) {
                       <span>Dernière mise à jour : {formatDate(source.indexingUpdatedAt)}</span>
                       {source.indexingNextRetryAt && <span>Prochaine tentative : {formatDate(source.indexingNextRetryAt)}</span>}
                     </div>
+                    {!!source.indexingHistory?.length && (
+                      <details className="mt-2 text-[10px] text-[var(--text-muted)]">
+                        <summary className="cursor-pointer select-none">Historique des {source.indexingHistory.length} dernière(s) tentative(s)</summary>
+                        <ol className="mt-2 space-y-1 border-l border-[var(--notebook-border)] pl-3">
+                          {[...source.indexingHistory].reverse().map((entry, index) => (
+                            <li key={`${entry.at}-${entry.attempt}-${index}`} className="space-y-0.5">
+                              <p className="font-medium text-[var(--text-secondary)]">
+                                #{entry.attempt} · {entry.outcome === 'indexed' ? 'Réussie' : entry.outcome === 'partial' ? 'Partielle' : 'Échec'}
+                                {' · '}{entry.category === 'permanent' ? 'Erreur définitive' : entry.category === 'transient' ? 'Erreur temporaire' : 'Aucune erreur'}
+                              </p>
+                              <p>{formatDate(entry.at)} · {(entry.durationMs / 1000).toFixed(1)} s</p>
+                              {entry.message && <p className="break-words text-red-500">{entry.message}</p>}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    )}
                   </article>
                 );
               })}
