@@ -39,7 +39,7 @@ export function createUploadDocumentRouter(getProfile: () => ProfileConfig): Rou
       }
 
       const file = req.file;
-      const validation = validateMultimodalDocumentUpload(safeFileName, file.mimetype, file.buffer);
+      const validation = validateMultimodalDocumentUpload(file.originalname, file.mimetype, file.buffer);
       if (!validation.valid) {
         res.status(400).json({ error: validation.error });
         return;
