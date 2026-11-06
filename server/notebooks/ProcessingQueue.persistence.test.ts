@@ -67,6 +67,14 @@ test("ProcessingQueue persists tasks waiting for retry backoff", async () => {
     assert.equal(restarted.getPending().length, 1);
     assert.equal(restarted.getPending()[0].id, "retry-task");
     assert.equal(restarted.getPending()[0].attempts, 1);
+    assert.ok(restarted.getPending()[0].nextAttemptAt);
+    let restartedHandlerCalls = 0;
+    restarted.setHandler(async () => {
+      restartedHandlerCalls++;
+      return undefined;
+    });
+    assert.equal(restartedHandlerCalls, 0, "a restored retry must respect its persisted backoff");
+    assert.equal(restarted.cancel("retry-task"), true);
   } finally {
     queue.cancel("retry-task");
     fs.rmSync(directory, { recursive: true, force: true });
