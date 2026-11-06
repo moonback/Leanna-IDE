@@ -169,11 +169,13 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
           onerror: (error: unknown) => {
             console.error(`[VoiceDuoLive][${speaker}] Gemini error`, error);
             send({ type: "session_error", speaker, message: `Erreur de session ${names[speaker]}.` });
+            client.close(1011, `Gemini Live error: ${speaker}`);
           },
           onclose: (event: unknown) => {
             if (!closed) {
               console.warn(`[VoiceDuoLive][${speaker}] Session closed`, event);
               send({ type: "session_closed", speaker });
+              client.close(1011, `Gemini Live closed: ${speaker}`);
             }
           },
         },
@@ -197,13 +199,13 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     send({ type: "connecting", model: MODEL, speakers: names });
     try {
       const leanna = await connectSpeaker("leanna");
+      if (closed) { try { leanna.close(); } catch { /* ignore */ } return; }
       sessions.set("leanna", leanna);
       deps.activeGeminiSessions.add(leanna);
-      if (closed) { cleanup(); return; }
       const roxane = await connectSpeaker("roxane");
+      if (closed) { try { roxane.close(); } catch { /* ignore */ } return; }
       sessions.set("roxane", roxane);
       deps.activeGeminiSessions.add(roxane);
-      if (closed) { cleanup(); return; }
       send({ type: "ready", model: MODEL, sessions: [
         { speaker: "leanna", name: names.leanna, voice: voices.leanna },
         { speaker: "roxane", name: names.roxane, voice: voices.roxane },
