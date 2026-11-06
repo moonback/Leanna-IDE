@@ -33,7 +33,7 @@ test('export routes: POST /html returns standalone HTML', async () => {
   }
 });
 
-test('export routes: POST /docx returns doc binary attachment', async () => {
+test('export routes: POST /docx returns a valid OpenXML attachment', async () => {
   const app = express();
   app.use(express.json());
   app.use('/api/export', createExportRouter());
@@ -54,9 +54,10 @@ test('export routes: POST /docx returns doc binary attachment', async () => {
     });
 
     assert.equal(res.status, 200);
-    assert.ok(res.headers.get('content-type')?.includes('application/msword'));
+    assert.ok(res.headers.get('content-type')?.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
     const arrayBuffer = await res.arrayBuffer();
     assert.ok(arrayBuffer.byteLength > 100);
+    assert.equal(Buffer.from(arrayBuffer).readUInt32LE(0), 0x04034B50);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
