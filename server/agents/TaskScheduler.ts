@@ -9,7 +9,6 @@ import { getAgentDefinition } from "./roles.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { createLogger } from "../utils/logger.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
-import { agentTaskExecutionLimiter, type TaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 
 const log = createLogger("TaskScheduler");
 
@@ -88,13 +87,10 @@ export function validateOrchestrationPlan(plan: OrchestrationPlan): void {
 export interface TaskSchedulerOptions {
   /** Maximum number of tasks started concurrently by one orchestration. */
   maxConcurrentTasks?: number;
-  /** Limiteur partagé entre les instances de scheduler (injectable en test). */
-  globalLimiter?: TaskExecutionLimiter;
 }
 
 export class TaskScheduler {
   private readonly maxConcurrentTasks: number;
-  private readonly globalLimiter: TaskExecutionLimiter;
 
   constructor(
     private executor: TaskRunner,
@@ -102,7 +98,6 @@ export class TaskScheduler {
     options: TaskSchedulerOptions = {}
   ) {
     this.maxConcurrentTasks = options.maxConcurrentTasks ?? 4;
-    this.globalLimiter = options.globalLimiter ?? agentTaskExecutionLimiter;
     if (!Number.isInteger(this.maxConcurrentTasks) || this.maxConcurrentTasks < 1) {
       throw new RangeError("maxConcurrentTasks doit être un entier supérieur ou égal à 1");
     }
@@ -209,7 +204,7 @@ export class TaskScheduler {
 
         log.info(`[${orchShortId}] [task:${taskShortId}] ➤ [${agentName}] Lancement: "${task.title}" | Dépendances satisfaites: ${deps.length > 0 ? deps.map(d => d.slice(0, 8)).join(", ") : "aucune"}`);
         const taskStart = Date.now();
-        await this.globalLimiter.run(() => this.executor.execute(task), task.id);
+        await this.executor.execute(task);
         const taskMs = Date.now() - taskStart;
 
         syncTerminalStatuses();
