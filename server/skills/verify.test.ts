@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "url";
 import path from "path";
 import { setSelfRoot } from "../utils/selfRoot.js";
-import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile } from "./verify.js";
+import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile, checkTypeScriptSyntax } from "./verify.js";
 
 // Set SELF_ROOT so verify_file path resolution works correctly
 {
@@ -33,6 +33,45 @@ test("verify skill has input schemas for all tools", () => {
   assert.ok(verifySkill.inputSchemas!["verify_lint"]);
   assert.ok(verifySkill.inputSchemas!["verify_format"]);
   assert.ok(verifySkill.inputSchemas!["verify_syntax"]);
+});
+
+// ─── checkTypeScriptSyntax : syntaxe uniquement, pas de typage inter-fichiers ──
+
+test("checkTypeScriptSyntax returns null for syntactically valid code", () => {
+  const code = "const x: number = 1;\nexport function add(a: number, b: number): number { return a + b; }\n";
+  assert.equal(checkTypeScriptSyntax(code, "sample.ts"), null);
+});
+
+test("checkTypeScriptSyntax detects a real syntax error", () => {
+  const code = "const x = ;\n"; // expression manquante → erreur de syntaxe
+  const result = checkTypeScriptSyntax(code, "broken.ts");
+  assert.ok(result, "une erreur de syntaxe doit être signalée");
+  assert.match(result!, /broken\.ts/);
+});
+
+test("checkTypeScriptSyntax does NOT report phantom errors for unresolved imports/types", () => {
+  // Fichier isolé : imports vers d'autres modules + types/symboles définis
+  // ailleurs. En analyse hors contexte, cela déclenchait TS2307/TS2304/TS2322.
+  // La validation syntaxique ne doit plus les signaler.
+  const code = [
+    "import { SomethingThatDoesNotResolve } from './nowhere.js';",
+    "import type { ExternalType } from '../types/external.js';",
+    "const value: ExternalType = SomethingThatDoesNotResolve;",
+    "export const doubled = unknownGlobal * 2;",
+  ].join("\n");
+  assert.equal(
+    checkTypeScriptSyntax(code, "isolated.ts"),
+    null,
+    "les erreurs de typage/résolution de modules ne sont pas des erreurs de syntaxe",
+  );
+});
+
+test("checkTypeScriptSyntax handles TSX JSX without phantom type errors", () => {
+  const code = [
+    "import { Missing } from './missing.js';",
+    "export function Comp() { return <div className={Missing}>hi</div>; }",
+  ].join("\n");
+  assert.equal(checkTypeScriptSyntax(code, "Comp.tsx"), null);
 });
 
 test("parseTsErrors parses TypeScript output formats correctly", () => {

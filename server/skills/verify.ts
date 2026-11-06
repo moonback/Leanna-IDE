@@ -155,7 +155,20 @@ export function checkBracketBalance(code: string): string | null {
 }
 
 /**
- * Vérifie la syntaxe TypeScript d'un code source via l'API TypeScript Compiler.
+ * Vérifie UNIQUEMENT la syntaxe TypeScript d'un code source, via l'API du
+ * compilateur TypeScript, sans analyse sémantique (typage).
+ *
+ * Important : cette fonction est appelée sur un fichier isolé, hors contexte du
+ * projet. On ne doit donc PAS effectuer de vérification de types : les imports
+ * inter-fichiers, les symboles et types définis ailleurs ne sont pas résolus,
+ * ce qui produirait des « erreurs fantômes » (TS2307 module introuvable,
+ * TS2304 nom introuvable, TS2322, …) totalement étrangères à la syntaxe du
+ * fichier analysé.
+ *
+ * On s'appuie exclusivement sur les diagnostics syntaxiques du `SourceFile`
+ * (via `(sourceFile as any).parseDiagnostics`), qui sont produits par le parser
+ * sans jamais instancier de `Program` ni déclencher la résolution de modules.
+ *
  * Retourne null si OK, sinon un message d'erreur lisible.
  */
 export function checkTypeScriptSyntax(code: string, filePath: string): string | null {
@@ -167,43 +180,25 @@ export function checkTypeScriptSyntax(code: string, filePath: string): string | 
     filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
 
-  // Options minimales sans lib explicites (utilise les defaults du target)
-  const compilerOptions: ts.CompilerOptions = {
-    target: ts.ScriptTarget.Latest,
-    module: ts.ModuleKind.ESNext,
-    strict: true,
-    skipLibCheck: true,
-    noEmit: true,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    // Les composants .tsx doivent être analysés avec JSX, comme dans tsconfig.json.
-    jsx: filePath.endsWith(".tsx") ? ts.JsxEmit.ReactJSX : undefined,
-  };
+  // Les diagnostics purement syntaxiques sont attachés au SourceFile par le
+  // parser (propriété interne `parseDiagnostics`). Ils ne dépendent d'aucun
+  // contexte de projet, contrairement aux diagnostics sémantiques.
+  const parseDiagnostics =
+    ((sourceFile as unknown as { parseDiagnostics?: ts.DiagnosticWithLocation[] })
+      .parseDiagnostics) ?? [];
 
-  const host = ts.createCompilerHost(compilerOptions, true);
-  
-  // Override seulement pour notre fichier en mémoire
-  const originalGetSourceFile = host.getSourceFile;
-  host.getSourceFile = (f, target, onError) => {
-    if (f === filePath) return sourceFile;
-    return originalGetSourceFile(f, target, onError);
-  };
-  
-  host.writeFile = () => {};
-
-  const program = ts.createProgram([filePath], compilerOptions, host);
-  
-  const diagnostics = ts.getPreEmitDiagnostics(program);
-  const syntaxErrors = diagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
+  const syntaxErrors = parseDiagnostics.filter(
+    d => d.category === ts.DiagnosticCategory.Error
+  );
 
   if (syntaxErrors.length === 0) return null;
 
   const messages = syntaxErrors.map(d => {
+    const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
     if (d.start === undefined || d.start < 0) {
-      const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
       return `${filePath}: error TS${d.code}: ${msg}`;
     }
     const { line, character } = sourceFile.getLineAndCharacterOfPosition(d.start);
-    const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
     return `${filePath}(${line + 1},${character + 1}): error TS${d.code}: ${msg}`;
   });
 
