@@ -145,6 +145,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
               advancing = false;
               activeSpeaker = speaker;
               send({ type: "user_text", text: inputText });
+              send({ type: "speaker", speaker, name: names[speaker], state: "thinking", turn: 0 });
             }
             const outputText = (content as any)?.outputTranscription?.text;
             if (typeof outputText === "string" && outputText.trim()) {
@@ -217,10 +218,7 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     } catch (error) {
       console.error("[VoiceDuoLive] Initialization failed", error);
       send({ type: "error", message: "Impossible de démarrer les deux sessions Gemini Live." });
-      for (const session of sessions.values()) {
-        try { session.close(); } catch { /* ignore */ }
-        deps.activeGeminiSessions.delete(session);
-      }
+      cleanup();
       client.close(1011, "Gemini Live initialization failed");
       return;
     }
