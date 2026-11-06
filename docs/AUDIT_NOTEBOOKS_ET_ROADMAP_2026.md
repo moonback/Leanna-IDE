@@ -390,3 +390,31 @@ La base Notebook couvre déjà un périmètre riche : gestion de corpus, ingesti
 ---
 
 *Document d'audit et de roadmap — à mettre à jour après chaque passe d'implémentation et chaque validation par tests.*
+
+
+---
+
+## 10. État d'implémentation — branche `fix/notebooks-data-integrity-persistence`
+
+Cette section suit les corrections effectivement apportées après l'audit. Elle ne vaut pas validation d'exécution : les tests TypeScript et les tests automatisés doivent encore être lancés dans un clone local.
+
+### Corrections appliquées
+
+| Référence audit | État | Implémentation |
+|---|---|---|
+| A01 — Écritures atomiques | Partiel | `NotebookManager` écrit d'abord dans un fichier temporaire puis publie par renommage atomique. Le flush immédiat est réellement synchrone, donc `flushAll()` ne retourne plus avant la fin de ses écritures. |
+| A03 — Sauvegardes vérifiables | Partiel | Les nouveaux backups incluent les SHA-256 des notebooks et index d'embeddings. La restauration vérifie les sommes avant de remplacer les fichiers. Les anciens backups sans checksum restent acceptés. |
+| A04 — Isolation workspace | Appliqué sur les routes HTTP notebook | Middleware de contrôle du workspace actif sur CRUD, sources, chat, audio, contenu, notes et embeddings ; export contrôlé ; accès WebSocket notebook et statistiques globales limités au workspace. |
+| A09 — Cohérence EmbeddingStore | Partiel | Écritures d'index via fichier temporaire + renommage ; numéro de génération empêchant une écriture asynchrone ancienne d'écraser un flush plus récent ; invalidation des écritures en vol lors de la suppression d'un notebook. |
+| A02 — Validation runtime | Partiel | Validation structurelle et cohérence entre identifiant du fichier et identifiant du notebook au chargement. Les migrations versionnées ne sont pas encore implémentées. |
+
+### Points restant à traiter
+
+- Ajouter un véritable système `schemaVersion` et des migrations versionnées.
+- Garantir la durabilité des écritures avec synchronisation disque adaptée et gestion des erreurs remontée à l'appelant.
+- Étendre la politique workspace aux autres points d'entrée internes non HTTP et valider le cycle de vie complet des WebSockets.
+- Ajouter des tests automatisés : accès inter-workspaces, notebooks historiques/corrompus, interruption pendant écriture, suppression pendant flush, checksum invalide et restauration de backups historiques.
+- Vérifier la restauration coordonnée notebook + embeddings et le comportement si une des deux publications échoue.
+- Exécuter `tsc --noEmit`, les tests ciblés et la suite notebooks complète dans l'environnement du dépôt.
+
+**Important :** l'isolation appliquée compare le `workspaceId` du notebook à `SELF_ROOT`. Les notebooks historiques sans workspace sont donc volontairement masqués lorsqu'un workspace actif est défini ; leur migration ou réaffectation doit être prévue avant déploiement si ces données doivent rester accessibles.
