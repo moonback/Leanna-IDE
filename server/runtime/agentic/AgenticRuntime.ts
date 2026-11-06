@@ -1232,6 +1232,7 @@ export class AgenticRuntime implements IAgentRuntime {
       temperature: 0.3,
       thinkingBudget: 0,
       maxOutputTokens: 16_384,
+      agentRole: agent.role,
     });
   }
 

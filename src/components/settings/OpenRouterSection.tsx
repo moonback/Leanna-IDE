@@ -500,6 +500,45 @@ export function OpenRouterSection() {
               </div>
             </Field>
 
+            {/* Adaptive model routing */}
+            <Field
+              label="Routage adaptatif des modèles"
+              hint="Leanna compare le coût estimé et les échecs récents par rôle. Le modèle global reste le choix de repli."
+            >
+              {(() => {
+                const routing = profile.agents?.modelRouting ?? { enabled: false, candidates: [] };
+                const updateRouting = (next: { enabled: boolean; candidates: string[] }) => {
+                  setField('agents', { ...profile.agents, modelRouting: next });
+                };
+                return (
+                  <div className="flex flex-col gap-2 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-base)' }}>
+                    <label className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={routing.enabled}
+                        onChange={event => updateRouting({ ...routing, enabled: event.target.checked })}
+                        className="accent-[var(--accent-primary)]"
+                      />
+                      Activer la sélection automatique (désactivée par défaut)
+                    </label>
+                    <textarea
+                      value={routing.candidates.join('\n')}
+                      onChange={event => updateRouting({ ...routing, candidates: event.target.value.split(/[\n,;]+/).map(value => value.trim()).filter(Boolean).slice(0, 20) })}
+                      rows={3}
+                      spellCheck={false}
+                      placeholder={'openai/gpt-4o-mini\nanthropic/claude-3.5-sonnet'}
+                      aria-label="Modèles candidats pour le routage adaptatif"
+                      className="w-full resize-y rounded-lg px-3 py-2 text-xs font-mono outline-none"
+                      style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                    />
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dimmed)' }}>
+                      Un ID par ligne. Le modèle global est ajouté automatiquement. Les modèles sans tarif configuré dans la télémétrie sont ignorés ; il faut au moins deux candidats tarifés. Les modèles imposés explicitement par un appel ou un agent restent prioritaires.
+                    </p>
+                  </div>
+                );
+              })()}
+            </Field>
+
             {/* Custom Model ID */}
             <Field label="Ou entrez un ID de modèle personnalisé" hint="Consultez openrouter.ai/models pour la liste complète.">
               <input

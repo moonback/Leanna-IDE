@@ -15,6 +15,7 @@ import { GoogleGenAI } from "@google/genai";
 import { telemetryService, type CallKind, type BillingUnit } from "../observability/TelemetryService.js";
 import { guardUntrustedContent } from "./promptInjectionGuard.js";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { getModelLatencySnapshot, recordModelLatency, selectAdaptiveModel } from "./modelRouter.js";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -24,6 +25,10 @@ interface TextGenProfile {
   openrouterApiKey?: string;
   /** Default temperature for conversational generation (0–2). */
   temperature?: number;
+  agents?: {
+    customAgents?: Array<{ role: string; model?: string }>;
+    modelRouting?: { enabled?: boolean; candidates?: string[] };
+  };
 }
 
 let _profile: TextGenProfile = {};
@@ -64,6 +69,24 @@ export function getActiveProvider(): 'gemini' | 'openrouter' {
   return _profile.textProvider || 'gemini';
 }
 
+/**
+ * Returns the effective default model for the active profile. This is used by
+ * planning/estimation code so projected costs follow the user's actual model
+ * selection instead of a hard-coded provider default.
+ */
+export function getActiveModel(agentRole?: string): string {
+  if (_profile.textProvider !== 'openrouter') return 'gemini-3.8-flash';
+  const agentModel = getAgentModelOverride(agentRole);
+  return agentModel || _profile.openrouterModel?.trim() || 'google/gemini-3.6-flash';
+}
+
+/** Modèle OpenRouter explicitement configuré pour un agent personnalisé. */
+function getAgentModelOverride(agentRole?: string): string | undefined {
+  if (!agentRole) return undefined;
+  const model = _profile.agents?.customAgents?.find((agent) => agent.role === agentRole)?.model;
+  return typeof model === 'string' && model.trim() ? model.trim() : undefined;
+}
+
 // ── Options for generateText ────────────────────────────────────────────────
 
 export interface GenerateTextOptions {
@@ -79,8 +102,10 @@ export interface GenerateTextOptions {
   maxOutputTokens?: number;
   /** Gemini model override (default gemini-3.8-flash) */
   geminiModel?: string;
-  /** OpenRouter model override (uses profile setting if not provided) */
+  /** OpenRouter model override (uses agent/profile setting if not provided) */
   openrouterModel?: string;
+  /** Role used to resolve an optional model configured on a custom agent. */
+  agentRole?: string;
   /** Gemini thinking budget override; use 0 when an agent needs visible output immediately. */
   thinkingBudget?: number;
   /** For Gemini: if you need to pass multimodal parts directly */
@@ -160,6 +185,21 @@ function isBreakerOpen(provider: Provider, cooldownMs: number): boolean {
   return true;
 }
 
+/**
+ * Only transient/provider-availability failures should trigger cross-provider
+ * failover. Authentication, permission, invalid-request and model-not-found
+ * errors are configuration/actionable errors: retrying another provider can
+ * hide a broken credential or silently change the requested model semantics.
+ */
+function shouldFailover(error: unknown): boolean {
+  const status = Number((error as { status?: unknown } | null)?.status);
+  if (Number.isFinite(status) && status >= 400 && status < 500) {
+    return status === 408 || status === 409 || status === 425 || status === 429;
+  }
+  // Fetch network failures and provider timeouts commonly have no HTTP status.
+  return true;
+}
+
 function recordProviderResult(provider: Provider, ok: boolean, threshold: number): void {
   const state = providerBreaker[provider];
   if (ok) {
@@ -201,6 +241,7 @@ async function generateOnce(provider: Provider, options: GenerateTextOptions, me
  */
 export async function generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
   options = guardOptionsPrompt(options);
+  options = applyAdaptiveModel(options);
   const primary: Provider = options.forceProvider || _profile.textProvider || 'gemini';
   const { enabled, breakerThreshold, breakerCooldownMs } = fallbackConfig();
 
@@ -231,8 +272,12 @@ export async function generateText(options: GenerateTextOptions): Promise<Genera
       recordProviderResult(provider, true, breakerThreshold);
       return result;
     } catch (error) {
-      recordProviderResult(provider, false, breakerThreshold);
+      const retryable = shouldFailover(error);
+      // Les erreurs transitoires alimentent le breaker ; les 4xx permanentes
+      // doivent rester visibles et ne pas déclarer le fournisseur indisponible.
+      if (retryable) recordProviderResult(provider, false, breakerThreshold);
       errors.push(`${provider}: ${(error as Error).message}`);
+      if (!retryable) break;
     } finally {
       release();
     }
@@ -300,9 +345,43 @@ function promptChars(options: GenerateTextOptions): number {
   return (options.systemPrompt?.length ?? 0) + (options.prompt?.length ?? 0);
 }
 
+function applyAdaptiveModel(options: GenerateTextOptions): GenerateTextOptions {
+  const provider = options.forceProvider || _profile.textProvider || 'gemini';
+  const routing = _profile.agents?.modelRouting;
+  if (provider !== 'openrouter' || routing?.enabled !== true) return options;
+  // Explicit call-level and per-agent model choices are intentional pins.
+  if (options.openrouterModel?.trim() || getAgentModelOverride(options.agentRole)) return options;
+  const candidates = [
+    ...(Array.isArray(routing.candidates) ? routing.candidates : []),
+    _profile.openrouterModel?.trim() || 'google/gemini-3.6-flash',
+  ];
+  const usage = telemetryService.getUsageRecords({
+    ...(options.agentRole ? { agentRole: options.agentRole } : {}),
+    provider: 'openrouter',
+    limit: 200,
+  });
+  const failures = telemetryService.getRecentFailures(200).filter((failure) =>
+    failure.provider === 'openrouter' && (!options.agentRole || failure.agentRole === options.agentRole),
+  );
+  const decision = selectAdaptiveModel({
+    candidates,
+    promptChars: promptChars(options),
+    maxOutputTokens: options.maxTokens ?? options.maxOutputTokens,
+    usage,
+    failures,
+    latencyMsByModel: getModelLatencySnapshot(),
+  });
+  if (!decision) return options;
+  console.info('[ModelRouter] role=' + (options.agentRole ?? 'general') +
+    ' complexity=' + decision.complexity + ' model=' + decision.model +
+    ' estimatedCostUsd=' + decision.estimatedCostUsd.toFixed(6) +
+    ' observations=' + decision.observedSuccesses + 'success/' + decision.observedFailures + 'failure');
+  return { ...options, openrouterModel: decision.model };
+}
+
 function modelFor(provider: Provider, options: GenerateTextOptions): string {
   return provider === 'openrouter'
-    ? options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash'
+    ? options.openrouterModel || getAgentModelOverride(options.agentRole) || _profile.openrouterModel || 'google/gemini-3.6-flash'
     : options.geminiModel || 'gemini-3.8-flash';
 }
 
@@ -388,7 +467,7 @@ function recordUsage(
   outputText: string,
   meta: AttemptMeta,
   streamed: boolean,
-  extra: { kind?: CallKind; units?: number; unit?: BillingUnit } = {},
+  extra: { kind?: CallKind; units?: number; unit?: BillingUnit; agentRole?: string } = {},
 ): { tokenUsage: NonNullable<GenerateTextResult['tokenUsage']>; costUsd: number } {
   const ctx = getTelemetryContext();
   const estimated = !usage;
@@ -406,7 +485,7 @@ function recordUsage(
   const costUsd = telemetryService.recordTokenUsage({
     missionId: ctx.missionId,
     taskId: ctx.taskId,
-    agentRole: ctx.agentRole,
+    agentRole: extra.agentRole ?? ctx.agentRole,
     toolName: ctx.toolName,
     provider,
     model,
@@ -544,14 +623,14 @@ export function recordModelCallFailure(provider: Provider, model: string, error:
   recordFailure(provider, model, error, {});
 }
 
-function recordFailure(provider: Provider, model: string, error: unknown, meta: AttemptMeta): void {
+function recordFailure(provider: Provider, model: string, error: unknown, meta: AttemptMeta, agentRole?: string): void {
   const ctx = getTelemetryContext();
   telemetryService.recordFailedCall({
     provider,
     model,
     missionId: ctx.missionId,
     taskId: ctx.taskId,
-    agentRole: ctx.agentRole,
+    agentRole: agentRole ?? ctx.agentRole,
     isFallback: meta.isFallback,
     error: ((error as Error)?.message ?? String(error)).slice(0, 300),
   });
@@ -657,7 +736,7 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
       config: geminiConfig(options),
     });
   } catch (error) {
-    recordFailure('gemini', model, error, {});
+    recordFailure('gemini', model, error, {}, options.agentRole);
     throw error;
   }
 
@@ -683,7 +762,7 @@ async function streamWithGemini(options: GenerateTextStreamOptions): Promise<str
     }
   } catch (error) {
     // Flux interrompu : la partie déjà générée est facturée — on la comptabilise.
-    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true);
+    recordUsage('gemini', model, normalizeGeminiUsage(usageMetadata), promptChars(options), fullText, {}, true, { agentRole: options.agentRole });
     throw error;
   }
 
@@ -704,7 +783,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
     return streamWithGemini(options);
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
+  const model = modelFor('openrouter', options);
 
   const messages: any[] = [];
   if (options.systemPrompt) {
@@ -781,7 +860,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       }
     }
 
-    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
+    recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true, { agentRole: options.agentRole });
     options.onDone?.(fullText);
     return fullText;
   } catch (e: any) {
@@ -790,7 +869,7 @@ async function streamWithOpenRouter(options: GenerateTextStreamOptions): Promise
       // Réponse acceptée puis flux coupé/annulé : la génération partielle est facturée.
       recordUsage('openrouter', model, normalizeOpenRouterUsage(usage), promptChars(options), fullText, {}, true);
     } else {
-      recordFailure('openrouter', model, e, {});
+      recordFailure('openrouter', model, e, {}, options.agentRole);
     }
     if (e.name === 'AbortError') {
       options.onDone?.(``);
@@ -861,7 +940,7 @@ async function generateWithGemini(options: GenerateTextOptions, meta: AttemptMet
     }
 
     const { tokenUsage, costUsd } = recordUsage(
-      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), promptChars(options), text, meta, false,
+      'gemini', model, normalizeGeminiUsage(rawResponse.usageMetadata), promptChars(options), text, meta, false, { agentRole: options.agentRole },
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);
@@ -880,7 +959,7 @@ async function generateWithGemini(options: GenerateTextOptions, meta: AttemptMet
       ...(meta.isFallback ? { isFallback: true } : {}),
     };
   } catch (error) {
-    recordFailure('gemini', model, error, meta);
+    recordFailure('gemini', model, error, meta, options.agentRole);
     span.recordException(error as Error);
     span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
     span.end();
@@ -907,7 +986,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     throw error;
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
+  const model = modelFor('openrouter', options);
 
   // Start OTel span for this model call
   const span = telemetryService.startModelCallSpan('openrouter', model, getTelemetryContext().taskId);
@@ -922,6 +1001,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
   // 120s au lieu de 60s : les agents font des sorties longues (code complet, analyses, délégations)
   // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
   const timeoutId = setTimeout(() => controller.abort(), 120_000);
+  const startedAt = Date.now();
 
   try {
     const messages: any[] = [];
@@ -959,7 +1039,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     const text = data.choices?.[0]?.message?.content || '';
 
     const { tokenUsage, costUsd } = recordUsage(
-      'openrouter', model, normalizeOpenRouterUsage(data.usage), promptChars(options), text, meta, false,
+      'openrouter', model, normalizeOpenRouterUsage(data.usage), promptChars(options), text, meta, false, { agentRole: options.agentRole },
     );
     span.setAttribute('tokens.input', tokenUsage.inputTokens);
     span.setAttribute('tokens.output', tokenUsage.outputTokens);
@@ -974,7 +1054,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
   } catch (e: any) {
     clearTimeout(timeoutId);
 
-    recordFailure('openrouter', model, e, meta);
+    recordFailure('openrouter', model, e, meta, options.agentRole);
     span.recordException(e);
     span.setStatus({ code: 2, message: e.message }); // ERROR
     span.end();
@@ -984,5 +1064,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     // circuit breaker and avoid a redundant double call. This keeps failover
     // in one place instead of two competing mechanisms.
     throw e;
+  } finally {
+    recordModelLatency(model, Date.now() - startedAt);
   }
 }

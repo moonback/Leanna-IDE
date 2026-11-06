@@ -241,7 +241,9 @@ export class AgentOrchestrator {
 
     // Lancer l'exécution en arrière-plan
     this.executor.execute(task).catch((err) => {
-      log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
+      if (task.status !== "cancelled") {
+        log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
+      }
     });
 
     return task;
@@ -646,6 +648,8 @@ export class AgentOrchestrator {
     if (!task) return false;
 
     if (task.status === "pending") {
+      // L'exécuteur central retire la tâche de sa file si elle attend un créneau.
+      this.executor.cancel(taskId);
       task.status = "cancelled";
       task.completedAt = new Date().toISOString();
       task.result = {

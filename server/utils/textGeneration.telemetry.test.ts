@@ -12,6 +12,7 @@ import {
   setTextGenerationProfile,
   runWithTelemetryContext,
   getTelemetryContext,
+  getActiveModel,
   BudgetExceededError,
   normalizeGeminiUsage,
   normalizeOpenRouterUsage,
@@ -23,6 +24,7 @@ const svc: any = telemetryService;
 const originalFetch = globalThis.fetch;
 const originalGenerateInternal = (Models.prototype as any).generateContentInternal;
 let fetchCalls = 0;
+let requestedModels: string[] = [];
 
 type OrBehaviour = { status?: number; usage?: any; content?: string; delayMs?: number; stream?: boolean };
 
@@ -33,6 +35,7 @@ function mockOpenRouter(behaviour: OrBehaviour | (() => OrBehaviour)) {
     if (b.delayMs) await new Promise((r) => setTimeout(r, b.delayMs));
     if (b.status && b.status >= 400) return new Response('upstream error', { status: b.status });
     const body = JSON.parse(init.body);
+    requestedModels.push(body.model);
     if (body.stream) {
       const enc = new TextEncoder();
       const lines = [
@@ -57,6 +60,7 @@ beforeEach(async () => {
   svc.recentRecords = [];
   svc.recentFailures = [];
   fetchCalls = 0;
+  requestedModels = [];
   delete process.env.LEANNA_PROVIDER_FALLBACK;
   setTextGenerationProfile({ textProvider: 'openrouter', openrouterApiKey: 'sk-test' });
   (Models.prototype as any).generateContentInternal = originalGenerateInternal;
@@ -70,6 +74,50 @@ after(async () => {
 });
 
 const USAGE = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 };
+
+test('custom agent model overrides the profile model without overriding an explicit call model', async () => {
+  setTextGenerationProfile({
+    textProvider: 'openrouter',
+    openrouterApiKey: 'sk-test',
+    openrouterModel: 'openai/gpt-6-luna',
+    agents: {
+      customAgents: [{ role: 'coder', model: 'cohere/north-mini-code:free' }],
+      modelRouting: { enabled: true, candidates: ['openai/gpt-4o-mini'] },
+    },
+  });
+  assert.equal(getActiveModel('coder'), 'cohere/north-mini-code:free');
+  assert.equal(getActiveModel('reviewer'), 'openai/gpt-6-luna');
+
+  mockOpenRouter({ usage: USAGE });
+  await generateText({ prompt: 'code task', agentRole: 'coder' });
+  await generateText({ prompt: 'explicit override', agentRole: 'coder', openrouterModel: 'openai/gpt-6-luna-pro' });
+  assert.deepEqual(requestedModels, ['cohere/north-mini-code:free', 'openai/gpt-6-luna-pro']);
+  assert.deepEqual(telemetryService.getUsageRecords().map((record) => record.agentRole), ['coder', 'coder']);
+});
+
+test('adaptive routing is opt-in and explicit model overrides remain pinned', async () => {
+  setTextGenerationProfile({
+    textProvider: 'openrouter',
+    openrouterApiKey: 'sk-test',
+    openrouterModel: 'anthropic/claude-3.5-sonnet',
+    agents: { modelRouting: { enabled: true, candidates: ['openai/gpt-4o-mini'] } },
+  });
+  mockOpenRouter({ usage: USAGE });
+  await generateText({ prompt: 'short task', agentRole: 'reviewer' });
+  await generateText({ prompt: 'pinned task', agentRole: 'reviewer', openrouterModel: 'anthropic/claude-3.5-sonnet' });
+  assert.deepEqual(requestedModels, ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet']);
+  assert.deepEqual(telemetryService.getUsageRecords().map((record) => record.agentRole), ['reviewer', 'reviewer']);
+});
+
+test('getActiveModel follows the selected OpenRouter model and safe defaults', () => {
+  setTextGenerationProfile({ textProvider: 'openrouter', openrouterModel: 'anthropic/claude-3.5-sonnet' });
+  assert.equal(getActiveModel(), 'anthropic/claude-3.5-sonnet');
+  setTextGenerationProfile({ textProvider: 'openrouter', openrouterModel: '   ' });
+  assert.equal(getActiveModel(), 'google/gemini-3.6-flash');
+  setTextGenerationProfile({ textProvider: 'gemini' });
+  assert.equal(getActiveModel(), 'gemini-3.8-flash');
+});
+
 
 // ─── Comptage / normalisation ────────────────────────────────────────────────
 
@@ -172,6 +220,20 @@ test('primary failure then fallback success: attributed to the fallback provider
   const failures = telemetryService.getRecentFailures();
   assert.equal(failures.length, 1);
   assert.equal(failures[0].provider, 'gemini');
+});
+
+test('permanent OpenRouter 401 does not silently fail over to another provider', async () => {
+  mockOpenRouter({ status: 401 });
+  await assert.rejects(() => generateText({ prompt: 'x' }), /OpenRouter 401/);
+  assert.equal(fetchCalls, 1, 'the invalid credential must not trigger a second provider');
+  assert.equal(telemetryService.getRecentFailures().length, 1);
+});
+
+test('transient OpenRouter 429 remains eligible for cross-provider failover', async () => {
+  mockOpenRouter({ status: 429 });
+  await assert.rejects(() => generateText({ prompt: 'x' }), /Aucune clé Gemini API disponible/);
+  assert.equal(fetchCalls, 1, 'OpenRouter is attempted once before Gemini fallback');
+  assert.equal(telemetryService.getRecentFailures().length, 2);
 });
 
 test('all providers failing: error raised, attempts bounded, no tokens recorded', async () => {

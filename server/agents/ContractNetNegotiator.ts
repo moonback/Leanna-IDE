@@ -25,6 +25,7 @@ import type { AgentMessage, TaskRequestPayload } from "./AgentCommunication.js";
 import { AgentMessageBus, agentMessageBus } from "./AgentMessageBus.js";
 import { getAgentDefinition } from "./roles.js";
 import { createLogger } from "../utils/logger.js";
+import { strategyMemory, type StrategyMemory } from "../knowledge/StrategyMemory.js";
 
 const log = createLogger("ContractNetNegotiator");
 
@@ -107,6 +108,8 @@ export interface NegotiatorOptions {
   weights?: Partial<ScoringWeights>;
   /** Initiateur par défaut des appels d'offres. */
   initiator?: AgentRole;
+  /** Source de fiabilité injectable (notamment pour les tests isolés). */
+  strategyMemory?: StrategyMemory;
 }
 
 const DEFAULT_WEIGHTS: ScoringWeights = { skill: 0.6, confidence: 0.25, load: 0.15 };
@@ -130,6 +133,7 @@ export class ContractNetNegotiator {
   private readonly biddingWindowMs: number;
   private readonly weights: ScoringWeights;
   private readonly initiator: AgentRole;
+  private readonly strategyMemory: StrategyMemory;
 
   /** Enchères ouvertes : taskId → bids reçus. */
   private openCalls: Map<string, Bid[]> = new Map();
@@ -139,6 +143,7 @@ export class ContractNetNegotiator {
     this.biddingWindowMs = options.biddingWindowMs ?? 500;
     this.weights = { ...DEFAULT_WEIGHTS, ...options.weights };
     this.initiator = options.initiator ?? NEGOTIATION_INITIATOR;
+    this.strategyMemory = options.strategyMemory ?? strategyMemory;
   }
 
   // ─── API publique ──────────────────────────────────────────────────────────
@@ -312,7 +317,7 @@ export class ContractNetNegotiator {
     if (!definition) return null;
 
     const skillMatch = this.computeSkillMatch(definition.capabilities, task.requiredCapabilities);
-    const confidence = this.estimateConfidence(role);
+    const confidence = this.estimateConfidence(role, task.requiredCapabilities);
     const loadPenalty = this.estimateLoadPenalty(role);
 
     return { role, skillMatch, confidence, loadPenalty };
@@ -491,16 +496,33 @@ export class ContractNetNegotiator {
   }
 
   /**
-   * Estime la fiabilité d'un rôle à partir du taux de succès observé sur le bus.
-   * Valeur neutre (0.5) en l'absence de données — pas de dépendance fantôme.
+   * Estime la fiabilité du candidat sur les capacités réellement requises.
+   *
+   * Le bus mesure du trafic, pas la réussite des tâches : son successRate global
+   * ne doit jamais être utilisé comme proxy de performance d'un rôle. On lit
+   * donc StrategyMemory, qui conserve les issues observées par skill/capacité.
+   * Un a priori neutre (2 succès / 2 échecs) évite qu'un échantillon minuscule
+   * produise une confiance artificiellement proche de 0 ou de 1.
    */
-  private estimateConfidence(role: AgentRole): number {
-    const metrics = this.bus.getMetrics();
-    const sent = metrics.byAgentRole[role];
-    if (!sent || metrics.totalMessages === 0) return 0.5;
-    // successRate est global au bus ; on l'utilise comme proxy de fiabilité
-    // tant qu'aucune métrique par-rôle n'est disponible.
-    return clamp01(metrics.successRate);
+  private estimateConfidence(role: AgentRole, requiredCapabilities: string[]): number {
+    const definition = getAgentDefinition(role);
+    if (!definition || requiredCapabilities.length === 0) return 0.5;
+
+    const relevantCapabilities = definition.capabilities.filter((capability) =>
+      requiredCapabilities.includes(capability)
+    );
+    let observedCalls = 0;
+    let weightedSuccesses = 0;
+
+    for (const capability of relevantCapabilities) {
+      const stats = this.strategyMemory.getSkillStats(capability);
+      if (!stats || stats.totalCalls <= 0) continue;
+      observedCalls += stats.totalCalls;
+      weightedSuccesses += stats.recentSuccessRate * stats.totalCalls;
+    }
+
+    if (observedCalls === 0) return 0.5;
+    return clamp01((weightedSuccesses + 2) / (observedCalls + 4));
   }
 
   /** Estime la charge normalisée d'un rôle à partir de getAgentLoad(). */
