@@ -1250,6 +1250,10 @@ async function startServer() {
     getCurrentProfile: () => currentProfile,
     createGeminiAI: getGeminiAI,
     activeGeminiSessions,
+    skillManager,
+    getWorkspaceRoot,
+    browserReadPending,
+    browserActionPending,
   });
 
   // ── Graceful shutdown — extrait dans server/lifecycle.ts ────────────────
