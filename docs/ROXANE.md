@@ -9,7 +9,7 @@ Depuis une conversation vocale active avec Leanna, prononcer par exemple :
 - « Roxane, rejoins-nous »
 - « Roxane, donne ton avis »
 - « Roxane, tu en penses quoi ? »
-- « Roxane, je veux trancher » (pendant le débat, « je tranche » arrête le débat et lance la synthèse)
+- Pendant le débat, « je tranche » arrête les échanges et lance la synthèse.
 
 Le déclencheur ouvre le panneau et démarre le débat avec le sujet détecté et un extrait des 24 dernières interventions. Le bouton global Roxane permet également de démarrer manuellement un débat.
 
