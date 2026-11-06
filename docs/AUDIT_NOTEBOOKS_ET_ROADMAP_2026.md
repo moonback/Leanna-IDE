@@ -450,6 +450,17 @@ Cette section suit les corrections effectivement apportées après l'audit. Elle
 
 **Limites à valider :** la réconciliation s'appuie sur les sources déjà présentes dans le fichier notebook ; elle ne restaure pas une source perdue. Les embeddings sont persistés avec le mécanisme asynchrone existant. `embedTexts()` convertit actuellement les erreurs de batch en vecteurs vides : le rapport `missing` les rend visibles, mais une politique de retry avec backoff et un statut durable par chunk restent à construire. Aucun test automatisé dédié à cette passe n'a encore été exécuté.
 
+### Quatrième passe — ingestion idempotente et ordre de persistance
+
+| Sujet | État | Détail |
+|---|---|---|
+| Empreinte de contenu | Implémenté | `Source.contentHash` reçoit une empreinte SHA-256 du texte extrait. Les anciens enregistrements sont compatibles : l'empreinte est recalculée à la comparaison. |
+| Déduplication des imports | Implémenté | `NotebookManager.addSource()` compare le type, l'origine normalisée et l'empreinte. Un import identique conserve l'identifiant de la source et ses IDs de chunks au lieu d'ajouter un doublon. |
+| Ordre source → embeddings | Corrigé | `SourceIngester` n'indexe plus les embeddings. `addSource()` écrit d'abord le notebook de façon atomique, puis déclenche l'indexation. Si l'écriture échoue, la source est retirée de la mémoire et l'indexation n'est pas lancée. |
+| Réparation au nouvel import | Renforcé | Un import reconnu comme doublon relance l'indexation des chunks canoniques : cela peut réparer un index partiellement absent sans dupliquer la source. |
+
+**Limites :** une source modifiée à la même origine est actuellement enregistrée comme une nouvelle entrée (pas de remplacement/versionnement de l'entrée précédente). La déduplication dépend du texte extrait et du couple type/origine ; elle ne détecte pas les fichiers identiques sous des noms ou origines différents. Les appels concurrents identiques peuvent encore lancer deux tentatives d'embedding, même si une seule source canonique est conservée. L'indexation reste asynchrone et sa reprise après crash repose sur `reconcileNotebook()` ; aucun test automatisé ni typecheck n'a été exécuté dans cette session.
+
 ### Contrôle des routes statiques
 
 Le middleware d'isolation est placé avant les routes métier. Les segments réservés `stats`, `sandbox` et `embeddings` sont explicitement laissés aux endpoints statiques correspondants (`/stats/global`, `/sandbox/folders`, `/embeddings/memory`) afin que le garde workspace ne les interprète pas comme des identifiants de notebook.
