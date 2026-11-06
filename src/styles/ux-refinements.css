@@ -70,3 +70,30 @@
     max-width: 46vw;
   }
 }
+
+
+/* La navigation des paramètres reste présente sans monopoliser la largeur utile. */
+.settings-view .settings-nav {
+  width: clamp(184px, 19vw, 232px) !important;
+}
+
+@media (max-width: 900px) {
+  .settings-view .settings-nav {
+    width: 176px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-view .settings-nav {
+    width: 148px !important;
+  }
+
+  .settings-view .settings-nav > div:first-child {
+    padding-inline: 8px;
+  }
+
+  .settings-view .settings-nav button {
+    gap: 6px;
+    padding-inline: 7px;
+  }
+}
