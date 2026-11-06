@@ -48,6 +48,34 @@ export function createEmbeddingsRouter(): Router {
     }
   });
 
+  router.post("/:id/embeddings/reconcile", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id);
+      if (!notebook) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+
+      const report = await embeddingStore.reconcileNotebook(
+        notebook.sources.map(source => ({
+          id: source.id,
+          chunks: (source.chunks || []).map(chunk => ({ id: chunk.id, content: chunk.content })),
+        })),
+        notebook.id
+      );
+
+      res.json({
+        status: report.missing === 0 ? "success" : "partial",
+        message: report.missing === 0
+          ? "Index vectoriel réconcilié avec les sources du notebook."
+          : "Réconciliation partielle : certains embeddings restent indisponibles.",
+        ...report,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   router.get("/:id/embeddings/stats", (req: Request, res: Response): void => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
