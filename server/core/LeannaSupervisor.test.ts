@@ -471,10 +471,8 @@ test("crash recovery quarantines an interrupted attempt instead of replaying it"
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-crash-recovery-"));
   const missionDir = path.join(dir, "missions");
   const checkpointDir = path.join(dir, "checkpoints");
-  const ledgerPath = path.join(dir, "ledger.jsonl");
   const store = new DurableMissionStore(missionDir);
   const checkpoints = new CheckpointManager({ gateway: memGateway({ "a.ts": "before" }), dirOverride: checkpointDir });
-  const ledger = new ExecutionLedger(ledgerPath);
   const checkpoint = checkpoints.snapshot(["a.ts"], { missionId: "m-crash", label: "attempt-2" });
   const machine = new MissionStateMachine("m-crash");
   machine.transition("PLANNING");

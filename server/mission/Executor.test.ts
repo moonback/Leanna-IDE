@@ -513,3 +513,94 @@ test('supervised mode: a mission is never "completed" while the Supervisor rejec
   assert.notEqual(done.status, 'completed', 'statut mission cohérent avec le verdict du Supervisor');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test('supervisor evidence includes files written through apply_patch', () => {
+  const executor = new Executor();
+  const mission = {
+    id: 'mission-apply-patch',
+    getState: () => ({
+      title: 'Patch a source file',
+      goals: {
+        root: { id: 'root', parentId: null, status: 'completed', plannedActions: [] },
+        child: {
+          id: 'child',
+          parentId: 'root',
+          status: 'completed',
+          plannedActions: [{
+            id: 'patch-1',
+            skillName: 'apply_patch',
+            args: { path: 'src/example.ts', patch: '...' },
+            status: 'completed',
+            result: { ok: true },
+          }],
+        },
+      },
+    }),
+  };
+  const outcome = (executor as any).buildMissionOutcome(mission);
+  assert.deepEqual(outcome.evidence.filesModified, ['src/example.ts']);
+  assert.deepEqual(outcome.evidence.toolsExecuted, ['apply_patch']);
+});
+
+test('artifact intent does not misclassify analytical goals as file deliverables', () => {
+  const executor = new Executor();
+  const expectsArtifact = (goal: unknown) => (executor as any).goalExpectsArtifact(goal);
+
+  assert.equal(expectsArtifact({
+    title: 'Analyser la stack technique et l’architecture',
+    description: 'Identifier les frameworks, dépendances et composants existants.',
+    successCriteria: ['Architecture comprise', 'Plan technique identifié', 'Documentation existante analysée'],
+  }), false, 'analysis and discovery criteria must not require a write');
+
+  assert.equal(expectsArtifact({
+    title: 'Mettre à jour le README.md',
+    description: 'Écrire une documentation complète et enregistrer le fichier.',
+    successCriteria: ['README.md mis à jour'],
+  }), true, 'an explicit file update must require a persistent artifact');
+
+  assert.equal(expectsArtifact({
+    title: 'Produire le rapport d’audit',
+    description: 'Rédiger et écrire un rapport Markdown documentant les résultats.',
+    successCriteria: ['Rapport Markdown créé'],
+  }), true, 'an explicit report-writing objective must require an artifact');
+
+  assert.equal(expectsArtifact({
+    title: 'Examiner les fichiers du projet',
+    description: 'Lire le plan de déploiement et comprendre les documents existants.',
+    successCriteria: ['Fichiers pertinents identifiés', 'Plan compris'],
+  }), false, 'reading existing files and plans is not a production request');
+});
+
+
+test('evidence verification accepts a successful analysis without requiring a file write', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-exec-analysis-'));
+  try {
+    const executor = new Executor();
+    executor.setEvidenceEngine(new EvidenceEngine(path.join(dir, 'ev')), true);
+    const goal = {
+      id: 'analysis-goal',
+      title: 'Analyser la stack technique et l’architecture',
+      description: 'Identifier les frameworks, dépendances et composants existants.',
+      successCriteria: ['Architecture comprise', 'Plan technique identifié', 'Documentation existante analysée'],
+    };
+    const verdict = (executor as any).verifyByEvidence(
+      { id: 'analysis-mission' },
+      goal,
+      [{
+        id: 'read-1',
+        skillName: 'read_project_file',
+        args: { path: 'package.json' },
+        rationale: 'Lire la configuration',
+        score: 50,
+        order: 1,
+        status: 'completed',
+        result: { ok: true },
+      }],
+    );
+
+    assert.equal(verdict.passed, true, 'a factual successful analysis must not fail the artifact check');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -6,7 +6,7 @@ import { SkillScorer } from "./SkillScorer.js";
 import type { MissionStatePort } from "./LocalMissionStore.js";
 import { AutonomyPolicy } from "./AutonomyPolicy.js";
 import { EvidenceEngine, type EvidenceInput, type CheckResult } from "../core/EvidenceEngine.js";
-import type { LeannaSupervisor, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
+import type { LeannaSupervisor, MissionRunner, RunnerOutcome, RecoveryDecision } from "../core/LeannaSupervisor.js";
 import type {  PlannedAction,  ReflectionResult,
   MissionConfig,
   MissionPlan,
@@ -250,7 +250,7 @@ export class Executor {
    * présence (réussie) dans un objectif prouve qu'il a dépassé l'exploration.
    */
   private static readonly WRITE_TOOLS = [
-    "write_project_file", "modify_project_file", "patch_project_file",
+    "write_project_file", "modify_project_file", "apply_patch", "patch_project_file",
     "create_project_directory", "rename_project_file",
   ];
 
@@ -1454,21 +1454,34 @@ export class Executor {
   }
 
   /**
-   * Heuristique : l'objectif attend-il un livrable concret (fichier/document) ?
-   * On s'appuie sur le vocabulaire du titre, de la description et des critères
-   * de succès (plan, rapport, document, fichier, .md, écrire, générer, produire…).
-   * Objectif purement analytique (ex. « comprendre l'architecture ») → false :
-   * on ne force alors aucune écriture.
+   * Détermine si l'objectif exige réellement un artefact persistant.
+   *
+   * Ne pas déduire une écriture de la simple présence de noms comme
+   * « plan », « fichier », « document » ou « rapport » : un objectif d'analyse
+   * peut précisément consister à lire/comprendre ces éléments. On exige une
+   * intention de production explicite (verbe d'action), ce qui évite qu'un
+   * critère tel que « plan technique identifié » déclenche un faux échec
+   * artefact-produit.
    */
   private goalExpectsArtifact(goal: Goal): boolean {
     const haystack = [
       goal.title,
       goal.description,
       ...(goal.successCriteria ?? []),
-    ].join(" ").toLowerCase();
-    return /\b(plan|rapport|report|document|documenter|fichier|écrire|ecrire|rédiger|rediger|générer|generer|produire|créer|creer|livrable|\.md|markdown|synth[èe]se)\b/.test(
-      haystack
-    );
+    ]
+      .join(" ")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    // Une formulation explicitement négative ne demande pas de production.
+    if (/\b(?:sans|ne pas|n'pas|aucun|aucune)\s+(?:ecrire|rediger|produire|generer|creer|modifier|documenter|enregistrer|sauvegarder)\b/.test(haystack)) {
+      return false;
+    }
+
+    // L'intention doit être exprimée par une action de production/modification.
+    // « plan », « document », « fichier » seuls ne suffisent volontairement pas.
+    return /\b(?:ecrire|rediger|produire|generer|creer|mettre a jour|modifier|patcher|enregistrer|sauvegarder|exporter|livrer|implementer|documenter|ajouter|supprimer|renommer)\b/.test(haystack);
   }
 
   /**
