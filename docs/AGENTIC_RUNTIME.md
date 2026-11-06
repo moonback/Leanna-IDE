@@ -1,6 +1,13 @@
+> **Mise à jour documentaire (2026-11-06) :** le nom réel du moteur est `AgenticRuntime`
+> (`server/runtime/agentic/AgenticRuntime.ts`). Les références de l'ancienne version à
+> `AgentRuntime.ts` ont été corrigées. Pour la distinction entre moteur de missions et
+> moteur de tâches d'agents, consulter aussi `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md`.
+>
+> ---
+>
 # Leanna — Runtime agentique
 
-Date de mise à jour : 2026-09-24.
+Date de mise à jour : 2026-11-06.
 
 Ce document décrit le **runtime agentique** de Leanna : la boucle qui donne réellement
 leurs outils aux agents et qui exécute une tâche via
@@ -53,7 +60,7 @@ agent_orchestrate / delegateTask / TaskScheduler / AutonomousLoop / AutonomousAg
         ▼
    AgentRuntimeExecutor            server/agents/AgentRuntimeExecutor.ts
         ▼
-   AgentRuntime (agentique)        server/runtime/agentic/AgentRuntime.ts
+   AgenticRuntime (agentique)        server/runtime/agentic/AgenticRuntime.ts
         ├─ ToolRegistry            server/runtime/ToolRegistry.ts   (permissions, dry-run, timeout, métriques)
         ├─ WorkspaceState          server/agents/WorkspaceState.ts  (hash SHA-256, verification record)
         └─ AgentRepairLoop         server/agents/AgentRepairLoop.ts (réparation bornée et progressive)
@@ -64,7 +71,7 @@ agent_orchestrate / delegateTask / TaskScheduler / AutonomousLoop / AutonomousAg
 | Fichier | Rôle |
 |---|---|
 | `server/runtime/agentic/types.ts` | Contrats : `AgentTask`, `Plan`, `PlanStep`, `Observation`, `Verification`, `Recovery`, `AgentResult`, `AgentBudget`, `BudgetUsage`, `IAgentRuntime`. |
-| `server/runtime/agentic/AgentRuntime.ts` | La boucle : `run / plan / execute / verify / recover / finalize`. |
+| `server/runtime/agentic/AgenticRuntime.ts` | La boucle : `run / plan / execute / verify / recover / finalize`. |
 | `server/runtime/agentic/ToolPromptBuilder.ts` | Résolution des outils réels de l'agent + sections de prompt (outils, budget, historique). |
 | `server/runtime/agentic/index.ts` | Barrel + `createAgentRuntime(runtime, { budget })`. |
 | `server/agents/AgentTaskRunner.ts` | Interface partagée `{ execute, runTool? }` implémentée par les deux moteurs. |
