@@ -23,6 +23,7 @@ graph TD
         subgraph WS["WebSocket Servers"]
             WS_LIVE["/live — Gemini Live"]
             WS_NOTEBOOK["/notebook-live — RAG vocal"]
+            WS_DUO["/voice-duo-live — 2 sessions Gemini Live"]
             WS_SANDBOX["/sandbox-watch"]
             WS_AUTONOMY["/autonomy — timeline"]
             WS_TERMINAL["/terminal"]
@@ -384,6 +385,7 @@ Le token est auto-généré (256 bits, URL-safe base64) au premier démarrage si
 |---|---|---|
 | `/live` | Session Gemini Live bidirectionnelle (texte, audio, vidéo, tool calls) | Cookie `Leanna_token` |
 | `/notebook-live` | Assistant vocal notebook (RAG groundé : `notebook_search` + `generate_document`) | Cookie `Leanna_token` |
+| `/voice-duo-live` | Deux sessions Gemini Live indépendantes (Leanna + Roxane), arbitrage des tours et barge-in | Cookie `Leanna_token` |
 | `/sandbox-watch` | Notifications temps réel des fichiers modifiés dans le sandbox | Cookie `Leanna_token` |
 | `/autonomy` | Timeline temps réel du runtime autonome (lecture seule, événements `autonomy:*` + snapshot initial) | Cookie `Leanna_token` |
 | `/terminal` | Terminal PTY interactif | Token query/cookie |
