@@ -41,7 +41,6 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
         try { session.close(); } catch { /* already closed */ }
         deps.activeGeminiSessions.delete(session);
       }
-      send({ type: 'closed' });
     };
     const rolePrompt = (role: 'leanna' | 'roxane') => role === 'leanna'
       ? [
@@ -60,8 +59,11 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     const connectSession = async (role: 'leanna' | 'roxane') => {
       const voiceName = role === 'roxane' ? config.voice : (profile.aiVoice || 'Aoede');
+      const liveModel = role === 'roxane' && config.provider === 'gemini' && /-live(?:-|$)/i.test(config.model)
+        ? config.model
+        : 'gemini-3.8-live';
       const session = await deps.createGeminiAI().live.connect({
-        model: 'gemini-3.8-live',
+        model: liveModel,
         config: {
           responseModalities: [Modality.AUDIO],
           temperature: role === 'roxane' ? config.temperature : (profile.temperature ?? 0.7),
@@ -74,7 +76,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
           onmessage: (message: LiveServerMessage) => {
             if (message.usageMetadata) {
               recordModelCallUsage({
-                provider: 'gemini', model: 'gemini-3.8-live', rawUsage: message.usageMetadata,
+                provider: 'gemini', model: role === 'roxane' ? config.model : 'gemini-3.8-live', rawUsage: message.usageMetadata,
                 promptCharCount: 0, outputText: '', toolName: `roxane_debate_live_${role}`, kind: 'live',
               });
             }
@@ -135,6 +137,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     const start = async (message: any) => {
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
+      if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
       topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
       context = typeof message.context === 'string' ? message.context.slice(-MAX_CONTEXT) : '';
       if (!topic) { send({ type: 'error', message: 'Le sujet du débat est obligatoire.' }); return; }
