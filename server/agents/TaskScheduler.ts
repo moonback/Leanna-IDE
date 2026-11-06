@@ -209,7 +209,7 @@ export class TaskScheduler {
 
         log.info(`[${orchShortId}] [task:${taskShortId}] ➤ [${agentName}] Lancement: "${task.title}" | Dépendances satisfaites: ${deps.length > 0 ? deps.map(d => d.slice(0, 8)).join(", ") : "aucune"}`);
         const taskStart = Date.now();
-        await this.globalLimiter.run(() => this.executor.execute(task));
+        await this.globalLimiter.run(() => this.executor.execute(task), task.id);
         const taskMs = Date.now() - taskStart;
 
         syncTerminalStatuses();
