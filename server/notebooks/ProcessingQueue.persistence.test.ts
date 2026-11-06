@@ -21,7 +21,8 @@ test("ProcessingQueue restores pending source payloads after restart", () => {
     assert.equal(pending.length, 1);
     assert.equal(pending[0].id, "source-task-1");
     assert.equal(pending[0].status, "pending");
-    assert.equal(Buffer.from(pending[0].payload.buffer).toString("utf-8"), "notebook source payload");
+    assert.ok(Buffer.isBuffer(pending[0].payload.buffer), "persisted Buffer payloads must be restored as Buffers");
+    assert.equal(pending[0].payload.buffer.toString("utf-8"), "notebook source payload");
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
