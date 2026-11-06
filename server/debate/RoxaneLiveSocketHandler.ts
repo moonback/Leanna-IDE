@@ -21,6 +21,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     let leanna: any = null;
     let roxane: any = null;
     let closed = false;
+    let started = false;
     let active: 'leanna' | 'roxane' = 'leanna';
     let rounds = 0;
     let currentText = '';
@@ -134,7 +135,10 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
             send({ type: 'error', message: `Erreur de la session vocale ${role === 'roxane' ? 'Roxane' : 'Leanna'}.` });
           },
           onclose: () => {
-            if (!closed) send({ type: 'session_closed', speaker: role });
+            if (!closed) {
+              send({ type: 'session_closed', speaker: role });
+              closeSessions();
+            }
           },
         },
       });
@@ -143,6 +147,8 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
     };
 
     const start = async (message: any) => {
+      if (started) { send({ type: 'error', message: 'Cette connexion de débat a déjà démarré.' }); return; }
+      started = true;
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
       if (deps.activeGeminiSessions.size >= 16) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
       if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
@@ -199,7 +205,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       }
       if (message.type === 'user_interjection' && typeof message.text === 'string' && message.text.trim()) {
         const text = message.text.trim().slice(0, 3000);
-        transcript.push({ speaker: 'user', text, round: rounds });
+        if (transcript.length < 32) transcript.push({ speaker: 'user', text, round: rounds + 1 });
         send({ type: 'user_interjection', text });
         const target = active === 'leanna' ? leanna : roxane;
         target?.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `L'utilisateur interrompt le débat et précise : ${text}. Réponds directement à cette intervention avant de poursuivre.` }] }], turnComplete: true });
@@ -208,6 +214,5 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
 
     client.on('close', closeSessions);
     client.on('error', (error) => { console.error('[RoxaneLive] WebSocket client error', error); closeSessions(); });
-    client.on('close', () => { closed = true; });
   });
 }
