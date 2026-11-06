@@ -250,9 +250,8 @@ export class Executor {
    * présence (réussie) dans un objectif prouve qu'il a dépassé l'exploration.
    */
   private static readonly WRITE_TOOLS = [
-    "write_project_file", "modify_project_file", "apply_patch", "patch_project_file",
-    "create_project_directory", "rename_project_file", "delete_project_file",
-    "delete_project_folder",
+    "write_project_file", "modify_project_file", "patch_project_file",
+    "create_project_directory", "rename_project_file",
   ];
 
   /** Tools whose handlers mutate workspace paths and require a pre-write snapshot. */
