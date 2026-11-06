@@ -87,13 +87,17 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
  * (la page à onglets fusionnée — étape 3).
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: 'pilotage', label: 'Pilotage',
+  { id: 'developpement', label: 'Espace de développement',
+    items: pick('ide', 'github') },
+  { id: 'pilotage', label: 'Pilotage & missions',
     items: [NAV_ITEMS['pilotage']] },
-  { id: 'travail', label: 'Travail',
-    items: pick('ide', 'notebooks', 'documents', 'github', 'automation') },
-  { id: 'memoire', label: 'Mémoire',
-    items: pick('memories', 'history', 'lists') },
-  { id: 'systeme', label: 'Système',
+  { id: 'intelligence', label: 'Intelligence artificielle',
+    items: pick('agent-swarm', 'autonomy', 'explainability') },
+  { id: 'connaissances', label: 'Connaissances & mémoire',
+    items: pick('memories', 'history', 'notebooks', 'documents', 'lists') },
+  { id: 'automatisation', label: 'Automatisation & intégrations',
+    items: pick('automation') },
+  { id: 'systeme', label: 'Système & supervision',
     items: pick('observability') },
 ];
 
