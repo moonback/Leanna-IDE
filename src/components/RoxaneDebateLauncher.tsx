@@ -199,6 +199,10 @@ export function RoxaneDebateLauncher() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
+      if (!liveSocketRef.current || liveSocketRef.current.readyState !== WebSocket.OPEN) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
       micStreamRef.current = stream;
       const context = new AudioContext({ sampleRate: 16000 });
       await context.resume();
