@@ -103,19 +103,19 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
               currentText = '';
               if (role === 'leanna') {
                 lastLeannaText = completed;
-                transcript.push({ speaker: 'leanna', text: completed, round: rounds });
-                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
+                transcript.push({ speaker: 'leanna', text: completed, round: rounds + 1 });
+                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
                   active = 'roxane';
                   roxane?.sendClientContent({
                     turns: [{ role: 'user', parts: [{ text: `Leanna vient de dire : ${completed || '(réponse vocale sans transcription)'}\nRéponds directement à son argument, puis donne ton avis à l'utilisateur.` }] }],
                     turnComplete: true,
                   });
-                } else send({ type: 'debate_complete' });
+                } else send({ type: 'debate_complete', turns: transcript });
               } else {
                 lastRoxaneText = completed;
-                transcript.push({ speaker: 'roxane', text: completed, round: rounds });
-                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds });
+                transcript.push({ speaker: 'roxane', text: completed, round: rounds + 1 });
+                send({ type: 'turn_complete', speaker: role, text: completed, round: rounds + 1 });
                 rounds += 1;
                 if (rounds < Math.min(config.maxRounds, MAX_TURNS)) {
                   active = 'leanna';
