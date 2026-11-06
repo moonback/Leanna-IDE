@@ -192,6 +192,8 @@ try {
       body: JSON.stringify({
         aiName:               p.aiName               || 'Leanna',
         aiVoice:              p.aiVoice              || 'Aoede',
+        duoName:              p.duoName              || 'Roxane',
+        duoVoice:             p.duoVoice             || 'Kore',
         userName:             p.userName             || '',
         userRole:             p.userRole             || '',
         language:             p.language             || 'fr',
