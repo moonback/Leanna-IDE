@@ -111,3 +111,4 @@ Les agents runtime retournent leur réponse finale dans le format XML normalisé
   <deliverable>Contenu final directement exploitable.</deliverable>
   <notes>Points d'attention, critères de validation et étapes recommandées.</notes>
 </result>
+```
