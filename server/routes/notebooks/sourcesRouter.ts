@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { notebookManager, sourceIngester, embeddingStore, sourceProcessingQueue } from "../../notebooks/index.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
+import { validateNotebookSourceUpload, MAX_NOTEBOOK_BATCH_BYTES } from "../../utils/notebookSourceUploadValidation.js";
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();
@@ -21,10 +22,15 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
+      const validation = validateNotebookSourceUpload(req.file.originalname, req.file.mimetype, req.file.buffer);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
       const source = await sourceIngester.ingestFromBuffer(
         req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
+        validation.fileName,
+        validation.mimeType,
         notebookId
       );
 
@@ -63,6 +69,12 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
+      const totalBytes = files.reduce((total, file) => total + file.size, 0);
+      if (totalBytes > MAX_NOTEBOOK_BATCH_BYTES) {
+        res.status(413).json({ error: "Le lot dépasse la limite totale de 50 Mio." });
+        return;
+      }
+
       const results: Array<{
         filename: string;
         status: "success" | "error";
@@ -72,16 +84,18 @@ export function createSourcesRouter(upload: multer.Multer): Router {
 
       for (const file of files) {
         try {
+          const validation = validateNotebookSourceUpload(file.originalname, file.mimetype, file.buffer);
+          if (!validation.valid) throw new Error(validation.error || "Fichier invalide.");
           const source = await sourceIngester.ingestFromBuffer(
             file.buffer,
-            file.originalname,
-            file.mimetype,
+            validation.fileName,
+            validation.mimeType,
             notebookId
           );
           notebookManager.addSource(notebookId, source);
 
           results.push({
-            filename: file.originalname,
+            filename: validation.fileName,
             status: "success",
             source: {
               id: source.id,
@@ -96,7 +110,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
           });
         } catch (e: any) {
           results.push({
-            filename: file.originalname,
+            filename: path.basename(file.originalname.replace(/\\\\/g, "/")),
             status: "error",
             error: e.message,
           });
@@ -133,18 +147,33 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
+      const totalBytes = files.reduce((total, file) => total + file.size, 0);
+      if (totalBytes > MAX_NOTEBOOK_BATCH_BYTES) {
+        res.status(413).json({ error: "Le lot dépasse la limite totale de 50 Mio." });
+        return;
+      }
+      const validatedFiles = files.map(file => ({
+        file,
+        validation: validateNotebookSourceUpload(file.originalname, file.mimetype, file.buffer),
+      }));
+      const invalidFile = validatedFiles.find(item => !item.validation.valid);
+      if (invalidFile) {
+        res.status(400).json({ error: invalidFile.validation.error, fileName: path.basename(invalidFile.file.originalname.replace(/\\\\/g, "/")) });
+        return;
+      }
+
       const priority = (req.body.priority as "urgent" | "normal" | "low") || "normal";
       const taskIds: string[] = [];
 
-      for (const file of files) {
+      for (const { file, validation } of validatedFiles) {
         const taskId = `src-${notebookId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const task = sourceProcessingQueue.enqueue(
           taskId,
           "source-ingest",
           {
             notebookId,
-            fileName: file.originalname,
-            mimeType: file.mimetype,
+            fileName: validation.fileName,
+            mimeType: validation.mimeType,
             buffer: file.buffer,
           },
           { priority }
