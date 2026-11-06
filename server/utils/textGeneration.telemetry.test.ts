@@ -24,6 +24,7 @@ const svc: any = telemetryService;
 const originalFetch = globalThis.fetch;
 const originalGenerateInternal = (Models.prototype as any).generateContentInternal;
 let fetchCalls = 0;
+let requestedModels: string[] = [];
 
 type OrBehaviour = { status?: number; usage?: any; content?: string; delayMs?: number; stream?: boolean };
 
@@ -34,6 +35,7 @@ function mockOpenRouter(behaviour: OrBehaviour | (() => OrBehaviour)) {
     if (b.delayMs) await new Promise((r) => setTimeout(r, b.delayMs));
     if (b.status && b.status >= 400) return new Response('upstream error', { status: b.status });
     const body = JSON.parse(init.body);
+    requestedModels.push(body.model);
     if (body.stream) {
       const enc = new TextEncoder();
       const lines = [
@@ -58,6 +60,7 @@ beforeEach(async () => {
   svc.recentRecords = [];
   svc.recentFailures = [];
   fetchCalls = 0;
+  requestedModels = [];
   delete process.env.LEANNA_PROVIDER_FALLBACK;
   setTextGenerationProfile({ textProvider: 'openrouter', openrouterApiKey: 'sk-test' });
   (Models.prototype as any).generateContentInternal = originalGenerateInternal;
@@ -71,6 +74,22 @@ after(async () => {
 });
 
 const USAGE = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 };
+
+test('custom agent model overrides the profile model without overriding an explicit call model', async () => {
+  setTextGenerationProfile({
+    textProvider: 'openrouter',
+    openrouterApiKey: 'sk-test',
+    openrouterModel: 'openai/gpt-6-luna',
+    agents: { customAgents: [{ role: 'coder', model: 'cohere/north-mini-code:free' }] },
+  });
+  assert.equal(getActiveModel('coder'), 'cohere/north-mini-code:free');
+  assert.equal(getActiveModel('reviewer'), 'openai/gpt-6-luna');
+
+  mockOpenRouter({ usage: USAGE });
+  await generateText({ prompt: 'code task', agentRole: 'coder' });
+  await generateText({ prompt: 'explicit override', agentRole: 'coder', openrouterModel: 'openai/gpt-6-luna-pro' });
+  assert.deepEqual(requestedModels, ['cohere/north-mini-code:free', 'openai/gpt-6-luna-pro']);
+});
 
 test('getActiveModel follows the selected OpenRouter model and safe defaults', () => {
   setTextGenerationProfile({ textProvider: 'openrouter', openrouterModel: 'anthropic/claude-3.5-sonnet' });
