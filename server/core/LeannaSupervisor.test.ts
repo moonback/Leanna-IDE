@@ -7,6 +7,8 @@ import { LeannaSupervisor, type MissionRunner } from "./LeannaSupervisor.js";
 import { DurableMissionStore } from "./DurableMissionStore.js";
 import { CheckpointManager, makeNodeFileGateway, type FileGateway } from "./CheckpointManager.js";
 import { EvidenceEngine } from "./EvidenceEngine.js";
+import { MissionStateMachine } from "./MissionStateMachine.js";
+import { ExecutionLedger } from "./ExecutionLedger.js";
 
 function memGateway(initial: Record<string, string> = {}): FileGateway & { store: Map<string, string> } {
   const store = new Map<string, string>(Object.entries(initial));
@@ -462,5 +464,87 @@ test("an open checkpoint after restart blocks automatic replay and marks recover
   assert.equal(runnerCalled, false);
   assert.equal(gateway.store.get("a.ts"), "possibly-applied");
   assert.equal(checkpoints.get(checkpoint.id)?.status, "open");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("crash recovery quarantines an interrupted attempt instead of replaying it", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-crash-recovery-"));
+  const missionDir = path.join(dir, "missions");
+  const checkpointDir = path.join(dir, "checkpoints");
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  const store = new DurableMissionStore(missionDir);
+  const checkpoints = new CheckpointManager({ gateway: memGateway({ "a.ts": "before" }), dirOverride: checkpointDir });
+  const ledger = new ExecutionLedger(ledgerPath);
+  const checkpoint = checkpoints.snapshot(["a.ts"], { missionId: "m-crash", label: "attempt-2" });
+  const machine = new MissionStateMachine("m-crash");
+  machine.transition("PLANNING");
+  machine.transition("READY");
+  machine.transition("RUNNING");
+  machine.setActiveAttempt({
+    attempt: 2,
+    checkpointId: checkpoint.id,
+    phase: "executing",
+    updatedAt: new Date().toISOString(),
+  });
+  store.save(machine);
+
+  // Simulate a process restart: all durable stores are rehydrated from disk.
+  const restartedStore = new DurableMissionStore(missionDir);
+  const restartedCheckpoints = new CheckpointManager({ gateway: memGateway({ "a.ts": "after-crash" }), dirOverride: checkpointDir });
+  const restartedLedger = new ExecutionLedger(ledgerPath);
+  const supervisor = new LeannaSupervisor({
+    maxAttempts: 3,
+    missionStore: restartedStore,
+    checkpoints: restartedCheckpoints,
+    evidence: new EvidenceEngine(path.join(dir, "evidence")),
+    ledger: restartedLedger,
+  });
+  let executions = 0;
+  const result = await supervisor.runMission({
+    missionId: "m-crash",
+    goal: "recover safely",
+    runner: async () => {
+      executions++;
+      return { success: true, evidence: { testsExecuted: [{ name: "must-not-run", passed: true }] } };
+    },
+  });
+
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(executions, 0, "an interrupted side-effecting attempt must never be replayed automatically");
+  assert.equal(restartedStore.load("m-crash")?.current, "RECOVERY_REQUIRED");
+  assert.equal(restartedCheckpoints.listOpenForMission("m-crash").length, 1);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("an unknown side effect in the durable ledger blocks automatic mission replay", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-ledger-recovery-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  const initialLedger = new ExecutionLedger(ledgerPath);
+  initialLedger.begin({ missionId: "m-ledger-unknown", stepId: "step-1", tool: "publish_release", args: { tag: "v1" } }, true);
+  const restoredLedger = new ExecutionLedger(ledgerPath);
+  const store = new DurableMissionStore(path.join(dir, "missions"));
+  const machine = new MissionStateMachine("m-ledger-unknown");
+  machine.transition("PLANNING");
+  machine.transition("READY");
+  store.save(machine);
+  const supervisor = new LeannaSupervisor({
+    missionStore: store,
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "checkpoints") }),
+    evidence: new EvidenceEngine(path.join(dir, "evidence")),
+    ledger: restoredLedger,
+  });
+  let executions = 0;
+  const result = await supervisor.runMission({
+    missionId: "m-ledger-unknown",
+    goal: "do not duplicate external effect",
+    runner: async () => { executions++; return { success: true }; },
+  });
+
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
+  assert.equal(executions, 0);
+
   fs.rmSync(dir, { recursive: true, force: true });
 });
