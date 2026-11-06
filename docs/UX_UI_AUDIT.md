@@ -354,3 +354,26 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier que cliquer dans le dialogue ne ferme pas la confirmation et qu'un glisser-déposer commencé dans le dialogue puis terminé sur le voile ne la ferme pas.
 - Vérifier que l'ouverture/fermeture restaure correctement le scroll de la page et qu'aucune soumission de formulaire n'est déclenchée par les actions de confirmation.
 - Exécuter typecheck, tests UI, lint et `ui:audit`. Ces validations locales ne sont pas exécutables via l'accès GitHub utilisé pour cette modification.
+
+
+## Seizième passe — Gestion du focus de l'assistant de configuration
+
+### Constats vérifiés
+
+- `EnvSetupModal` présentait un élément `role="dialog"` et gérait Escape avec un écouteur clavier local, mais ne piégeait pas le focus dans la fenêtre.
+- Le défilement de l'interface derrière l'assistant restait possible pendant la saisie.
+- La gestion clavier locale ne bénéficiait pas de la pile commune des overlays lorsque plusieurs fenêtres étaient ouvertes.
+
+### Corrections appliquées
+
+- L'assistant utilise désormais `useOverlay` pour centraliser le piège de focus, la restitution du focus à la fermeture, la pile Escape et le verrouillage du défilement.
+- La fermeture par Escape reste désactivée pendant l'enregistrement, comme auparavant.
+- Le clic sur le voile ne ferme toujours pas l'assistant ; les événements de fond sont explicitement configurés sans fermeture.
+
+### Validation restante
+
+- Ouvrir l'assistant depuis le parcours de démarrage et vérifier que le focus entre dans le premier champ, reste dans le dialogue et revient à l'élément déclencheur après « Plus tard » ou « Terminer ».
+- Vérifier qu'Escape ferme l'assistant hors enregistrement et ne le ferme pas pendant une sauvegarde.
+- Vérifier que le scroll arrière-plan est bloqué puis restauré, et qu'un clic sur le voile ne ferme pas l'assistant.
+- Vérifier le comportement lorsque l'assistant apparaît alors qu'un autre overlay est actif.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis contrôler le parcours de démarrage dans Electron.
