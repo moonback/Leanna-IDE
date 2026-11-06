@@ -33,6 +33,7 @@ interface UseSafeguardsConfigResult {
   config: SafeguardsConfig;
   loading: boolean;
   saving: boolean;
+  error: string | null;
   /** Applique et persiste une mise à jour partielle de la configuration. */
   update: (patch: Partial<SafeguardsConfig>) => Promise<void>;
   reload: () => Promise<void>;
@@ -42,7 +43,11 @@ export function useSafeguardsConfig(): UseSafeguardsConfigResult {
   const [config, setConfig] = useState<SafeguardsConfig>(DEFAULT_SAFEGUARDS_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const hasFetched = useRef(false);
+  const configRef = useRef<SafeguardsConfig>(DEFAULT_SAFEGUARDS_CONFIG);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSaves = useRef(0);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -50,10 +55,14 @@ export function useSafeguardsConfig(): UseSafeguardsConfigResult {
       const res = await fetch('/api/safeguards/config');
       if (res.ok) {
         const data = await res.json();
-        if (data.config) setConfig(data.config);
+        if (data.config && typeof data.config === 'object') {
+          configRef.current = { ...DEFAULT_SAFEGUARDS_CONFIG, ...data.config };
+          setConfig(configRef.current);
+          setError(null);
+        }
       }
-    } catch {
-      /* garde les valeurs par défaut */
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de charger les garde-fous.');
     } finally {
       setLoading(false);
     }
@@ -65,21 +74,36 @@ export function useSafeguardsConfig(): UseSafeguardsConfigResult {
     void reload();
   }, [reload]);
 
-  const update = useCallback(async (patch: Partial<SafeguardsConfig>) => {
-    setConfig(prev => {
-      const next = { ...prev, ...patch };
-      // Persistance en tâche de fond ; l'UI reste réactive (optimiste).
-      setSaving(true);
-      fetch('/api/safeguards/config', {
+  const update = useCallback((patch: Partial<SafeguardsConfig>) => {
+    const next = { ...configRef.current, ...patch };
+    configRef.current = next;
+    setConfig(next);
+    setError(null);
+    pendingSaves.current += 1;
+    setSaving(true);
+
+    const save = saveQueue.current.catch(() => undefined).then(async () => {
+      const res = await fetch('/api/safeguards/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
-      })
-        .catch(() => { /* silencieux — l'état local reste la source d'affichage */ })
-        .finally(() => setSaving(false));
-      return next;
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || (data && data.status === 'error')) {
+        throw new Error(typeof data?.error === 'string' ? data.error : `Échec de sauvegarde des garde-fous (HTTP ${res.status}).`);
+      }
+    });
+
+    saveQueue.current = save;
+    return save.catch(err => {
+      const message = err instanceof Error ? err.message : 'Impossible de sauvegarder les garde-fous.';
+      setError(message);
+      throw err;
+    }).finally(() => {
+      pendingSaves.current = Math.max(0, pendingSaves.current - 1);
+      setSaving(pendingSaves.current > 0);
     });
   }, []);
 
-  return { config, loading, saving, update, reload };
+  return { config, loading, saving, error, update, reload };
 }
