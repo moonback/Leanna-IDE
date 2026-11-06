@@ -110,3 +110,13 @@ test("ProcessingQueue rejects enqueue when the initial durable write fails", () 
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("ProcessingQueue does not retry permanent validation errors", async () => {
+  const queue = new ProcessingQueue({ concurrency: 1, maxRetries: 3 });
+  queue.setHandler(async () => { throw new Error("invalid document format"); });
+  const task = queue.enqueue("permanent-error", "test", {});
+  assert.ok(task);
+  await assert.rejects(queue.waitForTask(task.id), /invalid document format/);
+  assert.equal(task.attempts, 1);
+  assert.equal(queue.getStats().failed, 1);
+});
