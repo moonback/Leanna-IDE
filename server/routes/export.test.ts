@@ -140,3 +140,27 @@ test('export routes: notebook export rejects unsupported formats and unsafe iden
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+
+test('export routes: raw HTML in Markdown is escaped in standalone HTML', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/export', createExportRouter());
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/export/html`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markdown: '<img src=x onerror=alert(1)>\\n\\n<script>alert(1)</script>' }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+    assert.ok(!body.includes('<img src=x onerror=alert(1)>'));
+    assert.ok(!body.includes('<script>alert(1)</script>'));
+    assert.ok(body.includes('&lt;script&gt;'));
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
