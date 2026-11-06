@@ -121,3 +121,25 @@ test("ProcessingQueue does not retry permanent validation errors", async () => {
   assert.equal(task.attempts, 1);
   assert.equal(queue.getStats().failed, 1);
 });
+
+test("ProcessingQueue restores terminal task results from durable history", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-notebook-queue-history-"));
+  const persistenceFile = path.join(directory, "queue.json");
+  try {
+    const queue = new ProcessingQueue<{ value: string }>({ persistenceFile });
+    queue.setHandler(async task => ({ accepted: task.payload.value, sourceId: "source-42" }));
+    const task = queue.enqueue("durable-result", "source-ingest", { value: "persist me" });
+    assert.ok(task);
+    const completed = await queue.waitForTask(task.id);
+    assert.equal(completed.status, "completed");
+
+    const restarted = new ProcessingQueue<{ value: string }>({ persistenceFile });
+    const restored = restarted.getTask("durable-result");
+    assert.ok(restored, "terminal task must remain discoverable after restart");
+    assert.equal(restored.status, "completed");
+    assert.deepEqual(restored.result, { accepted: "persist me", sourceId: "source-42" });
+    assert.equal(restored.payload, undefined, "terminal history must not retain the original upload payload");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
