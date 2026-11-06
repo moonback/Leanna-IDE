@@ -2194,12 +2194,13 @@ export async function executeLiveToolCall(
   deps: LiveSocketDeps,
   voiceName = 'Aoede',
   supervisor = new Supervisor(),
+  mode: 'ask' | 'full' = 'full',
 ): Promise<void> {
   await handleToolCall(
     toolCall,
     session,
     clientWs,
-    'full',
+    mode,
     undefined,
     voiceName,
     deps,
