@@ -58,6 +58,20 @@ test('complex tasks increase the impact of historical failures', () => {
   assert.equal(result?.observedFailures, 0);
 });
 
+test('observed latency breaks ties between candidates with identical prices', () => {
+  const result = selectAdaptiveModel({
+    candidates: ['google/gemini-3.6-flash', 'google/gemini-2.0-flash-exp'],
+    promptChars: 500,
+    usage: [],
+    failures: [],
+    latencyMsByModel: {
+      'google/gemini-3.6-flash': 30_000,
+      'google/gemini-2.0-flash-exp': 500,
+    },
+  });
+  assert.equal(result?.model, 'google/gemini-2.0-flash-exp');
+});
+
 test('unknown-price models are excluded and one candidate is not a routing decision', () => {
   assert.equal(selectAdaptiveModel({
     candidates: ['unknown/provider-model', 'openai/gpt-4o-mini'],
