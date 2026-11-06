@@ -1,3 +1,13 @@
+> **État au 2026-11-06 :** ce fichier est conservé comme plan d'architecture historique.
+> Les composants `server/core/` (ledger, checkpoints, evidence, supervisor et kernel)
+> existent désormais. Leur présence ne signifie pas que la gouvernance est activée sur
+> tous les chemins : l'audit `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md` décrit les options
+> `LEANNA_MISSION_SUPERVISED`, `LEANNA_AGENT_SUPERVISED`, `LEANNA_IDEMPOTENCY` et
+> `LEANNA_SAFETY_GATE`. Vérifier le câblage et la configuration avant de cocher une
+> garantie comme universelle.
+>
+> ---
+>
 # Leanna P0 — Plan d'industrialisation du noyau
 
 > Traduction de l'audit (`src/components/notebooks/audit.md`) en architecture cible + plan d'implémentation P0, fichier par fichier, ancré dans le code réel du dépôt.
