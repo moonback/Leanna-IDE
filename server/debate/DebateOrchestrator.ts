@@ -34,12 +34,13 @@ async function ask(
   const model = speaker === 'roxane'
     ? config.model
     : (typeof profile.openrouterModel === 'string' ? profile.openrouterModel : undefined);
+  const geminiTextModel = /-live(?:-|$)/i.test(config.model) ? 'gemini-3.8-flash' : config.model;
   const result = await generateText({
     prompt,
     systemPrompt,
     forceProvider: provider,
     ...(provider === 'openrouter' && model ? { openrouterModel: model } : {}),
-    ...(provider === 'gemini' && speaker === 'roxane' ? { geminiModel: config.model } : {}),
+    ...(provider === 'gemini' && speaker === 'roxane' ? { geminiModel: geminiTextModel } : {}),
     temperature: speaker === 'roxane' ? config.temperature : (profile.temperature ?? 0.7),
     maxTokens: speaker === 'roxane' ? config.maxTokens : 1200,
     untrustedPrompt: true,
