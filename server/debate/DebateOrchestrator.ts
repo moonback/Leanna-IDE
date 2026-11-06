@@ -164,10 +164,10 @@ ${transcript}`;
     disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
     decisions: Array.isArray(parsed.decisions) ? parsed.decisions.filter((v): v is string => typeof v === 'string').slice(0, 10) : [],
     tasks: Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, 5).flatMap(task => {
-      if (!task || typeof task.title !== 'string' || typeof task.description !== 'string') return [];
+      if (!task || typeof task.title !== 'string' || !task.title.trim() || typeof task.description !== 'string') return [];
       return [{
         title: task.title.trim().slice(0, 160),
-        description: task.description.trim().slice(0, 4000),
+        description: (task.description.trim() || task.title.trim()).slice(0, 4000),
         priority: priorities.includes(task.priority as string) ? task.priority as DebateSynthesis['tasks'][number]['priority'] : 'medium',
       }];
     }) : [],
