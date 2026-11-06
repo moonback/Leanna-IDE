@@ -51,6 +51,46 @@ test("rejects dependency maps containing unknown task keys", () => {
 });
 
 
+test("scheduler bounds parallel task execution and drains ready tasks in batches", async () => {
+  const value: OrchestrationPlan = {
+    id: "orch-concurrency",
+    title: "bounded concurrency",
+    description: "bounded concurrency",
+    tasks: Array.from({ length: 7 }, (_, index) => task(`task-${index}`)),
+    dependencies: Object.fromEntries(Array.from({ length: 7 }, (_, index) => [`task-${index}`, []])),
+    status: "pending",
+    createdAt: new Date(0).toISOString(),
+  };
+  const { TaskScheduler } = await import("./TaskScheduler.js");
+  let active = 0;
+  let peak = 0;
+  const scheduler = new TaskScheduler({
+    async execute(current) {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      current.status = "completed";
+      current.result = { success: true, outcome: "success", summary: "done", durationMs: 5 };
+      active--;
+    },
+  }, undefined, { maxConcurrentTasks: 2 });
+
+  await scheduler.execute(value);
+
+  assert.equal(peak, 2, "le nombre d'exécutions simultanées doit respecter la limite");
+  assert.equal(active, 0, "toutes les exécutions doivent être terminées");
+  assert.equal(value.tasks.filter((current) => current.status === "completed").length, 7);
+  assert.equal(value.status, "completed");
+});
+
+test("scheduler rejects an invalid concurrency limit", async () => {
+  const { TaskScheduler } = await import("./TaskScheduler.js");
+  assert.throws(
+    () => new TaskScheduler({ async execute() {} }, undefined, { maxConcurrentTasks: 0 }),
+    /maxConcurrentTasks/
+  );
+});
+
 test("scheduler preserves blocked dependencies as incomplete rather than failed", async () => {
   const value: OrchestrationPlan = {
     id: "orch-run", title: "execution", description: "execution",
