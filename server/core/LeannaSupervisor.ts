@@ -51,6 +51,8 @@ export interface RunnerOutcome {
   suggestedRecovery?: RecoveryDecision;
   /** Message d'erreur éventuel. */
   error?: string;
+  /** False when a timed-out runner did not stop within the abort grace period. */
+  executionStopped?: boolean;
 }
 
 /** Fonction d'exécution d'une mission (le moteur réel — agentique/mission). */
@@ -237,6 +239,22 @@ export class LeannaSupervisor {
       };
       const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
 
+      // A timed-out runner may ignore AbortSignal. Never race a live writer
+      // against checkpoint rollback: quarantine the mission and leave the
+      // checkpoint open for explicit reconciliation instead.
+      if (outcome.executionStopped === false) {
+        this.advance(machine, "RECOVERING", "runner did not stop after timeout");
+        this.advance(machine, "ESCALATED", "rollback withheld while runner may still be active");
+        return {
+          missionId,
+          finalState: machine.current,
+          attempts: attempt,
+          evidence: lastEvidence,
+          rollbackComplete: false,
+          residualFiles: ["<runner encore actif : rollback différé pour éviter une course d'écriture>"],
+        };
+      }
+
       // VERIFY : la PREUVE prime sur ce que le runner "dit".
       this.advance(machine, "VERIFYING", "evaluate evidence");
 
@@ -380,26 +398,63 @@ export class LeannaSupervisor {
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // Convert rejection into a settled outcome immediately so a runner that
+    // finishes after timeout cannot create an unhandled rejection.
+    const execution = Promise.resolve()
+      .then(() => runner({ ...ctx, signal: controller.signal }))
+      .then(
+        (outcome) => ({ kind: "settled" as const, outcome }),
+        (err) => ({
+          kind: "settled" as const,
+          outcome: { success: false, error: (err as Error)?.message ?? String(err) } satisfies RunnerOutcome,
+        })
+      );
 
     try {
-      if (this.runnerTimeoutMs > 0) {
-        const timeout = new Promise<RunnerOutcome>((resolve) => {
-          timer = setTimeout(() => {
-            try { controller.abort(new Error("runner timeout")); } catch { /* best-effort */ }
-            resolve({ success: false, error: `runner timeout after ${this.runnerTimeoutMs}ms` });
-          }, this.runnerTimeoutMs);
-          if (typeof timer.unref === "function") timer.unref();
-        });
-        return await Promise.race([
-          runner({ ...ctx, signal: controller.signal }),
-          timeout,
-        ]);
+      if (this.runnerTimeoutMs <= 0) {
+        return (await execution).outcome;
       }
-      return await runner({ ...ctx, signal: controller.signal });
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
+
+      const timed = await Promise.race([
+        execution,
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          timer = setTimeout(() => resolve({ kind: "timeout" }), this.runnerTimeoutMs);
+        }),
+      ]);
+
+      if (timed.kind === "settled") return timed.outcome;
+
+      const timeoutError = `runner timeout after ${this.runnerTimeoutMs}ms`;
+      controller.abort(new Error(timeoutError));
+
+      // AbortSignal is cooperative. Wait briefly for the runner to acknowledge
+      // it; if it does not, do NOT rollback while its side effects may continue.
+      const stopped = await Promise.race([
+        execution,
+        new Promise<{ kind: "grace-expired" }>((resolve) => {
+          graceTimer = setTimeout(() => resolve({ kind: "grace-expired" }), 250);
+        }),
+      ]);
+
+      if (stopped.kind === "settled") {
+        return {
+          ...stopped.outcome,
+          success: false,
+          error: timeoutError,
+          executionStopped: true,
+        };
+      }
+
+      return {
+        success: false,
+        error: `${timeoutError}; runner ignored AbortSignal during 250ms grace period`,
+        executionStopped: false,
+      };
     } finally {
       if (timer) clearTimeout(timer);
+      if (graceTimer) clearTimeout(graceTimer);
     }
   }
 
