@@ -464,3 +464,24 @@ Cette section suit les corrections effectivement apportées après l'audit. Elle
 ### Contrôle des routes statiques
 
 Le middleware d'isolation est placé avant les routes métier. Les segments réservés `stats`, `sandbox` et `embeddings` sont explicitement laissés aux endpoints statiques correspondants (`/stats/global`, `/sandbox/folders`, `/embeddings/memory`) afin que le garde workspace ne les interprète pas comme des identifiants de notebook.
+
+
+### Cinquième passe — remplacement d'une source modifiée à origine constante
+
+| Sujet | État | Détail |
+|---|---|---|
+| Remplacement plutôt que doublon | Implémenté | Lorsqu'un import partage le même type et la même origine normalisée, une empreinte identique conserve la source existante ; une empreinte différente remplace son contenu dans la même entrée et conserve son ID. |
+| Identité des chunks | Renouvelée | Les chunks du nouveau contenu reçoivent de nouveaux IDs et pointent vers l'ID canonique de la source. Les anciens IDs ne peuvent donc pas être pris pour des embeddings valides du nouveau texte. |
+| Publication durable | Ordonnée | Le notebook contenant la nouvelle version est écrit atomiquement avant la suppression des vecteurs de l'ancienne version et le lancement de la nouvelle indexation. En cas d'échec du flush, l'objet source précédent est restauré en mémoire. |
+| Indexations concurrentes | Protégées | EmbeddingStore suit une génération par couple notebook/source. Toute indexation ayant commencé avant un remplacement est invalidée et ne peut pas publier ses vecteurs après son appel réseau. |
+| Réparation après interruption | Partielle | Si le processus s'arrête après publication de la source et avant la fin de l'indexation, reconcileNotebook() peut supprimer les vecteurs orphelins et indexer les nouveaux chunks au prochain passage. |
+
+**Limites et validation requise :** le remplacement conserve l'identifiant de source, mais les IDs de chunks changent volontairement. La suppression puis l'indexation des embeddings restent deux opérations locales distinctes ; une interruption entre les deux laisse temporairement un index incomplet, réparable par la réconciliation. Les métadonnées dérivées (résumé, mots-clés, taille, langue) sont celles du nouvel import. La normalisation d'origine reste volontairement simple : elle ne fusionne pas les URL équivalentes avec paramètres ou redirections différents. Les imports concurrents du même emplacement peuvent encore faire travailler deux extracteurs en parallèle ; le dernier remplacement durable gagne. Aucun test automatisé ni typecheck n'a été exécuté dans cette session.
+
+Tests locaux à ajouter/exécuter avant de retirer le statut draft :
+- même type/origine + même hash : un seul enregistrement, ID source/chunks conservés ;
+- même type/origine + hash différent : ID source conservé, contenu/chunks renouvelés, une seule source ;
+- flush du notebook en erreur : ancienne source restaurée et aucune indexation du nouveau contenu ;
+- indexation ancienne retardée : ses vecteurs ne sont pas publiés après remplacement ;
+- réconciliation après interruption entre publication source et indexation : aucun ancien chunk restant, nouveaux chunks indexés ;
+- même origine avec un type différent : comportement d'ajout distinct inchangé.
