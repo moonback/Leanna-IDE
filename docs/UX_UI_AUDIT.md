@@ -496,3 +496,26 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Ouvrir Réinitialiser, lancer une sauvegarde avant de confirmer, puis vérifier que la réinitialisation ne s'exécute pas pendant celle-ci.
 - Vérifier qu'une nouvelle sauvegarde est possible après succès comme après échec.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider les parcours dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
+
+## Vingt-deuxième passe — Fiabilité du changement de modèle
+
+### Constats vérifiés
+
+- `syncProfileToServer` ignorait le statut HTTP : un serveur répondant 4xx/5xx était traité comme une synchronisation réussie par `applyAndSave`.
+- `ModelPickerModal` fermait immédiatement la fenêtre sans attendre la persistance serveur ; un échec de synchronisation ne pouvait donc pas être corrigé depuis le sélecteur.
+- Le bouton Appliquer ne disposait pas d'état de traitement ni de verrou synchrone, et les actions de fermeture restaient disponibles pendant l'opération.
+
+### Corrections appliquées
+
+- La synchronisation du profil rejette maintenant les réponses HTTP non réussies au lieu de résoudre silencieusement la promesse.
+- Le sélecteur attend la fin de `applyAndSave` avant de notifier la session Live et de fermer la fenêtre.
+- Ajout d'un verrou anti-double soumission, d'un état « Enregistrement… » et de la désactivation des actions Annuler/Fermer pendant le traitement.
+- En cas d'échec, la fenêtre reste ouverte et affiche un message permettant de comprendre que l'application du modèle n'a pas abouti ; l'utilisateur peut réessayer.
+
+### Validation restante
+
+- Simuler HTTP 500 et une erreur réseau sur `POST /api/profile` depuis le sélecteur : vérifier que la promesse rejette, que la fenêtre reste ouverte et qu'un nouvel essai est possible.
+- Vérifier qu'une réponse 2xx ferme le sélecteur et déclenche exactement une notification `Leanna-settings-saved`.
+- Double-cliquer sur Appliquer et vérifier qu'une seule requête est envoyée.
+- Vérifier les variantes modale et panneau docké, notamment la fermeture Escape et le bouton Fermer pendant la synchronisation.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider dans Electron ; ces validations locales ne sont pas exécutables via l'accès GitHub seul.
