@@ -152,3 +152,26 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 
 - Vérifier visuellement les trois états : idle (aucun badge), connecting (indicateur animé), connected (indicateur vert).
 - Confirmer que les autres indicateurs de la barre (Sandbox, MCP, Telegram) restent indépendants du statut Gemini Live.
+
+## Sixième passe — États d'erreur des vues de données
+
+### Constats vérifiés
+
+- Les automatisations traitaient certaines réponses HTTP non-2xx comme des succès silencieux ; les actions de tâche ne donnaient pas de retour utilisateur fiable.
+- La suppression d'une tâche planifiée ne demandait pas de confirmation.
+- La détection GitHub confondait une erreur réseau/API avec l'absence réelle de dépôt.
+- L'historique et les souvenirs pouvaient afficher un état vide après une réponse HTTP invalide, ce qui masquait une panne de chargement.
+
+### Corrections appliquées
+
+- Automatisations : validation des statuts HTTP et des payloads de listes, retours de succès/erreur pour lancer, pause/reprise et suppression, confirmation avant suppression, état d'erreur avec action de réessai et libellés accessibles sur les actions icon-only.
+- GitHub : séparation entre « aucun dépôt détecté » et « échec de détection » ; les erreurs HTTP des listes de commits, issues et pull requests sont désormais remontées au panneau d'erreur existant.
+- Historique : validation de la réponse de liste et des messages d'une conversation ; un échec de chargement de la liste affiche une erreur avec réessai plutôt qu'un faux état vide.
+- Mémoire : validation de la réponse API et affichage d'un état d'erreur avec réessai plutôt qu'un faux état vide.
+
+### Validation restante
+
+- Simuler une API indisponible, un statut HTTP 500 et un JSON mal formé sur chacune de ces vues.
+- Vérifier que les états vides ne s'affichent qu'après une réponse valide contenant une liste vide.
+- Vérifier les retours toast et les confirmations de suppression dans Electron.
+- Lancer typecheck, tests UI et ui:audit dans l'environnement local ; ces commandes n'ont pas été exécutées via l'accès GitHub.
