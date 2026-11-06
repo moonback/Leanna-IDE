@@ -289,6 +289,7 @@ export class NotebookManager {
 
     this.notebooks.delete(id);
     this.remove(id);
+    for (const source of notebook.sources) this.cancelSourceIndexRetry(id, source.id);
 
     // Nettoyer tous les embeddings du notebook
     embeddingStore.removeNotebook(id);
@@ -326,7 +327,7 @@ export class NotebookManager {
         }
         Object.assign(source, sameOrigin);
         if (sameOrigin.indexingStatus !== "indexed") {
-          void this.indexSourceChunks(notebookId, sameOrigin.id);
+          void this.indexSourceChunks(notebookId, sameOrigin.id, true);
         }
         log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
         return notebook;
@@ -405,11 +406,13 @@ export class NotebookManager {
    * Indexe une source et persiste son état. Une opération interrompue reste
    * marquée pending ; elle pourra être reprise au prochain démarrage.
    */
-  private indexSourceChunks(notebookId: string, sourceId: string): Promise<void> {
+  private indexSourceChunks(notebookId: string, sourceId: string, force = false): Promise<void> {
     const runKey = `${notebookId}:${sourceId}`;
     const inFlight = this.sourceIndexInFlight.get(runKey);
-    if (inFlight) return inFlight;
-    const run = this.performSourceIndexChunks(notebookId, sourceId);
+    if (inFlight && !force) return inFlight;
+    const run = inFlight
+      ? inFlight.catch(() => undefined).then(() => this.performSourceIndexChunks(notebookId, sourceId))
+      : this.performSourceIndexChunks(notebookId, sourceId);
     this.sourceIndexInFlight.set(runKey, run);
     void run.finally(() => {
       if (this.sourceIndexInFlight.get(runKey) === run) this.sourceIndexInFlight.delete(runKey);
@@ -575,7 +578,7 @@ export class NotebookManager {
     source.indexingNextRetryAt = undefined;
     source.indexingStatus = "pending";
     source.indexingError = undefined;
-    void this.indexSourceChunks(notebookId, sourceId);
+    void this.indexSourceChunks(notebookId, sourceId, true);
     return true;
   }
 
@@ -597,12 +600,21 @@ export class NotebookManager {
             }, delay);
             timer.unref?.();
             this.sourceIndexRetryTimers.set(key, timer);
-          } else if ((source.indexingAttempts ?? 0) < NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
+          } else if (source.indexingHistory?.at(-1)?.category !== "permanent"
+            && (source.indexingAttempts ?? 0) < NotebookManager.MAX_SOURCE_INDEX_ATTEMPTS) {
             await this.indexSourceChunks(notebook.id, source.id);
           }
         }
       }
     }
+  }
+
+  private cancelSourceIndexRetry(notebookId: string, sourceId: string): void {
+    const key = `${notebookId}:${sourceId}`;
+    const timer = this.sourceIndexRetryTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.sourceIndexRetryTimers.delete(key);
+    this.sourceIndexRuns.set(key, (this.sourceIndexRuns.get(key) ?? 0) + 1);
   }
 
   removeSource(notebookId: string, sourceId: string): boolean {
@@ -613,6 +625,7 @@ export class NotebookManager {
     if (index === -1) return false;
 
     notebook.sources.splice(index, 1);
+    this.cancelSourceIndexRetry(notebookId, sourceId);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);
 
