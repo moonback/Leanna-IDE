@@ -1,3 +1,11 @@
+> **Statut au 2026-11-06 : rapport historique v1.4.0.**
+> Les statuts VERIFIED/PARTIAL sont ceux de l'audit initial et ne certifient pas
+> la configuration ou les chemins d'exécution actuels. Pour l'état réel plus récent,
+> consulter `AUDIT/AGENTS_MISSIONS_ARCHITECTURE.md` (2026-10-25) et
+> `docs/AUTONOMY_RUNTIME_MAP.md` (2026-11-06).
+>
+> ---
+>
 # AUDIT D'AUTONOMIE DE LEANNA (v1.4.0)
 
 > **Avertissement de rigueur** : La réussite des tests unitaires et d'intégration ne suffit pas à déclarer le système "production ready". Ce rapport établit une démarcation stricte et objective entre ce qui est formellement démontré par des invariants vérifiables et ce qui reste partiel, expérimental ou à risque.
