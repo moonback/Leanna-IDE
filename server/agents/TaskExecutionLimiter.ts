@@ -24,16 +24,21 @@ export class TaskExecutionLimiter {
   }
 
   async run<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.active >= this.maxConcurrent) {
+    if (this.active < this.maxConcurrent) {
+      this.active++;
+    } else {
+      // The occupied slot is handed directly to the next waiter on release.
+      // Do not decrement/re-increment around the handoff: that would let a
+      // newly arriving caller steal the slot before the waiter resumes.
       await new Promise<void>((resolve) => this.waiters.push(resolve));
     }
 
-    this.active++;
     try {
       return await operation();
     } finally {
-      this.active--;
-      this.waiters.shift()?.();
+      const next = this.waiters.shift();
+      if (next) next();
+      else this.active--;
     }
   }
 }
