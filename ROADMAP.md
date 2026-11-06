@@ -1,10 +1,25 @@
 # Roadmap — Leanna AI Operating System
 
-> **Dernière refonte : 15 octobre 2026** · Version courante : **2.1.0** · Licence BUSL 1.1
+> **Mise à jour documentaire : 6 novembre 2026** · **Version du dépôt : 2.2.0** · Licence BUSL 1.1
+> **Dernière revue fonctionnelle détaillée : 15 octobre 2026** (les statuts de roadmap
+> restent à revalider contre les changements postérieurs à cette date).
 >
-> Cette roadmap a été **re-auditée contre le code réel** (audit documentaire **2026-10-15**, par-dessus l'audit **2026-10-13**) après l'itération **Noyau P0** (`server/core/`), l'extension des rôles d'agents (**20 rôles statiques**) et le **câblage de la boucle humaine** (human-in-the-loop). Elle distingue rigoureusement ce qui est *réellement livré et solide*, ce qui est *scaffolding en attente de câblage*, et ce qui est *ambitieux mais buildable*. **Aucune case n'est ✅ sans preuve dans le code source, avec le fichier et le symbole qui l'attestent.**
+> Cette roadmap conserve l'audit fonctionnel du **2026-10-15** comme référence
+> historique. Elle distingue ce qui était alors *réellement livré et solide*,
+> le *scaffolding en attente de câblage* et les éléments *planifiés*. Les statuts
+> ne doivent pas être interprétés comme une validation complète du HEAD du
+> 2026-11-06 sans nouvel audit de chaque composant.
 >
-> **Recalage factuel (15 oct. 2026).** Suites de tests **exécutées** et recalées sur le dépôt réel : `npm test` → **1460 cas / 174 suites · 0 échec** sur **184 fichiers** `server/**/*.test.ts` (~90 s) ; `npm run test:ui` → **90 cas · 0 échec** sur **18 fichiers** `src/**/*.{test,spec}.{ts,tsx}`. Corrections de chemins et de faits : les plugins de rôles vivent sous `server/runtime/agents/` ; `supabase/migrations/` contient **14 migrations** (et non une seule) ; le décompte d'outils est un **total runtime variable** (builtin + MCP + custom), pas une constante.
+> **Inventaire et exécution des tests.** L'arbre Git actuel recense **193 fichiers
+> backend** `server/**/*.test.ts` et **19 fichiers UI**
+> `src/**/*.{test,spec}.{ts,tsx}`. La dernière exécution documentée reste celle
+> du 2026-10-15 : `npm test` → **1460 cas / 174 suites · 0 échec** (184 fichiers) ;
+> `npm run test:ui` → **90 cas · 0 échec** (18 fichiers). Ces résultats sont
+> historiques et n'ont pas été rejoués pendant cette revue documentaire.
+>
+> Les plugins de rôles vivent sous `server/runtime/agents/` ; `supabase/migrations/`
+> contient **14 migrations** ; le décompte d'outils est un **total runtime variable**
+> (builtin + MCP + custom), pas une constante.
 
 Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonomes et une mémoire long-terme réunis dans une seule application desktop. La vision reste : passer d'un « IDE qui délègue à des agents » à un **système d'exploitation cognitif qui comprend une intention, planifie un vrai graphe d'exécution parallèle, agit de façon autonome sous garde-fous transactionnels, et apprend de chaque mission**.
 
