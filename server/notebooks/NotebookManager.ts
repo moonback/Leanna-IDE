@@ -416,6 +416,10 @@ export class NotebookManager {
     }
 
     try {
+      // Nettoyer les IDs de chunks d'une éventuelle version précédente avant
+      // de recalculer. Cela ferme aussi la fenêtre de crash après publication
+      // de la nouvelle source mais avant le nettoyage des anciens vecteurs.
+      embeddingStore.removeSource(source.id, notebookId);
       const indexed = await embeddingStore.indexChunks(
         source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
         source.id,
