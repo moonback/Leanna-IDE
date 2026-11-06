@@ -229,3 +229,40 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Parcourir les deux modes d'affichage des notebooks uniquement au clavier, vérifier Entrée/Espace, et vérifier que le bouton de suppression interne reste indépendant.
 - Vérifier la lecture des onglets et du sélecteur de période avec un lecteur d'écran.
 - Exécuter typecheck, tests UI et audit visuel Electron ; aucune exécution locale n'est disponible depuis l'accès GitHub utilisé pour ces modifications.
+
+## Dixième passe — Documents, mémoire et liens de connaissances
+
+### Constats vérifiés
+
+- Documents : les deux endpoints de chargement pouvaient échouer indépendamment sans état d'erreur cohérent ; la vue pouvait alors présenter des données partielles comme une liste complète.
+- Mémoire : les réponses HTTP non réussies des faits documentaires ou de la mémoire projet étaient converties en tableaux vides, ce qui confondait panne et absence de faits.
+- Relations : une réponse JSON sans tableau `relations` était acceptée comme une liste vide.
+- Suppression d'un fait : le statut HTTP de la suppression n'était pas contrôlé ; l'interface pouvait retirer localement un fait alors que le serveur avait refusé l'opération.
+- Les onglets Documents/Mémoire/Relations/Tableau de bord n'exposaient pas leur sémantique de sélection aux technologies d'assistance.
+
+### Corrections appliquées
+
+- Documents : les deux listes doivent répondre correctement et fournir des tableaux valides ; une erreur affiche un état récupérable avec réessai au lieu d'un état vide ou partiel.
+- Mémoire : validation des deux endpoints et de leurs tableaux `facts`, conservation d'un état d'erreur distinct de la mémoire vide et action de réessai.
+- Relations : validation du tableau `relations` et état d'erreur avec réessai.
+- Suppression d'un fait : vérification du statut HTTP avant la mise à jour optimiste de la liste.
+- Onglets : ajout de `tablist`, `tab`, `aria-selected` et d'un ordre de tabulation limité à l'onglet actif.
+
+## Onzième passe — Récupération des sections Paramètres
+
+### Constat vérifié
+
+- Une ancienne valeur de section conservée dans l'URL ou dans le stockage local pouvait ne correspondre à aucune section encore déclarée. La zone de contenu ne rendait alors aucun panneau et donnait l'impression d'une page Paramètres vide.
+
+### Correction appliquée
+
+- Les identifiants de section sont désormais validés contre les groupes de navigation déclarés.
+- Une section inconnue dans le stockage local est ignorée au démarrage ; une section inconnue dans l'URL est remplacée par la section active valide, sans casser les autres paramètres de requête.
+
+### Validation restante
+
+- Simuler une panne HTTP sur chacun des endpoints Documents, Mémoire et Relations, ainsi qu'un JSON sans tableau attendu ; vérifier l'état d'erreur et le réessai.
+- Simuler un refus HTTP lors de la suppression d'un fait et vérifier que la ligne reste présente.
+- Ouvrir Documents avec un lecteur d'écran et vérifier l'annonce de l'onglet actif.
+- Ouvrir Paramètres avec une section inconnue dans l'URL et une valeur périmée dans le stockage local ; vérifier le repli sur une section valide.
+- Exécuter typecheck, tests UI, lint et `ui:audit`, puis effectuer les contrôles visuels dans Electron. Ces validations locales ne sont pas disponibles via l'accès GitHub utilisé pour ces changements.
