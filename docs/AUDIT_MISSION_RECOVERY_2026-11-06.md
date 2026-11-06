@@ -136,3 +136,34 @@ La méthode `load` renvoyait le premier store qui possédait une mission, sans c
 - Correction composite : tests ajoutés, exécution non disponible depuis cette session GitHub.
 - Aucune suite TypeScript/backend/UI n'est déclarée passée dans cet audit.
 - Les constats P0 ci-dessus doivent être corrigés avant de considérer le mode supervisé comme transactionnel et récupérable en production.
+
+
+## Passe de durcissement P0 — timeout et annulation (commit 2026-11-06)
+
+### Correction appliquée : ne plus rollback pendant qu'un runner peut encore écrire
+
+Dans `LeannaSupervisor.runAttempt`, le timeout ne se contente plus de gagner un `Promise.race` puis de rendre la main immédiatement :
+
+1. le délai de tentative expire ;
+2. le Supervisor déclenche l'`AbortSignal` ;
+3. il attend jusqu'à 250 ms que le runner se termine réellement ;
+4. si le runner s'arrête, la tentative est classée en échec et le rollback peut être envisagé ;
+5. si le runner ignore le signal, la mission passe en `RECOVERING → ESCALATED`, le rollback est volontairement différé et le résultat signale `rollbackComplete: false`.
+
+Cette stratégie ne prétend pas arrêter un code qui ignore l'annulation. Elle évite au moins une corruption supplémentaire causée par un rollback exécuté en concurrence avec ce code. Le checkpoint reste ouvert pour une réconciliation manuelle/automatisée ultérieure.
+
+### Correction appliquée : relayer l'annulation vers les skills
+
+Le runner fourni par `Executor.runSupervised` écoute désormais le signal du Supervisor. À son déclenchement, il annule l'agrégat de mission et appelle le contrôleur d'annulation de l'Executor, dont le signal est transmis au `skillHandler`.
+
+### Tests ajoutés
+
+- Un runner qui respecte `AbortSignal` doit s'arrêter et laisser le cycle normal de rollback/échec se terminer.
+- Un runner qui ignore `AbortSignal` et écrit tardivement doit être mis en quarantaine ; le Supervisor ne doit pas restaurer le fichier en concurrence avec lui.
+
+### Limites restantes — ne pas considérer le P0 comme clos
+
+- La propagation de `beforeToolCall` n'est pas encore raccordée au point d'appel du `skillHandler` dans l'Executor : les fichiers découverts dynamiquement ne sont donc pas encore garantis d'être capturés sur le chemin réel supervisé.
+- Le runner Executor finalise encore son agrégat interne ; le Supervisor ne possède donc pas encore l'autorité unique sur retry/replan.
+- Si un skill ignore lui-même le signal et continue après escalade, le workspace n'est pas encore verrouillé par un lease exclusif. Le résultat expose le danger, mais un verrou inter-processus et une procédure de réconciliation restent nécessaires.
+- Les tests n'ont pas été exécutés depuis la session GitHub ; aucune réussite de CI/typecheck n'est revendiquée.
