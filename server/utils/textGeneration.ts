@@ -15,6 +15,7 @@ import { GoogleGenAI } from "@google/genai";
 import { telemetryService, type CallKind, type BillingUnit } from "../observability/TelemetryService.js";
 import { guardUntrustedContent } from "./promptInjectionGuard.js";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { selectAdaptiveModel } from "./modelRouter.js";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -24,7 +25,10 @@ interface TextGenProfile {
   openrouterApiKey?: string;
   /** Default temperature for conversational generation (0–2). */
   temperature?: number;
-  agents?: { customAgents?: Array<{ role: string; model?: string }> };
+  agents?: {
+    customAgents?: Array<{ role: string; model?: string }>;
+    modelRouting?: { enabled?: boolean; candidates?: string[] };
+  };
 }
 
 let _profile: TextGenProfile = {};
@@ -81,7 +85,6 @@ function getAgentModelOverride(agentRole?: string): string | undefined {
   if (!agentRole) return undefined;
   const model = _profile.agents?.customAgents?.find((agent) => agent.role === agentRole)?.model;
   return typeof model === 'string' && model.trim() ? model.trim() : undefined;
-}
 }
 
 // ── Options for generateText ────────────────────────────────────────────────
@@ -238,6 +241,7 @@ async function generateOnce(provider: Provider, options: GenerateTextOptions, me
  */
 export async function generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
   options = guardOptionsPrompt(options);
+  options = applyAdaptiveModel(options);
   const primary: Provider = options.forceProvider || _profile.textProvider || 'gemini';
   const { enabled, breakerThreshold, breakerCooldownMs } = fallbackConfig();
 
@@ -339,6 +343,39 @@ function promptChars(options: GenerateTextOptions): number {
     );
   }
   return (options.systemPrompt?.length ?? 0) + (options.prompt?.length ?? 0);
+}
+
+function applyAdaptiveModel(options: GenerateTextOptions): GenerateTextOptions {
+  const provider = options.forceProvider || _profile.textProvider || 'gemini';
+  const routing = _profile.agents?.modelRouting;
+  if (provider !== 'openrouter' || routing?.enabled !== true) return options;
+  // Explicit call-level and per-agent model choices are intentional pins.
+  if (options.openrouterModel?.trim() || getAgentModelOverride(options.agentRole)) return options;
+  const candidates = [
+    ...(Array.isArray(routing.candidates) ? routing.candidates : []),
+    _profile.openrouterModel?.trim() || 'google/gemini-3.6-flash',
+  ];
+  const usage = telemetryService.getUsageRecords({
+    ...(options.agentRole ? { agentRole: options.agentRole } : {}),
+    provider: 'openrouter',
+    limit: 200,
+  });
+  const failures = telemetryService.getRecentFailures(200).filter((failure) =>
+    failure.provider === 'openrouter' && (!options.agentRole || failure.agentRole === options.agentRole),
+  );
+  const decision = selectAdaptiveModel({
+    candidates,
+    promptChars: promptChars(options),
+    maxOutputTokens: options.maxTokens ?? options.maxOutputTokens,
+    usage,
+    failures,
+  });
+  if (!decision) return options;
+  console.info('[ModelRouter] role=' + (options.agentRole ?? 'general') +
+    ' complexity=' + decision.complexity + ' model=' + decision.model +
+    ' estimatedCostUsd=' + decision.estimatedCostUsd.toFixed(6) +
+    ' observations=' + decision.observedSuccesses + 'success/' + decision.observedFailures + 'failure');
+  return { ...options, openrouterModel: decision.model };
 }
 
 function modelFor(provider: Provider, options: GenerateTextOptions): string {
@@ -948,7 +985,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     throw error;
   }
 
-  const model = options.openrouterModel || _profile.openrouterModel || 'google/gemini-3.6-flash';
+  const model = modelFor('openrouter', options);
 
   // Start OTel span for this model call
   const span = telemetryService.startModelCallSpan('openrouter', model, getTelemetryContext().taskId);
