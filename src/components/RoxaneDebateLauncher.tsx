@@ -82,7 +82,7 @@ export function RoxaneDebateLauncher() {
         let msg: any; try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'status') setLiveStatus(msg.status);
         if (msg.type === 'ready') { setBusy(false); setLiveStatus('live'); void toggleMicrophone(); }
-        if (msg.type === 'error') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); stopMicrophone(); setError(msg.message || 'Erreur Live'); setBusy(false); setLiveStatus('error'); }
+        if (msg.type === 'error') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); stopMicrophone(); liveSocketRef.current?.close(); liveSocketRef.current = null; setError(msg.message || 'Erreur Live'); setBusy(false); setLiveStatus('error'); }
         if (msg.type === 'transcript_delta' && typeof msg.text === 'string') {
           setLiveTurns(prev => {
             const last = prev[prev.length - 1];
@@ -128,7 +128,7 @@ export function RoxaneDebateLauncher() {
           }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
             .finally(() => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setBusy(false); setLiveStatus('complete'); });
         }
-        if (msg.type === 'session_closed') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); stopMicrophone(); setBusy(false); setLiveStatus('error'); setError('Une session Gemini Live a été fermée.'); }
+        if (msg.type === 'session_closed') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); stopMicrophone(); liveSocketRef.current?.close(); liveSocketRef.current = null; setBusy(false); setLiveStatus('error'); setError('Une session Gemini Live a été fermée.'); }
         if (msg.type === 'interrupted') clearAudioOutput();
         if (msg.type === 'user_transcript' && typeof msg.text === 'string') setLiveTurns(prev => [...prev, { id: 'user-' + Date.now(), speaker: 'user', text: msg.text, round: 0 }]);
         if (msg.type === 'interrupted_by_user') { clearAudioOutput(); setBusy(false); setLiveStatus('interrupted'); }
