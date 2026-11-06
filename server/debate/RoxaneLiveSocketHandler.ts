@@ -13,6 +13,7 @@ interface Deps {
 const MAX_TOPIC = 3000;
 const MAX_CONTEXT = 14000;
 const MAX_TURNS = 8;
+let pendingRoxaneSessions = 0;
 
 export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): void {
   wss.on('connection', (client: WebSocket) => {
@@ -163,7 +164,7 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       if (started) { send({ type: 'error', message: 'Cette connexion de débat a déjà démarré.' }); return; }
       started = true;
       if (!config.enabled) { send({ type: 'error', message: 'Roxane est désactivée dans les paramètres.' }); return; }
-      if (deps.activeGeminiSessions.size >= 15) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
+      if (deps.activeGeminiSessions.size + pendingRoxaneSessions + 2 > 16) { send({ type: 'error', message: 'Trop de sessions Gemini Live sont déjà actives. Ferme une autre session puis réessaie.' }); return; }
       if (config.provider !== 'gemini') { send({ type: 'error', message: 'Le mode vocal Live nécessite Google Gemini. OpenRouter reste disponible pour les débats texte.' }); return; }
       if (!/-live(?:-|$)/i.test(config.model)) { send({ type: 'error', message: 'Choisis un identifiant de modèle compatible Gemini Live dans les réglages de Roxane.' }); return; }
       topic = typeof message.topic === 'string' ? message.topic.trim().slice(0, MAX_TOPIC) : '';
@@ -171,7 +172,13 @@ export function attachRoxaneLiveWebSocket(wss: WebSocketServer, deps: Deps): voi
       if (!topic) { send({ type: 'error', message: 'Le sujet du débat est obligatoire.' }); return; }
       send({ type: 'status', status: 'connecting' });
       try {
-        const settled = await Promise.allSettled([connectSession('leanna'), connectSession('roxane')]);
+        pendingRoxaneSessions += 2;
+        let settled: PromiseSettledResult<any>[];
+        try {
+          settled = await Promise.allSettled([connectSession('leanna'), connectSession('roxane')]);
+        } finally {
+          pendingRoxaneSessions = Math.max(0, pendingRoxaneSessions - 2);
+        }
         const opened = settled.filter((item): item is PromiseFulfilledResult<any> => item.status === 'fulfilled').map(item => item.value);
         if (settled.some(item => item.status === 'rejected')) {
           for (const session of opened) {
