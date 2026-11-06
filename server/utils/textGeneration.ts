@@ -160,6 +160,21 @@ function isBreakerOpen(provider: Provider, cooldownMs: number): boolean {
   return true;
 }
 
+/**
+ * Only transient/provider-availability failures should trigger cross-provider
+ * failover. Authentication, permission, invalid-request and model-not-found
+ * errors are configuration/actionable errors: retrying another provider can
+ * hide a broken credential or silently change the requested model semantics.
+ */
+function shouldFailover(error: unknown): boolean {
+  const status = Number((error as { status?: unknown } | null)?.status);
+  if (Number.isFinite(status) && status >= 400 && status < 500) {
+    return status === 408 || status === 409 || status === 425 || status === 429;
+  }
+  // Fetch network failures and provider timeouts commonly have no HTTP status.
+  return true;
+}
+
 function recordProviderResult(provider: Provider, ok: boolean, threshold: number): void {
   const state = providerBreaker[provider];
   if (ok) {
@@ -231,8 +246,12 @@ export async function generateText(options: GenerateTextOptions): Promise<Genera
       recordProviderResult(provider, true, breakerThreshold);
       return result;
     } catch (error) {
-      recordProviderResult(provider, false, breakerThreshold);
+      const retryable = shouldFailover(error);
+      // Les erreurs transitoires alimentent le breaker ; les 4xx permanentes
+      // doivent rester visibles et ne pas déclarer le fournisseur indisponible.
+      if (retryable) recordProviderResult(provider, false, breakerThreshold);
       errors.push(`${provider}: ${(error as Error).message}`);
+      if (!retryable) break;
     } finally {
       release();
     }
