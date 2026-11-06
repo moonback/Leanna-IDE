@@ -2,6 +2,10 @@ import { WebSocketServer, WebSocket } from "ws";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import type { ProfileConfig } from "../prompts/systemInstruction.js";
 import { recordModelCallUsage } from "../utils/textGeneration.js";
+import type { SkillManagerV2 } from "../runtime/compat/SkillManagerV2.js";
+import { Supervisor } from "../autonomy/index.js";
+import { executeLiveToolCall, type LiveSocketDeps } from "./LiveSocketHandler.js";
+import type { BrowserPendingEntry, BrowserActionPendingEntry } from "../routes/browser.js";
 
 type Speaker = "leanna" | "roxane";
 type LiveSession = Awaited<ReturnType<GoogleGenAI["live"]["connect"]>>;
@@ -10,6 +14,10 @@ export interface VoiceDuoLiveDeps {
   getCurrentProfile: () => ProfileConfig;
   createGeminiAI: () => GoogleGenAI;
   activeGeminiSessions: Set<unknown>;
+  skillManager: SkillManagerV2;
+  getWorkspaceRoot: () => string;
+  browserReadPending: Map<string, BrowserPendingEntry>;
+  browserActionPending: Map<string, BrowserActionPendingEntry>;
 }
 const MODEL = "gemini-3.8-live";
 const MAX_AUTONOMOUS_TURNS = 4;
@@ -33,6 +41,45 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     };
     const language = profile.language || "fr";
     const sessions = new Map<Speaker, LiveSession>();
+    const supervisor = new Supervisor();
+    const liveToolDeps: LiveSocketDeps = {
+      skillManager: deps.skillManager,
+      getCurrentProfile: deps.getCurrentProfile,
+      getWorkspaceRoot: deps.getWorkspaceRoot,
+      createGeminiAI: deps.createGeminiAI,
+      activeGeminiSessions: deps.activeGeminiSessions,
+      browserReadPending: deps.browserReadPending,
+      browserActionPending: deps.browserActionPending,
+    };
+    const declarations = deps.skillManager.getToolDeclarations();
+    const profileMode = profile.mode === "ask" ? "ask" : "full";
+    const askAllowed = new Set([
+      "read_file_outline", "read_project_file", "list_project_files", "search_in_files",
+      "open_project_file", "open_ide", "get_workspace_info", "analyze_project_file",
+      "save_memory", "search_memory", "list_memories", "knowledge_build_context",
+      "knowledge_semantic_search", "knowledge_memory_search", "get_current_time",
+      "automation_search", "search_history", "list_conversations", "get_conversation_messages",
+      "get_weather", "get_github_user", "system_info", "set_plan", "graphify_query",
+      "graphify_path", "graphify_explain", "graphify_affected", "graphify_god_nodes",
+      "graphify_read_report", "graphify_update", "list_custom_skills",
+    ]);
+    const availableDeclarations = declarations
+      .filter((d: any) => (d as any)._mcpServerId || (!d.name.startsWith("git_") &&
+        !(profile.reasoningEnabled === false && d.name.startsWith("reasoning_")) &&
+        !(profile.agents?.enabled === false && d.name.startsWith("agent_")) &&
+        (profileMode !== "ask" || askAllowed.has(d.name) || d.name.startsWith("custom_"))))
+      .map((d: any) => {
+        if (!d?._mcpServerId) return d;
+        const { _mcpServerId, ...safe } = d;
+        return safe;
+      });
+    const geminiTools = availableDeclarations.length
+      ? [{ functionDeclarations: availableDeclarations }]
+      : undefined;
+    console.info("[VoiceDuoLive] Runtime tools exposed", {
+      total: declarations.length, exposed: availableDeclarations.length, mode: profileMode,
+      mcp: declarations.filter((d: any) => d._mcpServerId).length,
+    });
     const history: TranscriptItem[] = [];
     let activeSpeaker: Speaker = "leanna";
     let chainId = 0;
@@ -106,10 +153,12 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
     };
 
     const connectSpeaker = async (speaker: Speaker): Promise<LiveSession> => {
-      return deps.createGeminiAI().live.connect({
+      let sessionRef: LiveSession | null = null;
+      const session = await deps.createGeminiAI().live.connect({
         model: MODEL,
         config: {
           responseModalities: [Modality.AUDIO],
+          ...(geminiTools ? { tools: geminiTools } : {}),
           temperature: speaker === "roxane" ? 0.8 : (profile.temperature ?? 0.65),
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voices[speaker] } } },
           systemInstruction: { parts: [{ text: promptFor(speaker) }] },
@@ -124,6 +173,15 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
                 provider: "gemini", model: MODEL, rawUsage: message.usageMetadata,
                 promptCharCount: 0, outputText: "", toolName: `voice_duo_${speaker}`, kind: "live",
               });
+            }
+            if (message.toolCall && sessionRef) {
+              send({ type: "tool_call", speaker, calls: message.toolCall.functionCalls?.map((call: any) => ({ id: call.id, name: call.name })) ?? [] });
+              void executeLiveToolCall(message.toolCall, sessionRef, client, liveToolDeps, voices[speaker], supervisor)
+                .then(() => send({ type: "tool_batch_complete", speaker }))
+                .catch(error => {
+                  console.error(`[VoiceDuoLive][${speaker}] Tool execution failed`, error);
+                  send({ type: "tool_error", speaker, message: "Une action IDE a échoué." });
+                });
             }
             const content = message.serverContent;
             if (content?.interrupted) {
@@ -184,6 +242,8 @@ export function attachVoiceDuoLiveWebSocket(wss: WebSocketServer, deps: VoiceDuo
           },
         },
       });
+      sessionRef = session;
+      return session;
     };
 
     const cleanup = () => {
