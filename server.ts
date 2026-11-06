@@ -71,6 +71,7 @@ import automationRouter from "./server/routes/automation.js";
 import { createNotebooksRouter } from "./server/routes/notebooks/index.js";
 import { createTTSRouter } from "./server/routes/tts.js";
 import { createDebateRouter } from "./server/routes/debate.js";
+import { attachRoxaneLiveWebSocket } from "./server/debate/RoxaneLiveSocketHandler.js";
 import { notebookManager, embeddingStore } from "./server/notebooks/index.js";
 import { backupService } from "./server/notebooks/BackupService.js";
 import { sourceProcessingQueue } from "./server/notebooks/ProcessingQueue.js";
@@ -1017,6 +1018,8 @@ async function startServer() {
   // WebSocket server dédié au second assistant vocal « live » du Notebook Chat
   // (« Interrogez vos sources »). Indépendant de la session Live globale /live.
   const notebookLiveWss = new WebSocketServer({ noServer: true });
+  // Deux sessions Gemini Live indépendantes pour le débat vocal Leanna × Roxane.
+  const roxaneLiveWss = new WebSocketServer({ noServer: true });
 
   // WebSocket server dédié pour la timeline d'autonomie (lecture seule, aucun
   // session Gemini — contrairement à /live). Diffuse uniquement les événements
@@ -1167,7 +1170,7 @@ async function startServer() {
     // Sécurité : on exige le même jeton que pour les routes /api (passé en
     // cookie uniquement, plus de fallback par query string pour éviter
     // l'exposition du token dans les logs).
-    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy' || pathname === '/notebook-live') {
+    if (pathname === '/live' || pathname === '/sandbox-watch' || pathname === '/autonomy' || pathname === '/notebook-live' || pathname === '/roxane-live') {
       const cookieHeader = request.headers.cookie || '';
       const cookies: Record<string, string> = {};
       cookieHeader.split(';').forEach(c => {
@@ -1206,6 +1209,10 @@ async function startServer() {
       notebookLiveWss.handleUpgrade(request, socket, head, (ws) => {
         notebookLiveWss.emit('connection', ws, request);
       });
+    } else if (pathname === '/roxane-live') {
+      roxaneLiveWss.handleUpgrade(request, socket, head, (ws) => {
+        roxaneLiveWss.emit('connection', ws, request);
+      });
     } else {
       // In dev, Vite's own upgrade listener (registered via hmr.server)
       // handles the HMR WebSocket — just return and let it process.
@@ -1234,6 +1241,12 @@ async function startServer() {
   // l'outil notebook_search (moteur RAG). Chemin : /notebook-live?notebookId=...
   attachNotebookLiveWebSocket(notebookLiveWss, {
     getCurrentProfile: () => currentProfile,
+    createGeminiAI: getGeminiAI,
+    activeGeminiSessions,
+  });
+
+  attachRoxaneLiveWebSocket(roxaneLiveWss, {
+    getProfile: () => currentProfile as any,
     createGeminiAI: getGeminiAI,
     activeGeminiSessions,
   });
