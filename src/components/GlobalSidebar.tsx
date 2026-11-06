@@ -320,10 +320,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               <FadeSlide show={!collapsed} className="min-w-0 flex-1" reduceMotion={reduceMotion}>
                 <span className="flex flex-col leading-tight">
                   <span className="block truncate text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                    Leanna{mode === 'ide' ? ' · IDE' : ''}
+                    Leanna
                   </span>
                   <span className="block truncate text-xs font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
-                    {mode === 'ide' ? 'Espace de travail' : 'Centre de pilotage'}
+                    Navigation unifiée
                   </span>
                 </span>
               </FadeSlide>
