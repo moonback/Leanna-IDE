@@ -109,6 +109,7 @@ export function RoxaneDebateLauncher() {
           } catch (e) { console.warn('[RoxaneLive] Audio decode failed', e); }
         }
         if (msg.type === 'debate_complete') {
+          window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } }));
           stopMicrophone();
           const turns = Array.isArray(msg.turns) ? msg.turns : [];
           setLiveTurns(turns.map((turn: any, index: number) => ({ ...turn, id: 'live-' + Date.now() + '-' + index })));
@@ -129,8 +130,8 @@ export function RoxaneDebateLauncher() {
         if (msg.type === 'user_transcript' && typeof msg.text === 'string') setLiveTurns(prev => [...prev, { id: 'user-' + Date.now(), speaker: 'user', text: msg.text, round: 0 }]);
         if (msg.type === 'interrupted_by_user') { clearAudioOutput(); setBusy(false); setLiveStatus('interrupted'); }
       };
-      socket.onerror = () => { setError('Connexion WebSocket Roxane impossible.'); setBusy(false); setLiveStatus('error'); };
-      socket.onclose = () => setBusy(false);
+      socket.onerror = () => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setError('Connexion WebSocket Roxane impossible.'); setBusy(false); setLiveStatus('error'); };
+      socket.onclose = () => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setBusy(false); };
     } catch (e) { setError(e instanceof Error ? e.message : 'Erreur inconnue'); setBusy(false); setLiveStatus('error'); }
   };
 
