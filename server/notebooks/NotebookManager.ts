@@ -296,16 +296,21 @@ export class NotebookManager {
     // indépendamment de l'UUID temporaire généré pendant l'ingestion.
     const contentHash = createHash("sha256").update(source.rawText || "", "utf-8").digest("hex");
     source.contentHash = contentHash;
-    const normalizedOrigin = source.origin.trim().replace(/\\\\/g, "/").replace(/\\/$/, "").toLowerCase();
+    const normalizedOrigin = source.origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
     const duplicate = notebook.sources.find(existing => {
       const existingHash = existing.contentHash || createHash("sha256").update(existing.rawText || "", "utf-8").digest("hex");
-      const existingOrigin = existing.origin.trim().replace(/\\\\/g, "/").replace(/\\/$/, "").toLowerCase();
+      const existingOrigin = existing.origin.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
       return existing.type === source.type && existingOrigin === normalizedOrigin && existingHash === contentHash;
     });
 
     if (duplicate) {
       // Préserver l'identité durable et les IDs de chunks de la source déjà
       // enregistrée. Le caller reçoit aussi l'objet canonique.
+      if (!duplicate.contentHash) {
+        duplicate.contentHash = contentHash;
+        notebook.updatedAt = new Date().toISOString();
+        this.flushNotebook(notebook);
+      }
       Object.assign(source, duplicate);
       log.info(`⏭️ Source déjà présente, import ignoré: "${duplicate.title}" (${duplicate.id})`);
       // Une nouvelle tentative peut réparer des embeddings manquants.
