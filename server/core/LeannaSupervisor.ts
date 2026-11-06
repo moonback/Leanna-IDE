@@ -115,6 +115,7 @@ export interface SupervisedResult {
   rollbackComplete?: boolean;
   /** Files still differing from the pre-attempt snapshot after rollback retries. */
   residualFiles?: string[];
+  recoveryRequired?: boolean;
 }
 
 export class LeannaSupervisor {
@@ -372,6 +373,9 @@ export class LeannaSupervisor {
         case "RECOVERING":
           this.advance(machine, "READY", "recovered to ready");
           break;
+        case "RECOVERY_REQUIRED":
+          // Explicit operator reconciliation is required; never auto-resume.
+          return;
         case "WAITING_APPROVAL":
         case "PAUSED":
           this.advance(machine, "READY", "resume to ready");
