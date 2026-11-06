@@ -105,6 +105,19 @@ export function AiSection() {
           })}
         </div>
       </Field>
+
+      <div className="mt-5 border-t border-[var(--border-base)] pt-5">
+        <p className="mb-1 text-sm font-semibold">Seconde IA — Roxane</p>
+        <p className="mb-4 text-xs text-[var(--text-muted)]">Identité et voix indépendantes pour le mode Duo vocal.</p>
+        <Field label="Nom de la seconde IA">
+          <TextInput value={profile.duoName || 'Roxane'} onChange={v => setField('duoName', v)} placeholder="Roxane" />
+        </Field>
+        <Field label="Voix de la seconde IA">
+          <select value={profile.duoVoice || 'Kore'} onChange={e => setField('duoVoice', e.target.value)} className="w-full rounded-lg border border-[var(--border-base)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)]">
+            {VOICES.map(v => <option key={v.id} value={v.id}>{v.label} — {v.desc}</option>)}
+          </select>
+        </Field>
+      </div>
     </Section>
   );
 }
