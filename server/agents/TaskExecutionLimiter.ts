@@ -5,9 +5,21 @@
  * protects the process across multiple scheduler instances and direct
  * delegations. Waiting callers are resumed FIFO.
  */
+export class TaskExecutionCancelledError extends Error {
+  constructor(readonly taskId: string) {
+    super(`Tâche ${taskId} annulée avant d'obtenir un créneau d'exécution`);
+    this.name = "TaskExecutionCancelledError";
+  }
+}
+
+interface LimiterWaiter {
+  taskId?: string;
+  resolve: (granted: boolean) => void;
+}
+
 export class TaskExecutionLimiter {
   private active = 0;
-  private readonly waiters: Array<() => void> = [];
+  private readonly waiters: LimiterWaiter[] = [];
 
   constructor(readonly maxConcurrent: number = 8) {
     if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
@@ -23,21 +35,30 @@ export class TaskExecutionLimiter {
     return this.waiters.length;
   }
 
-  async run<T>(operation: () => Promise<T>): Promise<T> {
+  cancel(taskId: string): boolean {
+    const index = this.waiters.findIndex((waiter) => waiter.taskId === taskId);
+    if (index < 0) return false;
+    const [waiter] = this.waiters.splice(index, 1);
+    waiter.resolve(false);
+    return true;
+  }
+
+  async run<T>(operation: () => Promise<T>, taskId?: string): Promise<T> {
     if (this.active < this.maxConcurrent) {
       this.active++;
     } else {
       // The occupied slot is handed directly to the next waiter on release.
       // Do not decrement/re-increment around the handoff: that would let a
       // newly arriving caller steal the slot before the waiter resumes.
-      await new Promise<void>((resolve) => this.waiters.push(resolve));
+      const granted = await new Promise<boolean>((resolve) => this.waiters.push({ taskId, resolve }));
+      if (!granted) throw new TaskExecutionCancelledError(taskId ?? "unknown");
     }
 
     try {
       return await operation();
     } finally {
       const next = this.waiters.shift();
-      if (next) next();
+      if (next) next.resolve(true);
       else this.active--;
     }
   }
