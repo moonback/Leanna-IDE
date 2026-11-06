@@ -119,7 +119,6 @@ export function EditorTabs({
                   onSelectTab(file.path);
                 }
               }}
-              title={tabTitle}
             >
               {isActive && (
                 <motion.div
@@ -151,7 +150,6 @@ export function EditorTabs({
                     onCloseTab(file.path);
                   }}
                   className="absolute inset-0 flex items-center justify-center rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--bg-hover)] transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-primary)]"
-                  title="Fermer (Ctrl+W)"
                   aria-label={`Fermer ${displayName}`}
                   tabIndex={isActive ? 0 : -1}
                 >
@@ -170,7 +168,6 @@ export function EditorTabs({
             type="button"
             onClick={onToggleMarkdownPreview}
             className={iconButton}
-            title={markdownPreview ? 'Voir le texte brut' : 'Prévisualiser le Markdown'}
             aria-label={markdownPreview ? 'Voir le texte brut' : 'Prévisualiser le Markdown'}
             aria-pressed={markdownPreview}
           >
@@ -186,7 +183,6 @@ export function EditorTabs({
             type="button"
             onClick={onToggleHtmlPreview}
             className={iconButton}
-            title={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML'}
             aria-label={htmlPreview ? 'Fermer la prévisualisation HTML' : 'Prévisualiser le HTML'}
             aria-pressed={htmlPreview}
           >
@@ -199,7 +195,6 @@ export function EditorTabs({
           onClick={onSave}
           disabled={!activeFileDirty}
           className={iconButton + ' disabled:opacity-30'}
-          title="Enregistrer le fichier (Ctrl+S)"
           aria-label="Enregistrer le fichier"
         >
           <Save size={13} style={{ color: activeFileDirty ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
@@ -209,7 +204,6 @@ export function EditorTabs({
           type="button"
           onClick={() => setShowMore((value) => !value)}
           className={iconButton}
-          title="Autres options de l'éditeur"
           aria-label="Autres options de l'éditeur"
           aria-controls="editor-tabs-more-options"
           aria-expanded={showMore}
