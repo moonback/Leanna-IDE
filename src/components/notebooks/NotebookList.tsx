@@ -337,6 +337,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     delay: i < 12 ? i * 0.02 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
+                  onKeyDown={event => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectNotebook(nb.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ouvrir le notebook ${nb.title}`}
                   data-spotlight
                   data-interactive="true"
                   className="notebook-card group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-xl py-3 pl-5 pr-3 hover:shadow-md"
@@ -411,6 +421,16 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
                     delay: i < 12 ? i * 0.03 : 0,
                   }}
                   onClick={() => onSelectNotebook(nb.id)}
+                  onKeyDown={event => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectNotebook(nb.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ouvrir le notebook ${nb.title}`}
                   data-spotlight
                   data-interactive="true"
                   className="notebook-card group relative flex cursor-pointer flex-col overflow-hidden rounded-xl hover:shadow-lg"
