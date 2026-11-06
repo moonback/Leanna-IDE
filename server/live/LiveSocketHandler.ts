@@ -2180,3 +2180,33 @@ async function handleToolCall(
     void Promise.allSettled(backgroundPromises);
   }
 }
+
+
+/**
+ * Exécute un appel d'outil Live via le même pipeline que /live.
+ * Le duo vocal réutilise ainsi les gardes workspace/sandbox, Ask mode,
+ * Supervisor, context gate, retries, anti prompt-injection et auto-verify.
+ */
+export async function executeLiveToolCall(
+  toolCall: any,
+  session: any,
+  clientWs: WebSocket,
+  deps: LiveSocketDeps,
+  voiceName = 'Aoede',
+  supervisor = new Supervisor(),
+): Promise<void> {
+  await handleToolCall(
+    toolCall,
+    session,
+    clientWs,
+    'full',
+    undefined,
+    voiceName,
+    deps,
+    supervisor,
+    undefined,
+    undefined,
+    undefined,
+    new ToolCallTracker(),
+  );
+}
