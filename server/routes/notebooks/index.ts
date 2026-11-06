@@ -18,7 +18,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_NOTEBOOK_SOURCE_BYTES, files: 10, fields: 20 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /\\.(pdf|txt|md|markdown|html|htm|png|jpg|jpeg|webp)$/i;
+    const allowed = /\.(pdf|txt|md|markdown|html|htm|png|jpg|jpeg|webp)$/i;
     if (!allowed.test(file.originalname)) {
       cb(new Error("Format non pris en charge. Utilisez PDF, TXT, Markdown, HTML, PNG, JPEG ou WebP."));
       return;
