@@ -17,6 +17,7 @@ export function RoxaneDebateLauncher() {
   const [interjection, setInterjection] = useState('');
   const [approvedTasks, setApprovedTasks] = useState('');
   const [missionStatus, setMissionStatus] = useState('');
+  const [autoStartPending, setAutoStartPending] = useState(false);
   const [synthesis, setSynthesis] = useState<any>(null);
   const liveSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -27,6 +28,7 @@ export function RoxaneDebateLauncher() {
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const recognitionRef = useRef<any>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const runRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const openPanel = (event: Event) => {
@@ -35,6 +37,7 @@ export function RoxaneDebateLauncher() {
       if (typeof detail?.context === 'string') setContext(detail.context);
       setLiveStatus('idle');
       setOpen(true);
+      setAutoStartPending(true);
     };
     window.addEventListener('Leanna-start-roxane-debate', openPanel);
     return () => window.removeEventListener('Leanna-start-roxane-debate', openPanel);
@@ -67,6 +70,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const run = async () => {
+    window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: true } }));
     setError(''); setLiveTurns([]); setApprovedTasks(''); setMissionStatus(''); setSynthesis(null); setBusy(true); setLiveStatus('connecting');
     try {
       const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -77,7 +81,7 @@ export function RoxaneDebateLauncher() {
         let msg: any; try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'status') setLiveStatus(msg.status);
         if (msg.type === 'ready') { setBusy(false); setLiveStatus('live'); }
-        if (msg.type === 'error') { setError(msg.message || 'Erreur Live'); setBusy(false); setLiveStatus('error'); }
+        if (msg.type === 'error') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setError(msg.message || 'Erreur Live'); setBusy(false); setLiveStatus('error'); }
         if (msg.type === 'transcript_delta' && typeof msg.text === 'string') {
           setLiveTurns(prev => {
             const last = prev[prev.length - 1];
@@ -119,7 +123,7 @@ export function RoxaneDebateLauncher() {
             setSynthesis(data.synthesis);
             setApprovedTasks((data.synthesis?.tasks || []).map((task: any) => task.title + ' | ' + task.description + ' | ' + task.priority).join('\n'));
           }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
-            .finally(() => { setBusy(false); setLiveStatus('complete'); });
+            .finally(() => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setBusy(false); setLiveStatus('complete'); });
         }
         if (msg.type === 'interrupted') clearAudioOutput();
         if (msg.type === 'user_transcript' && typeof msg.text === 'string') setLiveTurns(prev => [...prev, { id: 'user-' + Date.now(), speaker: 'user', text: msg.text, round: 0 }]);
@@ -129,6 +133,13 @@ export function RoxaneDebateLauncher() {
       socket.onclose = () => setBusy(false);
     } catch (e) { setError(e instanceof Error ? e.message : 'Erreur inconnue'); setBusy(false); setLiveStatus('error'); }
   };
+
+  runRef.current = run;
+  useEffect(() => {
+    if (!autoStartPending) return;
+    setAutoStartPending(false);
+    runRef.current();
+  }, [autoStartPending]);
 
   const sendInterjection = () => {
     const text = interjection.trim(); if (!text) return;
@@ -231,6 +242,7 @@ export function RoxaneDebateLauncher() {
   };
 
   const stopLive = () => {
+    window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } }));
     stopMicrophone();
     clearAudioOutput();
     if (liveSocketRef.current?.readyState === WebSocket.OPEN) liveSocketRef.current.send(JSON.stringify({ type: 'interrupt' }));
