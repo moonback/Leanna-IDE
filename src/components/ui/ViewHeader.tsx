@@ -21,13 +21,13 @@ interface ViewHeaderProps {
 export function ViewHeader({ title, icon: Icon, description, badge, actions }: ViewHeaderProps) {
   return (
     <header
-      className="flex min-h-[60px] flex-shrink-0 items-center gap-4 border-b px-5 py-3 lg:px-7"
+      className="flex min-h-[68px] flex-shrink-0 items-center gap-3 border-b px-4 py-3 sm:gap-4 sm:px-5 lg:px-7"
       style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-base)' }}
     >
       {/* Left — Icon + Title + Badge + Description */}
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
         <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
           style={{ backgroundColor: 'var(--accent-subtle)' }}
         >
           <Icon aria-hidden="true" className="h-4 w-4" style={{ color: 'var(--accent-secondary)' }} />
@@ -36,7 +36,7 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions }: V
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1
-              className="truncate text-sm font-semibold tracking-tight"
+              className="truncate text-sm font-semibold tracking-tight sm:text-[15px]"
               style={{ color: 'var(--text-primary)' }}
             >
               {title}
@@ -63,7 +63,7 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions }: V
 
       {/* Right — Actions */}
       {actions && (
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex max-w-[55%] flex-shrink-0 items-center justify-end gap-1.5 sm:max-w-none sm:gap-2">
           {actions}
         </div>
       )}
