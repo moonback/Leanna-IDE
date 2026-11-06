@@ -64,7 +64,7 @@ test('unknown-price models are excluded and one candidate is not a routing decis
     promptChars: 100,
     usage: [],
     failures: [],
-  })?.model, 'openai/gpt-4o-mini');
+  }), undefined);
 
   assert.equal(selectAdaptiveModel({
     candidates: ['openai/gpt-4o-mini'],
