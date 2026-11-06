@@ -35,6 +35,11 @@ export interface Source {
   origin: string;
   /** Empreinte SHA-256 du texte extrait, utilisée pour la déduplication. */
   contentHash?: string;
+  /** État durable de l'indexation vectorielle de cette version de source. */
+  indexingStatus?: "pending" | "indexed" | "partial" | "failed";
+  /** Dernière erreur d'indexation, sans contenu sensible du document. */
+  indexingError?: string;
+  indexingUpdatedAt?: string;
   /** Texte brut extrait */
   rawText: string;
   /** HTML brut original (pour sources HTML uniquement) */
