@@ -133,11 +133,13 @@ export default function VoiceDuoView() {
   }, [appendEntry, audio.cleanupAudio, audio.handleInterrupt, audio.initAudio, audio.playAudioChunk, profile.aiName, profile.duoName]);
 
   const reset = useCallback(() => {
-    wsRef.current?.send(JSON.stringify({ type: "reset" }));
-    audio.handleInterrupt();
+    // Un vrai reset doit recréer les deux sessions Gemini : effacer seulement
+    // le transcript UI laisserait l'ancien contexte côté modèle.
+    disconnect();
     setMessages([]);
-    setStatus(sessionsReady ? "Conversation réinitialisée — à votre écoute" : "Prêt à démarrer");
-  }, [audio.handleInterrupt, sessionsReady]);
+    setError("");
+    setStatus("Sessions réinitialisées — relancez les deux IA");
+  }, [disconnect]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
