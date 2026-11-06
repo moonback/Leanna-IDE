@@ -21,7 +21,10 @@ test("voice duo live: opens two independent sessions and alternates bounded turn
   const server = http.createServer();
   const wss = new WebSocketServer({ noServer: true });
   const callbacks: Array<{ onmessage: (message: any) => void }> = [];
+  const connectOptions: any[] = [];
   const calls: Array<{ speaker: string; text: string }> = [];
+  const toolCalls: Array<{ name: string; args: any }> = [];
+  const toolResponses: any[] = [];
   const activeSessions = new Set<unknown>();
 
   const fakeAI = {
@@ -30,8 +33,10 @@ test("voice duo live: opens two independent sessions and alternates bounded turn
         const index = callbacks.length;
         const speaker = index === 0 ? "leanna" : "roxane";
         callbacks.push(options.callbacks);
+        connectOptions.push(options);
         return {
           sendRealtimeInput: () => {},
+          sendToolResponse: (payload: any) => toolResponses.push({ speaker, payload }),
           sendClientContent: (payload: any) => {
             const text = payload.turns?.[0]?.parts?.[0]?.text || "";
             calls.push({ speaker, text });
@@ -59,6 +64,22 @@ test("voice duo live: opens two independent sessions and alternates bounded turn
     }),
     createGeminiAI: () => fakeAI as any,
     activeGeminiSessions: activeSessions,
+    skillManager: {
+      getToolDeclarations: () => [
+        { name: "read_project_file", description: "Read a project file", parameters: { type: "OBJECT", properties: {} } },
+        { name: "run_project_command", description: "Run a project command", parameters: { type: "OBJECT", properties: {} } },
+        { name: "get_current_time", description: "Get current time", parameters: { type: "OBJECT", properties: {} } },
+      ],
+      handleToolCall: async (name: string, args: any) => {
+        toolCalls.push({ name, args });
+        return { success: true, now: "2026-11-06T12:00:00Z" };
+      },
+      isReadOnlyTool: () => true,
+      recordToolUsage: () => {},
+    } as any,
+    getWorkspaceRoot: () => "C:/workspace",
+    browserReadPending: new Map(),
+    browserActionPending: new Map(),
   });
 
   server.on("upgrade", (request, socket, head) => {
@@ -80,6 +101,16 @@ test("voice duo live: opens two independent sessions and alternates bounded turn
     await waitFor(() => events.some(event => event.type === "ready"));
     assert.equal(callbacks.length, 2, "two Gemini Live sessions must be created");
     assert.equal(activeSessions.size, 2, "both sessions must be tracked for shutdown");
+    for (const options of connectOptions) {
+      const declarations = options.config.tools?.[0]?.functionDeclarations ?? [];
+      assert.ok(declarations.some((d: any) => d.name === "read_project_file"), "IDE file tools must be exposed");
+      assert.ok(declarations.some((d: any) => d.name === "run_project_command"), "command tools must be exposed");
+      assert.ok(declarations.some((d: any) => d.name === "get_current_time"), "runtime utility tools must be exposed");
+    }
+
+    callbacks[0].onmessage({ toolCall: { functionCalls: [{ id: "tool-1", name: "get_current_time", args: {} }] } });
+    await waitFor(() => toolCalls.length === 1 && toolResponses.length === 1);
+    assert.equal(toolCalls[0].name, "get_current_time", "tool calls must execute through the shared SkillManager");
 
     ws.send(JSON.stringify({ type: "text", text: "Comparez deux options." }));
     await waitFor(() => events.some(event => event.type === "listening" && event.reason === "turn_limit"));
