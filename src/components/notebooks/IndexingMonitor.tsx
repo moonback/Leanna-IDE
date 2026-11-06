@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react';
 import { api, apiVoid } from './api/client.js';
 import { NbButton } from './ui/primitives.js';
+import { useToast } from '../ui/Toast.js';
 
 type IndexState = 'indexed' | 'pending' | 'partial' | 'failed' | 'unknown';
 interface IndexSource {
@@ -39,6 +40,7 @@ function formatDate(value?: string): string {
 }
 
 export function IndexingMonitor({ notebookId }: { notebookId: string }) {
+  const { success } = useToast();
   const [snapshot, setSnapshot] = useState<IndexingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,7 +86,7 @@ export function IndexingMonitor({ notebookId }: { notebookId: string }) {
     setReindexing(true);
     try {
       const result = await api<{ queued?: number }>(`/api/notebooks/${notebookId}/embeddings/reindex`, { method: 'POST' });
-      setError(result.queued === 0 ? 'Aucune source à réindexer.' : `${result.queued ?? 0} source(s) placée(s) en réindexation.`);
+      success(result.queued === 0 ? 'Aucune source à réindexer' : `${result.queued ?? 0} source(s) placée(s) en réindexation`);
       await refresh(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'La réindexation a échoué.');
