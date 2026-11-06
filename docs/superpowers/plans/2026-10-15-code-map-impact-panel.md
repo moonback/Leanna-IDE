@@ -1,3 +1,9 @@
+> **Statut au 2026-11-06 : IMPLÉMENTÉ dans le code.** Les fichiers `ImpactPanel.tsx`,
+> `impactModel.ts`, `useCodeMapImpact.ts` et leurs tests sont présents. Ce plan est conservé
+> comme trace historique ; vérifier les tests et l'implémentation actuelle avant toute reprise.
+>
+> ---
+>
 # Panneau d'impact de la cartographie du code — Plan d'implémentation
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
