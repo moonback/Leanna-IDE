@@ -10,6 +10,7 @@ import type {
 import { AgentExecutor, SkillHandler } from "./AgentExecutor.js";
 import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
 import { TaskScheduler, validateOrchestrationPlan, type TaskRunner } from "./TaskScheduler.js";
+import { agentTaskExecutionLimiter } from "./TaskExecutionLimiter.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { CoreKernel } from "../core/kernel.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
@@ -240,7 +241,7 @@ export class AgentOrchestrator {
     agentPersistence.saveTask(task).catch(() => {});
 
     // Lancer l'exécution en arrière-plan
-    this.executor.execute(task).catch((err) => {
+    agentTaskExecutionLimiter.run(() => this.executor.execute(task)).catch((err) => {
       log.error(`Erreur non gérée pour tâche ${task.id.slice(0, 8)}: ${err.message}`);
     });
 
