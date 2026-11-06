@@ -18,6 +18,7 @@ import { timeAgoLong as timeAgo } from './utils.js';
 import { SPRING_UI, SPRING_MOMENTUM } from './motion.js';
 import { api, apiVoid } from './api/client.js';
 import { NbButton, NbEmptyState, NbIconButton, NbModal } from './ui/primitives.js';
+import { ViewHeader } from '../ui/ViewHeader.js';
 
 interface NotebookSummary {
   id: string;
@@ -150,43 +151,21 @@ export function NotebookList({ onSelectNotebook, onClose }: Props) {
   return (
     <div className="notebook-workspace flex h-full flex-col overflow-hidden bg-[var(--notebook-bg)]">
 
-      {/* ─── Header ─────────────────────────────────────────── */}
-      <header className="flex-shrink-0 px-6 pb-6 pt-8 lg:px-12">
-        <div className="mx-auto flex max-w-8xl items-start justify-between gap-4">
-          {/* Title block */}
-          <div className="min-w-0">
-            <div className="notebook-eyebrow mb-3 flex items-center gap-2 uppercase text-[var(--notebook-accent)]">
-              <BookOpen className="h-3.5 w-3.5" aria-hidden />
-              {workspaceName || 'Espace de recherche'}
-            </div>
-            <h1 className="notebook-heading truncate text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-              {workspaceName ? `Notebooks · ${workspaceName}` : 'Vos notebooks'}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Retrouvez vos recherches et continuez là où vous vous êtes arrêté.
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="notebook-actions flex-shrink-0">
+      <ViewHeader
+        title={workspaceName ? `Notebooks · ${workspaceName}` : 'Notebooks'}
+        icon={BookOpen}
+        description="Retrouvez vos recherches et continuez là où vous vous êtes arrêté."
+        badge={workspaceName || 'Bibliothèque'}
+        actions={
+          <div className="flex flex-shrink-0 items-center gap-2">
             <NbButton variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
               Nouveau
             </NbButton>
-            <NbIconButton
-              icon={Github}
-              label="Importer depuis GitHub"
-              onClick={() => setShowGitHubImport(true)}
-            />
-            {onClose && (
-              <NbIconButton
-                icon={LayoutGrid}
-                label="Retour au sélecteur IDE / Notebook"
-                onClick={onClose}
-              />
-            )}
+            <NbIconButton icon={Github} label="Importer depuis GitHub" onClick={() => setShowGitHubImport(true)} />
+            {onClose && <NbIconButton icon={LayoutGrid} label="Retour au sélecteur IDE / Notebook" onClick={onClose} />}
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* ─── Search & Sort Bar ──────────────────────────────── */}
       {notebooks.length > 0 && (
