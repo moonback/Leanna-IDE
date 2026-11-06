@@ -15,7 +15,7 @@ import { GoogleGenAI } from "@google/genai";
 import { telemetryService, type CallKind, type BillingUnit } from "../observability/TelemetryService.js";
 import { guardUntrustedContent } from "./promptInjectionGuard.js";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { selectAdaptiveModel } from "./modelRouter.js";
+import { getModelLatencySnapshot, recordModelLatency, selectAdaptiveModel } from "./modelRouter.js";
 
 // ── Profile interface (minimal subset needed here) ──────────────────────────
 
@@ -369,6 +369,7 @@ function applyAdaptiveModel(options: GenerateTextOptions): GenerateTextOptions {
     maxOutputTokens: options.maxTokens ?? options.maxOutputTokens,
     usage,
     failures,
+    latencyMsByModel: getModelLatencySnapshot(),
   });
   if (!decision) return options;
   console.info('[ModelRouter] role=' + (options.agentRole ?? 'general') +
@@ -1000,6 +1001,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
   // 120s au lieu de 60s : les agents font des sorties longues (code complet, analyses, délégations)
   // qui peuvent nécessiter plus d'une minute sur des modèles OpenRouter sous charge.
   const timeoutId = setTimeout(() => controller.abort(), 120_000);
+  const startedAt = Date.now();
 
   try {
     const messages: any[] = [];
@@ -1062,5 +1064,7 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     // circuit breaker and avoid a redundant double call. This keeps failover
     // in one place instead of two competing mechanisms.
     throw e;
+  } finally {
+    recordModelLatency(model, Date.now() - startedAt);
   }
 }
