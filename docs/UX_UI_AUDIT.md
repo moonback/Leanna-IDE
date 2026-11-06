@@ -779,3 +779,31 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - L'échappement des balises HTML brutes protège le rendu HTML exporté ; il ne constitue pas une politique complète de désinfection de contenu externe pour tous les consommateurs Markdown de l'application.
 - Exécuter les tests export, typecheck, lint et tests complets ; vérifier l'ouverture des fichiers PDF, DOC et HTML dans les applications cibles et les téléchargements sur Windows/Electron.
 - Ces commandes et vérifications Electron ne sont pas exécutées via le connecteur GitHub seul.
+
+
+## Trente-et-unième passe — Génération DOCX OpenXML native
+
+### Constat
+
+- L'exporteur nommé `exportToDocx` produisait un document HTML Word-compatible. Il ne contenait ni conteneur ZIP, ni parties WordprocessingML et ne constituait donc pas un DOCX conforme.
+
+### Corrections appliquées
+
+- Remplacement de l'export HTML par un générateur OpenXML : paquet ZIP avec `[Content_Types].xml`, relations, `word/document.xml`, styles, numérotation et propriétés principales.
+- Conversion des titres, paragraphes, emphases, code inline, blocs de code, listes ordonnées/non ordonnées, tableaux, citations et liens HTTP(S) cliquables.
+- Échappement XML des contenus et métadonnées ; les blocs HTML bruts sont traités comme du texte.
+- Export HTTP `/api/export/docx` et export de notebooks en DOCX avec extension et type MIME OpenXML corrects. L'ancien format `doc` du parcours notebook est conservé comme alias vers le DOCX.
+- Tests de structure ZIP, présence des parties OpenXML, conversion des éléments Markdown, liens et échappement.
+
+### Fichiers concernés
+
+- `server/export/docxExporter.ts`
+- `server/export/docxExporter.test.ts`
+- `server/routes/export.ts`
+
+### Validation restante
+
+- Exécuter les tests DOCX et routes export, `npm run typecheck`, `npm run typecheck:test`, lint et tests complets.
+- Ouvrir les fichiers générés avec Microsoft Word et LibreOffice ; vérifier les tableaux multi-colonnes, listes imbriquées, caractères Unicode et documents volumineux.
+- Le générateur ZIP/OpenXML est volontairement autonome et doit faire l'objet d'une validation d'interopérabilité réelle avant de déclarer la compatibilité Word comme certifiée.
+- Les validations locales/Electron ne sont pas exécutées par le connecteur GitHub seul.
