@@ -12,6 +12,7 @@ import {
   setTextGenerationProfile,
   runWithTelemetryContext,
   getTelemetryContext,
+  getActiveModel,
   BudgetExceededError,
   normalizeGeminiUsage,
   normalizeOpenRouterUsage,
@@ -70,6 +71,16 @@ after(async () => {
 });
 
 const USAGE = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 };
+
+test('getActiveModel follows the selected OpenRouter model and safe defaults', () => {
+  setTextGenerationProfile({ textProvider: 'openrouter', openrouterModel: 'anthropic/claude-3.5-sonnet' });
+  assert.equal(getActiveModel(), 'anthropic/claude-3.5-sonnet');
+  setTextGenerationProfile({ textProvider: 'openrouter', openrouterModel: '   ' });
+  assert.equal(getActiveModel(), 'google/gemini-3.6-flash');
+  setTextGenerationProfile({ textProvider: 'gemini' });
+  assert.equal(getActiveModel(), 'gemini-3.8-flash');
+});
+
 
 // ─── Comptage / normalisation ────────────────────────────────────────────────
 
