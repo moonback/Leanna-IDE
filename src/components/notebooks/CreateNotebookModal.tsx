@@ -5,7 +5,7 @@
  * avec les primitives notebooks.
  */
 
-import { useState, useCallback, useId } from 'react';
+import { useState, useCallback, useId, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 import { api } from './api/client.js';
@@ -22,11 +22,13 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
   const titleInputId = useId();
   const descriptionInputId = useId();
 
   const handleCreate = useCallback(async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
       const data = await api<{ notebook: { title: string } }>('/api/notebooks', {
@@ -41,6 +43,7 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
     } catch (e: unknown) {
       toastError(errorMessage(e));
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   }, [title, description, success, toastError, onClose, onCreated]);
@@ -51,7 +54,7 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
   }, [handleCreate]);
 
   return (
-    <NbModal open onClose={onClose} title="Créer un notebook" size="md">
+    <NbModal open onClose={creating ? () => {} : onClose} title="Créer un notebook" size="md">
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
         <NbModal.Body className="space-y-4">
           <p className="text-xs text-[var(--text-muted)]">
@@ -88,7 +91,7 @@ export function CreateNotebookModal({ onClose, onCreated }: CreateNotebookModalP
         </NbModal.Body>
 
         <NbModal.Footer>
-          <NbButton variant="ghost" onClick={onClose}>
+          <NbButton variant="ghost" onClick={onClose} disabled={creating}>
             Annuler
           </NbButton>
           <NbButton
