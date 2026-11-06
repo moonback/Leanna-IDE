@@ -2940,3 +2940,29 @@ button {
     transition: none;
   }
 }
+
+
+/* Sidebar redesign v2 — restrained workspace navigation */
+.lea-sidebar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 3%, var(--bg-secondary)) 0%, var(--bg-secondary) 180px) !important;
+  border-right-color: color-mix(in srgb, var(--border-base) 82%, transparent) !important;
+}
+.lea-sidebar__search {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-input) 78%, transparent);
+  border: 1px solid var(--border-base);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.lea-sidebar__search:focus-within {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 58%, var(--border-base));
+  background: var(--bg-panel);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+.lea-sidebar__search input { color: var(--text-primary); }
+.lea-sidebar [data-nav-item] { min-height: 40px; border-radius: 9px; }
+.lea-sidebar [data-nav-item][aria-current="page"] { font-weight: 600; }
+@media (max-width: 768px) {
+  .lea-sidebar { width: min(88vw, 320px) !important; }
+}
+@media (prefers-reduced-motion: reduce) { .lea-sidebar__search { transition: none; } }

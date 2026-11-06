@@ -27,7 +27,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import type { LucideIcon } from 'lucide-react';
 import {
   Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio,
+  Power, MessageCircle, Mic, MicOff, Bot, ArrowLeft, FolderInput, Radio, Search,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
@@ -55,8 +55,8 @@ interface ToolGroup { id: string; label: string; items: ToolItem[] }
 
 const COLLAPSE_KEY = 'leanna_global_sidebar_collapsed';
 const GROUPS_KEY = 'leanna_global_sidebar_closed_groups';
-const WIDTH_COLLAPSED = 56;
-const WIDTH_EXPANDED = 232;
+const WIDTH_COLLAPSED = 60;
+const WIDTH_EXPANDED = 252;
 const HOVER_IN_MS = 110;
 const HOVER_OUT_MS = 220;
 
@@ -159,7 +159,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
   /* Préférence persistée : repliée par défaut (hors survol). */
   const [pinnedCollapsed, setPinnedCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem(COLLAPSE_KEY) !== '0'; } catch { return true; }
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
   });
   useEffect(() => {
     try { localStorage.setItem(COLLAPSE_KEY, pinnedCollapsed ? '1' : '0'); } catch { /* ignore */ }
@@ -258,7 +258,23 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
     }
   }, []);
 
+  const [navQuery, setNavQuery] = useState('');
+  const normalizedQuery = navQuery.trim().toLocaleLowerCase('fr');
+  const visibleNavGroups = useMemo(
+    () => NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.label.toLocaleLowerCase('fr').includes(normalizedQuery)),
+    })).filter((group) => group.items.length > 0),
+    [normalizedQuery],
+  );
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
+  const visibleToolGroups = useMemo(
+    () => toolGroups.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.label.toLocaleLowerCase('fr').includes(normalizedQuery)),
+    })).filter((group) => group.items.length > 0),
+    [toolGroups, normalizedQuery],
+  );
 
   const spring = reduceMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 420, damping: 40, mass: 0.9 };
 
@@ -323,7 +339,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                     Leanna
                   </span>
                   <span className="block truncate text-xs font-medium uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
-                    Navigation unifiée
+                    AI WORKSPACE
                   </span>
                 </span>
               </FadeSlide>
@@ -373,11 +389,28 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               />
             )}
 
+            {!collapsed && (
+              <div className="lea-sidebar__search mx-2 mb-2 flex h-9 flex-shrink-0 items-center gap-2 rounded-lg px-3">
+                <Search size={15} aria-hidden />
+                <input
+                  type="search"
+                  value={navQuery}
+                  onChange={(event) => setNavQuery(event.target.value)}
+                  placeholder="Rechercher une section…"
+                  aria-label="Rechercher dans la navigation"
+                  className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--text-dimmed)]"
+                />
+                {navQuery && (
+                  <button type="button" onClick={() => setNavQuery('')} className="text-xs" aria-label="Effacer la recherche">×</button>
+                )}
+              </div>
+            )}
+
             {/* Navigation groupée (routes) ou outils (IDE) */}
             <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
-              {mode === 'ide' && NAV_GROUPS.map((group, gi) => (
+              {mode === 'ide' && visibleNavGroups.map((group, gi) => (
                 <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
-                  open={!closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                  open={Boolean(normalizedQuery) || !closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
                   hasActive={group.items.some((item) => isActive(item.path))}>
                   {group.items.map((item) => (
                     <li key={item.id}>
@@ -387,14 +420,14 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 </Group>
               ))}
               {mode === 'ide'
-                ? toolGroups.map((group, gi) => (
+                ? visibleToolGroups.map((group, gi) => (
                     <Group
                       key={group.id}
                       id={group.id}
                       label={group.label}
                       first={gi === 0}
                       collapsed={collapsed}
-                      open={!closedGroups[group.id]}
+                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
                       onToggle={toggleGroup}
                       count={group.items.length}
                       hasActive={group.items.some((i) => i.active)}
@@ -413,14 +446,14 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       ))}
                     </Group>
                   ))
-                : NAV_GROUPS.map((group, gi) => (
+                : visibleNavGroups.map((group, gi) => (
                     <Group
                       key={group.id}
                       id={group.id}
                       label={group.label}
                       first={gi === 0}
                       collapsed={collapsed}
-                      open={!closedGroups[group.id]}
+                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
                       onToggle={toggleGroup}
                       count={group.items.length}
                       hasActive={group.items.some((i) => isActive(i.path))}
@@ -432,6 +465,11 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       ))}
                     </Group>
                   ))}
+              {normalizedQuery && visibleNavGroups.length === 0 && visibleToolGroups.length === 0 && !collapsed && (
+                <p className="px-3 py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Aucun élément ne correspond à « {navQuery} ».
+                </p>
+              )}
             </div>
 
             {/* Pied : présence vocale + changer de projet + paramètres */}
