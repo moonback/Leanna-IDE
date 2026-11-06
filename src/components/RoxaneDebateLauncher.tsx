@@ -104,6 +104,7 @@ export function RoxaneDebateLauncher() {
           } catch (e) { console.warn('[RoxaneLive] Audio decode failed', e); }
         }
         if (msg.type === 'debate_complete') {
+          stopMicrophone();
           const turns = Array.isArray(msg.turns) ? msg.turns : [];
           setLiveTurns(turns.map((turn: any, index: number) => ({ ...turn, id: 'live-' + Date.now() + '-' + index })));
           setBusy(true);
@@ -181,7 +182,9 @@ export function RoxaneDebateLauncher() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
+      micStreamRef.current = stream;
       const context = new AudioContext({ sampleRate: 16000 });
+      await context.resume();
       const source = context.createMediaStreamSource(stream);
       const processor = context.createScriptProcessor(4096, 1, 1);
       const mute = context.createGain();
@@ -194,7 +197,11 @@ export function RoxaneDebateLauncher() {
         const outputLength = Math.floor(input.length / ratio);
         const pcm = new Int16Array(outputLength);
         for (let i = 0; i < outputLength; i++) {
-          const sample = input[Math.min(input.length - 1, Math.floor(i * ratio))] || 0;
+          const start = Math.floor(i * ratio);
+          const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+          let sum = 0;
+          for (let j = start; j < Math.max(start + 1, end); j++) sum += input[Math.min(input.length - 1, j)] || 0;
+          const sample = sum / Math.max(1, end - start);
           const clipped = Math.max(-1, Math.min(1, sample));
           pcm[i] = clipped < 0 ? clipped * 32768 : clipped * 32767;
         }
