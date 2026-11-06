@@ -390,6 +390,11 @@ export class CheckpointManager {
     this.persist({ ...cp, status: "rolledback" });
   }
 
+  /** Liste les transactions ouvertes d’une mission, y compris après redémarrage. */
+  listOpenByMission(missionId: string): Checkpoint[] {
+    return [...this.checkpoints.values()].filter((checkpoint) => checkpoint.missionId === missionId && checkpoint.status === "open");
+  }
+
   /** Retourne un checkpoint connu (mémoire ou disque), ou undefined. */
   get(id: string): Checkpoint | undefined {
     return this.checkpoints.get(id);
