@@ -83,7 +83,8 @@ export function IndexingMonitor({ notebookId }: { notebookId: string }) {
   const reindexAll = async () => {
     setReindexing(true);
     try {
-      await apiVoid(`/api/notebooks/${notebookId}/embeddings/reindex`, { method: 'POST' });
+      const result = await api<{ queued?: number }>(`/api/notebooks/${notebookId}/embeddings/reindex`, { method: 'POST' });
+      setError(result.queued === 0 ? 'Aucune source à réindexer.' : `${result.queued ?? 0} source(s) placée(s) en réindexation.`);
       await refresh(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'La réindexation a échoué.');
@@ -142,7 +143,7 @@ export function IndexingMonitor({ notebookId }: { notebookId: string }) {
               ) : snapshot.sources.map(source => {
                 const meta = statusMeta[source.indexingStatus] || statusMeta.unknown;
                 const StatusIcon = meta.icon;
-                const retryable = source.indexingStatus === 'failed' || source.indexingStatus === 'partial' || source.indexingStatus === 'pending';
+                const retryable = source.indexingStatus !== 'indexed'; // Inclut les sources historiques sans statut (unknown).
                 return (
                   <article key={source.id} className="rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-3">
                     <div className="flex items-start gap-2">
