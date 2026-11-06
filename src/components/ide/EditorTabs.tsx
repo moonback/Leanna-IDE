@@ -301,7 +301,8 @@ export function EditorTabs({
                 <span className="flex-1">Bibliothèque de modèles</span>
               </button>
             )}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </div>
