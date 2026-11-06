@@ -143,7 +143,7 @@ export function createExportRouter(): Router {
       }
       if (format === 'doc' || format === 'docx') {
         const buffer = exportToDocx(markdown, { title });
-        res.setHeader('Content-Type', 'application/msword');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.setHeader('Content-Disposition', download.header);
         res.setHeader('Content-Length', buffer.length);
         return res.send(buffer);
