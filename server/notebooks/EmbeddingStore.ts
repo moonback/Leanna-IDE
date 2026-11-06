@@ -104,6 +104,8 @@ export class EmbeddingStore {
   private loadedNotebooks: Map<string, { accessedAt: number; vectorCount: number }> = new Map();
   /** Timers de debounce par notebookId pour la persistence async */
   private persistTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  /** Version monotone empêchant une ancienne écriture async d'écraser un flush plus récent. */
+  private persistVersions: Map<string, number> = new Map();
 
   constructor(options?: { maxVectorsInMemory?: number }) {
     this.maxVectorsInMemory = options?.maxVectorsInMemory ?? 50_000;
@@ -238,11 +240,19 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
-    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    const version = (this.persistVersions.get(notebookId) ?? 0) + 1;
+    this.persistVersions.set(notebookId, version);
+    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${version}`;
     fs.writeFile(tempPath, JSON.stringify(index), "utf-8", (writeError) => {
       if (writeError) {
         log.warn(`Erreur persistence notebook ${notebookId.slice(0, 8)}: ${writeError.message}`);
         try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch { /* best effort */ }
+        return;
+      }
+      // Une écriture plus récente a été planifiée entre-temps : ne jamais
+      // publier cet instantané obsolète sur le fichier final.
+      if (this.persistVersions.get(notebookId) !== version) {
+        try { fs.unlinkSync(tempPath); } catch { /* best effort */ }
         return;
       }
       fs.rename(tempPath, filePath, (renameError) => {
@@ -276,6 +286,8 @@ export class EmbeddingStore {
     };
 
     const filePath = this.getIndexPath(notebookId);
+    // Invalider toute écriture async antérieure avant de publier l'instantané sync.
+    this.persistVersions.set(notebookId, (this.persistVersions.get(notebookId) ?? 0) + 1);
     const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     try {
       fs.writeFileSync(tempPath, JSON.stringify(index), "utf-8");
