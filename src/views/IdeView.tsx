@@ -1437,6 +1437,17 @@ export default function IdeView() {
           onToggleSettings={openSettings}
           onShowDiff={() => setShowDiffViewer(true)}
           onAnalyzeImpact={() => { setImpactPin(null); openRightPanel('impact'); }}
+          extraCommands={[
+            { id: 'toggle-explorer', label: 'Afficher / masquer l’explorateur', description: 'Ouvrir ou fermer l’arborescence du projet', category: 'Espace de travail', shortcut: 'Ctrl+Shift+E', action: () => setShowExplorer((value) => !value) },
+            { id: 'toggle-search', label: 'Afficher / masquer la recherche', description: 'Rechercher dans le projet', category: 'Espace de travail', shortcut: 'Ctrl+Shift+F', action: () => toggleRightPanel('search', showGlobalSearch) },
+            { id: 'toggle-terminal', label: 'Afficher / masquer le terminal', description: 'Ouvrir ou fermer le terminal intégré', category: 'Espace de travail', shortcut: 'Ctrl+`', action: toggleTerminal },
+            { id: 'toggle-github', label: 'Afficher / masquer GitHub', description: 'Ouvrir les outils de contrôle de source', category: 'Intégrations', action: () => setShowGitHub((value) => !value) },
+            { id: 'toggle-sandbox', label: 'Afficher / masquer la sandbox', description: 'Contrôler l’espace de travail isolé', category: 'Outils', action: toggleSandbox },
+            { id: 'open-workflow', label: 'Ouvrir les workflows', description: 'Consulter les automatisations et pipelines', category: 'Outils', action: () => setShowWorkflow(true) },
+            { id: 'open-agents', label: 'Ouvrir les agents', description: 'Consulter les agents disponibles et leur activité', category: 'Intelligence artificielle', action: () => openRightPanel('agents') },
+            { id: 'open-missions', label: 'Ouvrir les missions', description: 'Suivre les missions et validations en attente', category: 'Intelligence artificielle', action: () => openRightPanel('missions') },
+            { id: 'open-settings', label: 'Ouvrir les paramètres', description: 'Configurer Leanna', category: 'Préférences', action: () => openSettings() },
+          ]}
         />
       )}
 
