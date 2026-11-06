@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, AudioLines, Brain, Save, ShieldCheck, Sparkles } from 'lucide-react';
+import { Brain, Save, Sparkles } from 'lucide-react';
 import { useToast } from '../ui/Toast.js';
 
 type Config = {
