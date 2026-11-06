@@ -231,7 +231,13 @@ export default function ListsView() {
               </div>
 
               <div className="space-y-1.5">
-                {filteredSnippets.map(snippet => (
+                {loadError && (
+                  <div role="alert" className="rounded-xl border border-dashed px-3 py-6 text-center" style={{ borderColor: 'var(--border-base)' }}>
+                    <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>{loadError}</p>
+                    <button type="button" onClick={loadSnippets} className="rounded-lg border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>Réessayer</button>
+                  </div>
+                )}
+                {!loadError && filteredSnippets.map(snippet => (
                   <button
                     key={snippet.name}
                     type="button"
