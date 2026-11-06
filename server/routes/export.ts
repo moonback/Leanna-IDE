@@ -9,7 +9,7 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_FILENAME_LENGTH = 120;
 const NOTEBOOK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const THEMES = new Set(['dark', 'light', 'academic', 'modern']);
-const FORMATS = new Set(['pdf', 'doc', 'html']);
+const FORMATS = new Set(['pdf', 'doc', 'docx', 'html']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -109,7 +109,7 @@ export function createExportRouter(): Router {
     const body = isRecord(req.body) ? req.body : {};
     const format = body.format === undefined ? 'pdf' : body.format;
     const theme = body.theme === undefined ? 'light' : body.theme;
-    if (typeof format !== 'string' || !FORMATS.has(format)) return sendValidationError(res, 'Format demandé invalide (pdf, doc ou html).');
+    if (typeof format !== 'string' || !FORMATS.has(format)) return sendValidationError(res, 'Format demandé invalide (pdf, docx ou html).');
     if (typeof theme !== 'string' || !THEMES.has(theme)) return sendValidationError(res, 'Thème HTML invalide.');
 
     try {
@@ -134,14 +134,14 @@ export function createExportRouter(): Router {
 
       const title = safeText(notebook.title, 'Notebook', MAX_TITLE_LENGTH);
       if (!title) return sendValidationError(res, 'Titre du notebook invalide.');
-      const extension = format as 'pdf' | 'doc' | 'html';
+      const extension = format === 'docx' ? 'doc' : format as 'pdf' | 'doc' | 'html';
       const download = safeDownloadName(title, extension);
       if (format === 'html') {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Content-Disposition', download.header);
         return res.send(exportToStandaloneHtml(markdown, { title, theme: theme as 'dark' | 'light' | 'academic' | 'modern' }));
       }
-      if (format === 'doc') {
+      if (format === 'doc' || format === 'docx') {
         const buffer = exportToDocx(markdown, { title });
         res.setHeader('Content-Type', 'application/msword');
         res.setHeader('Content-Disposition', download.header);
