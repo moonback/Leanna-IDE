@@ -32,6 +32,7 @@ import {
   TelegramSection,
   EnvSection,
 } from '../components/settings/index.js';
+import { RoxaneSettingsSection } from '../components/settings/RoxaneSettingsSection.js';
 
 // ─── Nav Groups (4 catégories — Phase 4c du plan) ─────────────────────────────
 
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
     label: 'IA & Modèles',
     items: [
       { id: 'ai-settings', icon: Cpu, label: 'Assistant IA', keywords: 'voix nom ia leanna Leanna identité' },
+      { id: 'roxane-settings', icon: Bot, label: 'Roxane · Seconde IA', keywords: 'roxane débat seconde ia modèle voix personnalité provider temperature prompt' },
       { id: 'systemprompt-settings', icon: Settings2, label: 'Prompt Système', keywords: 'prompt systeme instruction personnaliser comportement custom system' },
       { id: 'prompts-settings', icon: FileCog, label: 'Prompts (.md)', keywords: 'prompts markdown md fichiers base autonomy safety security persona editer modifier runtime template' },
       { id: 'notebook-prompts-settings', icon: BookText, label: 'Prompts Notebooks', keywords: 'notebook notebooks prompt systeme chat generation rapport rag voix vocal resume faq swot roadmap personnaliser' },
@@ -485,6 +487,7 @@ export default function SettingsView() {
               >
                 {activeSection === 'profile-settings' && <ProfileSection />}
                 {activeSection === 'ai-settings' && <AiSection />}
+                {activeSection === 'roxane-settings' && <RoxaneSettingsSection />}
                 {activeSection === 'systemprompt-settings' && <SystemPromptSection />}
                 {activeSection === 'prompts-settings' && <PromptsSection />}
                 {activeSection === 'notebook-prompts-settings' && <NotebookPromptsSection />}
@@ -519,6 +522,7 @@ function getSectionDescription(id: string): string {
   const descriptions: Record<string, string> = {
     'profile-settings': 'Personnalisez votre identité pour des échanges adaptés.',
     'ai-settings': 'Configurez le nom et la voix de votre assistant IA.',
+    'roxane-settings': 'Configurez indépendamment Roxane : fournisseur, modèle, personnalité, voix, génération et paramètres des débats.',
     'systemprompt-settings': 'Personnalisez les instructions système de l\'assistant.',
     'prompts-settings': 'Affichez et modifiez les fichiers Markdown du prompt système (server/runtime/prompts).',
     'notebook-prompts-settings': 'Personnalisez tous les prompts système des notebooks (chat, génération, rapports, RAG, voix).',
