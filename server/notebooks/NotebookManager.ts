@@ -34,6 +34,61 @@ function getNotebookPath(id: string): string {
   return path.join(DATA_DIR, `${id}.json`);
 }
 
+const CURRENT_NOTEBOOK_SCHEMA_VERSION = 1;
+
+/**
+ * Migre les enregistrements historiques avant de les exposer au reste du
+ * système. Les migrations sont monotones : une version inconnue plus récente
+ * est refusée plutôt que réécrite avec perte.
+ */
+function migrateNotebookRecord(value: unknown, fileId: string): Notebook {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Structure JSON invalide.");
+  }
+
+  const record = { ...(value as Record<string, unknown>) };
+  let version = record.schemaVersion === undefined ? 0 : record.schemaVersion;
+  if (!Number.isInteger(version) || typeof version !== "number" || version < 0) {
+    throw new Error("Version de schéma invalide.");
+  }
+  if (version > CURRENT_NOTEBOOK_SCHEMA_VERSION) {
+    throw new Error(`Schéma notebook ${version} non pris en charge (maximum ${CURRENT_NOTEBOOK_SCHEMA_VERSION}).`);
+  }
+
+  // v0 -> v1 : normaliser les champs optionnels des notebooks historiques.
+  if (version < 1) {
+    record.description = typeof record.description === "string" ? record.description : "";
+    record.sources = Array.isArray(record.sources) ? record.sources : [];
+    record.notes = Array.isArray(record.notes) ? record.notes : [];
+    record.generatedDocuments = Array.isArray(record.generatedDocuments) ? record.generatedDocuments : [];
+    record.audioOverviews = Array.isArray(record.audioOverviews) ? record.audioOverviews : [];
+    record.chatHistory = Array.isArray(record.chatHistory) ? record.chatHistory : [];
+    record.chatThreads = Array.isArray(record.chatThreads) ? record.chatThreads : [];
+    record.color = typeof record.color === "string" ? record.color : COLORS[0];
+    record.icon = typeof record.icon === "string" ? record.icon : ICONS[0];
+    record.schemaVersion = 1;
+    version = 1;
+  }
+
+  if (version !== CURRENT_NOTEBOOK_SCHEMA_VERSION
+    || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(fileId)
+    || record.id !== fileId
+    || typeof record.title !== "string"
+    || typeof record.description !== "string"
+    || !Array.isArray(record.sources)
+    || !Array.isArray(record.notes)
+    || !Array.isArray(record.generatedDocuments)
+    || !Array.isArray(record.audioOverviews)
+    || !Array.isArray(record.chatHistory)
+    || typeof record.createdAt !== "string"
+    || typeof record.updatedAt !== "string"
+    || (record.workspaceId !== undefined && typeof record.workspaceId !== "string")) {
+    throw new Error("Schéma notebook invalide ou identifiant incohérent.");
+  }
+
+  return record as unknown as Notebook;
+}
+
 // ─── Couleurs et icônes par défaut ───────────────────────────────────────────
 
 const COLORS = ["#60a5fa", "#34d399", "#fbbf24", "#a78bfa", "#f87171", "#06b6d4", "#f472b6", "#818cf8"];
@@ -64,27 +119,7 @@ export class NotebookManager {
       for (const file of files) {
         try {
           const raw = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
-          const parsed: unknown = JSON.parse(raw);
-          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-            throw new Error("Structure JSON invalide.");
-          }
-          const candidate = parsed as Partial<Notebook>;
-          const fileId = file.slice(0, -".json".length);
-          if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(fileId)
-            || candidate.id !== fileId
-            || typeof candidate.title !== "string"
-            || typeof candidate.description !== "string"
-            || !Array.isArray(candidate.sources)
-            || !Array.isArray(candidate.notes)
-            || !Array.isArray(candidate.generatedDocuments)
-            || !Array.isArray(candidate.audioOverviews)
-            || !Array.isArray(candidate.chatHistory)
-            || typeof candidate.createdAt !== "string"
-            || typeof candidate.updatedAt !== "string") {
-            throw new Error("Schéma notebook invalide ou identifiant incohérent.");
-          }
-          // Compatibilité avec les notebooks historiques : les threads sont facultatifs.
-          const notebook = { ...candidate, chatThreads: Array.isArray(candidate.chatThreads) ? candidate.chatThreads : undefined } as Notebook;
+          const notebook = migrateNotebookRecord(JSON.parse(raw), file.slice(0, -".json".length));
           this.notebooks.set(notebook.id, notebook);
         } catch (e: any) {
           log.warn(`Erreur chargement notebook ${file}: ${e.message}`);
@@ -126,6 +161,7 @@ export class NotebookManager {
     const filePath = getNotebookPath(notebook.id);
     const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     try {
+      notebook.schemaVersion = CURRENT_NOTEBOOK_SCHEMA_VERSION;
       fs.writeFileSync(tempPath, JSON.stringify(notebook, null, 2), "utf-8");
       fs.renameSync(tempPath, filePath);
       log.debug(`💾 Notebook "${notebook.title}" (${notebook.id.slice(0, 8)}) persisté atomiquement`);
@@ -179,6 +215,7 @@ export class NotebookManager {
 
     const notebook: Notebook = {
       id,
+      schemaVersion: CURRENT_NOTEBOOK_SCHEMA_VERSION,
       ...(workspaceId ? { workspaceId } : {}),
       title,
       description,
