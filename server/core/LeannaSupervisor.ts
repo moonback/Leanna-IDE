@@ -118,6 +118,7 @@ export interface SupervisedResult {
   /** Files still differing from the pre-attempt snapshot after rollback retries. */
   residualFiles?: string[];
   recoveryRequired?: boolean;
+  recoveryReason?: string;
 }
 
 export class LeannaSupervisor {
@@ -176,17 +177,6 @@ export class LeannaSupervisor {
     // crash/redémarrage), on la restaure au lieu d'en recréer une neuve.
     const machine = this.loadOrCreate(missionId);
 
-    // A durable open checkpoint means the previous process may have crashed
-    // between a side effect and its commit/rollback decision. Never guess.
-    const openCheckpoints = this.checkpoints.listOpenByMission(missionId);
-    if (openCheckpoints.length > 0) {
-      if (machine.current !== "RECOVERY_REQUIRED" && machine.canTransition("RECOVERY_REQUIRED")) {
-        this.advance(machine, "RECOVERY_REQUIRED", "startup reconciliation required: " + openCheckpoints.map((cp) => cp.id).join(", "));
-      }
-      return { missionId, finalState: machine.current, attempts: 0, rollbackComplete: false, recoveryRequired: true,
-        residualFiles: openCheckpoints.map((cp) => "checkpoint ouvert " + cp.id + " (" + (cp.label ?? "sans libellé") + ")") };
-    }
-
     // Déjà terminale : rien à relancer, on renvoie l'état final tel quel.
     if (machine.isTerminal()) {
       return { missionId, finalState: machine.current, attempts: 0 };
@@ -206,7 +196,7 @@ export class LeannaSupervisor {
         interruptedStates.has(machine.current) ? `état durable interrompu: ${machine.current}` : undefined,
       ].filter(Boolean).join(" ; ") || "État transactionnel incomplet.";
       this.safeAdvance(machine, "RECOVERY_REQUIRED", reason);
-      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryReason: reason };
+      return { missionId, finalState: machine.current, attempts: machine.currentAttempt?.attempt ?? 0, rollbackComplete: false, recoveryRequired: true, recoveryReason: reason };
     }
 
     // Ramener la machine à READY depuis n'importe quel état repris, par des
@@ -289,6 +279,7 @@ export class LeannaSupervisor {
           evidence: lastEvidence,
           rollbackComplete: false,
           residualFiles: ["<runner encore actif : rollback différé pour éviter une course d'écriture>"],
+          recoveryRequired: true,
           recoveryReason: "Le runner peut encore écrire. Le checkpoint reste ouvert et toute reprise est bloquée.",
         };
       }
