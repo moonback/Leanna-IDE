@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trash2, Check } from 'lucide-react';
 import { Section, Field } from './SettingsPrimitives.js';
@@ -16,17 +16,32 @@ const SCOPES: { id: string; label: string; hint: string }[] = [
   { id: 'lists', label: 'Listes', hint: 'Listes utilisateur' },
 ];
 
+async function readApiJson(response: Response): Promise<Record<string, any>> {
+  let payload: unknown;
+  try { payload = await response.json(); }
+  catch { throw new Error(response.ok ? 'Réponse serveur invalide (JSON attendu).' : `Erreur HTTP ${response.status}.`); }
+  if (!response.ok) {
+    const message = payload && typeof payload === 'object' && 'error' in payload ? String((payload as { error?: unknown }).error || '') : '';
+    throw new Error(message || `Erreur HTTP ${response.status}.`);
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Réponse serveur invalide.');
+  return payload as Record<string, any>;
+}
+
 export function DataSection() {
   const [clearing, setClearing] = useState(false);
+  const clearingRef = useRef(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [clearingMemory, setClearingMemory] = useState(false);
+  const clearingMemoryRef = useRef(false);
   const [confirmMemory, setConfirmMemory] = useState(false);
   const [memoryResult, setMemoryResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Sélection de purge multi-scopes
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [clearingSel, setClearingSel] = useState(false);
+  const clearingSelRef = useRef(false);
   const [confirmSel, setConfirmSel] = useState(false);
   const [selResult, setSelResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -46,33 +61,40 @@ export function DataSection() {
   };
 
   const handleClear = async () => {
+    if (clearingRef.current) return;
+    clearingRef.current = true;
     setClearing(true); setResult(null);
     try {
       const res = await fetch('/api/conversations/all', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.status === 'success') setResult({ type: 'success', message: `${data.deleted} conversation(s) supprimée(s)` });
-      else setResult({ type: 'error', message: data.error || 'Erreur inconnue' });
-    } catch (e: any) { setResult({ type: 'error', message: e.message || 'Erreur réseau' }); }
-    finally { setClearing(false); setConfirmOpen(false); }
+      const data = await readApiJson(res);
+      if (data.status !== 'success' || !Number.isFinite(data.deleted)) throw new Error(data.error || 'Réponse de suppression invalide.');
+      setResult({ type: 'success', message: `${data.deleted} conversation(s) supprimée(s)` });
+    } catch (e: unknown) { setResult({ type: 'error', message: e instanceof Error ? e.message : 'Erreur réseau' }); }
+    finally { clearingRef.current = false; setClearing(false); setConfirmOpen(false); }
   };
 
   const handleClearMemory = async () => {
+    if (clearingMemoryRef.current) return;
+    clearingMemoryRef.current = true;
     setClearingMemory(true); setMemoryResult(null);
     try {
       const res = await fetch('/api/memories/all', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.status === 'success') setMemoryResult({ type: 'success', message: `${data.deleted} mémoire(s) supprimée(s)` });
-      else setMemoryResult({ type: 'error', message: data.error || 'Erreur inconnue' });
-    } catch (e: any) { setMemoryResult({ type: 'error', message: e.message || 'Erreur réseau' }); }
-    finally { setClearingMemory(false); setConfirmMemory(false); }
+      const data = await readApiJson(res);
+      if (data.status === 'error' || !Number.isFinite(data.deleted)) throw new Error(data.error || 'Réponse de suppression des mémoires invalide.');
+      setMemoryResult({ type: 'success', message: `${data.deleted} mémoire(s) supprimée(s) dans le projet actif` });
+    } catch (e: unknown) { setMemoryResult({ type: 'error', message: e instanceof Error ? e.message : 'Erreur réseau' }); }
+    finally { clearingMemoryRef.current = false; setClearingMemory(false); setConfirmMemory(false); }
   };
 
   // Effacement complet du stockage local (localStorage) du navigateur.
   const [clearingLocal, setClearingLocal] = useState(false);
+  const clearingLocalRef = useRef(false);
   const [confirmLocal, setConfirmLocal] = useState(false);
   const [localResult, setLocalResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleClearLocalStorage = () => {
+    if (clearingLocalRef.current) return;
+    clearingLocalRef.current = true;
     setClearingLocal(true); setLocalResult(null);
     try {
       const count = localStorage.length;
@@ -84,12 +106,15 @@ export function DataSection() {
       setTimeout(() => window.location.reload(), 1200);
     } catch (e: any) {
       setLocalResult({ type: 'error', message: e?.message || 'Impossible d\'effacer le stockage local' });
+      clearingLocalRef.current = false;
       setClearingLocal(false);
       setConfirmLocal(false);
     }
   };
 
   const handleClearSelected = async () => {
+    if (clearingSelRef.current || selected.size === 0) return;
+    clearingSelRef.current = true;
     setClearingSel(true); setSelResult(null);
     try {
       const res = await fetch('/api/data/all', {
@@ -97,18 +122,18 @@ export function DataSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scopes: Array.from(selected) }),
       });
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await readApiJson(res);
+      if (data.status === 'success' && Number.isFinite(data.deleted)) {
         setSelResult({ type: 'success', message: `${data.deleted} enregistrement(s) supprimé(s)` });
         setSelected(new Set());
-      } else if (data.status === 'partial') {
-        const failed = Object.keys(data.errors || {}).join(', ');
-        setSelResult({ type: 'error', message: `Purge partielle · ${data.deleted} supprimé(s). Échecs : ${failed}` });
+      } else if (data.status === 'partial' && Number.isFinite(data.deleted) && data.errors && typeof data.errors === 'object') {
+        const failed = Object.keys(data.errors).join(', ');
+        setSelResult({ type: 'error', message: `Purge partielle · ${data.deleted} supprimé(s). Échecs : ${failed || 'détails indisponibles'}` });
       } else {
-        setSelResult({ type: 'error', message: data.error || 'Erreur inconnue' });
+        throw new Error(data.error || 'Réponse de purge invalide.');
       }
-    } catch (e: any) { setSelResult({ type: 'error', message: e.message || 'Erreur réseau' }); }
-    finally { setClearingSel(false); setConfirmSel(false); }
+    } catch (e: unknown) { setSelResult({ type: 'error', message: e instanceof Error ? e.message : 'Erreur réseau' }); }
+    finally { clearingSelRef.current = false; setClearingSel(false); setConfirmSel(false); }
   };
 
   return (
