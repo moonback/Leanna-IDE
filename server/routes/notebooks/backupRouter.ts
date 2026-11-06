@@ -70,7 +70,7 @@ export function createBackupRouter(): Router {
       if (!result || !Number.isSafeInteger(result.restored) || !Number.isSafeInteger(result.errors)) {
         throw new Error("Résultat de restauration invalide.");
       }
-      const status = result.errors > 0 ? 207 : "success";
+      const status = result.errors > 0 ? "partial" : "success";
       res.status(result.errors > 0 ? 207 : 200).json({ status, ...result });
     } catch (e: unknown) {
       sendError(res, e);
