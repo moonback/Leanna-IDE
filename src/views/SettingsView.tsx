@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import { useConfirm } from '../components/ui/ConfirmDialog.js';
 import { Button } from '../components/ui/Button.js';
 import { useProfile } from '../context/UserProfileContext.js';
 import { useToast } from '../components/ui/Toast.js';
@@ -117,6 +118,7 @@ export default function SettingsView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, save, reset } = useProfile();
   const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [saving, setSaving] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,7 +174,7 @@ export default function SettingsView() {
     setSaving(true);
     try {
       save();
-      await fetch('/api/profile', {
+      const response = await fetch('/api/profile', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           aiName: profile.aiName, aiVoice: profile.aiVoice,
@@ -190,6 +192,7 @@ export default function SettingsView() {
           customSystemPrompt: profile.customSystemPrompt,
         }),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       success('Paramètres sauvegardés ✓');
       // Notifier la session live de se reconnecter pour prendre en compte
       // les changements qui affectent les déclarations d'outils (reasoning, agents, etc.)
@@ -198,10 +201,18 @@ export default function SettingsView() {
     finally { setSaving(false); }
   }, [save, profile, success, toastError]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Réinitialiser les paramètres ?',
+      message: 'Tous les réglages du profil seront remplacés par leurs valeurs par défaut. Cette action ne peut pas être annulée.',
+      confirmLabel: 'Réinitialiser',
+      cancelLabel: 'Conserver mes réglages',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     reset();
     success('Paramètres réinitialisés');
-  }, [reset, success]);
+  }, [confirm, reset, success]);
 
   // Filter groups and items based on search query
   const filteredNavGroups = useMemo(() => {
