@@ -310,3 +310,22 @@ Faire de Leanna un espace de travail desktop minimaliste et professionnel. La su
 - Vérifier le réessai après rétablissement de l'API et l'absence de messages appartenant à la sélection précédente.
 - Tester les changements rapides de sélection pendant le chargement.
 - Exécuter typecheck, tests UI, lint et `ui:audit`, puis valider le parcours dans Electron.
+
+
+## Quatorzième passe — Accessibilité clavier des cartes GitHub
+
+### Constat vérifié
+
+- Les cartes Issues et Pull Requests étaient des éléments `div` cliquables annoncés comme des liens via `role="link"`, mais elles n'étaient pas focalisables et ne géraient pas l'activation au clavier.
+
+### Correction appliquée
+
+- Les deux types de cartes sont désormais accessibles dans l'ordre de tabulation (`tabIndex=0`).
+- La touche Entrée déclenche la même ouverture externe que le clic.
+- Un indicateur de focus visible est ajouté sans modifier la présentation au repos.
+
+### Validation restante
+
+- Parcourir les cartes Issues et Pull Requests au clavier ; vérifier l'ordre de focus, l'annonce du nom accessible et l'ouverture par Entrée.
+- Vérifier le comportement d'ouverture externe dans Electron et dans le navigateur.
+- Exécuter typecheck, tests UI, lint et `ui:audit`.
