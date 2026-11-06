@@ -126,6 +126,7 @@ export function RoxaneDebateLauncher() {
           }).catch(error => setError(error instanceof Error ? error.message : 'Erreur de synthèse'))
             .finally(() => { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setBusy(false); setLiveStatus('complete'); });
         }
+        if (msg.type === 'session_closed') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); stopMicrophone(); setBusy(false); setLiveStatus('error'); setError('Une session Gemini Live a été fermée.'); }
         if (msg.type === 'interrupted') clearAudioOutput();
         if (msg.type === 'user_transcript' && typeof msg.text === 'string') setLiveTurns(prev => [...prev, { id: 'user-' + Date.now(), speaker: 'user', text: msg.text, round: 0 }]);
         if (msg.type === 'interrupted_by_user') { clearAudioOutput(); setBusy(false); setLiveStatus('interrupted'); }
