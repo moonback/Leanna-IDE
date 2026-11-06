@@ -80,7 +80,7 @@ export function RoxaneDebateLauncher() {
       socket.onmessage = event => {
         let msg: any; try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'status') setLiveStatus(msg.status);
-        if (msg.type === 'ready') { setBusy(false); setLiveStatus('live'); }
+        if (msg.type === 'ready') { setBusy(false); setLiveStatus('live'); void toggleMicrophone(); }
         if (msg.type === 'error') { window.dispatchEvent(new CustomEvent('Leanna-roxane-debate-state', { detail: { active: false } })); setError(msg.message || 'Erreur Live'); setBusy(false); setLiveStatus('error'); }
         if (msg.type === 'transcript_delta' && typeof msg.text === 'string') {
           setLiveTurns(prev => {
