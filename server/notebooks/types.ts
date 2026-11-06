@@ -40,6 +40,10 @@ export interface Source {
   /** Dernière erreur d'indexation, sans contenu sensible du document. */
   indexingError?: string;
   indexingUpdatedAt?: string;
+  /** Nombre de tentatives d'indexation de cette version de source. */
+  indexingAttempts?: number;
+  /** Prochaine tentative automatique (backoff durable). */
+  indexingNextRetryAt?: string;
   /** Texte brut extrait */
   rawText: string;
   /** HTML brut original (pour sources HTML uniquement) */
