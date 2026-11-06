@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { clearAllConversations } from '../skills/history.js';
 import { createLogger } from '../utils/logger.js';
+import { getActiveProjectId } from '../utils/selfRoot.js';
+import { invalidateMemoryCache } from '../skills/memory.js';
 
 const log = createLogger('DataPurge');
 const router = Router();
@@ -49,10 +51,12 @@ router.delete('/all', async (req: Request, res: Response) => {
   const requested: unknown = req.body?.scopes;
   let scopes: string[];
   if (Array.isArray(requested) && requested.length > 0) {
-    scopes = requested.filter((s): s is string => typeof s === 'string' && ALL_SCOPES.includes(s));
-    if (scopes.length === 0) {
-      return res.status(400).json({ status: 'error', error: 'Aucun scope valide fourni.' });
+    const invalid = requested.filter((scope) => typeof scope !== 'string' || !ALL_SCOPES.includes(scope));
+    if (invalid.length > 0) {
+      return res.status(400).json({ status: 'error', error: `Scope(s) invalide(s) : ${invalid.map(String).join(', ')}.` });
     }
+    scopes = [...new Set(requested as string[])];
+    if (scopes.length === 0) return res.status(400).json({ status: 'error', error: 'Aucun scope valide fourni.' });
   } else {
     scopes = [...ALL_SCOPES];
   }
@@ -76,6 +80,18 @@ router.delete('/all', async (req: Request, res: Response) => {
     for (const scope of directScopes) {
       let scopeCount = 0;
       let scopeFailed = false;
+      if (scope === 'memories') {
+        try {
+          const projectId = getActiveProjectId();
+          if (!projectId) throw new Error('Aucun projet actif : suppression des mémoires refusée.');
+          const { data, error } = await supabase.from('memories').delete().eq('project_id', projectId).select('id');
+          if (error) throw new Error(error.message);
+          scopeCount = data?.length ?? 0;
+          invalidateMemoryCache();
+        } catch (e: any) { scopeFailed = true; errors[scope] = e.message || String(e); }
+        if (!scopeFailed || scopeCount > 0) deleted[scope] = scopeCount;
+        continue;
+      }
       for (const table of SCOPE_TABLES[scope]) {
         try {
           scopeCount += await purgeTable(supabase, table);
