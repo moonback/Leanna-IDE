@@ -35,6 +35,7 @@ interface Props {
   onDelete: (overviewId: string) => void;
   onSaveToSandbox: () => void;
   onDownloadScript: () => void;
+  onDownloadAudio: () => void;
   formatDuration: (seconds: number) => string;
 }
 
@@ -55,6 +56,7 @@ export function AudioPlayer({
   onDelete,
   onSaveToSandbox,
   onDownloadScript,
+  onDownloadAudio,
   formatDuration,
 }: Props) {
   return (
@@ -97,7 +99,7 @@ export function AudioPlayer({
                 icon={Volume2}
                 loading={ttsLoading}
                 onClick={onPlay}
-                title="Écouter le podcast (TTS)"
+                title="Générer et écouter la piste audio à deux voix"
               >
                 Écouter
               </NbButton>
@@ -187,8 +189,8 @@ export function AudioPlayer({
 
               {/* Estimated remaining */}
               <span className="text-xs font-medium text-[var(--text-dimmed)]">
-                {ttsTotalLines - ttsProgress > 0
-                  ? `~${Math.ceil((ttsTotalLines - ttsProgress) * 3)}s restants`
+                {ttsProgress < 100
+                  ? `~${formatDuration(Math.ceil(selectedOverview.estimatedDuration * (1 - ttsProgress / 100) / playbackSpeed))} restants`
                   : 'Terminé'}
               </span>
             </div>
@@ -200,6 +202,9 @@ export function AudioPlayer({
           <div className="flex flex-wrap items-center gap-2">
             <NbButton size="sm" onClick={onCycleSpeed} title="Vitesse de lecture">
               ⚡ {playbackSpeed}×
+            </NbButton>
+            <NbButton size="sm" onClick={onDownloadAudio} title="Télécharger la piste audio WAV">
+              🎧 Audio .wav
             </NbButton>
             <NbButton size="sm" onClick={onDownloadScript} title="Télécharger le script">
               📥 Script .md
