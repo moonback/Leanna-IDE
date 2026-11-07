@@ -1889,7 +1889,7 @@ Le skill `server/skills/email.ts` expose cinq outils de messagerie, exécutés p
 `server/email/GmailService.ts`. Le service utilise **IMAP pour la lecture** et
 **SMTP pour l'envoi**, sans OAuth2.
 
-Le compte dédié **Leanna** accepte une configuration IMAP/SMTP personnalisée : hôtes, ports, IMAP SSL/TLS et SMTP SSL/TLS ou STARTTLS. Les fournisseurs compatibles avec ces protocoles et une authentification par mot de passe peuvent être utilisés, sans OAuth2. Infomaniak est disponible comme configuration possible (`mail.infomaniak.com`, IMAP 993, SMTP 587 STARTTLS).
+Le compte dédié **Leanna** permet d'activer indépendamment la réception (IMAP), l'envoi (SMTP), ou les deux. Seuls les paramètres du protocole activé sont requis ; les hôtes, ports et modes SSL/TLS ou STARTTLS sont configurables. Les fournisseurs compatibles avec ces protocoles et une authentification par mot de passe peuvent être utilisés, sans OAuth2. Infomaniak est disponible comme configuration possible (`mail.infomaniak.com`, IMAP 993, SMTP 587 STARTTLS).
 
 Le compte personnel existant reste indépendant et conserve son intégration Gmail.
 
@@ -1906,7 +1906,7 @@ Le compte personnel existant reste indépendant et conserve son intégration Gma
 - Les mots de passe sont chiffrés avant leur persistance dans la configuration
   locale ; ils ne sont jamais ajoutés au dépôt ni renvoyés à l'interface.
 - TLS 1.2 minimum est exigé ; IMAP et SMTP imposent SSL/TLS ou STARTTLS.
-- Le service vérifie IMAP et SMTP avant d'enregistrer une nouvelle configuration.
+- Le service vérifie uniquement les protocoles activés avant d'enregistrer une nouvelle configuration ; les opérations de lecture et d'envoi sont bloquées côté service si leur capacité respective est désactivée.
 - Chaque envoi déclenche une confirmation interactive présentant le compte,
   le destinataire, l'objet et un aperçu du message.
 - L'envoi depuis le compte personnel reste verrouillé par défaut et nécessite
