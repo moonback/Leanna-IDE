@@ -132,19 +132,21 @@ const Card = React.memo(function Card({
   const reduce = !!useReducedMotion();
   return (
     <motion.section
-      className={`relative flex min-w-0 flex-col rounded-2xl border p-4 ${className}`}
+      className={`relative flex min-w-0 flex-col rounded-xl border p-3 ${className}`}
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         borderColor: 'var(--border-base)',
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(14px)',
+        transformStyle: 'preserve-3d',
+        boxShadow: '0 8px 24px color-mix(in srgb, var(--bg) 22%, transparent)',
       }}
       initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={reduce ? { duration: 0.15 } : { ...SPRING, delay: 0.04 * index }}
-      whileHover={reduce ? undefined : { y: -2, borderColor: 'var(--accent-primary)' }}
+      whileHover={reduce ? undefined : { y: -3, rotateX: 1.4, rotateY: -1.2, scale: 1.006, borderColor: 'var(--accent-primary)', boxShadow: '0 16px 34px color-mix(in srgb, var(--accent-primary) 13%, transparent)' }}
       aria-label={title}
     >
-      <header className="mb-3 flex items-center gap-2">
+      <header className="mb-2 flex items-center gap-2">
         <span
           className="flex h-6 w-6 items-center justify-center rounded-lg"
           style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
@@ -162,8 +164,8 @@ const Card = React.memo(function Card({
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div className="min-w-0" title={hint}>
-      <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>{label}</div>
-      <div className="truncate font-mono text-lg font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+      <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>{label}</div>
+      <div className="truncate font-mono text-base font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
         <AnimatedValue value={value} />
       </div>
     </div>
@@ -367,7 +369,7 @@ function AudioCard({ index }: { index: number }) {
   const state = !connected ? 'Hors ligne' : muted ? 'Micro coupé' : asleep ? 'En veille' : isBusy ? 'Outil en cours' : 'À l\'écoute';
 
   const bars = (refs: React.MutableRefObject<(HTMLSpanElement | null)[]>, color: string) => (
-    <div className="flex h-10 flex-1 items-end gap-[2px]" aria-hidden>
+    <div className="flex h-8 flex-1 items-end gap-[2px]" aria-hidden>
       {Array.from({ length: BARS }, (_, k) => (
         <span
           key={k}
@@ -435,7 +437,7 @@ function SessionCard({ index }: { index: number }) {
     <Card title="Session vocale" icon={Activity} index={index}
       right={<StatusBadge status={badge} size="sm" pulse={status === 'connecting'}
         label={status === 'connected' ? 'Connectée' : status === 'connecting' ? 'Connexion…' : 'Déconnectée'} />}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <Stat label="Durée" value={connectedAt ? fmtDuration(now - connectedAt) : '—'} />
         <Stat label="Messages" value={`${userMsgs} / ${transcript.length - userMsgs}`} hint="Vous / Leanna" />
         <Stat label="Latence" value={lastLatencyMs != null ? `${lastLatencyMs} ms` : '—'} hint="Dernier délai avant la première réponse audio" />
@@ -585,7 +587,7 @@ function AutomationsCard({ index }: { index: number }) {
   const failWf = workflows.filter(w => w.lastRunStatus === 'failed').length;
   return (
     <Card title="Automatisations" icon={CalendarClock} index={index}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <Stat label="Tâches actives" value={`${active.length} / ${scheduledTasks.length}`} />
         <Stat label="Workflows" value={`${workflows.filter(w => w.enabled).length} / ${workflows.length}`} />
       </div>
@@ -721,16 +723,16 @@ function OperationalOverviewCard({ index }: { index: number }) {
       </>}>
       {data ? (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Bot size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Agents disponibles" value={fmtInt(data.agents)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.runningAgentTasks)} tâche(s) active(s) · {fmtInt(data.agentTasks)} au total</div></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Workflow size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Missions" value={fmtInt(data.missions)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.activeMissions)} active(s)</div></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Mail size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Comptes e-mail" value={fmtInt(data.emailAccounts)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.configuredEmailAccounts)} configuré(s)</div></div>
             </div>
@@ -838,9 +840,9 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <main className="relative z-10 mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-[1480px] px-3 py-4 sm:px-5">
         <motion.header
-          className="mb-5 flex flex-wrap items-end justify-between gap-4"
+          className="mb-4 flex flex-wrap items-end justify-between gap-3"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={SPRING}
@@ -876,7 +878,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           </nav>
         </motion.header>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OperationalOverviewCard index={0} />
           <AudioCard index={1} />
           <SessionCard index={2} />
