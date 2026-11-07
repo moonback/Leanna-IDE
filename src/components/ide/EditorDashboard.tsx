@@ -362,6 +362,8 @@ function AudioCard({ index }: { index: number }) {
   }, [getInputAmplitude, getOutputAmplitude, connected, muted, asleep, reduce]);
 
   const MicIcon = muted ? MicOff : asleep ? Moon : Mic;
+  const micInactive = !connected || muted || asleep;
+  const micColor = micInactive ? 'var(--text-dimmed)' : 'var(--accent-primary)';
   const state = !connected ? 'Hors ligne' : muted ? 'Micro coupé' : asleep ? 'En veille' : isBusy ? 'Outil en cours' : 'À l\'écoute';
 
   const bars = (refs: React.MutableRefObject<(HTMLSpanElement | null)[]>, color: string) => (
@@ -394,18 +396,20 @@ function AudioCard({ index }: { index: number }) {
             ref={orbRef}
             className="absolute inset-0 rounded-full"
             style={{
-              background: 'radial-gradient(circle, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 20%, transparent) 60%, transparent 72%)',
-              opacity: 0.35,
+              background: micInactive
+                ? 'radial-gradient(circle, var(--text-dimmed) 0%, color-mix(in srgb, var(--text-dimmed) 20%, transparent) 60%, transparent 72%)'
+                : 'radial-gradient(circle, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 20%, transparent) 60%, transparent 72%)',
+              opacity: micInactive ? 0.12 : 0.35,
               transition: reduce ? undefined : 'transform 80ms linear, opacity 80ms linear',
             }}
           />
-          <MicIcon size={22} style={{ color: muted ? 'var(--color-error)' : 'var(--text-primary)', position: 'relative' }} />
+          <MicIcon size={22} style={{ color: micInactive ? 'var(--text-dimmed)' : 'var(--text-primary)', position: 'relative', opacity: micInactive ? 0.65 : 1 }} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
             <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Micro</span>
-            {bars(inRefs, muted ? 'var(--color-error)' : 'var(--accent-primary)')}
-            <span ref={inPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>0</span>
+            {bars(inRefs, micColor)}
+            <span ref={inPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: micInactive ? 'var(--text-dimmed)' : 'var(--text-muted)' }}>0</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Leanna</span>
