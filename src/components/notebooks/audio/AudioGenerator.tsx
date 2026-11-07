@@ -262,7 +262,7 @@ export function AudioGenerator({
           disabled={selectedSourceIds.length === 0}
           className="w-full"
         >
-          {generating ? 'Génération en cours...' : 'Générer le podcast'}
+          {generating ? 'Script + piste audio en cours...' : 'Générer le podcast'}
         </NbButton>
       </div>
 
