@@ -210,7 +210,7 @@ export function AudioPlayer({
               📥 Script .md
             </NbButton>
             <span className="ml-auto text-xs font-medium text-[var(--text-dimmed)]">
-              ~{Math.ceil(selectedOverview.script.split('\n').filter((l: string) => l.trim()).length * 3 / playbackSpeed)}s à {playbackSpeed}×
+              ~{formatDuration(Math.ceil(selectedOverview.estimatedDuration / playbackSpeed))} à {playbackSpeed}×
             </span>
           </div>
         )}
