@@ -651,16 +651,27 @@ export default function IdeView() {
   // ── Reprise de la dernière conversation persistée ─────────────────────────
   const handleResumeConversation = useCallback(async (conversationId: string) => {
     try {
-      const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}?limit=200`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error(`Chargement de l'historique impossible (HTTP ${response.status})`);
-      const data = await response.json();
-      if (data?.status !== 'success' || !Array.isArray(data.messages)) {
-        throw new Error(data?.error || "L'historique de cette conversation est indisponible.");
+      // Charger toutes les pages : l'analyse serveur relit aussi l'intégralité
+      // de la conversation, indépendamment de la limite d'affichage du transcript.
+      const allMessages: Array<{ id?: string; role: string; content: unknown; created_at?: string }> = [];
+      const pageSize = 500;
+      let offset = 0;
+      while (true) {
+        const response = await fetch(
+          `/api/conversations/${encodeURIComponent(conversationId)}?limit=${pageSize}&offset=${offset}`,
+          { credentials: 'include' },
+        );
+        if (!response.ok) throw new Error(`Chargement de l'historique impossible (HTTP ${response.status})`);
+        const data = await response.json();
+        if (data?.status !== 'success' || !Array.isArray(data.messages)) {
+          throw new Error(data?.error || "L'historique de cette conversation est indisponible.");
+        }
+        allMessages.push(...data.messages);
+        if (data.messages.length < pageSize) break;
+        offset += data.messages.length;
       }
 
-      const restoredMessages = data.messages
+      const restoredMessages = allMessages
         .filter((message: { role?: string; content?: unknown }) =>
           (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
         .map((message: { id?: string; role: 'user' | 'assistant'; content: string; created_at?: string }, index: number) => ({
@@ -686,7 +697,7 @@ export default function IdeView() {
       } else {
         connect([], 'full', conversationId);
       }
-      toastInfo('Dernière discussion restaurée.');
+      toastInfo('Restauration lancée : Leanna analyse toute la conversation avant de reprendre.');
     } catch (error) {
       console.error('[IdeView] Échec de reprise de conversation:', error);
       toastInfo(error instanceof Error ? error.message : 'Impossible de reprendre cette discussion.');
