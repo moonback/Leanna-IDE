@@ -21,6 +21,14 @@ export interface SourceItem {
   indexingError?: string;
   indexingUpdatedAt?: string;
   indexingNextRetryAt?: string;
+  indexingHistory?: Array<{
+    attempt: number;
+    at: string;
+    outcome: 'indexed' | 'partial' | 'failed';
+    category: 'none' | 'transient' | 'permanent';
+    durationMs: number;
+    message?: string;
+  }>;
 }
 
 export interface UploadFileStatus {
