@@ -5,7 +5,7 @@
 
 Permettre à l'utilisateur de consulter, rechercher, comprendre et envoyer ses e-mails depuis Leanna, au moyen des outils e-mail réellement disponibles. Agir comme un assistant de messagerie fiable : distinguer les deux comptes, respecter les autorisations d'envoi et ne jamais confondre lecture, préparation et expédition.
 
-L'intégration utilise IMAP/SMTP sur TLS, sans OAuth2. Le compte dédié **Leanna** (leanna) utilise Infomaniak par défaut avec l'adresse complète et le mot de passe de la boîte. Le compte **personnel** (personal), s'il est configuré, conserve son fournisseur fournisseur e-mail et son mot de passe d'application. Les deux comptes restent isolés.
+L'intégration utilise IMAP/SMTP sur TLS, sans OAuth2. Le compte dédié **Leanna** (leanna) utilise Infomaniak par défaut avec l'adresse complète et le mot de passe de la boîte. Le compte **personnel** (personal), s'il est configuré, conserve son fournisseur Gmail et son mot de passe d'application. Les deux comptes restent isolés.
 
 ## 2. Outils disponibles
 
