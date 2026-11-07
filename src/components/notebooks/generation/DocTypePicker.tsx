@@ -7,7 +7,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { SpringTransition } from '../motionTypes.js';
 import { NbButton, NbTextarea, NbSectionLabel, NbBadge } from '../ui/primitives.js';
 import { DOC_TYPES } from './constants.js';
@@ -67,8 +67,9 @@ export function DocTypePicker({
     { key: 'all', label: 'Tout', description: 'Tous les formats disponibles' },
     { key: 'understand', label: 'Comprendre', description: 'Synthétiser et clarifier les sources' },
     { key: 'learn', label: 'Apprendre', description: 'Mémoriser et réviser les notions' },
-    { key: 'analyze', label: 'Analyser', description: 'Évaluer, comparer et illustrer' },
+    { key: 'analyze', label: 'Analyser', description: 'Évaluer et illustrer les informations' },
     { key: 'organize', label: 'Organiser', description: 'Structurer les idées et les actions' },
+    { key: 'explore', label: 'Explorer', description: 'Produire des rapports spécialisés' },
   ] as const;
 
   const categoryByType: Record<string, string> = {
@@ -78,20 +79,20 @@ export function DocTypePicker({
     'study-guide': 'learn',
     swot: 'analyze',
     infographic: 'analyze',
-    'full-report': 'analyze',
+    mindmap: 'analyze',
     briefing: 'organize',
     timeline: 'organize',
     outline: 'organize',
-    mindmap: 'organize',
     roadmap: 'organize',
   };
 
-  const visibleTypes = useMemo(() => DOC_TYPES.filter((type) => {
+  const visibleTypes = DOC_TYPES.filter((type) => {
     const matchesCategory = activeCategory === 'all' || categoryByType[type.key] === activeCategory;
     const query = typeSearch.trim().toLocaleLowerCase('fr');
     const matchesSearch = !query || `${type.label} ${type.desc}`.toLocaleLowerCase('fr').includes(query);
     return type.key !== 'full-report' && matchesCategory && matchesSearch;
-  }), [activeCategory, typeSearch]);
+  });
+
   return (
     <>
       {/* Quick config bar — chips à gauche, compteur de sources à droite */}
@@ -246,7 +247,7 @@ export function DocTypePicker({
           ))}
         </div>
 
-        {(activeCategory === 'all' || activeCategory === 'analyze') && (!typeSearch || 'rapports rapport complet'.includes(typeSearch.toLocaleLowerCase('fr'))) && (
+        {(activeCategory === 'all' || activeCategory === 'explore') && (!typeSearch.trim() || 'rapports spécialisés rapport complet business marché technique concurrentiel financier marketing produit risques exécutif projet comparatif synthèse'.includes(typeSearch.trim().toLocaleLowerCase('fr'))) && (
           <button
             ref={reportModalTriggerRef}
             type="button"
@@ -289,7 +290,7 @@ export function DocTypePicker({
                   <span className="notebook-gen-card-icon" style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}>
                     {isActive ? <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden /> : <Icon className="h-4 w-4" style={{ color }} aria-hidden />}
                   </span>
-                  <span className="notebook-gen-card-label min-w-0 flex-1">
+                  <span className="notebook-gen-card-label !flex-col !items-start !gap-0 !overflow-visible !whitespace-normal min-w-0 flex-1">
                     <span className="notebook-gen-card-text">{label}</span>
                     <span className="mt-1 line-clamp-2 text-[10px] font-normal leading-snug text-[var(--text-muted)]">{desc}</span>
                     {badge && <span className="notebook-gen-card-badge">{badge}</span>}
