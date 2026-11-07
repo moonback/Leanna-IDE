@@ -57,6 +57,21 @@ export function ChatMessageList({
 }: ChatMessageListProps) {
   const aiName = profile?.aiName || 'Leanna';
   const hasSearch = searchQuery.trim().length > 0;
+  const visibleEntries = transcript.filter(
+    entry => !hasSearch || !matchedIds || matchedIds.has(entry.id),
+  );
+  const dayKey = (date: Date) =>
+    `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const dayLabel = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (dayKey(date) === dayKey(today)) return "Aujourd’hui";
+    if (dayKey(date) === dayKey(yesterday)) return "Hier";
+    return date.toLocaleDateString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+  };
 
   return (
     <div className="relative flex-1 min-h-0 flex flex-col">
@@ -97,28 +112,49 @@ export function ChatMessageList({
 
           {/* Messages */}
           <AnimatePresence initial={false}>
-            {transcript.map((entry, idx) => {
-              // En mode recherche, on masque les messages non correspondants.
-              if (hasSearch && matchedIds && !matchedIds.has(entry.id)) return null;
+            {visibleEntries.map((entry) => {
+              const index = transcript.findIndex(item => item.id === entry.id);
+              const previous = visibleEntries[visibleEntries.indexOf(entry) - 1];
+              const startsNewDay = !previous || dayKey(previous.timestamp) !== dayKey(entry.timestamp);
               return (
-                <div
-                  key={entry.id}
-                  data-message-id={entry.id}
-                  style={currentMatchId === entry.id ? { scrollMarginTop: '12px' } : undefined}
-                >
-                  <ChatMessage
-                    entry={entry}
-                    profile={profile}
-                    reduceMotion={reduceMotion}
-                    isLast={idx === lastAssistantIdx && entry.role === 'assistant'}
-                    isPinned={isPinned(entry.id)}
-                    onTogglePin={onTogglePin}
-                    onEdit={onEditMessage}
-                    highlight={hasSearch ? searchQuery.trim() : ''}
-                    onExcludeSource={onExcludeSource}
-                    onCopy={onCopy}
-                    onRetry={onRetry}
-                  />
+                <div key={entry.id}>
+                  {startsNewDay && (
+                    <div
+                      className="flex items-center gap-3 py-1.5"
+                      aria-label={dayLabel(entry.timestamp)}
+                    >
+                      <span className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
+                      <span
+                        className="text-[10px] font-medium tracking-wide px-2 py-1 rounded-full"
+                        style={{
+                          color: 'var(--text-dimmed)',
+                          backgroundColor: 'color-mix(in srgb, var(--bg-input) 72%, transparent)',
+                          border: '1px solid var(--border-base)',
+                        }}
+                      >
+                        {dayLabel(entry.timestamp)}
+                      </span>
+                      <span className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
+                    </div>
+                  )}
+                  <div
+                    data-message-id={entry.id}
+                    style={currentMatchId === entry.id ? { scrollMarginTop: '12px' } : undefined}
+                  >
+                    <ChatMessage
+                      entry={entry}
+                      profile={profile}
+                      reduceMotion={reduceMotion}
+                      isLast={index === lastAssistantIdx && entry.role === 'assistant'}
+                      isPinned={isPinned(entry.id)}
+                      onTogglePin={onTogglePin}
+                      onEdit={onEditMessage}
+                      highlight={hasSearch ? searchQuery.trim() : ''}
+                      onExcludeSource={onExcludeSource}
+                      onCopy={onCopy}
+                      onRetry={onRetry}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -174,7 +210,7 @@ export function ChatMessageList({
                   <button
                     type="button"
                     onClick={() => onDequeue(idx)}
-                    className="opacity-0 group-hover/queue:opacity-100 transition-opacity p-0.5 rounded hover:bg-[var(--bg-active)] flex-shrink-0"
+                    className="opacity-100 sm:opacity-0 sm:group-hover/queue:opacity-100 focus-visible:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-active)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 flex-shrink-0"
                     title="Retirer de la file"
                     aria-label="Retirer ce message de la file d'attente"
                   >
