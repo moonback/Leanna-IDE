@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   Activity, AudioLines, BookOpen, Bot, CalendarClock, Coins, Cpu, FilePlus, GitBranch,
-  History, ListChecks, Loader2, MessageSquare, Mic, MicOff, Moon, Search, Settings,
+  History, ListChecks, Loader2, Mail, MessageSquare, Mic, MicOff, Moon, Search, Settings,
   Sparkles, Timer, Workflow, CheckCircle2, XCircle, KeyRound, Power, PowerOff, RefreshCw, Sun,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -362,6 +362,8 @@ function AudioCard({ index }: { index: number }) {
   }, [getInputAmplitude, getOutputAmplitude, connected, muted, asleep, reduce]);
 
   const MicIcon = muted ? MicOff : asleep ? Moon : Mic;
+  const micInactive = !connected || muted || asleep;
+  const micColor = micInactive ? 'var(--text-dimmed)' : 'var(--accent-primary)';
   const state = !connected ? 'Hors ligne' : muted ? 'Micro coupé' : asleep ? 'En veille' : isBusy ? 'Outil en cours' : 'À l\'écoute';
 
   const bars = (refs: React.MutableRefObject<(HTMLSpanElement | null)[]>, color: string) => (
@@ -394,18 +396,20 @@ function AudioCard({ index }: { index: number }) {
             ref={orbRef}
             className="absolute inset-0 rounded-full"
             style={{
-              background: 'radial-gradient(circle, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 20%, transparent) 60%, transparent 72%)',
-              opacity: 0.35,
+              background: micInactive
+                ? 'radial-gradient(circle, var(--text-dimmed) 0%, color-mix(in srgb, var(--text-dimmed) 20%, transparent) 60%, transparent 72%)'
+                : 'radial-gradient(circle, var(--accent-primary) 0%, color-mix(in srgb, var(--accent-primary) 20%, transparent) 60%, transparent 72%)',
+              opacity: micInactive ? 0.12 : 0.35,
               transition: reduce ? undefined : 'transform 80ms linear, opacity 80ms linear',
             }}
           />
-          <MicIcon size={22} style={{ color: muted ? 'var(--color-error)' : 'var(--text-primary)', position: 'relative' }} />
+          <MicIcon size={22} style={{ color: micInactive ? 'var(--text-dimmed)' : 'var(--text-primary)', position: 'relative', opacity: micInactive ? 0.65 : 1 }} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
             <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Micro</span>
-            {bars(inRefs, muted ? 'var(--color-error)' : 'var(--accent-primary)')}
-            <span ref={inPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>0</span>
+            {bars(inRefs, micColor)}
+            <span ref={inPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: micInactive ? 'var(--text-dimmed)' : 'var(--text-muted)' }}>0</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Leanna</span>
@@ -643,6 +647,105 @@ function SystemCard({ index }: { index: number }) {
   );
 }
 
+type OperationalOverview = {
+  agents: number;
+  agentTasks: number;
+  runningAgentTasks: number;
+  missions: number;
+  activeMissions: number;
+  emailAccounts: number;
+  configuredEmailAccounts: number;
+};
+
+function useOperationalOverview() {
+  const [data, setData] = useState<OperationalOverview | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    if (document.hidden) return;
+    setLoading(true);
+    const results = await Promise.allSettled([
+      fetch('/api/agents/roles', { credentials: 'include' }).then(r => { if (!r.ok) throw new Error('Agents'); return r.json(); }),
+      fetch('/api/agents/tasks', { credentials: 'include' }).then(r => { if (!r.ok) throw new Error('Tâches agents'); return r.json(); }),
+      fetch('/api/missions', { credentials: 'include' }).then(r => { if (!r.ok) throw new Error('Missions'); return r.json(); }),
+      fetch('/api/email/settings', { credentials: 'include' }).then(r => { if (!r.ok) throw new Error('E-mail'); return r.json(); }),
+    ]);
+    const [rolesResult, tasksResult, missionsResult, emailResult] = results;
+    if (results.every(r => r.status === 'fulfilled')) {
+      const roles = rolesResult.status === 'fulfilled' ? rolesResult.value : {};
+      const tasksData = tasksResult.status === 'fulfilled' ? tasksResult.value : {};
+      const missionsData = missionsResult.status === 'fulfilled' ? missionsResult.value : {};
+      const emailData = emailResult.status === 'fulfilled' ? emailResult.value : {};
+      const tasks = Array.isArray(tasksData?.tasks) ? tasksData.tasks : [];
+      const missions = Array.isArray(missionsData?.missions) ? missionsData.missions : [];
+      const accounts = emailData?.status === 'success' ? emailData.data?.accounts : null;
+      const emailAccounts = accounts ? [accounts.leanna, accounts.personal].filter((a: any) => a?.connected).length : 0;
+      const configuredEmailAccounts = accounts ? [accounts.leanna, accounts.personal].filter((a: any) => !!a?.email).length : 0;
+      setData({
+        agents: Array.isArray(roles?.roles) ? roles.roles.length : 0,
+        agentTasks: tasks.length,
+        runningAgentTasks: tasks.filter((t: any) => ['pending', 'running', 'in_progress'].includes(String(t.status).toLowerCase())).length,
+        missions: missions.length,
+        activeMissions: missions.filter((m: any) => ['pending', 'in_progress', 'running', 'paused', 'blocked'].includes(String(m.status).toLowerCase())).length,
+        emailAccounts,
+        configuredEmailAccounts,
+      });
+      setUpdatedAt(Date.now());
+      setError(null);
+    } else {
+      const failed = results.flatMap((r, i) => r.status === 'rejected' ? [['Agents', 'Tâches agents', 'Missions', 'E-mail'][i]] : []);
+      setError(`Données indisponibles : ${failed.join(', ')}`);
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    void load();
+    const id = window.setInterval(() => void load(), 20_000);
+    const onVisible = () => { if (!document.hidden) void load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [load]);
+  return { data, updatedAt, loading, error, reload: load };
+}
+
+function OperationalOverviewCard({ index }: { index: number }) {
+  const { data, updatedAt, loading, error, reload } = useOperationalOverview();
+  const now = useNow(1000);
+  const total = data ? data.agents + data.missions + data.emailAccounts : null;
+  return (
+    <Card title="Données opérationnelles en temps réel" icon={Activity} index={index} className="md:col-span-2 xl:col-span-4"
+      right={<>
+        {updatedAt && <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>Actualisé il y a {fmtDuration(now - updatedAt)}</span>}
+        <MiniButton label="Actualiser les données" icon={RefreshCw} onClick={() => void reload()} spin={loading} />
+      </>}>
+      {data ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+              <Bot size={20} style={{ color: 'var(--accent-primary)' }} />
+              <div><Stat label="Agents disponibles" value={fmtInt(data.agents)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.runningAgentTasks)} tâche(s) active(s) · {fmtInt(data.agentTasks)} au total</div></div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+              <Workflow size={20} style={{ color: 'var(--accent-primary)' }} />
+              <div><Stat label="Missions" value={fmtInt(data.missions)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.activeMissions)} active(s)</div></div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+              <Mail size={20} style={{ color: 'var(--accent-primary)' }} />
+              <div><Stat label="Comptes e-mail" value={fmtInt(data.emailAccounts)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.configuredEmailAccounts)} configuré(s)</div></div>
+            </div>
+            <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+              <Stat label="Total recensé" value={fmtInt(total ?? 0)} hint="Agents disponibles + missions enregistrées + comptes e-mail connectés" />
+              <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Agents + missions + comptes connectés</div>
+            </div>
+          </div>
+          {error && <p className="mt-2 text-xs" style={{ color: 'var(--color-warning)' }}>{error} — valeurs affichées à la dernière synchronisation complète.</p>}
+        </>
+      ) : <Empty>{loading ? 'Récupération des agents, missions et comptes e-mail…' : error ?? 'Aucune donnée disponible.'}</Empty>}
+    </Card>
+  );
+}
+
 function ProjectCard({ index, onShowSettings }: { index: number; onShowSettings: (section?: string) => void }) {
   const ws = useWorkspaceState();
   const git = useGitInfo();
@@ -774,16 +877,17 @@ export const EditorDashboard = React.memo(function EditorDashboard({
         </motion.header>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <AudioCard index={0} />
-          <SessionCard index={1} />
-          <TokensCard index={2} />
-          <ActivityCard index={3} />
-          <TranscriptCard index={4} aiName={aiName} onOpenChat={onOpenChat} />
-          <PlanCard index={5} />
-          <SystemCard index={6} />
-          <AutomationsCard index={7} />
-          <ProjectCard index={8} onShowSettings={onShowSettings} />
-          <RecentCard index={9} onResumeConversation={onResumeConversation} />
+          <OperationalOverviewCard index={0} />
+          <AudioCard index={1} />
+          <SessionCard index={2} />
+          <TokensCard index={3} />
+          <ActivityCard index={4} />
+          <TranscriptCard index={5} aiName={aiName} onOpenChat={onOpenChat} />
+          <PlanCard index={6} />
+          <SystemCard index={7} />
+          <AutomationsCard index={8} />
+          <ProjectCard index={9} onShowSettings={onShowSettings} />
+          <RecentCard index={10} onResumeConversation={onResumeConversation} />
         </div>
       </main>
     </div>
