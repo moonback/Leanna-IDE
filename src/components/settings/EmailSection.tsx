@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Mail, Unlink, Save, ShieldCheck, RefreshCw } from "lucide-react";
 import { Section, Field, TextInput, SecretInput, SectionDivider } from "./SettingsPrimitives.js";
 
-type Account = { connected: boolean; email: string | null };
+type Account = { connected: boolean; email: string | null; provider?: "gmail" | "infomaniak" | null };
 type GmailSettings = {
   configured: boolean;
   protocol: string;
@@ -12,6 +12,7 @@ type GmailSettings = {
 
 export function EmailSection() {
   const [settings, setSettings] = useState<GmailSettings | null>(null);
+  const [leannaProvider, setLeannaProvider] = useState<"infomaniak" | "gmail">("infomaniak");
   const [credentials, setCredentials] = useState({
     leanna: { email: "", appPassword: "" },
     personal: { email: "", appPassword: "" },
@@ -26,6 +27,7 @@ export function EmailSection() {
       const data = await response.json();
       if (!response.ok || data.status !== "success") throw new Error(data.error || "Impossible de lire la configuration e-mail.");
       setSettings(data.data);
+      if (data.data.accounts.leanna.provider) setLeannaProvider(data.data.accounts.leanna.provider);
       setCredentials(current => ({
         leanna: { ...current.leanna, email: data.data.accounts.leanna.email || current.leanna.email },
         personal: { ...current.personal, email: data.data.accounts.personal.email || current.personal.email },
@@ -47,13 +49,13 @@ export function EmailSection() {
       const response = await fetch("/api/email/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account: id, email: values.email, appPassword: values.appPassword }),
+        body: JSON.stringify({ account: id, email: values.email, appPassword: values.appPassword, provider: id === "leanna" ? leannaProvider : "gmail" }),
       });
       const data = await response.json();
-      if (!response.ok || data.status !== "success") throw new Error(data.error || "Connexion Gmail impossible.");
+      if (!response.ok || data.status !== "success") throw new Error(data.error || "Connexion e-mail impossible.");
       setSettings(data.data);
       setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: "" } }));
-      setFeedback({ type: "success", message: `Compte ${id === "leanna" ? "Leanna" : "personnel"} connecté. Les identifiants sont chiffrés localement.` });
+      setFeedback({ type: "success", message: `Compte ${id === "leanna" ? "Leanna" : "personnel"} connecté via ${id === "leanna" ? (leannaProvider === "infomaniak" ? "Infomaniak" : "Gmail") : "Gmail"}. Les identifiants sont chiffrés localement.` });
     } catch (error) {
       setFeedback({ type: "error", message: (error as Error).message });
     } finally {
@@ -73,7 +75,7 @@ export function EmailSection() {
       const data = await response.json();
       if (!response.ok || data.status !== "success") throw new Error(data.error || "Déconnexion impossible.");
       setSettings(data.data);
-      setFeedback({ type: "success", message: "Compte Gmail déconnecté et identifiants locaux supprimés." });
+      setFeedback({ type: "success", message: "Compte e-mail déconnecté et identifiants locaux supprimés." });
     } catch (error) {
       setFeedback({ type: "error", message: (error as Error).message });
     } finally {
@@ -118,11 +120,19 @@ export function EmailSection() {
           </div>
         )}
         <div className="mt-3 flex flex-col gap-3">
-          <Field label="Adresse Gmail">
-            <TextInput value={values.email} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], email: value } }))} placeholder="adresse@gmail.com" />
+          {id === "leanna" && (
+            <Field label="Fournisseur e-mail">
+              <select value={leannaProvider} onChange={event => setLeannaProvider(event.target.value as "infomaniak" | "gmail")} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+                <option value="infomaniak">Infomaniak (sans OAuth2)</option>
+                <option value="gmail">Gmail (mot de passe d'application)</option>
+              </select>
+            </Field>
+          )}
+          <Field label="Adresse e-mail">
+            <TextInput value={values.email} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], email: value } }))} placeholder={id === "leanna" && leannaProvider === "infomaniak" ? "leanna@mondomaine.fr" : "adresse@gmail.com"} />
           </Field>
-          <Field label="Mot de passe d'application" hint="Saisissez le mot de passe d'application Google (16 caractères), pas le mot de passe habituel du compte.">
-            <SecretInput value={values.appPassword} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: value } }))} placeholder="xxxx xxxx xxxx xxxx" />
+          <Field label={id === "leanna" && leannaProvider === "infomaniak" ? "Mot de passe de la boîte Infomaniak" : "Mot de passe d'application"} hint={id === "leanna" && leannaProvider === "infomaniak" ? "Mot de passe de cette adresse e-mail. Si la double authentification est activée, utilisez le mot de passe dédié généré dans le Manager Infomaniak." : "Saisissez le mot de passe d'application Google (16 caractères), pas le mot de passe habituel du compte."}>
+            <SecretInput value={values.appPassword} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: value } }))} placeholder={id === "leanna" && leannaProvider === "infomaniak" ? "Mot de passe de messagerie" : "xxxx xxxx xxxx xxxx"} />
           </Field>
           <button type="button" disabled={!!busy || !values.email.trim() || !values.appPassword.trim()} onClick={() => void connect(id)} className="inline-flex items-center justify-center gap-2 self-start rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40" style={{ background: "var(--accent-primary)", color: "white" }}>
             <Save size={14} /> {busy === id ? "Vérification IMAP/SMTP…" : account?.connected ? "Mettre à jour les identifiants" : "Connecter le compte"}
@@ -136,17 +146,17 @@ export function EmailSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Section id="gmail-imap-smtp" icon={Mail} title="Comptes Gmail" description="Connexion directe aux serveurs Gmail, sans OAuth ni fenêtre de connexion Google.">
+      <Section id="gmail-imap-smtp" icon={Mail} title="Messagerie e-mail" description="Compte dédié de Leanna sur Infomaniak, avec une connexion IMAP/SMTP directe sans OAuth2.">
         <div className="rounded-xl border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
           <ShieldCheck size={15} className="mr-2 inline" />
-          IMAP/SMTP avec chiffrement TLS. Les mots de passe d'application sont chiffrés localement et ne sont jamais renvoyés à l'interface ni transmis aux agents. La connexion vérifie les deux protocoles avant d'enregistrer le compte.
+          IMAP/SMTP avec TLS obligatoire (TLS 1.2 minimum). Les mots de passe sont chiffrés localement, jamais renvoyés à l'interface ni transmis aux agents. La connexion vérifie IMAP et SMTP avant d'enregistrer le compte.
         </div>
         <div className="rounded-lg border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
-          Activez la validation en deux étapes dans votre compte Google, puis créez un mot de passe d'application. Cette option peut être indisponible pour certains comptes Google Workspace ou comptes protégés par des règles de sécurité avancées.
-          {" "}<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: "var(--accent-primary)" }}>Créer un mot de passe d'application</a>
+          Infomaniak utilise mail.infomaniak.com : IMAP 993 en SSL/TLS et SMTP 587 en STARTTLS. Utilisez l'adresse complète et le mot de passe de la boîte. Si la double authentification est activée, générez un mot de passe dédié dans le Manager Infomaniak.
+          {" "}<a href="https://www.infomaniak.com/fr/support/faq/468" target="_blank" rel="noreferrer" style={{ color: "var(--accent-primary)" }}>Voir les paramètres officiels</a>
         </div>
         {accountCard("leanna", "Compte dédié de Leanna", "Boîte utilisée par défaut pour consulter et envoyer les e-mails. Chaque envoi exige une confirmation explicite.")}
-        <SectionDivider label="Compte personnel" />
+        <SectionDivider label="Compte personnel — inchangé" />
         {accountCard("personal", "Votre compte Gmail personnel", "Leanna peut consulter cette boîte. L'envoi depuis cette adresse reste désactivé par défaut.")}
         <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-base)" }}>
           <label className="flex cursor-pointer items-start gap-3">
