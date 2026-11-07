@@ -410,7 +410,7 @@ export function attachLiveWebSocket(
           if (!contextResumeSummary && messages.length > 0) {
             contextResumeSummary = messages
               .map(m => `${m.role === 'user' ? 'Utilisateur' : 'Leanna'}: ${m.content}`)
-              .join('\\n')
+              .join('\n')
               .slice(-6000);
             console.log(`[ContextResume] 📚 Historique court restauré (${messages.length} messages)`);
           }
