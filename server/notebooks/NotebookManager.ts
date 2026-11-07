@@ -34,6 +34,15 @@ function getNotebookPath(id: string): string {
   return path.join(DATA_DIR, `${id}.json`);
 }
 
+/** Fichier WAV d'un podcast. `overviewId` doit venir de l'objet stocké, jamais de l'URL brute. */
+export function podcastAudioPath(overviewId: string): string {
+  return path.resolve(DATA_DIR, "audio", `${overviewId}.wav`);
+}
+
+function removePodcastAudio(overviewId: string): void {
+  try { fs.rmSync(podcastAudioPath(overviewId), { force: true }); } catch { /* best effort */ }
+}
+
 const CURRENT_NOTEBOOK_SCHEMA_VERSION = 1;
 
 /**
@@ -289,6 +298,7 @@ export class NotebookManager {
 
     this.notebooks.delete(id);
     this.remove(id);
+    for (const overview of notebook.audioOverviews) removePodcastAudio(overview.id);
     for (const source of notebook.sources) this.cancelSourceIndexRetry(id, source.id);
 
     // Nettoyer tous les embeddings du notebook
@@ -833,6 +843,7 @@ export class NotebookManager {
     const index = notebook.audioOverviews.findIndex(o => o.id === overviewId);
     if (index === -1) return false;
 
+    removePodcastAudio(notebook.audioOverviews[index].id);
     notebook.audioOverviews.splice(index, 1);
     notebook.updatedAt = new Date().toISOString();
     this.persist(notebook);

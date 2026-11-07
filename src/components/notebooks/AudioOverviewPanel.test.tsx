@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
-import { renderWithProviders, mockFetchRouter, jsonResponse } from '../../test/helpers.js';
+import { renderWithProviders, mockFetchRouter, jsonResponse, sseResponse } from '../../test/helpers.js';
 
 const SOURCES = [{ id: 'src-1', title: 'Source A' }];
 
@@ -26,13 +26,22 @@ describe('AudioOverviewPanel — génération (caractérisation après découpag
     const fetchMock = mockFetchRouter(
       [
         {
+          match: '/audio-overviews/ov-1/audio',
+          respond: () => sseResponse([
+            'event: start\ndata: {"total":2}\n\n',
+            'event: done\ndata: {"overview":{"id":"ov-1","audioReady":true}}\n\n',
+          ]),
+        },
+        {
           match: '/audio-overview',
           respond: () =>
             jsonResponse({
               overview: {
                 id: 'ov-1',
                 title: 'Mon podcast',
-                script: 'Alex: Bonjour.\nSam: Salut.',
+                script: 'Leanna: Bonjour.\nNoah: Salut.',
+                hostName: 'Leanna',
+                coHostName: 'Noah',
                 estimatedDuration: 300,
                 status: 'ready',
                 createdAt: new Date().toISOString(),
@@ -65,5 +74,10 @@ describe('AudioOverviewPanel — génération (caractérisation après découpag
 
     expect(await screen.findByText('Audio Overview généré !')).toBeInTheDocument();
     await waitFor(() => expect(onRefresh).toHaveBeenCalled());
+
+    // Le fichier audio à deux voix est rendu automatiquement après le script.
+    expect(await screen.findByText('Audio du podcast prêt !')).toBeInTheDocument();
+    const renderCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/audio-overviews/ov-1/audio'));
+    expect((renderCall![1] as RequestInit).method).toBe('POST');
   });
 });

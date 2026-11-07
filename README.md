@@ -1777,7 +1777,7 @@ streaming** (`TTSCache` : 200 entrées, TTL 30 min, plafond 50 Mo) et
 chunk mis en cache).
 
 > La cascade de fournisseurs est **OpenRouter Kokoro (primaire) → Fish → Gemini TTS
-> (`gemini-3.8-flash-preview-tts`, en repli)**.
+> (`gemini-3.8-flash-tts`, en repli)**.
 
 <br>
 

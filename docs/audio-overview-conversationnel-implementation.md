@@ -40,19 +40,17 @@ npm run test:ui
 
 Puis générer un podcast de test avec les identités « Leanna » et « Noah », écouter les deux voix, exporter le script et rouvrir un ancien podcast Alex/Sam.
 
-## Passe suivante — interaction vocale en direct
+## Refonte — fichier audio à deux voix (sans Live)
 
-Le mode interactif est maintenant raccordé au transport Notebook Live existant :
+Le mode « Rejoindre le podcast » (Gemini Live) est supprimé. Le podcast est désormais un simple fichier audio :
 
-- Le bouton « Rejoindre le podcast » ouvre une session micro/WebSocket depuis le lecteur Audio Overview.
-- Le serveur reçoit `mode=podcast` et adapte l'instruction système avec les noms et la personnalité du co-animateur.
-- Le participant peut parler au micro ou envoyer un message texte ; la transcription est affichée dans le panneau.
-- Le RAG du notebook et les citations restent actifs pendant la session.
-- La session se ferme lors du changement d'épisode ou à la demande ; la lecture TTS pré-générée est arrêtée avant l'ouverture du micro pour éviter le chevauchement audio.
-- Les interruptions vocales sont gérées par le protocole Live existant.
+- Après la génération du script, le client appelle `POST /api/notebooks/:id/audio-overviews/:overviewId/audio` (SSE de progression).
+- Le serveur synthétise chaque réplique : Leanna avec `ff_siwis` (la voix de Leanna dans l'app), le co-animateur avec `Puck`.
+- Les segments PCM 24 kHz sont assemblés avec 300 ms de silence dans `.Leanna/notebooks/audio/<overviewId>.wav` ; `audioReady` et la durée réelle sont persistés.
+- `GET …/audio` sert le fichier (requêtes Range) : lecture, avance, vitesse et téléchargement via le lecteur natif.
+- Les anciens podcasts sans fichier affichent un bouton « Générer l'audio ». Supprimer un podcast ou un notebook supprime le `.wav`.
+- Si une réplique échoue, aucun fichier n'est écrit : relancer réutilise le cache TTS.
 
-## Limites explicites
+## Limites
 
-- Le mode Live actuel utilise une seule voix Gemini Live. Le co-animateur intervient dans la structure conversationnelle générée, mais ne dispose pas encore d'une deuxième voix TTS indépendante pendant la session temps réel.
-- Le flux TTS pré-généré à deux voix reste distinct de la session Live. La reprise automatique à la position exacte du podcast après une intervention n'est pas encore implémentée.
-- Les tests et le typecheck doivent être exécutés dans l'environnement local du dépôt avant fusion.
+- Si Gemini échoue pour `Puck`, `geminiTTS` se replie sur `ff_siwis` : le co-animateur parlerait alors avec la voix de Leanna.
