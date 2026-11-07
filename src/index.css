@@ -2356,6 +2356,117 @@ button {
   transform: translateY(-0.5px);
 }
 
+/* ── Studio tab bar — onglets icônes, l'actif s'élargit avec son label ─────── */
+.notebook-studio-tabs {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--notebook-radius-pill);
+  background: var(--notebook-surface-muted);
+  border: 1px solid var(--notebook-border);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.notebook-studio-tab {
+  position: relative;
+  display: inline-flex;
+  /* Onglets inactifs : largeur fixe (icône seule). Actif : s'étend. */
+  flex: 0 0 auto;
+  min-width: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: 34px;
+  border: none;
+  border-radius: var(--notebook-radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.18s ease, flex-grow 0.25s ease, background-color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.notebook-studio-tab[data-active="true"] {
+  flex: 1 1 auto;
+  color: var(--notebook-accent);
+}
+.notebook-studio-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
+}
+.notebook-studio-tab:hover:not([data-active="true"]) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--notebook-surface-elevated) 60%, transparent);
+}
+.notebook-studio-tab:active {
+  transform: scale(0.96);
+}
+/* Indicateur actif glissant (animé via motion layoutId) */
+.notebook-studio-tab-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--notebook-radius-pill);
+  background: var(--notebook-surface-elevated);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.notebook-studio-tab-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+/* Le label n'apparaît que sur l'onglet actif */
+.notebook-studio-tab-label {
+  display: none;
+  overflow: hidden;
+  max-width: 0;
+  font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.notebook-studio-tab[data-active="true"] .notebook-studio-tab-label {
+  display: inline;
+  max-width: 120px;
+}
+.notebook-studio-tab-badge {
+  display: inline-flex;
+  min-width: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  border-radius: var(--notebook-radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.notebook-studio-tab-badge[data-active="true"] {
+  background: var(--notebook-accent-surface);
+  color: var(--notebook-accent);
+}
+/* Onglet inactif avec activité : point discret en haut à droite de l'icône */
+.notebook-studio-tab-dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--notebook-accent);
+  box-shadow: 0 0 0 2px var(--notebook-surface-muted);
+}
+
 /* Primary action button (small) */
 .notebook-primary-small {
   padding: 6px 14px;
@@ -2482,6 +2593,137 @@ button {
   border-color: var(--notebook-accent);
   transform: translateY(-2px);
   box-shadow: var(--notebook-shadow-md, 0 4px 16px rgba(0,0,0,0.25));
+}
+
+/* ── Generate cards — grille 2 colonnes, cartes horizontales (style NotebookLM) ── */
+.notebook-gen-card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  border-radius: var(--notebook-radius-lg);
+}
+.notebook-gen-card-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+.notebook-gen-card-label {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Le texte du label tronque avec des points de suspension ; le badge reste visible */
+.notebook-gen-card-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notebook-gen-card-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: var(--notebook-radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.notebook-gen-card:hover .notebook-gen-card-badge {
+  background: var(--notebook-accent-surface);
+  color: var(--notebook-accent);
+}
+
+/* ── Barre de config du panneau Générer (Sources / Prompt / compteur) ── */
+.notebook-gen-configbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border-radius: var(--notebook-radius-lg);
+  background: var(--notebook-surface-muted);
+  border: 1px solid var(--notebook-border);
+}
+.notebook-gen-configbar-count {
+  flex-shrink: 0;
+  padding-right: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Génération en cours — grandes cartes avec spinner (style NotebookLM) ── */
+.notebook-gen-active {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--notebook-radius-lg);
+  background: var(--notebook-surface-muted);
+  border: 1px solid var(--notebook-border);
+}
+.notebook-gen-active-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+/* ── Bouton « Ajouter une note » — pilule centrée en bas du Studio ── */
+.notebook-studio-addnote {
+  display: flex;
+  width: fit-content;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: var(--notebook-radius-pill);
+  background: var(--notebook-surface-elevated);
+  border: 1px solid var(--notebook-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0, 0, 0, 0.15));
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+              transform 0.12s ease, box-shadow 0.2s ease;
+}
+.notebook-studio-addnote:hover {
+  border-color: var(--notebook-accent);
+  color: var(--notebook-accent);
+  transform: translateY(-1px);
+  box-shadow: var(--notebook-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.22));
+}
+.notebook-studio-addnote:active {
+  transform: scale(0.97);
+}
+.notebook-studio-addnote:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
 }
 
 /* Chat message bubbles — NotebookLM style */

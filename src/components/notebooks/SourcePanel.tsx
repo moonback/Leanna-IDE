@@ -38,13 +38,15 @@ interface Props {
   selectedSourceId?: string | null;
   /** Mode compact : ouvre le gestionnaire d'ajout de sources */
   onAddSources?: () => void;
+  /** Mode compact : ouvre le moniteur d'indexation (État des embeddings par source) */
+  onOpenIndexing?: () => void;
   /** Mode compact : replie le panneau */
   onCollapse?: () => void;
   /** Mode plein écran : ferme le gestionnaire (retour à la discussion) */
   onClose?: () => void;
 }
 
-export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId, onAddSources, onCollapse, onClose }: Props) {
+export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, compact = false, onSelectSource, selectedSourceId, onAddSources, onOpenIndexing, onCollapse, onClose }: Props) {
   const { success, error: toastError } = useToast();
   const prefersReducedMotion = useReducedMotion();
 
@@ -106,6 +108,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
         onDelete={list.handleDelete}
         onSelectSource={onSelectSource}
         onAddSources={onAddSources}
+        onOpenIndexing={onOpenIndexing}
         onCollapse={onCollapse}
       />
     );

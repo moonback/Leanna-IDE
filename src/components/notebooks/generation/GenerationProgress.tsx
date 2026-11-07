@@ -31,11 +31,12 @@ export function GenerationProgress({
   onCancelTask,
   modalSpring,
 }: Props) {
+  const hasActive = activeGenerationIds.size > 0;
   return (
-    <div className="notebook-card rounded-xl p-3">
-      {/* Barre de progression pour la génération en cours */}
-      {activeGenerationIds.size > 0 ? (
-        <div className="space-y-3">
+    <div className={hasActive ? 'space-y-2' : 'notebook-card rounded-xl p-3'}>
+      {/* Générations en cours — grandes cartes (style NotebookLM) */}
+      {hasActive ? (
+        <div className="space-y-2">
           {[...activeGenerationIds].map(taskId => {
             const task = generationQueue.find(t => t.id === taskId);
             if (!task) return null;
@@ -43,33 +44,38 @@ export function GenerationProgress({
             const color = getDocTypeColor(task.type);
             const docType = DOC_TYPES.find(t => t.key === task.type) || REPORT_TYPES.find(t => t.key === task.type);
             const Icon = docType?.icon || Sparkles;
-            const progress = generationProgresses[taskId] || 0;
+            const progress = generationProgresses[taskId] || task.progress || 0;
+            const srcCount = task.sourceIds?.length ?? 0;
+            const subtitle = progress > 0 && progress < 15
+              ? 'Recherche dans les sources…'
+              : srcCount > 0
+                ? `d'après ${srcCount} source${srcCount > 1 ? 's' : ''}`
+                : 'Analyse du contenu…';
 
             return (
-              <div key={taskId} className="flex items-center gap-2">
-                <div
-                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full"
+              <div key={taskId} className="notebook-gen-active">
+                <span
+                  className="notebook-gen-active-icon"
                   style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` }}
                 >
-                  <Icon className="h-3 w-3" style={{ color }} aria-hidden />
-                </div>
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden />
+                  <Icon className="sr-only" aria-hidden />
+                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
-                    {getDocTypeLabel(task.type)}
+                  <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                    Génération — {getDocTypeLabel(task.type)}…
                   </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--notebook-surface-muted)]">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ backgroundColor: color }}
-                        initial={{ width: '0%' }}
-                        animate={{ width: `${progress}%` }}
-                        transition={{ duration: 0.3, ease: 'easeOut' }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium tabular-nums" style={{ color }}>
-                      {progress}%
-                    </span>
+                  <p className="truncate text-xs text-[var(--text-muted)]">
+                    {subtitle}
+                  </p>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--notebook-surface-muted)]">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: color }}
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.3, ease: 'easeOut' }}
+                    />
                   </div>
                 </div>
               </div>

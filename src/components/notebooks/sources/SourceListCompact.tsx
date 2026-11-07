@@ -7,7 +7,7 @@
 import type { SpringTransition, TapScaleProps } from '../motionTypes.js';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Trash2, Plus, FileText, CheckSquare, Square, X, PanelLeftClose,
+  Search, Trash2, Plus, FileText, CheckSquare, Square, X, PanelLeftClose, Activity,
 } from 'lucide-react';
 import { TYPE_ICONS, TYPE_COLORS, ACCEPTED_EXTENSIONS, type SourceItem } from './constants.js';
 import { NbButton, NbEmptyState, NbIconButton } from '../ui/primitives.js';
@@ -44,6 +44,8 @@ interface Props {
   onSelectSource?: (sourceId: string) => void;
   /** Ouvre le gestionnaire d'ajout (URL, texte, GitHub…) ; à défaut, le sélecteur de fichiers */
   onAddSources?: () => void;
+  /** Ouvre le moniteur d'indexation (État des embeddings par source) */
+  onOpenIndexing?: () => void;
   /** Replie le panneau Sources */
   onCollapse?: () => void;
 }
@@ -55,7 +57,7 @@ export function SourceListCompact(props: Props) {
     totalWords, totalChunks, prefersReducedMotion,
     fileInputRef, spring, springSnappy, tapScale,
     onFileInputChange, openFilePicker, onSelectAll, onDeleteSelected, onDeleteAll,
-    onToggleSelect, onDelete, onSelectSource, onAddSources, onCollapse,
+    onToggleSelect, onDelete, onSelectSource, onAddSources, onOpenIndexing, onCollapse,
   } = props;
 
   return (
@@ -110,18 +112,30 @@ export function SourceListCompact(props: Props) {
         <input ref={fileInputRef} type="file" accept={ACCEPTED_EXTENSIONS} multiple onChange={onFileInputChange} className="hidden" />
       </div>
 
-      {/* Ajouter + recherche */}
+      {/* Ajouter + Indexation + recherche */}
       <div className="flex-shrink-0 space-y-2 px-3 pb-1 pt-3">
-        <MotionButton
-          {...tapScale}
-          variant="secondary"
-          icon={Plus}
-          loading={uploading}
-          onClick={onAddSources ?? openFilePicker}
-          className="w-full !rounded-full"
-        >
-          Ajouter des sources
-        </MotionButton>
+        <div className="flex items-center gap-2">
+          <MotionButton
+            {...tapScale}
+            variant="secondary"
+            icon={Plus}
+            loading={uploading}
+            onClick={onAddSources ?? openFilePicker}
+            className="min-w-0 flex-1 !rounded-full"
+          >
+            Ajouter des sources
+          </MotionButton>
+          {onOpenIndexing && (
+            <MotionIconButton
+              {...tapScale}
+              icon={Activity}
+              label="Indexation — état des embeddings par source (Ctrl+7 / ⌘7)"
+              title="Indexation"
+              onClick={onOpenIndexing}
+              className="flex-shrink-0"
+            />
+          )}
+        </div>
       {sources.length > 0 && (
         <div>
           <div className="notebook-search-field !gap-2 !pr-1">

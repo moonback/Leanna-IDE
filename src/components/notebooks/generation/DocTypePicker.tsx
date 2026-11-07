@@ -61,36 +61,38 @@ export function DocTypePicker({
   const promptOn = showCustomPrompt || !!customInstructions.trim();
   return (
     <>
-      {/* Quick config bar */}
-      <div className="flex items-center gap-2">
-        {sources.length > 1 && (
+      {/* Quick config bar — chips à gauche, compteur de sources à droite */}
+      <div className="notebook-gen-configbar">
+        <div className="flex items-center gap-2">
+          {sources.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setShowSourceFilter(!showSourceFilter)}
+              className={clsx(
+                'notebook-chip text-xs',
+                sourceFilterOn && 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]',
+              )}
+            >
+              <Filter className="h-3 w-3" aria-hidden />
+              {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setShowSourceFilter(!showSourceFilter)}
+            onClick={() => setShowCustomPrompt(!showCustomPrompt)}
             className={clsx(
               'notebook-chip text-xs',
-              sourceFilterOn && 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]',
+              promptOn && 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
             )}
           >
-            <Filter className="h-3 w-3" aria-hidden />
-            {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
+            <PenLine className="h-3 w-3" aria-hidden />
+            Prompt
+            {customInstructions.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
           </button>
-        )}
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setShowCustomPrompt(!showCustomPrompt)}
-          className={clsx(
-            'notebook-chip text-xs',
-            promptOn && 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
-          )}
-        >
-          <PenLine className="h-3 w-3" aria-hidden />
-          Prompt
-          {customInstructions.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
-        </button>
-
-        <span className="ml-auto text-xs text-[var(--text-muted)]">
+        <span className="notebook-gen-configbar-count">
           {sources.length} source{sources.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -158,7 +160,7 @@ export function DocTypePicker({
         )}
       </AnimatePresence>
 
-      {/* Generate buttons — redesigned grid */}
+      {/* Generate cards — grille 2 colonnes, grandes cartes (style NotebookLM) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <NbSectionLabel>Générer</NbSectionLabel>
@@ -169,32 +171,34 @@ export function DocTypePicker({
           )}
         </div>
 
-        {/* Bouton principal — Rapport complet (ouvre le modal) */}
-        <button
-          ref={reportModalTriggerRef}
-          type="button"
-          onClick={onOpenReportModal}
-          disabled={sources.length === 0}
-          className="notebook-studio-card flex w-full items-center gap-3 rounded-xl p-3 text-left active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-          title="Choisir un type de rapport • Suggestions IA incluses"
-        >
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--color-error)_25%,transparent)] bg-[var(--color-error-subtle)]">
-            <FileBarChart className="h-4 w-4 text-[var(--color-error)]" aria-hidden />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              Rapport complet
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-              Types avancés
-            </p>
-          </div>
-          <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)]" aria-hidden />
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          {/* Carte « Rapport complet » — ouvre le modal, avec badge Nouveau ! */}
+          <button
+            ref={reportModalTriggerRef}
+            type="button"
+            onClick={onOpenReportModal}
+            disabled={sources.length === 0}
+            className="notebook-studio-card notebook-gen-card group active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+            title="Choisir un type de rapport • Suggestions IA incluses"
+          >
+            <span
+              className="notebook-gen-card-icon"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)',
+              }}
+            >
+              <FileBarChart className="h-4 w-4" style={{ color: 'var(--color-error)' }} aria-hidden />
+            </span>
+            <span className="notebook-gen-card-label">
+              <span className="notebook-gen-card-text">Rapports</span>
+              <span className="notebook-gen-card-badge">Nouveau !</span>
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+          </button>
 
-        {/* Types rapides — 3 par ligne */}
-        <div className="grid grid-cols-3 gap-2">
-          {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color }) => {
+          {/* Types rapides */}
+          {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color, badge }) => {
             const isActive = [...activeGenerationIds].some(taskId => {
               const task = generationQueue.find(t => t.id === taskId);
               return task && task.type === key;
@@ -207,32 +211,33 @@ export function DocTypePicker({
                 onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
                 disabled={sources.length === 0}
                 whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
-                className="notebook-studio-card group relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2 text-center disabled:pointer-events-none disabled:opacity-40"
+                className="notebook-studio-card notebook-gen-card group relative disabled:pointer-events-none disabled:opacity-40"
                 style={isActive ? {
                   borderColor: color,
                   backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))`,
                 } : undefined}
                 title={desc}
               >
-                <div
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+                <span
+                  className="notebook-gen-card-icon"
                   style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}
                 >
                   {isActive ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color }} aria-hidden />
+                    <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden />
                   ) : (
                     <Icon className="h-4 w-4" style={{ color }} aria-hidden />
                   )}
-                </div>
+                </span>
 
-                <span className="w-full text-[11px] font-medium leading-tight text-[var(--text-primary)]">
-                  {label}
+                <span className="notebook-gen-card-label">
+                  <span className="notebook-gen-card-text">{label}</span>
+                  {badge && <span className="notebook-gen-card-badge">{badge}</span>}
                 </span>
 
                 {isActive && (
                   <motion.div
                     layoutId="activeGenType"
-                    className="pointer-events-none absolute inset-0 rounded-xl opacity-60"
+                    className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-60"
                     style={{ border: `1.5px solid ${color}` }}
                   />
                 )}
