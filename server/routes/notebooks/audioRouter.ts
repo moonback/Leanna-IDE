@@ -124,6 +124,59 @@ export function createAudioRouter(): Router {
     }
   });
 
+  // Nouvelle voie de production : un épisode WAV unique avec deux voix.
+  router.post("/:id/audio-overviews/:overviewId/audio-track", async (req: Request, res: Response): Promise<void> => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined);
+      const overview = notebook?.audioOverviews?.find((item: any) => item.id === req.params.overviewId);
+      if (!overview || overview.status !== "ready") {
+        res.status(404).json({ error: "Podcast introuvable ou script non prêt." });
+        return;
+      }
+      const { renderPodcastAudio } = await import("../../notebooks/PodcastAudioRenderer.js");
+      const hostName = typeof overview.hostName === "string" && overview.hostName.trim() ? overview.hostName.trim() : "Leanna";
+      const coHostName = typeof overview.coHostName === "string" && overview.coHostName.trim() ? overview.coHostName.trim() : "Noah";
+      const result = await renderPodcastAudio(overview.script, overview.id, {
+        hostName,
+        coHostName,
+        hostVoice: typeof req.body?.hostVoice === "string" ? req.body.hostVoice : "Aoede",
+        coHostVoice: typeof req.body?.coHostVoice === "string" ? req.body.coHostVoice : "Charon",
+      });
+      res.json({
+        status: "ready",
+        audioUrl: `/api/notebooks/${encodeURIComponent(req.params.id)}/audio-overviews/${encodeURIComponent(overview.id)}/audio-track`,
+        format: "wav",
+        durationSeconds: result.durationSeconds,
+        sizeBytes: result.sizeBytes,
+        segmentCount: result.segmentCount,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Échec du rendu audio." });
+    }
+  });
+
+  router.get("/:id/audio-overviews/:overviewId/audio-track", (req: Request, res: Response): void => {
+    try {
+      const notebook = notebookManager.getNotebook(req.params.id, SELF_ROOT || undefined);
+      const overview = notebook?.audioOverviews?.find((item: any) => item.id === req.params.overviewId);
+      if (!overview) {
+        res.status(404).json({ error: "Podcast introuvable." });
+        return;
+      }
+      const audioPath = path.join(getSandboxRoot(), "podcasts", `${overview.id}.wav`);
+      if (!fs.existsSync(audioPath)) {
+        res.status(404).json({ error: "La piste audio n'a pas encore été générée." });
+        return;
+      }
+      res.setHeader("Content-Type", "audio/wav");
+      res.setHeader("Accept-Ranges", "bytes");
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.sendFile(audioPath);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Lecture audio impossible." });
+    }
+  });
+
   router.get("/:id/audio-overviews", (req: Request, res: Response): void => {
     try {
       const notebook = notebookManager.getNotebook(req.params.id);
