@@ -41,8 +41,6 @@ function createSmtpTransport(account: StoredAccount) {
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 30_000,
-    disableFileAccess: true,
-    disableUrlAccess: true,
   });
 }
 
@@ -80,6 +78,13 @@ export class GmailService {
 
   constructor() {
     this.config = this.loadConfig();
+    // Purge legacy OAuth client secrets and refresh tokens from the previous draft format.
+    try {
+      const legacy = JSON.parse(fs.readFileSync(this.configPath, "utf8"));
+      const hasLegacyOAuth = Boolean(legacy.clientId || legacy.clientSecret)
+        || Object.values(legacy.accounts || {}).some((account: any) => Boolean(account?.refreshToken));
+      if (hasLegacyOAuth) this.persist();
+    } catch { /* no existing configuration to migrate */ }
   }
 
   private get configPath(): string {
@@ -257,8 +262,8 @@ export class GmailService {
           id: String(message.uid),
           threadId: String(message.uid),
           from: parsed.from?.text || formatAddress(message.envelope?.from),
-          to: parsed.to?.text || formatAddress(message.envelope?.to),
-          cc: parsed.cc?.text || "",
+          to: (parsed.to as any)?.text || formatAddress(message.envelope?.to),
+          cc: (parsed.cc as any)?.text || "",
           subject: parsed.subject || "(sans objet)",
           date: parsed.date?.toISOString() || message.internalDate?.toISOString() || "",
           snippet: parsed.text?.slice(0, 240) || "",
