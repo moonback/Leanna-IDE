@@ -213,22 +213,26 @@ export function AudioPlayer({
         {/* Script as chat bubbles */}
         <div className="space-y-4">
           {selectedOverview.script.split('\n').map((line, i) => {
-            const isAlex = line.trim().startsWith('Alex:') || line.trim().startsWith('Alex :');
-            const isSam = line.trim().startsWith('Sam:') || line.trim().startsWith('Sam :');
+            const separator = line.trim().indexOf(':');
+            const label = separator > 0 ? line.trim().slice(0, separator).trim() : '';
+            const hostName = selectedOverview.hostName || 'Alex';
+            const coHostName = selectedOverview.coHostName || 'Sam';
+            const isHost = label.toLowerCase() === hostName.toLowerCase() || label.toLowerCase() === 'alex';
+            const isCoHost = label.toLowerCase() === coHostName.toLowerCase() || label.toLowerCase() === 'sam';
 
-            if (isAlex || isSam) {
-              const speaker = isAlex ? 'Alex' : 'Sam';
-              const text = line.replace(/^(Alex|Sam)\s*:\s*/i, '');
+            if (separator > 0 && (isHost || isCoHost)) {
+              const speaker = isHost ? hostName : coHostName;
+              const text = line.trim().slice(separator + 1).trim();
               const isCurrentLine = playing && currentLineIndex === i;
-              // Couleur de l'interlocuteur : accent pour Alex, succès pour Sam.
-              const speakerColor = isAlex ? 'var(--notebook-accent)' : 'var(--color-success)';
+              // Couleur de l'interlocuteur : accent pour l'hôte, succès pour le co-hôte.
+              const speakerColor = isHost ? 'var(--notebook-accent)' : 'var(--color-success)';
               return (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
-                  className={`flex gap-3 ${isSam ? 'flex-row-reverse' : ''}`}
+                  className={`flex gap-3 ${isCoHost ? 'flex-row-reverse' : ''}`}
                 >
                   <div
                     className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm ${isCurrentLine ? 'animate-pulse' : ''}`}
@@ -245,7 +249,7 @@ export function AudioPlayer({
                       {speaker}
                     </p>
                     <div
-                      className={`rounded-2xl p-3 text-sm leading-relaxed text-[var(--text-primary)] transition-colors ${isAlex ? 'rounded-tl-md' : 'rounded-tr-md'}`}
+                      className={`rounded-2xl p-3 text-sm leading-relaxed text-[var(--text-primary)] transition-colors ${isHost ? 'rounded-tl-md' : 'rounded-tr-md'}`}
                       style={{
                         backgroundColor: isCurrentLine ? `color-mix(in srgb, ${speakerColor} 6%, transparent)` : 'var(--notebook-surface)',
                         border: `1px solid ${isCurrentLine ? `color-mix(in srgb, ${speakerColor} 25%, transparent)` : 'var(--notebook-border)'}`,
