@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { getActiveProjectId } from '../utils/selfRoot.js';
 import { listConversations, getConversationMessages, searchHistory, deleteConversation, clearAllConversations, updateConversationTitle } from '../skills/history.js';
 
 const router = Router();
@@ -8,7 +9,7 @@ router.get('/', async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 30, 100);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const conversations = await listConversations(limit, offset);
+    const conversations = await listConversations(limit, offset, getActiveProjectId());
     res.json({ status: 'success', conversations });
   } catch (e: any) {
     res.status(500).json({ status: 'error', error: e.message });
