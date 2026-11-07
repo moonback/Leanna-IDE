@@ -2205,6 +2205,8 @@ button {
 .notebook-shell {
   --nb-left: clamp(260px, 22vw, 320px);
   --nb-right: clamp(300px, 26vw, 380px);
+  --nb-left-handle: 12px;
+  --nb-right-handle: 12px;
   --nb-rail: 56px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -2214,10 +2216,50 @@ button {
 }
 @media (min-width: 1024px) {
   .notebook-shell {
-    grid-template-columns: var(--nb-left) minmax(0, 1fr) var(--nb-right);
+    grid-template-columns:
+      var(--nb-left) var(--nb-left-handle) minmax(0, 1fr)
+      var(--nb-right-handle) var(--nb-right);
+    gap: 0;
   }
-  .notebook-shell[data-source-open="false"] { --nb-left: var(--nb-rail); }
-  .notebook-shell[data-studio-open="false"] { --nb-right: var(--nb-rail); }
+  .notebook-shell[data-source-open="false"] {
+    --nb-left: var(--nb-rail);
+    --nb-left-handle: 0px;
+  }
+  .notebook-shell[data-studio-open="false"] {
+    --nb-right: var(--nb-rail);
+    --nb-right-handle: 0px;
+  }
+}
+
+/* Séparateurs de panneaux : redimensionnement souris, tactile et clavier. */
+.notebook-resize-handle {
+  position: relative;
+  z-index: 2;
+  width: 12px;
+  min-width: 12px;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.notebook-resize-handle::before {
+  content: "";
+  width: 2px;
+  height: 36px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--notebook-border) 85%, transparent);
+  transition: height 160ms ease, width 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.notebook-resize-handle:hover::before,
+.notebook-resize-handle:focus-visible::before {
+  width: 3px;
+  height: 52px;
+  background: var(--notebook-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--notebook-accent) 35%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .notebook-resize-handle::before { transition: none; }
 }
 
 /* Panneau flottant */
