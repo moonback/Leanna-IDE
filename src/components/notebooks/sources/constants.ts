@@ -16,7 +16,7 @@ export interface SourceItem {
   addedAt: string;
   chunksCount: number;
   /** Durable vector-indexing state; absent on legacy sources. */
-  indexingStatus?: 'pending' | 'indexed' | 'partial' | 'failed';
+  indexingStatus?: 'pending' | 'indexed' | 'partial' | 'failed' | 'unknown';
   indexingAttempts?: number;
   indexingError?: string;
 }
