@@ -79,6 +79,14 @@ export function createNotebooksCrudRouter(): Router {
           language: s.language,
           addedAt: s.addedAt,
           chunksCount: s.chunks.length,
+          // Exposer le statut réellement persisté : sans ces champs, l'UI
+          // retombe systématiquement sur "unknown" même après indexation.
+          indexingStatus: s.indexingStatus ?? "unknown",
+          indexingAttempts: s.indexingAttempts ?? 0,
+          indexingError: s.indexingError,
+          indexingUpdatedAt: s.indexingUpdatedAt,
+          indexingNextRetryAt: s.indexingNextRetryAt,
+          indexingHistory: s.indexingHistory ?? [],
         })),
       };
       res.json({ status: "success", notebook: light });
