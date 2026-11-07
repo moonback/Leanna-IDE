@@ -20,7 +20,9 @@ export function createGmailRouter(): Router {
     try {
       const account = accountId(req.body?.account);
       const { email, appPassword } = req.body || {};
-      const provider: EmailProvider = req.body?.provider === "infomaniak" ? "infomaniak" : "gmail";
+      const rawProvider = req.body?.provider;
+      if (rawProvider !== undefined && rawProvider !== "gmail" && rawProvider !== "infomaniak") throw new Error("Fournisseur e-mail invalide.");
+      const provider: EmailProvider = rawProvider === "infomaniak" ? "infomaniak" : "gmail";
       if (typeof email !== "string" || typeof appPassword !== "string") {
         throw new Error("Adresse e-mail et mot de passe d'application requis.");
       }
