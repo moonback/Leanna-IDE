@@ -194,11 +194,15 @@ export function SourceListCompact(props: Props) {
                 const hasSelection = selectedSources.length > 0;
                 const typeColor = TYPE_COLORS[source.type] || 'var(--text-muted)';
                 const indexingStatus = source.indexingStatus ?? 'unknown';
+                const updatedAt = source.indexingUpdatedAt && Number.isFinite(Date.parse(source.indexingUpdatedAt))
+                  ? new Date(source.indexingUpdatedAt).toLocaleString('fr-FR') : '';
+                const nextRetryAt = source.indexingNextRetryAt && Number.isFinite(Date.parse(source.indexingNextRetryAt))
+                  ? new Date(source.indexingNextRetryAt).toLocaleString('fr-FR') : '';
                 const indexingDetails = [
                   `Indexation : ${indexingStatus}`,
                   source.indexingAttempts ? `${source.indexingAttempts} tentative(s)` : '',
-                  source.indexingUpdatedAt ? `Dernière mise à jour : ${new Date(source.indexingUpdatedAt).toLocaleString('fr-FR')}` : '',
-                  source.indexingNextRetryAt ? `Nouvel essai prévu : ${new Date(source.indexingNextRetryAt).toLocaleString('fr-FR')}` : '',
+                  updatedAt ? `Dernière mise à jour : ${updatedAt}` : '',
+                  nextRetryAt ? `Nouvel essai prévu : ${nextRetryAt}` : '',
                   source.indexingError || '',
                 ].filter(Boolean).join(' · ');
 
