@@ -3,8 +3,10 @@
  * Only one role speaks at a time; pause is honored between turns.
  */
 import { WebSocket, WebSocketServer } from "ws";
+import { randomUUID } from "node:crypto";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { notebookManager, ragEngine } from "../notebooks/index.js";
+import type { GeneratedDocument } from "../notebooks/types.js";
 import { recordModelCallUsage } from "../utils/textGeneration.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 import type { ProfileConfig } from "../prompts/systemInstruction.js";
@@ -190,6 +192,31 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
           previousText = message.text;
           send({ type: "transcript", message });
           send({ type: "speaker", speaker, state: "idle" });
+        }
+        if (transcript.length && !closed) {
+          const report = [
+            `# Débat IA — ${topic}`,
+            "",
+            `Durée configurée : ${durationMinutes} minutes maximum`,
+            `Date : ${new Date().toLocaleString("fr-FR")}`,
+            "",
+            "## Interventions",
+            ...transcript.flatMap((turn, index) => [
+              `### ${index + 1}. ${turn.speaker === "analyst" ? "Analyste" : turn.speaker === "critic" ? "Contradicteur" : "Modérateur"}`,
+              turn.text,
+              "",
+              turn.citations.length ? `Sources consultées : ${turn.citations.map(c => `${c.sourceTitle} (chunk ${c.chunkId})`).join(", ")}` : "Aucune citation associée.",
+              "",
+            ]),
+            "## Limites de traçabilité",
+            "Les passages listés sont ceux fournis aux agents par la recherche RAG. Leur présence ne constitue pas une validation sémantique automatique de chaque affirmation prononcée.",
+          ].join("\n");
+          const document: GeneratedDocument = {
+            id: randomUUID(), notebookId, type: "synthesis-report",
+            title: `Débat IA — ${topic.slice(0, 70)}`, content: report, sourceIds, createdAt: new Date().toISOString(),
+          };
+          notebookManager.addGeneratedDocument(notebookId, document);
+          send({ type: "document_saved", documentId: document.id, title: document.title });
         }
         if (!stopRequested && !closed) send({ type: "status", status: "completed", transcript });
         else if (!closed) send({ type: "status", status: "stopped", transcript });
