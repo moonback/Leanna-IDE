@@ -29,7 +29,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
   const [ttsLoading, setTtsLoading] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(-1);
   const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsTotalLines, setTtsTotalLines] = useState(1000);
+  const [ttsTotalLines, setTtsTotalLines] = useState(100);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const generationControllerRef = useRef<AbortController | null>(null);
@@ -83,7 +83,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
       audio.ontimeupdate = () => {
         if (!audio.duration || !Number.isFinite(audio.duration)) return;
         const ratio = Math.min(1, audio.currentTime / audio.duration);
-        setTtsProgress(Math.round(ratio * 1000));
+        setTtsProgress(Math.round(ratio * 100));
         const lineCount = selectedOverview.script.split("\n").filter(line => line.trim()).length;
         setCurrentLineIndex(Math.min(Math.max(0, lineCount - 1), Math.floor(ratio * lineCount)));
       };
@@ -91,7 +91,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
         playingRef.current = false;
         setPlaying(false);
         setTtsLoading(false);
-        setTtsProgress(1000);
+        setTtsProgress(100);
         setCurrentLineIndex(-1);
       };
       audio.onerror = () => {
