@@ -266,6 +266,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       const params = new URLSearchParams();
       if (activeSkills.length > 0) params.set('skills', activeSkills.join(','));
       if (mode) params.set('mode', mode);
+      if (initialConversationId) params.set('conversation_id', initialConversationId);
       // Le token est maintenant passé uniquement via cookie, plus par URL
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
@@ -275,7 +276,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       ws.onopen = () => {
         reconnectCountRef.current = 0;
         setStatus('connected');
-        onLog('Connected to Core', 'info');
+        onLog(initialConversationId ? 'Conversation précédente reprise' : 'Connected to Core', 'info');
         // Jouer un son lors du démarrage initial de la session live Gemini.
         playSessionStartSound();
         // Notifier les composants d'une connexion établie pour qu'ils chargent l'état
