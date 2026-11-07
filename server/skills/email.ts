@@ -88,7 +88,7 @@ export const emailSkill: Skill = {
       }
       const preview = String(args.body).slice(0, 500);
       const approved = await requestConfirmation(
-        String(args.subject),
+        `${to} — ${String(args.subject)}`,
         "send-email",
         context.emitToClient,
         `Envoyer depuis ${account === "leanna" ? "le compte Gmail de Leanna" : "votre compte Gmail personnel"} vers ${to} ?\nObjet : ${args.subject}\n\n${preview}`,
