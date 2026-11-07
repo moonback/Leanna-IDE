@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { gmailService, type GmailAccountId } from "../email/GmailService.js";
+import { gmailService, type EmailProvider, type GmailAccountId } from "../email/GmailService.js";
 
 const ACCOUNT_IDS = new Set<GmailAccountId>(["leanna", "personal"]);
 const accountId = (value: unknown): GmailAccountId => {
@@ -20,10 +20,11 @@ export function createGmailRouter(): Router {
     try {
       const account = accountId(req.body?.account);
       const { email, appPassword } = req.body || {};
+      const provider: EmailProvider = req.body?.provider === "infomaniak" ? "infomaniak" : "gmail";
       if (typeof email !== "string" || typeof appPassword !== "string") {
         throw new Error("Adresse e-mail et mot de passe d'application requis.");
       }
-      await gmailService.connectAccount(account, email, appPassword);
+      await gmailService.connectAccount(account, email, appPassword, provider);
       res.json({ status: "success", data: gmailService.getSettings() });
     } catch (error) {
       res.status(400).json({ status: "error", error: (error as Error).message });
