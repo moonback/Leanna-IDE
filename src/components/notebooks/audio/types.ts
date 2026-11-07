@@ -10,6 +10,9 @@ export interface AudioOverview {
   script: string;
   estimatedDuration: number;
   status: 'generating' | 'ready' | 'error';
+  hostName?: string;
+  coHostName?: string;
+  coHostPersonality?: string;
   createdAt: string;
 }
 
