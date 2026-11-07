@@ -1417,6 +1417,15 @@ export class TelegramService {
       targetChatId = this.config.allowedUsers.find((u) => /^\d+$/.test(u.trim()));
     }
     if (!targetChatId) return false;
+    // Les @usernames sont acceptés par l'API d'envoi, mais les callbacks Telegram
+    // exposent un chat.id numérique : normaliser avant d'enregistrer la demande.
+    if (!/^-?\\d+$/.test(String(targetChatId))) {
+      try {
+        targetChatId = String((await this.bot.api.getChat(targetChatId)).id);
+      } catch {
+        return false;
+      }
+    }
 
     const keyboard = new InlineKeyboard()
       .text("✅ Approuver", `appr:yes:${request.actionId}`)
@@ -1452,14 +1461,6 @@ export class TelegramService {
   }
 
   /**
-   * Clôture une demande d'approbation résolue en dehors de Telegram (UI web ou
-   * expiration côté serveur). Retire les boutons et met à jour le message pour
-   * refléter l'issue, sans rappeler `onDecision` (déjà géré par l'appelant).
-   *
-   * No-op si l'actionId est inconnu ou déjà résolu — garantit l'idempotence quel
-   * que soit l'ordre d'arrivée (clic Telegram vs résolution web).
-   */
-  /**
    * Approbation Telegram dédiée aux transferts de fichiers locaux.
    * Refus par défaut après 30 secondes ; décision à usage unique.
    */
@@ -1490,6 +1491,10 @@ export class TelegramService {
     });
   }
 
+  /**
+   * Clôture une demande d'approbation résolue en dehors de Telegram (UI web ou
+   * expiration côté serveur), sans rappeler le callback déjà traité.
+   */
   public async closeApprovalRequest(
     actionId: string,
     outcome: "approved" | "rejected" | "timeout"
