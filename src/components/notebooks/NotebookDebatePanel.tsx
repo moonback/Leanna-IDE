@@ -51,8 +51,11 @@ export function NotebookDebatePanel({
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [interventionText, setInterventionText] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [interimSpeech, setInterimSpeech] = useState("");
   const [queuedIntervention, setQueuedIntervention] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const recognitionShouldContinueRef = useRef(false);
+  const recognitionRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEnabledRef = useRef(true);
   useEffect(() => { audioEnabledRef.current = audioEnabled; }, [audioEnabled]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -80,43 +83,102 @@ export function NotebookDebatePanel({
   }, []);
 
   useEffect(() => () => {
+    recognitionShouldContinueRef.current = false;
+    if (recognitionRestartTimerRef.current) clearTimeout(recognitionRestartTimerRef.current);
     try { recognitionRef.current?.abort(); } catch { /* microphone already stopped */ }
     stopSocket();
   }, [stopSocket]);
 
-  const sendIntervention = () => {
-    const text = interventionText.trim();
+  useEffect(() => {
+    if (isActive) return;
+    recognitionShouldContinueRef.current = false;
+    if (recognitionRestartTimerRef.current) clearTimeout(recognitionRestartTimerRef.current);
+    try { recognitionRef.current?.stop(); } catch { /* recognition already stopped */ }
+    setIsListening(false);
+    setInterimSpeech("");
+  }, [isActive]);
+
+  const sendInterventionText = (value: string) => {
+    const text = value.trim().slice(0, 1200);
     const socket = wsRef.current;
-    if (!text || socket?.readyState !== WebSocket.OPEN) return;
+    if (!text || socket?.readyState !== WebSocket.OPEN) return false;
     socket.send(JSON.stringify({ type: "intervene", text }));
-    setInterventionText("");
     setQueuedIntervention(true);
+    return true;
+  };
+
+  const sendIntervention = () => {
+    if (sendInterventionText(interventionText)) setInterventionText("");
   };
 
   const toggleDictation = () => {
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionShouldContinueRef.current = false;
+      if (recognitionRestartTimerRef.current) clearTimeout(recognitionRestartTimerRef.current);
+      try { recognitionRef.current?.stop(); } catch { /* recognition already stopped */ }
       setIsListening(false);
+      setInterimSpeech("");
       return;
     }
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setError("La dictée vocale n’est pas disponible dans ce navigateur. Vous pouvez saisir votre question au clavier.");
+      setError("La reconnaissance vocale continue n’est pas disponible dans cet environnement. Utilisez la saisie clavier.");
       return;
     }
+
     const recognition = new SpeechRecognition();
     recognition.lang = "fr-FR";
-    recognition.interimResults = false;
-    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
     recognition.onresult = (event: any) => {
-      const spoken = Array.from(event.results || []).map((result: any) => result[0]?.transcript || "").join(" ").trim();
-      if (spoken) setInterventionText(current => [current, spoken].filter(Boolean).join(" ").slice(0, 1200));
+      let finalText = "";
+      let interimText = "";
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results[index];
+        const transcript = String(result?.[0]?.transcript || "").trim();
+        if (!transcript) continue;
+        if (result.isFinal) finalText += (finalText ? " " : "") + transcript;
+        else interimText += (interimText ? " " : "") + transcript;
+      }
+      setInterimSpeech(interimText);
+      if (finalText) {
+        const sent = sendInterventionText(finalText);
+        if (!sent) setInterventionText(current => [current, finalText].filter(Boolean).join(" ").slice(0, 1200));
+      }
     };
-    recognition.onerror = () => { setError("La reconnaissance vocale a échoué. Vérifiez l’autorisation du microphone."); setIsListening(false); };
-    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event: any) => {
+      const fatal = ["not-allowed", "service-not-allowed", "audio-capture"].includes(String(event?.error || ""));
+      if (fatal) {
+        recognitionShouldContinueRef.current = false;
+        setIsListening(false);
+        setError("Accès au microphone refusé ou indisponible. Vérifiez les autorisations de Leanna.");
+      }
+    };
+    recognition.onend = () => {
+      if (!recognitionShouldContinueRef.current) {
+        setIsListening(false);
+        setInterimSpeech("");
+        return;
+      }
+      if (recognitionRestartTimerRef.current) clearTimeout(recognitionRestartTimerRef.current);
+      recognitionRestartTimerRef.current = setTimeout(() => {
+        if (!recognitionShouldContinueRef.current) return;
+        try { recognition.start(); }
+        catch { /* Chromium peut encore finaliser la session précédente. */ }
+      }, 250);
+    };
     recognitionRef.current = recognition;
-    try { recognition.start(); setIsListening(true); }
-    catch { setIsListening(false); setError("Impossible de démarrer le microphone."); }
+    recognitionShouldContinueRef.current = true;
+    try {
+      recognition.start();
+      setIsListening(true);
+      setError("");
+    } catch {
+      recognitionShouldContinueRef.current = false;
+      setIsListening(false);
+      setError("Impossible de démarrer le microphone. Vérifiez ses autorisations.");
+    }
   };
 
   const start = async () => {
@@ -256,10 +318,11 @@ export function NotebookDebatePanel({
             <div ref={turnsEndRef} />
           </div>
           {isActive && <div className="flex-shrink-0 border-t border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-3">
-            <div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-medium text-[var(--text-secondary)]">Intervenir dans le débat</span><span className="text-[10px] text-[var(--text-muted)]">{queuedIntervention ? "Intervention en attente de traitement" : "Votre question sera traitée au prochain tour"}</span></div>
+            <div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-medium text-[var(--text-secondary)]">{isListening ? "Vous pouvez parler aux deux IA" : "Intervenir dans le débat"}</span><span className="text-[10px] text-[var(--text-muted)]">{queuedIntervention ? "Intervention en attente de traitement" : isListening ? "Chaque phrase reconnue est envoyée automatiquement" : "Activez le micro pour une conversation vocale"}</span></div>
+            {interimSpeech && <p className="mb-2 text-xs text-[var(--notebook-accent)]" aria-live="polite">Vous : {interimSpeech}</p>}
             <div className="flex items-end gap-2">
-              <button type="button" onClick={toggleDictation} aria-label={isListening ? "Arrêter la dictée" : "Dicter une intervention"} title={isListening ? "Arrêter la dictée" : "Dicter une intervention"} className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border ${isListening ? "border-red-500 bg-red-500/10 text-red-500" : "border-[var(--notebook-border)] text-[var(--text-secondary)]"}`}>{isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button>
-              <textarea value={interventionText} onChange={event => setInterventionText(event.target.value.slice(0, 1200))} rows={2} maxLength={1200} placeholder="Posez une question aux deux IA… ou utilisez le microphone" className="min-h-[40px] max-h-24 min-w-0 flex-1 resize-y rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--notebook-accent)]" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendIntervention(); } }} />
+              <button type="button" onClick={toggleDictation} aria-label={isListening ? "Arrêter la dictée" : "Dicter une intervention"} title={isListening ? "Arrêter le mode conversation vocale" : "Parler aux deux IA"} aria-pressed={isListening} className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border ${isListening ? "border-red-500 bg-red-500/10 text-red-500" : "border-[var(--notebook-border)] text-[var(--text-secondary)]"}`}>{isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button>
+              <textarea value={interventionText} onChange={event => setInterventionText(event.target.value.slice(0, 1200))} rows={2} maxLength={1200} placeholder="Posez une question aux deux IA… ou parlez naturellement avec le micro" className="min-h-[40px] max-h-24 min-w-0 flex-1 resize-y rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--notebook-accent)]" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendIntervention(); } }} />
               <button type="button" disabled={!interventionText.trim()} onClick={sendIntervention} aria-label="Envoyer l’intervention" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--notebook-accent)] text-white disabled:opacity-40"><Send className="h-4 w-4" /></button>
             </div>
           </div>}
