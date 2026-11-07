@@ -6,7 +6,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
-import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X } from 'lucide-react';
+import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { SpringTransition } from '../motionTypes.js';
 import { NbButton, NbTextarea, NbSectionLabel, NbBadge } from '../ui/primitives.js';
@@ -60,8 +60,13 @@ export function DocTypePicker({
 }: Props) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [typeSearch, setTypeSearch] = useState('');
+  const [showOptions, setShowOptions] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchOpen = showSearch || !!typeSearch;
   const sourceFilterOn = showSourceFilter || selectedSourceIds.length > 0;
   const promptOn = showCustomPrompt || !!customInstructions.trim();
+  const optionsActive = selectedSourceIds.length > 0 || !!customInstructions.trim() || activeCategory !== 'all';
+  const optionsOpen = showOptions || optionsActive;
 
   const categories = [
     { key: 'all', label: 'Tout', description: 'Tous les formats disponibles' },
@@ -95,157 +100,212 @@ export function DocTypePicker({
 
   return (
     <>
-      {/* Quick config bar — chips à gauche, compteur de sources à droite */}
-      <div className="notebook-gen-configbar">
-        <div className="flex items-center gap-2">
-          {sources.length > 1 && (
-            <button
-              type="button"
-              onClick={() => setShowSourceFilter(!showSourceFilter)}
-              className={clsx(
-                'notebook-chip text-xs',
-                sourceFilterOn && 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]',
-              )}
-            >
-              <Filter className="h-3 w-3" aria-hidden />
-              {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowCustomPrompt(!showCustomPrompt)}
-            className={clsx(
-              'notebook-chip text-xs',
-              promptOn && 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
-            )}
-          >
-            <PenLine className="h-3 w-3" aria-hidden />
-            Prompt
-            {customInstructions.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
-          </button>
-        </div>
-
-        <span className="notebook-gen-configbar-count">
-          {sources.length} source{sources.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Source filter dropdown */}
-      <AnimatePresence>
-        {showSourceFilter && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={modalSpring}
-            className="overflow-hidden"
-          >
-            <div className="notebook-card space-y-1 rounded-xl p-2">
-              {sources.map(src => (
-                <label
-                  key={src.id}
-                  htmlFor={`doctype-src-${src.id}`}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--notebook-surface-muted)]"
-                >
-                  <input
-                    id={`doctype-src-${src.id}`}
-                    type="checkbox"
-                    checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
-                    onChange={() => toggleSourceSelection(src.id)}
-                    className="h-3 w-3 rounded accent-[var(--notebook-accent)]"
-                  />
-                  <span className="truncate text-xs text-[var(--text-primary)]">{src.title}</span>
-                </label>
-              ))}
-              {selectedSourceIds.length > 0 && (
-                <NbButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedSourceIds([])}
-                  className="w-full justify-start text-[var(--notebook-accent)]"
-                >
-                  Réinitialiser (toutes)
-                </NbButton>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Custom instructions dropdown */}
-      <AnimatePresence>
-        {showCustomPrompt && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={modalSpring}
-            className="overflow-hidden"
-          >
-            <NbTextarea
-              value={customInstructions}
-              onChange={e => setCustomInstructions(e.target.value)}
-              placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
-              rows={2}
-              className="text-xs"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Catalogue organisé par intention : recherche + filtres de catégories. */}
-      <section className="space-y-3" aria-labelledby="notebook-generation-title">
+      {/* Catalogue organisé par intention : titre + toggles (Options / recherche). */}
+      <section className="space-y-2" aria-labelledby="notebook-generation-title">
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <NbSectionLabel>Studio de création</NbSectionLabel>
-            <p id="notebook-generation-title" className="mt-1 text-xs text-[var(--text-muted)]">
-              Choisissez ce que vous souhaitez produire à partir de vos sources.
-            </p>
-          </div>
-          {activeGenerationIds.size > 0 && (
-            <NbBadge tone="accent" icon={Loader2} className="flex-shrink-0 [&>svg]:animate-spin">
-              {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
-            </NbBadge>
-          )}
-        </div>
-
-        <label className="flex items-center gap-2 rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-card-bg)] px-3 py-2.5 focus-within:border-[var(--notebook-accent)]">
-          <Search className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]" aria-hidden />
-          <input
-            type="search"
-            value={typeSearch}
-            onChange={(event) => setTypeSearch(event.target.value)}
-            placeholder="Rechercher un format..."
-            aria-label="Rechercher un format de génération"
-            className="min-w-0 flex-1 bg-transparent text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
-          />
-          {typeSearch && (
-            <button type="button" onClick={() => setTypeSearch('')} aria-label="Effacer la recherche" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-              <X className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          )}
-        </label>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Filtrer les formats par catégorie">
-          {categories.map((category) => (
+          <NbSectionLabel>Studio de création</NbSectionLabel>
+          <div className="flex items-center gap-1.5">
+            {activeGenerationIds.size > 0 && (
+              <NbBadge tone="accent" icon={Loader2} className="flex-shrink-0 [&>svg]:animate-spin">
+                {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
+              </NbBadge>
+            )}
             <button
-              key={category.key}
               type="button"
-              aria-pressed={activeCategory === category.key}
-              title={category.description}
-              onClick={() => setActiveCategory(category.key)}
+              onClick={() => setShowOptions(v => !v)}
+              aria-expanded={optionsOpen}
+              title="Options — sources, prompt, catégorie"
               className={clsx(
-                'flex-shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors',
-                activeCategory === category.key
+                'flex h-6 flex-shrink-0 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors',
+                optionsActive || optionsOpen
                   ? 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
-                  : 'border-[var(--notebook-border)] text-[var(--text-secondary)] hover:border-[var(--notebook-accent)] hover:text-[var(--text-primary)]',
+                  : 'border-[var(--notebook-border)] text-[var(--text-muted)] hover:border-[var(--notebook-accent)] hover:text-[var(--text-primary)]',
               )}
             >
-              {category.label}
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+              Options
+              {optionsActive && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setShowSearch(v => !v)}
+              aria-expanded={searchOpen}
+              aria-label="Rechercher un format"
+              title="Rechercher un format"
+              className={clsx(
+                'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border transition-colors',
+                searchOpen
+                  ? 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+                  : 'border-[var(--notebook-border)] text-[var(--text-muted)] hover:border-[var(--notebook-accent)] hover:text-[var(--text-primary)]',
+              )}
+            >
+              <Search className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
         </div>
+
+        {/* Options déployées — chips Sources / Prompt + filtre par catégorie */}
+        <AnimatePresence>
+          {optionsOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
+              className="overflow-hidden"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {sources.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSourceFilter(!showSourceFilter)}
+                      className={clsx(
+                        'notebook-chip text-xs',
+                        sourceFilterOn && 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]',
+                      )}
+                    >
+                      <Filter className="h-3 w-3" aria-hidden />
+                      {selectedSourceIds.length > 0 ? `${selectedSourceIds.length} src` : 'Sources'}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomPrompt(!showCustomPrompt)}
+                    className={clsx(
+                      'notebook-chip text-xs',
+                      promptOn && 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
+                    )}
+                  >
+                    <PenLine className="h-3 w-3" aria-hidden />
+                    Prompt
+                    {customInstructions.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />}
+                  </button>
+                </div>
+
+                {/* Filtre par catégorie — intégré dans les Options */}
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer les formats par catégorie">
+                  {categories.map((category) => (
+                    <button
+                      key={category.key}
+                      type="button"
+                      aria-pressed={activeCategory === category.key}
+                      title={category.description}
+                      onClick={() => setActiveCategory(category.key)}
+                      className={clsx(
+                        'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                        activeCategory === category.key
+                          ? 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+                          : 'border-[var(--notebook-border)] text-[var(--text-secondary)] hover:border-[var(--notebook-accent)] hover:text-[var(--text-primary)]',
+                      )}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Source filter dropdown */}
+        <AnimatePresence>
+          {optionsOpen && showSourceFilter && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
+              className="overflow-hidden"
+            >
+              <div className="notebook-card space-y-1 rounded-xl p-2">
+                {sources.map(src => (
+                  <label
+                    key={src.id}
+                    htmlFor={`doctype-src-${src.id}`}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--notebook-surface-muted)]"
+                  >
+                    <input
+                      id={`doctype-src-${src.id}`}
+                      type="checkbox"
+                      checked={selectedSourceIds.length === 0 || selectedSourceIds.includes(src.id)}
+                      onChange={() => toggleSourceSelection(src.id)}
+                      className="h-3 w-3 rounded accent-[var(--notebook-accent)]"
+                    />
+                    <span className="truncate text-xs text-[var(--text-primary)]">{src.title}</span>
+                  </label>
+                ))}
+                {selectedSourceIds.length > 0 && (
+                  <NbButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedSourceIds([])}
+                    className="w-full justify-start text-[var(--notebook-accent)]"
+                  >
+                    Réinitialiser (toutes)
+                  </NbButton>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom instructions dropdown */}
+        <AnimatePresence>
+          {optionsOpen && showCustomPrompt && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
+              className="overflow-hidden"
+            >
+              <NbTextarea
+                value={customInstructions}
+                onChange={e => setCustomInstructions(e.target.value)}
+                placeholder="Ex: Ton formel, focus technique, ajoute des exemples..."
+                rows={2}
+                className="text-xs"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={modalSpring}
+              className="overflow-hidden"
+            >
+              <label className="flex items-center gap-2 rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-card-bg)] px-2.5 py-1.5 focus-within:border-[var(--notebook-accent)]">
+                <Search className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)]" aria-hidden />
+                <input
+                  type="search"
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                  value={typeSearch}
+                  onChange={(event) => setTypeSearch(event.target.value)}
+                  placeholder="Rechercher un format..."
+                  aria-label="Rechercher un format de génération"
+                  className="min-w-0 flex-1 bg-transparent text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
+                />
+                {typeSearch ? (
+                  <button type="button" onClick={() => setTypeSearch('')} aria-label="Effacer la recherche" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setShowSearch(false)} aria-label="Fermer la recherche" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                )}
+              </label>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {(activeCategory === 'all' || activeCategory === 'explore') && (!typeSearch.trim() || ['rapports spécialisés', 'rapport complet', 'business plan', 'étude de marché', 'rapport technique', 'analyse concurrentielle', 'rapport financier', 'plan marketing', 'rapport produit', 'analyse des risques', 'synthèse exécutive', 'rapport de projet', 'analyse comparative', 'rapport de synthèse'].some((label) => label.includes(typeSearch.trim().toLocaleLowerCase('fr')) || typeSearch.trim().toLocaleLowerCase('fr').includes(label))) && (
           <button
@@ -268,7 +328,7 @@ export function DocTypePicker({
         )}
 
         {visibleTypes.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {visibleTypes.map(({ key, label, icon: Icon, desc, color, badge }) => {
               const isActive = [...activeGenerationIds].some(taskId => {
                 const task = generationQueue.find(t => t.id === taskId);
@@ -282,7 +342,7 @@ export function DocTypePicker({
                   onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
                   disabled={sources.length === 0}
                   whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
-                  className="notebook-studio-card notebook-gen-card group relative min-h-[92px] items-start disabled:pointer-events-none disabled:opacity-40"
+                  className="notebook-studio-card notebook-gen-card group relative items-center disabled:pointer-events-none disabled:opacity-40"
                   style={isActive ? { borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))` } : undefined}
                   title={desc}
                   aria-label={`${label} : ${desc}`}
@@ -290,9 +350,8 @@ export function DocTypePicker({
                   <span className="notebook-gen-card-icon" style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}>
                     {isActive ? <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden /> : <Icon className="h-4 w-4" style={{ color }} aria-hidden />}
                   </span>
-                  <span className="notebook-gen-card-label !flex-col !items-start !gap-0 !overflow-visible !whitespace-normal min-w-0 flex-1">
+                  <span className="notebook-gen-card-label min-w-0 flex-1">
                     <span className="notebook-gen-card-text">{label}</span>
-                    <span className="mt-1 line-clamp-2 text-[10px] font-normal leading-snug text-[var(--text-muted)]">{desc}</span>
                     {badge && <span className="notebook-gen-card-badge">{badge}</span>}
                   </span>
                   {isActive && (

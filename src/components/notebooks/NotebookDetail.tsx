@@ -48,7 +48,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
+type StudioTab = 'generate' | 'audio' | 'history';
 
 interface Props {
   notebookId: string;
@@ -246,6 +246,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   // léger 'notebook-generated-docs-changed'.
   const [generatedCount, setGeneratedCount] = useState(0);
   const [noteEditorData, setNoteEditorData] = useState<NoteEditorData | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   const { spring, fadeOnly } = useFluidTransition();
   const prefersReducedMotion = useReducedMotion();
 
@@ -354,12 +355,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
         if (e.key === '1') { e.preventDefault(); setSourceRailOpen(v => !v); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setShowIndexing(false); }
-        if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setNotesOpen(false); setShowIndexing(false); }
+        if (e.key === '3') { e.preventDefault(); setNotesOpen(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setShowIndexing(false); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
-        if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
+        if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setNotesOpen(false); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
         if (e.key === '0') {
           e.preventDefault();
@@ -406,12 +407,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
     { key: 'generate', icon: Sparkles, label: 'Générer', badge: generatedCount },
-    { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
-    { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
+    { key: 'audio', icon: Mic, label: 'Vocal', badge: notebook.audioOverviews.length },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
-    notes: 'Ctrl+3 / ⌘3',
     generate: 'Ctrl+4 / ⌘4',
     audio: 'Ctrl+5 / ⌘5',
     history: 'Ctrl+6 / ⌘6',
@@ -426,6 +425,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     setSelectedSourceId(null);
     setViewingGeneratedDoc(null);
     setNoteEditorData(null);
+    setNotesOpen(false);
     setShowIndexing(false);
   };
 
@@ -435,6 +435,16 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     setSelectedSourceId(null);
     setViewingGeneratedDoc(null);
     setNoteEditorData(null);
+    setNotesOpen(false);
+  };
+
+  /** Ouvre les notes dans la colonne centrale */
+  const openNotes = () => {
+    setNotesOpen(true);
+    setSelectedSourceId(null);
+    setViewingGeneratedDoc(null);
+    setNoteEditorData(null);
+    setShowIndexing(false);
   };
 
   const openStudioTab = (key: StudioTab) => {
@@ -446,9 +456,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
    *  This preserves component state (e.g. GeneratePanel queue) across tab switches. */
   const renderStudioPanels = () => (
     <>
-      <div role="tabpanel" id="studio-panel-notes" aria-labelledby="studio-tab-notes" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'notes' ? 'block' : 'none' }}>
-        <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />
-      </div>
       <div role="tabpanel" id="studio-panel-generate" aria-labelledby="studio-tab-generate" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'generate' ? 'block' : 'none' }}>
         <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
       </div>
@@ -523,6 +530,34 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       );
     }
 
+    // Notes — vue centrale ouverte depuis le header
+    if (notesOpen) {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="notebook-panel-header px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
+                <StickyNote className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h2 className="notebook-panel-title truncate">Notes</h2>
+                <p className="text-xs text-[var(--text-muted)]">{notebook.notes.length} note{notebook.notes.length > 1 ? 's' : ''}</p>
+              </div>
+            </div>
+            <NbIconButton icon={X} label="Fermer les notes" onClick={() => setNotesOpen(false)} />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <NotesPanel
+              notebookId={notebookId}
+              notes={notebook.notes}
+              onRefresh={loadNotebook}
+              onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }}
+            />
+          </div>
+        </div>
+      );
+    }
+
     if (activeTab === 'sources') {
       return (
         <SourcePanel
@@ -586,6 +621,13 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <div className="flex items-center gap-2">
             <NbIconButton icon={ArrowLeft} label="Retour aux notebooks" onClick={onBack} className="transition-transform active:scale-90" />
             <div className="hidden md:flex"><NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} /></div>
+            <NbIconButton
+              icon={StickyNote}
+              label={`Notes${notebook.notes.length ? ` (${notebook.notes.length})` : ''}`}
+              onClick={() => (notesOpen ? setNotesOpen(false) : openNotes())}
+              className="transition-transform active:scale-90"
+              data-active={notesOpen}
+            />
             <NbIconButton
               icon={focusMode ? Minimize2 : Maximize2}
               label={focusMode ? 'Quitter le mode Focus (Ctrl+0 / ⌘0)' : 'Activer le mode Focus (Ctrl+0 / ⌘0)'}
@@ -709,7 +751,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <main className="notebook-panel notebook-main min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
-              key={showIndexing ? 'indexing' : selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : activeTab)}
+              key={showIndexing ? 'indexing' : selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : notesOpen ? 'notes' : activeTab)}
               {...centerMotion}
               transition={spring}
               className="h-full"
@@ -806,16 +848,11 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                         <span className="notebook-studio-tab-inner">
                           <Icon className="h-4 w-4 flex-shrink-0" aria-hidden />
                           <span className="notebook-studio-tab-label">{label}</span>
-                          {/* Compteur visible uniquement sur l'onglet actif (élargi) ;
-                              un point discret signale une activité sur les onglets inactifs. */}
+                          {/* Compteur visible sur tous les onglets de la barre segmentée */}
                           {badge !== undefined && badge > 0 && (
-                            isActive ? (
-                              <span className="notebook-studio-tab-badge" data-active>
-                                {badge > 99 ? '99+' : badge}
-                              </span>
-                            ) : (
-                              <span className="notebook-studio-tab-dot" aria-hidden />
-                            )
+                            <span className="notebook-studio-tab-badge" data-active={isActive || undefined}>
+                              {badge > 99 ? '99+' : badge}
+                            </span>
                           )}
                         </span>
                       </button>
@@ -827,22 +864,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               {/* Tous les panneaux restent montés ; les inactifs sont masqués (display:none) */}
               <div className="min-h-0 flex-1 overflow-hidden">
                 {renderStudioPanels()}
-              </div>
-
-              {/* Action persistante — Ajouter une note (centrée en bas du Studio) */}
-              <div className="flex-shrink-0 border-t border-[var(--notebook-border)] p-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNoteEditorData({ title: '', content: '' });
-                    setSelectedSourceId(null);
-                    setViewingGeneratedDoc(null);
-                  }}
-                  className="notebook-studio-addnote"
-                >
-                  <StickyNote className="h-4 w-4 flex-shrink-0" aria-hidden />
-                  <span>Ajouter une note</span>
-                </button>
               </div>
             </>
           ) : (

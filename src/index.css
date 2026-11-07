@@ -2417,9 +2417,9 @@ button {
 .notebook-studio-tab {
   position: relative;
   display: inline-flex;
-  /* Onglets inactifs : largeur fixe (icône seule). Actif : s'étend. */
-  flex: 0 0 auto;
-  min-width: 38px;
+  /* Tous les onglets partagent l'espace à parts égales — labels toujours visibles. */
+  flex: 1 1 0;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -2430,11 +2430,10 @@ button {
   color: var(--text-muted);
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.18s ease, flex-grow 0.25s ease, background-color 0.18s ease;
+  transition: color 0.18s ease, background-color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .notebook-studio-tab[data-active="true"] {
-  flex: 1 1 auto;
   color: var(--notebook-accent);
 }
 .notebook-studio-tab:focus-visible {
@@ -2469,19 +2468,15 @@ button {
   gap: 6px;
   padding: 0 8px;
 }
-/* Le label n'apparaît que sur l'onglet actif */
+/* Label visible sur tous les onglets (barre segmentée à 3 éléments) */
 .notebook-studio-tab-label {
-  display: none;
+  display: inline;
   overflow: hidden;
-  max-width: 0;
+  max-width: 120px;
   font-size: 12.5px;
   line-height: 1;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-.notebook-studio-tab[data-active="true"] .notebook-studio-tab-label {
-  display: inline;
-  max-width: 120px;
 }
 .notebook-studio-tab-badge {
   display: inline-flex;
@@ -2501,17 +2496,6 @@ button {
 .notebook-studio-tab-badge[data-active="true"] {
   background: var(--notebook-accent-surface);
   color: var(--notebook-accent);
-}
-/* Onglet inactif avec activité : point discret en haut à droite de l'icône */
-.notebook-studio-tab-dot {
-  position: absolute;
-  top: 5px;
-  right: 7px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--notebook-accent);
-  box-shadow: 0 0 0 2px var(--notebook-surface-muted);
 }
 
 /* Primary action button (small) */
@@ -2630,7 +2614,7 @@ button {
   border-radius: var(--premium-card-radius, var(--notebook-radius-lg));
   background: var(--notebook-card-bg);
   border: 1px solid var(--notebook-border);
-  padding: 16px;
+  padding: 12px;
   cursor: pointer;
   box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0,0,0,0.15));
   transition: all 0.2s ease;
@@ -2648,8 +2632,8 @@ button {
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 8px 10px;
   text-align: left;
   border-radius: var(--notebook-radius-lg);
 }
@@ -2658,9 +2642,9 @@ button {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
 }
 .notebook-gen-card-label {
   display: inline-flex;
@@ -2669,7 +2653,7 @@ button {
   align-items: center;
   gap: 6px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   line-height: 1.25;
   color: var(--text-primary);
@@ -2705,7 +2689,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px 6px 6px;
+  padding: 4px 8px 4px 5px;
   border-radius: var(--notebook-radius-lg);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -2740,39 +2724,6 @@ button {
 }
 
 /* ── Bouton « Ajouter une note » — pilule centrée en bas du Studio ── */
-.notebook-studio-addnote {
-  display: flex;
-  width: fit-content;
-  margin-inline: auto;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px 20px;
-  border-radius: var(--notebook-radius-pill);
-  background: var(--notebook-surface-elevated);
-  border: 1px solid var(--notebook-border);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: var(--notebook-shadow-sm, 0 1px 4px rgba(0, 0, 0, 0.15));
-  transition: background-color 0.18s ease, border-color 0.18s ease,
-              transform 0.12s ease, box-shadow 0.2s ease;
-}
-.notebook-studio-addnote:hover {
-  border-color: var(--notebook-accent);
-  color: var(--notebook-accent);
-  transform: translateY(-1px);
-  box-shadow: var(--notebook-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.22));
-}
-.notebook-studio-addnote:active {
-  transform: scale(0.97);
-}
-.notebook-studio-addnote:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
-}
-
 /* Chat message bubbles — NotebookLM style */
 .notebook-chat-message {
   border-radius: var(--notebook-radius-lg);
