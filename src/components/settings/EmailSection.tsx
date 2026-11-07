@@ -56,7 +56,7 @@ export function EmailSection() {
       if (!response.ok || data.status !== "success") throw new Error(data.error || "Connexion e-mail impossible.");
       setSettings(data.data);
       setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: "" } }));
-      setFeedback({ type: "success", message: `Compte ${id === "leanna" ? "Leanna" : "personnel"} connecté en ${id === "leanna" ? "IMAP/SMTP personnalisé" : "Gmail"}. Les identifiants sont chiffrés localement.` });
+      setFeedback({ type: "success", message: `Compte ${id === "leanna" ? "Leanna" : "personnel"} connecté en ${id === "leanna" ? (servers.receiveEnabled && servers.sendEnabled ? "réception + envoi" : servers.receiveEnabled ? "réception seule" : "envoi seul") : "Gmail"}. Les identifiants sont chiffrés localement.` });
     } catch (error) {
       setFeedback({ type: "error", message: (error as Error).message });
     } finally {
@@ -114,7 +114,10 @@ export function EmailSection() {
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{description}</p>
         {account?.connected && (
           <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="break-all text-xs font-mono" style={{ color: "var(--color-success, #16a34a)" }}>{account.email}</span>
+            <div className="min-w-0">
+              <span className="break-all text-xs font-mono" style={{ color: "var(--color-success, #16a34a)" }}>{account.email}</span>
+              {id === "leanna" && <span className="mt-1 block text-[11px]" style={{ color: "var(--text-muted)" }}>{account.servers?.receiveEnabled && account.servers?.sendEnabled ? "Réception + envoi actifs" : account.servers?.receiveEnabled ? "Réception seule" : account.servers?.sendEnabled ? "Envoi seul" : "Aucune capacité active"}</span>}
+            </div>
             <button type="button" disabled={!!busy} onClick={() => void disconnect(id)} className="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
               <Unlink size={14} /> Déconnecter
             </button>
