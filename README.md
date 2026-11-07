@@ -118,7 +118,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 | 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | ✅ | [Vérification & récupération](#-vérification-et-récupération) |
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
 | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
-| 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) |
+| 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) • [Veille & réveil](#-veille-et-réveil-vocal) |
 | 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
 
@@ -230,7 +230,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | Domaine | Capacités | Statut |
 |---|---|:---:|
 | **Noyau transactionnel** | Machine à états durable, ledger d'idempotence, checkpoints snapshot/rollback, moteur de preuve, superviseur unique | ✅ |
-| **Interaction IA** | Chat, sélection de modèle, Live audio, visibilité des tokens, tâches en arrière-plan | ✅ |
+| **Interaction IA** | Chat, sélection de modèle, Live audio, veille automatique + réveil par « Leanna » (hors ligne), visibilité des tokens, tâches en arrière-plan | ✅ |
 | **Ingénierie logicielle** | Inspecter/lire/modifier le code, analyser dépendances, vérifier, Git/GitHub, terminal contrôlé, audits de sécurité | ✅ |
 | **Exécution autonome** | Missions, planification, multi-étapes, suivi d'état, vérification, récupération, budgets bornés | ✅ |
 | **Multi-agents** | 20 rôles statiques + rôles dynamiques, orchestration, délégation, swarm, contract-net | ✅ |
@@ -1705,6 +1705,29 @@ sur le lexical ; si le re-ranking échoue, l'ordre de fusion RRF est conservé.
 
 <br>
 
+## 😴 Veille et réveil vocal
+
+La session vocale principale peut rester ouverte en permanence. Sans activité,
+Leanna passe en **veille** ; dire **« Leanna »** la réveille, sans clic.
+
+| Aspect | Comportement |
+|---|---|
+| **Mise en veille** | Après N s sans activité (réglable 5–300 s). Comptent comme activité : la voix au-dessus du seuil VAD, la lecture audio de Leanna, un outil en cours, un message texte envoyé. |
+| **Pendant la veille** | La session Gemini reste ouverte mais **aucun audio ne lui est envoyé** (aucun token consommé). Le micro alimente uniquement le détecteur local. La veille survit aux reconnexions GoAway. |
+| **Réveil** | Détection hors ligne (Vosk WASM, `vosk-browser`, grammaire restreinte). Un son confirme le réveil et les ~1,5 s précédentes sont rejouées à Gemini : « Leanna, ouvre X » passe d'une traite. Un clic sur l'orbe endormie réveille aussi. |
+| **Interface** | Orbe « EN VEILLE », mascotte endormie, sous-titre « dis « Leanna » pour me réveiller ». |
+| **Réglages** | *Réglages → Comportement* : « Veille automatique », « Délai avant veille », « Réveil par le nom ». |
+
+Le modèle français (`vosk-model-small-fr-0.22`, ~41 Mo, Apache-2.0) n'est **pas
+versionné** : voir [Installation](#cloner--installer). Sans lui, le réveil se fait
+uniquement par clic. Implémentation : `src/hooks/useAudio.ts`, `src/lib/wakeWord.ts`.
+
+> « Leanna » n'existe pas dans le vocabulaire du petit modèle : la grammaire utilise
+> des voisins phonétiques (`léna`, `lina`, `liana`…). Liste ajustable dans
+> `src/lib/wakeWord.ts`.
+
+<br>
+
 ## 🎙️ Assistant vocal du notebook
 
 Leanna dispose d'un **second assistant vocal live**, indépendant de l'assistant
@@ -1822,6 +1845,19 @@ les déclarations envoyées au modèle et re-synchronisés à chaque (dé)connex
 une **file d'approbation interactive** : `pendingApprovals` (Map), des boutons
 inline Approuver / Refuser, un handler `callback_query` qui résout la décision
 (`onDecision`), et une protection contre les double-clics.
+
+Le bot sert aussi de **télécommande** (menu de commandes enregistré via `setMyCommands`) :
+
+| Catégorie | Commandes |
+|---|---|
+| Démarrage & diagnostic | `/start`, `/help`, `/status`, `/health`, `/ping` |
+| Projet & Git (lecture seule) | `/project`, `/git` |
+| Missions autonomes | `/agent`, `/tasks`, `/task`, `/recent`, `/cancel` |
+| Workspace | `/ls`, `/read`, `/cmd` (commandes autorisées uniquement) |
+| Conversation | `/clear` |
+
+Le comportement de Leanna côté Telegram est décrit par la section de prompt
+`server/runtime/prompts/telegram.md` (active en mode `full`).
 
 ```env
 TELEGRAM_BOT_TOKEN=""
@@ -2009,6 +2045,16 @@ fonctionnalités backend persistantes.
 git clone https://github.com/moonback/Jarvis-os-original.git
 cd Jarvis-os-original
 npm install
+```
+
+**Optionnel — réveil vocal par « Leanna »** : téléchargez
+[`vosk-model-small-fr-0.22.zip`](https://alphacephei.com/vosk/models) (~41 Mo),
+décompressez-le, puis reconditionnez-le en `.tar.gz` (format exigé par `vosk-browser`) :
+
+```bash
+unzip vosk-model-small-fr-0.22.zip
+mkdir -p public/models
+tar -czf public/models/vosk-model-small-fr.tar.gz vosk-model-small-fr-0.22
 ```
 
 > Le dépôt distant actuel est `moonback/Jarvis-os-original` (remote `origin`). Le
