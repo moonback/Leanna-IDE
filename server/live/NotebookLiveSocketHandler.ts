@@ -171,6 +171,10 @@ export function attachNotebookLiveWebSocket(
   wss.on('connection', async (clientWs: WebSocket, req: { url?: string }) => {
     const urlParams = new URLSearchParams(req.url?.split('?')[1] || '');
     const notebookId = urlParams.get('notebookId') || '';
+    const mode = urlParams.get('mode') === 'podcast' ? 'podcast' : 'assistant';
+    const hostName = (urlParams.get('hostName') || 'Leanna').replace(/[:\r\n]/g, '').trim().slice(0, 32) || 'Leanna';
+    const coHostName = (urlParams.get('coHostName') || 'Noah').replace(/[:\r\n]/g, '').trim().slice(0, 32) || 'Noah';
+    const coHostPersonality = (urlParams.get('coHostPersonality') || 'Analytique et curieux.').slice(0, 600);
     const sourcesCsv = urlParams.get('sources') || '';
     const requestedSourceIds = sourcesCsv
       ? sourcesCsv.split(',').map(s => s.trim()).filter(Boolean)
@@ -224,9 +228,12 @@ export function attachNotebookLiveWebSocket(
     const temperature = profile.temperature ?? 0.6;
 
     const sourceTitles = notebook.sources.map(s => `- ${s.title}`).join('\n') || '(aucune source)';
+    const podcastInstructions = mode === 'podcast'
+      ? `\n\n═══ MODE PODCAST INTERACTIF ═══\nTu es ${hostName}, la présentatrice IA Leanna. Tu reprends le fil du podcast et réponds directement aux interventions de l'utilisateur.\nTon co-animateur s'appelle ${coHostName} : ${coHostPersonality}\nFais vivre un échange naturel entre ces deux points de vue : tu peux formuler brièvement une remarque ou une question de ${coHostName}, puis y répondre en tant que ${hostName}. Ne prétends jamais que deux flux vocaux ou deux voix distinctes sont actifs : cette session Live utilise une seule voix de synthèse.\nReste ancré dans les sources du notebook, utilise les outils de recherche avant toute affirmation factuelle sur celles-ci et cite les sources. L'utilisateur peut t'interrompre à tout moment ; écoute sa question et reprends ensuite le sujet.`
+      : '';
     const systemText =
       `${notebookPromptStore.render("voice.system")}\n\n` +
-      `═══ SOURCES DISPONIBLES DANS CE NOTEBOOK ═══\n${sourceTitles}`;
+      `═══ SOURCES DISPONIBLES DANS CE NOTEBOOK ═══\n${sourceTitles}` + podcastInstructions;
 
     let session: Awaited<ReturnType<GoogleGenAI['live']['connect']>> | null = null;
     let closed = false;
