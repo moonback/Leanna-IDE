@@ -10,6 +10,7 @@ type EmailConfig = {
   clientId: string;
   clientSecret: string;
   accounts: Partial<Record<GmailAccountId, StoredAccount>>;
+  personalSendEnabled: boolean;
 };
 type OAuthState = { account: GmailAccountId; expiresAt: number };
 
@@ -20,7 +21,7 @@ const SCOPES = [
 const MAX_MESSAGE_BYTES = 20 * 1024 * 1024;
 
 export class GmailService {
-  private config: EmailConfig = { clientId: "", clientSecret: "", accounts: {} };
+  private config: EmailConfig = { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
   private pendingStates = new Map<string, OAuthState>();
 
   constructor() {
@@ -34,7 +35,7 @@ export class GmailService {
 
   private loadConfig(): EmailConfig {
     try {
-      if (!fs.existsSync(this.configPath)) return { clientId: "", clientSecret: "", accounts: {} };
+      if (!fs.existsSync(this.configPath)) return { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
       const data = JSON.parse(fs.readFileSync(this.configPath, "utf8"));
       const accounts: EmailConfig["accounts"] = {};
       for (const id of ["leanna", "personal"] as const) {
@@ -53,7 +54,7 @@ export class GmailService {
       };
     } catch (error) {
       console.warn("[Gmail] Configuration locale illisible; intégration désactivée.");
-      return { clientId: "", clientSecret: "", accounts: {} };
+      return { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
     }
   }
 
@@ -68,6 +69,7 @@ export class GmailService {
       clientId: this.config.clientId,
       clientSecret: this.config.clientSecret ? encrypt(this.config.clientSecret) : "",
       accounts,
+      personalSendEnabled: data.personalSendEnabled === true,
     };
     const temp = this.configPath + ".tmp";
     fs.writeFileSync(temp, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 });
@@ -80,6 +82,7 @@ export class GmailService {
       configured: Boolean(this.config.clientId && this.config.clientSecret),
       clientId: this.config.clientId,
       hasClientSecret: Boolean(this.config.clientSecret),
+      personalSendEnabled: this.config.personalSendEnabled,
       redirectUri: this.redirectUri,
       accounts: {
         leanna: this.accountStatus("leanna"),
@@ -170,6 +173,11 @@ export class GmailService {
     return { account: pending.account, email: profile.emailAddress };
   }
 
+  setPersonalSendEnabled(enabled: boolean): void {
+    this.config.personalSendEnabled = enabled;
+    this.persist();
+  }
+
   disconnect(account: GmailAccountId): void {
     delete this.config.accounts[account];
     this.persist();
@@ -244,6 +252,9 @@ export class GmailService {
   }
 
   async sendMessage(account: GmailAccountId, to: string, subject: string, body: string, cc = "") {
+    if (account === "personal" && !this.config.personalSendEnabled) {
+      throw new Error("Envoi depuis le compte personnel désactivé. Activez cette autorisation dans Paramètres > E-mail.");
+    }
     const recipient = to.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");
