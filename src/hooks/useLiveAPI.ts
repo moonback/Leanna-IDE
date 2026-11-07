@@ -248,6 +248,11 @@ export function useLiveAPI() {
       autoMuteTimeout: profile.autoMuteTimeout,
       isBusy,
       wakeWordEnabled: profile.wakeWordEnabled,
+      wakeStrictness: {
+        minConfidence: profile.wakeMinConfidence,
+        minDurationSec: profile.wakeMinDurationMs / 1000,
+        maxWordIndex: profile.wakeMaxWordIndex,
+      },
       vadEnabled: profile.vadEnabled,
       vadThreshold: profile.vadThreshold,
       vadSilenceDuration: profile.vadSilenceDuration,

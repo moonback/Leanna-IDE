@@ -80,6 +80,58 @@ export function BehaviorSection() {
                   hint={profile.wakeWordEnabled ? 'Dites « Leanna »' : 'Réveil par clic uniquement'}
                 />
               </Field>
+              <AnimatePresence initial={false}>
+                {profile.wakeWordEnabled && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ overflow: 'hidden' }}
+                    className="flex flex-col gap-4"
+                  >
+                    <Field
+                      label="Certitude requise"
+                      hint="Plus haut = moins de réveils intempestifs en conversation, mais il faut bien articuler « Leanna »"
+                    >
+                      <RangeSlider
+                        value={Math.round(profile.wakeMinConfidence * 100)}
+                        onChange={v => setField('wakeMinConfidence', v / 100)}
+                        min={50}
+                        max={99}
+                        step={1}
+                        format={v => `${v} %`}
+                      />
+                    </Field>
+                    <Field
+                      label="Durée minimale du nom"
+                      hint="Ignore les mots trop brefs (« là », « Léa ») confondus avec « Leanna » (100–800 ms)"
+                    >
+                      <RangeSlider
+                        value={profile.wakeMinDurationMs}
+                        onChange={v => setField('wakeMinDurationMs', v)}
+                        min={100}
+                        max={800}
+                        step={25}
+                        format={v => `${v} ms`}
+                      />
+                    </Field>
+                    <Field
+                      label="Position du nom dans la phrase"
+                      hint="Le nom doit être parmi les premiers mots, comme quand on interpelle quelqu'un"
+                    >
+                      <RangeSlider
+                        value={profile.wakeMaxWordIndex}
+                        onChange={v => setField('wakeMaxWordIndex', v)}
+                        min={0}
+                        max={3}
+                        step={1}
+                        format={v => (v === 0 ? '1er mot' : `${v + 1} premiers mots`)}
+                      />
+                    </Field>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>

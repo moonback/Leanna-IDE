@@ -77,6 +77,9 @@ export interface UserProfile {
   // Auto Mute
   autoMuteEnabled: boolean;   // Activer la veille automatique sur inactivité
   wakeWordEnabled: boolean;   // En veille, se réveiller en entendant « Leanna »
+  wakeMinConfidence: number;  // Confiance minimale de la reconnaissance du nom (0.5-0.99)
+  wakeMinDurationMs: number;  // Durée minimale du nom prononcé en ms (100-800)
+  wakeMaxWordIndex: number;   // Position max du nom dans la phrase (0 = 1er mot, 3 = 4e mot)
   autoMuteTimeout: number;    // Délai en secondes avant muet auto (5-300)
   // VAD (Voice Activity Detection)
   vadEnabled: boolean;        // Activer la détection de voix (économie bande passante)
@@ -130,7 +133,10 @@ const DEFAULT_PROFILE: UserProfile = {
   // Auto Mute
   autoMuteEnabled: false,   // Désactivé par défaut
   wakeWordEnabled: true,    // Activé par défaut
-  autoMuteTimeout: 40,     // 40 secondes par défaut
+  wakeMinConfidence: 0.8,   // Mêmes valeurs que DEFAULT_WAKE_STRICTNESS (lib/wakeWord.ts)
+  wakeMinDurationMs: 300,
+  wakeMaxWordIndex: 1,      // Nom en 1re ou 2e position (« Leanna, … » / « Dis Leanna… »)
+  autoMuteTimeout: 40,    // 40 secondes par défaut
   // VAD (Voice Activity Detection)
   vadEnabled: true,        // Activé par défaut (économie bande passante)
   vadThreshold: 35,        // Seuil d'amplitude optimal pour la voix humaine

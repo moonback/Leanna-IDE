@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { preloadWakeModel, startWakeWordListener, type WakeWordListener } from '../lib/wakeWord.js';
+import {
+  preloadWakeModel, startWakeWordListener, DEFAULT_WAKE_STRICTNESS,
+  type WakeWordListener, type WakeStrictness,
+} from '../lib/wakeWord.js';
 import { playSessionStartSound } from '../lib/sound.js';
 import {
   computeNoiseProfile, createSpeechGate, loadNoiseProfile, saveNoiseProfile,
@@ -22,8 +25,10 @@ function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
 // FRAME_SIZE (2048, comme l'ancien buffer) et les poste au thread principal.
 // Défini en Blob inline pour éviter toute configuration de bundling (Vite/Electron).
 const CAPTURE_FRAME_SIZE = 2048;
-// 12 × 2048 échantillons à 16 kHz ≈ 1,5 s rejouées à Gemini après le réveil.
-const PREROLL_FRAMES = 12;
+// 32 × 2048 échantillons à 16 kHz ≈ 4 s rejouées à Gemini après le réveil.
+// Le réveil n'a lieu qu'en fin d'énoncé (résultat final Vosk) : le préroll doit
+// couvrir toute la phrase « Leanna, ouvre… » pour que la commande ne soit pas perdue.
+const PREROLL_FRAMES = 32;
 const AUDIO_WORKLET_SOURCE = `
 class CaptureProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -69,6 +74,8 @@ export interface UseAudioOptions {
   isBusy?: boolean;
   /** En veille, écoute le nom « Leanna » pour se réveiller. */
   wakeWordEnabled?: boolean;
+  /** Exigences sur le nom reconnu (confiance, durée, position) contre les faux réveils. */
+  wakeStrictness?: WakeStrictness;
   vadEnabled?: boolean;      // Voice Activity Detection
   vadThreshold?: number;     // Amplitude minimum pour détecter la voix (0-100)
   vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
@@ -93,6 +100,7 @@ export function useAudio({
   autoMuteTimeout = 40,
   isBusy = false,
   wakeWordEnabled = true,
+  wakeStrictness = DEFAULT_WAKE_STRICTNESS,
   vadEnabled = true,
   vadThreshold = 35,
   vadSilenceDuration = 800,
@@ -113,6 +121,9 @@ export function useAudio({
   const prerollRef = useRef<Float32Array[]>([]); // ~1,5 s d'audio avant le réveil
   const onAudioDataRef = useRef(onAudioData);
   onAudioDataRef.current = onAudioData;
+  // Lu à chaque résultat Vosk : un réglage modifié s'applique sans relancer l'écoute.
+  const wakeStrictnessRef = useRef(wakeStrictness);
+  wakeStrictnessRef.current = wakeStrictness;
 
   // VAD (Voice Activity Detection) refs
   const vadSilenceStartRef = useRef<number | null>(null);
@@ -222,7 +233,7 @@ export function useAudio({
       // Rejoue le début de la phrase (« Leanna, ouvre… ») pour Gemini.
       for (const frame of prerollRef.current) onAudioDataRef.current(floatToPcm16(frame));
       prerollRef.current = [];
-    })
+    }, () => wakeStrictnessRef.current)
       .then((listener) => {
         setWakeWordFailed(false);
         if (cancelled) listener.stop();
