@@ -260,7 +260,7 @@ export class GmailService {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");
     const ccValue = cc.trim();
-    if (ccValue && (/[\\r\\n]/.test(ccValue) || !ccValue.split(",").every(value => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value.trim())))) {
+    if (ccValue && (/[\r\n]/.test(ccValue) || !ccValue.split(",").every(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())))) {
       throw new Error("Adresse Cc invalide.");
     }
     const rawMessage = [
