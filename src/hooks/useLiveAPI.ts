@@ -642,6 +642,7 @@ export function useLiveAPI() {
     updatePromptContext,
     clearTokenUsage,
     recordLatency,
+    addLog,
   ]);
 
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
