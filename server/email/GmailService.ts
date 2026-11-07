@@ -41,14 +41,14 @@ export function validateServerSettings(value: unknown): MailServerSettings {
   const sendEnabled = v.sendEnabled !== false;
   if (!receiveEnabled && !sendEnabled) throw new Error("Activez au moins la réception ou l'envoi des e-mails.");
   const host = (input: unknown, label: string, enabled: boolean) => {
-    if (!enabled && (input === undefined || input === null || input === "")) return "";
+    if (!enabled) return "";
     if (typeof input !== "string" || input.length > 253 || !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(input) || input.includes("..")) throw new Error(`Nom d'hôte ${label} invalide.`);
     const normalized = input.toLowerCase();
     if (isIP(normalized) !== 0 || ["localhost", "localhost.localdomain"].includes(normalized) || /\.(local|internal|localhost|test|invalid)$/.test(normalized)) throw new Error("Les adresses IP littérales et les hôtes locaux ou réservés ne sont pas autorisés.");
     return normalized;
   };
   const port = (input: unknown, label: string, enabled: boolean, fallback: number) => {
-    if (!enabled && (input === undefined || input === null || input === "")) return fallback;
+    if (!enabled) return fallback;
     if (!Number.isInteger(input) || Number(input) < 1 || Number(input) > 65535) throw new Error(`Port ${label} invalide.`);
     return Number(input);
   };
