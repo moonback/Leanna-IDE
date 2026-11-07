@@ -39,7 +39,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 &nbsp;
 <img src="https://img.shields.io/badge/outils%20agent-runtime%20(builtin%2BMCP%2Bcustom)-38BDF8?style=for-the-badge" alt="Outils agent" />
 &nbsp;
-<img src="https://img.shields.io/badge/version-2.2.0-A78BFA?style=for-the-badge" alt="Version" />
+<img src="https://img.shields.io/badge/version-2.3.0-A78BFA?style=for-the-badge" alt="Version" />
 
 <br>
 
@@ -2290,5 +2290,5 @@ fichier `LICENSE` pour les termes complets.
 <br>
 
 <div align="center">
-<sub>Leanna · v2.2.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
+<sub>Leanna · v2.3.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
 </div>
