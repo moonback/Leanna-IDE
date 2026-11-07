@@ -179,10 +179,10 @@ export function EmailSection() {
       <Section id="gmail-imap-smtp" icon={Mail} title="Messagerie e-mail" description="Compte dédié de Leanna configurable avec n'importe quel fournisseur compatible IMAP/SMTP, sans OAuth2.">
         <div className="rounded-xl border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
           <ShieldCheck size={15} className="mr-2 inline" />
-          IMAP/SMTP avec TLS obligatoire (TLS 1.2 minimum). Les mots de passe sont chiffrés localement, jamais renvoyés à l'interface ni transmis aux agents. La connexion vérifie IMAP et SMTP avant d'enregistrer le compte.
+          IMAP/SMTP avec TLS obligatoire (TLS 1.2 minimum). Les mots de passe sont chiffrés localement, jamais renvoyés à l'interface ni transmis aux agents. La connexion vérifie uniquement les protocoles activés avant d'enregistrer le compte.
         </div>
         <div className="rounded-lg border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
-          Renseignez les paramètres IMAP/SMTP fournis par votre hébergeur. IMAP et SMTP imposent SSL/TLS ou STARTTLS. Utilisez l'adresse complète comme identifiant. Leanna vérifie les deux connexions avant d'enregistrer la configuration.
+          Choisissez la réception (IMAP), l'envoi (SMTP), ou les deux. Seuls les paramètres du mode activé sont requis. Chaque protocole activé impose SSL/TLS ou STARTTLS. Utilisez l'adresse complète comme identifiant.
         </div>
         {accountCard("leanna", "Compte dédié de Leanna", "Boîte utilisée par défaut pour consulter et envoyer les e-mails. Chaque envoi exige une confirmation explicite.")}
         <SectionDivider label="Compte personnel — inchangé" />
