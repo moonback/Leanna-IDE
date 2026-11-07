@@ -22,8 +22,10 @@ function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
 // FRAME_SIZE (2048, comme l'ancien buffer) et les poste au thread principal.
 // Défini en Blob inline pour éviter toute configuration de bundling (Vite/Electron).
 const CAPTURE_FRAME_SIZE = 2048;
-// 12 × 2048 échantillons à 16 kHz ≈ 1,5 s rejouées à Gemini après le réveil.
-const PREROLL_FRAMES = 12;
+// 32 × 2048 échantillons à 16 kHz ≈ 4 s rejouées à Gemini après le réveil.
+// Le réveil n'a lieu qu'en fin d'énoncé (résultat final Vosk) : le préroll doit
+// couvrir toute la phrase « Leanna, ouvre… » pour que la commande ne soit pas perdue.
+const PREROLL_FRAMES = 32;
 const AUDIO_WORKLET_SOURCE = `
 class CaptureProcessor extends AudioWorkletProcessor {
   constructor() {
