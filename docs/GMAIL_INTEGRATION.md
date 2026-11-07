@@ -14,14 +14,14 @@ Renseigner les paramètres communiqués par l'hébergeur :
 |---|---|
 | Hôte IMAP | Nom DNS du serveur entrant |
 | Port IMAP | Port TCP entre 1 et 65535 |
-| Sécurité IMAP | SSL/TLS obligatoire |
+| Sécurité IMAP | SSL/TLS implicite ou STARTTLS obligatoire |
 | Hôte SMTP | Nom DNS du serveur sortant |
 | Port SMTP | Port TCP entre 1 et 65535 |
 | Sécurité SMTP | SSL/TLS implicite ou STARTTLS obligatoire |
 | Identifiant | Adresse e-mail complète |
 | Mot de passe | Mot de passe de la boîte ou mot de passe dédié |
 
-Ports courants : IMAP 993 en SSL/TLS ; SMTP 465 en SSL/TLS ou 587 en STARTTLS. Les valeurs exactes dépendent du fournisseur.
+Ports courants : IMAP 993 en SSL/TLS ou 143 en STARTTLS ; SMTP 465 en SSL/TLS ou 587 en STARTTLS. Les valeurs exactes dépendent du fournisseur.
 
 ### Exemple Infomaniak
 
@@ -36,7 +36,7 @@ Documentation : https://www.infomaniak.com/fr/support/faq/468
 
 1. Ouvrir **Paramètres > E-mail**.
 2. Dans le compte dédié de Leanna, renseigner les hôtes et ports IMAP/SMTP fournis par le fournisseur.
-3. Choisir SSL/TLS ou STARTTLS pour SMTP. IMAP impose SSL/TLS.
+3. Choisir SSL/TLS ou STARTTLS pour IMAP et SMTP. Leanna exige une négociation TLS dans les deux cas.
 4. Saisir l'adresse complète et le mot de passe.
 5. Cliquer sur **Connecter le compte**.
 
@@ -50,7 +50,7 @@ Le service vérifie la connexion IMAP et l'accès à INBOX, puis vérifie SMTP. 
 - Les configurations historiques Infomaniak sont migrées vers les paramètres IMAP/SMTP personnalisés correspondants. Les anciennes configurations Gmail de Leanna sont reprises comme point de départ modifiable.
 - Les mots de passe restent chiffrés avec `server/utils/crypto.ts` dans `.Leanna-email.json`. Les paramètres serveur ne contiennent aucun secret.
 - Les hôtes doivent être des noms DNS valides ; les adresses IP littérales et les noms locaux/réservés sont refusés.
-- IMAP impose SSL/TLS ; SMTP impose SSL/TLS ou STARTTLS. TLS 1.2 minimum et la validation standard des certificats sont conservés.
+- IMAP et SMTP imposent SSL/TLS ou STARTTLS. TLS 1.2 minimum et la validation standard des certificats sont conservés.
 
 ## Outils agent conservés
 
