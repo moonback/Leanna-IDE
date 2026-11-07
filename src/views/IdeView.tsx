@@ -96,7 +96,7 @@ const SERVER_PORT = Number(import.meta.env.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
-  const { activity, clearActivity, connected, disconnect, connect, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
+  const { activity, clearActivity, connected, connecting, disconnect, connect, restoreTranscript, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
   const { info: toastInfo } = useToast();
@@ -647,6 +647,51 @@ export default function IdeView() {
     setShowSkillsMonitor(false);
     setShowChat(true);
   }, [connected, sendEditorContext, fileSystem.activePath, fileSystem.openFiles, editorRef, cursorPosition]);
+
+  // ── Reprise de la dernière conversation persistée ─────────────────────────
+  const handleResumeConversation = useCallback(async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}?limit=200`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`Chargement de l'historique impossible (HTTP ${response.status})`);
+      const data = await response.json();
+      if (data?.status !== 'success' || !Array.isArray(data.messages)) {
+        throw new Error(data?.error || "L'historique de cette conversation est indisponible.");
+      }
+
+      const restoredMessages = data.messages
+        .filter((message: { role?: string; content?: unknown }) =>
+          (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
+        .map((message: { id?: string; role: 'user' | 'assistant'; content: string; created_at?: string }, index: number) => ({
+          id: message.id || `restored-${conversationId}-${index}`,
+          role: message.role,
+          text: message.content,
+          timestamp: message.created_at ? new Date(message.created_at) : new Date(),
+        }));
+
+      if (restoredMessages.length === 0) {
+        toastInfo('Cette conversation ne contient aucun message récupérable.');
+        return;
+      }
+
+      restoreTranscript(restoredMessages);
+      clearActivity();
+      setChatDocked(true);
+      setShowChat(true);
+
+      if (connected || connecting) {
+        disconnect();
+        window.setTimeout(() => connect([], 'full', conversationId), 150);
+      } else {
+        connect([], 'full', conversationId);
+      }
+      toastInfo('Dernière discussion restaurée.');
+    } catch (error) {
+      console.error('[IdeView] Échec de reprise de conversation:', error);
+      toastInfo(error instanceof Error ? error.message : 'Impossible de reprendre cette discussion.');
+    }
+  }, [clearActivity, connected, connecting, connect, disconnect, restoreTranscript, toastInfo]);
 
   // ── Context menu actions ───────────────────────────────────────────────────
 
@@ -1268,6 +1313,7 @@ export default function IdeView() {
                                                     setChatDocked(true);
                                                     setShowChat(true);
                                                   }}
+                                                  onResumeConversation={handleResumeConversation}
                                                   onAskAssistant={(prompt, displayText) => {
                                                     setChatDocked(true);
                                                     void queueMessageToAI(prompt, displayText);
