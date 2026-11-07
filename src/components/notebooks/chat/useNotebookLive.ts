@@ -33,10 +33,6 @@ interface GeneratedDocInfo {
 
 interface UseNotebookLiveOptions {
   notebookId: string;
-  mode?: 'assistant' | 'podcast';
-  hostName?: string;
-  coHostName?: string;
-  coHostPersonality?: string;
   /** Sous-ensemble de sources à interroger (vide = toutes). */
   selectedSources?: string[];
   onError?: (message: string) => void;
@@ -50,10 +46,6 @@ interface UseNotebookLiveOptions {
 
 export function useNotebookLive({
   notebookId,
-  mode = 'assistant',
-  hostName = 'Leanna',
-  coHostName = 'Noah',
-  coHostPersonality = 'Analytique et curieux.',
   selectedSources = [],
   onError,
   onDocumentGenerating,
@@ -156,12 +148,7 @@ export function useNotebookLive({
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const params = new URLSearchParams({ notebookId, mode });
-    if (mode === 'podcast') {
-      params.set('hostName', hostName.slice(0, 32));
-      params.set('coHostName', coHostName.slice(0, 32));
-      params.set('coHostPersonality', coHostPersonality.slice(0, 600));
-    }
+    const params = new URLSearchParams({ notebookId });
     const sources = selectedSourcesRef.current;
     if (sources.length > 0) params.set('sources', sources.join(','));
 
@@ -230,7 +217,7 @@ export function useNotebookLive({
     ws.onerror = () => {
       onErrorRef.current?.("Erreur de l'assistant vocal du notebook.");
     };
-  }, [status, notebookId, mode, hostName, coHostName, coHostPersonality, initAudio, cleanupAudio, playAudioChunk, handleInterrupt, appendTranscript]);
+  }, [status, notebookId, initAudio, cleanupAudio, playAudioChunk, handleInterrupt, appendTranscript]);
 
   const toggle = useCallback(() => {
     if (status === 'idle') void connect();

@@ -176,12 +176,18 @@ export function createChatRouter(): Router {
         res.status(404).json({ error: "Notebook introuvable." });
         return;
       }
+      // preview = 1re question posée, pour libeller les onglets encore sans titre parlant
+      const summarize = (messages: any[] = []) => ({
+        messageCount: messages.length,
+        preview: String(messages.find((m: any) => m.role === "user")?.content ?? "").slice(0, 80),
+      });
       const threads = (notebook.chatThreads || []).map((t: any) => ({
         id: t.id,
         title: t.title,
         createdAt: t.createdAt,
+        ...summarize(t.messages),
       }));
-      res.json({ status: "success", threads });
+      res.json({ status: "success", threads, main: summarize(notebook.chatHistory) });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

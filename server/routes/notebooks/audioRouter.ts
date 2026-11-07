@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { notebookManager, contentGenerator } from "../../notebooks/index.js";
+import { podcastAudioPath } from "../../notebooks/NotebookManager.js";
+import { buildWav, parseDialogue, BYTES_PER_SECOND } from "../../notebooks/podcastAudio.js";
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { getProjectRoot } from "../../utils/pathUtils.js";
 import { SELF_ROOT } from "../../utils/selfRoot.js";
@@ -31,97 +33,68 @@ export function createAudioRouter(): Router {
     }
   });
 
-  router.post("/:id/audio-overviews/:overviewId/tts", async (req: Request, res: Response): Promise<void> => {
-    try {
-      const notebook = notebookManager.getNotebook(req.params.id);
-      if (!notebook) {
-        res.status(404).json({ error: "Notebook introuvable." });
-        return;
-      }
-
-      const overview = notebook.audioOverviews?.find((o: any) => o.id === req.params.overviewId);
-      if (!overview || overview.status !== "ready") {
-        res.status(404).json({ error: "Audio overview introuvable ou pas prêt." });
-        return;
-      }
-
-      const { generateSpeech } = await import("../../utils/geminiTTS.js");
-
-      const hostName = typeof overview.hostName === "string" && overview.hostName.trim() ? overview.hostName.trim() : "Alex";
-      const coHostName = typeof overview.coHostName === "string" && overview.coHostName.trim() ? overview.coHostName.trim() : "Sam";
-      const hostVoice = req.body.hostVoice || req.body.alexVoice || "ff_siwis";
-      const coHostVoice = req.body.coHostVoice || req.body.samVoice || "Puck";
-      const lines = overview.script.split("\n").filter((l: string) => l.trim());
-      const dialogueLines: { speaker: string; text: string }[] = [];
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        const separator = trimmed.indexOf(":");
-        const label = separator > 0 ? trimmed.slice(0, separator).trim().toLowerCase() : "";
-        const body = separator > 0 ? trimmed.slice(separator + 1).trim() : trimmed;
-        if (label === hostName.toLowerCase() || label === "alex") {
-          dialogueLines.push({ speaker: "host", text: body });
-        } else if (label === coHostName.toLowerCase() || label === "sam") {
-          dialogueLines.push({ speaker: "cohost", text: body });
-        } else if (trimmed) {
-          dialogueLines.push({ speaker: "host", text: trimmed });
-        }
-      }
-
-      if (dialogueLines.length === 0) {
-        res.status(400).json({ error: "Le script ne contient aucune réplique." });
-        return;
-      }
-
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders();
-
-      res.write(`event: start\ndata: ${JSON.stringify({ total: dialogueLines.length })}\n\n`);
-
-      let generatedCount = 0;
-      let skippedCount = 0;
-      for (let i = 0; i < dialogueLines.length; i++) {
-        if (res.destroyed || res.writableEnded) return;
-        const { speaker, text } = dialogueLines[i];
-        const voice = speaker === "host" ? hostVoice : coHostVoice;
-
-        try {
-          const audioBase64 = await generateSpeech(text, { voiceName: voice });
-          if (audioBase64) {
-            generatedCount++;
-            res.write(`event: chunk\ndata: ${JSON.stringify({
-              index: i,
-              speaker,
-              text,
-              audio: audioBase64,
-            })}\n\n`);
-          } else {
-            skippedCount++;
-            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "Le fournisseur TTS n'a retourné aucun audio." })}\n\n`);
-          }
-        } catch (ttsErr: any) {
-          skippedCount++;
-          res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: ttsErr.message })}\n\n`);
-        }
-      }
-
-      if (generatedCount === 0) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: `Aucun audio n'a été généré (${skippedCount} répliques ignorées). Vérifiez les clés API et la disponibilité du fournisseur TTS.` })}\n\n`);
-      } else {
-        res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: generatedCount, totalSkipped: skippedCount })}\n\n`);
-      }
-      res.end();
-    } catch (e: any) {
-      if (res.headersSent) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
-        res.end();
-      } else {
-        res.status(500).json({ error: e.message });
-      }
+  // Rendu unique du fichier WAV à deux voix (Leanna = ff_siwis, co-animateur = Puck).
+  // SSE pour la progression : le rendu d'un épisode long prend plusieurs minutes.
+  router.post("/:id/audio-overviews/:overviewId/audio", async (req: Request, res: Response): Promise<void> => {
+    const notebook = notebookManager.getNotebook(req.params.id);
+    const overview = notebook?.audioOverviews?.find(o => o.id === req.params.overviewId);
+    if (!overview || overview.status !== "ready") {
+      res.status(404).json({ error: "Audio overview introuvable ou pas prêt." });
+      return;
     }
+    const lines = parseDialogue(overview.script, overview.hostName?.trim() || "Alex", overview.coHostName?.trim() || "Sam");
+    if (lines.length === 0) {
+      res.status(400).json({ error: "Le script ne contient aucune réplique." });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    const send = (event: string, data: unknown) => {
+      if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      const { generateSpeech } = await import("../../utils/geminiTTS.js");
+      send("start", { total: lines.length });
+      let done = 0;
+      // ttsQueue limite déjà la concurrence ; Promise.all conserve l'ordre des répliques.
+      const segments = await Promise.all(lines.map(async ({ speaker, text }) => {
+        const audio = await generateSpeech(text, { voiceName: speaker === "host" ? "ff_siwis" : "Puck" }).catch(() => null);
+        send("progress", { done: ++done, total: lines.length });
+        return audio ? Buffer.from(audio, "base64") : null;
+      }));
+      const failed = segments.filter(s => !s).length;
+      if (failed > 0) {
+        send("error", { error: `${failed}/${lines.length} répliques n'ont pas pu être synthétisées. Vérifiez les clés TTS puis relancez (les répliques réussies sont en cache).` });
+        return;
+      }
+      const wav = buildWav(segments as Buffer[]);
+      const filePath = podcastAudioPath(overview.id);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, wav);
+      overview.audioReady = true;
+      overview.estimatedDuration = Math.round((wav.length - 44) / BYTES_PER_SECOND);
+      notebookManager.persistNotebook(req.params.id);
+      send("done", { overview });
+    } catch (e: any) {
+      send("error", { error: e.message });
+    } finally {
+      res.end();
+    }
+  });
+
+  router.get("/:id/audio-overviews/:overviewId/audio", (req: Request, res: Response): void => {
+    const overview = notebookManager.getNotebook(req.params.id)?.audioOverviews?.find(o => o.id === req.params.overviewId);
+    const filePath = overview?.audioReady ? podcastAudioPath(overview.id) : null;
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.status(404).json({ error: "Audio non généré." });
+      return;
+    }
+    res.sendFile(filePath); // gère les requêtes Range (avance rapide dans le lecteur)
   });
 
   router.get("/:id/audio-overviews", (req: Request, res: Response): void => {

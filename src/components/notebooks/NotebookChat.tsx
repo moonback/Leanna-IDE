@@ -89,10 +89,11 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, 
 
   // ─── Threads ───────────────────────────────────────────────────────────────
   const {
-    threads, showThreadList, setShowThreadList,
+    threads, mainSummary, showThreadList, setShowThreadList,
     handleNewThread, handleSwitchThread, handleDeleteThread,
   } = useChatThreads({
     notebookId, activeThreadId, setActiveThreadId,
+    activeMessageCount: messages.length, loading, inputRef,
     setMessages, setStreamingText: stream.setStreamingText,
     setFollowUps,
   });
@@ -241,10 +242,12 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, 
     <div className="flex h-full flex-col">
       <ThreadBar
         threads={threads}
+        mainSummary={mainSummary}
         activeThreadId={activeThreadId}
         showThreadList={showThreadList}
         setShowThreadList={setShowThreadList}
         messages={messages}
+        loading={loading}
         onSwitchThread={handleSwitchThread}
         onDeleteThread={handleDeleteThread}
         onNewThread={handleNewThread}

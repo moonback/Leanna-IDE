@@ -472,7 +472,7 @@ async function callOpenRouter(
  */
 async function callGemini(text: string, voiceName: string): Promise<string | null> {
   const start = Date.now();
-  const model = "gemini-3.8-flash-preview-tts";
+  const model = "gemini-3.8-flash-tts";
   const releaseBudget = reserveModelCallBudget(model, text.length, "tts");
 
   try {

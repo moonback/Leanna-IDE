@@ -50,4 +50,7 @@ export interface ChatThreadSummary {
   id: string;
   title: string;
   createdAt: string;
+  messageCount?: number;
+  /** Première question posée (tronquée), sert de libellé si le titre est générique */
+  preview?: string;
 }

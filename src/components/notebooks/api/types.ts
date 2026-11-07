@@ -65,6 +65,8 @@ export interface ChatThread {
   id: string;
   title: string;
   createdAt: string;
+  messageCount?: number;
+  preview?: string;
 }
 
 // ─── Événements SSE ──────────────────────────────────────────────────────────

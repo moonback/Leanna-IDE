@@ -251,6 +251,8 @@ export interface AudioOverview {
   hostName?: string;
   coHostName?: string;
   coHostPersonality?: string;
+  /** true quand le fichier WAV à deux voix a été rendu (voir podcastAudioPath). */
+  audioReady?: boolean;
   /** Status de génération */
   status: 'generating' | 'ready' | 'error';
   createdAt: string;

@@ -1,7 +1,6 @@
 /**
  * Types partagés du sous-module Audio Overview (podcast IA).
- * Extraits d'AudioOverviewPanel pour être réutilisés par AudioGenerator,
- * AudioPlayer et le hook useTtsPlayer.
+ * Extraits d'AudioOverviewPanel pour être réutilisés par AudioGenerator et AudioPlayer.
  */
 
 export interface AudioOverview {
@@ -13,6 +12,8 @@ export interface AudioOverview {
   hostName?: string;
   coHostName?: string;
   coHostPersonality?: string;
+  /** Fichier WAV à deux voix disponible via GET …/audio. */
+  audioReady?: boolean;
   createdAt: string;
 }
 
