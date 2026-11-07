@@ -31,6 +31,12 @@ function detectMac(): boolean {
 
 const MOD = detectMac() ? '⌘' : 'Ctrl';
 
+function formatConversationTitle(title: string | null | undefined, fallback: string): string {
+  const value = title?.trim() || fallback;
+  const characters = Array.from(value);
+  return characters.length <= 50 ? value : `${characters.slice(0, 49).join("").trimEnd()}…`;
+}
+
 const SPRING = { type: 'spring' as const, bounce: 0, duration: 0.4 };
 
 type GeminiStatus = 'configured' | 'invalid' | 'unconfigured' | null;
@@ -1172,6 +1178,10 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                       const dateLabel = date && !Number.isNaN(date.getTime())
                         ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
                         : 'Date inconnue';
+                      const displayTitle = formatConversationTitle(
+                        conversation.title,
+                        `Discussion du ${dateLabel.split(' à ')[0]}`,
+                      );
                       return (
                         <button
                           key={conversation.id}
@@ -1179,14 +1189,14 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                           onClick={() => onResumeConversation?.(conversation.id)}
                           disabled={!onResumeConversation}
                           className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label={`Reprendre ${conversation.title || `Discussion ${index + 1}`}, ${conversation.message_count} messages, ${dateLabel}`}
+                          aria-label={`Reprendre ${displayTitle}, ${conversation.message_count} messages, ${dateLabel}`}
                         >
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--muted)]">
                             <MessageSquare size={16} />
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium text-[var(--text)]">
-                              {conversation.title?.trim() || `Discussion du ${dateLabel.split(' à ')[0]}`}
+                              {displayTitle}
                             </span>
                             <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">
                               {dateLabel} · {conversation.message_count} message{conversation.message_count > 1 ? 's' : ''}
