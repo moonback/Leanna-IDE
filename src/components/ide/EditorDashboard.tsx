@@ -807,6 +807,36 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const reduce = !!useReducedMotion();
   const aiName = profile.aiName || 'Leanna';
   const userName = profile.userName?.trim();
+  const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
+  const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
+  const [draggedSection, setDraggedSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('leanna.dashboard.section-order');
+      if (!saved) return;
+      const parsed: unknown = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.every(id => typeof id === 'string')) {
+        const valid = parsed.filter(id => DEFAULT_SECTION_ORDER.includes(id));
+        setSectionOrder([...valid, ...DEFAULT_SECTION_ORDER.filter(id => !valid.includes(id))]);
+      }
+    } catch { /* ordre par défaut si stockage indisponible ou invalide */ }
+  }, []);
+
+  const moveSection = useCallback((targetId: string) => {
+    if (!draggedSection || draggedSection === targetId) return;
+    setSectionOrder(current => {
+      const next = [...current];
+      const from = next.indexOf(draggedSection);
+      const to = next.indexOf(targetId);
+      if (from < 0 || to < 0) return current;
+      next.splice(from, 1);
+      next.splice(to, 0, draggedSection);
+      try { window.localStorage.setItem('leanna.dashboard.section-order', JSON.stringify(next)); } catch { /* stockage facultatif */ }
+      return next;
+    });
+    setDraggedSection(null);
+  }, [draggedSection]);
 
   // Connexion seule : le chat reste fermé (bouton « Ouvrir le chat » séparé).
   const handleConnect = useCallback(() => {
@@ -878,18 +908,43 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           </nav>
         </motion.header>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <OperationalOverviewCard index={0} />
-          <AudioCard index={1} />
-          <SessionCard index={2} />
-          <TokensCard index={3} />
-          <ActivityCard index={4} />
-          <TranscriptCard index={5} aiName={aiName} onOpenChat={onOpenChat} />
-          <PlanCard index={6} />
-          <SystemCard index={7} />
-          <AutomationsCard index={8} />
-          <ProjectCard index={9} onShowSettings={onShowSettings} />
-          <RecentCard index={10} onResumeConversation={onResumeConversation} />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Sections du tableau de bord réorganisables">
+          {sectionOrder.map((sectionId, index) => {
+            const section = (() => {
+              switch (sectionId) {
+                case 'operations': return <OperationalOverviewCard index={index} />;
+                case 'audio': return <AudioCard index={index} />;
+                case 'session': return <SessionCard index={index} />;
+                case 'tokens': return <TokensCard index={index} />;
+                case 'activity': return <ActivityCard index={index} />;
+                case 'transcript': return <TranscriptCard index={index} aiName={aiName} onOpenChat={onOpenChat} />;
+                case 'plan': return <PlanCard index={index} />;
+                case 'system': return <SystemCard index={index} />;
+                case 'automations': return <AutomationsCard index={index} />;
+                case 'project': return <ProjectCard index={index} onShowSettings={onShowSettings} />;
+                case 'recent': return <RecentCard index={index} onResumeConversation={onResumeConversation} />;
+                default: return null;
+              }
+            })();
+            return (
+              <div
+                key={sectionId}
+                draggable
+                onDragStart={event => {
+                  setDraggedSection(sectionId);
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', sectionId);
+                }}
+                onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                onDrop={event => { event.preventDefault(); moveSection(sectionId); }}
+                onDragEnd={() => setDraggedSection(null)}
+                className={`min-w-0 cursor-grab active:cursor-grabbing transition-opacity ${draggedSection === sectionId ? 'opacity-40' : ''}`}
+                title="Faire glisser pour déplacer cette section"
+              >
+                {section}
+              </div>
+            );
+          })}
         </div>
       </main>
     </div>
