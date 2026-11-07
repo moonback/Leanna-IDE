@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { preloadWakeModel, startWakeWordListener, type WakeWordListener } from '../lib/wakeWord.js';
 import { playSessionStartSound } from '../lib/sound.js';
+import {
+  computeNoiseProfile, createSpeechGate, loadNoiseProfile, saveNoiseProfile,
+  NoiseCalibrationError, DEFAULT_CALIBRATION_MS, type NoiseProfile,
+} from '../lib/noiseCalibration.js';
 
 function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
   const buffer = new ArrayBuffer(pcmData.length * 2);
@@ -143,6 +147,16 @@ export function useAudio({
   const animFrameRef = useRef<number>(0);
 
   mutedRef.current = muted;
+
+  // ── Calibration du bruit ambiant ────────────────────────────────────────
+  // Le seuil d'activité (qui repousse la veille) est relevé au-dessus du bruit
+  // mesuré de la pièce ; sans calibration, il vaut vadThreshold comme avant.
+  const [noiseProfile, setNoiseProfile] = useState<NoiseProfile | null>(() => loadNoiseProfile());
+  const [calibrating, setCalibrating] = useState(false);
+  const calibrationSamplesRef = useRef<number[] | null>(null);
+  const activityThresholdRef = useRef(vadThreshold);
+  activityThresholdRef.current = Math.max(vadThreshold, noiseProfile?.threshold ?? 0);
+  const speechGateRef = useRef(createSpeechGate());
 
   // Toute activité (voix, texte envoyé…) repousse la mise en veille.
   const markActivity = useCallback(() => {
@@ -377,8 +391,18 @@ export function useAudio({
         const inAvg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         inputAmplitudeRef.current = Math.min(1, inAvg / 100);
 
-        // Activité vocale : même seuil que le VAD, sinon un ventilateur empêcherait la veille.
-        if (inAvg > vadThresholdRef.current) {
+        const out = outputAudioCtxRef.current;
+        const leannaSpeaking = !!out && nextStartTimeRef.current > out.currentTime;
+
+        // Calibration : on n'échantillonne que le bruit de la pièce, pas la voix de Leanna.
+        if (calibrationSamplesRef.current && !leannaSpeaking) {
+          calibrationSamplesRef.current.push(inAvg);
+        }
+
+        // Activité vocale : seul un son soutenu au-dessus du seuil calibré compte
+        // comme de la parole. Bruit de fond et bruits brefs laissent la veille venir.
+        if (!calibrationSamplesRef.current
+          && speechGateRef.current.update(inAvg, activityThresholdRef.current, performance.now())) {
           markActivity();
         }
 
@@ -415,8 +439,9 @@ export function useAudio({
           if (amplitude > vadThresholdRef.current) {
             vadSilenceStartRef.current = null;
             vadSilenceFiredRef.current = false; // voix détectée → réarmer la sonde A
+            // Pas de markActivity ici : la veille ne dépend que de la porte « parole »
+            // (tick), sinon le bruit ambiant au-dessus du seuil VAD la repousserait.
             onAudioData(floatToPcm16(channelData));
-            markActivity();
           } else {
             if (vadSilenceStartRef.current === null) {
               vadSilenceStartRef.current = Date.now();
@@ -482,6 +507,8 @@ export function useAudio({
   /** keepSleep : reconnexion GoAway → Leanna reste en veille au lieu de se réveiller seule. */
   const cleanupAudio = useCallback((keepSleep = false) => {
     cancelAnimationFrame(animFrameRef.current);
+    // Une calibration en cours échouera proprement (pas assez de mesures).
+    calibrationSamplesRef.current = null;
 
     processorRef.current?.disconnect();
     processorRef.current = null;
@@ -523,8 +550,55 @@ export function useAudio({
 
   const getInputAmplitude = useCallback(() => inputAmplitudeRef.current, []);
   const getOutputAmplitude = useCallback(() => outputAmplitudeRef.current, []);
+  /** Seuil d'activité vocale, sur la même échelle que getInputAmplitude (0–1). */
+  const getActivityThreshold = useCallback(() => activityThresholdRef.current / 100, []);
+
+  /**
+   * Mesure le bruit ambiant pendant `durationMs` (l'utilisateur doit rester
+   * silencieux) et relève le seuil d'activité au-dessus de ce bruit.
+   */
+  const calibrateNoise = useCallback((durationMs = DEFAULT_CALIBRATION_MS): Promise<NoiseProfile> => {
+    if (!inputAnalyserRef.current) {
+      return Promise.reject(new NoiseCalibrationError('unavailable', 'Micro inactif : connectez la discussion avant de calibrer.'));
+    }
+    if (mutedRef.current) {
+      return Promise.reject(new NoiseCalibrationError('unavailable', 'Micro coupé ou en veille : réactivez-le avant de calibrer.'));
+    }
+    if (calibrationSamplesRef.current) {
+      return Promise.reject(new NoiseCalibrationError('unavailable', 'Calibration déjà en cours.'));
+    }
+    calibrationSamplesRef.current = [];
+    setCalibrating(true);
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        const samples = calibrationSamplesRef.current ?? [];
+        calibrationSamplesRef.current = null;
+        speechGateRef.current.reset();
+        setCalibrating(false);
+        try {
+          const profile = computeNoiseProfile(samples, vadThresholdRef.current);
+          saveNoiseProfile(profile);
+          setNoiseProfile(profile);
+          lastActivityRef.current = Date.now();
+          resolve(profile);
+        } catch (err) {
+          reject(err);
+        }
+      }, durationMs);
+    });
+  }, []);
+
+  const resetNoiseCalibration = useCallback(() => {
+    saveNoiseProfile(null);
+    setNoiseProfile(null);
+  }, []);
 
   return {
+    noiseProfile,
+    calibrating,
+    calibrateNoise,
+    resetNoiseCalibration,
+    getActivityThreshold,
     muted,
     asleep,
     wakeWordFailed,

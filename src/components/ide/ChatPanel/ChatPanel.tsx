@@ -14,6 +14,8 @@ import { RADII, MIN_WIDTH, STORAGE_KEYS } from './theme.js';
 import { readJSON, writeJSON } from './utils.js';
 import { Toast } from './Toast.js';
 import { ChatHeader } from './ChatHeader.js';
+import { MicLevelMeter } from './MicLevelMeter.js';
+import { NoiseCalibrationModal } from './NoiseCalibrationModal.js';
 import { SearchBar } from './SearchBar.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { InputArea, type InputAreaHandle } from './InputArea.js';
@@ -53,6 +55,8 @@ export function ChatPanel({
     systemOverride, sendSystemPromptOverride,
     systemReplace, sendSystemPromptReplace,
     currentPlan, clearPlan,
+    asleep, getInputAmplitude,
+    noiseProfile, calibrating, calibrateNoise, resetNoiseCalibration, getActivityThreshold,
   } = useLiveAPIContext();
   const { profile } = useProfile();
 
@@ -64,6 +68,7 @@ export function ChatPanel({
   const [showMenu, setShowMenu] = useState(false);
   const [showPromptInspector, setShowPromptInspector] = useState(false);
   const [showChangeLog, setShowChangeLog] = useState(false);
+  const [showCalibration, setShowCalibration] = useState(false);
 
   // Journal des modifications appliquées depuis le chat (feature #9).
   const { entries: changeLog, clear: clearChangeLog, remove: removeChangeLogEntry } = useChangeLog();
@@ -295,6 +300,8 @@ export function ChatPanel({
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // La modale de calibration gère ses propres touches.
+      if (showCalibration) return;
       if (e.key === 'Escape') {
         if (showMenu) { setShowMenu(false); return; }
         if (showSearch) { closeSearch(); return; }
@@ -314,7 +321,7 @@ export function ChatPanel({
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [showMenu, showSearch, fullscreen, onClose, transcript.length, openSearch, closeSearch]);
+  }, [showMenu, showSearch, fullscreen, onClose, transcript.length, openSearch, closeSearch, showCalibration]);
 
   // Dernier message assistant (pour le bouton « régénérer »).
   const lastAssistantIdx = useMemo(() => {
@@ -346,6 +353,21 @@ export function ChatPanel({
           />
         )}
       </AnimatePresence>
+
+      {/* Calibration du bruit ambiant : seule la parole repousse la veille */}
+      <NoiseCalibrationModal
+        open={showCalibration}
+        onClose={() => setShowCalibration(false)}
+        getLevel={getInputAmplitude}
+        getThreshold={getActivityThreshold}
+        muted={muted}
+        asleep={asleep}
+        reduceMotion={reduceMotion}
+        calibrating={calibrating}
+        noiseProfile={noiseProfile}
+        calibrateNoise={calibrateNoise}
+        resetNoiseCalibration={resetNoiseCalibration}
+      />
 
       <motion.div
         ref={panelRef}
@@ -448,6 +470,20 @@ export function ChatPanel({
           onToggleConnect={handleToggleConnect}
           onClose={onClose}
         />
+
+        {/* Son capté par le micro (visible dès que la discussion est ouverte) */}
+        {!minimized && connected && (
+          <MicLevelMeter
+            getLevel={getInputAmplitude}
+            getThreshold={getActivityThreshold}
+            muted={muted}
+            asleep={asleep}
+            reduceMotion={reduceMotion}
+            calibrating={calibrating}
+            calibrated={!!noiseProfile}
+            onOpenCalibration={() => setShowCalibration(true)}
+          />
+        )}
 
         {/* Journal des modifications appliquées (feature #9) */}
         {!minimized && (

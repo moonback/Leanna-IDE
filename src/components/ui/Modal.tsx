@@ -64,6 +64,11 @@ export interface ModalProps {
   tone?: ModalTone;
   /** Palier z-index : 'modal' (var(--z-modal)) ou 'critical' (var(--z-critical)) */
   layer?: ModalLayer;
+  /**
+   * z-index explicite, prioritaire sur `layer`. Pour une modale ouverte depuis
+   * un panneau flottant placé au-dessus des paliers standard (ex. ChatPanel).
+   */
+  zIndex?: number;
   /** Désactiver la fermeture par Escape */
   disableEscape?: boolean;
   /** Désactiver la fermeture par clic sur le voile */
@@ -154,6 +159,7 @@ function ModalRoot({
   size = 'sm',
   tone = 'default',
   layer = 'modal',
+  zIndex: zIndexOverride,
   disableEscape = false,
   disableBackdropClick = false,
   children,
@@ -177,7 +183,7 @@ function ModalRoot({
   });
 
   const toneStyle = TONE_STYLES[tone];
-  const zIndex    = LAYER_Z[layer];
+  const zIndex    = zIndexOverride ?? LAYER_Z[layer];
 
   const content = (
     <ModalContext.Provider value={{ titleId, descId, tone, onClose, hideClose }}>
