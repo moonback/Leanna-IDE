@@ -44,6 +44,7 @@ export function NotebookDebatePanel({
   const [selectedSources, setSelectedSources] = useState<string[]>(sources.map(source => source.id));
   const [status, setStatus] = useState<Status>("setup");
   const [speaker, setSpeaker] = useState<Speaker | null>(null);
+  const [nextSpeaker, setNextSpeaker] = useState<Speaker | null>(null);
   const [turns, setTurns] = useState<DebateTurn[]>([]);
   const [liveText, setLiveText] = useState("");
   const [error, setError] = useState("");
@@ -137,7 +138,8 @@ export function NotebookDebatePanel({
       if (message.type === "document_saved") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
       if (message.type === "intervention_queued") setQueuedIntervention(true);
       if (message.type === "intervention_applied") setQueuedIntervention(false);
-      if (message.type === "speaker") setSpeaker(message.state === "speaking" ? message.speaker : null);
+      if (message.type === "speaker") { setSpeaker(message.state === "speaking" ? message.speaker : null); if (message.state === "speaking") setNextSpeaker(null); }
+      if (message.type === "orchestration" && message.nextSpeaker) setNextSpeaker(message.nextSpeaker as Speaker);
       if (message.type === "transcript" && message.message) {
         setTurns(current => [...current, message.message as DebateTurn]);
         setLiveText("");
@@ -237,7 +239,7 @@ export function NotebookDebatePanel({
       {(isActive || status === "completed" || status === "stopped") && (
         <>
           <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-[var(--notebook-border)] px-5 py-3">
-            <div className="min-w-0"><div className="truncate text-sm font-semibold text-[var(--text-primary)]">{topic}</div><div className="text-xs text-[var(--text-muted)]">{status === "connecting" ? "Connexion aux voix…" : status === "paused" ? "Débat en pause" : status === "completed" ? "Débat terminé" : status === "stopped" ? "Débat arrêté" : "Débat en cours"}</div></div>
+            <div className="min-w-0"><div className="truncate text-sm font-semibold text-[var(--text-primary)]">{topic}</div><div className="text-xs text-[var(--text-muted)]">{status === "connecting" ? "Connexion aux voix…" : status === "paused" ? "Débat en pause" : status === "completed" ? "Débat terminé" : status === "stopped" ? "Débat arrêté" : "Débat en cours"}{nextSpeaker ? ` · Prochain : ${SPEAKERS[nextSpeaker].label}` : ""}</div></div>
             <div className="flex flex-shrink-0 items-center gap-2">
               <button type="button" onClick={() => setAudioEnabled(value => !value)} className="rounded-lg border border-[var(--notebook-border)] px-2.5 py-2 text-xs text-[var(--text-secondary)]">{audioEnabled ? "Audio activé" : "Audio coupé"}</button>
               {status === "paused" ? <button type="button" onClick={() => sendControl("resume")} className="rounded-lg bg-[var(--notebook-accent)] p-2 text-white" aria-label="Reprendre"><CirclePlay className="h-4 w-4" /></button> : isActive && status !== "stopping" ? <button type="button" onClick={() => sendControl("pause")} className="rounded-lg border border-[var(--notebook-border)] p-2 text-[var(--text-primary)]" aria-label="Mettre en pause"><CirclePause className="h-4 w-4" /></button> : null}
