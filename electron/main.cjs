@@ -145,8 +145,8 @@ function createSplashWindow() {
   // main sur son bureau pendant le démarrage. 20 px de marge transparente
   // autour de la carte pour son ombre portée (voir splash.css).
   const splash = new BrowserWindow({
-    width: 760,
-    height: 480,
+    width: 900,
+    height: 560,
     center: true,
     show: false, // affichée au premier rendu : pas de flash de fenêtre vide
     frame: false,
