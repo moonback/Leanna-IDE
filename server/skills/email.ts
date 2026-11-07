@@ -18,12 +18,12 @@ export const emailSkill: Skill = {
   declarations: [
     {
       name: "email_check_new",
-      description: "Vérifie les nouveaux e-mails non lus des deux comptes Gmail connectés (compte Leanna et compte personnel). À utiliser quand l'utilisateur demande s'il a reçu de nouveaux mails.",
+      description: "Vérifie les nouveaux e-mails non lus des deux comptes e-mail connectés (compte Leanna et compte personnel). À utiliser quand l'utilisateur demande s'il a reçu de nouveaux mails.",
       parameters: z.object({ maxResults: z.number().int().min(1).max(20).optional().default(10) }),
     },
     {
       name: "email_list_messages",
-      description: "Liste les derniers e-mails d'un compte Gmail. Le compte peut être 'leanna' ou 'personal'.",
+      description: "Liste les derniers e-mails d'un compte e-mail. Le compte peut être 'leanna' ou 'personal'.",
       parameters: z.object({ account: accountSchema, maxResults: z.number().int().min(1).max(50).optional().default(20) }),
     },
     {
@@ -38,7 +38,7 @@ export const emailSkill: Skill = {
     },
     {
       name: "email_send_message",
-      description: "Prépare et envoie un e-mail depuis Gmail. Par défaut, envoie depuis le compte dédié de Leanna vers l'adresse du compte personnel connecté. Toute expédition exige une confirmation explicite de l'utilisateur. L'envoi depuis le compte personnel est désactivé par défaut.",
+      description: "Prépare et envoie un e-mail depuis le compte e-mail de Leanna. Par défaut, envoie depuis le compte dédié de Leanna vers l'adresse du compte personnel connecté. Toute expédition exige une confirmation explicite de l'utilisateur. L'envoi depuis le compte personnel est désactivé par défaut.",
       parameters: z.object({
         account: accountSchema.optional().default("leanna"),
         to: z.string().email().optional(),
@@ -91,7 +91,7 @@ export const emailSkill: Skill = {
         `${to} — ${String(args.subject)}`,
         "send-email",
         context.emitToClient,
-        `Envoyer depuis ${account === "leanna" ? "le compte Gmail de Leanna" : "votre compte Gmail personnel"} vers ${to} ?\nObjet : ${args.subject}\n\n${preview}`,
+        `Envoyer depuis ${account === "leanna" ? "le compte e-mail de Leanna" : "votre compte e-mail personnel"} vers ${to} ?\nObjet : ${args.subject}\n\n${preview}`,
         "high",
       );
       if (!approved) return { success: false, error: "Envoi annulé ou refusé par l'utilisateur." };
