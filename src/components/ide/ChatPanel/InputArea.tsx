@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Send } from 'lucide-react';
+import { Send, X, CornerDownLeft } from 'lucide-react';
 import { useFileMention } from '../../../hooks/useFileMention.js';
 import { useSlashCommand } from '../../../hooks/useSlashCommand.js';
 import { MentionDropdown } from '../MentionDropdown.js';
@@ -13,6 +13,8 @@ import { SuggestionChips } from './SuggestionChips.js';
 import type { SuggestionSet } from './proactiveSuggestions.js';
 import { CHAR_LIMIT } from './theme.js';
 import { setCursorPosition } from './utils.js';
+
+const DRAFT_STORAGE_KEY = 'Leanna_chat_draft_v1';
 
 /** API impérative exposée au parent pour piloter la saisie (ex. édition). */
 export interface InputAreaHandle {
@@ -39,7 +41,10 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
   { connected, onConnect: _onConnect, isBusy, onSend, onDocumentAnalyzed, onToast: _onToast, showChips = true, proactiveSuggestions },
   ref,
 ) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    try { return typeof window !== 'undefined' ? window.localStorage.getItem(DRAFT_STORAGE_KEY) ?? '' : ''; }
+    catch { return ''; }
+  });
   const [cursorPos, setCursorPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -47,7 +52,9 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canSend = connected && !isBusy;
+  // Le parent sait placer les messages en file lorsque Leanna travaille déjà.
+  // Ne pas désactiver la saisie pendant isBusy : cela rendrait cette file inaccessible.
+  const canSend = connected;
 
   useImperativeHandle(ref, () => ({
     setValue: (value: string) => {
@@ -66,6 +73,14 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
     ta.style.height = 'auto';
     const newH = Math.min(ta.scrollHeight, 140);
     ta.style.height = `${newH}px`;
+  }, [input]);
+
+  // Brouillon local : une fermeture/recharge du panneau ne fait pas perdre la saisie.
+  useEffect(() => {
+    try {
+      if (input) window.localStorage.setItem(DRAFT_STORAGE_KEY, input);
+      else window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch { /* Le chat reste utilisable si le stockage est indisponible. */ }
   }, [input]);
 
   // Typing indicator
@@ -221,8 +236,8 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
               ref={textareaRef}
               value={input}
               onChange={(e) => {
-                setInput(e.target.value);
-                setCursorPos(e.target.selectionStart ?? 0);
+                setInput(e.target.value.slice(0, CHAR_LIMIT));
+                setCursorPos(Math.min(e.target.selectionStart ?? 0, CHAR_LIMIT));
               }}
               onSelect={(e) => {
                 setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? 0);
@@ -252,6 +267,17 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
             />
 
             <div className="flex items-center gap-1 pb-0.5 flex-shrink-0">
+              {input.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setInput(''); setCursorPos(0); textareaRef.current?.focus(); }}
+                  className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-active)]"
+                  title="Effacer le brouillon"
+                  aria-label="Effacer le brouillon"
+                >
+                  <X size={14} style={{ color: 'var(--text-muted)' }} />
+                </button>
+              )}
               <SkillPicker onSelect={handleSelectSkill} disabled={!canSend} />
               <DocumentUpload connected={connected} onDocumentAnalyzed={onDocumentAnalyzed} />
 
@@ -268,10 +294,10 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
                   color: input.trim() && canSend ? '#0a1628' : 'var(--accent-primary)',
                   boxShadow: input.trim() && canSend ? '0 2px 12px var(--accent-glow)' : 'none',
                 }}
-                title="Envoyer (Enter)"
+                title={isBusy ? 'Ajouter à la file d’attente (Enter)' : 'Envoyer (Enter)'}
                 aria-label="Envoyer le message"
               >
-                <Send size={16} />
+                {isBusy ? <CornerDownLeft size={16} /> : <Send size={16} />}
               </motion.button>
             </div>
           </div>
@@ -286,7 +312,7 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
               className="text-xs tracking-wide min-w-0 flex-1 truncate whitespace-nowrap"
               style={{ color: 'var(--text-dimmed)' }}
             >
-              <kbd className="font-mono">Enter</kbd> envoyer <span className="opacity-60">·</span>{' '}
+              <kbd className="font-mono">Enter</kbd> {isBusy ? 'mettre en file' : 'envoyer'} <span className="opacity-60">·</span>{' '}
               <kbd className="font-mono">⇧Enter</kbd> saut de ligne <span className="opacity-60">·</span>{' '}
               <kbd className="font-mono">@</kbd> fichier <span className="opacity-60">·</span>{' '}
               <kbd className="font-mono">/</kbd> commande
@@ -318,7 +344,7 @@ export const InputArea = forwardRef<InputAreaHandle, InputAreaProps>(function In
                     reduceMotion={reduceMotion}
                     size={4}
                   />
-                  {isBusy ? 'En cours…' : isTyping ? 'Frappe…' : 'Connecté'}
+                  {isBusy ? 'Leanna travaille · file active' : isTyping ? 'Frappe…' : 'Connecté'}
                 </span>
               )}
             </div>
