@@ -261,6 +261,36 @@ export const MessageItem = memo(function MessageItem({
           </div>
         )}
 
+        {/* Audit structurel : mesure la traçabilité, pas la véracité sémantique. */}
+        {msg.role === 'assistant' && msg.citationAudit && (
+          <div
+            className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-surface)] px-3 py-2 text-xs"
+            aria-label="Indicateurs de traçabilité des sources"
+          >
+            <span className="font-medium text-[var(--text-primary)]">Traçabilité</span>
+            <span className="text-[var(--text-secondary)]">
+              {msg.citationAudit.citedChunks}/{msg.citationAudit.retrievedChunks} passages cités
+            </span>
+            <span className="font-medium text-[var(--notebook-accent)]">
+              {msg.citationAudit.retrievalCoveragePercent}% des passages récupérés
+            </span>
+            <span className="text-[var(--text-dimmed)]">
+              {msg.citationAudit.citedSources} document{msg.citationAudit.citedSources > 1 ? 's' : ''}
+            </span>
+            {msg.citationAudit.invalidReferences > 0 && (
+              <span className="font-medium text-[var(--color-error)]" role="status">
+                {msg.citationAudit.invalidReferences} référence{msg.citationAudit.invalidReferences > 1 ? 's' : ''} invalide{msg.citationAudit.invalidReferences > 1 ? 's' : ''}
+              </span>
+            )}
+            {msg.citationAudit.status === 'implicit' && (
+              <span className="text-[var(--text-dimmed)]">Citations implicites</span>
+            )}
+            {msg.citationAudit.status === 'missing' && (
+              <span className="font-medium text-[var(--color-warning)]">Aucune citation</span>
+            )}
+          </div>
+        )}
+
         {/* Citations */}
         {msg.citations.length > 0 && (
           <div className="mt-3 border-t border-[var(--notebook-border)] pt-2">
