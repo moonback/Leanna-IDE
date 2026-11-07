@@ -193,10 +193,22 @@ export class GmailService {
     this.persist();
   }
 
-  disconnect(account: GmailAccountId): void {
+  async disconnect(account: GmailAccountId): Promise<void> {
+    const refreshToken = this.config.accounts[account]?.refreshToken;
     delete this.config.accounts[account];
     if (account === "personal") this.config.personalSendEnabled = false;
     this.persist();
+    if (refreshToken) {
+      try {
+        await fetch("https://oauth2.googleapis.com/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ token: refreshToken }),
+        });
+      } catch {
+        console.warn("[Gmail] Jeton local supprimé; révocation distante Google non confirmée.");
+      }
+    }
   }
 
   private async getAccessToken(account: GmailAccountId): Promise<string> {
