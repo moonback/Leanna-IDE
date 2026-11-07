@@ -609,3 +609,17 @@ Compléments de la dixième passe :
 - Les payloads terminés ne conservent que `notebookId` afin de garder le contrôle d'accès au statut sans archiver le contenu des sources.
 - Test ajouté pour la restauration d'un résultat terminal après redémarrage.
 - Limites : tâches `processing` toujours non récupérées après crash ; endpoints HTTP encore synchrones ; historique borné ; progression non détaillée par sous-étape ; queue globale au processus.
+
+
+### Douzième passe — ergonomie adaptative du workspace Notebook
+
+| Sujet | État | Détail |
+|---|---|---|
+| Largeur des panneaux | Implémenté | Les colonnes Sources et Studio sont redimensionnables à la souris avec des bornes de sécurité (Sources : 220–420 px ; Studio : 260–480 px). |
+| Préférences locales | Implémenté | Les largeurs choisies sont conservées dans le stockage local du client. Une préférence absente, invalide ou illisible revient aux valeurs par défaut sans bloquer le Notebook. |
+| Accessibilité des séparateurs | Implémenté | Les séparateurs sont exposés comme séparateurs verticaux focalisables et peuvent être ajustés au clavier avec les flèches ; Maj augmente le pas. |
+| Mode Focus | Implémenté | Une action dans l'en-tête replie simultanément Sources et Studio pour donner la priorité à la discussion ; l'action inverse restaure les deux panneaux. Raccourci Ctrl/Cmd+0. |
+| État d'indexation des sources | Implémenté | La liste compacte affiche les états réellement persistés : indexé, en attente, partiel, échec ou non vérifié pour les anciennes sources. L'erreur est accessible dans l'infobulle lorsqu'elle existe. |
+| Compatibilité historique | Préservée | L'absence de indexingStatus reste neutre : aucun état de succès n'est inventé pour les sources historiques. |
+
+**Validation restante :** le code a été poussé sur une branche dédiée, mais le typecheck, les tests UI, le lint et la vérification visuelle Electron doivent encore être exécutés dans l'environnement local. Vérifier en particulier le redimensionnement souris/tactile, les raccourcis sous Windows/macOS, le repli indépendant des panneaux, le comportement à 1024 px et la persistance après redémarrage.
