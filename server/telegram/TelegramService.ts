@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { randomUUID } from "node:crypto";
 import { Leanna_APP_ROOT, SELF_ROOT, hasProject, setSelfRoot, listWorkspaces } from "../utils/selfRoot.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { resolveWorkspacePath } from "../security.js";
@@ -62,6 +63,7 @@ interface TrackedApproval {
 
 export class TelegramService {
   private bot: Bot | null = null;
+  private botToken: string | null = null;
   private isRunning: boolean = false;
   private lastError: string | null = null;
   private botInfo: TelegramBotInfo | null = null;
@@ -201,6 +203,7 @@ export class TelegramService {
     }
 
     try {
+      this.botToken = token;
       this.bot = new Bot(token);
 
       // Récupérer les infos officielles du bot
@@ -417,6 +420,62 @@ export class TelegramService {
           "🕘 *Les " + tasks.length + " dernières missions*\n\n" + lines.join("\n"),
           { parse_mode: "Markdown" }
         );
+      });
+
+      // /files — Liste les derniers fichiers importés depuis Telegram.
+      this.bot.command("files", async (ctx) => {
+        if (!hasProject()) {
+          await ctx.reply("📁 Aucun projet actif. Définissez un projet avec /project avant d'importer des fichiers.");
+          return;
+        }
+        try {
+          const inbox = path.join(SELF_ROOT, "Telegram-Inbox");
+          if (!fs.existsSync(inbox)) {
+            await ctx.reply("📭 Aucun fichier reçu pour le moment. Envoyez-moi une photo ou un document.");
+            return;
+          }
+          const entries = await fs.promises.readdir(inbox, { withFileTypes: true });
+          const files = await Promise.all(entries.filter((entry) => entry.isFile()).map(async (entry) => {
+            const fullPath = path.join(inbox, entry.name);
+            const stat = await fs.promises.stat(fullPath);
+            return { name: entry.name, size: stat.size, mtime: stat.mtimeMs };
+          }));
+          files.sort((a, b) => b.mtime - a.mtime);
+          if (!files.length) {
+            await ctx.reply("📭 Le dossier Telegram-Inbox est vide.");
+            return;
+          }
+          const lines = files.slice(0, 20).map((file) =>
+            "📄 " + this.escapeMarkdown(file.name) + " — " +
+            (file.size < 1024 * 1024 ? Math.max(1, Math.round(file.size / 1024)) + " Ko" : (file.size / 1024 / 1024).toFixed(1) + " Mo")
+          );
+          await this.sendLongMessage(ctx.chat.id,
+            "📥 Fichiers reçus — Telegram-Inbox\n\n" + lines.join("\n") +
+            (files.length > 20 ? "\n\n20 fichiers affichés sur " + files.length + "." : "") +
+            "\n\nPour renvoyer un fichier : /send Telegram-Inbox/nom-du-fichier",
+            {}
+          );
+        } catch (err) {
+          await this.replySafe(ctx, "❌ Impossible de lister les fichiers reçus : " + (err instanceof Error ? err.message : String(err)));
+        }
+      });
+
+      // /send <chemin> [légende] — Envoie un fichier du workspace vers Telegram.
+      this.bot.command("send", async (ctx) => {
+        const raw = ctx.match?.trim() || "";
+        const match = raw.match(/^(?:"([^"]+)"|(\S+))(?:\s+([\s\S]+))?$/);
+        if (!match) {
+          await ctx.reply("Usage : /send <chemin> [légende]\nExemple : /send Telegram-Inbox/rapport.pdf\nPour un chemin avec espaces, utilisez des guillemets.");
+          return;
+        }
+        const relativePath = match[1] || match[2];
+        const caption = match[3]?.trim();
+        const result = await this.sendFromWorkspace(String(ctx.chat.id), relativePath, caption ? { caption } : {});
+        if (result.success) {
+          await ctx.reply("✅ Fichier envoyé : " + relativePath);
+        } else {
+          await this.replySafe(ctx, "❌ Envoi impossible : " + (result.error || "erreur inconnue"));
+        }
       });
 
       // /clear
@@ -820,6 +879,42 @@ export class TelegramService {
         }
       });
 
+      // Réception des photos Telegram : conserver la meilleure résolution disponible.
+      this.bot.on("message:photo", async (ctx) => {
+        const photos = ctx.message.photo;
+        const photo = photos[photos.length - 1];
+        try {
+          const name = "photo-" + new Date().toISOString().replace(/[:.]/g, "-") + ".jpg";
+          const saved = await this.saveIncomingTelegramFile(photo.file_id, name, photo.file_size);
+          let reply = "✅ Photo importée dans Leanna\n\nFichier : " + saved.relativePath + "\nTaille : " +
+            (saved.size / 1024).toFixed(0) + " Ko";
+          if (ctx.message.caption) reply += "\n\nLégende reçue : " + ctx.message.caption.slice(0, 500);
+          reply += "\n\nLe fichier est enregistré dans le projet. Vous pouvez maintenant me demander de l'analyser.";
+          await this.replySafe(ctx, reply);
+        } catch (err) {
+          await this.replySafe(ctx, "❌ Photo non importée : " + (err instanceof Error ? err.message : String(err)));
+        }
+      });
+
+      // Réception des documents et fichiers Telegram.
+      this.bot.on("message:document", async (ctx) => {
+        const document = ctx.message.document;
+        try {
+          const saved = await this.saveIncomingTelegramFile(
+            document.file_id,
+            document.file_name || "document-" + Date.now(),
+            document.file_size
+          );
+          let reply = "✅ Fichier importé dans Leanna\n\nFichier : " + saved.relativePath + "\nTaille : " +
+            (saved.size / 1024).toFixed(0) + " Ko";
+          if (ctx.message.caption) reply += "\n\nLégende reçue : " + ctx.message.caption.slice(0, 500);
+          reply += "\n\nLe fichier est enregistré dans le projet. Il n'a pas été exécuté.";
+          await this.replySafe(ctx, reply);
+        } catch (err) {
+          await this.replySafe(ctx, "❌ Fichier non importé : " + (err instanceof Error ? err.message : String(err)));
+        }
+      });
+
       // Messages vocaux
       this.bot.on("message:voice", async (ctx) => {
         await ctx.reply(
@@ -948,6 +1043,8 @@ export class TelegramService {
         { command: "status", description: "État du système et projet actif" },
         { command: "health", description: "Diagnostic technique de Leanna" },
         { command: "ping", description: "Tester la connexion Telegram" },
+        { command: "files", description: "Lister les fichiers reçus" },
+        { command: "send", description: "Envoyer un fichier du projet" },
         { command: "project", description: "Voir ou changer de projet" },
         { command: "git", description: "Consulter l'état Git (lecture seule)" },
         { command: "recent", description: "Afficher les cinq dernières missions" },
@@ -1003,6 +1100,7 @@ export class TelegramService {
       console.warn("[Telegram] Erreur lors de l'arrêt :", (e as Error).message);
     } finally {
       this.bot = null;
+      this.botToken = null;
       this.isRunning = false;
       // Les boutons d'approbation Telegram ne répondront plus : on vide le suivi.
       // La résolution web et l'expiration côté Executor restent les filets actifs.
@@ -1052,6 +1150,67 @@ export class TelegramService {
     }
 
     return null;
+  }
+
+  /**
+   * Télécharge une pièce jointe Telegram dans Telegram-Inbox du workspace actif.
+   * Le contenu reste un fichier utilisateur non fiable : il n'est jamais exécuté.
+   */
+  private async saveIncomingTelegramFile(
+    fileId: string,
+    originalName: string,
+    declaredSize?: number
+  ): Promise<{ relativePath: string; size: number }> {
+    const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024;
+    if (!hasProject()) throw new Error("Aucun projet actif. Définissez-le avec /project.");
+    if (!this.bot || !this.botToken) throw new Error("Le bot Telegram n'est pas initialisé.");
+    if (typeof declaredSize === "number" && declaredSize > MAX_DOWNLOAD_BYTES) {
+      throw new Error("Fichier trop volumineux. La limite de réception est de 20 Mo.");
+    }
+
+    const file = await this.bot.api.getFile(fileId);
+    if (!file.file_path) throw new Error("Telegram n'a pas fourni de chemin de téléchargement.");
+    if (typeof file.file_size === "number" && file.file_size > MAX_DOWNLOAD_BYTES) {
+      throw new Error("Fichier trop volumineux. La limite de réception est de 20 Mo.");
+    }
+
+    const response = await fetch(
+      "https://api.telegram.org/file/bot" + this.botToken + "/" + file.file_path,
+      { signal: AbortSignal.timeout(30_000) }
+    );
+    if (!response.ok) throw new Error("Téléchargement Telegram impossible (HTTP " + response.status + ").");
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > MAX_DOWNLOAD_BYTES) throw new Error("Fichier trop volumineux. La limite de réception est de 20 Mo.");
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0) throw new Error("Le fichier reçu est vide.");
+    if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error("Fichier trop volumineux. La limite de réception est de 20 Mo.");
+
+    const workspaceRoot = await fs.promises.realpath(SELF_ROOT);
+    const inboxPath = path.join(workspaceRoot, "Telegram-Inbox");
+    await fs.promises.mkdir(inboxPath, { recursive: true });
+    const realInbox = await fs.promises.realpath(inboxPath);
+    const relativeInbox = path.relative(workspaceRoot, realInbox);
+    if (relativeInbox.startsWith("..") || path.isAbsolute(relativeInbox)) {
+      throw new Error("Le dossier Telegram-Inbox pointe en dehors du projet.");
+    }
+
+    const baseName = path.basename(String(originalName).replace(/\\/g, "/"));
+    const sanitized = baseName
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+      .replace(/^\.+$/, "file")
+      .trim()
+      .slice(0, 120) || "telegram-file";
+    const extension = path.extname(sanitized);
+    const stem = path.basename(sanitized, extension).slice(0, 80) || "file";
+    const uniqueName = Date.now() + "-" + randomUUID().slice(0, 8) + "-" + stem + extension;
+    const absolutePath = path.join(realInbox, uniqueName);
+    await fs.promises.writeFile(absolutePath, bytes, { flag: "wx", mode: 0o600 });
+
+    return {
+      relativePath: path.posix.join("Telegram-Inbox", uniqueName),
+      size: bytes.length,
+    };
   }
 
   private resolveInsideRoot(rootDir: string, relPath: string): string | null {
