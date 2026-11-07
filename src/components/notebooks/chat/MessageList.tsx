@@ -347,6 +347,14 @@ export function MessageList(props: Props) {
               </NbBadge>
               <NbIconButton icon={X} label="Fermer" size="sm" onClick={() => setHoveredCitation(null)} />
             </div>
+            {hoveredCitation.citation.filePath && (
+              <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                <FileText className="h-3 w-3 flex-shrink-0 text-[var(--notebook-accent)]" aria-hidden />
+                <span className="min-w-0 truncate font-mono" title={hoveredCitation.citation.filePath}>
+                  {hoveredCitation.citation.filePath}
+                </span>
+              </div>
+            )}
             <p className="custom-scrollbar max-h-56 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
               {hoveredCitation.fullContent}
             </p>

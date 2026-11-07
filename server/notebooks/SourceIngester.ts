@@ -69,10 +69,34 @@ async function githubApiFetch(endpoint: string): Promise<any> {
 interface SemanticBlock {
   content: string;
   section?: string;
+  /** Chemin du fichier d'origine (codebase/github-repo), propagé jusqu'au chunk. */
+  filePath?: string;
   page?: number;
   startChar: number;
   endChar: number;
   type: "section" | "paragraph" | "sentence-group";
+}
+
+/**
+ * Reconnaît un chemin de fichier dans un libellé de section, pour les sources
+ * de type codebase. Deux formats produits par l'ingestion :
+ *   - Codebase workspace (markdown) : heading `` `path/to/file.ts` ``
+ *   - GitHub repo (texte)          : séparateur `// === path/to/file.ts === (N bytes)`
+ * Retourne le chemin nettoyé, ou undefined si le libellé n'est pas un chemin.
+ */
+function detectFilePathLabel(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const label = raw.trim();
+  // Heading markdown entouré de backticks : `path/to/file.ts`
+  const backtick = label.match(/^`([^`]+)`$/);
+  const candidate = (backtick ? backtick[1] : label).trim();
+  // Un chemin plausible : contient un séparateur ou une extension de fichier,
+  // sans espace (les vrais titres de section en contiennent presque toujours).
+  if (/\s/.test(candidate)) return undefined;
+  if (/[/\\]/.test(candidate) || /\.[A-Za-z0-9]{1,8}$/.test(candidate)) {
+    return candidate.replace(/\\/g, "/");
+  }
+  return undefined;
 }
 
 // ─── Configuration du chunking ──────────────────────────────────────────────
@@ -635,6 +659,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
           blocks.push({
             content: currentContent.trim(),
             section: currentSection || undefined,
+            filePath: detectFilePathLabel(currentSection),
             startChar: currentStart,
             endChar: charPos,
             type: "section",
@@ -655,6 +680,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
       blocks.push({
         content: currentContent.trim(),
         section: currentSection || undefined,
+        filePath: detectFilePathLabel(currentSection),
         startChar: currentStart,
         endChar: charPos,
         type: "section",
@@ -727,6 +753,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     const lines = text.split("\n");
 
     let currentSection: string | undefined;
+    let currentFilePath: string | undefined;
     let currentContent = "";
     let currentStart = 0;
     let charPos = 0;
@@ -735,21 +762,42 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
       const line = lines[i];
       const nextLine = lines[i + 1] || "";
 
+      // Séparateur de fichier de l'ingestion GitHub : `// === path === (N bytes)`.
+      // Prioritaire : il ouvre un nouveau bloc portant la provenance du fichier.
+      const fileSep = line.match(/^\/\/\s*===\s*(.+?)\s*===(?:\s*\(\d+\s*bytes?\))?\s*$/);
+
       // Détecter un titre potentiel :
       // - Ligne courte (< 80 chars) suivie d'une ligne vide
       // - Ligne entièrement en majuscules (> 3 chars)
       // - Ligne suivie de === ou ---
-      const isTitle = (
+      const isTitle = !fileSep && (
         (line.trim().length > 3 && line.trim().length < 80 && line.trim() === line.trim().toUpperCase() && /[A-ZÀ-Ú]/.test(line)) ||
         (nextLine.match(/^[=]{3,}$/) || nextLine.match(/^[-]{3,}$/)) ||
         (line.match(/^\d+\.\s+[A-ZÀ-Ú]/) && line.length < 100)
       );
 
-      if (isTitle && currentContent.trim()) {
+      if (fileSep) {
+        if (currentContent.trim()) {
+          blocks.push({
+            content: currentContent.trim(),
+            section: currentSection,
+            filePath: currentFilePath,
+            startChar: currentStart,
+            endChar: charPos,
+            type: "paragraph",
+          });
+        }
+        const detected = detectFilePathLabel(fileSep[1]) || fileSep[1].trim();
+        currentFilePath = detected;
+        currentSection = detected;
+        currentContent = "";
+        currentStart = charPos + line.length + 1;
+      } else if (isTitle && currentContent.trim()) {
         // Sauvegarder le bloc précédent
         blocks.push({
           content: currentContent.trim(),
           section: currentSection,
+          filePath: currentFilePath,
           startChar: currentStart,
           endChar: charPos,
           type: "paragraph",
@@ -774,6 +822,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
       blocks.push({
         content: currentContent.trim(),
         section: currentSection,
+        filePath: currentFilePath,
         startChar: currentStart,
         endChar: charPos,
         type: "paragraph",
@@ -796,6 +845,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     const chunks: SourceChunk[] = [];
     let pendingContent = "";
     let pendingSection: string | undefined;
+    let pendingFilePath: string | undefined;
     let pendingPage: number | undefined;
     let pendingStart = 0;
     let pendingEnd = 0;
@@ -816,6 +866,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
           index: chunks.length,
           metadata: {
             section: pendingSection,
+            filePath: pendingFilePath,
             page: pendingPage,
             startChar: pendingStart,
             endChar: pendingEnd,
@@ -828,6 +879,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
 
       pendingContent = "";
       pendingSection = undefined;
+      pendingFilePath = undefined;
       pendingPage = undefined;
     };
 
@@ -842,6 +894,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
         for (const sub of subChunks) {
           pendingContent = sub.content;
           pendingSection = sub.section || block.section;
+          pendingFilePath = sub.filePath || block.filePath;
           pendingPage = sub.page || block.page;
           pendingStart = sub.startChar;
           pendingEnd = sub.endChar;
@@ -866,6 +919,9 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
       // Garder la première section rencontrée dans ce chunk
       if (!pendingSection && block.section) {
         pendingSection = block.section;
+      }
+      if (!pendingFilePath && block.filePath) {
+        pendingFilePath = block.filePath;
       }
       if (!pendingPage && block.page) {
         pendingPage = block.page;
@@ -894,6 +950,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
         subBlocks.push({
           content: current.trim(),
           section: block.section,
+          filePath: block.filePath,
           page: block.page,
           startChar: currentStart,
           endChar: currentStart + current.length,
@@ -910,6 +967,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
       subBlocks.push({
         content: current.trim(),
         section: block.section,
+        filePath: block.filePath,
         page: block.page,
         startChar: currentStart,
         endChar: block.endChar,

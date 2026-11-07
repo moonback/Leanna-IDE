@@ -482,8 +482,12 @@ export class RAGEngine {
 
     for (let i = 0; i < results.length; i++) {
       const { chunk, source, relevance } = results[i];
+      const filePath = chunk.metadata?.filePath;
+      const header = filePath
+        ? `[SOURCE ${i + 1}: "${source.title}" | Fichier: ${filePath} | Pertinence: ${(relevance * 100).toFixed(0)}%]`
+        : `[SOURCE ${i + 1}: "${source.title}" | Pertinence: ${(relevance * 100).toFixed(0)}%]`;
       sections.push(
-        `[SOURCE ${i + 1}: "${source.title}" | Pertinence: ${(relevance * 100).toFixed(0)}%]\n` +
+        `${header}\n` +
         `${chunk.content}\n` +
         `[/SOURCE ${i + 1}]`
       );
@@ -555,8 +559,8 @@ export class RAGEngine {
   extractCitations(
     response: string,
     ragResults: RAGSearchResult[]
-  ): { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number; ref?: number }[] {
-    const citations: { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number; ref?: number }[] = [];
+  ): Citation[] {
+    const citations: Citation[] = [];
     const cited = new Set<string>();
 
     // Chercher les références explicites [SOURCE N] ou [N]. Si le modèle a
@@ -580,6 +584,7 @@ export class RAGEngine {
             excerpt: result.chunk.content.slice(0, 200),
             relevance: result.relevance,
             ref: index + 1,
+            filePath: result.chunk.metadata?.filePath,
           });
         }
       }
@@ -595,6 +600,7 @@ export class RAGEngine {
             chunkId: result.chunk.id,
             excerpt: result.chunk.content.slice(0, 200),
             relevance: result.relevance,
+            filePath: result.chunk.metadata?.filePath,
           });
         }
       }

@@ -10,6 +10,8 @@ export interface Citation {
   relevance: number;
   /** Numéro N du marqueur [SOURCE N] dans la réponse (citations récentes uniquement) */
   ref?: number;
+  /** Chemin du fichier d'origine (sources codebase/github-repo), si connu. */
+  filePath?: string;
 }
 
 export interface CitationAudit {

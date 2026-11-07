@@ -158,6 +158,7 @@ interface NotebookCitation {
   chunkId: string;
   excerpt: string;
   relevance: number;
+  filePath?: string;
 }
 
 // ─── Attache le WebSocket server dédié au notebook ───────────────────────────
@@ -215,6 +216,7 @@ export function attachNotebookLiveWebSocket(
         chunkId: r.chunk.id,
         excerpt: r.chunk.content.slice(0, 240),
         relevance: r.relevance,
+        filePath: r.chunk.metadata?.filePath,
       }));
       return { context, citations };
     };

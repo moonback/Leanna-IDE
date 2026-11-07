@@ -19,6 +19,8 @@ export interface SourceChunk {
   metadata: {
     page?: number;
     section?: string;
+    /** Chemin du fichier d'origine pour les sources de type codebase/github-repo. */
+    filePath?: string;
     startChar: number;
     endChar: number;
   };
@@ -151,6 +153,8 @@ export interface Citation {
   relevance: number;
   /** Numéro N du marqueur [SOURCE N] dans la réponse (absent si citation implicite) */
   ref?: number;
+  /** Chemin du fichier d'origine (sources codebase/github-repo), si connu. */
+  filePath?: string;
 }
 
 export interface CitationAudit {
