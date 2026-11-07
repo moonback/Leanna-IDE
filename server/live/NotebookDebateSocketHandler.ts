@@ -218,13 +218,13 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
             sourceId: result.source.id, sourceTitle: result.source.title, chunkId: result.chunk.id,
             excerpt: result.chunk.content.slice(0, 240), relevance: result.relevance,
           }));
-          const evidence = results.map(result => \`[chunk:\${result.chunk.id}] [source:\${result.source.id}] \${result.source.title}\n\${result.chunk.content.slice(0, 1600)}\`).join("\n\n");
-          const userContext = latestUserQuestion ? \`\nQUESTION DE L'UTILISATEUR À TRAITER : \${latestUserQuestion}\nRéponds explicitement à cette question en t'appuyant sur les extraits.\` : "";
+          const evidence = results.map(result => `[chunk:${result.chunk.id}] [source:${result.source.id}] ${result.source.title}\n${result.chunk.content.slice(0, 1600)}`).join("\n\n");
+          const userContext = latestUserQuestion ? `\nQUESTION DE L'UTILISATEUR À TRAITER : ${latestUserQuestion}\nRéponds explicitement à cette question en t'appuyant sur les extraits.` : "";
           const prompt = speaker === "analyst"
-            ? \`Analyse le sujet : \${topic}. Tiens compte des interventions utilisateur et des objections précédentes.\${userContext}\nContexte précédent : \${previousText.slice(-2200)}\`
+            ? `Analyse le sujet : ${topic}. Tiens compte des interventions utilisateur et des objections précédentes.${userContext}\nContexte précédent : ${previousText.slice(-2200)}`
             : speaker === "critic"
-              ? \`Contredis et teste les arguments précédents sur « \${topic} ». Réponds aussi à la question de l'utilisateur si elle reste ouverte.\${userContext}\nIntervention précédente : \${previousText.slice(-2200)}\`
-              : \`Produis la synthèse finale du débat sur « \${topic} ». Distingue consensus, désaccords persistants et réponses aux questions de l'utilisateur. Dernière intervention : \${previousText.slice(-2200)}\`;
+              ? `Contredis et teste les arguments précédents sur « ${topic} ». Réponds aussi à la question de l'utilisateur si elle reste ouverte.${userContext}\nIntervention précédente : ${previousText.slice(-2200)}`
+              : `Produis la synthèse finale du débat sur « ${topic} ». Distingue consensus, désaccords persistants et réponses aux questions de l'utilisateur. Dernière intervention : ${previousText.slice(-2200)}`;
           send({ type: "speaker", speaker, state: "speaking" });
           const text = await turnRunners.get(speaker)!(prompt, evidence);
           const message: TurnMessage = { speaker, text: text || "Transcription indisponible ; consultez la sortie audio.", at: new Date().toISOString(), citations };
