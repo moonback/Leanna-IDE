@@ -9,6 +9,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useToast } from '../ui/Toast.js';
 import { api, apiVoid } from './api/client.js';
 import { AudioGenerator } from './audio/AudioGenerator.js';
@@ -25,6 +26,7 @@ interface Props {
   fullView?: boolean;
   onClose?: () => void;
   onViewDoc?: (doc: { id: string; title: string; type: string; content: string; createdAt: string }) => void;
+  playerDockElement?: HTMLElement | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -33,7 +35,7 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, fullView = false, onViewDoc }: Props) {
+export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, fullView = false, onViewDoc, playerDockElement }: Props) {
   const { success, error: toastError } = useToast();
 
   // ─── État de génération / configuration ────────────────────────────────────
@@ -198,7 +200,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     }
   }, [onViewDoc, fullView]);
 
-  return (
+  return (<>
     <div className={`h-full ${fullView ? 'flex flex-col lg:flex-row' : 'flex flex-col'}`}>
       <AudioGenerator
         fullView={fullView}
@@ -263,27 +265,32 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
             </form>
           </div>
         )}
-        <AudioPlayer
-          selectedOverview={selectedOverview}
-          playing={player.playing}
-          ttsLoading={player.ttsLoading}
-          currentLineIndex={player.currentLineIndex}
-          ttsProgress={player.ttsProgress}
-          ttsTotalLines={player.ttsTotalLines}
-          playbackSpeed={player.playbackSpeed}
-          onPlay={() => { if (podcastLive.connected) podcastLive.disconnect(); void player.playTTS(); }}
-          onStop={player.stopTTS}
-          onCycleSpeed={player.cycleSpeed}
-          generating={generating}
-          downloading={downloading}
-          onRegenerate={handleRegenerate}
-          onDelete={handleDelete}
-          onSaveToSandbox={handleSaveToSandbox}
-          onDownloadScript={handleDownloadScript}
-          formatDuration={formatDuration}
-        />
+
         </div>
       )}
+
     </div>
-  );
+    {selectedOverview && playerDockElement && createPortal(
+      <AudioPlayer
+        selectedOverview={selectedOverview}
+        playing={player.playing}
+        ttsLoading={player.ttsLoading}
+        currentLineIndex={player.currentLineIndex}
+        ttsProgress={player.ttsProgress}
+        ttsTotalLines={player.ttsTotalLines}
+        playbackSpeed={player.playbackSpeed}
+        onPlay={() => { if (podcastLive.connected) podcastLive.disconnect(); void player.playTTS(); }}
+        onStop={player.stopTTS}
+        onCycleSpeed={player.cycleSpeed}
+        generating={generating}
+        downloading={downloading}
+        onRegenerate={handleRegenerate}
+        onDelete={handleDelete}
+        onSaveToSandbox={handleSaveToSandbox}
+        onDownloadScript={handleDownloadScript}
+        formatDuration={formatDuration}
+      />,
+      playerDockElement,
+    )}
+  </>);
 }
