@@ -76,9 +76,9 @@ export function createGmailRouter(): Router {
     }
   });
 
-  router.post("/disconnect", (req, res) => {
+  router.post("/disconnect", async (req, res) => {
     try {
-      gmailService.disconnect(accountId(req.body?.account));
+      await gmailService.disconnect(accountId(req.body?.account));
       res.json({ status: "success", data: gmailService.getSettings() });
     } catch (error) {
       res.status(400).json({ status: "error", error: (error as Error).message });
