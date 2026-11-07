@@ -92,6 +92,7 @@ export function useLiveAPI() {
     transcript,
     addTranscript,
     clearTranscript,
+    restoreTranscript,
     addPendingImage,
     resolvePendingImage,
     failPendingImage,
@@ -667,12 +668,12 @@ export function useLiveAPI() {
     onLog: addLog,
   });
 
-  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full') => {
+  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', conversationId?: string) => {
     connectWebSocket(activeSkills, mode, initAudio, () => {
       cleanupAudio();
       clearTokenUsage();
       resetActivityState();
-    });
+    }, conversationId);
   }, [connectWebSocket, initAudio, cleanupAudio, clearTokenUsage, resetActivityState]);
 
   const disconnect = useCallback(() => {
@@ -938,7 +939,7 @@ export function useLiveAPI() {
       connect, disconnect,
       muted, toggleMute,
       wake,
-      logs, transcript, clearTranscript,
+      logs, transcript, clearTranscript, restoreTranscript,
       auditSteps,
       auditReport,
       scheduledTasks,
