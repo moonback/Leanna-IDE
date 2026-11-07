@@ -4,7 +4,7 @@ import React, {
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
-  Bot, Target, Globe, GitPullRequest, CalendarClock, ClipboardCheck, Stethoscope,
+  Bot, Target, Globe, GitPullRequest, CalendarClock, ClipboardCheck, Stethoscope, History,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -828,6 +828,8 @@ interface EmptyEditorStateProps {
   onOpenNotebooks?: () => void;
   /** Confie une invite à l'assistante (ouvre le chat et connecte si besoin). */
   onAskAssistant?: (prompt: string, displayText?: string) => void;
+  /** Reprend une conversation persistée à partir de son identifiant. */
+  onResumeConversation?: (conversationId: string) => void;
 }
 
 export const EmptyEditorState = React.memo(function EmptyEditorState({
@@ -837,6 +839,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   onOpenChat,
   onOpenNotebooks,
   onAskAssistant,
+  onResumeConversation,
 }: EmptyEditorStateProps) {
   const ws = useWorkspaceState();
   const { connected, isBusy, connect, clearTranscript, clearActivity } = useLiveAPIContext();
@@ -845,6 +848,33 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
+  const [lastConversation, setLastConversation] = useState<{ id: string; title: string | null; message_count: number; started_at: string } | null>(null);
+  const [loadingLastConversation, setLoadingLastConversation] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingLastConversation(true);
+    fetch('/api/conversations?limit=1', { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        const latest = Array.isArray(data?.conversations) ? data.conversations[0] : null;
+        setLastConversation(latest && typeof latest.id === 'string' && Number(latest.message_count) > 0
+          ? { id: latest.id, title: latest.title ?? null, message_count: Number(latest.message_count), started_at: latest.started_at }
+          : null);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setLastConversation(null);
+          console.warn('[EmptyEditorState] Impossible de charger la dernière conversation:', error);
+        }
+      })
+      .finally(() => { if (!cancelled) setLoadingLastConversation(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const geminiStatus = useGeminiStatus();
   const gitInfo = useGitInfo();
@@ -1074,6 +1104,19 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
             {/* auto-fit : suit la largeur RÉELLE de la scène (explorateur, dock
                 droit et chat la réduisent), pas celle de la fenêtre. */}
             <div className="lea-stagger grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+              <ActionCard
+                icon={History}
+                title="Reprendre discussion"
+                description={loadingLastConversation
+                  ? 'Recherche de votre dernière conversation…'
+                  : lastConversation
+                    ? (lastConversation.title || 'Dernière conversation')
+                    : 'Aucune conversation précédente à reprendre'}
+                onClick={() => lastConversation && onResumeConversation?.(lastConversation.id)}
+                disabled={loadingLastConversation || !lastConversation || !onResumeConversation}
+                reduceMotion={reduceMotion}
+                accent="#a78bfa"
+              />
               <ActionCard
                 icon={Bot} title="Agents" description="Flotte et activité"
                 onClick={handleOpenAgents} reduceMotion={reduceMotion}
