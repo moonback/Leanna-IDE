@@ -265,6 +265,58 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
   useEffect(() => { loadNotebook(); }, [loadNotebook]);
 
+  // Synchroniser les statuts d'indexation sans recharger tout le Notebook :
+  // l'indexation vectorielle se termine après l'ingestion du fichier et le
+  // premier chargement peut donc encore voir "pending".
+  useEffect(() => {
+    if (!notebook) return;
+    let cancelled = false;
+    const refreshIndexing = async () => {
+      try {
+        const result = await api<{
+          indexing: {
+            sources: Array<{
+              id: string;
+              indexingStatus: NonNullable<NotebookData['sources'][number]['indexingStatus']>;
+              indexingAttempts: number;
+              indexingError?: string;
+              indexingUpdatedAt?: string;
+              indexingNextRetryAt?: string;
+              indexingHistory?: unknown[];
+            }>;
+          };
+        }>(`/api/notebooks/${notebookId}/embeddings/indexing-status`);
+        if (cancelled) return;
+        const byId = new Map(result.indexing.sources.map(source => [source.id, source]));
+        setNotebook(current => {
+          if (!current || current.id !== notebookId) return current;
+          let changed = false;
+          const sources = current.sources.map(source => {
+            const status = byId.get(source.id);
+            if (!status) return source;
+            if (source.indexingStatus === status.indexingStatus
+              && source.indexingAttempts === status.indexingAttempts
+              && source.indexingError === status.indexingError
+              && source.indexingUpdatedAt === status.indexingUpdatedAt
+              && source.indexingNextRetryAt === status.indexingNextRetryAt) return source;
+            changed = true;
+            return { ...source, ...status };
+          });
+          return changed ? { ...current, sources } : current;
+        });
+      } catch {
+        // Le statut détaillé reste disponible dans le moniteur ; une erreur
+        // de rafraîchissement ne doit pas bloquer l'édition du Notebook.
+      }
+    };
+    void refreshIndexing();
+    const timer = window.setInterval(() => { void refreshIndexing(); }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [notebookId, Boolean(notebook)]);
+
   // Listen for external source changes
   useEffect(() => {
     const handler = (e: Event) => {
