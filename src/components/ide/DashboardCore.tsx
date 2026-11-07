@@ -1,0 +1,77 @@
+import React from 'react';
+import { Activity, Bot, Power, PowerOff } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+
+interface DashboardCoreProps {
+  aiName: string;
+  connected: boolean;
+  connecting: boolean;
+  onToggleConnection: () => void;
+}
+
+/** Noyau visuel du dashboard : son état est exclusivement dérivé de la session Live réelle. */
+export const DashboardCore = React.memo(function DashboardCore({
+  aiName, connected, connecting, onToggleConnection,
+}: DashboardCoreProps) {
+  const reduce = !!useReducedMotion();
+  const status = connecting ? 'Connexion en cours' : connected ? 'Session connectée' : 'En attente de connexion';
+  const accent = connected ? 'var(--color-success, #22c55e)' : 'var(--accent-primary)';
+
+  return (
+    <section
+      className="relative mb-4 flex min-h-[150px] flex-col items-center justify-between gap-4 overflow-hidden rounded-2xl border p-4 sm:flex-row sm:px-6"
+      style={{
+        borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--border-base))',
+        background: 'linear-gradient(115deg, color-mix(in srgb, var(--bg-panel) 96%, var(--accent-primary) 4%), color-mix(in srgb, var(--bg-secondary) 90%, transparent))',
+        boxShadow: 'inset 0 1px 0 color-mix(in srgb, white 7%, transparent), 0 18px 48px color-mix(in srgb, var(--bg) 28%, transparent)',
+        transformStyle: 'preserve-3d',
+      }}
+      aria-label={`Noyau de contrôle ${aiName} : ${status}`}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden
+        style={{ backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px)', backgroundSize: '28px 28px', maskImage: 'linear-gradient(90deg, transparent, black 35%, black 75%, transparent)' }} />
+      <div className="relative z-10 flex items-center gap-4">
+        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center" style={{ perspective: '600px' }}>
+          <motion.div className="absolute inset-1 rounded-full border"
+            style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 55%, transparent)', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 18%, transparent)' }}
+            animate={reduce ? undefined : { rotate: 360 }}
+            transition={{ duration: 24, repeat: Infinity, ease: 'linear' }} />
+          <motion.div className="absolute inset-3 rounded-full border border-dashed"
+            style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 38%, transparent)' }}
+            animate={reduce ? undefined : { rotate: -360 }}
+            transition={{ duration: 32, repeat: Infinity, ease: 'linear' }} />
+          <motion.div className="absolute inset-5 rounded-full"
+            style={{ background: `radial-gradient(circle, color-mix(in srgb, ${accent} 35%, transparent), color-mix(in srgb, ${accent} 8%, transparent) 65%, transparent)`, boxShadow: `0 0 30px color-mix(in srgb, ${accent} 24%, transparent)` }}
+            animate={reduce ? undefined : { scale: [0.92, 1.08, 0.92], opacity: [0.72, 1, 0.72] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
+          <Bot size={25} style={{ color: 'var(--text-primary)', zIndex: 1, filter: `drop-shadow(0 0 8px ${accent})` }} />
+          <span className="absolute right-2 top-3 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 12px ${accent}` }} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--accent-primary)' }}>
+            <Activity size={12} /> Centre de contrôle
+          </div>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{aiName} Core</h2>
+          <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
+            {status}
+          </div>
+        </div>
+      </div>
+      <div className="relative z-10 flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-col sm:items-end">
+        <div className="text-right">
+          <div className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>SESSION LIVE</div>
+          <div className="text-sm font-semibold" style={{ color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-primary)' }}>{connected ? 'ACTIVE' : connecting ? 'CONNECTING' : 'IDLE'}</div>
+        </div>
+        <button type="button" onClick={onToggleConnection} disabled={connecting}
+          className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-50"
+          style={connected
+            ? { borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)' }
+            : { borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-primary)', color: 'white' }}>
+          {connected ? <PowerOff size={13} /> : <Power size={13} />}
+          {connecting ? 'Connexion…' : connected ? 'Déconnecter' : 'Connecter Leanna'}
+        </button>
+      </div>
+    </section>
+  );
+});
