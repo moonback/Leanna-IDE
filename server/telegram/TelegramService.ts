@@ -51,6 +51,8 @@ export interface TelegramApprovalRequest {
    * - "timeout"  : la demande a expiré
    */
   onDecision: (approved: boolean, source: "telegram" | "timeout") => void;
+  chatId?: string;
+  allowedUserId?: string;
 }
 
 /** État interne d'une approbation en attente, suivie pour pouvoir éditer le message. */
@@ -1008,6 +1010,15 @@ export class TelegramService {
         const approved = decisionToken === "yes";
 
         const tracked = this.pendingApprovals.get(actionId);
+        if (tracked && !tracked.resolved) {
+          const callbackChatId = ctx.chat?.id != null ? String(ctx.chat.id) : "";
+          const callbackUserId = ctx.from?.id != null ? String(ctx.from.id) : "";
+          if (callbackChatId !== tracked.chatId ||
+              (tracked.request.allowedUserId && callbackUserId !== tracked.request.allowedUserId)) {
+            await ctx.answerCallbackQuery({ text: "Cette approbation ne vous est pas destinée.", show_alert: true }).catch(() => {});
+            return;
+          }
+        }
         if (!tracked || tracked.resolved) {
           await ctx.answerCallbackQuery({
             text: "Cette demande a déjà été traitée ou a expiré.",
@@ -1401,7 +1412,7 @@ export class TelegramService {
   public async sendApprovalRequest(request: TelegramApprovalRequest): Promise<boolean> {
     if (!this.isRunning || !this.bot) return false;
 
-    let targetChatId = this.config.defaultChatId;
+    let targetChatId = request.chatId || this.config.defaultChatId;
     if (!targetChatId) {
       targetChatId = this.config.allowedUsers.find((u) => /^\d+$/.test(u.trim()));
     }
@@ -1448,6 +1459,37 @@ export class TelegramService {
    * No-op si l'actionId est inconnu ou déjà résolu — garantit l'idempotence quel
    * que soit l'ordre d'arrivée (clic Telegram vs résolution web).
    */
+  /**
+   * Approbation Telegram dédiée aux transferts de fichiers locaux.
+   * Refus par défaut après 30 secondes ; décision à usage unique.
+   */
+  public async requestFileTransferApproval(chatId: string, relativePath: string, allowedUserId?: string): Promise<boolean> {
+    const actionId = "file-" + randomUUID();
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (approved: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(approved);
+      };
+      const timer = setTimeout(() => {
+        finish(false);
+        void this.closeApprovalRequest(actionId, "timeout");
+      }, 30_000);
+      void this.sendApprovalRequest({
+        actionId,
+        missionId: "transfert-fichier",
+        skill: "telegram_send_from_workspace",
+        reason: "Autoriser l'envoi de ce fichier vers le chat Telegram indiqué ?",
+        args: { fichier: relativePath, destinataire: chatId },
+        chatId,
+        allowedUserId,
+        onDecision: (approved) => finish(approved),
+      }).then((sent) => { if (!sent) finish(false); }).catch(() => finish(false));
+    });
+  }
+
   public async closeApprovalRequest(
     actionId: string,
     outcome: "approved" | "rejected" | "timeout"
