@@ -623,3 +623,17 @@ Compléments de la dixième passe :
 | Compatibilité historique | Préservée | L'absence de indexingStatus reste neutre : aucun état de succès n'est inventé pour les sources historiques. |
 
 **Validation restante :** le code a été poussé sur une branche dédiée, mais le typecheck, les tests UI, le lint et la vérification visuelle Electron doivent encore être exécutés dans l'environnement local. Vérifier en particulier le redimensionnement souris/tactile, les raccourcis sous Windows/macOS, le repli indépendant des panneaux, le comportement à 1024 px et la persistance après redémarrage.
+
+
+### Treizième passe — Studio de génération orienté intention
+
+| Sujet | État | Détail |
+|---|---|---|
+| Organisation par intention | Implémenté | Les formats rapides sont regroupés en catégories Comprendre, Apprendre, Analyser et Organiser ; les rapports spécialisés disposent de la catégorie Explorer. |
+| Recherche de formats | Implémenté | Recherche locale sur le nom et la description des générateurs, sans nouvel appel API. Effacement et remise à zéro des filtres disponibles. |
+| Découverte des formats | Implémenté | Les cartes affichent une description courte, conservent les infobulles détaillées et exposent un libellé accessible. |
+| Rapports spécialisés | Préservé | La carte ouvre le ReportModal existant et ses 12 modèles ; aucune nouvelle logique de génération ni route API n'a été créée. La recherche reconnaît les noms des modèles de rapports. |
+| Générations existantes | Préservées | Les actions continuent d'utiliser `handleGenerate`, la file d'attente, les modales d'infographie et les indicateurs de tâches actifs déjà présents. |
+| État sans résultat | Implémenté | Un état vide explique qu'aucun format ne correspond et permet de réinitialiser les filtres. |
+
+**Validation restante :** exécuter `npm run typecheck`, `npm run lint:eslint:notebooks` et `npm run test:ui` dans l'environnement local, puis vérifier visuellement la densité des cartes, la navigation clavier, les catégories et la recherche sur les formats et rapports.
