@@ -30,7 +30,10 @@ export class GmailService {
 
   private get configPath(): string {
     const override = process.env.LEANNA_EMAIL_CONFIG_PATH?.trim();
-    return override || path.join(Leanna_APP_ROOT, ".Leanna-email.json");
+    const configBase = process.env.Leanna_CONFIG_PATH?.trim()
+      || process.env.ELECTRON_APP_PATH?.trim()
+      || Leanna_APP_ROOT;
+    return override || path.join(configBase, ".Leanna-email.json");
   }
 
   private loadConfig(): EmailConfig {
