@@ -193,6 +193,16 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     success('Script téléchargé');
   }, [selectedOverview, success]);
 
+  const handleDownloadAudio = useCallback(() => {
+    if (!selectedOverview) return;
+    const link = document.createElement('a');
+    link.href = `/api/notebooks/${encodeURIComponent(notebookId)}/audio-overviews/${encodeURIComponent(selectedOverview.id)}/audio-track?download=1`;
+    link.download = `podcast-${selectedOverview.id}.wav`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [notebookId, selectedOverview]);
+
   const handleSelectOverview = useCallback((ov: AudioOverview) => {
     setSelectedOverview(ov);
     if (onViewDoc && !fullView) {
@@ -237,7 +247,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--notebook-border)] px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--text-primary)]">Podcast interactif</p>
-            <p className="text-xs text-[var(--text-muted)]">Discutez avec {selectedOverview.hostName || 'Leanna'} et explorez les sources pendant l'émission. Session Live à une seule voix.</p>
+            <p className="text-xs text-[var(--text-muted)]">Épisode audio pré-généré avec deux voix distinctes. Vous pouvez aussi rejoindre Leanna en conversation Live.</p>
           </div>
           <div className="flex items-center gap-2">
             {podcastLive.connected && <button type="button" onClick={podcastLive.toggleMute} className="rounded-lg border border-[var(--notebook-border)] px-3 py-1.5 text-xs text-[var(--text-primary)]">{podcastLive.muted ? 'Activer le micro' : 'Couper le micro'}</button>}
@@ -288,6 +298,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         onDelete={handleDelete}
         onSaveToSandbox={handleSaveToSandbox}
         onDownloadScript={handleDownloadScript}
+        onDownloadAudio={handleDownloadAudio}
         formatDuration={formatDuration}
       />,
       playerDockElement,
