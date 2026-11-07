@@ -6,7 +6,7 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
-import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import type { SpringTransition } from '../motionTypes.js';
 import { NbButton, NbTextarea, NbSectionLabel, NbBadge } from '../ui/primitives.js';
