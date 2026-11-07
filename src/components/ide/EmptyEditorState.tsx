@@ -4,7 +4,7 @@ import React, {
 import {
   FolderOpen, KeyRound, AlertCircle, BookOpen,
   Sparkles, RotateCcw, Trash2, Loader2, Play, GitBranch, ArrowRight,
-  Bot, Target, Globe, GitPullRequest, CalendarClock, ClipboardCheck, Stethoscope, History,
+  Bot, Target, Globe, GitPullRequest, CalendarClock, ClipboardCheck, Stethoscope, History, MessageSquare, ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
@@ -848,27 +848,34 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
-  const [lastConversation, setLastConversation] = useState<{ id: string; title: string | null; message_count: number; started_at: string } | null>(null);
+  const [recentConversations, setRecentConversations] = useState<Array<{ id: string; title: string | null; message_count: number; started_at: string }>>([]);
   const [loadingLastConversation, setLoadingLastConversation] = useState(true);
+  const [showConversationHistory, setShowConversationHistory] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoadingLastConversation(true);
-    fetch('/api/conversations?limit=1', { credentials: 'include' })
+    fetch('/api/conversations?limit=5', { credentials: 'include' })
       .then(async response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       })
       .then(data => {
         if (cancelled) return;
-        const latest = Array.isArray(data?.conversations) ? data.conversations[0] : null;
-        setLastConversation(latest && typeof latest.id === 'string' && Number(latest.message_count) > 0
-          ? { id: latest.id, title: latest.title ?? null, message_count: Number(latest.message_count), started_at: latest.started_at }
-          : null);
+        const recent = Array.isArray(data?.conversations) ? data.conversations : [];
+        setRecentConversations(recent
+          .filter((conversation: any) => typeof conversation.id === 'string' && Number(conversation.message_count) > 0)
+          .slice(0, 5)
+          .map((conversation: any) => ({
+            id: conversation.id,
+            title: conversation.title ?? null,
+            message_count: Number(conversation.message_count),
+            started_at: conversation.started_at,
+          })));
       })
       .catch(error => {
         if (!cancelled) {
-          setLastConversation(null);
+          setRecentConversations([]);
           console.warn('[EmptyEditorState] Impossible de charger la dernière conversation:', error);
         }
       })
@@ -1108,12 +1115,12 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 icon={History}
                 title="Reprendre discussion"
                 description={loadingLastConversation
-                  ? 'Recherche de votre dernière conversation…'
-                  : lastConversation
-                    ? (lastConversation.title || 'Dernière conversation')
-                    : 'Aucune conversation précédente à reprendre'}
-                onClick={() => lastConversation && onResumeConversation?.(lastConversation.id)}
-                disabled={loadingLastConversation || !lastConversation || !onResumeConversation}
+                  ? 'Chargement de votre historique…'
+                  : recentConversations.length
+                    ? `${recentConversations.length} discussion${recentConversations.length > 1 ? 's' : ''} récente${recentConversations.length > 1 ? 's' : ''} disponible${recentConversations.length > 1 ? 's' : ''}`
+                    : 'Aucune conversation précédente'}
+                onClick={() => setShowConversationHistory(value => !value)}
+                disabled={loadingLastConversation || recentConversations.length === 0}
                 reduceMotion={reduceMotion}
                 accent="#a78bfa"
               />
@@ -1138,6 +1145,61 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                 accent="#a78bfa"
               />
             </div>
+
+            <AnimatePresence initial={false}>
+              {showConversationHistory && recentConversations.length > 0 && (
+                <motion.section
+                  key="recent-conversations"
+                  initial={reduceMotion ? false : { opacity: 0, height: 0, y: -6 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -6 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.2 }}
+                  className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+                  aria-label="Dernières discussions"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-[var(--text)]">Vos dernières discussions</h3>
+                      <p className="mt-0.5 text-xs text-[var(--muted)]">Sélectionnez une conversation pour la reprendre.</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[var(--surface-hover)] px-2 py-1 text-xs text-[var(--muted)]">
+                      {recentConversations.length} / 5
+                    </span>
+                  </div>
+                  <div className="divide-y divide-[var(--border)]">
+                    {recentConversations.map((conversation, index) => {
+                      const date = conversation.started_at ? new Date(conversation.started_at) : null;
+                      const dateLabel = date && !Number.isNaN(date.getTime())
+                        ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+                        : 'Date inconnue';
+                      return (
+                        <button
+                          key={conversation.id}
+                          type="button"
+                          onClick={() => onResumeConversation?.(conversation.id)}
+                          disabled={!onResumeConversation}
+                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label={`Reprendre ${conversation.title || `Discussion ${index + 1}`}, ${conversation.message_count} messages, ${dateLabel}`}
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--muted)]">
+                            <MessageSquare size={16} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-[var(--text)]">
+                              {conversation.title?.trim() || `Discussion du ${dateLabel.split(' à ')[0]}`}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">
+                              {dateLabel} · {conversation.message_count} message{conversation.message_count > 1 ? 's' : ''}
+                            </span>
+                          </span>
+                          <ChevronRight size={17} className="shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text)]" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
           </motion.section>
 
           {/* ── Suggestions proactives (visibles uniquement quand l'assistante est activée) ── */}
