@@ -6,7 +6,7 @@ import {
   Bot, Target, Clock3, Wrench,
 } from 'lucide-react';
 import type { ActivityStep, ReasoningState } from '../../hooks/useActivity.js';
-import { getAgentTasks, getToolActivities, subscribe } from '../../stores/agentActivityStore.js';
+import { getAgentTasks, getToolActivities, getAgentDisplayName, subscribe } from '../../stores/agentActivityStore.js';
 import { type Phase, PHASE_META, PHASE_ORDER, toolToPhase } from './activityPhases.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -184,11 +184,16 @@ export function UnifiedTimeline({ steps, reasoning }: UnifiedTimelineProps) {
                           {running ? (
                             <Loader2 size={11} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
                           ) : (
-                            <CheckCircle2 size={11} className="flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                            <CheckCircle2 size={11} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
                           )}
-                          <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--text-primary)' }} title={tool.tool}>
-                            {tool.label}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }} title={tool.tool}>
+                              {tool.label}
+                            </span>
+                            <span className="block text-[10px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+                              {getAgentDisplayName(tool.agentId)}
+                            </span>
+                          </div>
                           <span className="text-[10px] font-mono tabular-nums flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
                             {running ? 'En cours' : `${(durationMs / 1000).toFixed(1)} s`}
                           </span>
