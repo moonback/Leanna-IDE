@@ -36,6 +36,62 @@ export interface SearchResult {
   rank: number;
 }
 
+const CONVERSATION_TITLE_MAX_LENGTH = 50;
+
+/** Normalize an AI-generated title and enforce the 50-character limit. */
+function normalizeConversationTitle(value: string): string {
+  const cleaned = value
+    .trim()
+    .replace(/^["'«»\s]+|["'«»\s]+$/g, "")
+    .replace(/^(titre|sujet)\s*:\s*/i, "")
+    .replace(/[.!?;:,]+$/g, "")
+    .replace(/\s+/g, " ");
+  const characters = Array.from(cleaned);
+  if (characters.length <= CONVERSATION_TITLE_MAX_LENGTH) return cleaned;
+  return Array.from(characters.slice(0, CONVERSATION_TITLE_MAX_LENGTH - 1)).join("").trimEnd() + "…";
+}
+
+/**
+ * Generate a concise, descriptive conversation title (maximum 50 characters).
+ * Falls back to a safely truncated version of the first user message.
+ */
+async function generateConversationTitle(messages: { role: string; content: string }[]): Promise<string | null> {
+  const firstUserMessage = messages.find(message => message.role === "user")?.content?.trim();
+  if (!firstUserMessage) return null;
+
+  const fallback = normalizeConversationTitle(firstUserMessage);
+  const transcript = messages
+    .slice(0, 8)
+    .map(message => `${message.role === "user" ? "Utilisateur" : "Assistant"}: ${message.content.slice(0, 350)}`)
+    .join("\n")
+    .slice(0, 2200);
+
+  try {
+    const response = await generateText({
+      prompt: [
+        "Crée un titre très court en français pour cette conversation.",
+        "Le titre doit résumer précisément le sujet principal, pas recopier la demande.",
+        "Maximum absolu : 50 caractères, espaces compris.",
+        "Une seule ligne, sans guillemets, sans préambule, sans ponctuation finale.",
+        "Exemples : « Corriger le bug de connexion », « Refonte du panneau de chat », « Préparer un repas avec les restes ».",
+        "",
+        transcript,
+      ].join("\n"),
+      temperature: 0.2,
+      maxTokens: 40,
+    });
+    const title = response.text ? normalizeConversationTitle(response.text) : "";
+    return title || fallback;
+  } catch (error: any) {
+    if (error.status === 402 || error.message?.includes("402")) {
+      logger.warn("Titre IA non généré : crédits insuffisants, utilisation du premier message.");
+    } else {
+      logger.warn("Échec de génération du titre IA, utilisation du premier message.", error);
+    }
+    return fallback;
+  }
+}
+
 // ── Supabase helper ─────────────────────────────────────────────────────────
 
 function getSupabaseClient(): SupabaseClient {
@@ -176,7 +232,7 @@ export async function saveMessage(
 
   const updates: Record<string, any> = { message_count: count || 0 };
 
-  // Auto-generate title from first user message
+  // Generate a descriptive title from the opening exchange (maximum 50 characters).
   if (role === "user") {
     const { data: conv } = await supabase
       .from("conversations")
@@ -185,7 +241,13 @@ export async function saveMessage(
       .single();
 
     if (!conv?.title) {
-      updates.title = content.trim().slice(0, 80) + (content.trim().length > 80 ? "…" : "");
+      const { data: openingMessages } = await supabase
+        .from("conversation_messages")
+        .select("role, content")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true })
+        .limit(4);
+      updates.title = await generateConversationTitle(openingMessages?.length ? openingMessages : [{ role, content }]);
     }
   }
 
@@ -279,9 +341,11 @@ export async function clearAllConversations(): Promise<number> {
 
 export async function updateConversationTitle(conversationId: string, title: string): Promise<void> {
   const supabase = getSupabaseClient();
+  const normalizedTitle = normalizeConversationTitle(title);
+  if (!normalizedTitle) throw new Error("Le titre ne peut pas être vide.");
   const { error } = await supabase
     .from("conversations")
-    .update({ title })
+    .update({ title: normalizedTitle })
     .eq("id", conversationId);
 
   if (error) throw new Error(error.message);
