@@ -346,6 +346,7 @@ export const StatusBar = memo(function StatusBar({
   onToggleLogs,
   onToggleMissions,
   onToggleTelegram,
+  onToggleEmail,
   onToggleModelPicker,
   onToggleTokenDetail,
   onToggleImpact,
