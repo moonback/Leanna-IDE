@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, CirclePause, CirclePlay, Mic2, Radio, Square, Users, ShieldCheck, Clock3 } from "lucide-react";
+import { BookOpen, CirclePause, CirclePlay, Mic2, Radio, Square, Users, ShieldCheck, Clock3, Send, Mic, MicOff } from "lucide-react";
 
 type Source = { id: string; title: string; indexingStatus?: string };
-type Speaker = "analyst" | "critic" | "moderator";
+type Speaker = "analyst" | "critic" | "moderator" | "user";
 type DebateTurn = { speaker: Speaker; text: string; at: string; citations: Array<{ sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number }> };
 type Status = "setup" | "connecting" | "running" | "paused" | "stopping" | "completed" | "stopped" | "error";
 
@@ -10,6 +10,7 @@ const SPEAKERS: Record<Speaker, { label: string; role: string; initials: string 
   analyst: { label: "Analyste", role: "Construit l'argumentation", initials: "A" },
   critic: { label: "Contradicteur", role: "Teste les arguments et les preuves", initials: "C" },
   moderator: { label: "Modérateur", role: "Dégage consensus et désaccords", initials: "M" },
+  user: { label: "Vous", role: "Intervention utilisateur", initials: "Vous" },
 };
 
 function pcm16Base64ToBuffer(context: AudioContext, base64: string): AudioBuffer | null {
@@ -47,6 +48,10 @@ export function NotebookDebatePanel({
   const [liveText, setLiveText] = useState("");
   const [error, setError] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [interventionText, setInterventionText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [queuedIntervention, setQueuedIntervention] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const audioEnabledRef = useRef(true);
   useEffect(() => { audioEnabledRef.current = audioEnabled; }, [audioEnabled]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -73,7 +78,45 @@ export function NotebookDebatePanel({
     audioCursorRef.current = 0;
   }, []);
 
-  useEffect(() => () => stopSocket(), [stopSocket]);
+  useEffect(() => () => {
+    try { recognitionRef.current?.abort(); } catch { /* microphone already stopped */ }
+    stopSocket();
+  }, [stopSocket]);
+
+  const sendIntervention = () => {
+    const text = interventionText.trim();
+    const socket = wsRef.current;
+    if (!text || socket?.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "intervene", text }));
+    setInterventionText("");
+    setQueuedIntervention(true);
+  };
+
+  const toggleDictation = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("La dictée vocale n’est pas disponible dans ce navigateur. Vous pouvez saisir votre question au clavier.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event: any) => {
+      const spoken = Array.from(event.results || []).map((result: any) => result[0]?.transcript || "").join(" ").trim();
+      if (spoken) setInterventionText(current => [current, spoken].filter(Boolean).join(" ").slice(0, 1200));
+    };
+    recognition.onerror = () => { setError("La reconnaissance vocale a échoué. Vérifiez l’autorisation du microphone."); setIsListening(false); };
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    try { recognition.start(); setIsListening(true); }
+    catch { setIsListening(false); setError("Impossible de démarrer le microphone."); }
+  };
 
   const start = async () => {
     if (!topic.trim() || selectedSources.length === 0) return;
@@ -92,6 +135,8 @@ export function NotebookDebatePanel({
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.type === "status") setStatus(message.status as Status);
       if (message.type === "document_saved") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
+      if (message.type === "intervention_queued") setQueuedIntervention(true);
+      if (message.type === "orchestration") setQueuedIntervention(false);
       if (message.type === "speaker") setSpeaker(message.state === "speaking" ? message.speaker : null);
       if (message.type === "transcript" && message.message) {
         setTurns(current => [...current, message.message as DebateTurn]);
@@ -208,6 +253,14 @@ export function NotebookDebatePanel({
             {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
             <div ref={turnsEndRef} />
           </div>
+          {isActive && <div className="flex-shrink-0 border-t border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-medium text-[var(--text-secondary)]">Intervenir dans le débat</span><span className="text-[10px] text-[var(--text-muted)]">{queuedIntervention ? "Intervention en attente de traitement" : "Votre question sera traitée au prochain tour"}</span></div>
+            <div className="flex items-end gap-2">
+              <button type="button" onClick={toggleDictation} aria-label={isListening ? "Arrêter la dictée" : "Dicter une intervention"} title={isListening ? "Arrêter la dictée" : "Dicter une intervention"} className={\`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border \${isListening ? "border-red-500 bg-red-500/10 text-red-500" : "border-[var(--notebook-border)] text-[var(--text-secondary)]"}\`}>{isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button>
+              <textarea value={interventionText} onChange={event => setInterventionText(event.target.value.slice(0, 1200))} rows={2} maxLength={1200} placeholder="Posez une question aux deux IA… ou utilisez le microphone" className="min-h-[40px] max-h-24 min-w-0 flex-1 resize-y rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--notebook-accent)]" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendIntervention(); } }} />
+              <button type="button" disabled={!interventionText.trim()} onClick={sendIntervention} aria-label="Envoyer l’intervention" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--notebook-accent)] text-white disabled:opacity-40"><Send className="h-4 w-4" /></button>
+            </div>
+          </div>}
           {!isActive && <div className="flex-shrink-0 border-t border-[var(--notebook-border)] p-3"><button type="button" onClick={() => { stopSocket(); setStatus("setup"); setTurns([]); setLiveText(""); setError(""); }} className="w-full rounded-lg border border-[var(--notebook-border)] px-3 py-2 text-sm text-[var(--text-secondary)]">Préparer un nouveau débat</button></div>}
         </>
       )}
