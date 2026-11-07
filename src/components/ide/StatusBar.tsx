@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { useNavigate } from 'react-router-dom';
 import { QuitConfirmDialog } from '../sidebar/QuitConfirmDialog.js';
 
 /** API Electron exposant quit() — présente uniquement dans la fenêtre desktop. */
@@ -59,6 +58,7 @@ interface StatusBarProps {
   onToggleGitHub?: () => void;
   onToggleMissions?: () => void;
   onToggleTelegram?: () => void;
+  onToggleEmail?: () => void;
   onToggleModelPicker?: () => void;
   onToggleTokenDetail?: () => void;
   onToggleImpact?: () => void;
@@ -352,7 +352,6 @@ export const StatusBar = memo(function StatusBar({
 }: StatusBarProps) {
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
-  const navigate = useNavigate();
 
 
   // Quitter l'application (fenêtre Electron uniquement).
@@ -1047,7 +1046,7 @@ export const StatusBar = memo(function StatusBar({
           {/* E-mail — indépendant de Telegram, vert dès qu'au moins un compte est connecté. */}
           <button
             type="button"
-            onClick={() => navigate('/settings?section=email-settings')}
+            onClick={() => onToggleEmail?.()}
             className={PILL}
             style={{ color: emailStatus === 'connected' ? 'var(--color-success)' : emailStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)' }}
             title={
@@ -1059,7 +1058,7 @@ export const StatusBar = memo(function StatusBar({
                 ? 'E-mail — statut indisponible. Cliquer pour ouvrir les paramètres.'
                 : 'E-mail — vérification de la connexion…'
             }
-            aria-label="Ouvrir les paramètres e-mail"
+            aria-label="Ouvrir le panneau e-mail"
           >
             <Mail size={13} />
             <StatusDot
