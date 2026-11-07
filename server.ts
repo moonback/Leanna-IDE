@@ -289,7 +289,7 @@ import { telegramSkill } from "./server/skills/telegram.js";
 import { emailSkill } from "./server/skills/email.js";
 import { telegramService } from "./server/telegram/TelegramService.js";
 import { createTelegramRouter } from "./server/routes/telegram.js";
-import { createGmailRouter, handleGmailOAuthCallback } from "./server/routes/email.js";
+import { createGmailRouter } from "./server/routes/email.js";
 import { createSmartSkills } from "./server/autonomy/SmartSkills.js";
 import { LeannaCore } from "./server/autonomy/LeannaCore.js";
 import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
@@ -711,7 +711,6 @@ async function startServer() {
 
   // Callback OAuth Google : protégé par un state CSRF à usage unique et une expiration courte.
   // Il doit précéder le middleware API token, car Google redirige le navigateur sans en-tête applicatif.
-  app.get("/api/email/oauth/callback", handleGmailOAuthCallback);
 
   // BUGFIX (sécurité critique) : jusqu'ici `requireAuth` n'était appliqué qu'à
   // une poignée de routes /api/ide/* et /api/upload-document. Toutes les
