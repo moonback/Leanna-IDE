@@ -309,6 +309,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
         if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
+        if (e.key === '0') {
+          e.preventDefault();
+          const enteringFocus = sourceRailOpen || studioOpen;
+          setSourceRailOpen(!enteringFocus);
+          setStudioOpen(!enteringFocus);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
