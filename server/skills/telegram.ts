@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { Skill } from "./base.js";
 import { telegramService } from "../telegram/TelegramService.js";
-import { requestConfirmation } from "../utils/confirmationBridge.js";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
 
 export const telegramSkill: Skill = {
   name: "telegram",
@@ -172,17 +173,22 @@ export const telegramSkill: Skill = {
       }
       const check = telegramService.resolveSendableFile(relPath);
       if (!check.ok) return { success: false, error: check.error };
-      if (!context?.emitToClient) {
-        return { success: false, error: "Confirmation interactive indisponible dans ce contexte : envoi de fichier refusé." };
+      const initialStats = fs.statSync(check.absolutePath);
+      const MAX_SEND_BYTES = 50 * 1024 * 1024;
+      if (initialStats.size > MAX_SEND_BYTES) {
+        return { success: false, error: "Fichier trop volumineux (limite d'envoi : 50 Mo)." };
       }
-      const approved = await requestConfirmation(
-        relPath,
-        "send-file",
-        context.emitToClient,
-        `Envoi du fichier par Telegram au chat ${target}`,
-        "high"
-      );
-      if (!approved) return { success: false, error: "Envoi refusé par l'utilisateur ou expiré." };
+      const initialHash = createHash("sha256").update(fs.readFileSync(check.absolutePath)).digest("hex");
+      const numericTarget = /^\d+$/.test(String(target)) ? String(target) : undefined;
+      const approved = await telegramService.requestFileTransferApproval(String(target), relPath, numericTarget);
+      if (!approved) return { success: false, error: "Envoi refusé ou demande expirée après 30 secondes." };
+      const finalCheck = telegramService.resolveSendableFile(relPath);
+      if (!finalCheck.ok) return { success: false, error: finalCheck.error };
+      const finalStats = fs.statSync(finalCheck.absolutePath);
+      const finalHash = createHash("sha256").update(fs.readFileSync(finalCheck.absolutePath)).digest("hex");
+      if (finalStats.size !== initialStats.size || finalHash !== initialHash) {
+        return { success: false, error: "Envoi annulé : le fichier a changé depuis la demande d'approbation." };
+      }
       return telegramService.sendFromWorkspace(target, relPath, options);
     };
     const isUrl = (s: string) => /^https?:\/\//i.test(s);
