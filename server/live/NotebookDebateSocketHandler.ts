@@ -20,13 +20,17 @@ type TurnMessage = { speaker: Speaker | "user"; text: string; at: string; citati
 const MAX_AGENT_TURNS = 8;
 const MIN_AGENT_TURNS = 4;
 
-function chooseNextSpeaker(lastSpeaker: Speaker, turnCount: number, lastText: string): Speaker {
+function chooseNextSpeaker(lastSpeaker: Speaker, turnCount: number, lastText: string, citations: Citation[]): Speaker {
   if (turnCount >= MAX_AGENT_TURNS) return "moderator";
   if (turnCount < MIN_AGENT_TURNS) return lastSpeaker === "analyst" ? "critic" : "analyst";
   if (lastSpeaker === "analyst") return "critic";
   if (lastSpeaker === "critic") {
-    const unresolved = /\b(question|preuve|manque|incertain|non démontré|contradiction|cependant|pourtant|à vérifier|ne permet pas)\b/i.test(lastText);
-    return unresolved && turnCount < MAX_AGENT_TURNS - 1 ? "analyst" : "moderator";
+    const unresolved = /\b(question|preuve|manque|incertain|non démontré|contradiction|cependant|pourtant|à vérifier|ne permet pas|contre-argument|objection)\b/i.test(lastText);
+    const meanRelevance = citations.length
+      ? citations.reduce((sum, citation) => sum + citation.relevance, 0) / citations.length
+      : 0;
+    const weakEvidence = meanRelevance < 0.18;
+    return (unresolved || weakEvidence) && turnCount < MAX_AGENT_TURNS - 1 ? "analyst" : "moderator";
   }
   return "moderator";
 }
@@ -231,7 +235,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
           send({ type: "speaker", speaker, state: "idle" });
 
           // Choix adaptatif : objections et preuves manquantes prolongent la confrontation.
-          nextSpeaker = chooseNextSpeaker(speaker, agentTurnCount, message.text);
+          nextSpeaker = chooseNextSpeaker(speaker, agentTurnCount, message.text, citations);
           send({ type: "orchestration", nextSpeaker, agentTurnCount, maxAgentTurns: MAX_AGENT_TURNS });
           if (speaker === "moderator") break;
         }
