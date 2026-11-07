@@ -820,7 +820,7 @@ function RecentCard({ index, onResumeConversation }: { index: number; onResumeCo
 export const EditorDashboard = React.memo(function EditorDashboard({
   onCreateFile, onShowSettings, onOpenSearch, onOpenChat, onOpenNotebooks, onResumeConversation,
 }: EmptyEditorStateProps) {
-  const { connected, connecting, connect, disconnect, clearTranscript, clearActivity } = useLiveAPIContext();
+  const { connected, connecting, connect, disconnect, clearTranscript, clearActivity, activity, isBusy, reasoning } = useLiveAPIContext();
   const { profile } = useProfile();
   const reduce = !!useReducedMotion();
   const aiName = profile.aiName || 'Leanna';
@@ -942,7 +942,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           </nav>
         </motion.header>
 
-        <DashboardCore aiName={aiName} connected={connected} connecting={connecting} onToggleConnection={handleConnect} />
+        <DashboardCore aiName={aiName} connected={connected} connecting={connecting} onToggleConnection={handleConnect} activity={activity} isBusy={isBusy} reasoningActive={!!reasoning?.active} />
 
         {isEditMode && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
           <Settings size={14} style={{ color: 'var(--accent-primary)' }} />
