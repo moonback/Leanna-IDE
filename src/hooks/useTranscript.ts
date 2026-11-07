@@ -89,6 +89,14 @@ export function useTranscript() {
     setTranscript([]);
   }, []);
 
+  /** Remplace le transcript local par les messages d'une conversation persistée. */
+  const restoreTranscript = useCallback((entries: TranscriptEntry[]) => {
+    const restored = entries
+      .filter(entry => (entry.role === 'user' || entry.role === 'assistant') && typeof entry.text === 'string')
+      .slice(-200);
+    setTranscript(restored);
+  }, []);
+
   // ── Placeholder « génération d'image » ──────────────────────────────────────
   // On insère un message assistant marqué `pending: 'image'` dès le début de la
   // génération (animation de chargement), puis on le remplace par l'image une
@@ -225,6 +233,7 @@ export function useTranscript() {
     transcript,
     addTranscript,
     clearTranscript,
+    restoreTranscript,
     addPendingImage,
     resolvePendingImage,
     failPendingImage,
