@@ -73,7 +73,7 @@ function useClock() {
   return time;
 }
 
-function useGitInfo() {
+export function useGitInfo() {
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
 
   useEffect(() => {
@@ -98,7 +98,7 @@ function useGitInfo() {
 
 // ─── Hook : statut de la clé Gemini ──────────────────────────────────────
 
-function useGeminiStatus(): GeminiStatus {
+export function useGeminiStatus(): GeminiStatus {
   const [status, setStatus] = useState<GeminiStatus>(null);
 
   useEffect(() => {
@@ -824,7 +824,7 @@ const ProactiveInsightsSection = React.memo(function ProactiveInsightsSection({
 
 // ─── Composant principal ─────────────────────────────────────────────────
 
-interface EmptyEditorStateProps {
+export interface EmptyEditorStateProps {
   onCreateFile: () => void;
   /** Réservé : conservé dans le contrat pour l'appelant, non utilisé par cet écran. */
   onCreateFolder: () => void;
