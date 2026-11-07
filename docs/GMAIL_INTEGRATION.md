@@ -7,7 +7,7 @@ Leanna prend en charge deux boîtes Gmail indépendantes :
 - **Compte dédié de Leanna** : compte d'expédition par défaut de l'assistante.
 - **Compte personnel** : boîte personnelle consultable séparément. L'envoi depuis cette adresse est désactivé par défaut.
 
-L'intégration utilise OAuth 2.0 et l'API Gmail. Aucun mot de passe Google n'est collecté. Le Client Secret OAuth et les refresh tokens sont chiffrés avec le module local `server/utils/crypto.ts`, puis enregistrés dans `.Leanna-email.json` sous `Leanna_APP_ROOT`. Ce fichier ne doit jamais être ajouté à Git, envoyé au frontend ou inclus dans les logs.
+L'intégration utilise OAuth 2.0 et l'API Gmail. Aucun mot de passe Google n'est collecté. Le Client Secret OAuth et les refresh tokens sont chiffrés avec le module local `server/utils/crypto.ts`, puis enregistrés dans `.Leanna-email.json` sous le dossier de configuration persistant de Leanna (`Leanna_CONFIG_PATH` / `userData` Electron). Ce fichier ne doit jamais être ajouté à Git, envoyé au frontend ou inclus dans les logs.
 
 ## Configuration Google Cloud
 
