@@ -133,6 +133,18 @@ export function createAudioRouter(): Router {
         res.status(404).json({ error: "Podcast introuvable ou script non prêt." });
         return;
       }
+      const cachedTrack = path.join(getSandboxRoot(), "podcasts", `${overview.id}.wav`);
+      if (fs.existsSync(cachedTrack)) {
+        const stat = fs.statSync(cachedTrack);
+        res.json({
+          status: "ready",
+          audioUrl: `/api/notebooks/${encodeURIComponent(req.params.id)}/audio-overviews/${encodeURIComponent(overview.id)}/audio-track`,
+          format: "wav",
+          sizeBytes: stat.size,
+          cached: true,
+        });
+        return;
+      }
       const { renderPodcastAudio } = await import("../../notebooks/PodcastAudioRenderer.js");
       const hostName = typeof overview.hostName === "string" && overview.hostName.trim() ? overview.hostName.trim() : "Leanna";
       const coHostName = typeof overview.coHostName === "string" && overview.coHostName.trim() ? overview.coHostName.trim() : "Noah";
@@ -171,6 +183,9 @@ export function createAudioRouter(): Router {
       res.setHeader("Content-Type", "audio/wav");
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "private, max-age=3600");
+      if (req.query.download === "1") {
+        res.setHeader("Content-Disposition", `attachment; filename="podcast-${overview.id}.wav"`);
+      }
       res.sendFile(audioPath);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Lecture audio impossible." });
