@@ -12,11 +12,23 @@ export interface Citation {
   ref?: number;
 }
 
+export interface CitationAudit {
+  retrievedChunks: number;
+  citedChunks: number;
+  citedSources: number;
+  explicitReferences: number;
+  validReferences: number;
+  invalidReferences: number;
+  retrievalCoveragePercent: number;
+  status: 'valid' | 'partial' | 'invalid' | 'implicit' | 'missing';
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   citations: Citation[];
+  citationAudit?: CitationAudit;
   timestamp: string;
 }
 
