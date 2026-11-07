@@ -151,8 +151,14 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
       const topic = typeof input.topic === "string" ? input.topic.trim().slice(0, 500) : "";
       if (!topic) { send({ type: "error", error: "Indiquez un sujet de débat." }); running = false; return; }
       const allowed = new Set(notebook!.sources.map(source => source.id));
-      const requested = Array.isArray(input.sourceIds) ? input.sourceIds.filter((id): id is string => typeof id === "string" && allowed.has(id)) : [];
-      const sourceIds = requested.length ? requested : notebook!.sources.map(source => source.id);
+      const hasSourceSelection = Array.isArray(input.sourceIds);
+      const requested = hasSourceSelection ? input.sourceIds!.filter((id): id is string => typeof id === "string" && allowed.has(id)) : [];
+      if (hasSourceSelection && requested.length !== input.sourceIds!.length) {
+        send({ type: "error", error: "La sélection contient une source invalide ou étrangère à ce Notebook." });
+        running = false;
+        return;
+      }
+      const sourceIds = hasSourceSelection ? requested : notebook!.sources.map(source => source.id);
       if (!sourceIds.length) { send({ type: "error", error: "Ajoutez au moins une source au Notebook avant de lancer le débat." }); running = false; return; }
       const durationMinutes = Math.max(1, Math.min(10, Number(input.durationMinutes) || 10));
       deadline = Date.now() + Math.min(durationMinutes * 60_000, MAX_DURATION_MS);
