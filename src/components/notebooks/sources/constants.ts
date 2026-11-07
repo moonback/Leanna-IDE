@@ -19,6 +19,8 @@ export interface SourceItem {
   indexingStatus?: 'pending' | 'indexed' | 'partial' | 'failed' | 'unknown';
   indexingAttempts?: number;
   indexingError?: string;
+  indexingUpdatedAt?: string;
+  indexingNextRetryAt?: string;
 }
 
 export interface UploadFileStatus {
