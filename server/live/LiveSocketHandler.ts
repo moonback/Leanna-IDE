@@ -613,6 +613,22 @@ export function attachLiveWebSocket(
         }
       }
 
+      // Le filtrage dynamique (requête initiale non vide) peut reconstruire
+      // les déclarations depuis requestedSkills et écarter à nouveau les outils
+      // natifs. On réapplique donc l'inclusion e-mail après TOUS les filtres.
+      // En mode ask, seuls les outils de lecture sont exposés ; l'envoi reste
+      // réservé au mode full et conserve sa confirmation explicite à l'exécution.
+      const sessionEmailDeclarations = declarations.filter(d =>
+        EMAIL_TOOL_NAMES.has(d.name) &&
+        (sessionMode !== 'ask' || d.name !== 'email_send_message'),
+      );
+      const missingEmailDeclarations = sessionEmailDeclarations.filter(
+        d => !filteredDeclarations.some(selected => selected.name === d.name),
+      );
+      if (missingEmailDeclarations.length > 0) {
+        filteredDeclarations = [...filteredDeclarations, ...missingEmailDeclarations];
+      }
+
       // ── Outils MCP : toujours exposés à l'assistant ─────────────────
       // Les outils fournis par les serveurs MCP (marqués _mcpServerId) ne sont
       // pas dans TIER1_CORE_TOOLS ; comme les custom skills, on les force dans
