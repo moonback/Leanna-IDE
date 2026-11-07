@@ -7,7 +7,7 @@ import { Button } from './ui/Button.js';
 interface ConfirmRequest {
   requestId: string;
   filePath: string;
-  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file' | 'tool-call';
+  operation: 'write' | 'modify' | 'patch' | 'delete' | 'rename' | 'npm-command' | 'send-file' | 'send-email' | 'tool-call';
   reason?: string;
   timeoutMs: number;
 }
@@ -19,6 +19,7 @@ const OPERATION_LABELS: Record<string, string> = {
   delete: 'Suppression',
   rename: 'Renommage',
   'send-file': 'Envoi de fichier (Telegram)',
+  'send-email': 'Envoi d’e-mail',
   'tool-call': "Action de l'assistant",
 };
 
@@ -87,10 +88,10 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
           </div>
           <div>
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              Fichier critique
+              {pending?.operation === 'send-email' ? 'Envoi d’un e-mail' : 'Fichier critique'}
             </h3>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              L'IA demande à modifier un fichier protégé
+              {pending?.operation === 'send-email' ? 'Leanna demande l’autorisation d’expédier ce message.' : 'L’IA demande à modifier un fichier protégé.'}
             </p>
           </div>
         </div>
@@ -118,7 +119,7 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Fichier</span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{pending.operation === "send-email" ? "Destinataire / objet" : "Fichier"}</span>
                   <span className="text-xs font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {pending.filePath}
                   </span>
@@ -153,7 +154,7 @@ export function CriticalEditConfirm({ sendMessage }: Props) {
             </div>
 
             <p className="text-xs text-center" style={{ color: 'var(--text-dimmed)' }}>
-              Sans réponse, la modification sera automatiquement refusée après timeout.
+              Sans réponse, l’action sera automatiquement refusée après expiration du délai.
             </p>
           </div>
         )}

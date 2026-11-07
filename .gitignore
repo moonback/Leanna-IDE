@@ -25,6 +25,8 @@ graphify-out/
 .project-knowledge.json
 .project-memory.json
 .Leanna-telegram.json
+.Leanna-email.json
+.Leanna-email.json.tmp
 .Leanna-strategy.json
 .Leanna-strategy.json.tmp
 

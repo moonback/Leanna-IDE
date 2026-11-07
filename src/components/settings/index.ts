@@ -21,3 +21,4 @@ export { TelegramSection } from './TelegramSection.js';
 export { EnvSection } from './EnvSection.js';
 export { Section, Field, TextInput, SecretInput, ChipGroup, ToggleSwitch, SectionDivider, InfoRow } from './SettingsPrimitives.js';
 
+export { EmailSection } from './EmailSection.js';
