@@ -7,7 +7,8 @@ import { Leanna_APP_ROOT } from "../utils/selfRoot.js";
 import { encrypt, decrypt, isEncrypted } from "../utils/crypto.js";
 
 export type GmailAccountId = "leanna" | "personal";
-type StoredAccount = { email: string; appPassword: string; connectedAt: string };
+export type EmailProvider = "gmail" | "infomaniak";
+type StoredAccount = { email: string; appPassword: string; provider: EmailProvider; connectedAt: string };
 type EmailConfig = {
   accounts: Partial<Record<GmailAccountId, StoredAccount>>;
   personalSendEnabled: boolean;
@@ -15,12 +16,14 @@ type EmailConfig = {
 
 const MAX_RESULTS = 50;
 const MAX_BODY_CHARS = 100_000;
-const IMAP_HOST = "imap.gmail.com";
-const SMTP_HOST = "smtp.gmail.com";
+const PROVIDER_CONFIG: Record<EmailProvider, { imapHost: string; smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpRequireTLS: boolean }> = {
+  gmail: { imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecure: true, smtpRequireTLS: false },
+  infomaniak: { imapHost: "mail.infomaniak.com", smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecure: false, smtpRequireTLS: true },
+};
 
 function createImapClient(account: StoredAccount): ImapFlow {
   return new ImapFlow({
-    host: IMAP_HOST,
+    host: PROVIDER_CONFIG[account.provider].imapHost,
     port: 993,
     secure: true,
     auth: { user: account.email, pass: account.appPassword },
@@ -33,9 +36,10 @@ function createImapClient(account: StoredAccount): ImapFlow {
 
 function createSmtpTransport(account: StoredAccount) {
   return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: 465,
-    secure: true,
+    host: PROVIDER_CONFIG[account.provider].smtpHost,
+    port: PROVIDER_CONFIG[account.provider].smtpPort,
+    secure: PROVIDER_CONFIG[account.provider].smtpSecure,
+    requireTLS: PROVIDER_CONFIG[account.provider].smtpRequireTLS,
     auth: { user: account.email, pass: account.appPassword },
     tls: { minVersion: "TLSv1.2" },
     connectionTimeout: 15_000,
@@ -104,8 +108,9 @@ export class GmailService {
         const saved = data.accounts?.[id];
         if (typeof saved?.email !== "string" || typeof saved?.appPassword !== "string") continue;
         const password = isEncrypted(saved.appPassword) ? decrypt(saved.appPassword) : "";
+        const provider: EmailProvider = saved.provider === "infomaniak" && id === "leanna" ? "infomaniak" : "gmail";
         if (password && !isEncrypted(password)) {
-          accounts[id] = { email: saved.email, appPassword: password, connectedAt: saved.connectedAt || "" };
+          accounts[id] = { email: saved.email, appPassword: password, provider, connectedAt: saved.connectedAt || "" };
         }
       }
       return { accounts, personalSendEnabled: data.personalSendEnabled === true && Boolean(accounts.personal) };
@@ -145,7 +150,7 @@ export class GmailService {
 
   private accountStatus(id: GmailAccountId) {
     const account = this.config.accounts[id];
-    return { connected: Boolean(account?.appPassword), email: account?.email || null };
+    return { connected: Boolean(account?.appPassword), email: account?.email || null, provider: account?.provider || null };
   }
 
   private requireAccount(id: GmailAccountId): StoredAccount {
@@ -154,19 +159,20 @@ export class GmailService {
     return account;
   }
 
-  async connectAccount(id: GmailAccountId, email: string, appPassword: string): Promise<void> {
+  async connectAccount(id: GmailAccountId, email: string, appPassword: string, provider: EmailProvider = "gmail"): Promise<void> {
+    if (id === "personal" && provider !== "gmail") throw new Error("Infomaniak est configuré uniquement pour le compte dédié de Leanna.");
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPassword = appPassword.replace(/\s+/g, "");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       throw new Error("Adresse e-mail invalide.");
     }
-    if (normalizedPassword.length < 16 || normalizedPassword.length > 128) {
-      throw new Error("Le mot de passe d'application Gmail doit contenir au moins 16 caractères.");
-    }
+    if (normalizedPassword.length < 1 || normalizedPassword.length > 256) throw new Error("Le mot de passe de messagerie est invalide.");
+    if (provider === "gmail" && normalizedPassword.length < 16) throw new Error("Le mot de passe d'application Gmail doit contenir au moins 16 caractères.");
 
     const candidate: StoredAccount = {
       email: normalizedEmail,
       appPassword: normalizedPassword,
+      provider,
       connectedAt: new Date().toISOString(),
     };
 
@@ -176,7 +182,7 @@ export class GmailService {
       const lock = await imap.getMailboxLock("INBOX");
       lock.release();
     } catch {
-      throw new Error("Connexion IMAP refusée. Vérifiez l'adresse, le mot de passe d'application et l'accès IMAP du compte Google.");
+      throw new Error("Connexion IMAP refusée. Vérifiez l'adresse, le mot de passe et l'activation de l'accès IMAP chez votre fournisseur.");
     } finally {
       try { await imap.logout(); } catch { /* connection may not have completed */ }
     }
@@ -185,7 +191,7 @@ export class GmailService {
     try {
       await smtp.verify();
     } catch {
-      throw new Error("Connexion SMTP refusée. Vérifiez le mot de passe d'application et les paramètres de sécurité du compte Google.");
+      throw new Error("Connexion SMTP refusée. Vérifiez le mot de passe et les paramètres de sécurité de votre fournisseur.");
     } finally {
       smtp.close();
     }
@@ -197,7 +203,7 @@ export class GmailService {
 
   setPersonalSendEnabled(enabled: boolean): void {
     if (enabled && !this.config.accounts.personal) {
-      throw new Error("Connectez d'abord votre compte Gmail personnel.");
+      throw new Error("Connectez d'abord votre compte e-mail personnel.");
     }
     this.config.personalSendEnabled = enabled;
     this.persist();
