@@ -1,28 +1,82 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ImapFlow } from "imapflow";
+import nodemailer from "nodemailer";
+import { simpleParser } from "mailparser";
 import { Leanna_APP_ROOT } from "../utils/selfRoot.js";
 import { encrypt, decrypt, isEncrypted } from "../utils/crypto.js";
 
 export type GmailAccountId = "leanna" | "personal";
-type StoredAccount = { email: string; refreshToken: string; connectedAt: string };
+type StoredAccount = { email: string; appPassword: string; connectedAt: string };
 type EmailConfig = {
-  clientId: string;
-  clientSecret: string;
   accounts: Partial<Record<GmailAccountId, StoredAccount>>;
   personalSendEnabled: boolean;
 };
-type OAuthState = { account: GmailAccountId; expiresAt: number };
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-];
-const MAX_MESSAGE_BYTES = 20 * 1024 * 1024;
+const MAX_RESULTS = 50;
+const MAX_BODY_CHARS = 100_000;
+const IMAP_HOST = "imap.gmail.com";
+const SMTP_HOST = "smtp.gmail.com";
+
+function createImapClient(account: StoredAccount): ImapFlow {
+  return new ImapFlow({
+    host: IMAP_HOST,
+    port: 993,
+    secure: true,
+    auth: { user: account.email, pass: account.appPassword },
+    logger: false,
+    socketTimeout: 20_000,
+    greetingTimeout: 10_000,
+    tls: { minVersion: "TLSv1.2" },
+  });
+}
+
+function createSmtpTransport(account: StoredAccount) {
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: 465,
+    secure: true,
+    auth: { user: account.email, pass: account.appPassword },
+    tls: { minVersion: "TLSv1.2" },
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+    disableFileAccess: true,
+    disableUrlAccess: true,
+  });
+}
+
+function formatAddress(addresses: Array<{ name?: string; address?: string }> | undefined): string {
+  return (addresses || []).map(item => item.name
+    ? `"${item.name.replace(/["\\]/g, "")}" <${item.address || ""}>`
+    : item.address || "").filter(Boolean).join(", ");
+}
+
+function buildSearchCriteria(query: string): Record<string, unknown> {
+  const criteria: Record<string, unknown> = {};
+  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+  for (const raw of tokens) {
+    const token = raw.replace(/^"|"$/g, "");
+    if (/^is:unread$/i.test(token)) criteria.seen = false;
+    else if (/^is:read$/i.test(token)) criteria.seen = true;
+    else if (/^from:/i.test(token)) criteria.from = token.slice(5);
+    else if (/^to:/i.test(token)) criteria.to = token.slice(3);
+    else if (/^subject:/i.test(token)) criteria.subject = token.slice(8);
+    else if (/^after:/i.test(token)) {
+      const date = new Date(token.slice(6).replace(/\//g, "-"));
+      if (!Number.isNaN(date.getTime())) criteria.since = date;
+    } else if (/^before:/i.test(token)) {
+      const date = new Date(token.slice(7).replace(/\//g, "-"));
+      if (!Number.isNaN(date.getTime())) criteria.before = date;
+    } else {
+      throw new Error(`Critère de recherche non pris en charge par IMAP : ${token}. Utilisez from:, to:, subject:, after:, before:, is:unread ou is:read.`);
+    }
+  }
+  return criteria;
+}
 
 export class GmailService {
-  private config: EmailConfig = { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
-  private pendingStates = new Map<string, OAuthState>();
+  private config: EmailConfig = { accounts: {}, personalSendEnabled: false };
 
   constructor() {
     this.config = this.loadConfig();
@@ -38,27 +92,21 @@ export class GmailService {
 
   private loadConfig(): EmailConfig {
     try {
-      if (!fs.existsSync(this.configPath)) return { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
+      if (!fs.existsSync(this.configPath)) return { accounts: {}, personalSendEnabled: false };
       const data = JSON.parse(fs.readFileSync(this.configPath, "utf8"));
       const accounts: EmailConfig["accounts"] = {};
       for (const id of ["leanna", "personal"] as const) {
         const saved = data.accounts?.[id];
-        if (!saved?.refreshToken) continue;
-        const token = isEncrypted(saved.refreshToken) ? decrypt(saved.refreshToken) : "";
-        if (token && !isEncrypted(token)) accounts[id] = { ...saved, refreshToken: token };
+        if (typeof saved?.email !== "string" || typeof saved?.appPassword !== "string") continue;
+        const password = isEncrypted(saved.appPassword) ? decrypt(saved.appPassword) : "";
+        if (password && !isEncrypted(password)) {
+          accounts[id] = { email: saved.email, appPassword: password, connectedAt: saved.connectedAt || "" };
+        }
       }
-      const secret = typeof data.clientSecret === "string"
-        ? (isEncrypted(data.clientSecret) ? decrypt(data.clientSecret) : "")
-        : "";
-      return {
-        clientId: typeof data.clientId === "string" ? data.clientId : "",
-        clientSecret: secret && !isEncrypted(secret) ? secret : "",
-        accounts,
-        personalSendEnabled: data.personalSendEnabled === true,
-      };
-    } catch (error) {
-      console.warn("[Gmail] Configuration locale illisible; intégration désactivée.");
-      return { clientId: "", clientSecret: "", accounts: {}, personalSendEnabled: false };
+      return { accounts, personalSendEnabled: data.personalSendEnabled === true && Boolean(accounts.personal) };
+    } catch {
+      console.warn("[Email] Configuration locale illisible; intégration désactivée.");
+      return { accounts: {}, personalSendEnabled: false };
     }
   }
 
@@ -67,27 +115,22 @@ export class GmailService {
     const accounts: EmailConfig["accounts"] = {};
     for (const id of ["leanna", "personal"] as const) {
       const account = this.config.accounts[id];
-      if (account) accounts[id] = { ...account, refreshToken: encrypt(account.refreshToken) };
+      if (account) accounts[id] = { ...account, appPassword: encrypt(account.appPassword) };
     }
-    const payload = {
-      clientId: this.config.clientId,
-      clientSecret: this.config.clientSecret ? encrypt(this.config.clientSecret) : "",
+    const temp = this.configPath + ".tmp";
+    fs.writeFileSync(temp, JSON.stringify({
       accounts,
       personalSendEnabled: this.config.personalSendEnabled,
-    };
-    const temp = this.configPath + ".tmp";
-    fs.writeFileSync(temp, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 });
+    }, null, 2), { encoding: "utf8", mode: 0o600 });
     fs.renameSync(temp, this.configPath);
     try { fs.chmodSync(this.configPath, 0o600); } catch { /* Windows ACLs are managed by the OS. */ }
   }
 
   getSettings() {
     return {
-      configured: Boolean(this.config.clientId && this.config.clientSecret),
-      clientId: this.config.clientId,
-      hasClientSecret: Boolean(this.config.clientSecret),
+      configured: Boolean(this.config.accounts.leanna || this.config.accounts.personal),
       personalSendEnabled: this.config.personalSendEnabled,
-      redirectUri: this.redirectUri,
+      protocol: "IMAP/SMTP",
       accounts: {
         leanna: this.accountStatus("leanna"),
         personal: this.accountStatus("personal"),
@@ -97,195 +140,148 @@ export class GmailService {
 
   private accountStatus(id: GmailAccountId) {
     const account = this.config.accounts[id];
-    return { connected: Boolean(account?.refreshToken), email: account?.email || null };
+    return { connected: Boolean(account?.appPassword), email: account?.email || null };
   }
 
-  get redirectUri(): string {
-    return process.env.LEANNA_GMAIL_REDIRECT_URI?.trim()
-      || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || "4000"}/api/email/oauth/callback`;
+  private requireAccount(id: GmailAccountId): StoredAccount {
+    const account = this.config.accounts[id];
+    if (!account) throw new Error(`Le compte Gmail ${id} n'est pas connecté. Configurez son adresse et son mot de passe d'application dans Paramètres > E-mail.`);
+    return account;
   }
 
-  saveOAuthCredentials(clientId: string, clientSecret?: string): void {
-    const id = clientId.trim();
-    if (!id || !id.endsWith(".apps.googleusercontent.com")) {
-      throw new Error("Client ID Google OAuth invalide.");
+  async connectAccount(id: GmailAccountId, email: string, appPassword: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = appPassword.replace(/\s+/g, "");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      throw new Error("Adresse e-mail invalide.");
     }
-    if (clientSecret !== undefined && !clientSecret.trim()) {
-      throw new Error("Le client secret ne peut pas être vide.");
-    }
-    if (this.config.clientId && this.config.clientId !== id && clientSecret === undefined) {
-      throw new Error("Un nouveau Client Secret est requis lorsque le Client ID change.");
-    }
-    if (this.config.clientId && this.config.clientId !== id) {
-      this.config.accounts = {};
-      this.config.personalSendEnabled = false;
-    }
-    this.config.clientId = id;
-    if (clientSecret !== undefined) this.config.clientSecret = clientSecret.trim();
-    if (!this.config.clientSecret) throw new Error("Configurez le client secret OAuth Google.");
-    this.persist();
-  }
-
-  private assertOAuthConfigured(): void {
-    if (!this.config.clientId || !this.config.clientSecret) {
-      throw new Error("Configurez d'abord le Client ID et le Client Secret Google OAuth dans Paramètres > E-mail.");
-    }
-  }
-
-  createAuthorizationUrl(account: GmailAccountId): string {
-    this.assertOAuthConfigured();
-    const now = Date.now();
-    for (const [key, pending] of this.pendingStates) {
-      if (pending.expiresAt <= now) this.pendingStates.delete(key);
-    }
-    const state = crypto.randomBytes(32).toString("base64url");
-    this.pendingStates.set(state, { account, expiresAt: now + 10 * 60_000 });
-    const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-    url.searchParams.set("client_id", this.config.clientId);
-    url.searchParams.set("redirect_uri", this.redirectUri);
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set("access_type", "offline");
-    url.searchParams.set("prompt", "consent");
-    url.searchParams.set("include_granted_scopes", "true");
-    url.searchParams.set("scope", SCOPES.join(" "));
-    url.searchParams.set("state", state);
-    return url.toString();
-  }
-
-  async completeAuthorization(code: string, state: string): Promise<{ account: GmailAccountId; email: string }> {
-    const pending = this.pendingStates.get(state);
-    this.pendingStates.delete(state);
-    if (!pending || pending.expiresAt < Date.now()) throw new Error("État OAuth invalide ou expiré. Relancez la connexion Gmail.");
-    this.assertOAuthConfigured();
-
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        redirect_uri: this.redirectUri,
-        grant_type: "authorization_code",
-      }),
-    });
-    const tokenData = await tokenResponse.json() as { access_token?: string; refresh_token?: string; error_description?: string; error?: string };
-    if (!tokenResponse.ok || !tokenData.access_token) {
-      throw new Error(tokenData.error_description || tokenData.error || "Échange du code OAuth refusé par Google.");
+    if (normalizedPassword.length < 16 || normalizedPassword.length > 128) {
+      throw new Error("Le mot de passe d'application Gmail doit contenir au moins 16 caractères.");
     }
 
-    let refreshToken = tokenData.refresh_token;
-    if (!refreshToken) refreshToken = this.config.accounts[pending.account]?.refreshToken;
-    if (!refreshToken) throw new Error("Google n'a pas fourni de refresh token. Révoquez l'accès de l'application dans votre compte Google puis reconnectez le compte.");
-
-    const profile = await this.gmailRequest<{ emailAddress: string }>(tokenData.access_token, "/profile");
-    this.config.accounts[pending.account] = {
-      email: profile.emailAddress,
-      refreshToken,
+    const candidate: StoredAccount = {
+      email: normalizedEmail,
+      appPassword: normalizedPassword,
       connectedAt: new Date().toISOString(),
     };
+
+    const imap = createImapClient(candidate);
+    try {
+      await imap.connect();
+      const lock = await imap.getMailboxLock("INBOX");
+      lock.release();
+    } catch {
+      throw new Error("Connexion IMAP refusée. Vérifiez l'adresse, le mot de passe d'application et l'accès IMAP du compte Google.");
+    } finally {
+      try { await imap.logout(); } catch { /* connection may not have completed */ }
+    }
+
+    const smtp = createSmtpTransport(candidate);
+    try {
+      await smtp.verify();
+    } catch {
+      throw new Error("Connexion SMTP refusée. Vérifiez le mot de passe d'application et les paramètres de sécurité du compte Google.");
+    } finally {
+      smtp.close();
+    }
+
+    this.config.accounts[id] = candidate;
+    if (id === "personal" && !this.config.personalSendEnabled) this.config.personalSendEnabled = false;
     this.persist();
-    return { account: pending.account, email: profile.emailAddress };
   }
 
   setPersonalSendEnabled(enabled: boolean): void {
-    if (enabled && !this.config.accounts.personal?.refreshToken) {
+    if (enabled && !this.config.accounts.personal) {
       throw new Error("Connectez d'abord votre compte Gmail personnel.");
     }
     this.config.personalSendEnabled = enabled;
     this.persist();
   }
 
-  async disconnect(account: GmailAccountId): Promise<void> {
-    const refreshToken = this.config.accounts[account]?.refreshToken;
-    delete this.config.accounts[account];
-    if (account === "personal") this.config.personalSendEnabled = false;
+  async disconnect(id: GmailAccountId): Promise<void> {
+    delete this.config.accounts[id];
+    if (id === "personal") this.config.personalSendEnabled = false;
     this.persist();
-    if (refreshToken) {
+  }
+
+  async listMessages(id: GmailAccountId, query = "", maxResults = 20) {
+    const account = this.requireAccount(id);
+    const client = createImapClient(account);
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock("INBOX");
       try {
-        await fetch("https://oauth2.googleapis.com/revoke", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ token: refreshToken }),
-        });
-      } catch {
-        console.warn("[Gmail] Jeton local supprimé; révocation distante Google non confirmée.");
+        const criteria = buildSearchCriteria(query);
+        const found = await client.search(criteria as any, { uid: true });
+        const uids = Array.isArray(found) ? found.slice(-Math.min(Math.max(maxResults, 1), MAX_RESULTS)).reverse() : [];
+        const messages = uids.length
+          ? await client.fetchAll(uids, { uid: true, envelope: true, internalDate: true, flags: true }, { uid: true })
+          : [];
+        return {
+          account: id,
+          email: account.email,
+          totalEstimate: Array.isArray(found) ? found.length : 0,
+          messages: messages.map(message => ({
+            id: String(message.uid),
+            threadId: String(message.uid),
+            from: formatAddress(message.envelope?.from),
+            to: formatAddress(message.envelope?.to),
+            subject: message.envelope?.subject || "(sans objet)",
+            date: message.internalDate?.toISOString() || message.envelope?.date?.toISOString() || "",
+            snippet: "",
+            unread: !message.flags?.has("\\Seen"),
+          })),
+        };
+      } finally {
+        lock.release();
       }
+    } finally {
+      try { await client.logout(); } catch { /* ignore disconnect errors */ }
     }
   }
 
-  private async getAccessToken(account: GmailAccountId): Promise<string> {
-    const stored = this.config.accounts[account];
-    if (!stored?.refreshToken) throw new Error(`Le compte Gmail ${account} n'est pas connecté.`);
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        refresh_token: stored.refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-    const data = await response.json() as { access_token?: string; error_description?: string; error?: string };
-    if (!response.ok || !data.access_token) {
-      throw new Error(data.error_description || data.error || "Impossible de renouveler l'accès Gmail.");
+  async readMessage(id: GmailAccountId, messageId: string) {
+    if (!/^\d+$/.test(messageId)) throw new Error("Identifiant IMAP invalide.");
+    const account = this.requireAccount(id);
+    const client = createImapClient(account);
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const message = await client.fetchOne(Number(messageId), {
+          uid: true, envelope: true, internalDate: true, flags: true, source: true,
+        }, { uid: true });
+        if (!message?.source) throw new Error("E-mail introuvable dans la boîte de réception.");
+        const parsed = await simpleParser(message.source);
+        return {
+          id: String(message.uid),
+          threadId: String(message.uid),
+          from: parsed.from?.text || formatAddress(message.envelope?.from),
+          to: parsed.to?.text || formatAddress(message.envelope?.to),
+          cc: parsed.cc?.text || "",
+          subject: parsed.subject || "(sans objet)",
+          date: parsed.date?.toISOString() || message.internalDate?.toISOString() || "",
+          snippet: parsed.text?.slice(0, 240) || "",
+          body: (parsed.text || parsed.html || "").slice(0, MAX_BODY_CHARS),
+          attachments: parsed.attachments.map(item => ({
+            filename: item.filename || "piece-jointe",
+            mimeType: item.contentType,
+            size: item.size,
+          })),
+        };
+      } finally {
+        lock.release();
+      }
+    } finally {
+      try { await client.logout(); } catch { /* ignore disconnect errors */ }
     }
-    return data.access_token;
   }
 
-  private async gmailRequest<T>(accessToken: string, endpoint: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${endpoint}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${accessToken}`, ...(init?.headers || {}) },
-    });
-    const data = await response.json().catch(() => ({})) as any;
-    if (!response.ok) {
-      const message = data?.error?.message || `Gmail API HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    return data as T;
-  }
-
-  async listMessages(account: GmailAccountId, query = "", maxResults = 20) {
-    const token = await this.getAccessToken(account);
-    const params = new URLSearchParams({ maxResults: String(Math.min(Math.max(maxResults, 1), 50)) });
-    if (query.trim()) params.set("q", query.trim());
-    const result = await this.gmailRequest<{ messages?: Array<{ id: string; threadId: string }>; resultSizeEstimate?: number }>(
-      token, `/messages?${params.toString()}`,
-    );
-    const messages = await Promise.all((result.messages || []).map(async item => {
-      const message = await this.gmailRequest<any>(token, `/messages/${encodeURIComponent(item.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`);
-      const headers = message.payload?.headers || [];
-      const get = (name: string) => headers.find((h: any) => String(h.name).toLowerCase() === name.toLowerCase())?.value || "";
-      return { id: message.id, threadId: message.threadId, from: get("From"), to: get("To"), subject: get("Subject") || "(sans objet)", date: get("Date"), snippet: message.snippet || "", unread: (message.labelIds || []).includes("UNREAD") };
-    }));
-    return { account, email: this.config.accounts[account]?.email, totalEstimate: result.resultSizeEstimate || 0, messages };
-  }
-
-  async readMessage(account: GmailAccountId, messageId: string) {
-    if (!messageId.trim()) throw new Error("Identifiant de message manquant.");
-    const token = await this.getAccessToken(account);
-    const message = await this.gmailRequest<any>(token, `/messages/${encodeURIComponent(messageId)}?format=full`);
-    const headers = message.payload?.headers || [];
-    const get = (name: string) => headers.find((h: any) => String(h.name).toLowerCase() === name.toLowerCase())?.value || "";
-    const decodePart = (part: any): string => {
-      if (part?.body?.data) return Buffer.from(part.body.data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-      return (part?.parts || []).map(decodePart).filter(Boolean).join("\n");
-    };
-    const body = decodePart(message.payload);
-    return {
-      id: message.id, threadId: message.threadId, from: get("From"), to: get("To"),
-      cc: get("Cc"), subject: get("Subject") || "(sans objet)", date: get("Date"),
-      snippet: message.snippet || "", body: body.slice(0, 100_000),
-      attachments: (message.payload?.parts || []).filter((p: any) => p.filename).map((p: any) => ({ filename: p.filename, mimeType: p.mimeType, attachmentId: p.body?.attachmentId })),
-    };
-  }
-
-  async sendMessage(account: GmailAccountId, to: string, subject: string, body: string, cc = "") {
-    if (account === "personal" && !this.config.personalSendEnabled) {
+  async sendMessage(id: GmailAccountId, to: string, subject: string, body: string, cc = "") {
+    if (id === "personal" && !this.config.personalSendEnabled) {
       throw new Error("Envoi depuis le compte personnel désactivé. Activez cette autorisation dans Paramètres > E-mail.");
     }
+    const account = this.requireAccount(id);
     const recipient = to.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");
@@ -293,29 +289,28 @@ export class GmailService {
     if (ccValue && (/[\r\n]/.test(ccValue) || !ccValue.split(",").every(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())))) {
       throw new Error("Adresse Cc invalide.");
     }
-    const rawMessage = [
-      `To: ${recipient}`,
-      ...(ccValue ? [`Cc: ${ccValue}`] : []),
-      `Subject: =?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "Content-Transfer-Encoding: 8bit",
-      "",
-      body,
-    ].join("\r\n");
-    if (Buffer.byteLength(rawMessage, "utf8") > MAX_MESSAGE_BYTES) throw new Error("Message trop volumineux.");
-    const token = await this.getAccessToken(account);
-    const raw = Buffer.from(rawMessage, "utf8").toString("base64url");
-    return this.gmailRequest<{ id: string; threadId: string }>(token, "/messages/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw }),
-    });
+    if (Buffer.byteLength(body, "utf8") > 20 * 1024 * 1024) throw new Error("Message trop volumineux.");
+
+    const transport = createSmtpTransport(account);
+    try {
+      const info = await transport.sendMail({
+        from: account.email,
+        to: recipient,
+        ...(ccValue ? { cc: ccValue } : {}),
+        subject,
+        text: body,
+        disableFileAccess: true,
+        disableUrlAccess: true,
+      });
+      return { id: info.messageId, threadId: info.messageId };
+    } finally {
+      transport.close();
+    }
   }
 
-  async searchMessages(account: GmailAccountId, query: string, maxResults = 20) {
-    if (!query.trim()) throw new Error("La recherche Gmail ne peut pas être vide.");
-    return this.listMessages(account, query, maxResults);
+  async searchMessages(id: GmailAccountId, query: string, maxResults = 20) {
+    if (!query.trim()) throw new Error("La recherche e-mail ne peut pas être vide.");
+    return this.listMessages(id, query, maxResults);
   }
 }
 
