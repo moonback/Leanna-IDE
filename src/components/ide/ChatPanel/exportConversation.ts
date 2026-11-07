@@ -251,6 +251,22 @@ export function buildMarkdown(
     }
     lines.push('');
 
+    if (e.attachment) {
+      lines.push('**Document joint et analysé :**');
+      lines.push('');
+      lines.push(`- Fichier : \`${e.attachment.fileName.replace(/[`\\\\]/g, '')}\``);
+      lines.push(`- Type MIME : ${e.attachment.mimeType || 'inconnu'}`);
+      lines.push(`- Texte extrait : ${e.attachment.extractedTextLength.toLocaleString('fr-FR')} caractères`);
+      lines.push(`- Fournisseur : ${e.attachment.provider || 'non précisé'}`);
+      if (e.attachment.summary) {
+        lines.push('');
+        lines.push('**Résumé de l’analyse :**');
+        lines.push('');
+        lines.push(e.attachment.summary);
+      }
+      lines.push('');
+    }
+
     if (e.sources && e.sources.length > 0) {
       lines.push('**Sources :**');
       lines.push('');
@@ -309,6 +325,13 @@ export function buildJson(
       timestamp: safeDate(e.timestamp)?.toISOString() ?? null,
       pending: e.pending ?? null,
       imageError: e.imageError ?? null,
+      attachment: e.attachment ? {
+        fileName: e.attachment.fileName,
+        mimeType: e.attachment.mimeType,
+        extractedTextLength: e.attachment.extractedTextLength,
+        provider: e.attachment.provider ?? null,
+        summary: e.attachment.summary,
+      } : null,
       sources: (e.sources ?? []).map(s => ({
         id: s.id,
         path: s.path,
