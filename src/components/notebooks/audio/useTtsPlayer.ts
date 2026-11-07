@@ -102,6 +102,23 @@ export function useTtsPlayer({
     setTtsProgress(0);
     nextStartTimeRef.current = 0;
 
+    // Créer et démarrer le contexte audio immédiatement depuis le clic Play.
+    // Le créer après le fetch SSE peut perdre l'activation utilisateur et laisser
+    // le contexte suspendu (autoplay policy des navigateurs).
+    try {
+      const audioCtx = getAudioContext();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      if (audioCtx.state !== 'running') {
+        throw new Error("Le navigateur bloque la lecture audio. Autorisez le son puis réessayez.");
+      }
+    } catch (audioError) {
+      playingRef.current = false;
+      setPlaying(false);
+      setTtsLoading(false);
+      onError?.(audioError instanceof Error ? audioError.message : "Impossible d'initialiser la sortie audio.");
+      return;
+    }
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -122,8 +139,13 @@ export function useTtsPlayer({
               setCurrentLineIndex(parsed.index ?? 0);
               setTtsProgress(prev => prev + 1);
               if (parsed.audio) playAudioChunk(parsed.audio);
+            } else if (event === 'skip') {
+              skippedChunksRef.current += 1;
+              lastSkipReasonRef.current = (parsed as TtsStreamData & { reason?: string }).reason || 'Audio indisponible';
             } else if (event === 'done') {
-              // Fini
+              if (ttsProgressRef.current === 0 && skippedChunksRef.current > 0) {
+                onError?.(`Aucun extrait audio n'a pu être généré. Dernière erreur : ${lastSkipReasonRef.current}`);
+              }
             } else if (event === 'error') {
               onError?.(parsed.error ?? 'Erreur TTS');
             }
