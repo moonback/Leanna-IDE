@@ -19,7 +19,7 @@ import { notebookManager } from "./NotebookManager.js";
 import { chatResponseCache } from "./ResponseCache.js";
 import { notebookPromptStore } from "./PromptStore.js";
 import { buildSourcesContext } from "./generationContext.js";
-import type { ChatMessage, Citation } from "./types.js";
+import type { ChatMessage, Citation, CitationAudit } from "./types.js";
 
 const log = createLogger("GroundedChat");
 
@@ -459,7 +459,10 @@ export class GroundedChat {
 
     // 7. Citations + sauvegarde
     const citations = ragEngine.extractCitations(responseText, ragResults);
-    const assistantMessage = this.buildMessage("assistant", responseText, citations);
+    const citationAudit = generationFailed
+      ? undefined
+      : ragEngine.auditCitations(responseText, ragResults, citations);
+    const assistantMessage = this.buildMessage("assistant", responseText, citations, citationAudit);
     this.persistMessage(notebookId, threadId, assistantMessage);
 
     // 8. Mise en cache (hors erreurs, annulation client et réponses contextuelles).
@@ -849,12 +852,18 @@ export class GroundedChat {
     notebookManager.addChatMessage(notebookId, message);
   }
 
-  private buildMessage(role: "user" | "assistant", content: string, citations: Citation[]): ChatMessage {
+  private buildMessage(
+    role: "user" | "assistant",
+    content: string,
+    citations: Citation[],
+    citationAudit?: CitationAudit,
+  ): ChatMessage {
     return {
       id: randomUUID(),
       role,
       content,
       citations,
+      ...(citationAudit ? { citationAudit } : {}),
       timestamp: new Date().toISOString(),
     };
   }
