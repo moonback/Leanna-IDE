@@ -3,7 +3,7 @@
  * édition, sa barre d'actions et ses citations. Mémoïsé. Présentationnel.
  */
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { SpringTransition } from '../motionTypes.js';
 import {
@@ -47,6 +47,7 @@ export const MessageItem = memo(function MessageItem({
   onCopy, onRetry, onTTS, onSaveToNote, onOpenFolderPicker, onFeedback,
   onEditStart, onEditCancel, onEditSubmit, onFetchCitation,
 }: Props) {
+  const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
   const isCopied = copiedMsgId === msg.id;
   const isSpeaking = speakingMsgId === msg.id;
   const feedback = feedbackMap[msg.id];
@@ -291,41 +292,64 @@ export const MessageItem = memo(function MessageItem({
                 >
                   {/* Conteneur scrollable avec hauteur max */}
                   <div className="custom-scrollbar mt-3 max-h-96 space-y-2 overflow-y-auto">
-                    {msg.citations.map((cit, i) => (
-                      <div
-                        key={cit.chunkId || i}
-                        className="notebook-card p-3 text-[var(--text-muted)]"
-                        data-interactive="true"
-                      >
-                        {/* Header avec titre + pertinence */}
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="truncate text-sm font-medium text-[var(--text-primary)]">
-                            {cit.sourceTitle}
-                          </span>
-                          <NbBadge tone="accent">
-                            {(cit.relevance * 100).toFixed(0)}% pertinent
-                          </NbBadge>
-                        </div>
-
-                        {/* Extrait avec affichage complet au clic */}
-                        <p className="line-clamp-3 cursor-pointer text-sm leading-relaxed">
-                          {cit.excerpt}
-                        </p>
-
-                        {/* Bouton pour voir le détail */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            onFetchCitation(cit, rect.left, rect.top);
-                          }}
-                          className="mt-1 flex items-center gap-1 rounded text-xs text-[var(--notebook-accent)] opacity-80 transition-opacity hover:opacity-100 hover:underline"
+                    {msg.citations.map((cit, i) => {
+                      const citationKey = cit.chunkId || `${msg.id}-citation-${i}`;
+                      const isExpanded = expandedCitations[citationKey] === true;
+                      const relevance = Number.isFinite(cit.relevance)
+                        ? Math.max(0, Math.min(1, cit.relevance))
+                        : null;
+                      return (
+                        <div
+                          key={citationKey}
+                          className="notebook-card p-3 text-[var(--text-muted)]"
+                          data-interactive="true"
                         >
-                          Voir le détail <ExternalLink className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
+                          {/* Header avec titre + pertinence */}
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                              {cit.sourceTitle}
+                            </span>
+                            {relevance !== null && (
+                              <NbBadge tone="accent">
+                                {(relevance * 100).toFixed(0)}% pertinent
+                              </NbBadge>
+                            )}
+                          </div>
+
+                          {/* L'extrait est réellement dépliable au clavier et au clic. */}
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            onClick={() => setExpandedCitations((current) => ({
+                              ...current,
+                              [citationKey]: !current[citationKey],
+                            }))}
+                            className="block w-full rounded text-left text-sm leading-relaxed text-[var(--text-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--notebook-accent)]"
+                            title={isExpanded ? 'Réduire l’extrait' : 'Afficher l’extrait complet'}
+                          >
+                            <span className={isExpanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-3'}>
+                              {cit.excerpt}
+                            </span>
+                            <span className="mt-1 block text-[11px] text-[var(--notebook-accent)]">
+                              {isExpanded ? 'Réduire l’extrait' : 'Afficher l’extrait complet'}
+                            </span>
+                          </button>
+
+                          {/* Ouverture du chunk source : reste distincte de l'expansion locale. */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              onFetchCitation(cit, rect.left, rect.top);
+                            }}
+                            className="mt-2 flex items-center gap-1 rounded text-xs text-[var(--notebook-accent)] opacity-80 transition-opacity hover:opacity-100 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--notebook-accent)]"
+                          >
+                            Ouvrir le passage source <ExternalLink className="h-3 w-3" aria-hidden />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
