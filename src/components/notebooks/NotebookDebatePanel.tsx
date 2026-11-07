@@ -47,6 +47,8 @@ export function NotebookDebatePanel({
   const [liveText, setLiveText] = useState("");
   const [error, setError] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const audioEnabledRef = useRef(true);
+  useEffect(() => { audioEnabledRef.current = audioEnabled; }, [audioEnabled]);
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioCursorRef = useRef(0);
@@ -88,7 +90,11 @@ export function NotebookDebatePanel({
       if (typeof event.data !== "string") return;
       let message: any;
       try { message = JSON.parse(event.data); } catch { return; }
-      if (message.type === "status") setStatus(message.status as Status);
+      if (message.type === "status") {
+        setStatus(message.status as Status);
+        if (message.status === "completed" || message.status === "stopped") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
+      }
+      if (message.type === "document_saved") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
       if (message.type === "speaker") setSpeaker(message.state === "speaking" ? message.speaker : null);
       if (message.type === "transcript" && message.message) {
         setTurns(current => [...current, message.message as DebateTurn]);
@@ -97,7 +103,7 @@ export function NotebookDebatePanel({
       if (message.type === "live_transcript") setLiveText((current) => current + (current ? " " : "") + String(message.text || ""));
       if (message.type === "error") { setError(String(message.error || "Erreur du débat.")); setStatus("error"); }
       if (message.type === "limit_reached") setStatus("stopping");
-      if (message.type === "audio" && audioEnabled) {
+      if (message.type === "audio" && audioEnabledRef.current) {
         try {
           const context = audioContextRef.current || new AudioContext({ sampleRate: 24000 });
           audioContextRef.current = context;
