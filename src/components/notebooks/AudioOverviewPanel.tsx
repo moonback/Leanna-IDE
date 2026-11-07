@@ -230,7 +230,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         formatDuration={formatDuration}
       />
 
-      {fullView && selectedOverview && (
+      {selectedOverview && (
         <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--notebook-border)] px-4 py-3">
           <div className="min-w-0">
