@@ -52,7 +52,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
     setTtsProgress(0);
   }, []);
 
-  const playTTS = useCallback(async () => {
+  useEffect(() => {\n    stopTTS();\n  }, [selectedOverview?.id, stopTTS]);\n\n  const playTTS = useCallback(async () => {
     if (!selectedOverview || playingRef.current) return;
     stopTTS();
     setTtsLoading(true);
