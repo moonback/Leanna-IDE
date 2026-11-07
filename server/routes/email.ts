@@ -66,6 +66,16 @@ export function createGmailRouter(): Router {
     }
   });
 
+  router.post("/permissions/personal-send", (req, res) => {
+    try {
+      if (typeof req.body?.enabled !== "boolean") throw new Error("Valeur enabled booléenne requise.");
+      gmailService.setPersonalSendEnabled(req.body.enabled);
+      res.json({ status: "success", data: gmailService.getSettings() });
+    } catch (error) {
+      res.status(400).json({ status: "error", error: (error as Error).message });
+    }
+  });
+
   router.post("/disconnect", (req, res) => {
     try {
       gmailService.disconnect(accountId(req.body?.account));
