@@ -11,6 +11,14 @@ export interface ContextSource {
   excluded?: boolean;
 }
 
+export interface DocumentAttachment {
+  fileName: string;
+  mimeType: string;
+  summary: string;
+  extractedTextLength: number;
+  provider?: 'gemini' | 'openrouter';
+}
+
 export interface TranscriptEntry {
   id: string;
   role: TranscriptRole;
@@ -28,6 +36,8 @@ export interface TranscriptEntry {
   pending?: 'image' | 'image-error';
   /** Message d'erreur affiché quand `pending === 'image-error'`. */
   imageError?: string;
+  /** Document réellement analysé et injecté dans le contexte de conversation. */
+  attachment?: DocumentAttachment;
 }
 
 export function useTranscript() {
@@ -156,6 +166,26 @@ export function useTranscript() {
       };
       return [...prev.slice(0, idx), failed, ...prev.slice(idx + 1)];
     });
+  }, []);
+
+
+  // ── Documents analysés : conserver une trace visible dans l'historique ───────
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const attachment = (event as CustomEvent<DocumentAttachment>).detail;
+      if (!attachment || typeof attachment.fileName !== 'string') return;
+      const summary = typeof attachment.summary === 'string' ? attachment.summary : '';
+      const entry: TranscriptEntry = {
+        id: `document-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: 'user',
+        text: `Document analysé : ${attachment.fileName}\n${summary}`,
+        timestamp: new Date(),
+        attachment,
+      };
+      setTranscript(prev => [...prev, entry].slice(-200));
+    };
+    window.addEventListener('Leanna-document-analyzed', handler as EventListener);
+    return () => window.removeEventListener('Leanna-document-analyzed', handler as EventListener);
   }, []);
 
   // ── Listener: résumé automatique du contexte ─────────────────────────────
