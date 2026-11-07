@@ -151,8 +151,8 @@ export function createAudioRouter(): Router {
       const result = await renderPodcastAudio(overview.script, overview.id, {
         hostName,
         coHostName,
-        hostVoice: typeof req.body?.hostVoice === "string" ? req.body.hostVoice : "Aoede",
-        coHostVoice: typeof req.body?.coHostVoice === "string" ? req.body.coHostVoice : "Charon",
+        hostVoice: typeof req.body?.hostVoice === "string" ? req.body.hostVoice : "ff_siwis",
+        coHostVoice: typeof req.body?.coHostVoice === "string" ? req.body.coHostVoice : "am_adam",
       });
       res.json({
         status: "ready",
