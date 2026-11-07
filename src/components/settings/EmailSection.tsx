@@ -64,7 +64,7 @@ export function EmailSection() {
   };
 
   const disconnect = async (id: "leanna" | "personal") => {
-    if (!window.confirm(`Déconnecter le compte Gmail ${id === "leanna" ? "de Leanna" : "personnel"} ?`)) return;
+    if (!window.confirm(`Déconnecter le compte e-mail ${id === "leanna" ? "de Leanna" : "personnel"} ?`)) return;
     setBusy(id);
     try {
       const response = await fetch("/api/email/disconnect", {
