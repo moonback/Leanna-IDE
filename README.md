@@ -239,7 +239,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
 | **Navigateur intégré** | 29 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
 | **Boucle humaine (HITL)** | Approbation interactive des actions à risque + contrôle de mission (pause/reprise/annulation), relais Telegram | ✅ |
-| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), E-mail (Infomaniak pour Leanna, Gmail personnel), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
+| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), E-mail (IMAP/SMTP générique pour Leanna, Gmail personnel), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
 | **Marketplace** | Registre de compétences (backend local + UI : recherche, publication avec analyse de sécurité, notes, installation) | ✅ |
 | **Workflow builder** | Éditeur de workflows par étapes dans l'interface (steps, actions, onError, retries, schedule) | 🟡 |
 
@@ -1889,16 +1889,9 @@ Le skill `server/skills/email.ts` expose cinq outils de messagerie, exécutés p
 `server/email/GmailService.ts`. Le service utilise **IMAP pour la lecture** et
 **SMTP pour l'envoi**, sans OAuth2.
 
-Le compte dédié **Leanna** utilise Infomaniak par défaut :
-
-| Paramètre | Valeur |
-|---|---|
-| IMAP | `mail.infomaniak.com:993` — SSL/TLS |
-| SMTP | `mail.infomaniak.com:587` — STARTTLS |
-| Authentification | Adresse complète + mot de passe de la boîte |
+Le compte dédié **Leanna** accepte une configuration IMAP/SMTP personnalisée : hôtes, ports, IMAP SSL/TLS et SMTP SSL/TLS ou STARTTLS. Les fournisseurs compatibles avec ces protocoles et une authentification par mot de passe peuvent être utilisés, sans OAuth2. Infomaniak est disponible comme configuration possible (`mail.infomaniak.com`, IMAP 993, SMTP 587 STARTTLS).
 
 Le compte personnel existant reste indépendant et conserve son intégration Gmail.
-Infomaniak est limité au compte dédié de Leanna dans cette évolution.
 
 | Outil | Fonction |
 |---|---|
@@ -1912,7 +1905,7 @@ Infomaniak est limité au compte dédié de Leanna dans cette évolution.
 
 - Les mots de passe sont chiffrés avant leur persistance dans la configuration
   locale ; ils ne sont jamais ajoutés au dépôt ni renvoyés à l'interface.
-- TLS 1.2 minimum est exigé ; SMTP Infomaniak utilise STARTTLS obligatoire.
+- TLS 1.2 minimum est exigé ; IMAP impose SSL/TLS et SMTP impose SSL/TLS ou STARTTLS.
 - Le service vérifie IMAP et SMTP avant d'enregistrer une nouvelle configuration.
 - Chaque envoi déclenche une confirmation interactive présentant le compte,
   le destinataire, l'objet et un aperçu du message.
