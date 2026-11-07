@@ -259,9 +259,13 @@ export class GmailService {
     const recipient = to.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");
+    const ccValue = cc.trim();
+    if (ccValue && (/[\\r\\n]/.test(ccValue) || !ccValue.split(",").every(value => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value.trim())))) {
+      throw new Error("Adresse Cc invalide.");
+    }
     const rawMessage = [
       `To: ${recipient}`,
-      ...(cc.trim() ? [`Cc: ${cc.trim()}`] : []),
+      ...(ccValue ? [`Cc: ${ccValue}`] : []),
       `Subject: =?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`,
       "MIME-Version: 1.0",
       "Content-Type: text/plain; charset=UTF-8",
