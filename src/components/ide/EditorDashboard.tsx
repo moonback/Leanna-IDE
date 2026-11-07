@@ -18,6 +18,8 @@ const SPRING = { type: 'spring' as const, bounce: 0.15, duration: 0.5 };
 const AUDIT_POLL_MS = 30_000; // même cadence que SystemHealthDashboard
 const BARS = 40;
 
+const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
+
 const fmtInt = (n: number) => n.toLocaleString('fr-FR');
 const fmtTime = (d: Date) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -823,7 +825,6 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const reduce = !!useReducedMotion();
   const aiName = profile.aiName || 'Leanna';
   const userName = profile.userName?.trim();
-  const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
