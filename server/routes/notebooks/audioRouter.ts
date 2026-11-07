@@ -84,7 +84,7 @@ export function createAudioRouter(): Router {
       let generatedCount = 0;
       let skippedCount = 0;
       for (let i = 0; i < dialogueLines.length; i++) {
-        if (req.destroyed || res.destroyed) return;
+        if (res.destroyed || res.writableEnded) return;
         const { speaker, text } = dialogueLines[i];
         const voice = speaker === "host" ? hostVoice : coHostVoice;
 
