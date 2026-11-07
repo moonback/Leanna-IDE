@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, RotateCcw, Save, Settings2,
   User, Cpu, Globe, SlidersHorizontal, Languages,
-  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, BookText, Layers, Send, Lock, FileCog
+  Palette, Key, Database, Trash2, Shield, ShieldCheck, X, Code2, ArrowLeft, Bot, BookOpen, BookText, Layers, Send, Mail, Lock, FileCog
 } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip.js';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
@@ -33,6 +33,7 @@ import {
   SkillsDocumentationSection,
   HierarchicalMemorySection,
   TelegramSection,
+  EmailSection,
   EnvSection,
 } from '../components/settings/index.js';
 
@@ -57,6 +58,7 @@ const NAV_GROUPS = [
       { id: 'custom-skills-settings', icon: Code2, label: 'Skills custom', keywords: 'skill personnalisé custom outil tool instruction prompt automatisation' },
       { id: 'skills-doc-settings', icon: BookOpen, label: 'Documentation Skills', keywords: 'documentation doc skills outils tools paramètres schéma tester interactif auto-généré' },
       { id: 'telegram-settings', icon: Send, label: 'Bot Telegram', keywords: 'telegram bot mobile smartphone distant notifications token polling' },
+      { id: 'email-settings', icon: Mail, label: 'E-mail Gmail', keywords: 'email e-mail gmail google boîte mail courrier réception envoyer lire rechercher oauth compte personnel leanna' },
       { id: 'openrouter-settings', icon: Globe, label: 'Modèles & API', keywords: 'openrouter cles providers gpt gemini claude modèle' },
       { id: 'model-settings', icon: SlidersHorizontal, label: 'Hyperparamètres', keywords: 'temperature top p créativité précis équilibré preset' },
       { id: 'tokens-settings', icon: Key, label: 'Tokens API', keywords: 'cle api gemini tokens pool rotation' },
@@ -497,6 +499,7 @@ export default function SettingsView() {
                 {activeSection === 'skills-doc-settings' && <SkillsDocumentationSection />}
                 {activeSection === 'hierarchical-memory-settings' && <HierarchicalMemorySection />}
                 {activeSection === 'telegram-settings' && <TelegramSection />}
+                {activeSection === 'email-settings' && <EmailSection />}
                 {activeSection === 'env-settings' && <EnvSection />}
               </motion.div>
             </AnimatePresence>
