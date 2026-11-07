@@ -136,7 +136,7 @@ export function NotebookDebatePanel({
       if (message.type === "status") setStatus(message.status as Status);
       if (message.type === "document_saved") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
       if (message.type === "intervention_queued") setQueuedIntervention(true);
-      if (message.type === "orchestration") setQueuedIntervention(false);
+      if (message.type === "intervention_applied") setQueuedIntervention(false);
       if (message.type === "speaker") setSpeaker(message.state === "speaking" ? message.speaker : null);
       if (message.type === "transcript" && message.message) {
         setTurns(current => [...current, message.message as DebateTurn]);
