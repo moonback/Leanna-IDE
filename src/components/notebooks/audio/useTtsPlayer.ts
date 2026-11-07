@@ -52,10 +52,6 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
     setTtsProgress(0);
   }, []);
 
-  useEffect(() => {
-    stopTTS();
-  }, [selectedOverview?.id, stopTTS]);
-
   const playTTS = useCallback(async () => {
     if (!selectedOverview || playingRef.current) return;
     stopTTS();
@@ -132,8 +128,11 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.removeAttribute("src");
+      audioRef.current.load();
+      audioRef.current = null;
     }
-  }, []);
+    playingRef.current = false;
+  }, [selectedOverview?.id]);
 
   return {
     playing,
