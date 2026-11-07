@@ -48,7 +48,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio' | 'history' | 'indexing';
+type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
 
 interface Props {
   notebookId: string;
@@ -205,6 +205,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [showIndexing, setShowIndexing] = useState(false);
   const [viewingGeneratedDoc, setViewingGeneratedDoc] = useState<{ id: string; title: string; type: string; content: string; createdAt: string } | null>(null);
   // Compteur de documents générés tenu à jour en direct, sans recharger tout
   // le notebook (ce qui démonterait l'assistant vocal). Alimenté par l'event
@@ -267,12 +268,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
         if (e.key === '1') { e.preventDefault(); setSourceRailOpen(v => !v); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('chat'); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setShowIndexing(false); }
         if (e.key === '3') { e.preventDefault(); setStudioTab('notes'); setStudioOpen(true); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
-        if (e.key === '7') { e.preventDefault(); setStudioTab('indexing'); setStudioOpen(true); }
+        if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
       }
     };
@@ -316,14 +317,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
-    { key: 'indexing', icon: Activity, label: 'Indexation' },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
     notes: 'Ctrl+3 / ⌘3',
     generate: 'Ctrl+4 / ⌘4',
     audio: 'Ctrl+5 / ⌘5',
     history: 'Ctrl+6 / ⌘6',
-    indexing: 'Ctrl+7 / ⌘7',
   };
 
   // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
@@ -332,6 +331,15 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   /** Ouvre le gestionnaire d'ajout de sources dans la colonne centrale */
   const openSourceManager = () => {
     setActiveTab('sources');
+    setSelectedSourceId(null);
+    setViewingGeneratedDoc(null);
+    setNoteEditorData(null);
+    setShowIndexing(false);
+  };
+
+  /** Ouvre le moniteur d'indexation dans la colonne centrale */
+  const openIndexing = () => {
+    setShowIndexing(true);
     setSelectedSourceId(null);
     setViewingGeneratedDoc(null);
     setNoteEditorData(null);
@@ -346,26 +354,46 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
    *  This preserves component state (e.g. GeneratePanel queue) across tab switches. */
   const renderStudioPanels = () => (
     <>
-      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'notes' ? 'block' : 'none' }}>
+      <div role="tabpanel" id="studio-panel-notes" aria-labelledby="studio-tab-notes" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'notes' ? 'block' : 'none' }}>
         <NotesPanel notebookId={notebookId} notes={notebook.notes} onRefresh={loadNotebook} onOpenNoteEditor={(data) => { setNoteEditorData(data); setSelectedSourceId(null); setViewingGeneratedDoc(null); }} />
       </div>
-      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'generate' ? 'block' : 'none' }}>
+      <div role="tabpanel" id="studio-panel-generate" aria-labelledby="studio-tab-generate" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'generate' ? 'block' : 'none' }}>
         <GeneratePanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
       </div>
-      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'history' ? 'block' : 'none' }}>
+      <div role="tabpanel" id="studio-panel-history" aria-labelledby="studio-tab-history" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'history' ? 'block' : 'none' }}>
         <GeneratedDocsPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
       </div>
-      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
+      <div role="tabpanel" id="studio-panel-audio" aria-labelledby="studio-tab-audio" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
         <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
-      </div>
-      <div className="h-full transition-opacity duration-150" style={{ display: studioTab === 'indexing' ? 'block' : 'none' }}>
-        <IndexingMonitor notebookId={notebookId} />
       </div>
     </>
   );
 
   /** Renders the main center content */
   const renderMainContent = () => {
+    // Moniteur d'indexation — ouvert depuis la colonne Sources
+    if (showIndexing) {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="notebook-panel-header px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)]">
+                <Activity className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h2 className="notebook-panel-title truncate">Indexation</h2>
+                <p className="text-xs text-[var(--text-muted)]">État réel des embeddings par source</p>
+              </div>
+            </div>
+            <NbIconButton icon={X} label="Fermer" onClick={() => setShowIndexing(false)} />
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <IndexingMonitor notebookId={notebookId} />
+          </div>
+        </div>
+      );
+    }
+
     if (selectedSourceId) {
       return (
         <SourceViewer
@@ -511,9 +539,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               onRefresh={loadNotebook}
               onUploadProgress={setIndexingProgress}
               compact
-              onSelectSource={(id) => setSelectedSourceId(id === selectedSourceId ? null : id)}
+              onSelectSource={(id) => { setShowIndexing(false); setSelectedSourceId(id === selectedSourceId ? null : id); }}
               selectedSourceId={selectedSourceId}
               onAddSources={openSourceManager}
+              onOpenIndexing={openIndexing}
               onCollapse={() => setSourceRailOpen(false)}
             />
           ) : (
@@ -524,6 +553,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                 onClick={() => setSourceRailOpen(true)}
               />
               <NbIconButton icon={Plus} label="Ajouter des sources" onClick={openSourceManager} />
+              <NbIconButton icon={Activity} label="Indexation (Ctrl+7 / ⌘7)" onClick={openIndexing} />
               <button
                 type="button"
                 onClick={() => setSourceRailOpen(true)}
@@ -540,7 +570,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <main className="notebook-panel notebook-main min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
-              key={selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : activeTab)}
+              key={showIndexing ? 'indexing' : selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : activeTab)}
               {...centerMotion}
               transition={spring}
               className="h-full"
@@ -567,31 +597,79 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                 />
               </div>
 
-              {/* Onglets du Studio */}
+              {/* Onglets du Studio — barre moderne avec indicateur actif glissant */}
               <div className="flex-shrink-0 px-3 pt-3">
-                <div className="notebook-segmented flex w-full" role="tablist" aria-label="Sections du Studio">
-                  {studioTabs.map(({ key, icon: Icon, label, badge }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      role="tab"
-                      aria-selected={studioTab === key}
-                      onClick={() => setStudioTab(key)}
-                      className="notebook-segment min-w-0 flex-1 !px-2 transition-transform active:scale-95"
-                      data-active={studioTab === key}
-                      title={`${label} (${studioShortcuts[key]})`}
-                    >
-                      <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                      <span className="truncate text-xs">{label}</span>
-                      {badge !== undefined && badge > 0 && <span className="notebook-count">{badge}</span>}
-                    </button>
-                  ))}
+                <div
+                  className="notebook-studio-tabs"
+                  role="tablist"
+                  aria-label="Sections du Studio"
+                >
+                  {studioTabs.map(({ key, icon: Icon, label, badge }) => {
+                    const isActive = studioTab === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        id={`studio-tab-${key}`}
+                        aria-selected={isActive}
+                        aria-controls={`studio-panel-${key}`}
+                        onClick={() => setStudioTab(key)}
+                        className="notebook-studio-tab"
+                        data-active={isActive}
+                        title={`${label} (${studioShortcuts[key]})`}
+                      >
+                        {isActive && !prefersReducedMotion && (
+                          <motion.span
+                            layoutId="studio-tab-indicator"
+                            className="notebook-studio-tab-indicator"
+                            transition={spring}
+                            aria-hidden
+                          />
+                        )}
+                        {isActive && prefersReducedMotion && (
+                          <span className="notebook-studio-tab-indicator" aria-hidden />
+                        )}
+                        <span className="notebook-studio-tab-inner">
+                          <Icon className="h-4 w-4 flex-shrink-0" aria-hidden />
+                          <span className="notebook-studio-tab-label">{label}</span>
+                          {/* Compteur visible uniquement sur l'onglet actif (élargi) ;
+                              un point discret signale une activité sur les onglets inactifs. */}
+                          {badge !== undefined && badge > 0 && (
+                            isActive ? (
+                              <span className="notebook-studio-tab-badge" data-active>
+                                {badge > 99 ? '99+' : badge}
+                              </span>
+                            ) : (
+                              <span className="notebook-studio-tab-dot" aria-hidden />
+                            )
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Tous les panneaux restent montés ; les inactifs sont masqués (display:none) */}
               <div className="min-h-0 flex-1 overflow-hidden">
                 {renderStudioPanels()}
+              </div>
+
+              {/* Action persistante — Ajouter une note (centrée en bas du Studio) */}
+              <div className="flex-shrink-0 border-t border-[var(--notebook-border)] p-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoteEditorData({ title: '', content: '' });
+                    setSelectedSourceId(null);
+                    setViewingGeneratedDoc(null);
+                  }}
+                  className="notebook-studio-addnote"
+                >
+                  <StickyNote className="h-4 w-4 flex-shrink-0" aria-hidden />
+                  <span>Ajouter une note</span>
+                </button>
               </div>
             </>
           ) : (

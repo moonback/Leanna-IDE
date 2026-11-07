@@ -15,6 +15,8 @@ export interface DocTypeEntry {
   icon: LucideIcon;
   desc: string;
   color: string;
+  /** Petit badge affiché sur la carte (ex. "Nouveau !"). Optionnel. */
+  badge?: string;
 }
 
 export const DOC_TYPES: DocTypeEntry[] = [
