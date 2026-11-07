@@ -406,6 +406,14 @@ export function attachLiveWebSocket(
             contextResumeSummary = summary;
             console.log(`[ContextResume] 🧠 Résumé généré à la volée (${summary.length} chars)`);
           }
+          // Les conversations courtes doivent elles aussi retrouver leur contexte.
+          if (!contextResumeSummary && messages.length > 0) {
+            contextResumeSummary = messages
+              .map(m => `${m.role === 'user' ? 'Utilisateur' : 'Leanna'}: ${m.content}`)
+              .join('\\n')
+              .slice(-6000);
+            console.log(`[ContextResume] 📚 Historique court restauré (${messages.length} messages)`);
+          }
         }
       } catch (e) {
         console.warn('[ContextResume] Erreur chargement résumé:', e);
