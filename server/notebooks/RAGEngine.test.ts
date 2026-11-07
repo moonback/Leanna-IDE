@@ -221,3 +221,47 @@ test('extractCitations: aucune citation si aucun résultat', () => {
   const citations = ragEngine.extractCitations('Peu importe [SOURCE 1].', []);
   assert.deepEqual(citations, []);
 });
+
+// ─── Audit de traçabilité des citations ──────────────────────────────────────
+
+test('auditCitations: mesure la couverture et détecte les références invalides', () => {
+  const src = makeSource('audit-a', 'Document A', ['preuve alpha', 'preuve beta', 'preuve gamma']);
+  const results = makeResults(src, [0.95, 0.9, 0.85]);
+  const response = 'Le premier point [SOURCE 1] est établi. Le second [SOURCE 99] est à vérifier.';
+  const citations = ragEngine.extractCitations(response, results);
+  const audit = ragEngine.auditCitations(response, results, citations);
+
+  assert.equal(audit.retrievedChunks, 3);
+  assert.equal(audit.citedChunks, 1);
+  assert.equal(audit.citedSources, 1);
+  assert.equal(audit.explicitReferences, 2);
+  assert.equal(audit.validReferences, 1);
+  assert.equal(audit.invalidReferences, 1);
+  assert.equal(audit.retrievalCoveragePercent, 33);
+  assert.equal(audit.status, 'partial');
+});
+
+test('auditCitations: distingue les citations implicites des références explicites', () => {
+  const src = makeSource('audit-b', 'Document B', ['preuve un', 'preuve deux']);
+  const results = makeResults(src, [0.9, 0.8]);
+  const response = 'Voici une réponse sans marqueur de citation.';
+  const citations = ragEngine.extractCitations(response, results);
+  const audit = ragEngine.auditCitations(response, results, citations);
+
+  assert.equal(audit.status, 'implicit');
+  assert.equal(audit.explicitReferences, 0);
+  assert.equal(audit.citedChunks, 2);
+  assert.equal(audit.retrievalCoveragePercent, 100);
+});
+
+test('auditCitations: signale une réponse sans citation exploitable', () => {
+  const src = makeSource('audit-c', 'Document C', ['preuve peu pertinente']);
+  const results = makeResults(src, [0.2]);
+  const response = 'Réponse sans citation.';
+  const citations = ragEngine.extractCitations(response, results);
+  const audit = ragEngine.auditCitations(response, results, citations);
+
+  assert.equal(audit.status, 'missing');
+  assert.equal(audit.citedChunks, 0);
+  assert.equal(audit.retrievalCoveragePercent, 0);
+});
