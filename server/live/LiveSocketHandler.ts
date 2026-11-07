@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction.js';
-import { startConversation, endConversation, saveMessage, generateConversationResumeContext } from '../skills/history.js';
+import { startConversation, endConversation, saveMessage, getConversationMessages, generateConversationResumeContext } from '../skills/history.js';
 import { isSandboxActive, getSandboxState } from '../utils/sandbox.js';
 import { getNextGeminiKey, describeKey } from '../utils/geminiKeyPool.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
