@@ -10,6 +10,7 @@ import { useProfile } from '../../context/UserProfileContext.js';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
 import { StatusBadge } from '../ui/index.js';
 import { useGitInfo, useGeminiStatus, type EmptyEditorStateProps } from './EmptyEditorState.js';
+import { DashboardCore } from './DashboardCore.js';
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
@@ -939,6 +940,8 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             </motion.button>
           </nav>
         </motion.header>
+
+        <DashboardCore aiName={aiName} connected={connected} connecting={connecting} onToggleConnection={handleConnect} />
 
         {isEditMode && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
           <Settings size={14} style={{ color: 'var(--accent-primary)' }} />
