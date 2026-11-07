@@ -135,11 +135,11 @@ export function SourcesSummaryCard({
             setCollapsed((value) => !value);
           }
         }}
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--notebook-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--notebook-accent)]"
+        className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--notebook-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--notebook-accent)]"
         aria-expanded={!collapsed}
       >
         {/* Icône */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
           <Sparkles className="h-3.5 w-3.5" aria-hidden />
         </div>
 
@@ -155,7 +155,7 @@ export function SourcesSummaryCard({
             </NbBadge>
           </div>
 
-          <p className="mt-0.5 truncate text-xs text-[var(--text-dimmed)]">
+          <p className="truncate text-[11px] leading-tight text-[var(--text-dimmed)]">
             Synthèse automatique de votre documentation
           </p>
         </div>
@@ -180,7 +180,7 @@ export function SourcesSummaryCard({
             className={loading ? '[&_svg]:animate-spin' : undefined}
           />
 
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--notebook-surface-muted)] text-[var(--text-dimmed)]">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--notebook-surface-muted)] text-[var(--text-dimmed)]">
             {collapsed ? (
               <ChevronDown className="h-3.5 w-3.5" aria-hidden />
             ) : (
@@ -208,12 +208,12 @@ export function SourcesSummaryCard({
             }}
             className="overflow-hidden"
           >
-            <div className="mx-4 border-t border-[var(--notebook-border)]" />
+            <div className="mx-3 border-t border-[var(--notebook-border)]" />
 
-            <div className="px-4 pb-4 pt-3">
+            <div className="px-3 pb-3 pt-2.5">
               {/* Génération initiale */}
               {loading && !summary && (
-                <div className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-xl bg-[var(--notebook-surface-muted)]">
+                <div className="flex min-h-[80px] flex-col items-center justify-center gap-2 rounded-lg bg-[var(--notebook-surface-muted)]">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
                     <Sparkles className="h-3.5 w-3.5 animate-pulse" aria-hidden />
                   </div>
@@ -248,7 +248,7 @@ export function SourcesSummaryCard({
               {/* Résumé */}
               {summary && (
                 <div
-                  className="sources-summary-content text-xs leading-[1.75] text-[var(--text-secondary)]"
+                  className="sources-summary-content text-xs leading-[1.6] text-[var(--text-secondary)]"
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with safeMarkdownParse
                   dangerouslySetInnerHTML={{
                     __html: safeMarkdownParse(summary),
@@ -273,7 +273,7 @@ export function SourcesSummaryCard({
 
               {/* Footer */}
               {!loading && summary && !error && (
-                <div className="mt-3 flex items-center gap-1.5 border-t border-[var(--notebook-border)] pt-2 text-xs text-[var(--text-dimmed)]">
+                <div className="mt-2.5 flex items-center gap-1.5 border-t border-[var(--notebook-border)] pt-2 text-[11px] text-[var(--text-dimmed)]">
                   <FileText className="h-3 w-3" aria-hidden />
 
                   <span>
@@ -294,7 +294,7 @@ export function SourcesSummaryCard({
       {/* Styles du Markdown */}
       <style>{`
         .sources-summary-content p {
-          margin: 0 0 0.65rem;
+          margin: 0 0 0.5rem;
         }
 
         .sources-summary-content p:last-child {
@@ -305,9 +305,9 @@ export function SourcesSummaryCard({
         .sources-summary-content h2,
         .sources-summary-content h3,
         .sources-summary-content h4 {
-          margin: 1rem 0 0.45rem;
+          margin: 0.75rem 0 0.35rem;
           font-weight: 600;
-          line-height: 1.35;
+          line-height: 1.3;
           color: var(--text-primary);
         }
 
@@ -332,13 +332,13 @@ export function SourcesSummaryCard({
 
         .sources-summary-content ul,
         .sources-summary-content ol {
-          margin: 0.4rem 0 0.75rem;
-          padding-left: 1.2rem;
+          margin: 0.3rem 0 0.55rem;
+          padding-left: 1.1rem;
         }
 
         .sources-summary-content li {
-          margin: 0.25rem 0;
-          padding-left: 0.15rem;
+          margin: 0.15rem 0;
+          padding-left: 0.1rem;
         }
 
         .sources-summary-content strong {

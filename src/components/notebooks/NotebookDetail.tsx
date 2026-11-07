@@ -579,20 +579,20 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         onAddSources={openSourceManager}
         onOpenSource={(id) => setSelectedSourceId(id)}
         intro={
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-3">
               <div
-                className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl text-2xl"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-xl"
                 style={{ backgroundColor: `color-mix(in srgb, ${notebook.color || 'var(--notebook-accent)'} 14%, transparent)` }}
                 aria-hidden
               >
-                {notebook.icon || <BookOpen className="h-6 w-6" style={{ color: notebook.color }} />}
+                {notebook.icon || <BookOpen className="h-5 w-5" style={{ color: notebook.color }} />}
               </div>
               <div className="min-w-0">
-                <h2 className="notebook-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+                <h2 className="notebook-heading text-lg font-semibold tracking-tight text-[var(--text-primary)]">
                   {notebook.title}
                 </h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--text-muted)]">
                   {notebook.sources.length} source{notebook.sources.length > 1 ? 's' : ''}
                 </p>
               </div>

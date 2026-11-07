@@ -195,7 +195,7 @@ export function NotebookChat({ notebookId, hasSources, sources = [], onRefresh, 
     setInput(e.target.value);
     const el = e.target;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 110) + 'px';
   }, []);
 
   // Envoi depuis le composer : vide le champ puis délègue au moteur.

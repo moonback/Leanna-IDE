@@ -62,7 +62,7 @@ export function Composer(props: Props) {
   const canSend = !!input.trim() && !loading;
 
   return (
-    <div className="flex-shrink-0 px-5 pb-5 pt-3 lg:px-8">
+    <div className="flex-shrink-0 px-3 pb-3 pt-2 lg:px-5">
       {/* Source filter bar */}
       {showSourceFilter && sources.length > 0 && (
         <motion.div
@@ -138,7 +138,7 @@ export function Composer(props: Props) {
         className="relative mx-auto flex max-w-4xl items-end rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] shadow-[var(--notebook-shadow-sm)] transition-[border-color,box-shadow] duration-200 focus-within:border-[var(--notebook-accent)] focus-within:ring-2 focus-within:ring-[var(--notebook-glow)]"
       >
         {/* Left actions — filter */}
-        <div className="flex flex-shrink-0 items-center py-3 pl-2">
+        <div className="flex flex-shrink-0 items-center py-2 pl-1.5">
           {sources.length > 1 && (
             <span className="relative inline-flex">
               <NbIconButton
@@ -167,11 +167,11 @@ export function Composer(props: Props) {
           onKeyDown={onKeyDown}
           placeholder={'Posez une question sur vos sources... (/ pour les commandes)'}
           rows={1}
-          className="max-h-[120px] min-h-[56px] flex-1 resize-none bg-transparent px-4 py-4 text-sm leading-6 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
+          className="max-h-[110px] min-h-[42px] flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-5 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
         />
 
         {/* Right action buttons */}
-        <div className="context-menu-container relative flex flex-shrink-0 items-center gap-1 px-2 py-3">
+        <div className="context-menu-container relative flex flex-shrink-0 items-center gap-0.5 px-1.5 py-2">
           <NbIconButton
             icon={Telescope}
             label="Deep Dive — exploration approfondie"
@@ -255,9 +255,9 @@ export function Composer(props: Props) {
       </div>
 
       {/* Bottom bar — hints + personality + secondary actions */}
-      <div className="mt-2 flex items-center justify-between px-1">
+      <div className="mt-1.5 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <p className="text-xs text-[var(--text-dimmed)]">
+          <p className="text-[11px] text-[var(--text-dimmed)]">
             Entrée pour envoyer • / commandes
             {queuedCount > 0 && (
               <span className="text-[var(--notebook-accent)]">

@@ -2154,11 +2154,19 @@ button {
   --notebook-chat-ai: transparent;
 }
 :root {
-  --notebook-radius-sm: 8px;
-  --notebook-radius-md: 12px;
-  --notebook-radius-lg: 16px;
-  --notebook-radius-xl: 24px;
+  --notebook-radius-sm: 7px;
+  --notebook-radius-md: 10px;
+  --notebook-radius-lg: 13px;
+  --notebook-radius-xl: 20px;
   --notebook-radius-pill: 999px;
+
+  /* Échelle de densité "compact" — hauteurs de contrôle & rythme vertical.
+     Pilotée ici pour que la refonte dense reste cohérente sur tous les panneaux. */
+  --nb-control-h: 30px;        /* hauteur standard d'un contrôle compact */
+  --nb-control-h-sm: 26px;
+  --nb-gap: 8px;               /* gap de base entre blocs serrés */
+  --nb-pad-x: 12px;            /* padding horizontal des panneaux/cartes */
+  --nb-pad-y: 8px;             /* padding vertical des panneaux/cartes */
 }
 
 /* Workspace container */
@@ -2168,27 +2176,27 @@ button {
   font-family: var(--font-sans);
 }
 
-/* Header — clean top bar with glassmorphism */
+/* Header — clean top bar with glassmorphism (compact) */
 .notebook-header {
-  min-height: 56px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px var(--premium-page-gutter, 20px);
+  gap: 12px;
+  padding: 6px var(--premium-page-gutter, 16px);
   border-bottom: 1px solid var(--notebook-border);
   background: var(--notebook-surface-elevated);
   box-shadow: 0 1px 0 var(--notebook-border), var(--notebook-shadow-sm, 0 2px 8px rgba(0,0,0,0.2));
 }
 .notebook-title {
-  font-size: 17px;
-  line-height: 1.3;
+  font-size: 15px;
+  line-height: 1.25;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 .notebook-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 11.5px;
   color: var(--text-muted);
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -2207,11 +2215,11 @@ button {
   --nb-right: clamp(300px, 26vw, 380px);
   --nb-left-handle: 12px;
   --nb-right-handle: 12px;
-  --nb-rail: 56px;
+  --nb-rail: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px;
   background: var(--notebook-bg);
 }
 @media (min-width: 1024px) {
@@ -2284,7 +2292,7 @@ button {
 }
 .notebook-panel > .notebook-panel-header,
 .notebook-panel .notebook-panel-header {
-  min-height: 52px;
+  min-height: 42px;
 }
 
 /* Panneau replié → rail d'icônes vertical */
@@ -2364,7 +2372,7 @@ button {
   font-weight: 500;
   cursor: pointer;
   border: none;
-  min-height: var(--premium-control-height-touch, 36px);
+  min-height: var(--nb-control-h, 30px);
   transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 .notebook-segment:focus-visible,
@@ -2375,8 +2383,8 @@ button {
   box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
 }
 .notebook-segment {
-  padding: 5px 13px;
-  font-size: 13px;
+  padding: 4px 11px;
+  font-size: 12.5px;
 }
 .notebook-segment[data-active="true"],
 .notebook-ghost-button[data-active="true"],
@@ -2386,12 +2394,12 @@ button {
   box-shadow: 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .notebook-ghost-button {
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 5px 11px;
+  font-size: 12.5px;
 }
 .notebook-icon-button {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   min-height: 0;
   border-radius: 50%;
 }
@@ -2407,8 +2415,8 @@ button {
 .notebook-studio-tabs {
   display: flex;
   width: 100%;
-  gap: 4px;
-  padding: 4px;
+  gap: 3px;
+  padding: 3px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -2423,7 +2431,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 0;
-  min-height: 34px;
+  min-height: 30px;
   border: none;
   border-radius: var(--notebook-radius-pill);
   background: transparent;
@@ -2500,10 +2508,10 @@ button {
 
 /* Primary action button (small) */
 .notebook-primary-small {
-  padding: 6px 14px;
+  padding: 5px 12px;
   background: var(--notebook-accent);
   color: var(--notebook-accent-text);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   border-radius: var(--notebook-radius-pill);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 16%, transparent);
@@ -2537,16 +2545,16 @@ button {
   gap: 4px;
 }
 
-/* Search field — rounded Material style */
+/* Search field — rounded Material style (compact) */
 .notebook-search-field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: var(--premium-control-height-touch, 36px);
+  gap: 8px;
+  min-height: var(--nb-control-h, 30px);
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
-  padding: 0 14px;
+  padding: 0 12px;
   color: var(--text-muted);
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
@@ -2748,13 +2756,13 @@ button {
 .notebook-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 13px;
+  gap: 5px;
+  padding: 4px 11px;
   border-radius: var(--notebook-radius-pill);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -2833,10 +2841,10 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 14px;
-  min-height: var(--premium-control-height-touch, 36px);
+  padding: 5px 12px;
+  min-height: var(--nb-control-h, 30px);
   border-radius: var(--notebook-radius-pill);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -2866,14 +2874,14 @@ button {
   box-shadow: 0 0 0 3px var(--notebook-glow, rgba(129, 140, 248, 0.3));
 }
 .notebook-btn-sm {
-  min-height: 28px;
-  padding: 4px 10px;
-  font-size: 12px;
+  min-height: var(--nb-control-h-sm, 26px);
+  padding: 3px 9px;
+  font-size: 11.5px;
   gap: 5px;
 }
 .notebook-icon-button.notebook-icon-button--sm {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 .notebook-icon-button.notebook-icon-button--danger:hover {
   background: var(--color-error-subtle);
@@ -2893,8 +2901,8 @@ button {
 /* Champs de saisie */
 .notebook-input {
   width: 100%;
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: var(--nb-control-h, 30px);
+  padding: 6px 11px;
   border-radius: var(--notebook-radius-sm);
   background: var(--notebook-surface-muted);
   border: 1px solid var(--notebook-border);
@@ -2911,19 +2919,19 @@ button {
   box-shadow: 0 0 0 3px var(--notebook-glow, rgba(168, 199, 250, 0.15));
 }
 
-/* En-tête de panneau (Sources, Chat, Studio, Notes…) */
+/* En-tête de panneau (Sources, Chat, Studio, Notes…) — compact */
 .notebook-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 48px;
-  padding: 8px 16px;
+  min-height: 42px;
+  padding: 6px var(--nb-pad-x);
   border-bottom: 1px solid var(--notebook-border);
   flex-shrink: 0;
 }
 .notebook-panel-title {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
