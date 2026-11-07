@@ -212,6 +212,8 @@ export function createAudioRouter(): Router {
         res.status(404).json({ error: "Audio overview introuvable." });
         return;
       }
+      const audioPath = path.join(getSandboxRoot(), "podcasts", `${req.params.overviewId}.wav`);
+      try { fs.rmSync(audioPath, { force: true }); } catch { /* le nettoyage du média ne doit pas annuler la suppression du podcast */ }
       res.json({ status: "success", message: "Audio overview supprimé." });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
