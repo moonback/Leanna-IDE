@@ -648,3 +648,14 @@ Compléments de la dixième passe :
 - Les types UI sont alignés sur les champs du modèle serveur (`indexingStatus`, `indexingAttempts`, `indexingError`, `indexingUpdatedAt`, `indexingNextRetryAt`).
 
 **Validation CI observée :** une exécution GitHub Actions associée au commit précédent est remontée en `startup_failure`, sans job créé ; aucun résultat de typecheck/test/lint n'est disponible. Cela ne permet pas de conclure à un échec du code ni à une réussite. Refaire les validations dans l'environnement local et vérifier le démarrage de l'action GitHub.
+
+
+### Quinzième passe — lecture et traçabilité des citations
+
+- Les extraits de citation sont maintenant réellement dépliables/repliables ; auparavant, leur style indiquait un curseur interactif sans gestionnaire de clic.
+- L'expansion est accessible au clavier et expose `aria-expanded` ; le texte complet conserve les retours à la ligne et les mots longs.
+- L'ouverture du passage source reste une action distincte, via le callback existant `onFetchCitation`, afin de ne pas confondre expansion de l'extrait et navigation vers le chunk d'origine.
+- Le score de pertinence est borné entre 0 et 100 % lorsqu'il est numérique et n'est pas affiché s'il est invalide.
+- Aucun changement du contrat API, du modèle Citation ou du mécanisme de récupération de chunk.
+
+**Validation restante :** vérifier le rendu des citations longues, les interactions clavier, les références sans score valide et l'ouverture du chunk dans la visionneuse ; typecheck, lint et tests UI restent à exécuter localement.
