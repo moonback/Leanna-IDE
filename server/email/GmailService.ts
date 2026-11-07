@@ -31,7 +31,7 @@ const INFOMANIAK_SERVERS: MailServerSettings = {
   smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecurity: "starttls",
 };
 const DEFAULT_CUSTOM_SERVERS = INFOMANIAK_SERVERS;
-function validateServerSettings(value: unknown): MailServerSettings {
+export function validateServerSettings(value: unknown): MailServerSettings {
   if (!value || typeof value !== "object") throw new Error("Paramètres IMAP/SMTP manquants.");
   const v = value as Record<string, unknown>;
   const host = (input: unknown, label: string) => {
@@ -325,6 +325,7 @@ export class GmailService {
   async readMessage(id: GmailAccountId, messageId: string) {
     if (!/^\d+$/.test(messageId)) throw new Error("Identifiant IMAP invalide.");
     const account = this.requireAccount(id);
+    await assertPublicMailHost(account.servers.imapHost);
     const client = createImapClient(account);
     try {
       await client.connect();
