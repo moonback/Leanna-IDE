@@ -51,6 +51,7 @@ export class GmailService {
         clientId: typeof data.clientId === "string" ? data.clientId : "",
         clientSecret: secret && !isEncrypted(secret) ? secret : "",
         accounts,
+        personalSendEnabled: data.personalSendEnabled === true,
       };
     } catch (error) {
       console.warn("[Gmail] Configuration locale illisible; intégration désactivée.");
@@ -69,7 +70,7 @@ export class GmailService {
       clientId: this.config.clientId,
       clientSecret: this.config.clientSecret ? encrypt(this.config.clientSecret) : "",
       accounts,
-      personalSendEnabled: data.personalSendEnabled === true,
+      personalSendEnabled: this.config.personalSendEnabled,
     };
     const temp = this.configPath + ".tmp";
     fs.writeFileSync(temp, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 });
@@ -98,7 +99,7 @@ export class GmailService {
 
   get redirectUri(): string {
     return process.env.LEANNA_GMAIL_REDIRECT_URI?.trim()
-      || `http://127.0.0.1:${process.env.PORT || "4000"}/api/email/oauth/callback`;
+      || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || "4000"}/api/email/oauth/callback`;
   }
 
   saveOAuthCredentials(clientId: string, clientSecret?: string): void {
