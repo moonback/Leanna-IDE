@@ -70,7 +70,23 @@ function makeWav(pcm: Buffer): Buffer {
   return Buffer.concat([header, pcm]);
 }
 
-export async function renderPodcastAudio(
+const activeRenders = new Map<string, Promise<PodcastRenderResult>>();
+
+export function renderPodcastAudio(
+  script: string,
+  overviewId: string,
+  options: PodcastRenderOptions,
+): Promise<PodcastRenderResult> {
+  const active = activeRenders.get(overviewId);
+  if (active) return active;
+  const job = renderPodcastAudioInternal(script, overviewId, options).finally(() => {
+    activeRenders.delete(overviewId);
+  });
+  activeRenders.set(overviewId, job);
+  return job;
+}
+
+async function renderPodcastAudioInternal(
   script: string,
   overviewId: string,
   options: PodcastRenderOptions,
