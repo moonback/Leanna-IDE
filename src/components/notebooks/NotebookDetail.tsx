@@ -13,7 +13,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
-  Save, Maximize2, Minimize2, Users,
+  Save, Maximize2, Minimize2, Users, MessageSquareText,
 } from 'lucide-react';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { useToast } from '../ui/Toast.js';
@@ -49,7 +49,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio' | 'history' | 'debate';
+type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
 
 interface Props {
   notebookId: string;
@@ -203,6 +203,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [studioTab, setStudioTab] = useState<StudioTab>('generate');
   const [studioOpen, setStudioOpen] = useState(true);
+  const [debateOpen, setDebateOpen] = useState(false);
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
   const [panelWidths, setPanelWidths] = useState({ sources: 280, studio: 340 });
   const [panelWidthsReady, setPanelWidthsReady] = useState(false);
@@ -361,7 +362,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
         if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
-        if (e.key === '8') { e.preventDefault(); setStudioTab('debate'); setStudioOpen(true); }
+        if (e.key === '8') { e.preventDefault(); setDebateOpen(value => !value); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
         if (e.key === '0') {
           e.preventDefault();
@@ -411,14 +412,12 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
-    { key: 'debate', icon: Users, label: 'Débat IA' },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
     notes: 'Ctrl+3 / ⌘3',
     generate: 'Ctrl+4 / ⌘4',
     audio: 'Ctrl+5 / ⌘5',
     history: 'Ctrl+6 / ⌘6',
-    debate: 'Ctrl+8 / ⌘8',
   };
 
   // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
@@ -461,9 +460,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       </div>
       <div role="tabpanel" id="studio-panel-audio" aria-labelledby="studio-tab-audio" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
         <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
-      </div>
-      <div role="tabpanel" id="studio-panel-debate" aria-labelledby="studio-tab-debate" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'debate' ? 'block' : 'none' }}>
-        <NotebookDebatePanel notebookId={notebookId} sources={notebook.sources.map((source: any) => ({ id: source.id, title: source.title, indexingStatus: source.indexingStatus }))} onOpenSource={(id) => { setStudioOpen(false); setSelectedSourceId(id); }} />
       </div>
     </>
   );
@@ -593,6 +589,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <div className="flex items-center gap-2">
             <NbIconButton icon={ArrowLeft} label="Retour aux notebooks" onClick={onBack} className="transition-transform active:scale-90" />
             <div className="hidden md:flex"><NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} /></div>
+            <NbIconButton icon={MessageSquareText} label="Ouvrir le débat IA (Ctrl+8 / ⌘8)" onClick={() => setDebateOpen(true)} className="transition-transform active:scale-90" />
             <NbIconButton
               icon={focusMode ? Minimize2 : Maximize2}
               label={focusMode ? 'Quitter le mode Focus (Ctrl+0 / ⌘0)' : 'Activer le mode Focus (Ctrl+0 / ⌘0)'}
@@ -871,6 +868,31 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           )}
         </aside>
       </div>
+      <AnimatePresence>
+        {debateOpen && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0.1 : 0.18 }}
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setDebateOpen(false); }}
+          >
+            <motion.section
+              role="dialog" aria-modal="true" aria-labelledby="notebook-debate-dialog-title"
+              className="flex h-[min(860px,calc(100vh-2rem))] max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] shadow-2xl"
+              initial={{ opacity: 0, y: 18, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.985 }}
+              transition={{ duration: prefersReducedMotion ? 0.1 : 0.22 }}
+            >
+              <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--notebook-border)] px-4 py-2.5">
+                <div className="min-w-0"><h2 id="notebook-debate-dialog-title" className="text-sm font-semibold text-[var(--text-primary)]">Débat IA</h2><p className="text-[11px] text-[var(--text-muted)]">Espace de débat vocal · {notebook.title}</p></div>
+                <NbIconButton icon={X} label="Fermer le débat IA" onClick={() => setDebateOpen(false)} />
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <NotebookDebatePanel notebookId={notebookId} sources={notebook.sources.map((source: any) => ({ id: source.id, title: source.title, indexingStatus: source.indexingStatus }))} onOpenSource={(id) => { setDebateOpen(false); setSelectedSourceId(id); }} />
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
     </NotebookLiveProvider>
   );
