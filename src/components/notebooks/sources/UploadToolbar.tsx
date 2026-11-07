@@ -46,6 +46,7 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
     showTextForm, setShowTextForm, textTitle, setTextTitle, textContent, setTextContent, handleTextAdd,
     showCodebaseForm, setShowCodebaseForm,
     codebaseTitle, setCodebaseTitle, codebaseExtensions, setCodebaseExtensions,
+    codebaseIncludeDirs, setCodebaseIncludeDirs, codebaseExcludeDirs, setCodebaseExcludeDirs,
     codebaseMaxSizeKb, setCodebaseMaxSizeKb, codebaseIncludeConfig, setCodebaseIncludeConfig,
     handleCodebaseImport, handleClipboardPaste,
   } = upload;
@@ -276,6 +277,34 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 />
               </div>
 
+              <div>
+                <label htmlFor="codebase-include-dirs" className={FIELD_LABEL}>
+                  Dossiers à inclure <span className="text-[var(--text-dimmed)]">(vide = tout le workspace)</span>
+                </label>
+                <NbInput
+                  id="codebase-include-dirs"
+                  type="text"
+                  value={codebaseIncludeDirs}
+                  onChange={e => setCodebaseIncludeDirs(e.target.value)}
+                  placeholder="src server/notebooks ..."
+                  className="font-mono"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="codebase-exclude-dirs" className={FIELD_LABEL}>
+                  Dossiers à exclure <span className="text-[var(--text-dimmed)]">(en plus des exclusions par défaut)</span>
+                </label>
+                <NbInput
+                  id="codebase-exclude-dirs"
+                  type="text"
+                  value={codebaseExcludeDirs}
+                  onChange={e => setCodebaseExcludeDirs(e.target.value)}
+                  placeholder="docs tests dist ..."
+                  className="font-mono"
+                />
+              </div>
+
               <div className="flex flex-wrap items-center gap-6">
                 <div>
                   <label htmlFor="codebase-max-size" className={FIELD_LABEL}>
@@ -324,7 +353,7 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 <NbButton
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setShowCodebaseForm(false); setCodebaseTitle(''); setCodebaseExtensions(''); }}
+                  onClick={() => { setShowCodebaseForm(false); setCodebaseTitle(''); setCodebaseExtensions(''); setCodebaseIncludeDirs(''); setCodebaseExcludeDirs(''); }}
                 >
                   Annuler
                 </NbButton>

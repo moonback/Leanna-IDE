@@ -492,9 +492,6 @@ function NavSidebar() {
   return <GlobalSidebar />;
 }
 
-/* L'état agent n'est plus une barre pleine largeur : c'est une pastille dans
-   l'en-tête unifié (<ViewHeader> → <AgentStatusPill>). */
-
 // ── Animated route transitions (Phase 3.5) ─────────────────────────────────
 function AnimatedRoutes() {
   const location = useLocation();

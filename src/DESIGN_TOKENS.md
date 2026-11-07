@@ -37,7 +37,7 @@ Rayons : `--r-control` 8 · `--r-card` 12 · `--r-float` 12 · `--r-surface` 14 
 
 ### En-tête unifié
 
-Toute page utilise `<ViewHeader>` (`.lea-header`) : une ligne de `--header-h` — icône · titre · badge · description en ligne | pastille d'état agent (`<AgentStatusPill>`) · séparateur · actions. Les vues embarquées (`embedded`) n'affichent pas de header. L'IDE n'en a pas : onglets + barre d'état en tiennent lieu.
+Toute page utilise `<ViewHeader>` (`.lea-header`) : une ligne de `--header-h` — icône · titre · badge · description en ligne | actions. Les vues embarquées (`embedded`) n'affichent pas de header. L'IDE n'en a pas : onglets + barre d'état en tiennent lieu.
 
 ---
 

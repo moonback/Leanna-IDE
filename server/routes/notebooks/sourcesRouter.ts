@@ -343,12 +343,14 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       const {
         extensions,
         excludeDirs = [],
+        includeDirs = [],
         maxFileSizeKb = 100,
         includeConfig = true,
         title,
       } = req.body as {
         extensions?: string[];
         excludeDirs?: string[];
+        includeDirs?: string[];
         maxFileSizeKb?: number;
         includeConfig?: boolean;
         title?: string;
@@ -373,14 +375,41 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         ...excludeDirs.map((d: string) => d.toLowerCase()),
       ]);
 
+      // Normalise les dossiers à inclure (relatifs à la racine, séparateurs
+      // unifiés, sans slash final). Si la liste est vide, tout le workspace
+      // est scanné. Un chemin inclus matche lui-même et tous ses descendants.
+      const normalizeRel = (p: string) =>
+        p.trim().replace(/\\/g, "/").replace(/^\.?\/+/, "").replace(/\/+$/, "").toLowerCase();
+      const includeDirsNorm = includeDirs
+        .map(normalizeRel)
+        .filter(Boolean);
+      const hasIncludeFilter = includeDirsNorm.length > 0;
+      // Un dossier doit être visité s'il est (ou est un ancêtre/descendant d')
+      // un des chemins inclus.
+      const dirMatchesInclude = (relDir: string): boolean => {
+        if (!hasIncludeFilter) return true;
+        const rel = normalizeRel(relDir);
+        if (rel === "") return true; // racine : on descend toujours
+        return includeDirsNorm.some(inc => rel === inc || rel.startsWith(`${inc}/`) || inc.startsWith(`${rel}/`));
+      };
+      // Un fichier est retenu par le filtre d'inclusion s'il est sous un des
+      // chemins inclus.
+      const fileMatchesInclude = (relFile: string): boolean => {
+        if (!hasIncludeFilter) return true;
+        const rel = normalizeRel(relFile);
+        return includeDirsNorm.some(inc => rel === inc || rel.startsWith(`${inc}/`));
+      };
+
       const configFiles = new Set(["package.json", "tsconfig.json", ".env.example", "vite.config.ts", "vite.config.js"]);
       const maxBytes = maxFileSizeKb * 1024;
       const collectedFiles: { rel: string; content: string }[] = [];
+      const skippedFiles: { rel: string; reason: "too-large" | "total-limit" | "unreadable" }[] = [];
       let totalChars = 0;
+      let totalLimitReached = false;
       const MAX_TOTAL_CHARS = 2_000_000;
 
       function walk(dir: string, relBase: string) {
-        if (totalChars >= MAX_TOTAL_CHARS) return;
+        if (totalChars >= MAX_TOTAL_CHARS) { totalLimitReached = true; return; }
         let entries: fs.Dirent[];
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
         catch { return; }
@@ -389,6 +418,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
           const relPath = relBase ? `${relBase}/${entry.name}` : entry.name;
           if (entry.isDirectory()) {
             if (excludedDirsSet.has(entry.name.toLowerCase())) continue;
+            if (!dirMatchesInclude(relPath)) continue;
             walk(path.join(dir, entry.name), relPath);
           } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase();
@@ -396,17 +426,22 @@ export function createSourcesRouter(upload: multer.Multer): Router {
             const isTextFile = TEXT_FILE_EXT.test(entry.name);
             const isAllowed = allowedExtensions ? allowedExtensions.has(ext) : isTextFile;
             if (!isAllowed && !isConfig) continue;
+            if (!fileMatchesInclude(relPath)) continue;
 
             let stats: fs.Stats;
             try { stats = fs.statSync(path.join(dir, entry.name)); } catch { continue; }
-            if (stats.size > maxBytes) continue;
-            if (totalChars + stats.size > MAX_TOTAL_CHARS) continue;
+            if (stats.size > maxBytes) { skippedFiles.push({ rel: relPath, reason: "too-large" }); continue; }
+            if (totalChars + stats.size > MAX_TOTAL_CHARS) {
+              totalLimitReached = true;
+              skippedFiles.push({ rel: relPath, reason: "total-limit" });
+              continue;
+            }
 
             try {
               const content = fs.readFileSync(path.join(dir, entry.name), "utf-8");
               collectedFiles.push({ rel: relPath, content });
               totalChars += content.length;
-            } catch { /* fichier non lisible */ }
+            } catch { skippedFiles.push({ rel: relPath, reason: "unreadable" }); }
           }
         }
       }
@@ -432,6 +467,21 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         `# Codebase : ${workspaceName}`,
         ``,
         `> Exporté le ${now} — ${collectedFiles.length} fichier(s) — ${Math.round(totalChars / 1024)} Ko de texte`,
+      ];
+      if (hasIncludeFilter) {
+        mdLines.push(`> Dossiers inclus : ${includeDirsNorm.join(", ")}`);
+      }
+      if (skippedFiles.length > 0) {
+        const tooLarge = skippedFiles.filter(f => f.reason === "too-large").length;
+        const limitHit = skippedFiles.filter(f => f.reason === "total-limit").length;
+        const unreadable = skippedFiles.filter(f => f.reason === "unreadable").length;
+        const parts: string[] = [];
+        if (tooLarge) parts.push(`${tooLarge} trop volumineux (> ${maxFileSizeKb} Ko)`);
+        if (limitHit) parts.push(`${limitHit} au-delà de la limite totale (${Math.round(MAX_TOTAL_CHARS / 1024)} Ko)`);
+        if (unreadable) parts.push(`${unreadable} illisible(s)`);
+        mdLines.push(`> ⚠️ ${skippedFiles.length} fichier(s) ignoré(s) : ${parts.join(", ")}`);
+      }
+      mdLines.push(
         ``,
         `## Arborescence`,
         ``,
@@ -441,7 +491,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         ``,
         `---`,
         ``,
-      ];
+      );
 
       for (const { rel, content } of collectedFiles) {
         const ext = path.extname(rel).replace(".", "") || "text";
@@ -480,6 +530,16 @@ export function createSourcesRouter(upload: multer.Multer): Router {
           filesCollected: collectedFiles.length,
           totalChars,
           workspaceRoot,
+          filesSkipped: skippedFiles.length,
+          skipReasons: {
+            tooLarge: skippedFiles.filter(f => f.reason === "too-large").length,
+            totalLimit: skippedFiles.filter(f => f.reason === "total-limit").length,
+            unreadable: skippedFiles.filter(f => f.reason === "unreadable").length,
+          },
+          // Échantillon pour un retour UI lisible sans gonfler la réponse.
+          skippedSample: skippedFiles.slice(0, 20).map(f => ({ rel: f.rel, reason: f.reason })),
+          totalLimitReached,
+          maxTotalKb: Math.round(MAX_TOTAL_CHARS / 1024),
         },
       });
     } catch (e: any) {

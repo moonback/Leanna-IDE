@@ -299,31 +299,8 @@ html, body { background: var(--atmo-base); }
   flex-shrink: 0;
   min-width: 0;
 }
-.lea-header__sep { width: 1px; height: 20px; background: var(--glass-stroke); flex-shrink: 0; }
-
-/* Pastille d'état agent (anciennement une barre pleine largeur au-dessus
-   de chaque page) — compacte, dans l'en-tête. */
-.lea-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--control-h-sm);
-  flex: 0 1 auto;
-  max-width: 320px;
-  padding-inline: 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: var(--glass-card);
-  border: 1px solid var(--glass-stroke);
-  transition: background-color 150ms ease, border-color 150ms ease;
-}
-.lea-status-pill:hover { background: var(--glass-hover); border-color: var(--glass-stroke-strong); }
-.lea-status-pill:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
-
 @media (max-width: 900px) {
   .lea-header__desc { display: none; }
-  .lea-status-pill__reason { display: none; }
 }
 
 /* ═══════════════════════════════════════════════
@@ -394,7 +371,7 @@ html, body { background: var(--atmo-base); }
    9. RÉDUCTION DU MOUVEMENT & PETITES FENÊTRES
 ═══════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-  .lea-sidebar__search, .lea-status-pill { transition: none; }
+  .lea-sidebar__search { transition: none; }
 }
 
 /* Fenêtres étroites ou basses : on resserre la grille du shell. */

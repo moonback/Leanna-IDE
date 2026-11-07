@@ -38,6 +38,8 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
   const [showCodebaseForm, setShowCodebaseForm] = useState(false);
   const [codebaseTitle, setCodebaseTitle] = useState('');
   const [codebaseExtensions, setCodebaseExtensions] = useState('');
+  const [codebaseIncludeDirs, setCodebaseIncludeDirs] = useState('');
+  const [codebaseExcludeDirs, setCodebaseExcludeDirs] = useState('');
   const [codebaseMaxSizeKb, setCodebaseMaxSizeKb] = useState(100);
   const [codebaseIncludeConfig, setCodebaseIncludeConfig] = useState(true);
 
@@ -198,31 +200,58 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
         ? codebaseExtensions.split(/[\s,;]+/).filter(Boolean).map(e => e.startsWith('.') ? e : `.${e}`)
         : undefined;
 
+      const splitDirs = (raw: string) =>
+        raw.trim() ? raw.split(/[\s,;]+/).filter(Boolean) : undefined;
+      const includeDirs = splitDirs(codebaseIncludeDirs);
+      const excludeDirs = splitDirs(codebaseExcludeDirs);
+
       const data = await api<{
         source: { title: string; wordCount: number };
-        stats: { filesCollected: number };
+        stats: {
+          filesCollected: number;
+          filesSkipped?: number;
+          totalLimitReached?: boolean;
+          maxTotalKb?: number;
+        };
       }>(`/api/notebooks/${notebookId}/sources/codebase`, {
         method: 'POST',
         json: {
           title: codebaseTitle.trim() || undefined,
           extensions,
+          includeDirs,
+          excludeDirs,
           maxFileSizeKb: codebaseMaxSizeKb,
           includeConfig: codebaseIncludeConfig,
         },
       });
-      onSuccess(
-        `Codebase importé : "${data.source.title}" — ${data.stats.filesCollected} fichiers, ${data.source.wordCount.toLocaleString()} mots`
-      );
+      const { filesCollected, filesSkipped = 0, totalLimitReached } = data.stats;
+      let message =
+        `Codebase importé : "${data.source.title}" — ${filesCollected} fichiers, ${data.source.wordCount.toLocaleString()} mots`;
+      if (filesSkipped > 0) {
+        message += ` — ⚠️ ${filesSkipped} fichier(s) ignoré(s)`;
+      }
+      if (totalLimitReached) {
+        message += ` (limite de ${data.stats.maxTotalKb ?? 2000} Ko atteinte, indexation partielle)`;
+      }
+      if (filesSkipped > 0 || totalLimitReached) {
+        // Les troncatures méritent une notification visible (warning), pas un
+        // simple succès silencieux.
+        onError(message);
+      } else {
+        onSuccess(message);
+      }
       setShowCodebaseForm(false);
       setCodebaseTitle('');
       setCodebaseExtensions('');
+      setCodebaseIncludeDirs('');
+      setCodebaseExcludeDirs('');
       onRefresh();
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Erreur serveur');
     } finally {
       setUploading(false);
     }
-  }, [notebookId, codebaseTitle, codebaseExtensions, codebaseMaxSizeKb, codebaseIncludeConfig, onSuccess, onError, onRefresh]);
+  }, [notebookId, codebaseTitle, codebaseExtensions, codebaseIncludeDirs, codebaseExcludeDirs, codebaseMaxSizeKb, codebaseIncludeConfig, onSuccess, onError, onRefresh]);
 
   // Note : l'effet onUploadProgress reste dans le parent pour conserver le
   // contrat exact avec la prop onUploadProgress (il lit uploadQueue + uploading
@@ -241,6 +270,8 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
     showCodebaseForm, setShowCodebaseForm,
     codebaseTitle, setCodebaseTitle,
     codebaseExtensions, setCodebaseExtensions,
+    codebaseIncludeDirs, setCodebaseIncludeDirs,
+    codebaseExcludeDirs, setCodebaseExcludeDirs,
     codebaseMaxSizeKb, setCodebaseMaxSizeKb,
     codebaseIncludeConfig, setCodebaseIncludeConfig,
     fileInputRef,

@@ -1,6 +1,5 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { AgentStatusPill } from '../AgentStatusBar.js';
 import '../../styles/ux-refinements.css';
 
 interface ViewHeaderProps {
@@ -14,8 +13,6 @@ interface ViewHeaderProps {
   badge?: string;
   /** Actions rendered on the right side */
   actions?: React.ReactNode;
-  /** Agent status pill (what Leanna is doing now). Default: shown. */
-  showStatus?: boolean;
 }
 
 /**
@@ -23,7 +20,7 @@ interface ViewHeaderProps {
  * Le titre conserve toujours la priorité ; la description et les éléments
  * secondaires se contractent avant les actions principales.
  */
-export function ViewHeader({ title, icon: Icon, description, badge, actions, showStatus = true }: ViewHeaderProps) {
+export function ViewHeader({ title, icon: Icon, description, badge, actions }: ViewHeaderProps) {
   return (
     <header className="lea-header" aria-label={`En-tête de la page : ${title}`}>
       <div className="lea-header__icon" aria-hidden="true">
@@ -40,15 +37,10 @@ export function ViewHeader({ title, icon: Icon, description, badge, actions, sho
         )}
       </div>
 
-      {showStatus && <AgentStatusPill />}
-
       {actions && (
-        <>
-          {showStatus && <span className="lea-header__sep" aria-hidden="true" />}
-          <div className="lea-header__actions" role="group" aria-label={`Actions de ${title}`}>
-            {actions}
-          </div>
-        </>
+        <div className="lea-header__actions" role="group" aria-label={`Actions de ${title}`}>
+          {actions}
+        </div>
       )}
     </header>
   );

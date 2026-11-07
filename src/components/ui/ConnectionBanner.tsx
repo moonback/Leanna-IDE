@@ -6,7 +6,7 @@
  * (« Redémarrez le backend avec npm run dev ») mais cette information n'atteint
  * jamais l'interface : l'utilisateur voit juste des listes vides.
  *
- * Montage (main.tsx → Layout, juste au-dessus de <GlobalAgentStatusBar />) :
+ * Montage (main.tsx → Layout) :
  *   <ConnectionBanner />
  *
  * Sondage léger : GET /api/health toutes les 15 s, seulement fenêtre visible,
