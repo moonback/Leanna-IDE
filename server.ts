@@ -302,7 +302,7 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
     memorySkill, hierarchicalMemorySkill, reasoningSkill, systemSkill, timeSkill,
     verifySkill, securityAuditSkill, weatherSkill, utilitiesSkill, projectSkill, agentsSkill,
     missionSkill, aiStudioDirectivesSkill, documentLinkerSkill,
-    documentKnowledgeSkill, richDocumentSkill, imageGenerationSkill, graphifySkill, telegramSkill,
+    documentKnowledgeSkill, richDocumentSkill, imageGenerationSkill, graphifySkill, telegramSkill, emailSkill,
     setPlanSkill, finalizeMissionSkill,
     createSmartSkills((name: string, args: any) => skillManager.handleToolCall(name, args)),
   ],
