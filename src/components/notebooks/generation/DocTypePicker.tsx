@@ -247,7 +247,7 @@ export function DocTypePicker({
           ))}
         </div>
 
-        {(activeCategory === 'all' || activeCategory === 'explore') && (!typeSearch.trim() || 'rapports spécialisés rapport complet business marché technique concurrentiel financier marketing produit risques exécutif projet comparatif synthèse'.includes(typeSearch.trim().toLocaleLowerCase('fr'))) && (
+        {(activeCategory === 'all' || activeCategory === 'explore') && (!typeSearch.trim() || ['rapports spécialisés', 'rapport complet', 'business plan', 'étude de marché', 'rapport technique', 'analyse concurrentielle', 'rapport financier', 'plan marketing', 'rapport produit', 'analyse des risques', 'synthèse exécutive', 'rapport de projet', 'analyse comparative', 'rapport de synthèse'].some((label) => label.includes(typeSearch.trim().toLocaleLowerCase('fr')) || typeSearch.trim().toLocaleLowerCase('fr').includes(label))) && (
           <button
             ref={reportModalTriggerRef}
             type="button"
