@@ -265,13 +265,13 @@ export function renderInlineMarkdown(text: string): JSX.Element {
 
     const patterns: Array<{
       regex: RegExp;
-      render: (content: string, fullMatch: string) => JSX.Element;
+      render: (content: string, fullMatch: string, position: number) => JSX.Element;
     }> = [
       {
         regex: /`([^`]+)`/g,
-        render: (content) => (
+        render: (content, _fullMatch, position) => (
           <code
-            key={`${content}-code-${depth}`}
+            key={`code-${depth}-${position}`}
             className="notebooklm-inline-code rounded bg-[var(--notebook-surface-muted)] px-1.5 py-0.5 font-mono text-sm text-[var(--notebook-accent)]"
           >
             {content}
@@ -280,13 +280,13 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       },
       {
         regex: /\[([^\]]+)\]\(([^)]+)\)/g,
-        render: (content, fullMatch) => {
+        render: (content, fullMatch, position) => {
           const matchResult = fullMatch.match(/\[([^\]]+)\]\(([^)]+)\)/);
           const linkText = matchResult ? matchResult[1] : content;
           const url = matchResult ? matchResult[2] : content;
           return (
             <a
-              key={`${url}-link-${depth}`}
+              key={`link-${depth}-${position}`}
               href={url}
               target="_blank"
               rel="noopener noreferrer"
@@ -301,7 +301,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       {
         regex: /\*\*([^*]+)\*\*/g,
         render: (content) => (
-          <strong key={`${content}-bold-${depth}`} className="font-bold">
+          <strong key={`bold-${depth}-${position}`} className="font-bold">
             {parseMarkdown(content, depth + 1)}
           </strong>
         ),
@@ -309,7 +309,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       {
         regex: /\*([^*]+)\*/g,
         render: (content) => (
-          <em key={`${content}-italic-${depth}`} className="italic opacity-80">
+          <em key={`italic-${depth}-${position}`} className="italic opacity-80">
             {parseMarkdown(content, depth + 1)}
           </em>
         ),
@@ -317,7 +317,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       {
         regex: /~~([^~]+)~~/g,
         render: (content) => (
-          <s key={`${content}-strike-${depth}`} className="line-through opacity-50">
+          <s key={`strike-${depth}-${position}`} className="line-through opacity-50">
             {parseMarkdown(content, depth + 1)}
           </s>
         ),
@@ -332,7 +332,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
         if (match.index > lastIndex) {
           result.push(text.slice(lastIndex, match.index));
         }
-        result.push(pattern.render(match[1], match[0]));
+        result.push(pattern.render(match[1], match[0], match.index));
         lastIndex = match.index + match[0].length;
       }
     }
