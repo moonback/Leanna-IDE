@@ -581,7 +581,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       >
         {/* Gauche : Sources */}
         <aside
-          className="notebook-panel notebook-panel--side hidden lg:flex"
+          className="notebook-panel notebook-panel--side notebook-panel--sources hidden lg:flex"
           data-collapsed={!sourceRailOpen}
           aria-label="Sources"
         >
@@ -621,7 +621,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
         {sourceRailOpen && (
           <div
-            className="notebook-resize-handle hidden lg:flex"
+            className="notebook-resize-handle notebook-resize-handle--sources hidden lg:flex"
             role="separator"
             aria-orientation="vertical"
             aria-label="Redimensionner le panneau Sources"
@@ -669,7 +669,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
 
         {studioOpen && (
           <div
-            className="notebook-resize-handle hidden lg:flex"
+            className="notebook-resize-handle notebook-resize-handle--studio hidden lg:flex"
             role="separator"
             aria-orientation="vertical"
             aria-label="Redimensionner le panneau Studio"
