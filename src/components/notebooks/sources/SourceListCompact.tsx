@@ -258,7 +258,8 @@ export function SourceListCompact(props: Props) {
                             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
                             {source.indexingStatus === 'indexed' ? 'Indexé' :
                               source.indexingStatus === 'pending' ? 'En attente' :
-                              source.indexingStatus === 'partial' ? 'Partiel' : 'Échec'}
+                              source.indexingStatus === 'partial' ? 'Partiel' :
+                              source.indexingStatus === 'failed' ? 'Échec' : 'Non vérifiée'}
                           </span>
                         )}
                       </div>
