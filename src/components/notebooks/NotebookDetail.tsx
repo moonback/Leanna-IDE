@@ -13,7 +13,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
-  Save, Maximize2, Minimize2, Users, MessageSquareText,
+  Save, Maximize2, Minimize2, Users,
 } from 'lucide-react';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { useToast } from '../ui/Toast.js';
@@ -353,6 +353,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   // Keyboard shortcuts — Cmd sur macOS, Ctrl ailleurs (convention plateforme)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && debateOpen) { e.preventDefault(); setDebateOpen(false); return; }
       const modifier = e.metaKey || e.ctrlKey;
       if (modifier && !e.shiftKey && !e.altKey) {
         if (e.key === '1') { e.preventDefault(); setSourceRailOpen(v => !v); }
@@ -374,7 +375,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sourceRailOpen, studioOpen]);
+  }, [sourceRailOpen, studioOpen, debateOpen]);
 
   if (loading) {
     return (
@@ -589,7 +590,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <div className="flex items-center gap-2">
             <NbIconButton icon={ArrowLeft} label="Retour aux notebooks" onClick={onBack} className="transition-transform active:scale-90" />
             <div className="hidden md:flex"><NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} /></div>
-            <NbIconButton icon={MessageSquareText} label="Ouvrir le débat IA (Ctrl+8 / ⌘8)" onClick={() => setDebateOpen(true)} className="transition-transform active:scale-90" />
+            <NbIconButton icon={Users} label="Ouvrir le débat IA (Ctrl+8 / ⌘8)" onClick={() => setDebateOpen(true)} className="transition-transform active:scale-90" />
             <NbIconButton
               icon={focusMode ? Minimize2 : Maximize2}
               label={focusMode ? 'Quitter le mode Focus (Ctrl+0 / ⌘0)' : 'Activer le mode Focus (Ctrl+0 / ⌘0)'}
