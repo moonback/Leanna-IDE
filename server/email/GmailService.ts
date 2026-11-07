@@ -164,7 +164,7 @@ export class GmailService {
     if (!refreshToken) refreshToken = this.config.accounts[pending.account]?.refreshToken;
     if (!refreshToken) throw new Error("Google n'a pas fourni de refresh token. Révoquez l'accès de l'application dans votre compte Google puis reconnectez le compte.");
 
-    const profile = await this.gmailRequest<{ emailAddress: string }>(tokenData.access_token, "/users/me/profile");
+    const profile = await this.gmailRequest<{ emailAddress: string }>(tokenData.access_token, "/profile");
     this.config.accounts[pending.account] = {
       email: profile.emailAddress,
       refreshToken,
