@@ -194,6 +194,13 @@ export function SourceListCompact(props: Props) {
                 const hasSelection = selectedSources.length > 0;
                 const typeColor = TYPE_COLORS[source.type] || 'var(--text-muted)';
                 const indexingStatus = source.indexingStatus ?? 'unknown';
+                const indexingDetails = [
+                  `Indexation : ${indexingStatus}`,
+                  source.indexingAttempts ? `${source.indexingAttempts} tentative(s)` : '',
+                  source.indexingUpdatedAt ? `Dernière mise à jour : ${new Date(source.indexingUpdatedAt).toLocaleString('fr-FR')}` : '',
+                  source.indexingNextRetryAt ? `Nouvel essai prévu : ${new Date(source.indexingNextRetryAt).toLocaleString('fr-FR')}` : '',
+                  source.indexingError || '',
+                ].filter(Boolean).join(' · ');
 
                 return (
                   <motion.div
@@ -252,7 +259,7 @@ export function SourceListCompact(props: Props) {
                                     ? 'text-[var(--color-warning)] bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)]'
                                     : 'text-[var(--text-muted)] bg-[var(--notebook-surface-muted)]'
                             }`}
-                            title={source.indexingError || `Indexation : ${indexingStatus}`}
+                            title={indexingDetails}
                             aria-label={`État de l'indexation : ${indexingStatus}`}
                           >
                             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
