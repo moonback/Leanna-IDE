@@ -162,7 +162,7 @@ export class GmailService {
   async connectAccount(id: GmailAccountId, email: string, appPassword: string, provider: EmailProvider = "gmail"): Promise<void> {
     if (id === "personal" && provider !== "gmail") throw new Error("Infomaniak est configuré uniquement pour le compte dédié de Leanna.");
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = appPassword.replace(/\s+/g, "");
+    const normalizedPassword = provider === "gmail" ? appPassword.replace(/\s+/g, "") : appPassword.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       throw new Error("Adresse e-mail invalide.");
     }
