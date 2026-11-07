@@ -44,6 +44,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [tone, setTone] = useState<Tone>('casual');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [hostName, setHostName] = useState('Leanna');
+  const [coHostName, setCoHostName] = useState('Noah');
+  const [coHostPersonality, setCoHostPersonality] = useState('Analytique et curieux : pose des questions pertinentes, nuance les affirmations et apporte un autre point de vue.');
 
   // ─── Lecture TTS (hook dédié) ──────────────────────────────────────────────
   const player = useTtsPlayer({ notebookId, selectedOverview, onError: toastError });
@@ -80,6 +83,9 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
             sourceIds: selectedSourceIds.length < sources.length ? selectedSourceIds : undefined,
             tone: tone !== 'casual' ? tone : undefined,
             customInstructions: customInstructions.trim() || undefined,
+            hostName: hostName.trim() || 'Leanna',
+            coHostName: coHostName.trim() || 'Noah',
+            coHostPersonality: coHostPersonality.trim() || undefined,
           },
         },
       );
@@ -98,7 +104,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     } finally {
       setGenerating(false);
     }
-  }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, success, toastError, onRefresh]);
+  }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, hostName, coHostName, coHostPersonality, success, toastError, onRefresh]);
 
   const handleSaveToSandbox = useCallback(async () => {
     if (!selectedOverview) return;
@@ -192,6 +198,12 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         deselectAllSources={deselectAllSources}
         customInstructions={customInstructions}
         setCustomInstructions={setCustomInstructions}
+        hostName={hostName}
+        setHostName={setHostName}
+        coHostName={coHostName}
+        setCoHostName={setCoHostName}
+        coHostPersonality={coHostPersonality}
+        setCoHostPersonality={setCoHostPersonality}
         generating={generating}
         onGenerate={handleGenerate}
         onSelectOverview={handleSelectOverview}
