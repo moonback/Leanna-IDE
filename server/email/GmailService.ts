@@ -155,7 +155,7 @@ export class GmailService {
 
   private requireAccount(id: GmailAccountId): StoredAccount {
     const account = this.config.accounts[id];
-    if (!account) throw new Error(`Le compte Gmail ${id} n'est pas connecté. Configurez son adresse et son mot de passe d'application dans Paramètres > E-mail.`);
+    if (!account) throw new Error(`Le compte e-mail ${id} n'est pas connecté. Configurez son adresse et son mot de passe dans Paramètres > E-mail.`);
     return account;
   }
 
