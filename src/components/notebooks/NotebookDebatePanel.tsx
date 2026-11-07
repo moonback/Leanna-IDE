@@ -90,10 +90,7 @@ export function NotebookDebatePanel({
       if (typeof event.data !== "string") return;
       let message: any;
       try { message = JSON.parse(event.data); } catch { return; }
-      if (message.type === "status") {
-        setStatus(message.status as Status);
-        if (message.status === "completed" || message.status === "stopped") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
-      }
+      if (message.type === "status") setStatus(message.status as Status);
       if (message.type === "document_saved") window.dispatchEvent(new CustomEvent("notebook-generated-docs-changed", { detail: { notebookId } }));
       if (message.type === "speaker") setSpeaker(message.state === "speaking" ? message.speaker : null);
       if (message.type === "transcript" && message.message) {
