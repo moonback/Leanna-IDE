@@ -300,7 +300,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       },
       {
         regex: /\*\*([^*]+)\*\*/g,
-        render: (content) => (
+        render: (content, _fullMatch, position) => (
           <strong key={`bold-${depth}-${position}`} className="font-bold">
             {parseMarkdown(content, depth + 1)}
           </strong>
@@ -308,7 +308,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       },
       {
         regex: /\*([^*]+)\*/g,
-        render: (content) => (
+        render: (content, _fullMatch, position) => (
           <em key={`italic-${depth}-${position}`} className="italic opacity-80">
             {parseMarkdown(content, depth + 1)}
           </em>
@@ -316,7 +316,7 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       },
       {
         regex: /~~([^~]+)~~/g,
-        render: (content) => (
+        render: (content, _fullMatch, position) => (
           <s key={`strike-${depth}-${position}`} className="line-through opacity-50">
             {parseMarkdown(content, depth + 1)}
           </s>
