@@ -81,6 +81,7 @@ export async function renderPodcastAudio(
   const dialogue = parseDialogue(script, options.hostName, options.coHostName);
   if (dialogue.length === 0) throw new Error("Aucune réplique attribuable aux deux animateurs.");
   const pcmSegments: Buffer[] = [];
+  const interTurnSilence = Buffer.alloc(Math.round(SAMPLE_RATE * 0.18) * (BITS_PER_SAMPLE / 8));
   let totalBytes = 0;
 
   for (let index = 0; index < dialogue.length; index++) {
@@ -100,6 +101,10 @@ export async function renderPodcastAudio(
     const pcm = Buffer.from(base64, "base64");
     if (pcm.length === 0 || pcm.length % 2 !== 0) {
       throw new Error(`Segment audio invalide à la réplique ${index + 1}.`);
+    }
+    if (pcmSegments.length > 0) {
+      pcmSegments.push(interTurnSilence);
+      totalBytes += interTurnSilence.length;
     }
     pcmSegments.push(pcm);
     totalBytes += pcm.length;
