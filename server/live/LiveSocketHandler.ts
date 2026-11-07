@@ -434,7 +434,27 @@ export function attachLiveWebSocket(
         }
       }
 
-      const declarations = skillManager.getToolDeclarations(requestedSkills);
+      // Les outils e-mail sont un socle natif du chat : ils ne doivent pas
+      // dépendre d'une sélection manuelle de skill côté client. On conserve le
+      // filtrage demandé pour les autres catégories, puis on réinjecte les cinq
+      // déclarations e-mail si elles sont enregistrées dans le runtime.
+      const EMAIL_TOOL_NAMES = new Set([
+        'email_check_new',
+        'email_list_messages',
+        'email_read_message',
+        'email_search_messages',
+        'email_send_message',
+      ]);
+      const allDeclarations = skillManager.getToolDeclarations();
+      const declarations = requestedSkills
+        ? [
+            ...skillManager.getToolDeclarations(requestedSkills),
+            ...allDeclarations.filter(d =>
+              EMAIL_TOOL_NAMES.has(d.name) &&
+              !skillManager.getToolDeclarations(requestedSkills).some(selected => selected.name === d.name),
+            ),
+          ]
+        : allDeclarations;
 
       // ── Sélection par pertinence des custom skills ───────────────────────────
       // Quand l'utilisateur a « plein » de custom skills, les injecter tous
@@ -519,6 +539,9 @@ export function attachLiveWebSocket(
         'telegram_notify', 'telegram_send_message', 'telegram_send_photo',
         'telegram_send_document', 'telegram_send_from_workspace', 'telegram_broadcast',
         'telegram_get_status', 'telegram_list_users', 'telegram_get_chat_info',
+        // E-mail — disponibles dès l'ouverture d'une session chat, sans activation manuelle.
+        'email_check_new', 'email_list_messages', 'email_read_message',
+        'email_search_messages', 'email_send_message',
       ]);
 
       const ASK_MODE_ALLOWED_TOOLS = new Set([
@@ -546,6 +569,8 @@ export function attachLiveWebSocket(
         'set_plan',
         // Telegram — statut et notifications en mode ask
         'telegram_notify', 'telegram_send_message', 'telegram_get_status', 'telegram_list_users',
+        // E-mail en mode ask : lecture uniquement. L'envoi reste réservé au mode full.
+        'email_check_new', 'email_list_messages', 'email_read_message', 'email_search_messages',
       ]);
 
       let filteredDeclarations: typeof declarations;
