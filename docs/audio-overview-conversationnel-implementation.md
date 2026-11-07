@@ -40,6 +40,19 @@ npm run test:ui
 
 Puis générer un podcast de test avec les identités « Leanna » et « Noah », écouter les deux voix, exporter le script et rouvrir un ancien podcast Alex/Sam.
 
-## Limite connue / étape suivante
+## Passe suivante — interaction vocale en direct
 
-Cette passe livre le podcast préparé à deux voix et sa lecture TTS. Elle ne livre pas encore le mode où l'utilisateur interrompt le podcast à la voix et dialogue en direct avec les deux personnalités. Cette fonction doit être raccordée séparément au transport live Notebook existant (session, interruption, reprise de lecture, tour de parole et état de session), sans mélanger le flux TTS pré-généré avec la session temps réel.
+Le mode interactif est maintenant raccordé au transport Notebook Live existant :
+
+- Le bouton « Rejoindre le podcast » ouvre une session micro/WebSocket depuis le lecteur Audio Overview.
+- Le serveur reçoit `mode=podcast` et adapte l'instruction système avec les noms et la personnalité du co-animateur.
+- Le participant peut parler au micro ou envoyer un message texte ; la transcription est affichée dans le panneau.
+- Le RAG du notebook et les citations restent actifs pendant la session.
+- La session se ferme lors du changement d'épisode ou à la demande ; la lecture TTS pré-générée est arrêtée avant l'ouverture du micro pour éviter le chevauchement audio.
+- Les interruptions vocales sont gérées par le protocole Live existant.
+
+## Limites explicites
+
+- Le mode Live actuel utilise une seule voix Gemini Live. Le co-animateur intervient dans la structure conversationnelle générée, mais ne dispose pas encore d'une deuxième voix TTS indépendante pendant la session temps réel.
+- Le flux TTS pré-généré à deux voix reste distinct de la session Live. La reprise automatique à la position exacte du podcast après une intervention n'est pas encore implémentée.
+- Les tests et le typecheck doivent être exécutés dans l'environnement local du dépôt avant fusion.
