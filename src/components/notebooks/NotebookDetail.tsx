@@ -13,7 +13,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
-  Save,
+  Save, Maximize2, Minimize2,
 } from 'lucide-react';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { useToast } from '../ui/Toast.js';
@@ -203,6 +203,40 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [studioTab, setStudioTab] = useState<StudioTab>('generate');
   const [studioOpen, setStudioOpen] = useState(true);
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
+  const [panelWidths, setPanelWidths] = useState({ sources: 280, studio: 340 });
+  const [panelWidthsReady, setPanelWidthsReady] = useState(false);
+  const focusMode = !sourceRailOpen && !studioOpen;
+
+  // Les largeurs sont partagées entre notebooks et conservées localement.
+  // Les valeurs stockées sont validées pour éviter de casser la grille après
+  // une ancienne version ou une valeur locale invalide.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('leanna:notebook:panel-widths');
+      if (raw) {
+        const saved = JSON.parse(raw) as { sources?: unknown; studio?: unknown };
+        setPanelWidths({
+          sources: typeof saved.sources === 'number' && Number.isFinite(saved.sources)
+            ? Math.min(420, Math.max(220, saved.sources)) : 280,
+          studio: typeof saved.studio === 'number' && Number.isFinite(saved.studio)
+            ? Math.min(480, Math.max(260, saved.studio)) : 340,
+        });
+      }
+    } catch {
+      // Une préférence illisible ne doit jamais empêcher l'ouverture du Notebook.
+    } finally {
+      setPanelWidthsReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!panelWidthsReady) return;
+    try {
+      window.localStorage.setItem('leanna:notebook:panel-widths', JSON.stringify(panelWidths));
+    } catch {
+      // Le workspace reste utilisable si le stockage local est indisponible.
+    }
+  }, [panelWidths, panelWidthsReady]);
   const [indexingProgress, setIndexingProgress] = useState<{ total: number; done: number; active: boolean }>({ total: 0, done: 0, active: false });
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [showIndexing, setShowIndexing] = useState(false);
@@ -279,7 +313,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [sourceRailOpen, studioOpen]);
 
   if (loading) {
     return (
@@ -494,6 +528,11 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           <div className="flex items-center gap-2">
             <NbIconButton icon={ArrowLeft} label="Retour aux notebooks" onClick={onBack} className="transition-transform active:scale-90" />
             <div className="hidden md:flex"><NotebookVoicePanel prefersReducedMotion={prefersReducedMotion} /></div>
+            <NbIconButton
+              icon={focusMode ? Minimize2 : Maximize2}
+              label={focusMode ? 'Quitter le mode Focus (Ctrl+0 / ⌘0)' : 'Activer le mode Focus (Ctrl+0 / ⌘0)'}
+              onClick={() => { setSourceRailOpen(focusMode); setStudioOpen(focusMode); }}
+            />
             <NbIconButton icon={RefreshCw} label="Actualiser" onClick={loadNotebook} className="transition-transform active:scale-90" />
           </div>
         }
@@ -525,7 +564,15 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       </AnimatePresence>
 
       {/* ─── 3 panneaux flottants (Sources · Discussion · Studio) ───── */}
-      <div className="notebook-shell flex-1 overflow-hidden" data-studio-open={studioOpen} data-source-open={sourceRailOpen}>
+      <div
+        className="notebook-shell flex-1 overflow-hidden"
+        data-studio-open={studioOpen}
+        data-source-open={sourceRailOpen}
+        style={{
+          '--nb-left': `${panelWidths.sources}px`,
+          '--nb-right': `${panelWidths.studio}px`,
+        } as React.CSSProperties}
+      >
         {/* Gauche : Sources */}
         <aside
           className="notebook-panel notebook-panel--side hidden lg:flex"
@@ -566,6 +613,40 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           )}
         </aside>
 
+        {sourceRailOpen && (
+          <div
+            className="notebook-resize-handle hidden lg:flex"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionner le panneau Sources"
+            aria-valuemin={220}
+            aria-valuemax={420}
+            aria-valuenow={panelWidths.sources}
+            tabIndex={0}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (event.buttons !== 1) return;
+              const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+              if (!bounds) return;
+              setPanelWidths((current) => ({
+                ...current,
+                sources: Math.min(420, Math.max(220, event.clientX - bounds.left - 12)),
+              }));
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              const delta = event.shiftKey ? 32 : 12;
+              setPanelWidths((current) => ({
+                ...current,
+                sources: Math.min(420, Math.max(220, current.sources + (event.key === 'ArrowRight' ? delta : -delta))),
+              }));
+            }}
+          />
+        )}
+
         {/* Centre : Discussion (ou source / document / note ouverts) */}
         <main className="notebook-panel notebook-main min-w-0">
           <AnimatePresence mode="wait">
@@ -579,6 +660,40 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        {studioOpen && (
+          <div
+            className="notebook-resize-handle hidden lg:flex"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionner le panneau Studio"
+            aria-valuemin={260}
+            aria-valuemax={480}
+            aria-valuenow={panelWidths.studio}
+            tabIndex={0}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (event.buttons !== 1) return;
+              const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+              if (!bounds) return;
+              setPanelWidths((current) => ({
+                ...current,
+                studio: Math.min(480, Math.max(260, bounds.right - event.clientX - 12)),
+              }));
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              const delta = event.shiftKey ? 32 : 12;
+              setPanelWidths((current) => ({
+                ...current,
+                studio: Math.min(480, Math.max(260, current.studio + (event.key === 'ArrowLeft' ? delta : -delta))),
+              }));
+            }}
+          />
+        )}
 
         {/* Droite : Studio (Générer · Notes · Historique · Audio) */}
         <aside
