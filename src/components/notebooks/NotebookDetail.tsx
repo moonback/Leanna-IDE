@@ -13,7 +13,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
   Loader2, RefreshCw, BookOpen, X, PanelRightOpen, PanelRightClose, PanelLeftOpen,
-  Save, Maximize2, Minimize2,
+  Save, Maximize2, Minimize2, Users,
 } from 'lucide-react';
 import { SourcesSummaryCard } from './SourcesSummaryCard.js';
 import { useToast } from '../ui/Toast.js';
@@ -27,6 +27,7 @@ import { NotesPanel, type NoteEditorData } from './NotesPanel.js';
 import { GeneratePanel } from './GeneratePanel.js';
 import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
+import { NotebookDebatePanel } from './NotebookDebatePanel.js';
 import { IndexingMonitor } from './IndexingMonitor.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
 import { NbButton, NbIconButton } from './ui/primitives.js';
@@ -48,7 +49,7 @@ interface NotebookData {
 }
 
 type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
-type StudioTab = 'notes' | 'generate' | 'audio' | 'history';
+type StudioTab = 'notes' | 'generate' | 'audio' | 'history' | 'debate';
 
 interface Props {
   notebookId: string;
@@ -360,6 +361,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
         if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
         if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); }
+        if (e.key === '8') { e.preventDefault(); setStudioTab('debate'); setStudioOpen(true); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
         if (e.key === '0') {
           e.preventDefault();
@@ -409,12 +411,14 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
     { key: 'notes', icon: StickyNote, label: 'Notes', badge: notebook.notes.length },
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
     { key: 'audio', icon: Mic, label: 'Audio', badge: notebook.audioOverviews.length },
+    { key: 'debate', icon: Users, label: 'Débat IA' },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
     notes: 'Ctrl+3 / ⌘3',
     generate: 'Ctrl+4 / ⌘4',
     audio: 'Ctrl+5 / ⌘5',
     history: 'Ctrl+6 / ⌘6',
+    debate: 'Ctrl+8 / ⌘8',
   };
 
   // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
@@ -457,6 +461,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
       </div>
       <div role="tabpanel" id="studio-panel-audio" aria-labelledby="studio-tab-audio" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
         <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+      </div>
+      <div role="tabpanel" id="studio-panel-debate" aria-labelledby="studio-tab-debate" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'debate' ? 'block' : 'none' }}>
+        <NotebookDebatePanel notebookId={notebookId} sources={notebook.sources.map((source: any) => ({ id: source.id, title: source.title, indexingStatus: source.indexingStatus }))} onOpenSource={(id) => { setStudioOpen(false); setSelectedSourceId(id); }} />
       </div>
     </>
   );
