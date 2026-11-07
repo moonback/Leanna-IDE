@@ -277,6 +277,9 @@ export class TelegramService {
           `• \`/ping\` — Tester la connexion Telegram\n` +
           `• \`/git [status|branch|log|diff]\` — Informations Git en lecture seule\n` +
           `• \`/recent\` — Les cinq dernières missions\n` +
+          `• /files — Lister les fichiers reçus depuis Telegram\n` +
+          `• /send <chemin> — Envoyer un fichier du projet vers Telegram\n` +
+          `• Envoyez une photo ou un document pour l'importer dans le projet\n` +
           `• \`/agent <mission>\` — Lancer une mission autonome\n` +
           `• \`/tasks [statut]\` — Lister les tâches agents\n` +
           `• \`/task <id>\` — Détail d'une tâche\n` +
@@ -312,6 +315,9 @@ export class TelegramService {
           `• \`/ping\` pour tester la réponse du bot.\n` +
           `• \`/git status\`, \`/git branch\`, \`/git log\` ou \`/git diff\` pour consulter Git sans modifier le dépôt.\n` +
           `• \`/recent\` pour retrouver les cinq dernières missions.\n` +
+          `• /files pour lister les fichiers reçus depuis Telegram.\n` +
+          `• /send <chemin> pour envoyer un fichier du projet.\n` +
+          `• Envoyez une photo ou un document dans le chat pour l'importer dans le projet.\n` +
           `• \`/clear\` pour effacer l'historique du chat Telegram.`,
           { parse_mode: "Markdown" }
         );
@@ -1759,7 +1765,7 @@ export class TelegramService {
     const resolved = check.absolutePath;
 
     const ext = path.extname(resolved).toLowerCase();
-    const imageExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
+    const imageExts = [".png", ".jpg", ".jpeg"];
 
     if (imageExts.includes(ext)) {
       return this.sendPhoto(chatId, resolved, options);
