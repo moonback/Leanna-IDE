@@ -270,6 +270,10 @@ export class TelegramService {
           `📌 *Commandes rapides :*\n` +
           `• \`/help\` — Guide et liste des commandes\n` +
           `• \`/status\` — État du système et projet actif\n` +
+          `• \`/health\` — Diagnostic technique de Leanna\n` +
+          `• \`/ping\` — Tester la connexion Telegram\n` +
+          `• \`/git [status|branch|log|diff]\` — Informations Git en lecture seule\n` +
+          `• \`/recent\` — Les cinq dernières missions\n` +
           `• \`/agent <mission>\` — Lancer une mission autonome\n` +
           `• \`/tasks [statut]\` — Lister les tâches agents\n` +
           `• \`/task <id>\` — Détail d'une tâche\n` +
@@ -300,7 +304,11 @@ export class TelegramService {
           `• \`/ls\` ou \`/ls src\` pour lister les fichiers d'un dossier.\n` +
           `• \`/read package.json\` pour afficher le contenu d'un fichier (les gros fichiers sont envoyés en pièce jointe).\n\n` +
           `*5. Statut & Mémoire*\n` +
-          `• \`/status\` pour voir le projet actif et la santé du système.\n` +
+          `• \`/status\` pour voir le projet actif et le moteur IA.\n` +
+          `• \`/health\` pour le diagnostic technique (mémoire, uptime, Telegram).\n` +
+          `• \`/ping\` pour tester la réponse du bot.\n` +
+          `• \`/git status\`, \`/git branch\`, \`/git log\` ou \`/git diff\` pour consulter Git sans modifier le dépôt.\n` +
+          `• \`/recent\` pour retrouver les cinq dernières missions.\n` +
           `• \`/clear\` pour effacer l'historique du chat Telegram.`,
           { parse_mode: "Markdown" }
         );
@@ -321,6 +329,92 @@ export class TelegramService {
           `🤖 *Bot connecté :* \`@${this.botInfo?.username}\`\n` +
           `🔔 *Notifications :* \`${this.config.notificationsEnabled ? "Activées" : "Désactivées"}\`\n` +
           `⏱️ *Uptime :* \`${Math.round(process.uptime() / 60)} minutes\``,
+          { parse_mode: "Markdown" }
+        );
+      });
+
+      // /ping — Vérifie que le bot répond depuis l'instance locale.
+      this.bot.command("ping", async (ctx) => {
+        await ctx.reply("🏓 Pong ! Leanna est joignable via Telegram.");
+      });
+
+      // /health — Diagnostic rapide du processus Leanna.
+      this.bot.command("health", async (ctx) => {
+        const memory = process.memoryUsage();
+        const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
+        const project = hasProject() ? SELF_ROOT : "Aucun projet actif";
+        const seconds = Math.floor(process.uptime());
+        const uptime = Math.floor(seconds / 3600) + " h " + Math.floor((seconds % 3600) / 60) + " min";
+        const lines = [
+          "🩺 *Diagnostic Leanna*",
+          "",
+          "🤖 Telegram : " + (this.isRunning ? "✅ connecté" : "⚠️ arrêté"),
+          "📁 Projet : \`" + this.escapeMarkdown(project) + "\`",
+          "🧠 Fournisseur IA : \`" + this.escapeMarkdown(getActiveProvider()) + "\`",
+          "⏱️ Uptime : \`" + uptime + "\`",
+          "💾 Mémoire RSS : \`" + mb(memory.rss) + " Mo\`",
+          "   Heap : \`" + mb(memory.heapUsed) + " / " + mb(memory.heapTotal) + " Mo\`",
+          "👥 Utilisateurs autorisés : \`" + this.config.allowedUsers.length + "\`",
+        ];
+        await this.sendLongMessage(ctx.chat.id, lines.join("\n"), { parse_mode: "Markdown" });
+      });
+
+      // /git — Consultation Git uniquement : aucune commande d'écriture n'est exposée.
+      this.bot.command("git", async (ctx) => {
+        const requested = (ctx.match?.trim().toLowerCase() || "status").split(/\s+/)[0];
+        const commands: Record<string, string> = {
+          status: "git status --short --branch",
+          branch: "git branch --show-current",
+          log: "git log -5 --oneline --decorate",
+          diff: "git diff --stat",
+        };
+        const command = commands[requested];
+        if (!command) {
+          await ctx.reply(
+            "Usage : \`/git [status|branch|log|diff]\`\n" +
+            "Choisissez : état, branche, cinq derniers commits ou résumé des modifications.\n" +
+            "Commande limitée à la consultation.",
+            { parse_mode: "Markdown" }
+          );
+          return;
+        }
+        try {
+          const result = await execAsync(command, {
+            cwd: hasProject() ? SELF_ROOT : process.cwd(),
+            timeout: 15000,
+            maxBuffer: 128 * 1024,
+          });
+          const output = (result.stdout || result.stderr || "Aucune sortie.").trim();
+          await this.sendLongMessage(
+            ctx.chat.id,
+            "🔀 *Git — " + requested + "*\n\n\`\`\`text\n" + output + "\n\`\`\`",
+            { parse_mode: "Markdown" }
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await this.replySafe(ctx, "❌ Git indisponible : " + message);
+        }
+      });
+
+      // /recent — Affiche les cinq dernières missions enregistrées.
+      this.bot.command("recent", async (ctx) => {
+        const tasks = agentOrchestrator.listTasks({ limit: 5 });
+        if (!tasks.length) {
+          await ctx.reply("📭 Aucune mission récente enregistrée.");
+          return;
+        }
+        const icons: Record<string, string> = {
+          pending: "⏳", running: "🔄", completed: "✅",
+          incomplete: "⚠️", failed: "❌", cancelled: "🚫",
+        };
+        const lines = tasks.map((task) =>
+          (icons[task.status] || "•") + " \`" + task.id.slice(0, 8) + "\` — *" +
+          this.escapeMarkdown(task.title) + "*\n   " + this.escapeMarkdown(task.role) +
+          " · " + this.escapeMarkdown(task.status)
+        );
+        await this.sendLongMessage(
+          ctx.chat.id,
+          "🕘 *Les " + tasks.length + " dernières missions*\n\n" + lines.join("\n"),
           { parse_mode: "Markdown" }
         );
       });
@@ -845,6 +939,28 @@ export class TelegramService {
         } catch (e) {
           console.warn("[Telegram] Erreur dans le callback d'approbation :", (e as Error).message);
         }
+      });
+
+      // Publier les commandes dans le menu natif Telegram (bouton /).
+      await this.bot.api.setMyCommands([
+        { command: "start", description: "Démarrer et afficher les raccourcis" },
+        { command: "help", description: "Afficher le guide des commandes" },
+        { command: "status", description: "État du système et projet actif" },
+        { command: "health", description: "Diagnostic technique de Leanna" },
+        { command: "ping", description: "Tester la connexion Telegram" },
+        { command: "project", description: "Voir ou changer de projet" },
+        { command: "git", description: "Consulter l'état Git (lecture seule)" },
+        { command: "recent", description: "Afficher les cinq dernières missions" },
+        { command: "agent", description: "Lancer une mission autonome" },
+        { command: "tasks", description: "Lister les missions des agents" },
+        { command: "task", description: "Afficher le détail d'une mission" },
+        { command: "cancel", description: "Annuler une mission en cours" },
+        { command: "ls", description: "Lister les fichiers du projet" },
+        { command: "read", description: "Lire un fichier du projet" },
+        { command: "cmd", description: "Exécuter une commande autorisée" },
+        { command: "clear", description: "Effacer l'historique du chat" },
+      ]).catch((err) => {
+        console.warn("[Telegram] Impossible de publier le menu des commandes :", err instanceof Error ? err.message : err);
       });
 
       // Démarrage effectif du long polling
