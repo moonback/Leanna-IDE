@@ -179,12 +179,16 @@ export class GmailService {
   }
 
   setPersonalSendEnabled(enabled: boolean): void {
+    if (enabled && !this.config.accounts.personal?.refreshToken) {
+      throw new Error("Connectez d'abord votre compte Gmail personnel.");
+    }
     this.config.personalSendEnabled = enabled;
     this.persist();
   }
 
   disconnect(account: GmailAccountId): void {
     delete this.config.accounts[account];
+    if (account === "personal") this.config.personalSendEnabled = false;
     this.persist();
   }
 
