@@ -760,7 +760,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               {renderMainContent()}
             </motion.div>
           </AnimatePresence>
-          <div ref={setAudioDockElement} aria-label="Lecteur du podcast" className="max-h-[260px] flex-shrink-0 overflow-hidden border-t border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] empty:hidden" />
+          <div ref={setAudioDockElement} aria-label="Lecteur du podcast" className="h-[220px] min-h-[180px] max-h-[35%] flex flex-col flex-shrink-0 overflow-hidden border-t border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] empty:hidden" />
         </main>
 
         {studioOpen && (
