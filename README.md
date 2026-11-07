@@ -31,9 +31,9 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 <br><br>
 
 <!-- Badges row 1 — Status -->
-<img src="https://img.shields.io/badge/Tests%20backend-193%20fichiers-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Inventaire tests backend" />
+<img src="https://img.shields.io/badge/Tests-backend-00C853?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Tests backend" />
 &nbsp;
-<img src="https://img.shields.io/badge/Tests%20front-19%20fichiers-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Inventaire tests frontend" />
+<img src="https://img.shields.io/badge/Tests-frontend-00C853?style=for-the-badge&logo=vitest&logoColor=white" alt="Tests frontend" />
 &nbsp;
 <img src="https://img.shields.io/badge/skills%20builtin-29%20modules-818CF8?style=for-the-badge" alt="29 Skills" />
 &nbsp;
@@ -119,7 +119,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
 | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) • [Veille & réveil](#-veille-et-réveil-vocal) |
-| 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
+| 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [Gmail](#-e-mail-et-gmail) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
 
 </details>
@@ -239,7 +239,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
 | **Navigateur intégré** | 29 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
 | **Boucle humaine (HITL)** | Approbation interactive des actions à risque + contrôle de mission (pause/reprise/annulation), relais Telegram | ✅ |
-| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram, MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
+| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), Gmail (deux comptes), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
 | **Marketplace** | Registre de compétences (backend local + UI : recherche, publication avec analyse de sécurité, notes, installation) | ✅ |
 | **Workflow builder** | Éditeur de workflows par étapes dans l'interface (steps, actions, onError, retries, schedule) | 🟡 |
 
@@ -1859,9 +1859,66 @@ Le bot sert aussi de **télécommande** (menu de commandes enregistré via `setM
 Le comportement de Leanna côté Telegram est décrit par la section de prompt
 `server/runtime/prompts/telegram.md` (active en mode `full`).
 
+### Envoi de photos et de documents
+
+Les outils `telegram_send_photo`, `telegram_send_document` et
+`telegram_send_from_workspace` permettent à l'agent d'envoyer une image ou un
+fichier du workspace vers un chat Telegram :
+
+- source par URL HTTP(S), chemin local ou chemin relatif au workspace ;
+- détection automatique du type photo/document pour les fichiers du workspace ;
+- destinataire limité au chat par défaut ou à un utilisateur autorisé pour les
+  fichiers locaux ;
+- vérification du chemin dans le workspace et refus des chemins exclus ;
+- confirmation interactive obligatoire avant l'envoi d'un fichier local ;
+- limite de 50 Mo pour les documents.
+
+Ces capacités décrivent **l'envoi depuis Leanna vers Telegram**. Elles ne signifient
+pas que le transfert entrant de pièces jointes Telegram vers le workspace est
+disponible.
+
 ```env
 TELEGRAM_BOT_TOKEN=""
 ```
+
+<br>
+
+## ✉️ E-mail et Gmail
+
+Le skill `server/skills/email.ts` expose cinq outils de messagerie, exécutés par
+`server/email/GmailService.ts`. L'intégration utilise **IMAP pour la lecture** et
+**SMTP pour l'envoi**, avec deux comptes configurables et indépendants :
+
+| Compte | Identifiant | Rôle |
+|---|---|---|
+| Compte dédié Leanna | `leanna` | Boîte Gmail de l'assistant ; compte d'envoi par défaut |
+| Compte personnel | `personal` | Boîte privée de l'utilisateur ; envoi désactivé par défaut |
+
+| Outil | Fonction |
+|---|---|
+| `email_check_new` | Vérifier les messages non lus des deux comptes |
+| `email_list_messages` | Lister les derniers messages d'un compte |
+| `email_read_message` | Lire un message par identifiant IMAP |
+| `email_search_messages` | Rechercher par expéditeur, destinataire, objet, date ou état lu/non lu |
+| `email_send_message` | Envoyer un e-mail après confirmation interactive |
+
+**Garde-fous et limites :**
+
+- Les mots de passe d'application Gmail sont chiffrés avant leur persistance dans
+  la configuration locale ; ils ne doivent jamais être ajoutés au dépôt.
+- Chaque envoi déclenche une confirmation interactive qui présente le compte,
+  le destinataire, l'objet et un aperçu du message.
+- L'envoi depuis le compte personnel reste verrouillé tant que l'autorisation
+  correspondante n'a pas été activée dans **Paramètres → E-mail**.
+- La lecture actuelle porte sur la boîte de réception IMAP ; les recherches ne
+  doivent pas être présentées comme couvrant tous les dossiers Gmail.
+- Les pièces jointes sont exposées sous forme de métadonnées (nom, type MIME,
+  taille). Leur téléchargement, leur analyse et leur transfert ne sont pas
+  fournis par ces cinq outils.
+
+Configuration des comptes : **Paramètres → E-mail**. Les secrets de connexion
+sont stockés localement dans le fichier de configuration de Leanna, chiffrés
+avec la clé maître de l'application.
 
 <br>
 
@@ -2042,8 +2099,8 @@ fonctionnalités backend persistantes.
 ### Cloner & installer
 
 ```bash
-git clone https://github.com/moonback/Jarvis-os-original.git
-cd Jarvis-os-original
+git clone https://github.com/moonback/Leanna-IDE.git
+cd Leanna-IDE
 npm install
 ```
 
@@ -2057,7 +2114,7 @@ mkdir -p public/models
 tar -czf public/models/vosk-model-small-fr.tar.gz vosk-model-small-fr-0.22
 ```
 
-> Le dépôt distant actuel est `moonback/Jarvis-os-original` (remote `origin`). Le
+> Le dépôt distant actuel est `moonback/Leanna-IDE` (remote `origin`). Le
 > nom du produit est **Leanna** ; le répertoire local cloné portera le nom du
 > dépôt distant. Adaptez le chemin si vous renommez le dossier.
 
@@ -2152,8 +2209,8 @@ npm run dist:win       # distribuable Windows
 
 | Commande | Objet |
 |---|---|
-| `npm test` | Suite backend (`node --test` via `tsx`), **193 fichiers** `server/**/*.test.ts` recensés dans l'arborescence actuelle |
-| `npm run test:ui` | Tests frontend (Vitest + React Testing Library), **19 fichiers** `src/**/*.{test,spec}.{ts,tsx}` recensés dans l'arborescence actuelle |
+| `npm test` | Suite de tests backend (`node --test` via `tsx`) |
+| `npm run test:ui` | Tests frontend (Vitest + React Testing Library) |
 | `npm run test:ui:watch` | Tests frontend en mode watch |
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` |
 | `npm run typecheck:test` | Typage des fichiers de test |
@@ -2168,9 +2225,8 @@ npm run dist:win       # distribuable Windows
 > **Dernière exécution documentée : 2026-10-15** — `npm test` : **1460 cas /
 > 174 suites, 0 échec** (184 fichiers) ; `npm run test:ui` : **90 cas, 0 échec**
 > (18 fichiers). Ces résultats sont historiques et ne décrivent pas une exécution
-> du code actuel. L'inventaire Git actuel recense 193 fichiers de test backend et
-> 19 fichiers de test UI ; les suites doivent être relancées pour actualiser les
-> nombres de cas et leur statut.
+> du code actuel. Relancez les suites pour obtenir les nombres de cas et leur
+> statut à jour ; aucun décompte statique n'est affiché dans les badges.
 
 ### Validation de l'autonomie (banc E2E)
 
