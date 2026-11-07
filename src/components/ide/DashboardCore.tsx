@@ -1,17 +1,22 @@
 import React from 'react';
 import { Activity, Bot, Power, PowerOff } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import type { ActivityStep } from '../../hooks/useActivity.js';
+import { DashboardAgentNetwork } from './DashboardAgentNetwork.js';
 
 interface DashboardCoreProps {
   aiName: string;
   connected: boolean;
   connecting: boolean;
   onToggleConnection: () => void;
+  activity: ActivityStep[];
+  isBusy: boolean;
+  reasoningActive: boolean;
 }
 
 /** Noyau visuel du dashboard : son état est exclusivement dérivé de la session Live réelle. */
 export const DashboardCore = React.memo(function DashboardCore({
-  aiName, connected, connecting, onToggleConnection,
+  aiName, connected, connecting, onToggleConnection, activity, isBusy, reasoningActive,
 }: DashboardCoreProps) {
   const reduce = !!useReducedMotion();
   const status = connecting ? 'Connexion en cours' : connected ? 'Session connectée' : 'En attente de connexion';
@@ -72,6 +77,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           {connecting ? 'Connexion…' : connected ? 'Déconnecter' : 'Connecter Leanna'}
         </button>
       </div>
+      <DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} />
     </section>
   );
 });
