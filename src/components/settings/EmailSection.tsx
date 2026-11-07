@@ -145,7 +145,7 @@ export function EmailSection() {
             </div>
           )}
           <Field label="Adresse e-mail">
-            <TextInput value={values.email} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], email: value } }))} placeholder={id === "leanna" && leannaProvider === "infomaniak" ? "leanna@mondomaine.fr" : "adresse@gmail.com"} />
+            <TextInput value={values.email} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], email: value } }))} placeholder={id === "leanna" ? "leanna@votredomaine.fr" : "adresse@gmail.com"} />
           </Field>
           <Field label={id === "leanna" ? "Mot de passe de la boîte e-mail" : "Mot de passe d'application"} hint={id === "leanna" ? "Mot de passe de la boîte ou mot de passe dédié fourni par votre hébergeur. Il sera chiffré localement." : "Mot de passe d'application Google (16 caractères), pas le mot de passe habituel du compte."}>
             <SecretInput value={values.appPassword} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: value } }))} placeholder={id === "leanna" ? "Mot de passe de messagerie" : "xxxx xxxx xxxx xxxx"} />
