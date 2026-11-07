@@ -120,6 +120,8 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
           success('Podcast audio généré avec ses deux voix !');
         } catch (audioError) {
           toastError(`Script créé, mais génération de la piste audio impossible : ${audioError instanceof Error ? audioError.message : 'erreur TTS'}`);
+          onRefresh();
+          return null;
         }
         onRefresh();
         return data.overview;
