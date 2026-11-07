@@ -48,6 +48,8 @@ Les commandes sont accessibles depuis le chat Telegram. Les arguments entre croc
 
 - **Telegram vers Leanna** : tout message `photo` ou `document` envoyé par un utilisateur autorisé est téléchargé dans `<workspace>/Telegram-Inbox/`. La photo est prise dans sa meilleure résolution disponible. Le nom de fichier est nettoyé et rendu unique.
 - **Leanna vers Telegram** : `/send <chemin> [légende]` envoie un fichier du workspace actif au chat courant. `sendFromWorkspace` applique les contrôles de chemin du workspace et les exclusions de sécurité ; les extensions d'image prises en charge sont envoyées comme photos, les autres fichiers comme documents.
+- **Envoi par un agent** : les outils d’envoi de fichiers locaux affichent une approbation Telegram avec les boutons *Approuver* / *Refuser*. La demande est liée au chat destinataire et, si son ID numérique est connu, à cet utilisateur. Elle expire après 30 secondes ; aucun envoi n’a lieu sans approbation.
+- **Intégrité** : Leanna calcule une empreinte SHA-256 avant la demande et revalide le chemin, la taille et le contenu après approbation. Si le fichier a été remplacé ou modifié, l’envoi est annulé.
 - **Consultation** : `/files` affiche les 20 derniers fichiers reçus. Le chemin retourné peut être utilisé avec `/read` ou `/send`.
 - **Limite de réception** : 20 Mo par fichier pour le téléchargement via l'API Bot Telegram. Les fichiers trop volumineux sont refusés avant et après téléchargement.
 - **Confinement** : le dossier `Telegram-Inbox` est créé dans le workspace actif ; sa cible réelle est vérifiée pour empêcher une sortie du workspace. Les noms sont neutralisés et les fichiers sont écrits sans écrasement.
