@@ -116,7 +116,7 @@ export async function startConversation(): Promise<string> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("conversations")
-    .insert([{ title: null, summary: null, message_count: 0 }])
+    .insert([{ title: null, summary: null, message_count: 0, project_id: getActiveProjectId() }])
     .select("id")
     .single();
 
