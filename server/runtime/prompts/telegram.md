@@ -85,6 +85,9 @@ Lors du démarrage du bot, Leanna publie les commandes disponibles avec l'API Te
 
 - `telegram_notify` : envoyer une notification simple.
 - `telegram_send_message` : envoyer un message Telegram avec formatage Markdown.
+- `telegram_send_photo` : envoyer une photo à un chat Telegram.
+- `telegram_send_document` : envoyer un document ou fichier à un chat Telegram.
+- `telegram_send_from_workspace` : envoyer un fichier du workspace actif en appliquant les contrôles de chemin et les exclusions de sécurité.
 
 Les événements `message:photo` et `message:document` sont enregistrés dans le service Telegram pour assurer la réception des pièces jointes. Les commandes `/files` et `/send` exposent la consultation et l'envoi de fichiers.
 
