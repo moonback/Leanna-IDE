@@ -87,11 +87,11 @@ export async function renderPodcastAudio(
     if (options.signal?.aborted) throw new Error("Génération audio annulée.");
     const segment = dialogue[index];
     const voice = segment.speaker === "host"
-      ? (options.hostVoice || "Aoede")
-      : (options.coHostVoice || "Charon");
+      ? (options.hostVoice || "ff_siwis")
+      : (options.coHostVoice || "am_adam");
     const base64 = await generateSpeech(segment.text, {
       voiceName: voice,
-      provider: "gemini",
+      provider: "auto",
       noCache: false,
     });
     if (!base64) {
