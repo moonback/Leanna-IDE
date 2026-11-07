@@ -266,7 +266,10 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       const params = new URLSearchParams();
       if (activeSkills.length > 0) params.set('skills', activeSkills.join(','));
       if (mode) params.set('mode', mode);
-      if (initialConversationId) params.set('conversation_id', initialConversationId);
+      if (initialConversationId) {
+        params.set('conversation_id', initialConversationId);
+        params.set('context_resume', '1');
+      }
       // Le token est maintenant passé uniquement via cookie, plus par URL
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
