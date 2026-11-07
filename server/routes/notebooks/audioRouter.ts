@@ -81,13 +81,17 @@ export function createAudioRouter(): Router {
 
       res.write(`event: start\ndata: ${JSON.stringify({ total: dialogueLines.length })}\n\n`);
 
+      let generatedCount = 0;
+      let skippedCount = 0;
       for (let i = 0; i < dialogueLines.length; i++) {
+        if (req.destroyed || res.destroyed) return;
         const { speaker, text } = dialogueLines[i];
         const voice = speaker === "host" ? hostVoice : coHostVoice;
 
         try {
           const audioBase64 = await generateSpeech(text, { voiceName: voice });
           if (audioBase64) {
+            generatedCount++;
             res.write(`event: chunk\ndata: ${JSON.stringify({
               index: i,
               speaker,
@@ -95,14 +99,20 @@ export function createAudioRouter(): Router {
               audio: audioBase64,
             })}\n\n`);
           } else {
-            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "no audio" })}\n\n`);
+            skippedCount++;
+            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "Le fournisseur TTS n'a retourné aucun audio." })}\n\n`);
           }
         } catch (ttsErr: any) {
+          skippedCount++;
           res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: ttsErr.message })}\n\n`);
         }
       }
 
-      res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: dialogueLines.length })}\n\n`);
+      if (generatedCount === 0) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: `Aucun audio n'a été généré (${skippedCount} répliques ignorées). Vérifiez les clés API et la disponibilité du fournisseur TTS.` })}\n\n`);
+      } else {
+        res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: generatedCount, totalSkipped: skippedCount })}\n\n`);
+      }
       res.end();
     } catch (e: any) {
       if (res.headersSent) {
