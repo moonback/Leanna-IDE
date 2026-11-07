@@ -675,3 +675,16 @@ Compléments de la dixième passe :
 **Tests ajoutés dans `RAGEngine.test.ts` :** filtre `sourceIds` vide et référence explicite hors limites avec scores élevés. Les tests existants couvrent déjà la numérotation, le dédoublonnage, le fallback sans référence explicite et le filtre TF-IDF par source.
 
 **Validation restante :** exécuter le test ciblé `node --import tsx --import ./scripts/test-isolation.mjs --test server/notebooks/RAGEngine.test.ts`, `npm run typecheck` et `npm run lint:eslint:notebooks`. La recherche hybride complète dépend d'embeddings et de services LLM ; elle nécessite un test d'intégration avec store isolé et doubles réseau pour valider la portée notebook/source sans appeler les fournisseurs réels.
+
+
+### Dix-septième passe — audit de traçabilité des réponses
+
+- Ajout d'un `CitationAudit` persisté avec chaque réponse grounded générée sans erreur.
+- Mesures exposées : nombre de passages récupérés, passages cités, documents cités, références explicites, références valides et invalides, couverture des passages récupérés.
+- États structurels distinguant références valides, partielles, invalides, citations implicites et absence de citation.
+- Le panneau de message affiche une ligne de traçabilité compacte, avec avertissement visible si des marqueurs de citation sont invalides.
+- Trois tests déterministes couvrent la couverture partielle avec référence invalide, le fallback implicite et l'absence de citation exploitable.
+
+**Limite importante :** ce contrôle vérifie la cohérence structurelle des marqueurs et la couverture des passages récupérés. Il ne prétend pas vérifier qu'une phrase est sémantiquement prouvée par son extrait. La vérification claim → evidence nécessitera une étape distincte, avec évaluation explicite des affirmations et possibilité de verdict « indéterminé ».
+
+**Validation restante :** exécuter le test ciblé RAG, le typecheck, le lint et les tests UI dans l'environnement local. La CI GitHub doit également être réparée : les exécutions observées jusqu'ici échouent au démarrage sans créer de job.
