@@ -112,6 +112,8 @@ export interface UserProfile {
   customSystemPrompt: string;  // Prompt système personnalisé (ajouté au prompt de base)
   // Chat UI
   showChatSuggestions: boolean;  // Afficher les chips de suggestions rapides dans le chat
+  // Écran affiché quand aucun fichier n'est ouvert
+  emptyEditorMode: 'classic' | 'dashboard';
 }
 
 const STORAGE_KEY = 'Leanna_user_profile';
@@ -171,6 +173,7 @@ const DEFAULT_PROFILE: UserProfile = {
   customSystemPrompt: '',
   // Chat UI
   showChatSuggestions: true,
+  emptyEditorMode: 'classic',
 };
 
 function load(): UserProfile {

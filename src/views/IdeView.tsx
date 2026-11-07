@@ -69,6 +69,7 @@ import { MarkdownPreview } from '../components/ide/MarkdownPreview.js';
 import { ImagePreview } from '../components/ide/ImagePreview.js';
 import { PdfPreview } from '../components/ide/PdfPreview.js';
 import { EmptyEditorState } from '../components/ide/EmptyEditorState.js';
+import { EditorDashboard } from '../components/ide/EditorDashboard.js';
 import { SelfEditBanner } from '../components/ide/SelfEditBanner.js';
 import { SandboxWorkspace } from '../components/sandbox/SandboxWorkspace.js';
 import { AgentPanel } from '../components/panels/AgentPanel.js';
@@ -96,6 +97,7 @@ const SERVER_PORT = Number(import.meta.env.VITE_SERVER_PORT) || 5000;
 
 export default function IdeView() {
   const { profile } = useProfile();
+  const EmptyScreen = profile.emptyEditorMode === 'dashboard' ? EditorDashboard : EmptyEditorState;
   const { activity, clearActivity, connected, connecting, disconnect, connect, restoreTranscript, muted, toggleMute, isBusy, reasoning, sendVideoFrame, sendRawMessage, sendEditorContext } = useLiveAPIContext();
   const { isSharing: screenShareEnabled, toggleScreenShare } = useScreenShare();
   const navigate = useNavigate();
@@ -1315,7 +1317,7 @@ export default function IdeView() {
                                                 </Suspense>
                                               )
                       ) : (
-                        <EmptyEditorState
+                        <EmptyScreen
                                                   onCreateFile={() => setModalState({ type: 'create-file', dir: fileSystem.currentDir })}
                                                   onCreateFolder={() => setModalState({ type: 'create-folder', dir: fileSystem.currentDir })}
                                                   onShowSettings={openSettings}

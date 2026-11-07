@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Check, Moon, Sun, Zap, BookOpen, Eye, Pipette } from 'lucide-react';
 import { useProfile } from '../../context/UserProfileContext.js';
-import { Section, Field, ToggleSwitch } from './SettingsPrimitives.js';
+import { Section, Field, ToggleSwitch, ChipGroup } from './SettingsPrimitives.js';
 import { ACCENTS, FONTS } from './constants.js';
 
 // Palette d'accents : les 5 de base (tokens) + variantes distinctes en hex.
@@ -208,6 +208,19 @@ export function AppearanceSection() {
             The quick brown fox — 0123456789
           </p>
         </div>
+      </Field>
+
+      {/* Écran sans fichier ouvert */}
+      <Field label="Écran d'accueil de l'éditeur" hint="Affiché quand aucun fichier n'est ouvert.">
+        <ChipGroup
+          aria-label="Écran d'accueil de l'éditeur"
+          options={[
+            { id: 'classic', label: 'Classique', desc: 'Accueil et raccourcis' },
+            { id: 'dashboard', label: 'Tableau de bord', desc: 'Données en temps réel' },
+          ]}
+          value={profile.emptyEditorMode}
+          onChange={v => setField('emptyEditorMode', v)}
+        />
       </Field>
 
       {/* Floating Orb toggle */}
