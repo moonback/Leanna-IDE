@@ -2221,6 +2221,11 @@ button {
       var(--nb-right-handle) var(--nb-right);
     gap: 0;
   }
+  .notebook-panel--sources { grid-column: 1; }
+  .notebook-resize-handle--sources { grid-column: 2; }
+  .notebook-main { grid-column: 3; }
+  .notebook-resize-handle--studio { grid-column: 4; }
+  .notebook-panel--studio { grid-column: 5; }
   .notebook-shell[data-source-open="false"] {
     --nb-left: var(--nb-rail);
     --nb-left-handle: 0px;
