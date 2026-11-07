@@ -58,7 +58,7 @@ export function AudioPlayer({
   formatDuration,
 }: Props) {
   return (
-    <div className="custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-8">
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 lg:p-4">
       <div className="mx-auto max-w-2xl space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-[var(--notebook-border)] pb-4">
