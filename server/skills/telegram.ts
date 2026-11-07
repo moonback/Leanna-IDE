@@ -156,7 +156,7 @@ export const telegramSkill: Skill = {
       }),
     },
   ],
-  handleToolCall: async (name, args, context) => {
+  handleToolCall: async (name, args, _context) => {
     const getDefaultChatId = (): string | undefined => {
       const cfg = telegramService.getConfig();
       return cfg.defaultChatId || cfg.allowedUsers.find((u) => /^\d+$/.test(u.trim()));
