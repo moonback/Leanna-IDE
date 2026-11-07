@@ -71,7 +71,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostVoice: "Aoede", coHostVoice: "Charon" }),
+        body: JSON.stringify({ hostVoice: "ff_siwis", coHostVoice: "am_adam" }),
         signal: controller.signal,
       });
       const payload = await response.json() as { audioUrl?: string; error?: string; durationSeconds?: number };
