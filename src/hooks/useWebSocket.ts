@@ -59,7 +59,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
     onLog(intentional ? 'Disconnected' : 'Connection lost', 'system');
   }, [onLog]);
 
-  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void) => {
+  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void, initialConversationId: string | null = null) => {
     if (statusRef.current !== 'idle') return;
     intentionalDisconnectRef.current = false;
     reconnectSkillsRef.current = activeSkills;
@@ -68,7 +68,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
     onInitAudioRef.current = onInitAudio;
     onCleanupAudioRef.current = onCleanupAudio;
     setStatus('connecting');
-    onLog('Initializing...', 'system');
+    onLog(initialConversationId ? 'Reprise de la conversation…' : 'Initializing...', 'system');
 
     // Helper for scheduling reconnect
     const scheduleReconnect = (conversationId?: string | null) => {
@@ -239,7 +239,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
 
           const isClean = evt.wasClean && evt.code === 1000;
           onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
-          if (!isClean) scheduleReconnect(null);
+          if (!isClean) scheduleReconnect(initialConversationId);
         };
 
         ws.onerror = (event) => {
