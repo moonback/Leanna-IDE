@@ -124,8 +124,12 @@ export class GmailService {
 
   createAuthorizationUrl(account: GmailAccountId): string {
     this.assertOAuthConfigured();
+    const now = Date.now();
+    for (const [key, pending] of this.pendingStates) {
+      if (pending.expiresAt <= now) this.pendingStates.delete(key);
+    }
     const state = crypto.randomBytes(32).toString("base64url");
-    this.pendingStates.set(state, { account, expiresAt: Date.now() + 10 * 60_000 });
+    this.pendingStates.set(state, { account, expiresAt: now + 10 * 60_000 });
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     url.searchParams.set("client_id", this.config.clientId);
     url.searchParams.set("redirect_uri", this.redirectUri);
