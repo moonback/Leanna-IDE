@@ -1,27 +1,14 @@
 /**
- * useTtsPlayer — lecture TTS en streaming d'un Audio Overview.
- *
- * Encapsule toute la logique de lecture (Web Audio + flux SSE) auparavant
- * mêlée à AudioOverviewPanel : les refs stables (AudioContext, AbortController,
- * curseur de planification, miroir synchrone de l'état « en lecture »), l'état
- * exposé à l'UI, et le nettoyage au démontage.
- *
- * Le comportement est volontairement identique à l'implémentation d'origine :
- *  - planification « gapless » des chunks via nextStartTimeRef ;
- *  - la vitesse ne s'applique qu'aux chunks planifiés APRÈS son changement ;
- *  - playingRef permet à la closure onFrame de lire l'état de lecture à jour.
+ * useTtsPlayer — lecture d'une piste podcast WAV complète.
+ * Le rendu des deux voix est effectué côté serveur ; le navigateur lit un
+ * seul fichier continu et ne synthétise/assemble plus les répliques.
  */
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { streamSSE } from '../api/sse.js';
-import type { TtsStreamData } from '../api/types.js';
-import type { AudioOverview } from './types.js';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AudioOverview } from "./types.js";
 
 export interface UseTtsPlayerOptions {
   notebookId: string;
-  /** Overview sélectionné (fournit l'id du flux à lire). */
   selectedOverview: AudioOverview | null;
-  /** Remonte les erreurs non liées à une annulation (pour un toast). */
   onError?: (message: string) => void;
 }
 
@@ -37,178 +24,111 @@ export interface TtsPlayerState {
   cycleSpeed: () => void;
 }
 
-export function useTtsPlayer({
-  notebookId,
-  selectedOverview,
-  onError,
-}: UseTtsPlayerOptions): TtsPlayerState {
+export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPlayerOptions): TtsPlayerState {
   const [playing, setPlaying] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(-1);
   const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsTotalLines, setTtsTotalLines] = useState(0);
+  const [ttsTotalLines, setTtsTotalLines] = useState(1000);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const generationControllerRef = useRef<AbortController | null>(null);
   const playingRef = useRef(false);
-  const nextStartTimeRef = useRef(0);
-  const skippedChunksRef = useRef(0);
-  const lastSkipReasonRef = useRef('Audio indisponible');
-  const ttsProgressRef = useRef(0);
-
-  const getAudioContext = useCallback(() => {
-    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      audioCtxRef.current = new AC({ sampleRate: 24000 });
-    }
-    return audioCtxRef.current;
-  }, []);
-
-  const playAudioChunk = useCallback((base64Audio: string) => {
-    const audioCtx = getAudioContext();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    try {
-      const binaryStr = atob(base64Audio);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-      const pcm16 = new Int16Array(bytes.buffer);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
-
-      const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
-      audioBuffer.getChannelData(0).set(float32);
-
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.playbackRate.value = playbackSpeed;
-      source.connect(audioCtx.destination);
-
-      const now = audioCtx.currentTime;
-      const startTime = Math.max(now, nextStartTimeRef.current);
-      source.start(startTime);
-      nextStartTimeRef.current = startTime + (audioBuffer.duration / playbackSpeed);
-    } catch (err) {
-      console.error('[TTS] Erreur lecture audio:', err);
-    }
-  }, [getAudioContext, playbackSpeed]);
-
-  const playTTS = useCallback(async () => {
-    if (!selectedOverview) return;
-
-    setTtsLoading(true);
-    setPlaying(true);
-    playingRef.current = true;
-    setCurrentLineIndex(0);
-    setTtsProgress(0);
-    ttsProgressRef.current = 0;
-    skippedChunksRef.current = 0;
-    lastSkipReasonRef.current = 'Audio indisponible';
-    nextStartTimeRef.current = 0;
-
-    // Créer et démarrer le contexte audio immédiatement depuis le clic Play.
-    // Le créer après le fetch SSE peut perdre l'activation utilisateur et laisser
-    // le contexte suspendu (autoplay policy des navigateurs).
-    try {
-      const audioCtx = getAudioContext();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      if (audioCtx.state !== 'running') {
-        throw new Error("Le navigateur bloque la lecture audio. Autorisez le son puis réessayez.");
-      }
-    } catch (audioError) {
-      playingRef.current = false;
-      setPlaying(false);
-      setTtsLoading(false);
-      onError?.(audioError instanceof Error ? audioError.message : "Impossible d'initialiser la sortie audio.");
-      return;
-    }
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      await streamSSE(
-        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/tts`,
-        {
-          signal: controller.signal,
-          json: {},
-          onFrame: ({ event, data }) => {
-            // On cesse de traiter les frames si la lecture a été stoppée.
-            if (!playingRef.current) return;
-            const parsed = data as TtsStreamData;
-            if (event === 'start') {
-              setTtsTotalLines(parsed.total ?? 0);
-              setTtsLoading(false);
-            } else if (event === 'chunk') {
-              setCurrentLineIndex(parsed.index ?? 0);
-              if (parsed.audio) {
-                ttsProgressRef.current += 1;
-                setTtsProgress(prev => prev + 1);
-                playAudioChunk(parsed.audio);
-              }
-            } else if (event === 'skip') {
-              skippedChunksRef.current += 1;
-              lastSkipReasonRef.current = (parsed as TtsStreamData & { reason?: string }).reason || 'Audio indisponible';
-            } else if (event === 'done') {
-              if (ttsProgressRef.current === 0 && skippedChunksRef.current > 0) {
-                onError?.(`Aucun extrait audio n'a pu être généré. Dernière erreur : ${lastSkipReasonRef.current}`);
-              }
-            } else if (event === 'error') {
-              onError?.(parsed.error ?? 'Erreur TTS');
-            }
-          },
-        },
-      );
-    } catch (e: unknown) {
-      if (e instanceof Error && e.name !== 'AbortError') {
-        onError?.(`Erreur TTS: ${e.message}`);
-      }
-    } finally {
-      setTtsLoading(false);
-      setPlaying(false);
-      playingRef.current = false;
-      abortControllerRef.current = null;
-    }
-  }, [notebookId, selectedOverview, playAudioChunk, onError]);
 
   const stopTTS = useCallback(() => {
     playingRef.current = false;
+    generationControllerRef.current?.abort();
+    generationControllerRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      audioRef.current = null;
+    }
     setPlaying(false);
+    setTtsLoading(false);
     setCurrentLineIndex(-1);
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    // Stop tout l'audio en cours
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch((err) => {
-        console.debug('[AudioOverviewPanel] AudioContext close failed:', err);
-      });
-      audioCtxRef.current = null;
-    }
-    nextStartTimeRef.current = 0;
+    setTtsProgress(0);
   }, []);
 
+  const playTTS = useCallback(async () => {
+    if (!selectedOverview || playingRef.current) return;
+    stopTTS();
+    setTtsLoading(true);
+    setTtsProgress(0);
+    setCurrentLineIndex(0);
+    const controller = new AbortController();
+    generationControllerRef.current = controller;
+
+    try {
+      const base = `/api/notebooks/${encodeURIComponent(notebookId)}/audio-overviews/${encodeURIComponent(selectedOverview.id)}`;
+      const response = await fetch(`${base}/audio-track`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostVoice: "Aoede", coHostVoice: "Charon" }),
+        signal: controller.signal,
+      });
+      const payload = await response.json() as { audioUrl?: string; error?: string; durationSeconds?: number };
+      if (!response.ok || !payload.audioUrl) {
+        throw new Error(payload.error || "Impossible de générer la piste audio.");
+      }
+      if (controller.signal.aborted) return;
+
+      const audio = new Audio(payload.audioUrl);
+      audio.preload = "auto";
+      audio.playbackRate = playbackSpeed;
+      audioRef.current = audio;
+      audio.ontimeupdate = () => {
+        if (!audio.duration || !Number.isFinite(audio.duration)) return;
+        const ratio = Math.min(1, audio.currentTime / audio.duration);
+        setTtsProgress(Math.round(ratio * 1000));
+        const lineCount = selectedOverview.script.split("\n").filter(line => line.trim()).length;
+        setCurrentLineIndex(Math.min(Math.max(0, lineCount - 1), Math.floor(ratio * lineCount)));
+      };
+      audio.onended = () => {
+        playingRef.current = false;
+        setPlaying(false);
+        setTtsLoading(false);
+        setTtsProgress(1000);
+        setCurrentLineIndex(-1);
+      };
+      audio.onerror = () => {
+        playingRef.current = false;
+        setPlaying(false);
+        setTtsLoading(false);
+        onError?.("Le fichier audio du podcast ne peut pas être lu.");
+      };
+      await audio.play();
+      playingRef.current = true;
+      setPlaying(true);
+      setTtsLoading(false);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      playingRef.current = false;
+      setPlaying(false);
+      setTtsLoading(false);
+      onError?.(error instanceof Error ? error.message : "Erreur pendant la génération audio.");
+    } finally {
+      if (generationControllerRef.current === controller) generationControllerRef.current = null;
+    }
+  }, [notebookId, selectedOverview, playbackSpeed, stopTTS, onError]);
+
   const cycleSpeed = useCallback(() => {
-    setPlaybackSpeed(prev => {
-      if (prev === 1) return 1.25;
-      if (prev === 1.25) return 1.5;
-      if (prev === 1.5) return 1.75;
-      if (prev === 1.75) return 2;
-      return 1;
+    setPlaybackSpeed(previous => {
+      const next = previous === 1 ? 1.25 : previous === 1.25 ? 1.5 : previous === 1.5 ? 1.75 : previous === 1.75 ? 2 : 1;
+      if (audioRef.current) audioRef.current.playbackRate = next;
+      return next;
     });
   }, []);
 
-  // Nettoyage au démontage : abort du flux + fermeture du contexte audio.
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-      if (audioCtxRef.current) audioCtxRef.current.close().catch((err) => {
-        console.debug('[AudioOverviewPanel] AudioContext close failed (cleanup):', err);
-      });
-    };
+  useEffect(() => () => {
+    generationControllerRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+    }
   }, []);
 
   return {
