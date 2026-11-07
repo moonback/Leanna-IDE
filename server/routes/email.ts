@@ -107,19 +107,5 @@ export function createGmailRouter(): Router {
     }
   });
 
-  router.post("/send", async (req, res) => {
-    try {
-      const account = accountId(req.body?.account);
-      const { to, subject, body, cc } = req.body || {};
-      if (typeof to !== "string" || typeof subject !== "string" || typeof body !== "string") {
-        throw new Error("Destinataire, objet et corps du message sont obligatoires.");
-      }
-      const result = await gmailService.sendMessage(account, to, subject, body, typeof cc === "string" ? cc : "");
-      res.json({ status: "success", data: { id: result.id, threadId: result.threadId } });
-    } catch (error) {
-      res.status(400).json({ status: "error", error: (error as Error).message });
-    }
-  });
-
   return router;
 }
