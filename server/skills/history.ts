@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { generateText } from "../utils/textGeneration.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const logger = createLogger("History");
 
@@ -263,11 +264,12 @@ export function getActiveConversationId(): string | null {
 
 // ── Query functions (for API routes) ────────────────────────────────────────
 
-export async function listConversations(limit = 30, offset = 0): Promise<Conversation[]> {
+export async function listConversations(limit = 30, offset = 0, projectId = getActiveProjectId()): Promise<Conversation[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
+    .eq("project_id", projectId)
     .order("started_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
