@@ -42,6 +42,7 @@ import { buildImpactRef, importedSymbolRef, toWorkspacePath } from '../component
 import { BottomDock } from '../components/ide/BottomDock.js';
 import { ExplorerDock, getExplorerWidth } from '../components/ide/ExplorerDock.js';
 import { TelegramStatusModal } from '../components/ide/TelegramStatusModal.js';
+import { EmailStatusPanel } from '../components/ide/EmailStatusPanel.js';
 import { ModelPickerModal } from '../components/ide/ModelPickerModal.js';
 import { TokenDetailModal } from '../components/ide/TokenDetailModal.js';
 
@@ -205,6 +206,7 @@ export default function IdeView() {
   const [showAssistantLogs, setShowAssistantLogs] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [showTelegram, setShowTelegram] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showTokenDetail, setShowTokenDetail] = useState(false);
   const [showImpact, setShowImpact] = useState(false);
@@ -268,7 +270,7 @@ export default function IdeView() {
   // un panneau ferme tous les autres — « un panneau remplace l'autre dans sa zone ».
   type RightPanelName =
     | 'search' | 'mcp' | 'vision' | 'skillsMonitor' | 'missions'
-    | 'agents' | 'fleet' | 'telegram' | 'modelPicker' | 'tokenDetail' | 'impact';
+    | 'agents' | 'fleet' | 'telegram' | 'email' | 'modelPicker' | 'tokenDetail' | 'impact';
 
   const openRightPanel = useCallback((target: RightPanelName | null) => {
     setShowGlobalSearch(target === 'search');
@@ -279,6 +281,7 @@ export default function IdeView() {
     setShowAgents(target === 'agents');
     setShowFleet(target === 'fleet');
     setShowTelegram(target === 'telegram');
+    setShowEmail(target === 'email');
     setShowModelPicker(target === 'modelPicker');
     setShowTokenDetail(target === 'tokenDetail');
     setShowImpact(target === 'impact');
@@ -1359,7 +1362,7 @@ export default function IdeView() {
               open={
                 showGlobalSearch || showMcp || visionEnabled ||
                 (showSkillsMonitor && connected) || showMissions || showAgents ||
-                showFleet || showTelegram || showModelPicker || showTokenDetail || showImpact
+                showFleet || showTelegram || showEmail || showModelPicker || showTokenDetail || showImpact
               }
             >
               {showGlobalSearch && (
@@ -1393,6 +1396,7 @@ export default function IdeView() {
               {showTelegram && (
                 <TelegramStatusModal docked status={null} onClose={closeRightPanel} />
               )}
+              {showEmail && <EmailStatusPanel onClose={closeRightPanel} />}
               {showModelPicker && (
                 <ModelPickerModal docked onClose={closeRightPanel} />
               )}
@@ -1431,6 +1435,7 @@ export default function IdeView() {
           onToggleGitHub={() => setShowGitHub(v => !v)}
           onToggleMissions={() => toggleRightPanel('missions', showMissions)}
           onToggleTelegram={() => toggleRightPanel('telegram', showTelegram)}
+          onToggleEmail={() => toggleRightPanel('email', showEmail)}
           onToggleModelPicker={() => toggleRightPanel('modelPicker', showModelPicker)}
           onToggleTokenDetail={() => toggleRightPanel('tokenDetail', showTokenDetail)}
           onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
