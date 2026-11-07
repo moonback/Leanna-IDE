@@ -373,10 +373,7 @@ export function initActivityStore() {
  * pour éviter les fuites mémoire.
  */
 export function destroyActivityStore() {
-  if (!initialized) {
-    console.log('[agentActivityStore] ⚠️ Pas initialisé, rien à détruire');
-    return;
-  }
+  if (!initialized) return;
   
   console.log('[agentActivityStore] 🧹 Nettoyage...');
   

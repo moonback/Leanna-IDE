@@ -53,6 +53,7 @@ export function getDevCSP(): CSPDirectives {
     ],
     connectSrc: [
       "'self'",
+      "data:", // WASM inline de vosk-browser (fetch d'une URI data: dans le worker)
       "ws://localhost:*",
       "ws://127.0.0.1:*",
       "wss://localhost:*",
@@ -125,6 +126,7 @@ export function getProdCSP(): CSPDirectives {
     ],
     connectSrc: [
       "'self'",
+      "data:", // WASM inline de vosk-browser (fetch d'une URI data: dans le worker)
       "wss://*.supabase.co",
       "https://*.supabase.co",
       "https://generativelanguage.googleapis.com",

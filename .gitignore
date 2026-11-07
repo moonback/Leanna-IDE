@@ -28,3 +28,6 @@ graphify-out/
 .Leanna-strategy.json
 .Leanna-strategy.json.tmp
 
+
+# Modèle Vosk du réveil vocal (~40 Mo, téléchargé localement — voir src/lib/wakeWord.ts)
+public/models/*.tar.gz

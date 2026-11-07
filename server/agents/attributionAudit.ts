@@ -211,18 +211,10 @@ export function auditToolAttribution(runtime: ToolRegistryView): AttributionAudi
  * burn-down direct.
  */
 export function logAttributionAudit(report: AttributionAuditReport): void {
-  console.log(
-    "[AttributionAudit] Chaîne outil → agent :\n" +
-      `  • Attribution certaine (explicite/capability) : ${report.certain}\n` +
-      `  • Attribution probable (catégorie, heuristique) : ${report.probable}\n` +
-      `  • Sans attribution (→ rôle "${UNATTRIBUTED_ROLE}")     : ${report.unattributed}\n` +
-      `  • Total outils exécutables                      : ${report.totalTools}`
-  );
-
   if (report.actionable.length === 0) {
     console.log(
-      `[AttributionAudit] ✅ Chaîne déterministe : chaque outil exécutable est attribué ` +
-        `(aucun retour au rôle "${UNATTRIBUTED_ROLE}").`
+      `[AttributionAudit] ✅ ${report.totalTools} outils attribués ` +
+        `(${report.certain} certains, ${report.probable} probables, ${report.unattributed} → "${UNATTRIBUTED_ROLE}").`
     );
     return;
   }

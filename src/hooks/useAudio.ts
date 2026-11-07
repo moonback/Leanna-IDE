@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { preloadWakeModel, startWakeWordListener, type WakeWordListener } from '../lib/wakeWord.js';
+import { playSessionStartSound } from '../lib/sound.js';
 
 function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
   const buffer = new ArrayBuffer(pcmData.length * 2);
@@ -16,6 +18,8 @@ function floatToPcm16(pcmData: Float32Array): ArrayBuffer {
 // FRAME_SIZE (2048, comme l'ancien buffer) et les poste au thread principal.
 // Défini en Blob inline pour éviter toute configuration de bundling (Vite/Electron).
 const CAPTURE_FRAME_SIZE = 2048;
+// 12 × 2048 échantillons à 16 kHz ≈ 1,5 s rejouées à Gemini après le réveil.
+const PREROLL_FRAMES = 12;
 const AUDIO_WORKLET_SOURCE = `
 class CaptureProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -57,6 +61,10 @@ export interface UseAudioOptions {
   onAudioData: (pcm16: ArrayBuffer) => void;
   autoMuteEnabled?: boolean;
   autoMuteTimeout?: number; // in seconds
+  /** Outil en cours côté serveur : empêche la mise en veille. */
+  isBusy?: boolean;
+  /** En veille, écoute le nom « Leanna » pour se réveiller. */
+  wakeWordEnabled?: boolean;
   vadEnabled?: boolean;      // Voice Activity Detection
   vadThreshold?: number;     // Amplitude minimum pour détecter la voix (0-100)
   vadSilenceDuration?: number; // Durée de silence avant d'arrêter l'envoi (ms)
@@ -79,6 +87,8 @@ export function useAudio({
   onAudioData, 
   autoMuteEnabled = false, 
   autoMuteTimeout = 40,
+  isBusy = false,
+  wakeWordEnabled = true,
   vadEnabled = true,
   vadThreshold = 35,
   vadSilenceDuration = 800,
@@ -88,11 +98,17 @@ export function useAudio({
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
   
-  // Auto-mute timer refs
-  const autoMuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Veille automatique
   const lastActivityRef = useRef<number>(Date.now());
-  const autoMuteEnabledRef = useRef(autoMuteEnabled);
-  const autoMuteTimeoutRef = useRef(autoMuteTimeout);
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
+  // Veille = muet déclenché par l'inactivité (≠ muet manuel) : seul cas où l'on écoute le nom.
+  const [asleep, setAsleep] = useState(false);
+  const [wakeWordFailed, setWakeWordFailed] = useState(false); // modèle absent/illisible → réveil par clic
+  const wakeListenerRef = useRef<WakeWordListener | null>(null);
+  const prerollRef = useRef<Float32Array[]>([]); // ~1,5 s d'audio avant le réveil
+  const onAudioDataRef = useRef(onAudioData);
+  onAudioDataRef.current = onAudioData;
 
   // VAD (Voice Activity Detection) refs
   const vadSilenceStartRef = useRef<number | null>(null);
@@ -107,8 +123,6 @@ export function useAudio({
   const firstAudioScheduledFiredRef = useRef(false);
 
   // Keep refs in sync
-  autoMuteEnabledRef.current = autoMuteEnabled;
-  autoMuteTimeoutRef.current = autoMuteTimeout;
   vadEnabledRef.current = vadEnabled;
   vadThresholdRef.current = vadThreshold;
   vadSilenceDurationRef.current = vadSilenceDuration;
@@ -130,38 +144,31 @@ export function useAudio({
 
   mutedRef.current = muted;
 
-  // Auto-mute logic - Utilise useEffect pour synchronisation avec config
-  const clearAutoMuteTimer = useCallback(() => {
-    if (autoMuteTimerRef.current) {
-      clearTimeout(autoMuteTimerRef.current);
-      autoMuteTimerRef.current = null;
-    }
+  // Toute activité (voix, texte envoyé…) repousse la mise en veille.
+  const markActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
   }, []);
 
-  // Reset auto-mute: simplement unmute, le useEffect ci-dessous relancera le timer
-  const resetAutoMute = useCallback(() => {
-    if (!mutedRef.current) {
-      lastActivityRef.current = Date.now();
-    }
-  }, []);
-
-  // useEffect: Gère le timer auto-mute de manière réactive aux changements de config
+  // Veille sur inactivité : vérifie chaque seconde depuis quand rien ne s'est passé.
+  // Un outil en cours ou Leanna en train de parler comptent comme de l'activité.
   useEffect(() => {
-    if (!autoMuteEnabled || muted) {
-      clearAutoMuteTimer();
-      return;
-    }
-    
-    const timerId = setTimeout(() => {
-      if (!mutedRef.current) {
+    if (!autoMuteEnabled || muted) return;
+    lastActivityRef.current = Date.now(); // délai complet après réveil/activation
+    const id = setInterval(() => {
+      const out = outputAudioCtxRef.current;
+      const playing = !!out && nextStartTimeRef.current > out.currentTime;
+      if (isBusyRef.current || playing) {
+        lastActivityRef.current = Date.now();
+        return;
+      }
+      if (Date.now() - lastActivityRef.current >= autoMuteTimeout * 1000) {
         setMuted(true);
         mutedRef.current = true;
+        setAsleep(true);
       }
-    }, autoMuteTimeout * 1000);
-    
-    autoMuteTimerRef.current = timerId;
-    return () => clearTimeout(timerId);
-  }, [autoMuteEnabled, autoMuteTimeout, muted, clearAutoMuteTimer]);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [autoMuteEnabled, autoMuteTimeout, muted]);
 
   // Wake/unmute function
   const wake = useCallback(() => {
@@ -169,12 +176,55 @@ export function useAudio({
       setMuted(false);
       mutedRef.current = false;
     }
+    setAsleep(false);
     lastActivityRef.current = Date.now();
   }, []);
 
   const toggleMute = useCallback(() => {
+    setAsleep(false);
     setMuted(prev => !prev);
   }, []);
+
+  // Précharge le modèle dès que la veille + réveil vocal sont actifs, pour que le
+  // premier « Leanna » après l'endormissement ne soit pas perdu pendant le chargement.
+  useEffect(() => {
+    if (!autoMuteEnabled || !wakeWordEnabled) return;
+    preloadWakeModel()
+      .then(() => setWakeWordFailed(false))
+      .catch((err) => {
+        console.warn('[useAudio] Modèle de réveil vocal introuvable :', err);
+        setWakeWordFailed(true);
+      });
+  }, [autoMuteEnabled, wakeWordEnabled]);
+
+  // En veille : écoute le nom « Leanna ». Le recognizer est libéré au réveil (le modèle reste).
+  useEffect(() => {
+    if (!asleep || !wakeWordEnabled) return;
+    let cancelled = false;
+    startWakeWordListener(16000, () => {
+      if (!mutedRef.current) return;
+      wake();
+      playSessionStartSound();
+      // Rejoue le début de la phrase (« Leanna, ouvre… ») pour Gemini.
+      for (const frame of prerollRef.current) onAudioDataRef.current(floatToPcm16(frame));
+      prerollRef.current = [];
+    })
+      .then((listener) => {
+        setWakeWordFailed(false);
+        if (cancelled) listener.stop();
+        else wakeListenerRef.current = listener;
+      })
+      .catch((err) => {
+        console.warn('[useAudio] Réveil vocal indisponible :', err);
+        setWakeWordFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      wakeListenerRef.current?.stop();
+      wakeListenerRef.current = null;
+      prerollRef.current = [];
+    };
+  }, [asleep, wakeWordEnabled, wake]);
 
   const playAudioChunk = useCallback((audioData: ArrayBuffer | string) => {
     const audioCtx = outputAudioCtxRef.current;
@@ -327,9 +377,9 @@ export function useAudio({
         const inAvg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         inputAmplitudeRef.current = Math.min(1, inAvg / 100);
 
-        // Detect voice activity (simple amplitude threshold)
-        if (inAvg > 30) {
-          resetAutoMute();
+        // Activité vocale : même seuil que le VAD, sinon un ventilateur empêcherait la veille.
+        if (inAvg > vadThresholdRef.current) {
+          markActivity();
         }
 
         outputAnalyser.getByteFrequencyData(outDataArray);
@@ -343,7 +393,17 @@ export function useAudio({
       // ScriptProcessor). L'amplitude VAD est lue via l'analyser côté thread
       // principal, alimenté en continu par tick(), donc indépendant du backend.
       const processCaptureFrame = (channelData: Float32Array) => {
-        if (mutedRef.current) return;
+        if (mutedRef.current) {
+          // En veille, l'audio part uniquement au détecteur local, jamais à Gemini.
+          const listener = wakeListenerRef.current;
+          if (listener) {
+            const preroll = prerollRef.current;
+            preroll.push(channelData);
+            if (preroll.length > PREROLL_FRAMES) preroll.shift();
+            listener.feed(channelData);
+          }
+          return;
+        }
 
         // ── VAD (Voice Activity Detection) ──────────────────────────────
         // Économise 40-60% de bande passante en ne transmettant que les segments
@@ -356,7 +416,7 @@ export function useAudio({
             vadSilenceStartRef.current = null;
             vadSilenceFiredRef.current = false; // voix détectée → réarmer la sonde A
             onAudioData(floatToPcm16(channelData));
-            resetAutoMute();
+            markActivity();
           } else {
             if (vadSilenceStartRef.current === null) {
               vadSilenceStartRef.current = Date.now();
@@ -417,11 +477,11 @@ export function useAudio({
       console.error('Failed to start audio', err);
       throw err;
     }
-  }, [onAudioData, resetAutoMute]);
+  }, [onAudioData, markActivity]);
 
-  const cleanupAudio = useCallback(() => {
+  /** keepSleep : reconnexion GoAway → Leanna reste en veille au lieu de se réveiller seule. */
+  const cleanupAudio = useCallback((keepSleep = false) => {
     cancelAnimationFrame(animFrameRef.current);
-    clearAutoMuteTimer();
 
     processorRef.current?.disconnect();
     processorRef.current = null;
@@ -450,28 +510,27 @@ export function useAudio({
     mediaStreamRef.current?.getTracks().forEach(t => t.stop());
     mediaStreamRef.current = null;
 
-    // Reset mute state so the next session starts unmuted
-    setMuted(false);
-    mutedRef.current = false;
+    // Reset mute state so the next session starts unmuted (sauf veille conservée)
+    if (!(keepSleep && mutedRef.current)) {
+      setMuted(false);
+      mutedRef.current = false;
+      setAsleep(false);
+    }
 
     inputAmplitudeRef.current = 0;
     outputAmplitudeRef.current = 0;
-  }, [clearAutoMuteTimer]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      clearAutoMuteTimer();
-    };
-  }, [clearAutoMuteTimer]);
+  }, []);
 
   const getInputAmplitude = useCallback(() => inputAmplitudeRef.current, []);
   const getOutputAmplitude = useCallback(() => outputAmplitudeRef.current, []);
 
   return {
     muted,
+    asleep,
+    wakeWordFailed,
     toggleMute,
     wake,
+    markActivity,
     playAudioChunk,
     handleInterrupt,
     initAudio,

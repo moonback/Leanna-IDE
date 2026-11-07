@@ -42,14 +42,14 @@ export function BehaviorSection() {
           />
         </Field>
 
-        <SectionDivider label="Mode Muet Automatique" />
+        <SectionDivider label="Veille automatique" />
        
-        <Field label="Activer le mode muet automatique" hint="Coupe le micro automatiquement après une période d'inactivité">
+        <Field label="Activer la veille automatique" hint="Leanna se met en veille après une période sans activité (la session reste ouverte)">
           <ToggleSwitch
             value={profile.autoMuteEnabled}
             onChange={v => setField('autoMuteEnabled', v)}
-            label="Mode muet auto"
-            hint={profile.autoMuteEnabled ? `Micro coupé après ${profile.autoMuteTimeout}s d'inactivité` : 'Désactivé'}
+            label="Veille auto"
+            hint={profile.autoMuteEnabled ? `En veille après ${profile.autoMuteTimeout}s d'inactivité` : 'Désactivé'}
           />
         </Field>
        
@@ -62,7 +62,7 @@ export function BehaviorSection() {
               transition={{ duration: 0.2 }}
               style={{ overflow: 'hidden' }}
             >
-              <Field label="Délai avant muet" hint="Temps d'inactivité avant de couper le micro (5–300s)">
+              <Field label="Délai avant veille" hint="Temps sans activité avant la mise en veille (5–300s)">
                 <RangeSlider
                   value={profile.autoMuteTimeout}
                   onChange={v => setField('autoMuteTimeout', v)}
@@ -70,6 +70,14 @@ export function BehaviorSection() {
                   max={300}
                   step={5}
                   format={v => `${v} s`}
+                />
+              </Field>
+              <Field label="Réveil par le nom" hint="En veille, dire « Leanna » la réveille (reconnaissance locale, hors ligne)">
+                <ToggleSwitch
+                  value={profile.wakeWordEnabled}
+                  onChange={v => setField('wakeWordEnabled', v)}
+                  label="Réveil vocal"
+                  hint={profile.wakeWordEnabled ? 'Dites « Leanna »' : 'Réveil par clic uniquement'}
                 />
               </Field>
             </motion.div>

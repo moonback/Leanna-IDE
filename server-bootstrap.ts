@@ -6,8 +6,8 @@ import { validateEnvironment } from "./server/config/environment.js";
 import { loadEnv } from "./server/config/env.js";
 
 const configRoot = process.env.Leanna_CONFIG_PATH || process.env.ELECTRON_APP_PATH || process.cwd();
-dotenv.config({ path: path.join(configRoot, ".env") });
-dotenv.config({ path: path.join(configRoot, ".env.local"), override: true });
+dotenv.config({ path: path.join(configRoot, ".env"), quiet: true });
+dotenv.config({ path: path.join(configRoot, ".env.local"), override: true, quiet: true });
 
 for (const key of ENCRYPTED_AT_REST_ENV_KEYS) {
   // decrypt() renvoie la valeur telle quelle si elle n'est pas chiffrée (pas de

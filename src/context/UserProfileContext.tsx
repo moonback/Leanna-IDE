@@ -75,7 +75,8 @@ export interface UserProfile {
   language:      Language;
   responseStyle: ResponseStyle;
   // Auto Mute
-  autoMuteEnabled: boolean;   // Activer le mode muet automatique
+  autoMuteEnabled: boolean;   // Activer la veille automatique sur inactivité
+  wakeWordEnabled: boolean;   // En veille, se réveiller en entendant « Leanna »
   autoMuteTimeout: number;    // Délai en secondes avant muet auto (5-300)
   // VAD (Voice Activity Detection)
   vadEnabled: boolean;        // Activer la détection de voix (économie bande passante)
@@ -127,7 +128,8 @@ const DEFAULT_PROFILE: UserProfile = {
   language:      'fr',
   responseStyle: 'balanced',
   // Auto Mute
-  autoMuteEnabled: false,   // Activé par défaut
+  autoMuteEnabled: false,   // Désactivé par défaut
+  wakeWordEnabled: true,    // Activé par défaut
   autoMuteTimeout: 40,     // 40 secondes par défaut
   // VAD (Voice Activity Detection)
   vadEnabled: true,        // Activé par défaut (économie bande passante)
