@@ -118,6 +118,13 @@ test('TF-IDF: requête sans correspondance renvoie un tableau vide', () => {
   assert.deepEqual(results, []);
 });
 
+test('TF-IDF: un filtre de sources explicitement vide ne retourne aucune source', () => {
+  const a = makeSource('s-empty-a', 'A', ['contenu secret du document A']);
+  const b = makeSource('s-empty-b', 'B', ['contenu secret du document B']);
+  const results = ragEngine.search('contenu secret', [a, b], { sourceIds: [], minRelevance: 0 });
+  assert.deepEqual(results, [], 'un filtre vide ne doit jamais être interprété comme une recherche globale');
+});
+
 // ─── buildContext ──────────────────────────────────────────────────────────
 
 test('buildContext: numérote les sources et encadre le contenu', () => {
@@ -184,6 +191,13 @@ test('extractCitations: ignore les index hors limites (pas de citation explicite
 
   const citations = ragEngine.extractCitations('Voir [SOURCE 5] et [0].', results);
   assert.equal(citations.length, 0, 'aucun index valide → aucune citation (fallback neutralisé)');
+});
+
+test('extractCitations: ne remplace pas une référence explicite invalide par des citations implicites', () => {
+  const src = makeSource('s9-invalid', 'Doc', ['passage fiable un', 'passage fiable deux', 'passage fiable trois']);
+  const results = makeResults(src, [0.95, 0.9, 0.85]);
+  const citations = ragEngine.extractCitations('La preuve est [SOURCE 99].', results);
+  assert.deepEqual(citations, [], 'une référence explicite hors limites ne doit pas être remplacée par des citations non demandées');
 });
 
 test('extractCitations: repli top-3 quand aucune citation explicite (si pertinence >= 0.3)', () => {
