@@ -688,3 +688,16 @@ Compléments de la dixième passe :
 **Limite importante :** ce contrôle vérifie la cohérence structurelle des marqueurs et la couverture des passages récupérés. Il ne prétend pas vérifier qu'une phrase est sémantiquement prouvée par son extrait. La vérification claim → evidence nécessitera une étape distincte, avec évaluation explicite des affirmations et possibilité de verdict « indéterminé ».
 
 **Validation restante :** exécuter le test ciblé RAG, le typecheck, le lint et les tests UI dans l'environnement local. La CI GitHub doit également être réparée : les exécutions observées jusqu'ici échouent au démarrage sans créer de job.
+
+
+### Dix-huitième passe — statut d'indexation réellement reflété dans la liste Sources
+
+**Cause racine confirmée :** `GET /api/notebooks/:id` reconstruisait chaque source avec une liste blanche de champs, mais omettait `indexingStatus`, `indexingAttempts`, `indexingError`, `indexingUpdatedAt` et les métadonnées de retry. Le serveur persistait pourtant correctement le statut final `indexed`. L'interface recevait donc une source amputée de son statut et `SourceListCompact` appliquait son fallback `unknown` → « Non vérifiée ».
+
+Corrections :
+- La route CRUD expose maintenant le statut d'indexation persistant et ses métadonnées, y compris pour les sources historiques (`unknown` explicite si absent).
+- Les types frontend `SourceItem` sont alignés avec le contrat serveur, y compris l'historique borné.
+- `NotebookDetail` synchronise les statuts depuis `/embeddings/indexing-status` toutes les 5 secondes, sans recharger/démonter toute la vue Notebook. Cela fait passer le badge de `pending` à `indexed` lorsque l'embedding se termine après le premier chargement.
+- Les erreurs de rafraîchissement du statut ne bloquent pas l'édition ; le moniteur détaillé reste la source de diagnostic.
+
+**Validation restante :** typecheck, lint ESLint notebooks, tests UI et vérification Electron. Reproduire avec un import dont l'ingestion se termine avant l'indexation vectorielle : vérifier `pending` puis `indexed` dans la liste compacte et dans le moniteur.
