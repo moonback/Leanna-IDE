@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Mail, Unlink, Save, ShieldCheck, RefreshCw } from "lucide-react";
 import { Section, Field, TextInput, SecretInput, SectionDivider } from "./SettingsPrimitives.js";
 
-type MailServers = { imapHost: string; imapPort: number; imapSecure: true; smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls" };
+type MailServers = { imapHost: string; imapPort: number; imapSecurity: "ssl" | "starttls"; smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls" };
 type Account = { connected: boolean; email: string | null; provider?: "gmail" | "custom" | null; servers?: MailServers | null };
 type GmailSettings = {
   configured: boolean;
@@ -13,7 +13,7 @@ type GmailSettings = {
 
 export function EmailSection() {
   const [settings, setSettings] = useState<GmailSettings | null>(null);
-  const [servers, setServers] = useState<MailServers>({ imapHost: "", imapPort: 993, imapSecure: true, smtpHost: "", smtpPort: 465, smtpSecurity: "ssl" });
+  const [servers, setServers] = useState<MailServers>({ imapHost: "", imapPort: 993, imapSecurity: "ssl", smtpHost: "", smtpPort: 465, smtpSecurity: "ssl" });
   const [credentials, setCredentials] = useState({
     leanna: { email: "", appPassword: "" },
     personal: { email: "", appPassword: "" },
@@ -123,9 +123,15 @@ export function EmailSection() {
         <div className="mt-3 flex flex-col gap-3">
           {id === "leanna" && (
             <div className="grid grid-cols-1 gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border-base)" }}>
-              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur entrant — IMAP (SSL/TLS obligatoire)</div>
+              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur entrant — IMAP</div>
               <Field label="Hôte IMAP"><TextInput value={servers.imapHost} onChange={value => setServers(current => ({ ...current, imapHost: value }))} placeholder="imap.votre-fournisseur.fr" /></Field>
-              <Field label="Port IMAP"><TextInput value={String(servers.imapPort)} onChange={value => setServers(current => ({ ...current, imapPort: Number(value) }))} placeholder="993" /></Field>
+              <Field label="Port IMAP"><TextInput value={String(servers.imapPort)} onChange={value => setServers(current => ({ ...current, imapPort: Number(value) }))} placeholder="993 ou 143" /></Field>
+              <Field label="Sécurité IMAP">
+                <select value={servers.imapSecurity} onChange={event => setServers(current => ({ ...current, imapSecurity: event.target.value as "ssl" | "starttls" }))} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+                  <option value="ssl">SSL/TLS implicite (souvent port 993)</option>
+                  <option value="starttls">STARTTLS obligatoire (souvent port 143)</option>
+                </select>
+              </Field>
               <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur sortant — SMTP</div>
               <Field label="Hôte SMTP"><TextInput value={servers.smtpHost} onChange={value => setServers(current => ({ ...current, smtpHost: value }))} placeholder="smtp.votre-fournisseur.fr" /></Field>
               <Field label="Port SMTP"><TextInput value={String(servers.smtpPort)} onChange={value => setServers(current => ({ ...current, smtpPort: Number(value) }))} placeholder="465 ou 587" /></Field>
@@ -162,7 +168,7 @@ export function EmailSection() {
           IMAP/SMTP avec TLS obligatoire (TLS 1.2 minimum). Les mots de passe sont chiffrés localement, jamais renvoyés à l'interface ni transmis aux agents. La connexion vérifie IMAP et SMTP avant d'enregistrer le compte.
         </div>
         <div className="rounded-lg border p-3 text-xs leading-relaxed" style={{ borderColor: "var(--border-base)", color: "var(--text-secondary)" }}>
-          Renseignez les paramètres IMAP/SMTP fournis par votre hébergeur. IMAP impose SSL/TLS ; SMTP accepte SSL/TLS ou STARTTLS. Utilisez l'adresse complète comme identifiant. Leanna vérifie les deux connexions avant d'enregistrer la configuration.
+          Renseignez les paramètres IMAP/SMTP fournis par votre hébergeur. IMAP et SMTP imposent SSL/TLS ou STARTTLS. Utilisez l'adresse complète comme identifiant. Leanna vérifie les deux connexions avant d'enregistrer la configuration.
         </div>
         {accountCard("leanna", "Compte dédié de Leanna", "Boîte utilisée par défaut pour consulter et envoyer les e-mails. Chaque envoi exige une confirmation explicite.")}
         <SectionDivider label="Compte personnel — inchangé" />
