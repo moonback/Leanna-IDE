@@ -111,6 +111,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         },
       );
       if (data.overview.status === 'ready') {
+        player.stopTTS();
         setSelectedOverview(data.overview);
         try {
           await api<{ audioUrl: string }>(
@@ -159,6 +160,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
       });
       success('Audio overview supprimé');
       if (selectedOverview?.id === overviewId) {
+        player.stopTTS();
         setSelectedOverview(null);
       }
       onRefresh();
@@ -223,11 +225,12 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
   }, [notebookId, selectedOverview, success, toastError]);
 
   const handleSelectOverview = useCallback((ov: AudioOverview) => {
+    player.stopTTS();
     setSelectedOverview(ov);
     if (onViewDoc && !fullView) {
       onViewDoc({ id: ov.id, title: ov.title, type: 'audio-overview', content: ov.script, createdAt: ov.createdAt });
     }
-  }, [onViewDoc, fullView]);
+  }, [onViewDoc, fullView, player.stopTTS]);
 
   return (<>
     <div className={`h-full ${fullView ? 'flex flex-col lg:flex-row' : 'flex flex-col'}`}>
