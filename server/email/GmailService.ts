@@ -257,6 +257,7 @@ export class GmailService {
           uid: true, envelope: true, internalDate: true, flags: true, source: true,
         }, { uid: true });
         if (!message?.source) throw new Error("E-mail introuvable dans la boîte de réception.");
+        if (message.source.length > 25 * 1024 * 1024) throw new Error("E-mail trop volumineux pour être lu dans Leanna (limite : 25 Mo).");
         const parsed = await simpleParser(message.source);
         return {
           id: String(message.uid),
