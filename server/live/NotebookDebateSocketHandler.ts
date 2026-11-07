@@ -190,7 +190,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
         let previousText = "";
         let nextSpeaker: Speaker = "analyst";
         let agentTurnCount = 0;
-        while (agentTurnCount < MAX_AGENT_TURNS) {
+        while (agentTurnCount <= MAX_AGENT_TURNS) {
           await waitIfPaused();
           if (stopRequested || closed || Date.now() >= deadline) break;
 
