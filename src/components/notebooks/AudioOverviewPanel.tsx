@@ -136,7 +136,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     } finally {
       setGenerating(false);
     }
-  }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, hostName, coHostName, coHostPersonality, success, toastError, onRefresh]);
+  }, [notebookId, duration, selectedSourceIds, sources.length, tone, customInstructions, hostName, coHostName, coHostPersonality, success, toastError, onRefresh, player.stopTTS]);
 
   const handleSaveToSandbox = useCallback(async () => {
     if (!selectedOverview) return;
@@ -167,7 +167,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     } catch (e) {
       toastError(e instanceof Error ? e.message : 'Erreur');
     }
-  }, [notebookId, selectedOverview, success, toastError, onRefresh]);
+  }, [notebookId, selectedOverview, success, toastError, onRefresh, player.stopTTS]);
 
   const handleRegenerate = useCallback(async () => {
     if (!selectedOverview) return;
