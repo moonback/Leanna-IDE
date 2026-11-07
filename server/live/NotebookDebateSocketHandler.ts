@@ -169,8 +169,9 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
         await Promise.all([
           connectAgent("analyst", profile.aiVoice || "Aoede", profile.temperature ?? 0.5),
           connectAgent("critic", "Puck", profile.temperature ?? 0.6),
-          connectAgent("moderator", profile.aiVoice || "Aoede", 0.3),
         ]);
+        // Le modérateur réutilise la session Analyste : deux sessions Live au total.
+        turnRunners.set("moderator", turnRunners.get("analyst")!);
         send({ type: "status", status: "running" });
         let previousText = "";
         for (const speaker of ROLES) {
