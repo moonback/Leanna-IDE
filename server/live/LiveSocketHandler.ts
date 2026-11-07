@@ -446,12 +446,15 @@ export function attachLiveWebSocket(
         'email_send_message',
       ]);
       const allDeclarations = skillManager.getToolDeclarations();
-      const declarations = requestedSkills
+      const selectedDeclarations = requestedSkills
+        ? skillManager.getToolDeclarations(requestedSkills)
+        : null;
+      const declarations = selectedDeclarations
         ? [
-            ...skillManager.getToolDeclarations(requestedSkills),
+            ...selectedDeclarations,
             ...allDeclarations.filter(d =>
               EMAIL_TOOL_NAMES.has(d.name) &&
-              !skillManager.getToolDeclarations(requestedSkills).some(selected => selected.name === d.name),
+              !selectedDeclarations.some(selected => selected.name === d.name),
             ),
           ]
         : allDeclarations;
