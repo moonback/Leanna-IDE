@@ -154,6 +154,25 @@ function handleToolStart(e: Event) {
   notify();
 }
 
+function summarizeToolResult(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  let summary: string;
+  if (typeof value === 'string') {
+    summary = value;
+  } else if (typeof value === 'number' || typeof value === 'boolean') {
+    summary = String(value);
+  } else {
+    try {
+      summary = JSON.stringify(value);
+    } catch {
+      summary = '[Résultat non affichable]';
+    }
+  }
+  // Les payloads complets restent dans le flux/outillage ; le chat n'affiche
+  // qu'un aperçu borné pour préserver la lisibilité et éviter les gros dumps.
+  return summary.length > 240 ? `${summary.slice(0, 237)}…` : summary;
+}
+
 function handleToolDone(e: Event) {
   const detail = (e as CustomEvent).detail;
   if (!detail?.tool) return;
@@ -165,7 +184,7 @@ function handleToolDone(e: Event) {
     ...toolActivities[realIdx],
     status: 'done',
     endTimestamp: Date.now(),
-    result: detail.info || detail.result,
+    result: summarizeToolResult(detail.info ?? detail.result),
   };
   notify();
 }

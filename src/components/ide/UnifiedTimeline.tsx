@@ -3,10 +3,10 @@ import { useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronDown, Loader2, CheckCircle2, AlertCircle,
-  Bot, Target,
+  Bot, Target, Clock3, Wrench,
 } from 'lucide-react';
 import type { ActivityStep, ReasoningState } from '../../hooks/useActivity.js';
-import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
+import { getAgentTasks, getToolActivities, getAgentDisplayName, subscribe } from '../../stores/agentActivityStore.js';
 import { type Phase, PHASE_META, PHASE_ORDER, toolToPhase } from './activityPhases.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -23,11 +23,11 @@ import { type Phase, PHASE_META, PHASE_ORDER, toolToPhase } from './activityPhas
 interface UnifiedTimelineProps {
   steps: ActivityStep[];
   reasoning?: ReasoningState;
-  connected: boolean;
 }
 
-export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimelineProps) {
+export function UnifiedTimeline({ steps, reasoning }: UnifiedTimelineProps) {
   const agentTasks = useSyncExternalStore(subscribe, getAgentTasks, getAgentTasks);
+  const toolActivities = useSyncExternalStore(subscribe, getToolActivities, getToolActivities);
   // Réduit par défaut : l'en-tête résume l'état (en cours / terminé + nb
   // d'agents). L'utilisateur déplie s'il veut le détail des phases.
   const [collapsed, setCollapsed] = useState(true);
@@ -36,6 +36,15 @@ export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimeline
     () => agentTasks.filter(t => t.status === 'running' || t.status === 'pending'),
     [agentTasks],
   );
+  // Conserver un aperçu des dernières tâches terminées/échouées : l'utilisateur
+  // doit pouvoir vérifier le résultat d'une délégation après sa fin.
+  const recentAgentTasks = useMemo(
+    () => agentTasks.slice(-5).reverse(),
+    [agentTasks],
+  );
+  const failedAgentCount = recentAgentTasks.filter(t => t.status === 'failed' || t.status === 'incomplete').length;
+  const recentTools = useMemo(() => toolActivities.slice(-6).reverse(), [toolActivities]);
+  const runningToolCount = recentTools.filter(tool => tool.status === 'running').length;
 
   const phases = useMemo(() => {
     const grouped: Record<Phase, ActivityStep[]> = { planning: [], writing: [], verification: [] };
@@ -45,11 +54,11 @@ export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimeline
 
   const runningCount = steps.filter(s => s.status === 'running').length;
   const doneCount = steps.filter(s => s.status === 'done').length;
-  const isWorking = runningCount > 0 || reasoning?.active || activeAgents.length > 0;
+  const isWorking = runningCount > 0 || runningToolCount > 0 || reasoning?.active || activeAgents.length > 0;
 
-  // Rien à montrer : pas connecté, ou aucune activité/agent.
-  if (!connected) return null;
-  if (steps.length === 0 && activeAgents.length === 0 && !reasoning?.active) return null;
+  // La timeline reste consultable après la déconnexion du flux Live : les
+  // événements agents ont leur propre flux SSE et les résultats récents restent utiles.
+  if (steps.length === 0 && agentTasks.length === 0 && toolActivities.length === 0 && !reasoning?.active) return null;
 
   return (
     <div
@@ -70,8 +79,12 @@ export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimeline
         )}
         <span className="text-sm font-semibold flex-1" style={{ color: 'var(--text-secondary)' }}>
           {isWorking
-            ? (runningCount > 0 ? `${runningCount} action${runningCount > 1 ? 's' : ''} en cours` : 'En cours…')
-            : `${doneCount} action${doneCount > 1 ? 's' : ''} terminée${doneCount > 1 ? 's' : ''}`}
+            ? ((runningCount + runningToolCount) > 0 ? `${runningCount + runningToolCount} action${runningCount + runningToolCount > 1 ? 's' : ''} en cours` : 'En cours…')
+            : failedAgentCount > 0
+              ? `${failedAgentCount} tâche${failedAgentCount > 1 ? 's' : ''} à examiner`
+              : recentAgentTasks.length > 0
+                ? 'Activité récente'
+                : `${doneCount} action${doneCount > 1 ? 's' : ''} terminée${doneCount > 1 ? 's' : ''}`}
         </span>
         {activeAgents.length > 0 && (
           <span className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--color-accent-alt)' }}>
@@ -95,20 +108,104 @@ export function UnifiedTimeline({ steps, reasoning, connected }: UnifiedTimeline
             className="overflow-hidden"
           >
             <div className="px-2 pb-2 space-y-2">
-              {/* Agents actifs (source unique : agentActivityStore) */}
-              {activeAgents.length > 0 && (
-                <div className="space-y-1 pt-1">
-                  {activeAgents.map(agent => (
-                    <div key={agent.id} className="flex items-center gap-2 px-2 py-1">
-                      <Loader2 size={10} className="animate-spin flex-shrink-0" style={{ color: 'var(--color-accent-alt)' }} />
-                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                        {agent.agentName}
-                      </span>
-                      <span className="text-xs truncate" style={{ color: 'var(--text-dimmed)' }}>
-                        {agent.title}
-                      </span>
-                    </div>
-                  ))}
+              {/* Tâches agents récentes : état réel, progression et résultat */}
+              {recentAgentTasks.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {recentAgentTasks.map(agent => {
+                    const running = agent.status === 'running';
+                    const pending = agent.status === 'pending';
+                    const failed = agent.status === 'failed' || agent.status === 'incomplete';
+                    const StatusIcon = running || pending ? Loader2 : failed ? AlertCircle : agent.status === 'completed' ? CheckCircle2 : Clock3;
+                    const statusLabel = running ? 'En cours' : pending ? 'En attente' : failed ? 'À examiner' : agent.status === 'cancelled' ? 'Annulée' : 'Terminée';
+                    const statusColor = running || pending ? 'var(--accent-primary)' : failed ? 'var(--color-error)' : agent.status === 'cancelled' ? 'var(--text-dimmed)' : 'var(--color-success)';
+                    const progressPct = agent.progress && agent.progress.total > 0
+                      ? Math.min(100, Math.max(0, (agent.progress.current / agent.progress.total) * 100))
+                      : null;
+                    return (
+                      <div key={agent.id} className="rounded-lg px-2.5 py-2" style={{ backgroundColor: 'var(--bg-input)' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <StatusIcon
+                            size={11}
+                            className={running || pending ? 'animate-spin flex-shrink-0' : 'flex-shrink-0'}
+                            style={{ color: statusColor }}
+                          />
+                          <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {agent.agentName}
+                          </span>
+                          <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }} title={agent.title}>
+                            {agent.title}
+                          </span>
+                          <span className="text-[10px] flex-shrink-0" style={{ color: statusColor }}>{statusLabel}</span>
+                        </div>
+                        {(agent.detail || agent.summary) && (
+                          <p className="mt-1 pl-[19px] text-xs leading-relaxed line-clamp-2" style={{ color: failed ? 'var(--color-error)' : 'var(--text-dimmed)' }}>
+                            {agent.summary || agent.detail}
+                          </p>
+                        )}
+                        {progressPct !== null && (running || pending) && (
+                          <div className="mt-1.5 ml-[19px] flex items-center gap-2">
+                            <div className="h-1 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
+                              <motion.div className="h-full rounded-full" style={{ backgroundColor: statusColor }} initial={false} animate={{ width: `${progressPct}%` }} />
+                            </div>
+                            <span className="text-[10px] font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                              {agent.progress!.current}/{agent.progress!.total}
+                            </span>
+                          </div>
+                        )}
+                        {agent.durationMs !== undefined && !running && (
+                          <div className="mt-1 pl-[19px] text-[10px] font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                            Durée : {(agent.durationMs / 1000).toFixed(1)} s
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Appels d'outils réellement observés sur le flux Live */}
+              {recentTools.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-2 px-1">
+                    <Wrench size={11} style={{ color: 'var(--text-dimmed)' }} />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dimmed)' }}>
+                      Outils exécutés
+                    </span>
+                    <span className="text-[10px] font-mono tabular-nums" style={{ color: 'var(--text-dimmed)' }}>
+                      {recentTools.length}
+                    </span>
+                  </div>
+                  {recentTools.map(tool => {
+                    const running = tool.status === 'running';
+                    const durationMs = Math.max(0, (tool.endTimestamp ?? Date.now()) - tool.timestamp);
+                    return (
+                      <div key={tool.id} className="rounded-lg px-2.5 py-2" style={{ backgroundColor: 'var(--bg-input)' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {running ? (
+                            <Loader2 size={11} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                          ) : (
+                            <CheckCircle2 size={11} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }} title={tool.tool}>
+                              {tool.label}
+                            </span>
+                            <span className="block text-[10px] truncate" style={{ color: 'var(--text-dimmed)' }}>
+                              {getAgentDisplayName(tool.agentId)}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono tabular-nums flex-shrink-0" style={{ color: 'var(--text-dimmed)' }}>
+                            {running ? 'En cours' : `${(durationMs / 1000).toFixed(1)} s`}
+                          </span>
+                        </div>
+                        {!running && tool.result && (
+                          <p className="mt-1 pl-[19px] text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--text-dimmed)' }}>
+                            {tool.result}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

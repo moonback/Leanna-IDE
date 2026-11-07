@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Sparkles, Copy, CheckCheck, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
+import { User, Sparkles, Copy, CheckCheck, ClipboardX, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
 import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { BUBBLE_STYLES, TRANSITIONS } from './theme.js';
@@ -135,6 +135,7 @@ export const ChatMessage = memo(function ChatMessage({
 }: ChatMessageProps) {
   const isAssistant = entry.role === 'assistant';
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const bubbleStyle = isAssistant ? BUBBLE_STYLES.assistant : BUBBLE_STYLES.user;
 
   // Découpe le message de l'assistante en prose + éditeurs diff inline. Les
@@ -146,12 +147,19 @@ export const ChatMessage = memo(function ChatMessage({
   );
   const hasEdits = segments.some(s => s.kind === 'edit');
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(entry.text).then(() => {
+  const handleCopy = useCallback(async () => {
+    setCopyFailed(false);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(entry.text);
       setCopied(true);
       onCopy?.(entry.text);
-      setTimeout(() => setCopied(false), 2000);
-    });
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+      window.setTimeout(() => setCopyFailed(false), 2500);
+    }
   }, [entry.text, onCopy]);
 
   return (
@@ -228,23 +236,33 @@ export const ChatMessage = memo(function ChatMessage({
 
         {/* Footer: timestamp + actions */}
         <div
-          className={`lea-chat-actions flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
+          className={`lea-chat-actions flex items-center gap-1.5 mt-1.5 px-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
         >
-          <span className="text-xs font-mono tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
+          <time
+            className="text-xs font-mono tracking-wide"
+            dateTime={entry.timestamp.toISOString()}
+            title={entry.timestamp.toLocaleString('fr-FR', {
+              dateStyle: 'full', timeStyle: 'long',
+            })}
+            style={{ color: 'var(--text-dimmed)' }}
+          >
             {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          </time>
 
           {/* Copy */}
           <button
             type="button"
             onClick={handleCopy}
             className="p-1 rounded-md transition-colors hover:bg-[var(--bg-active)]"
-            title="Copier le message"
-            aria-label="Copier le message"
+            title={copyFailed ? 'Copie impossible : vérifiez les autorisations du navigateur' : copied ? 'Message copié' : 'Copier le message'}
+            aria-label={copyFailed ? 'La copie a échoué' : copied ? 'Message copié' : 'Copier le message'}
+            aria-live="polite"
           >
-            {copied
-              ? <CheckCheck size={11} style={{ color: 'var(--color-success)' }} />
-              : <Copy size={11} style={{ color: 'var(--text-dimmed)' }} />
+            {copyFailed
+              ? <ClipboardX size={11} style={{ color: 'var(--color-error)' }} />
+              : copied
+                ? <CheckCheck size={11} style={{ color: 'var(--color-success)' }} />
+                : <Copy size={11} style={{ color: 'var(--text-dimmed)' }} />
             }
           </button>
 

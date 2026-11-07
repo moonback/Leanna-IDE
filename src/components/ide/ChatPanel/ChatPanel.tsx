@@ -474,9 +474,9 @@ export function ChatPanel({
         </AnimatePresence>
 
         {/* Timeline d'activité unifiée */}
-        {!minimized && connected && (activity.length > 0 || reasoning?.active) && (
+        {!minimized && (
           <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-base)' }}>
-            <UnifiedTimeline steps={activity} reasoning={reasoning} connected={connected} />
+            <UnifiedTimeline steps={activity} reasoning={reasoning} />
           </div>
         )}
 
