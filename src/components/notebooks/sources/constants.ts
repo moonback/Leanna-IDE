@@ -15,6 +15,10 @@ export interface SourceItem {
   language: string;
   addedAt: string;
   chunksCount: number;
+  /** Durable vector-indexing state; absent on legacy sources. */
+  indexingStatus?: 'pending' | 'indexed' | 'partial' | 'failed';
+  indexingAttempts?: number;
+  indexingError?: string;
 }
 
 export interface UploadFileStatus {
