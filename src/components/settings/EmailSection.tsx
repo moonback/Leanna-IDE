@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Mail, Unlink, Save, ShieldCheck, RefreshCw } from "lucide-react";
 import { Section, Field, TextInput, SecretInput, SectionDivider } from "./SettingsPrimitives.js";
 
-type MailServers = { imapHost: string; imapPort: number; imapSecurity: "ssl" | "starttls"; smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls" };
+type MailServers = { receiveEnabled: boolean; sendEnabled: boolean; imapHost: string; imapPort: number; imapSecurity: "ssl" | "starttls"; smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls" };
 type Account = { connected: boolean; email: string | null; provider?: "gmail" | "custom" | null; servers?: MailServers | null };
 type GmailSettings = {
   configured: boolean;
@@ -13,7 +13,7 @@ type GmailSettings = {
 
 export function EmailSection() {
   const [settings, setSettings] = useState<GmailSettings | null>(null);
-  const [servers, setServers] = useState<MailServers>({ imapHost: "", imapPort: 993, imapSecurity: "ssl", smtpHost: "", smtpPort: 465, smtpSecurity: "ssl" });
+  const [servers, setServers] = useState<MailServers>({ receiveEnabled: true, sendEnabled: true, imapHost: "", imapPort: 993, imapSecurity: "ssl", smtpHost: "", smtpPort: 465, smtpSecurity: "ssl" });
   const [credentials, setCredentials] = useState({
     leanna: { email: "", appPassword: "" },
     personal: { email: "", appPassword: "" },
@@ -123,25 +123,39 @@ export function EmailSection() {
         <div className="mt-3 flex flex-col gap-3">
           {id === "leanna" && (
             <div className="grid grid-cols-1 gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border-base)" }}>
-              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur entrant — IMAP</div>
-              <Field label="Hôte IMAP"><TextInput value={servers.imapHost} onChange={value => setServers(current => ({ ...current, imapHost: value }))} placeholder="imap.votre-fournisseur.fr" /></Field>
-              <Field label="Port IMAP"><TextInput value={String(servers.imapPort)} onChange={value => setServers(current => ({ ...current, imapPort: Number(value) }))} placeholder="993 ou 143" /></Field>
-              <Field label="Sécurité IMAP">
-                <select value={servers.imapSecurity} onChange={event => setServers(current => ({ ...current, imapSecurity: event.target.value as "ssl" | "starttls" }))} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
-                  <option value="ssl">SSL/TLS implicite (souvent port 993)</option>
-                  <option value="starttls">STARTTLS obligatoire (souvent port 143)</option>
-                </select>
-              </Field>
-              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur sortant — SMTP</div>
-              <Field label="Hôte SMTP"><TextInput value={servers.smtpHost} onChange={value => setServers(current => ({ ...current, smtpHost: value }))} placeholder="smtp.votre-fournisseur.fr" /></Field>
-              <Field label="Port SMTP"><TextInput value={String(servers.smtpPort)} onChange={value => setServers(current => ({ ...current, smtpPort: Number(value) }))} placeholder="465 ou 587" /></Field>
-              <Field label="Sécurité SMTP">
-                <select value={servers.smtpSecurity} onChange={event => setServers(current => ({ ...current, smtpSecurity: event.target.value as "ssl" | "starttls" }))} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
-                  <option value="ssl">SSL/TLS implicite (souvent port 465)</option>
-                  <option value="starttls">STARTTLS obligatoire (souvent port 587)</option>
-                </select>
-              </Field>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucune connexion en clair. Les serveurs locaux ou réservés sont refusés.</p>
+              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Fonctionnalités du compte</div>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-primary)" }}>
+                <input type="checkbox" checked={servers.receiveEnabled} onChange={event => setServers(current => ({ ...current, receiveEnabled: event.target.checked }))} />
+                Activer la réception des e-mails (IMAP)
+              </label>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-primary)" }}>
+                <input type="checkbox" checked={servers.sendEnabled} onChange={event => setServers(current => ({ ...current, sendEnabled: event.target.checked }))} />
+                Activer l'envoi des e-mails (SMTP)
+              </label>
+              {!servers.receiveEnabled && !servers.sendEnabled && <p className="text-xs" style={{ color: "var(--color-error, #dc2626)" }}>Activez au moins une fonctionnalité pour connecter ce compte.</p>}
+              {servers.receiveEnabled && <>
+                <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur entrant — IMAP</div>
+                <Field label="Hôte IMAP"><TextInput value={servers.imapHost} onChange={value => setServers(current => ({ ...current, imapHost: value }))} placeholder="imap.votre-fournisseur.fr" /></Field>
+                <Field label="Port IMAP"><TextInput value={String(servers.imapPort)} onChange={value => setServers(current => ({ ...current, imapPort: Number(value) }))} placeholder="993 ou 143" /></Field>
+                <Field label="Sécurité IMAP">
+                  <select value={servers.imapSecurity} onChange={event => setServers(current => ({ ...current, imapSecurity: event.target.value as "ssl" | "starttls" }))} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+                    <option value="ssl">SSL/TLS implicite (souvent port 993)</option>
+                    <option value="starttls">STARTTLS obligatoire (souvent port 143)</option>
+                  </select>
+                </Field>
+              </>}
+              {servers.sendEnabled && <>
+                <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Serveur sortant — SMTP</div>
+                <Field label="Hôte SMTP"><TextInput value={servers.smtpHost} onChange={value => setServers(current => ({ ...current, smtpHost: value }))} placeholder="smtp.votre-fournisseur.fr" /></Field>
+                <Field label="Port SMTP"><TextInput value={String(servers.smtpPort)} onChange={value => setServers(current => ({ ...current, smtpPort: Number(value) }))} placeholder="465 ou 587" /></Field>
+                <Field label="Sécurité SMTP">
+                  <select value={servers.smtpSecurity} onChange={event => setServers(current => ({ ...current, smtpSecurity: event.target.value as "ssl" | "starttls" }))} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border-base)", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+                    <option value="ssl">SSL/TLS implicite (souvent port 465)</option>
+                    <option value="starttls">STARTTLS obligatoire (souvent port 587)</option>
+                  </select>
+                </Field>
+              </>}
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucune connexion en clair. Seuls les serveurs activés sont vérifiés.</p>
             </div>
           )}
           <Field label="Adresse e-mail">
@@ -150,7 +164,7 @@ export function EmailSection() {
           <Field label={id === "leanna" ? "Mot de passe de la boîte e-mail" : "Mot de passe d'application"} hint={id === "leanna" ? "Mot de passe de la boîte ou mot de passe dédié fourni par votre hébergeur. Il sera chiffré localement." : "Mot de passe d'application Google (16 caractères), pas le mot de passe habituel du compte."}>
             <SecretInput value={values.appPassword} onChange={value => setCredentials(current => ({ ...current, [id]: { ...current[id], appPassword: value } }))} placeholder={id === "leanna" ? "Mot de passe de messagerie" : "xxxx xxxx xxxx xxxx"} />
           </Field>
-          <button type="button" disabled={!!busy || !values.email.trim() || !values.appPassword.trim()} onClick={() => void connect(id)} className="inline-flex items-center justify-center gap-2 self-start rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40" style={{ background: "var(--accent-primary)", color: "white" }}>
+          <button type="button" disabled={!!busy || !values.email.trim() || !values.appPassword.trim() || (id === "leanna" && !servers.receiveEnabled && !servers.sendEnabled)} onClick={() => void connect(id)} className="inline-flex items-center justify-center gap-2 self-start rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40" style={{ background: "var(--accent-primary)", color: "white" }}>
             <Save size={14} /> {busy === id ? "Vérification IMAP/SMTP…" : account?.connected ? "Mettre à jour les identifiants" : "Connecter le compte"}
           </button>
         </div>
