@@ -111,8 +111,16 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
         },
       );
       if (data.overview.status === 'ready') {
-        success('Audio Overview généré !');
         setSelectedOverview(data.overview);
+        try {
+          await api<{ audioUrl: string }>(
+            `/api/notebooks/${notebookId}/audio-overviews/${data.overview.id}/audio-track`,
+            { method: 'POST', json: { hostVoice: 'ff_siwis', coHostVoice: 'am_adam' } },
+          );
+          success('Podcast audio généré avec ses deux voix !');
+        } catch (audioError) {
+          toastError(`Script créé, mais génération de la piste audio impossible : ${audioError instanceof Error ? audioError.message : 'erreur TTS'}`);
+        }
         onRefresh();
         return data.overview;
       }
