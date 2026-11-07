@@ -21,12 +21,13 @@ export function createGmailRouter(): Router {
       const account = accountId(req.body?.account);
       const { email, appPassword } = req.body || {};
       const rawProvider = req.body?.provider;
-      if (rawProvider !== undefined && rawProvider !== "gmail" && rawProvider !== "infomaniak") throw new Error("Fournisseur e-mail invalide.");
-      const provider: EmailProvider = rawProvider === "infomaniak" ? "infomaniak" : "gmail";
+      if (rawProvider !== undefined && rawProvider !== "gmail" && rawProvider !== "custom") throw new Error("Fournisseur e-mail invalide.");
+      const provider: EmailProvider = account === "leanna" ? "custom" : "gmail";
+      if (account === "personal" && rawProvider === "custom") throw new Error("La configuration personnalisée est réservée au compte Leanna.");
       if (typeof email !== "string" || typeof appPassword !== "string") {
-        throw new Error("Adresse e-mail et mot de passe d'application requis.");
+        throw new Error("Adresse e-mail et mot de passe de messagerie requis.");
       }
-      await gmailService.connectAccount(account, email, appPassword, provider);
+      await gmailService.connectAccount(account, email, appPassword, provider, req.body?.servers);
       res.json({ status: "success", data: gmailService.getSettings() });
     } catch (error) {
       res.status(400).json({ status: "error", error: (error as Error).message });
