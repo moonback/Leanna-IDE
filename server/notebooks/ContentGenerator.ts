@@ -410,9 +410,9 @@ export class ContentGenerator {
       lang: lang === "fr" ? "français" : "anglais",
       custom: customPart,
     })
-      .replace(/\\bAlex\\b/g, hostName)
-      .replace(/\\bSam\\b/g, coHostName)
-      + `\\n\\nPERSONNALITÉS OBLIGATOIRES :\\n- ${hostName} est Leanna, présentatrice principale. Elle interprète le script, contextualise les sources, explique clairement et guide l'épisode.\\n- ${coHostName} est le co-animateur : ${coHostPersonality}\\n- Les deux voix dialoguent réellement : réactions, relances, questions, désaccords argumentés et transitions naturelles. Évite les monologues alternés mécaniques.\\n- Préfixe chaque réplique exactement par "${hostName}:" ou "${coHostName}:". N'utilise aucun autre nom d'intervenant.\\n- N'invente aucun fait absent des sources ; signale les incertitudes.`;
+      .replace(/\bAlex\b/g, hostName)
+      .replace(/\bSam\b/g, coHostName)
+      + `\n\nPERSONNALITÉS OBLIGATOIRES :\n- ${hostName} incarne Leanna, présentatrice principale. Elle interprète le script, contextualise les sources, explique clairement et guide l'épisode.\n- ${coHostName} est le co-animateur : ${coHostPersonality}\n- Les deux voix dialoguent réellement : réactions, relances, questions, désaccords argumentés et transitions naturelles. Évite les monologues alternés mécaniques.\n- Préfixe chaque réplique exactement par "${hostName}:" ou "${coHostName}:". N'utilise aucun autre nom d'intervenant.\n- N'invente aucun fait absent des sources ; signale les incertitudes.`;
 
     log.info(`🎙️ Génération Audio Overview pour "${notebook.title}" (~${durationMinutes}min, ton=${tone})`);
 
