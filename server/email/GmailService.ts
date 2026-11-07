@@ -113,6 +113,9 @@ export class GmailService {
     if (clientSecret !== undefined && !clientSecret.trim()) {
       throw new Error("Le client secret ne peut pas être vide.");
     }
+    if (this.config.clientId && this.config.clientId !== id && clientSecret === undefined) {
+      throw new Error("Un nouveau Client Secret est requis lorsque le Client ID change.");
+    }
     if (this.config.clientId && this.config.clientId !== id) {
       this.config.accounts = {};
       this.config.personalSendEnabled = false;
