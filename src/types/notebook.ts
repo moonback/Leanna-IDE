@@ -15,6 +15,19 @@ export interface SourceItem {
   language: string;
   addedAt: string;
   chunksCount: number;
+  indexingStatus?: 'pending' | 'indexed' | 'partial' | 'failed' | 'unknown';
+  indexingAttempts?: number;
+  indexingError?: string;
+  indexingUpdatedAt?: string;
+  indexingNextRetryAt?: string;
+  indexingHistory?: Array<{
+    attempt: number;
+    at: string;
+    outcome: 'indexed' | 'partial' | 'failed';
+    category: 'none' | 'transient' | 'permanent';
+    durationMs: number;
+    message?: string;
+  }>;
 }
 
 export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'html' | 'youtube' | 'audio' | 'docx';

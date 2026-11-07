@@ -531,9 +531,12 @@ export function createChatRouter(): Router {
   return router;
 }
 
-/** Filtre de sources envoyé par le composer : tableau d'ids non vides, sinon undefined. */
+/** Un tableau vide signifie « toutes les sources » (convention du composer).
+ * Un tableau non vide mais invalide reste un filtre vide : ne jamais l'élargir
+ * silencieusement à l'ensemble du notebook.
+ */
 function parseSourceIds(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const ids = value.filter((id): id is string => typeof id === "string" && id.length > 0);
-  return ids.length > 0 ? ids : undefined;
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+    .map(id => id.trim());
 }

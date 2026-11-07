@@ -609,3 +609,95 @@ Compléments de la dixième passe :
 - Les payloads terminés ne conservent que `notebookId` afin de garder le contrôle d'accès au statut sans archiver le contenu des sources.
 - Test ajouté pour la restauration d'un résultat terminal après redémarrage.
 - Limites : tâches `processing` toujours non récupérées après crash ; endpoints HTTP encore synchrones ; historique borné ; progression non détaillée par sous-étape ; queue globale au processus.
+
+
+### Douzième passe — ergonomie adaptative du workspace Notebook
+
+| Sujet | État | Détail |
+|---|---|---|
+| Largeur des panneaux | Implémenté | Les colonnes Sources et Studio sont redimensionnables à la souris avec des bornes de sécurité (Sources : 220–420 px ; Studio : 260–480 px). |
+| Préférences locales | Implémenté | Les largeurs choisies sont conservées dans le stockage local du client. Une préférence absente, invalide ou illisible revient aux valeurs par défaut sans bloquer le Notebook. |
+| Accessibilité des séparateurs | Implémenté | Les séparateurs sont exposés comme séparateurs verticaux focalisables et peuvent être ajustés au clavier avec les flèches ; Maj augmente le pas. |
+| Mode Focus | Implémenté | Une action dans l'en-tête replie simultanément Sources et Studio pour donner la priorité à la discussion ; l'action inverse restaure les deux panneaux. Raccourci Ctrl/Cmd+0. |
+| État d'indexation des sources | Implémenté | La liste compacte affiche les états réellement persistés : indexé, en attente, partiel, échec ou non vérifié pour les anciennes sources. L'erreur est accessible dans l'infobulle lorsqu'elle existe. |
+| Compatibilité historique | Préservée | L'absence de indexingStatus reste neutre : aucun état de succès n'est inventé pour les sources historiques. |
+
+**Validation restante :** le code a été poussé sur une branche dédiée, mais le typecheck, les tests UI, le lint et la vérification visuelle Electron doivent encore être exécutés dans l'environnement local. Vérifier en particulier le redimensionnement souris/tactile, les raccourcis sous Windows/macOS, le repli indépendant des panneaux, le comportement à 1024 px et la persistance après redémarrage.
+
+
+### Treizième passe — Studio de génération orienté intention
+
+| Sujet | État | Détail |
+|---|---|---|
+| Organisation par intention | Implémenté | Les formats rapides sont regroupés en catégories Comprendre, Apprendre, Analyser et Organiser ; les rapports spécialisés disposent de la catégorie Explorer. |
+| Recherche de formats | Implémenté | Recherche locale sur le nom et la description des générateurs, sans nouvel appel API. Effacement et remise à zéro des filtres disponibles. |
+| Découverte des formats | Implémenté | Les cartes affichent une description courte, conservent les infobulles détaillées et exposent un libellé accessible. |
+| Rapports spécialisés | Préservé | La carte ouvre le ReportModal existant et ses 12 modèles ; aucune nouvelle logique de génération ni route API n'a été créée. La recherche reconnaît les noms des modèles de rapports. |
+| Générations existantes | Préservées | Les actions continuent d'utiliser `handleGenerate`, la file d'attente, les modales d'infographie et les indicateurs de tâches actifs déjà présents. |
+| État sans résultat | Implémenté | Un état vide explique qu'aucun format ne correspond et permet de réinitialiser les filtres. |
+
+**Validation restante :** exécuter `npm run typecheck`, `npm run lint:eslint:notebooks` et `npm run test:ui` dans l'environnement local, puis vérifier visuellement la densité des cartes, la navigation clavier, les catégories et la recherche sur les formats et rapports.
+
+
+### Quatorzième passe — diagnostic d'indexation visible dans les sources
+
+- Le badge d'état est désormais toujours présent dans la liste compacte : les sources historiques sans champ d'état sont explicitement marquées « Non vérifiée » plutôt que de laisser croire qu'elles sont indexées.
+- Les états `pending`, `indexed`, `partial` et `failed` reflètent les champs durables déjà stockés par `NotebookManager` ; aucun statut n'est déduit du nombre de chunks.
+- L'infobulle rassemble le statut, le nombre de tentatives, la dernière mise à jour, la prochaine tentative planifiée et l'erreur éventuelle.
+- Les horodatages sont validés avant formatage afin d'éviter d'afficher `Invalid Date` si une ancienne donnée est mal formée.
+- Les types UI sont alignés sur les champs du modèle serveur (`indexingStatus`, `indexingAttempts`, `indexingError`, `indexingUpdatedAt`, `indexingNextRetryAt`).
+
+**Validation CI observée :** une exécution GitHub Actions associée au commit précédent est remontée en `startup_failure`, sans job créé ; aucun résultat de typecheck/test/lint n'est disponible. Cela ne permet pas de conclure à un échec du code ni à une réussite. Refaire les validations dans l'environnement local et vérifier le démarrage de l'action GitHub.
+
+
+### Quinzième passe — lecture et traçabilité des citations
+
+- Les extraits de citation sont maintenant réellement dépliables/repliables ; auparavant, leur style indiquait un curseur interactif sans gestionnaire de clic.
+- L'expansion est accessible au clavier et expose `aria-expanded` ; le texte complet conserve les retours à la ligne et les mots longs.
+- L'ouverture du passage source reste une action distincte, via le callback existant `onFetchCitation`, afin de ne pas confondre expansion de l'extrait et navigation vers le chunk d'origine.
+- Le score de pertinence est borné entre 0 et 100 % lorsqu'il est numérique et n'est pas affiché s'il est invalide.
+- Aucun changement du contrat API, du modèle Citation ou du mécanisme de récupération de chunk.
+
+**Validation restante :** vérifier le rendu des citations longues, les interactions clavier, les références sans score valide et l'ouverture du chunk dans la visionneuse ; typecheck, lint et tests UI restent à exécuter localement.
+
+
+### Seizième passe — intégrité du grounding RAG
+
+| Risque constaté | Correction |
+|---|---|
+| Un tableau `sourceIds` non vide mais composé d'identifiants invalides était normalisé en `undefined`, ce qui supprimait le filtre et pouvait élargir la recherche à toutes les sources. | Le parseur conserve un filtre restrictif vide ; `GroundedChat` refuse explicitement la requête et demande de vérifier la sélection. Le tableau vide intentionnel du composer conserve sa convention « toutes les sources ». |
+| Une recherche d'embeddings ne transmettait pas `notebookId` au store vectoriel. | `RAGEngine.searchHybrid` transmet désormais le notebook propriétaire et vérifie aussi que le `sourceId` du vecteur correspond au propriétaire du chunk local avant de fusionner le score. |
+| Des sources de notebooks différents ou des identifiants de chunks dupliqués entre sources pouvaient rendre la fusion ambiguë. | Le pipeline refuse les corpus multi-notebooks et les collisions de chunk IDs au lieu d'associer un score à un mauvais passage. |
+| En l'absence de résultat RAG, le LLM recevait un contexte vide et pouvait tout de même générer une réponse non étayée. | `GroundedChat` répond explicitement qu'aucun passage suffisamment pertinent n'a été trouvé, sans appel de génération ni citation. |
+| Le prompt système ne qualifiait pas explicitement le contenu des documents comme donnée non fiable. | Ajout d'une consigne anti-injection : les instructions contenues dans les sources ne peuvent pas modifier le rôle ou les règles de l'assistant ; les contradictions et incertitudes doivent être exposées. |
+| Une référence `[SOURCE N]` invalide pouvait déclencher le fallback de citations implicites et donner l'apparence d'une citation correcte. | Le fallback top-3 n'est plus appliqué lorsqu'une référence explicite invalide a été tentée. |
+
+**Tests ajoutés dans `RAGEngine.test.ts` :** filtre `sourceIds` vide et référence explicite hors limites avec scores élevés. Les tests existants couvrent déjà la numérotation, le dédoublonnage, le fallback sans référence explicite et le filtre TF-IDF par source.
+
+**Validation restante :** exécuter le test ciblé `node --import tsx --import ./scripts/test-isolation.mjs --test server/notebooks/RAGEngine.test.ts`, `npm run typecheck` et `npm run lint:eslint:notebooks`. La recherche hybride complète dépend d'embeddings et de services LLM ; elle nécessite un test d'intégration avec store isolé et doubles réseau pour valider la portée notebook/source sans appeler les fournisseurs réels.
+
+
+### Dix-septième passe — audit de traçabilité des réponses
+
+- Ajout d'un `CitationAudit` persisté avec chaque réponse grounded générée sans erreur.
+- Mesures exposées : nombre de passages récupérés, passages cités, documents cités, références explicites, références valides et invalides, couverture des passages récupérés.
+- États structurels distinguant références valides, partielles, invalides, citations implicites et absence de citation.
+- Le panneau de message affiche une ligne de traçabilité compacte, avec avertissement visible si des marqueurs de citation sont invalides.
+- Trois tests déterministes couvrent la couverture partielle avec référence invalide, le fallback implicite et l'absence de citation exploitable.
+
+**Limite importante :** ce contrôle vérifie la cohérence structurelle des marqueurs et la couverture des passages récupérés. Il ne prétend pas vérifier qu'une phrase est sémantiquement prouvée par son extrait. La vérification claim → evidence nécessitera une étape distincte, avec évaluation explicite des affirmations et possibilité de verdict « indéterminé ».
+
+**Validation restante :** exécuter le test ciblé RAG, le typecheck, le lint et les tests UI dans l'environnement local. La CI GitHub doit également être réparée : les exécutions observées jusqu'ici échouent au démarrage sans créer de job.
+
+
+### Dix-huitième passe — statut d'indexation réellement reflété dans la liste Sources
+
+**Cause racine confirmée :** `GET /api/notebooks/:id` reconstruisait chaque source avec une liste blanche de champs, mais omettait `indexingStatus`, `indexingAttempts`, `indexingError`, `indexingUpdatedAt` et les métadonnées de retry. Le serveur persistait pourtant correctement le statut final `indexed`. L'interface recevait donc une source amputée de son statut et `SourceListCompact` appliquait son fallback `unknown` → « Non vérifiée ».
+
+Corrections :
+- La route CRUD expose maintenant le statut d'indexation persistant et ses métadonnées, y compris pour les sources historiques (`unknown` explicite si absent).
+- Les types frontend `SourceItem` sont alignés avec le contrat serveur, y compris l'historique borné.
+- `NotebookDetail` synchronise les statuts depuis `/embeddings/indexing-status` toutes les 5 secondes, sans recharger/démonter toute la vue Notebook. Cela fait passer le badge de `pending` à `indexed` lorsque l'embedding se termine après le premier chargement.
+- Les erreurs de rafraîchissement du statut ne bloquent pas l'édition ; le moniteur détaillé reste la source de diagnostic.
+
+**Validation restante :** typecheck, lint ESLint notebooks, tests UI et vérification Electron. Reproduire avec un import dont l'ingestion se termine avant l'indexation vectorielle : vérifier `pending` puis `indexed` dans la liste compacte et dans le moniteur.

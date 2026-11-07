@@ -193,6 +193,18 @@ export function SourceListCompact(props: Props) {
                 const isSingleSelected = selectedSourceId === source.id;
                 const hasSelection = selectedSources.length > 0;
                 const typeColor = TYPE_COLORS[source.type] || 'var(--text-muted)';
+                const indexingStatus = source.indexingStatus ?? 'unknown';
+                const updatedAt = source.indexingUpdatedAt && Number.isFinite(Date.parse(source.indexingUpdatedAt))
+                  ? new Date(source.indexingUpdatedAt).toLocaleString('fr-FR') : '';
+                const nextRetryAt = source.indexingNextRetryAt && Number.isFinite(Date.parse(source.indexingNextRetryAt))
+                  ? new Date(source.indexingNextRetryAt).toLocaleString('fr-FR') : '';
+                const indexingDetails = [
+                  `Indexation : ${indexingStatus}`,
+                  source.indexingAttempts ? `${source.indexingAttempts} tentative(s)` : '',
+                  updatedAt ? `Dernière mise à jour : ${updatedAt}` : '',
+                  nextRetryAt ? `Nouvel essai prévu : ${nextRetryAt}` : '',
+                  source.indexingError || '',
+                ].filter(Boolean).join(' · ');
 
                 return (
                   <motion.div
@@ -239,9 +251,28 @@ export function SourceListCompact(props: Props) {
                       <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                         {source.title}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-[var(--text-dimmed)]">
-                        {source.type} · {source.wordCount?.toLocaleString()} mots
-                      </p>
+                      <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-[var(--text-dimmed)]">
+                        <span className="truncate">{source.type} · {source.wordCount?.toLocaleString()} mots</span>
+                        <span
+                            className={`inline-flex flex-shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                              indexingStatus === 'indexed'
+                                ? 'text-[var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]'
+                                : indexingStatus === 'failed'
+                                  ? 'text-[var(--color-error)] bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)]'
+                                  : indexingStatus === 'partial'
+                                    ? 'text-[var(--color-warning)] bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)]'
+                                    : 'text-[var(--text-muted)] bg-[var(--notebook-surface-muted)]'
+                            }`}
+                            title={indexingDetails}
+                            aria-label={`État de l'indexation : ${indexingStatus}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+                            {indexingStatus === 'indexed' ? 'Indexé' :
+                              indexingStatus === 'pending' ? 'En attente' :
+                              indexingStatus === 'partial' ? 'Partiel' :
+                              indexingStatus === 'failed' ? 'Échec' : 'Non vérifiée'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Delete button on hover */}

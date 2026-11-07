@@ -153,12 +153,33 @@ export interface Citation {
   ref?: number;
 }
 
+export interface CitationAudit {
+  /** Nombre de passages distincts transmis au modèle. */
+  retrievedChunks: number;
+  /** Nombre de passages distincts effectivement cités. */
+  citedChunks: number;
+  /** Nombre de documents distincts représentés dans les citations. */
+  citedSources: number;
+  /** Nombre de marqueurs de citation explicites détectés dans la réponse. */
+  explicitReferences: number;
+  /** Références explicites pointant vers un passage existant. */
+  validReferences: number;
+  /** Références explicites hors limites ou mal formées. */
+  invalidReferences: number;
+  /** Part des passages récupérés qui sont cités (ne mesure pas la justesse sémantique). */
+  retrievalCoveragePercent: number;
+  /** Intégrité structurelle des références, pas une validation du sens des affirmations. */
+  status: 'valid' | 'partial' | 'invalid' | 'implicit' | 'missing';
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   /** Citations (uniquement pour les messages assistant) */
   citations: Citation[];
+  /** Audit structurel de traçabilité entre la réponse et les passages RAG. */
+  citationAudit?: CitationAudit;
   timestamp: string;
   /** Retour utilisateur sur un message assistant (pouce haut/bas) */
   feedback?: 'up' | 'down' | null;

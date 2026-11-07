@@ -18,7 +18,7 @@ import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { embeddingStore } from "./EmbeddingStore.js";
 import { notebookPromptStore } from "./PromptStore.js";
-import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
+import type { Citation, CitationAudit, Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
 
 const log = createLogger("RAGEngine");
 
@@ -120,10 +120,23 @@ export class RAGEngine {
 
     if (filteredSources.length === 0) return [];
 
-    // Collecter tous les chunks
+    // Collecter tous les chunks et vérifier qu'une recherche ne mélange pas
+    // plusieurs notebooks (les identifiants de chunks ne sont pas une frontière
+    // de sécurité suffisante pour le store vectoriel).
+    const notebookId = filteredSources[0].notebookId;
+    if (filteredSources.some(source => source.notebookId !== notebookId)) {
+      log.warn("Recherche RAG refusée : les sources appartiennent à plusieurs notebooks.");
+      return [];
+    }
+
     const chunkMap = new Map<string, { chunk: SourceChunk; source: Source }>();
     for (const source of filteredSources) {
       for (const chunk of source.chunks) {
+        const existing = chunkMap.get(chunk.id);
+        if (existing && existing.source.id !== source.id) {
+          log.warn(`Recherche RAG : identifiant de chunk partagé entre sources (${chunk.id.slice(0, 12)}).`);
+          return [];
+        }
         chunkMap.set(chunk.id, { chunk, source });
       }
     }
@@ -141,6 +154,7 @@ export class RAGEngine {
       // Paralléliser les recherches d'embeddings pour toutes les sous-requêtes
       const embeddingSearches = queries.map(q => 
         embeddingStore.search(q, {
+          notebookId,
           sourceIds: options.sourceIds,
           maxResults: RERANK_TOP_K * 2,
           minSimilarity: 0.2,
@@ -152,7 +166,8 @@ export class RAGEngine {
       // Fusionner les résultats de toutes les sous-requêtes
       for (const embeddingResults of allEmbeddingResults) {
         for (const result of embeddingResults) {
-          if (chunkMap.has(result.chunkId)) {
+          const localChunk = chunkMap.get(result.chunkId);
+          if (localChunk && localChunk.source.id === result.sourceId) {
             // Garder le meilleur score parmi toutes les sous-queries
             const existing = semanticResults.get(result.chunkId) || 0;
             semanticResults.set(result.chunkId, Math.max(existing, result.similarity));
@@ -478,6 +493,62 @@ export class RAGEngine {
   }
 
   /**
+   * Mesure la traçabilité structurelle entre les marqueurs de la réponse,
+   * les citations extraites et les passages remis au modèle.
+   *
+   * Ce score mesure la couverture des passages récupérés, pas la véracité
+   * sémantique des affirmations ni la qualité de la preuve.
+   */
+  auditCitations(
+    response: string,
+    ragResults: RAGSearchResult[],
+    citations: Citation[],
+  ): CitationAudit {
+    const referenceMatches = Array.from(
+      response.matchAll(/\\[(?:SOURCE\\s*)?(\\d+)\\]/gi),
+    );
+    const validReferences = referenceMatches.filter((match) => {
+      const index = Number.parseInt(match[1], 10) - 1;
+      return Number.isInteger(index) && index >= 0 && index < ragResults.length;
+    }).length;
+    const invalidReferences = referenceMatches.length - validReferences;
+    const retrievedChunkIds = new Set(ragResults.map(result => result.chunk.id));
+    const citedChunkIds = new Set(
+      citations.map(citation => citation.chunkId).filter(id => retrievedChunkIds.has(id)),
+    );
+    const citedSources = new Set(
+      citations
+        .filter(citation => citedChunkIds.has(citation.chunkId))
+        .map(citation => citation.sourceId),
+    );
+    const retrievalCoveragePercent = retrievedChunkIds.size === 0
+      ? 0
+      : Math.round((citedChunkIds.size / retrievedChunkIds.size) * 100);
+
+    let status: CitationAudit["status"];
+    if (referenceMatches.length === 0) {
+      status = citations.length > 0 ? "implicit" : "missing";
+    } else if (invalidReferences === 0 && validReferences > 0) {
+      status = "valid";
+    } else if (validReferences > 0) {
+      status = "partial";
+    } else {
+      status = "invalid";
+    }
+
+    return {
+      retrievedChunks: retrievedChunkIds.size,
+      citedChunks: citedChunkIds.size,
+      citedSources: citedSources.size,
+      explicitReferences: referenceMatches.length,
+      validReferences,
+      invalidReferences,
+      retrievalCoveragePercent,
+      status,
+    };
+  }
+
+  /**
    * Extrait les citations depuis la réponse du LLM.
    * Cherche les références [SOURCE N] dans la réponse.
    */
@@ -488,11 +559,15 @@ export class RAGEngine {
     const citations: { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number; ref?: number }[] = [];
     const cited = new Set<string>();
 
-    // Chercher les références explicites [SOURCE N] ou [N]
+    // Chercher les références explicites [SOURCE N] ou [N]. Si le modèle a
+    // tenté de citer un index invalide, ne pas inventer ensuite des citations
+    // de remplacement via le fallback implicite.
     const refPattern = /\[(?:SOURCE\s*)?(\d+)\]/gi;
     let match: RegExpExecArray | null;
+    let sawExplicitReference = false;
 
     while ((match = refPattern.exec(response)) !== null) {
+      sawExplicitReference = true;
       const index = parseInt(match[1]) - 1;
       if (index >= 0 && index < ragResults.length) {
         const result = ragResults[index];
@@ -511,7 +586,7 @@ export class RAGEngine {
     }
 
     // Si aucune citation explicite trouvée, citer les top résultats utilisés
-    if (citations.length === 0 && ragResults.length > 0) {
+    if (!sawExplicitReference && citations.length === 0 && ragResults.length > 0) {
       for (const result of ragResults.slice(0, 3)) {
         if (result.relevance >= 0.3) {
           citations.push({
