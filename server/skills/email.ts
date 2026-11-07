@@ -33,7 +33,7 @@ export const emailSkill: Skill = {
     },
     {
       name: "email_search_messages",
-      description: "Recherche dans Gmail avec la syntaxe native Gmail (from:, to:, subject:, after:, before:, has:attachment, is:unread, etc.).",
+      description: "Recherche dans la boîte via IMAP avec les critères pris en charge : from:, to:, subject:, after:, before:, is:unread et is:read.",
       parameters: z.object({ account: accountSchema, query: z.string().min(1), maxResults: z.number().int().min(1).max(50).optional().default(20) }),
     },
     {
