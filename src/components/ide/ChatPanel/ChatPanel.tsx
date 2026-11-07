@@ -206,6 +206,9 @@ export function ChatPanel({
     if (!connected) return;
     try {
       sendRawMessage({ type: 'document_context', fileName: result.fileName, summary: result.summary });
+      // L'événement est consommé par useTranscript : la pièce analysée reste
+      // consultable dans l'historique et survit à la fermeture de la carte d'upload.
+      window.dispatchEvent(new CustomEvent('Leanna-document-analyzed', { detail: result }));
     } catch (err) {
       console.error('[ChatPanel] sendRawMessage failed:', err);
     }

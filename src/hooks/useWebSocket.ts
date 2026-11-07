@@ -59,7 +59,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
     onLog(intentional ? 'Disconnected' : 'Connection lost', 'system');
   }, [onLog]);
 
-  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void) => {
+  const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', onInitAudio: () => Promise<void>, onCleanupAudio: () => void, initialConversationId: string | null = null) => {
     if (statusRef.current !== 'idle') return;
     intentionalDisconnectRef.current = false;
     reconnectSkillsRef.current = activeSkills;
@@ -68,7 +68,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
     onInitAudioRef.current = onInitAudio;
     onCleanupAudioRef.current = onCleanupAudio;
     setStatus('connecting');
-    onLog('Initializing...', 'system');
+    onLog(initialConversationId ? 'Reprise de la conversation…' : 'Initializing...', 'system');
 
     // Helper for scheduling reconnect
     const scheduleReconnect = (conversationId?: string | null) => {
@@ -239,7 +239,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
 
           const isClean = evt.wasClean && evt.code === 1000;
           onLog(isClean ? 'Connexion fermée proprement' : `Connexion perdue (code WS: ${evt.code}${evt.reason ? `, raison: ${evt.reason}` : ''})`, isClean ? 'system' : 'error');
-          if (!isClean) scheduleReconnect(null);
+          if (!isClean) scheduleReconnect(initialConversationId);
         };
 
         ws.onerror = (event) => {
@@ -266,6 +266,10 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       const params = new URLSearchParams();
       if (activeSkills.length > 0) params.set('skills', activeSkills.join(','));
       if (mode) params.set('mode', mode);
+      if (initialConversationId) {
+        params.set('conversation_id', initialConversationId);
+        params.set('context_resume', '1');
+      }
       // Le token est maintenant passé uniquement via cookie, plus par URL
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/live${query}`);
@@ -275,7 +279,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       ws.onopen = () => {
         reconnectCountRef.current = 0;
         setStatus('connected');
-        onLog('Connected to Core', 'info');
+        onLog(initialConversationId ? 'Conversation précédente reprise' : 'Connected to Core', 'info');
         // Jouer un son lors du démarrage initial de la session live Gemini.
         playSessionStartSound();
         // Notifier les composants d'une connexion établie pour qu'ils chargent l'état

@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Sparkles, Copy, CheckCheck, ClipboardX, RefreshCw, Pin, PinOff, Pencil, ImageOff } from 'lucide-react';
+import { User, Sparkles, Copy, CheckCheck, ClipboardX, RefreshCw, Pin, PinOff, Pencil, ImageOff, FileText, Image } from 'lucide-react';
 import type { TranscriptEntry, ContextSource } from '../../../hooks/useLiveAPI.js';
 import type { UserProfile } from '../../../context/UserProfileContext.js';
 import { BUBBLE_STYLES, TRANSITIONS } from './theme.js';
@@ -210,7 +210,46 @@ export const ChatMessage = memo(function ChatMessage({
               <Pin size={10} />
             </span>
           )}
-          {entry.pending === 'image' ? (
+          {entry.attachment ? (
+            <div
+              className="flex flex-col gap-2 min-w-0"
+              style={{ minWidth: '220px', maxWidth: 'min(100%, 420px)' }}
+              aria-label={`Document analysé : ${entry.attachment.fileName}`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)', color: 'var(--accent-primary)' }}
+                >
+                  {entry.attachment.mimeType.startsWith('image/') ? <Image size={17} /> : <FileText size={17} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold truncate" title={entry.attachment.fileName}>
+                    {entry.attachment.fileName}
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+                    Document analysé · {entry.attachment.extractedTextLength > 0
+                      ? `${(entry.attachment.extractedTextLength / 1000).toFixed(1)}k caractères extraits`
+                      : 'analyse visuelle'}
+                  </p>
+                </div>
+                <span
+                  className="text-[10px] rounded-full px-2 py-1 flex-shrink-0"
+                  style={{ color: 'var(--color-success)', backgroundColor: 'color-mix(in srgb, var(--color-success) 10%, transparent)' }}
+                >
+                  {entry.attachment.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'}
+                </span>
+              </div>
+              {entry.attachment.summary && (
+                <div
+                  className="rounded-md px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--bg-input) 65%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)' }}
+                >
+                  {entry.attachment.summary}
+                </div>
+              )}
+            </div>
+          ) : entry.pending === 'image' ? (
             <GeneratingImage reduceMotion={reduceMotion} />
           ) : entry.pending === 'image-error' ? (
             <FailedImage message={entry.imageError} />
