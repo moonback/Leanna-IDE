@@ -238,9 +238,10 @@ function createWindow(splash, splashMinEnd) {
     }, remaining);
   });
 
-  // Logger les messages de la console renderer dans le fichier de log
-  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    log(`[Renderer L${level}] ${message} (${sourceId}:${line})`);
+  // Seuls les warnings/erreurs du renderer vont au terminal et au fichier ; le reste reste dans les DevTools (F12).
+  win.webContents.on('console-message', (event) => {
+    if (event.level !== 'warning' && event.level !== 'error') return;
+    log(`[Renderer ${event.level}] ${event.message} (${event.sourceId}:${event.lineNumber})`);
   });
 
   // Raccourci F12 ou Ctrl+Shift+I pour ouvrir/fermer les DevTools

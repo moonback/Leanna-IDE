@@ -114,7 +114,7 @@ export class AutonomousAgent {
     );
 
     this.isOnline = true;
-    log.info(`🤖 Agent "${this.agentName}" en ligne`);
+    log.debug(`🤖 Agent "${this.agentName}" en ligne`);
 
     // Annoncer la disponibilité
     this.bus

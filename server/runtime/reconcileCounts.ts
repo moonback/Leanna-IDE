@@ -121,27 +121,14 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     inventory,
   };
 
-  // ── Log lisible : les 4 populations, explicitement nommées ──────────────────
+  // ── Résumé compact (une ligne) ; le détail reste dans le rapport retourné ───
   console.log(
-    "[Reconcile] Populations distinctes au démarrage :\n" +
-    `  • Agents de délégation (roles.ts)      : ${report.delegationAgents}\n` +
-    `  • Agents runtime (AgentRuntime plugins) : ${report.runtimeAgents}\n` +
-    `  • Outils exécutables (ToolRegistry)     : ${report.executableTools} (${formatSourceBreakdown(inventory.summary)})\n` +
-    `  • Capabilities mappées UI (roles.ts)    : ${report.mappedCapabilities}`
-  );
-
-  // ── Ventilation canonique par provenance ────────────────────────────────────
-  // C'est CE log qui dissipe l'écart « 225 → 229 » : le premier chiffre était un
-  // snapshot des outils builtin pris avant l'enregistrement MCP/custom ; le
-  // total final est builtin + mcp + custom, désormais explicite.
-  console.log(
-    "[Reconcile] Inventaire canonique des outils (par provenance) :\n" +
-    `  • builtin : ${inventory.summary.bySource.builtin}\n` +
-    `  • mcp     : ${inventory.summary.bySource.mcp}\n` +
-    `  • custom  : ${inventory.summary.bySource.custom}\n` +
-    `  • unknown : ${inventory.summary.bySource.unknown}\n` +
-    `  → total exécutable : ${inventory.summary.total} ` +
-    `(dont ${inventory.summary.sideEffecting} à effet de bord)`
+    `[Reconcile] Agents : ${report.delegationAgents} délégation / ${report.runtimeAgents} runtime · ` +
+    `Outils : ${report.executableTools} (${formatSourceBreakdown(inventory.summary)}, ` +
+    `${inventory.summary.sideEffecting} à effet de bord) · ` +
+    `Attribution : ${report.explicitlyAttributedTools} explicite, ${report.capabilityAttributedTools} capability, ` +
+    `${report.categoryAttributedTools} catégorie, ${report.unmappedExecutableTools} système · ` +
+    `${report.mappedCapabilities} capabilities UI`
   );
   if (inventory.summary.bySource.unknown > 0) {
     console.warn(
@@ -149,15 +136,6 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
       `(enregistrés sans source explicite). À tagguer à la source d'enregistrement.`
     );
   }
-
-  // ── Attribution réelle des outils (cascade explicit → capability → category) ─
-  console.log(
-    "[Reconcile] Attribution des outils exécutables :\n" +
-    `  • Explicite (ToolRegistry / socle sensible) : ${report.explicitlyAttributedTools}\n` +
-    `  • Capability de rôle (roles.ts)             : ${report.capabilityAttributedTools}\n` +
-    `  • Catégorie sémantique (heuristique)        : ${report.categoryAttributedTools}\n` +
-    `  • Non attribué → rôle « system »            : ${report.unmappedExecutableTools}`
-  );
 
   if (report.orphanCapabilities.length > 0) {
     console.warn(
@@ -170,14 +148,6 @@ export function reconcileAndLogCounts(runtime: AgentRuntime): ReconciliationRepo
     console.warn(
       `[Reconcile] ⚠️ ${report.delegationOnlyRoles.length} rôle(s) de délégation SANS plugin runtime ` +
       `(exécutables via orchestrateur, pas via AgentRuntime.submit) : ${report.delegationOnlyRoles.join(", ")}`
-    );
-  }
-
-  if (report.categoryAttributedTools > 0) {
-    console.log(
-      `[Reconcile] ℹ️ ${report.categoryAttributedTools} outil(s) attribué(s) par catégorie sémantique ` +
-      `→ ENSEMBLE d'agents (affiché « Plusieurs agents », jamais un propriétaire unique). ` +
-      `Précisable via une attribution explicite (ToolRegistry) au besoin.`
     );
   }
 

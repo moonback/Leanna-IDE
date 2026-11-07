@@ -170,7 +170,6 @@ export function attachLiveWebSocket(
   // ── Sandbox Watcher WebSocket ────────────────────────────────────────────
   sandboxWss.on('connection', async (clientWs) => {
     const { addWatchClient, startWatching } = await import('../utils/sandboxWatcher.js');
-    console.log('[SandboxWatch] Client connecté');
     addWatchClient(clientWs);
     if (isSandboxActive()) {
       startWatching();

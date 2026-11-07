@@ -6,11 +6,11 @@ const dotenv = require('dotenv');
 // Load .env.local first, then .env
 const envLocalPath = path.join(__dirname, '../.env.local');
 if (fs.existsSync(envLocalPath)) {
-  dotenv.config({ path: envLocalPath });
+  dotenv.config({ path: envLocalPath, quiet: true });
 }
 const envPath = path.join(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+  dotenv.config({ path: envPath, quiet: true });
 }
 
 const port = process.env.VITE_SERVER_PORT || 4000;

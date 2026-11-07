@@ -47,7 +47,6 @@ export function addWatchClient(ws: WebSocket): void {
   
   const handleDisconnect = () => {
     connectedClients.delete(ws);
-    console.log(`[SandboxWatcher] Client déconnecté (${connectedClients.size} restant(s))`);
     
     // Si plus aucun client, arrêter la surveillance pour économiser les ressources
     if (connectedClients.size === 0 && watcher) {
@@ -69,8 +68,7 @@ export function addWatchClient(ws: WebSocket): void {
     active: isSandboxActive(),
     watching: watcher !== null,
   }));
-  
-  console.log(`[SandboxWatcher] ✅ Client ajouté (${connectedClients.size} total)`);
+
 }
 
 /**

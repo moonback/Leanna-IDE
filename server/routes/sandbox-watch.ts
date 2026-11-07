@@ -15,7 +15,6 @@ export function initSandboxWatchWSS(): WebSocketServer {
   sandboxWss = new WebSocketServer({ noServer: true });
   
   sandboxWss.on('connection', (clientWs, _req) => {
-    console.log('[SandboxWatch] Client connecté');
     addWatchClient(clientWs);
     
     // Démarrer la surveillance si le sandbox est actif

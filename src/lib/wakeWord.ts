@@ -24,7 +24,7 @@ let modelPromise: Promise<Model> | null = null;
 export function preloadWakeModel(): Promise<Model> {
   if (!modelPromise) {
     modelPromise = import('vosk-browser')
-      .then(({ createModel }) => createModel(new URL(WAKE_MODEL_URL, window.location.origin).href));
+      .then(({ createModel }) => createModel(new URL(WAKE_MODEL_URL, window.location.origin).href, -1)); // -1 : warnings Kaldi seulement, pas les LOG de chargement
     modelPromise.catch(() => { modelPromise = null; }); // réessai possible au prochain endormissement
   }
   return modelPromise;
