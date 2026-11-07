@@ -281,6 +281,20 @@ export function useLiveAPI() {
       });
       return;
     }
+    if (msg.type === 'context_resumed') {
+      addLog('Conversation précédente analysée et contexte complet réinjecté.', 'info');
+      window.dispatchEvent(new CustomEvent('Leanna-conversation-resume-ready', {
+        detail: { conversationId: msg.conversation_id, summaryTokens: msg.summaryTokens },
+      }));
+      return;
+    }
+    if (msg.type === 'conversation_resume_error') {
+      addLog(`Échec de la restauration du contexte : ${msg.error || 'erreur inconnue'}`, 'error');
+      window.dispatchEvent(new CustomEvent('Leanna-conversation-resume-error', {
+        detail: { conversationId: msg.conversation_id, error: msg.error },
+      }));
+      return;
+    }
     if (msg.type === 'system_prompt_override_ack') {
       if (msg.reset || !msg.applied) {
         setSystemOverride(null);
@@ -628,6 +642,7 @@ export function useLiveAPI() {
     updatePromptContext,
     clearTokenUsage,
     recordLatency,
+    addLog,
   ]);
 
   const handleAudioChunk = useCallback((pcm16: ArrayBuffer) => {
