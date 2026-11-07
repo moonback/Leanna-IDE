@@ -1468,13 +1468,14 @@ export class TelegramService {
     const actionId = "file-" + randomUUID();
     return new Promise<boolean>((resolve) => {
       let settled = false;
+      let timer: ReturnType<typeof setTimeout>;
       const finish = (approved: boolean) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         resolve(approved);
       };
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         finish(false);
         void this.closeApprovalRequest(actionId, "timeout");
       }, 30_000);
