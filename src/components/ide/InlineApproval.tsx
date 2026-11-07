@@ -112,7 +112,7 @@ export function InlineApproval({ sendMessage }: InlineApprovalProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Édition d'un fichier protégé
+                {pending.operation === 'send-email' ? 'Confirmation d’envoi d’e-mail' : 'Édition d’un fichier protégé'}
               </p>
               <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                 {OPERATION_LABELS[pending.operation] || pending.operation} · <span className="font-mono">{pending.filePath}</span>
@@ -161,14 +161,14 @@ export function InlineApproval({ sendMessage }: InlineApprovalProps) {
             >
               <X size={13} /> Refuser
             </button>
-            <button
+            {pending.operation !== 'send-email' && <button
               type="button"
               onClick={viewFile}
               className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--bg-hover)]"
               style={{ color: 'var(--accent-primary)' }}
             >
               <FileText size={13} /> Voir le fichier
-            </button>
+            </button>}
           </div>
         </motion.div>
       )}
