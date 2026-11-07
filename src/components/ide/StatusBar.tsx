@@ -14,6 +14,7 @@ import {
   ScrollText,
   DatabaseZap,
   Send,
+  Mail,
   Play,
   Square,
   Target,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
+import { useNavigate } from 'react-router-dom';
 import { QuitConfirmDialog } from '../sidebar/QuitConfirmDialog.js';
 
 /** API Electron exposant quit() — présente uniquement dans la fenêtre desktop. */
@@ -350,6 +352,7 @@ export const StatusBar = memo(function StatusBar({
 }: StatusBarProps) {
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
+  const navigate = useNavigate();
 
 
   // Quitter l'application (fenêtre Electron uniquement).
@@ -391,6 +394,10 @@ export const StatusBar = memo(function StatusBar({
   // ── Telegram ───────────────────────────────────────────────────────────────
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [telegramActionLoading, setTelegramActionLoading] = useState(false);
+
+  // ── E-mail ─────────────────────────────────────────────────────────────────
+  const [emailStatus, setEmailStatus] = useState<'loading' | 'connected' | 'disconnected' | 'error'>('loading');
+  const [emailAccounts, setEmailAccounts] = useState<{ leanna: string | null; personal: string | null }>({ leanna: null, personal: null });
 
   // ── Agent activity ─────────────────────────────────────────────────────────
 
@@ -557,6 +564,39 @@ export const StatusBar = memo(function StatusBar({
       cancelled = true;
       clearInterval(interval);
       window.removeEventListener('Leanna-telegram-status-changed', handleTelegramChanged);
+    };
+  }, []);
+
+  // ── E-mail : état des comptes IMAP/SMTP configurés ────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const fetchEmailStatus = async () => {
+      try {
+        const response = await fetch('/api/email/settings');
+        if (!response.ok) throw new Error('Email status unavailable');
+        const result = await response.json();
+        if (cancelled || result.status !== 'success') return;
+        const accounts = result.data?.accounts;
+        const leannaConnected = accounts?.leanna?.connected === true;
+        const personalConnected = accounts?.personal?.connected === true;
+        setEmailAccounts({
+          leanna: leannaConnected ? accounts.leanna.email : null,
+          personal: personalConnected ? accounts.personal.email : null,
+        });
+        setEmailStatus(leannaConnected || personalConnected ? 'connected' : 'disconnected');
+      } catch {
+        if (!cancelled) setEmailStatus('error');
+      }
+    };
+
+    void fetchEmailStatus();
+    const interval = setInterval(fetchEmailStatus, 10000);
+    const handleEmailChanged = () => { void fetchEmailStatus(); };
+    window.addEventListener('Leanna-email-status-changed', handleEmailChanged);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('Leanna-email-status-changed', handleEmailChanged);
     };
   }, []);
 
@@ -1003,7 +1043,33 @@ export const StatusBar = memo(function StatusBar({
               </button>
             )}
           </div>
-          
+
+          {/* E-mail — indépendant de Telegram, vert dès qu'au moins un compte est connecté. */}
+          <button
+            type="button"
+            onClick={() => navigate('/settings?section=email-settings')}
+            className={PILL}
+            style={{ color: emailStatus === 'connected' ? 'var(--color-success)' : emailStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)' }}
+            title={
+              emailStatus === 'connected'
+                ? `E-mail connecté — ${[emailAccounts.leanna, emailAccounts.personal].filter(Boolean).join(' · ')}`
+                : emailStatus === 'disconnected'
+                ? 'E-mail — aucun compte connecté. Cliquer pour configurer.'
+                : emailStatus === 'error'
+                ? 'E-mail — statut indisponible. Cliquer pour ouvrir les paramètres.'
+                : 'E-mail — vérification de la connexion…'
+            }
+            aria-label="Ouvrir les paramètres e-mail"
+          >
+            <Mail size={13} />
+            <StatusDot
+              color={emailStatus === 'connected' ? 'var(--color-success)' : emailStatus === 'error' ? 'var(--color-error)' : 'var(--text-muted)'}
+              pulse={emailStatus === 'loading'}
+              glow={emailStatus === 'connected' || emailStatus === 'error'}
+            />
+            <span>E-mail</span>
+          </button>
+
           <Divider />
           {/* Menu "Outils" — regroupe les actions occasionnelles (Telegram,
               Agents, Flotte, Missions, Logs, GitHub, Réindexer) dans une
