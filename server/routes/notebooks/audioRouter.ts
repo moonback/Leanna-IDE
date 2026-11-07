@@ -154,6 +154,8 @@ export function createAudioRouter(): Router {
         hostVoice: typeof req.body?.hostVoice === "string" ? req.body.hostVoice : "ff_siwis",
         coHostVoice: typeof req.body?.coHostVoice === "string" ? req.body.coHostVoice : "am_adam",
       });
+      overview.estimatedDuration = Math.round(result.durationSeconds);
+      notebookManager.persistNotebook(req.params.id);
       res.json({
         status: "ready",
         audioUrl: `/api/notebooks/${encodeURIComponent(req.params.id)}/audio-overviews/${encodeURIComponent(overview.id)}/audio-track`,
