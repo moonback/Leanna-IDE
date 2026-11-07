@@ -2,7 +2,7 @@
 
 ## Périmètre
 
-Le compte dédié **Leanna** utilise une configuration IMAP/SMTP générique, définie dans Paramètres > E-mail. Il est compatible avec les fournisseurs qui exposent IMAP sur SSL/TLS et SMTP sur SSL/TLS ou STARTTLS. Aucun OAuth2, SDK propriétaire ni navigateur d'authentification n'est utilisé.
+Le compte dédié **Leanna** utilise une configuration générique avec réception IMAP et envoi SMTP activables indépendamment dans Paramètres > E-mail. Il peut être configuré en réception seule, envoi seul ou réception + envoi. Aucun OAuth2, SDK propriétaire ni navigateur d'authentification n'est utilisé.
 
 Le compte personnel existant reste indépendant et conserve Gmail et son mot de passe d'application. Cette évolution ne modifie pas sa configuration ni ses permissions d'envoi.
 
@@ -12,12 +12,14 @@ Renseigner les paramètres communiqués par l'hébergeur :
 
 | Champ | Règle |
 |---|---|
-| Hôte IMAP | Nom DNS du serveur entrant |
-| Port IMAP | Port TCP entre 1 et 65535 |
-| Sécurité IMAP | SSL/TLS implicite ou STARTTLS obligatoire |
-| Hôte SMTP | Nom DNS du serveur sortant |
-| Port SMTP | Port TCP entre 1 et 65535 |
-| Sécurité SMTP | SSL/TLS implicite ou STARTTLS obligatoire |
+| Réception activée | Active ou désactive la réception IMAP |
+| Envoi activé | Active ou désactive l'envoi SMTP |
+| Hôte IMAP | Nom DNS du serveur entrant, requis uniquement si la réception est activée |
+| Port IMAP | Port TCP entre 1 et 65535, requis uniquement si la réception est activée |
+| Sécurité IMAP | SSL/TLS implicite ou STARTTLS obligatoire, si la réception est activée |
+| Hôte SMTP | Nom DNS du serveur sortant, requis uniquement si l'envoi est activé |
+| Port SMTP | Port TCP entre 1 et 65535, requis uniquement si l'envoi est activé |
+| Sécurité SMTP | SSL/TLS implicite ou STARTTLS obligatoire, si l'envoi est activé |
 | Identifiant | Adresse e-mail complète |
 | Mot de passe | Mot de passe de la boîte ou mot de passe dédié |
 
@@ -35,12 +37,12 @@ Documentation : https://www.infomaniak.com/fr/support/faq/468
 ## Connexion
 
 1. Ouvrir **Paramètres > E-mail**.
-2. Dans le compte dédié de Leanna, renseigner les hôtes et ports IMAP/SMTP fournis par le fournisseur.
-3. Choisir SSL/TLS ou STARTTLS pour IMAP et SMTP. Leanna exige une négociation TLS dans les deux cas.
-4. Saisir l'adresse complète et le mot de passe.
-5. Cliquer sur **Connecter le compte**.
+2. Dans le compte dédié de Leanna, activer la réception, l'envoi, ou les deux.
+3. Renseigner uniquement les paramètres du protocole activé : IMAP pour recevoir, SMTP pour envoyer.
+4. Choisir SSL/TLS ou STARTTLS pour chaque protocole activé. Leanna refuse toute connexion en clair.
+5. Saisir l'adresse complète et le mot de passe, puis cliquer sur **Connecter le compte**.
 
-Le service vérifie la connexion IMAP et l'accès à INBOX, puis vérifie SMTP. La nouvelle configuration n'est persistée qu'après réussite des deux contrôles ; une configuration existante reste active si la tentative échoue.
+Le service vérifie uniquement les connexions activées. La configuration n'est persistée qu'après réussite de tous les contrôles requis ; une configuration existante reste active si la tentative échoue.
 
 ## Architecture
 
@@ -49,8 +51,9 @@ Le service vérifie la connexion IMAP et l'accès à INBOX, puis vérifie SMTP. 
 - Le compte `personal` conserve Gmail et ses paramètres historiques ; la configuration personnalisée est refusée pour ce compte.
 - Les configurations historiques Infomaniak sont migrées vers les paramètres IMAP/SMTP personnalisés correspondants. Les anciennes configurations Gmail de Leanna sont reprises comme point de départ modifiable.
 - Les mots de passe restent chiffrés avec `server/utils/crypto.ts` dans `.Leanna-email.json`. Les paramètres serveur ne contiennent aucun secret.
-- Les hôtes doivent être des noms DNS valides ; les adresses IP littérales et les noms locaux/réservés sont refusés.
-- IMAP et SMTP imposent SSL/TLS ou STARTTLS. TLS 1.2 minimum et la validation standard des certificats sont conservés.
+- Les hôtes activés doivent être des noms DNS valides ; les adresses IP littérales et les noms locaux/réservés sont refusés.
+- Chaque protocole activé impose SSL/TLS ou STARTTLS. TLS 1.2 minimum et la validation standard des certificats sont conservés.
+- Les opérations de réception sont refusées côté service lorsque IMAP est désactivé ; les opérations d'envoi sont refusées lorsque SMTP est désactivé.
 
 ## Outils agent conservés
 
@@ -69,7 +72,7 @@ Les critères de recherche restent : `from:`, `to:`, `subject:`, `after:`, `befo
 - Chiffrement des secrets au repos et permissions de fichier restrictives.
 - TLS 1.2 minimum et validation des certificats.
 - Refus des hôtes locaux/réservés et des adresses IP littérales.
-- Vérification IMAP et SMTP avant l'enregistrement.
+- Vérification de chaque connexion activée avant l'enregistrement (IMAP, SMTP ou les deux).
 - Pas de route HTTP d'envoi direct.
 - Chaque envoi passe par l'outil agent et une confirmation interactive explicite affichant le compte expéditeur, le destinataire, l'objet et un aperçu du corps.
 - Si le pont de confirmation est absent, l'envoi est refusé.
