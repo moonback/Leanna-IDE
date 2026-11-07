@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { simpleParser } from "mailparser";
@@ -35,7 +37,7 @@ function validateServerSettings(value: unknown): MailServerSettings {
   const host = (input: unknown, label: string) => {
     if (typeof input !== "string" || input.length > 253 || !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(input) || input.includes("..")) throw new Error(`Nom d'hôte ${label} invalide.`);
     const normalized = input.toLowerCase();
-    if (["localhost", "localhost.localdomain"].includes(normalized) || /\.(local|internal|localhost|test|invalid)$/.test(normalized)) throw new Error("Les hôtes locaux ou réservés ne sont pas autorisés pour les connexions e-mail.");
+    if (isIP(normalized) !== 0 || ["localhost", "localhost.localdomain"].includes(normalized) || /\.(local|internal|localhost|test|invalid)$/.test(normalized)) throw new Error("Les adresses IP littérales et les hôtes locaux ou réservés ne sont pas autorisés.");
     return normalized;
   };
   const port = (input: unknown, label: string) => {
@@ -48,6 +50,36 @@ function validateServerSettings(value: unknown): MailServerSettings {
     imapHost: host(v.imapHost, "IMAP"), imapPort: port(v.imapPort, "IMAP"), imapSecure: true,
     smtpHost: host(v.smtpHost, "SMTP"), smtpPort: port(v.smtpPort, "SMTP"), smtpSecurity: v.smtpSecurity,
   };
+}
+
+function isPublicAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    const octets = address.split(".").map(Number);
+    const [a, b, d] = octets;
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && (b === 168 || (b === 0 && d === 0) || (b === 0 && d === 2) || (b === 88 && d === 99))) return false;
+    if (a === 198 && (b === 18 || b === 19 || (b === 51 && d === 100))) return false;
+    if (a === 203 && b === 0 && d === 113) return false;
+    return true;
+  }
+  if (isIP(address) === 6) {
+    const value = address.toLowerCase();
+    if (value.startsWith("::ffff:")) return isPublicAddress(value.slice(7));
+    return /^[23]/.test(value) && !value.startsWith("2001:db8:");
+  }
+  return false;
+}
+
+async function assertPublicMailHost(host: string): Promise<void> {
+  let addresses: Array<{ address: string; family: number }>;
+  try { addresses = await lookup(host, { all: true, verbatim: true }); }
+  catch { throw new Error(`Impossible de résoudre le serveur e-mail ${host}.`); }
+  if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) {
+    throw new Error("Le serveur e-mail doit résoudre uniquement vers des adresses IP publiques.");
+  }
 }
 
 function createImapClient(account: StoredAccount): ImapFlow {
@@ -212,6 +244,8 @@ export class GmailService {
       connectedAt: new Date().toISOString(),
     };
 
+    await Promise.all([assertPublicMailHost(servers.imapHost), assertPublicMailHost(servers.smtpHost)]);
+
     const imap = createImapClient(candidate);
     try {
       await imap.connect();
@@ -253,6 +287,7 @@ export class GmailService {
 
   async listMessages(id: GmailAccountId, query = "", maxResults = 20) {
     const account = this.requireAccount(id);
+    await assertPublicMailHost(account.servers.imapHost);
     const client = createImapClient(account);
     try {
       await client.connect();
@@ -330,6 +365,7 @@ export class GmailService {
       throw new Error("Envoi depuis le compte personnel désactivé. Activez cette autorisation dans Paramètres > E-mail.");
     }
     const account = this.requireAccount(id);
+    await assertPublicMailHost(account.servers.smtpHost);
     const recipient = to.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");
