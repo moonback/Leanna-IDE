@@ -228,7 +228,7 @@ export const ChatMessage = memo(function ChatMessage({
 
         {/* Footer: timestamp + actions */}
         <div
-          className={`lea-chat-actions flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
+          className={`lea-chat-actions flex items-center gap-1.5 mt-1.5 px-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150 ${isAssistant ? '' : 'flex-row-reverse'}`}
         >
           <span className="text-xs font-mono tracking-wide" style={{ color: 'var(--text-dimmed)' }}>
             {entry.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
