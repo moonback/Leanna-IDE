@@ -53,6 +53,9 @@ export function useTtsPlayer({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const playingRef = useRef(false);
   const nextStartTimeRef = useRef(0);
+  const skippedChunksRef = useRef(0);
+  const lastSkipReasonRef = useRef('Audio indisponible');
+  const ttsProgressRef = useRef(0);
 
   const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
@@ -100,6 +103,9 @@ export function useTtsPlayer({
     playingRef.current = true;
     setCurrentLineIndex(0);
     setTtsProgress(0);
+    ttsProgressRef.current = 0;
+    skippedChunksRef.current = 0;
+    lastSkipReasonRef.current = 'Audio indisponible';
     nextStartTimeRef.current = 0;
 
     // Créer et démarrer le contexte audio immédiatement depuis le clic Play.
@@ -137,8 +143,11 @@ export function useTtsPlayer({
               setTtsLoading(false);
             } else if (event === 'chunk') {
               setCurrentLineIndex(parsed.index ?? 0);
-              setTtsProgress(prev => prev + 1);
-              if (parsed.audio) playAudioChunk(parsed.audio);
+              if (parsed.audio) {
+                ttsProgressRef.current += 1;
+                setTtsProgress(prev => prev + 1);
+                playAudioChunk(parsed.audio);
+              }
             } else if (event === 'skip') {
               skippedChunksRef.current += 1;
               lastSkipReasonRef.current = (parsed as TtsStreamData & { reason?: string }).reason || 'Audio indisponible';
