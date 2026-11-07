@@ -193,15 +193,24 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     success('Script téléchargé');
   }, [selectedOverview, success]);
 
-  const handleDownloadAudio = useCallback(() => {
+  const handleDownloadAudio = useCallback(async () => {
     if (!selectedOverview) return;
-    const link = document.createElement('a');
-    link.href = `/api/notebooks/${encodeURIComponent(notebookId)}/audio-overviews/${encodeURIComponent(selectedOverview.id)}/audio-track?download=1`;
-    link.download = `podcast-${selectedOverview.id}.wav`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }, [notebookId, selectedOverview]);
+    try {
+      const data = await api<{ audioUrl: string }>(
+        `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/audio-track`,
+        { method: 'POST', json: { hostVoice: 'Aoede', coHostVoice: 'Charon' } },
+      );
+      const link = document.createElement('a');
+      link.href = `${data.audioUrl}?download=1`;
+      link.download = `podcast-${selectedOverview.id}.wav`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      success('Piste audio WAV prête au téléchargement.');
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Impossible de générer la piste audio.');
+    }
+  }, [notebookId, selectedOverview, success, toastError]);
 
   const handleSelectOverview = useCallback((ov: AudioOverview) => {
     setSelectedOverview(ov);
