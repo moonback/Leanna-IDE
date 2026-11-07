@@ -1011,7 +1011,7 @@ export class TelegramService {
 
         const tracked = this.pendingApprovals.get(actionId);
         if (tracked && !tracked.resolved) {
-          const callbackChatId = ctx.chat?.id != null ? String(ctx.chat.id) : "";
+          const callbackChatId = ctx.callbackQuery.message?.chat?.id != null ? String(ctx.callbackQuery.message.chat.id) : "";
           const callbackUserId = ctx.from?.id != null ? String(ctx.from.id) : "";
           if (callbackChatId !== tracked.chatId ||
               (tracked.request.allowedUserId && callbackUserId !== tracked.request.allowedUserId)) {
