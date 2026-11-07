@@ -69,10 +69,12 @@ describe('NotebookChat — envoi de message (caractérisation)', () => {
     await user.type(textarea, 'Quelle est la thèse principale ?');
     await user.keyboard('{Enter}');
 
-    // Le message utilisateur apparaît immédiatement (optimiste).
+    // Le message utilisateur apparaît immédiatement (optimiste), et l'onglet
+    // de la conversation prend la question comme libellé.
     expect(
-      await screen.findByText('Quelle est la thèse principale ?'),
-    ).toBeInTheDocument();
+      await screen.findAllByText('Quelle est la thèse principale ?'),
+    ).toHaveLength(2);
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Quelle est la thèse principale ?');
 
     // Un POST a bien été émis vers l'endpoint de streaming du chat.
     await waitFor(() => {
