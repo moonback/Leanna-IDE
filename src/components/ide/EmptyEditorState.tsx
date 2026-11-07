@@ -887,7 +887,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
       })
       .finally(() => { if (!cancelled) setLoadingLastConversation(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [ws.workspace?.path]);
 
   const geminiStatus = useGeminiStatus();
   const gitInfo = useGitInfo();
