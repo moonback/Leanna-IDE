@@ -68,7 +68,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
 
   useEffect(() => {
     if (podcastLive.connected) podcastLive.disconnect();
-  }, [selectedOverview?.id, podcastLive.connected, podcastLive.disconnect]);
+  }, [selectedOverview?.id, podcastLive.disconnect]);
 
   // Initialiser la sélection de sources avec toutes les sources (une fois les
   // sources chargées). La garde `length === 0` rend l'effet idempotent : une
