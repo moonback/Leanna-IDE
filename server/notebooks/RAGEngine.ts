@@ -18,7 +18,7 @@ import { createLogger } from "../utils/logger.js";
 import { generateText } from "../utils/textGeneration.js";
 import { embeddingStore } from "./EmbeddingStore.js";
 import { notebookPromptStore } from "./PromptStore.js";
-import type { Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
+import type { Citation, CitationAudit, Source, SourceChunk, RAGSearchOptions, RAGSearchResult } from "./types.js";
 
 const log = createLogger("RAGEngine");
 
@@ -490,6 +490,62 @@ export class RAGEngine {
     }
 
     return sections.join("\n\n---\n\n");
+  }
+
+  /**
+   * Mesure la traçabilité structurelle entre les marqueurs de la réponse,
+   * les citations extraites et les passages remis au modèle.
+   *
+   * Ce score mesure la couverture des passages récupérés, pas la véracité
+   * sémantique des affirmations ni la qualité de la preuve.
+   */
+  auditCitations(
+    response: string,
+    ragResults: RAGSearchResult[],
+    citations: Citation[],
+  ): CitationAudit {
+    const referenceMatches = Array.from(
+      response.matchAll(/\\[(?:SOURCE\\s*)?(\\d+)\\]/gi),
+    );
+    const validReferences = referenceMatches.filter((match) => {
+      const index = Number.parseInt(match[1], 10) - 1;
+      return Number.isInteger(index) && index >= 0 && index < ragResults.length;
+    }).length;
+    const invalidReferences = referenceMatches.length - validReferences;
+    const retrievedChunkIds = new Set(ragResults.map(result => result.chunk.id));
+    const citedChunkIds = new Set(
+      citations.map(citation => citation.chunkId).filter(id => retrievedChunkIds.has(id)),
+    );
+    const citedSources = new Set(
+      citations
+        .filter(citation => citedChunkIds.has(citation.chunkId))
+        .map(citation => citation.sourceId),
+    );
+    const retrievalCoveragePercent = retrievedChunkIds.size === 0
+      ? 0
+      : Math.round((citedChunkIds.size / retrievedChunkIds.size) * 100);
+
+    let status: CitationAudit["status"];
+    if (referenceMatches.length === 0) {
+      status = citations.length > 0 ? "implicit" : "missing";
+    } else if (invalidReferences === 0 && validReferences > 0) {
+      status = "valid";
+    } else if (validReferences > 0) {
+      status = "partial";
+    } else {
+      status = "invalid";
+    }
+
+    return {
+      retrievedChunks: retrievedChunkIds.size,
+      citedChunks: citedChunkIds.size,
+      citedSources: citedSources.size,
+      explicitReferences: referenceMatches.length,
+      validReferences,
+      invalidReferences,
+      retrievalCoveragePercent,
+      status,
+    };
   }
 
   /**
