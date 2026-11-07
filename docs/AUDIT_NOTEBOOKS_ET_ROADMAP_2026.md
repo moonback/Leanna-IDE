@@ -637,3 +637,14 @@ Compléments de la dixième passe :
 | État sans résultat | Implémenté | Un état vide explique qu'aucun format ne correspond et permet de réinitialiser les filtres. |
 
 **Validation restante :** exécuter `npm run typecheck`, `npm run lint:eslint:notebooks` et `npm run test:ui` dans l'environnement local, puis vérifier visuellement la densité des cartes, la navigation clavier, les catégories et la recherche sur les formats et rapports.
+
+
+### Quatorzième passe — diagnostic d'indexation visible dans les sources
+
+- Le badge d'état est désormais toujours présent dans la liste compacte : les sources historiques sans champ d'état sont explicitement marquées « Non vérifiée » plutôt que de laisser croire qu'elles sont indexées.
+- Les états `pending`, `indexed`, `partial` et `failed` reflètent les champs durables déjà stockés par `NotebookManager` ; aucun statut n'est déduit du nombre de chunks.
+- L'infobulle rassemble le statut, le nombre de tentatives, la dernière mise à jour, la prochaine tentative planifiée et l'erreur éventuelle.
+- Les horodatages sont validés avant formatage afin d'éviter d'afficher `Invalid Date` si une ancienne donnée est mal formée.
+- Les types UI sont alignés sur les champs du modèle serveur (`indexingStatus`, `indexingAttempts`, `indexingError`, `indexingUpdatedAt`, `indexingNextRetryAt`).
+
+**Validation CI observée :** une exécution GitHub Actions associée au commit précédent est remontée en `startup_failure`, sans job créé ; aucun résultat de typecheck/test/lint n'est disponible. Cela ne permet pas de conclure à un échec du code ni à une réussite. Refaire les validations dans l'environnement local et vérifier le démarrage de l'action GitHub.
