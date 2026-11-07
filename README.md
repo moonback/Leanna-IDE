@@ -1905,7 +1905,7 @@ Le compte personnel existant reste indépendant et conserve son intégration Gma
 
 - Les mots de passe sont chiffrés avant leur persistance dans la configuration
   locale ; ils ne sont jamais ajoutés au dépôt ni renvoyés à l'interface.
-- TLS 1.2 minimum est exigé ; IMAP impose SSL/TLS et SMTP impose SSL/TLS ou STARTTLS.
+- TLS 1.2 minimum est exigé ; IMAP et SMTP imposent SSL/TLS ou STARTTLS.
 - Le service vérifie IMAP et SMTP avant d'enregistrer une nouvelle configuration.
 - Chaque envoi déclenche une confirmation interactive présentant le compte,
   le destinataire, l'objet et un aperçu du message.
