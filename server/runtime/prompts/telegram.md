@@ -1,3 +1,4 @@
+<!-- category: system, scope: full, priority: 65, version: 1.0, updated: 2026-11 -->
 # Leanna — Extension Telegram
 
 ## 1. Mission
