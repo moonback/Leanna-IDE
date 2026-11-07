@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { simpleParser } from "mailparser";
@@ -7,7 +9,13 @@ import { Leanna_APP_ROOT } from "../utils/selfRoot.js";
 import { encrypt, decrypt, isEncrypted } from "../utils/crypto.js";
 
 export type GmailAccountId = "leanna" | "personal";
-type StoredAccount = { email: string; appPassword: string; connectedAt: string };
+export type EmailProvider = "gmail" | "custom";
+export type MailServerSettings = {
+  receiveEnabled: boolean; sendEnabled: boolean;
+  imapHost: string; imapPort: number; imapSecurity: "ssl" | "starttls";
+  smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls";
+};
+type StoredAccount = { email: string; appPassword: string; provider: EmailProvider; servers: MailServerSettings; connectedAt: string };
 type EmailConfig = {
   accounts: Partial<Record<GmailAccountId, StoredAccount>>;
   personalSendEnabled: boolean;
@@ -15,14 +23,82 @@ type EmailConfig = {
 
 const MAX_RESULTS = 50;
 const MAX_BODY_CHARS = 100_000;
-const IMAP_HOST = "imap.gmail.com";
-const SMTP_HOST = "smtp.gmail.com";
+const GMAIL_SERVERS: MailServerSettings = {
+  receiveEnabled: true, sendEnabled: true,
+  imapHost: "imap.gmail.com", imapPort: 993, imapSecurity: "ssl",
+  smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
+};
+const INFOMANIAK_SERVERS: MailServerSettings = {
+  receiveEnabled: true, sendEnabled: true,
+  imapHost: "mail.infomaniak.com", imapPort: 993, imapSecurity: "ssl",
+  smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecurity: "starttls",
+};
+const DEFAULT_CUSTOM_SERVERS = INFOMANIAK_SERVERS;
+export function validateServerSettings(value: unknown): MailServerSettings {
+  if (!value || typeof value !== "object") throw new Error("Paramètres de messagerie manquants.");
+  const v = value as Record<string, unknown>;
+  const receiveEnabled = v.receiveEnabled !== false;
+  const sendEnabled = v.sendEnabled !== false;
+  if (!receiveEnabled && !sendEnabled) throw new Error("Activez au moins la réception ou l'envoi des e-mails.");
+  const host = (input: unknown, label: string, enabled: boolean) => {
+    if (!enabled) return "";
+    if (typeof input !== "string" || input.length > 253 || !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(input) || input.includes("..")) throw new Error(`Nom d'hôte ${label} invalide.`);
+    const normalized = input.toLowerCase();
+    if (isIP(normalized) !== 0 || ["localhost", "localhost.localdomain"].includes(normalized) || /\.(local|internal|localhost|test|invalid)$/.test(normalized)) throw new Error("Les adresses IP littérales et les hôtes locaux ou réservés ne sont pas autorisés.");
+    return normalized;
+  };
+  const port = (input: unknown, label: string, enabled: boolean, fallback: number) => {
+    if (!enabled) return fallback;
+    if (!Number.isInteger(input) || Number(input) < 1 || Number(input) > 65535) throw new Error(`Port ${label} invalide.`);
+    return Number(input);
+  };
+  if (receiveEnabled && v.imapSecurity !== "ssl" && v.imapSecurity !== "starttls") throw new Error("IMAP doit utiliser SSL/TLS ou STARTTLS.");
+  if (sendEnabled && v.smtpSecurity !== "ssl" && v.smtpSecurity !== "starttls") throw new Error("SMTP doit utiliser SSL/TLS ou STARTTLS.");
+  return {
+    receiveEnabled, sendEnabled,
+    imapHost: host(v.imapHost, "IMAP", receiveEnabled), imapPort: port(v.imapPort, "IMAP", receiveEnabled, 993),
+    imapSecurity: v.imapSecurity === "starttls" ? "starttls" : "ssl",
+    smtpHost: host(v.smtpHost, "SMTP", sendEnabled), smtpPort: port(v.smtpPort, "SMTP", sendEnabled, 465),
+    smtpSecurity: v.smtpSecurity === "starttls" ? "starttls" : "ssl",
+  };
+}
+
+function isPublicAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    const octets = address.split(".").map(Number);
+    const [a, b, d] = octets;
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && (b === 168 || (b === 0 && d === 0) || (b === 0 && d === 2) || (b === 88 && d === 99))) return false;
+    if (a === 198 && (b === 18 || b === 19 || (b === 51 && d === 100))) return false;
+    if (a === 203 && b === 0 && d === 113) return false;
+    return true;
+  }
+  if (isIP(address) === 6) {
+    const value = address.toLowerCase();
+    if (value.startsWith("::ffff:")) return isPublicAddress(value.slice(7));
+    return /^[23]/.test(value) && !value.startsWith("2001:db8:");
+  }
+  return false;
+}
+
+async function assertPublicMailHost(host: string): Promise<void> {
+  let addresses: Array<{ address: string; family: number }>;
+  try { addresses = await lookup(host, { all: true, verbatim: true }); }
+  catch { throw new Error(`Impossible de résoudre le serveur e-mail ${host}.`); }
+  if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) {
+    throw new Error("Le serveur e-mail doit résoudre uniquement vers des adresses IP publiques.");
+  }
+}
 
 function createImapClient(account: StoredAccount): ImapFlow {
   return new ImapFlow({
-    host: IMAP_HOST,
-    port: 993,
-    secure: true,
+    host: account.servers.imapHost,
+    port: account.servers.imapPort,
+    secure: account.servers.imapSecurity === "ssl",
+    doSTARTTLS: account.servers.imapSecurity === "starttls",
     auth: { user: account.email, pass: account.appPassword },
     logger: false,
     socketTimeout: 20_000,
@@ -33,9 +109,10 @@ function createImapClient(account: StoredAccount): ImapFlow {
 
 function createSmtpTransport(account: StoredAccount) {
   return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: 465,
-    secure: true,
+    host: account.servers.smtpHost,
+    port: account.servers.smtpPort,
+    secure: account.servers.smtpSecurity === "ssl",
+    requireTLS: account.servers.smtpSecurity === "starttls",
     auth: { user: account.email, pass: account.appPassword },
     tls: { minVersion: "TLSv1.2" },
     connectionTimeout: 15_000,
@@ -104,8 +181,13 @@ export class GmailService {
         const saved = data.accounts?.[id];
         if (typeof saved?.email !== "string" || typeof saved?.appPassword !== "string") continue;
         const password = isEncrypted(saved.appPassword) ? decrypt(saved.appPassword) : "";
+        const provider: EmailProvider = id === "leanna" && saved.provider !== "gmail" ? "custom" : "gmail";
+        const legacyServers = saved.provider === "infomaniak" ? INFOMANIAK_SERVERS : GMAIL_SERVERS;
+        let servers: MailServerSettings;
+        try { servers = provider === "custom" && saved.servers ? validateServerSettings(saved.servers) : legacyServers; }
+        catch { continue; }
         if (password && !isEncrypted(password)) {
-          accounts[id] = { email: saved.email, appPassword: password, connectedAt: saved.connectedAt || "" };
+          accounts[id] = { email: saved.email, appPassword: password, provider, servers, connectedAt: saved.connectedAt || "" };
         }
       }
       return { accounts, personalSendEnabled: data.personalSendEnabled === true && Boolean(accounts.personal) };
@@ -145,49 +227,62 @@ export class GmailService {
 
   private accountStatus(id: GmailAccountId) {
     const account = this.config.accounts[id];
-    return { connected: Boolean(account?.appPassword), email: account?.email || null };
+    return {
+      connected: Boolean(account?.appPassword), email: account?.email || null, provider: account?.provider || null,
+      servers: id === "leanna" ? account?.servers || null : undefined,
+      receiveEnabled: account ? account.servers.receiveEnabled : false,
+      sendEnabled: account ? account.servers.sendEnabled : false,
+    };
   }
 
   private requireAccount(id: GmailAccountId): StoredAccount {
     const account = this.config.accounts[id];
-    if (!account) throw new Error(`Le compte Gmail ${id} n'est pas connecté. Configurez son adresse et son mot de passe d'application dans Paramètres > E-mail.`);
+    if (!account) throw new Error(`Le compte e-mail ${id} n'est pas connecté. Configurez son adresse et son mot de passe dans Paramètres > E-mail.`);
     return account;
   }
 
-  async connectAccount(id: GmailAccountId, email: string, appPassword: string): Promise<void> {
+  async connectAccount(id: GmailAccountId, email: string, appPassword: string, provider: EmailProvider = "gmail", serverInput?: unknown): Promise<void> {
+    if (id === "personal" && provider !== "gmail") throw new Error("Le compte personnel conserve Gmail dans cette configuration.");
+    if (id === "leanna" && provider !== "custom") throw new Error("Le compte dédié de Leanna doit utiliser la configuration IMAP/SMTP générique.");
+    const servers = id === "personal" ? GMAIL_SERVERS : validateServerSettings(serverInput || DEFAULT_CUSTOM_SERVERS);
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = appPassword.replace(/\s+/g, "");
+    const normalizedPassword = provider === "gmail" ? appPassword.replace(/\s+/g, "") : appPassword.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       throw new Error("Adresse e-mail invalide.");
     }
-    if (normalizedPassword.length < 16 || normalizedPassword.length > 128) {
-      throw new Error("Le mot de passe d'application Gmail doit contenir au moins 16 caractères.");
-    }
+    if (normalizedPassword.length < 1 || normalizedPassword.length > 256) throw new Error("Le mot de passe de messagerie est invalide.");
+    if (provider === "gmail" && normalizedPassword.length < 16) throw new Error("Le mot de passe d'application Gmail doit contenir au moins 16 caractères.");
 
     const candidate: StoredAccount = {
       email: normalizedEmail,
       appPassword: normalizedPassword,
+      provider,
+      servers,
       connectedAt: new Date().toISOString(),
     };
 
-    const imap = createImapClient(candidate);
-    try {
-      await imap.connect();
-      const lock = await imap.getMailboxLock("INBOX");
-      lock.release();
-    } catch {
-      throw new Error("Connexion IMAP refusée. Vérifiez l'adresse, le mot de passe d'application et l'accès IMAP du compte Google.");
-    } finally {
-      try { await imap.logout(); } catch { /* connection may not have completed */ }
-    }
+    const checks: Promise<void>[] = [];
+    if (servers.receiveEnabled) checks.push(assertPublicMailHost(servers.imapHost));
+    if (servers.sendEnabled) checks.push(assertPublicMailHost(servers.smtpHost));
+    await Promise.all(checks);
 
-    const smtp = createSmtpTransport(candidate);
-    try {
-      await smtp.verify();
-    } catch {
-      throw new Error("Connexion SMTP refusée. Vérifiez le mot de passe d'application et les paramètres de sécurité du compte Google.");
-    } finally {
-      smtp.close();
+    if (servers.receiveEnabled) {
+      const imap = createImapClient(candidate);
+      try {
+        await imap.connect();
+        const lock = await imap.getMailboxLock("INBOX");
+        lock.release();
+      } catch {
+        throw new Error("Connexion IMAP refusée. Vérifiez l'adresse, le mot de passe et l'activation de l'accès IMAP chez votre fournisseur.");
+      } finally {
+        try { await imap.logout(); } catch { /* connection may not have completed */ }
+      }
+    }
+    if (servers.sendEnabled) {
+      const smtp = createSmtpTransport(candidate);
+      try { await smtp.verify(); }
+      catch { throw new Error("Connexion SMTP refusée. Vérifiez le mot de passe et les paramètres de sécurité de votre fournisseur."); }
+      finally { smtp.close(); }
     }
 
     this.config.accounts[id] = candidate;
@@ -197,7 +292,7 @@ export class GmailService {
 
   setPersonalSendEnabled(enabled: boolean): void {
     if (enabled && !this.config.accounts.personal) {
-      throw new Error("Connectez d'abord votre compte Gmail personnel.");
+      throw new Error("Connectez d'abord votre compte e-mail personnel.");
     }
     this.config.personalSendEnabled = enabled;
     this.persist();
@@ -211,6 +306,8 @@ export class GmailService {
 
   async listMessages(id: GmailAccountId, query = "", maxResults = 20) {
     const account = this.requireAccount(id);
+    if (!account.servers.receiveEnabled) throw new Error("La réception des e-mails est désactivée pour ce compte.");
+    await assertPublicMailHost(account.servers.imapHost);
     const client = createImapClient(account);
     try {
       await client.connect();
@@ -248,6 +345,8 @@ export class GmailService {
   async readMessage(id: GmailAccountId, messageId: string) {
     if (!/^\d+$/.test(messageId)) throw new Error("Identifiant IMAP invalide.");
     const account = this.requireAccount(id);
+    if (!account.servers.receiveEnabled) throw new Error("La réception des e-mails est désactivée pour ce compte.");
+    await assertPublicMailHost(account.servers.imapHost);
     const client = createImapClient(account);
     try {
       await client.connect();
@@ -288,6 +387,8 @@ export class GmailService {
       throw new Error("Envoi depuis le compte personnel désactivé. Activez cette autorisation dans Paramètres > E-mail.");
     }
     const account = this.requireAccount(id);
+    if (!account.servers.sendEnabled) throw new Error("L'envoi des e-mails est désactivé pour ce compte.");
+    await assertPublicMailHost(account.servers.smtpHost);
     const recipient = to.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) throw new Error("Adresse destinataire invalide.");
     if (!subject.trim() || !body.trim()) throw new Error("L'objet et le corps du message sont obligatoires.");

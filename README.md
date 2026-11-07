@@ -119,7 +119,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
 | 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) • [Veille & réveil](#-veille-et-réveil-vocal) |
-| 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [Gmail](#-e-mail-et-gmail) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
+| 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [E-mail](#-e-mail-et-messagerie) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
 
 </details>
@@ -239,7 +239,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
 | **Navigateur intégré** | 29 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
 | **Boucle humaine (HITL)** | Approbation interactive des actions à risque + contrôle de mission (pause/reprise/annulation), relais Telegram | ✅ |
-| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), Gmail (deux comptes), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
+| **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), E-mail (IMAP/SMTP générique pour Leanna, Gmail personnel), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
 | **Marketplace** | Registre de compétences (backend local + UI : recherche, publication avec analyse de sécurité, notes, installation) | ✅ |
 | **Workflow builder** | Éditeur de workflows par étapes dans l'interface (steps, actions, onError, retries, schedule) | 🟡 |
 
@@ -1883,20 +1883,19 @@ TELEGRAM_BOT_TOKEN=""
 
 <br>
 
-## ✉️ E-mail et Gmail
+## ✉️ E-mail et messagerie
 
 Le skill `server/skills/email.ts` expose cinq outils de messagerie, exécutés par
-`server/email/GmailService.ts`. L'intégration utilise **IMAP pour la lecture** et
-**SMTP pour l'envoi**, avec deux comptes configurables et indépendants :
+`server/email/GmailService.ts`. Le service utilise **IMAP pour la lecture** et
+**SMTP pour l'envoi**, sans OAuth2.
 
-| Compte | Identifiant | Rôle |
-|---|---|---|
-| Compte dédié Leanna | `leanna` | Boîte Gmail de l'assistant ; compte d'envoi par défaut |
-| Compte personnel | `personal` | Boîte privée de l'utilisateur ; envoi désactivé par défaut |
+Le compte dédié **Leanna** permet d'activer indépendamment la réception (IMAP), l'envoi (SMTP), ou les deux. Seuls les paramètres du protocole activé sont requis ; les hôtes, ports et modes SSL/TLS ou STARTTLS sont configurables. Les fournisseurs compatibles avec ces protocoles et une authentification par mot de passe peuvent être utilisés, sans OAuth2. Infomaniak est disponible comme configuration possible (`mail.infomaniak.com`, IMAP 993, SMTP 587 STARTTLS).
+
+Le compte personnel existant reste indépendant et conserve son intégration Gmail.
 
 | Outil | Fonction |
 |---|---|
-| `email_check_new` | Vérifier les messages non lus des deux comptes |
+| `email_check_new` | Vérifier les messages non lus |
 | `email_list_messages` | Lister les derniers messages d'un compte |
 | `email_read_message` | Lire un message par identifiant IMAP |
 | `email_search_messages` | Rechercher par expéditeur, destinataire, objet, date ou état lu/non lu |
@@ -1904,21 +1903,20 @@ Le skill `server/skills/email.ts` expose cinq outils de messagerie, exécutés p
 
 **Garde-fous et limites :**
 
-- Les mots de passe d'application Gmail sont chiffrés avant leur persistance dans
-  la configuration locale ; ils ne doivent jamais être ajoutés au dépôt.
-- Chaque envoi déclenche une confirmation interactive qui présente le compte,
+- Les mots de passe sont chiffrés avant leur persistance dans la configuration
+  locale ; ils ne sont jamais ajoutés au dépôt ni renvoyés à l'interface.
+- TLS 1.2 minimum est exigé ; IMAP et SMTP imposent SSL/TLS ou STARTTLS.
+- Le service vérifie uniquement les protocoles activés avant d'enregistrer une nouvelle configuration ; les opérations de lecture et d'envoi sont bloquées côté service si leur capacité respective est désactivée.
+- Chaque envoi déclenche une confirmation interactive présentant le compte,
   le destinataire, l'objet et un aperçu du message.
-- L'envoi depuis le compte personnel reste verrouillé tant que l'autorisation
-  correspondante n'a pas été activée dans **Paramètres → E-mail**.
-- La lecture actuelle porte sur la boîte de réception IMAP ; les recherches ne
-  doivent pas être présentées comme couvrant tous les dossiers Gmail.
-- Les pièces jointes sont exposées sous forme de métadonnées (nom, type MIME,
-  taille). Leur téléchargement, leur analyse et leur transfert ne sont pas
-  fournis par ces cinq outils.
+- L'envoi depuis le compte personnel reste verrouillé par défaut et nécessite
+  une autorisation explicite ainsi qu'une confirmation par message.
+- La lecture actuelle porte sur INBOX ; les recherches ne couvrent pas
+  nécessairement tous les dossiers du fournisseur.
+- Les pièces jointes sont exposées sous forme de métadonnées uniquement.
 
-Configuration des comptes : **Paramètres → E-mail**. Les secrets de connexion
-sont stockés localement dans le fichier de configuration de Leanna, chiffrés
-avec la clé maître de l'application.
+Configuration : **Paramètres → E-mail**. Voir
+[`docs/GMAIL_INTEGRATION.md`](docs/GMAIL_INTEGRATION.md) pour les détails.
 
 <br>
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { gmailService, type GmailAccountId } from "../email/GmailService.js";
+import { gmailService, type EmailProvider, type GmailAccountId } from "../email/GmailService.js";
 
 const ACCOUNT_IDS = new Set<GmailAccountId>(["leanna", "personal"]);
 const accountId = (value: unknown): GmailAccountId => {
@@ -20,10 +20,14 @@ export function createGmailRouter(): Router {
     try {
       const account = accountId(req.body?.account);
       const { email, appPassword } = req.body || {};
+      const rawProvider = req.body?.provider;
+      if (rawProvider !== undefined && rawProvider !== "gmail" && rawProvider !== "custom") throw new Error("Fournisseur e-mail invalide.");
+      const provider: EmailProvider = account === "leanna" ? "custom" : "gmail";
+      if (account === "personal" && rawProvider === "custom") throw new Error("La configuration personnalisée est réservée au compte Leanna.");
       if (typeof email !== "string" || typeof appPassword !== "string") {
-        throw new Error("Adresse e-mail et mot de passe d'application requis.");
+        throw new Error("Adresse e-mail et mot de passe de messagerie requis.");
       }
-      await gmailService.connectAccount(account, email, appPassword);
+      await gmailService.connectAccount(account, email, appPassword, provider, req.body?.servers);
       res.json({ status: "success", data: gmailService.getSettings() });
     } catch (error) {
       res.status(400).json({ status: "error", error: (error as Error).message });

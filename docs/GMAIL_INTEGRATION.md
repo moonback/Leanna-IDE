@@ -1,57 +1,90 @@
-# Intégration Gmail — Leanna
+# Intégration e-mail — Leanna
 
-## Fonctionnement
+## Périmètre
 
-Leanna prend en charge deux boîtes Gmail indépendantes :
+Le compte dédié **Leanna** utilise une configuration générique avec réception IMAP et envoi SMTP activables indépendamment dans Paramètres > E-mail. Il peut être configuré en réception seule, envoi seul ou réception + envoi. Aucun OAuth2, SDK propriétaire ni navigateur d'authentification n'est utilisé.
 
-- **Compte dédié de Leanna** : boîte de réception et compte d'expédition par défaut.
-- **Compte personnel** : boîte consultable séparément. L'envoi depuis cette adresse est désactivé par défaut.
+Le compte personnel existant reste indépendant et conserve Gmail et son mot de passe d'application. Cette évolution ne modifie pas sa configuration ni ses permissions d'envoi.
 
-La connexion utilise directement les protocoles **IMAP et SMTP sur TLS**, sans Google Web OAuth, sans API Gmail et sans fenêtre de connexion navigateur.
+## Configuration du compte Leanna
 
-- IMAP : `imap.gmail.com:993` (TLS implicite).
-- SMTP : `smtp.gmail.com:465` (TLS implicite).
-- Authentification : mot de passe d'application Google propre à chaque compte.
+Renseigner les paramètres communiqués par l'hébergeur :
 
-Les mots de passe d'application sont chiffrés avec `server/utils/crypto.ts` et enregistrés dans `.Leanna-email.json` sous le dossier de configuration persistant de Leanna (`Leanna_CONFIG_PATH` / `userData` Electron). Les secrets ne sont jamais renvoyés au frontend, ajoutés aux prompts ou écrits dans les logs. Le fichier est ignoré par Git.
+| Champ | Règle |
+|---|---|
+| Réception activée | Active ou désactive la réception IMAP |
+| Envoi activé | Active ou désactive l'envoi SMTP |
+| Hôte IMAP | Nom DNS du serveur entrant, requis uniquement si la réception est activée |
+| Port IMAP | Port TCP entre 1 et 65535, requis uniquement si la réception est activée |
+| Sécurité IMAP | SSL/TLS implicite ou STARTTLS obligatoire, si la réception est activée |
+| Hôte SMTP | Nom DNS du serveur sortant, requis uniquement si l'envoi est activé |
+| Port SMTP | Port TCP entre 1 et 65535, requis uniquement si l'envoi est activé |
+| Sécurité SMTP | SSL/TLS implicite ou STARTTLS obligatoire, si l'envoi est activé |
+| Identifiant | Adresse e-mail complète |
+| Mot de passe | Mot de passe de la boîte ou mot de passe dédié |
 
-## Configuration des comptes
+Ports courants : IMAP 993 en SSL/TLS ou 143 en STARTTLS ; SMTP 465 en SSL/TLS ou 587 en STARTTLS. Les valeurs exactes dépendent du fournisseur.
 
-Pour chacun des deux comptes :
+### Exemple Infomaniak
 
-1. Activer la validation en deux étapes dans le compte Google.
-2. Ouvrir [Mots de passe des applications Google](https://myaccount.google.com/apppasswords).
-3. Créer un mot de passe d'application (Google affiche généralement un code de 16 caractères).
-4. Dans **Paramètres > E-mail**, saisir l'adresse Gmail et ce mot de passe d'application.
-5. Cliquer sur **Connecter le compte**. Leanna vérifie IMAP et SMTP avant d'enregistrer les identifiants.
+| Paramètre | Valeur |
+|---|---|
+| IMAP | `mail.infomaniak.com:993` — SSL/TLS |
+| SMTP | `mail.infomaniak.com:587` — STARTTLS |
 
-Le mot de passe Google habituel ne doit pas être utilisé. Google peut ne pas proposer les mots de passe d'application sur certains comptes, notamment selon les règles Google Workspace, Advanced Protection ou les politiques de sécurité du compte. Si l'option n'est pas disponible, cette méthode ne pourra pas fonctionner pour ce compte.
+Documentation : https://www.infomaniak.com/fr/support/faq/468
 
-## Outils disponibles pour Leanna
+## Connexion
+
+1. Ouvrir **Paramètres > E-mail**.
+2. Dans le compte dédié de Leanna, activer la réception, l'envoi, ou les deux.
+3. Renseigner uniquement les paramètres du protocole activé : IMAP pour recevoir, SMTP pour envoyer.
+4. Choisir SSL/TLS ou STARTTLS pour chaque protocole activé. Leanna refuse toute connexion en clair.
+5. Saisir l'adresse complète et le mot de passe, puis cliquer sur **Connecter le compte**.
+
+Le service vérifie uniquement les connexions activées. La configuration n'est persistée qu'après réussite de tous les contrôles requis ; une configuration existante reste active si la tentative échoue.
+
+## Architecture
+
+- `server/email/GmailService.ts` conserve les cinq outils agent et utilise une configuration de serveurs persistée par compte.
+- Le compte `leanna` utilise les paramètres personnalisés fournis par l'utilisateur.
+- Le compte `personal` conserve Gmail et ses paramètres historiques ; la configuration personnalisée est refusée pour ce compte.
+- Les configurations historiques Infomaniak sont migrées vers les paramètres IMAP/SMTP personnalisés correspondants. Les anciennes configurations Gmail de Leanna sont reprises comme point de départ modifiable.
+- Les mots de passe restent chiffrés avec `server/utils/crypto.ts` dans `.Leanna-email.json`. Les paramètres serveur ne contiennent aucun secret.
+- Les hôtes activés doivent être des noms DNS valides ; les adresses IP littérales et les noms locaux/réservés sont refusés.
+- Chaque protocole activé impose SSL/TLS ou STARTTLS. TLS 1.2 minimum et la validation standard des certificats sont conservés.
+- Les opérations de réception sont refusées côté service lorsque IMAP est désactivé ; les opérations d'envoi sont refusées lorsque SMTP est désactivé.
+
+## Outils agent conservés
 
 | Outil | Fonction |
 |---|---|
-| `email_check_new` | Vérifier les messages non lus des deux comptes |
-| `email_list_messages` | Lister les derniers messages d'une boîte |
+| `email_check_new` | Vérifier les messages non lus |
+| `email_list_messages` | Lister les derniers messages |
 | `email_read_message` | Lire un message par son UID IMAP |
 | `email_search_messages` | Rechercher avec les critères IMAP pris en charge |
 | `email_send_message` | Envoyer un message après confirmation humaine |
 
-Critères de recherche pris en charge : `from:`, `to:`, `subject:`, `after:`, `before:`, `is:unread` et `is:read`. Les autres opérateurs propres à la recherche Gmail ne sont pas interprétés par IMAP.
+Les critères de recherche restent : `from:`, `to:`, `subject:`, `after:`, `before:`, `is:unread` et `is:read`. Les messages sont actuellement lus dans INBOX.
 
-## Politique d'envoi
+## Protections conservées
 
-- Le compte de Leanna est le compte d'expédition par défaut.
-- Si le destinataire n'est pas précisé, Leanna utilise l'adresse du compte personnel connecté.
-- Chaque envoi depuis le chat passe par la demande de confirmation interactive du runtime.
-- L'envoi depuis le compte personnel nécessite une activation explicite dans les paramètres **et** une confirmation pour chaque message.
-- Aucune route HTTP d'envoi direct n'est exposée : l'envoi reste derrière l'outil agent et sa confirmation.
+- Chiffrement des secrets au repos et permissions de fichier restrictives.
+- TLS 1.2 minimum et validation des certificats.
+- Refus des hôtes locaux/réservés et des adresses IP littérales.
+- Vérification de chaque connexion activée avant l'enregistrement (IMAP, SMTP ou les deux).
+- Pas de route HTTP d'envoi direct.
+- Chaque envoi passe par l'outil agent et une confirmation interactive explicite affichant le compte expéditeur, le destinataire, l'objet et un aperçu du corps.
+- Si le pont de confirmation est absent, l'envoi est refusé.
+- Les validations de destinataire, Cc, objet, corps et taille du message restent actives.
+- Les contenus reçus sont des données non fiables : ils ne peuvent pas modifier les règles de Leanna ni déclencher seuls un envoi.
+- Le compte personnel garde son verrou d'envoi désactivé par défaut.
 
-## Sécurité et limites
+## Limites connues
 
-- Connexions TLS obligatoires, avec TLS 1.2 minimum.
-- Mot de passe d'application chiffré au repos et masqué dans l'interface.
-- Déconnexion : suppression du secret local. Google ne propose pas de révocation OAuth car aucun jeton OAuth n'est utilisé.
-- La lecture extrait le texte du message et les métadonnées des pièces jointes ; le téléchargement des pièces jointes n'est pas encore exposé comme outil.
-- Les réponses et transferts de conversations ne sont pas encore exposés comme outils dédiés.
+- Compatibilité limitée aux fournisseurs offrant IMAP SSL/TLS et SMTP SSL/TLS ou STARTTLS avec authentification par identifiant/mot de passe.
+- Les fournisseurs imposant OAuth2, API propriétaires, authentification spéciale ou SMTP sans authentification ne sont pas compatibles avec ce connecteur.
+- La lecture et la recherche couvrent actuellement INBOX et les critères exposés par le service.
+- Les pièces jointes sont exposées sous forme de métadonnées ; leur téléchargement et leur envoi ne sont pas couverts par les cinq outils actuels.
+- Les opérations d'archivage, suppression, déplacement, réponse et transfert ne sont pas exposées.
 - Les listes sont limitées à 50 messages par appel et le corps lu à 100 000 caractères.
