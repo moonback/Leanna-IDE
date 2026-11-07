@@ -749,7 +749,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         )}
 
         {/* Centre : Discussion (ou source / document / note ouverts) */}
-        <main className="notebook-panel notebook-main min-w-0 flex min-h-0 flex-col overflow-hidden">
+        <main className="notebook-panel notebook-main relative min-w-0 flex min-h-0 flex-col overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={showIndexing ? 'indexing' : selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : notesOpen ? 'notes' : activeTab)}
@@ -760,7 +760,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
               {renderMainContent()}
             </motion.div>
           </AnimatePresence>
-          <div ref={setAudioDockElement} aria-label="Lecteur du podcast" className="h-[220px] min-h-[180px] max-h-[35%] flex flex-col flex-shrink-0 overflow-hidden border-t border-[var(--notebook-border)] bg-[var(--notebook-surface-elevated)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] empty:hidden" />
+          <div ref={setAudioDockElement} aria-label="Lecteur du podcast" className="absolute inset-0 z-20 flex min-h-0 flex-col overflow-hidden bg-[var(--notebook-surface-elevated)] empty:hidden" />
         </main>
 
         {studioOpen && (
