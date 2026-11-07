@@ -29,7 +29,7 @@ export function useTtsPlayer({ notebookId, selectedOverview, onError }: UseTtsPl
   const [ttsLoading, setTtsLoading] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(-1);
   const [ttsProgress, setTtsProgress] = useState(0);
-  const [ttsTotalLines, setTtsTotalLines] = useState(100);
+  const ttsTotalLines = 100;
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const generationControllerRef = useRef<AbortController | null>(null);
