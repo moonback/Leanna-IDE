@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLiveAPIContext } from '../context/LiveAPIContext.js';
 
-export type OrbStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'busy' | 'online';
+export type OrbStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'busy' | 'online' | 'sleeping';
 
 export interface OrbState {
   /** Raw connection status from the Live API */
@@ -38,7 +38,7 @@ export function useOrbState(): OrbState {
   const {
     status, connect, disconnect,
     getInputAmplitude, getOutputAmplitude, isBusy,
-    muted, wake,
+    muted, asleep, wake,
   } = useLiveAPIContext();
 
   const [levels, setLevels] = useState({ input: 0, output: 0 });
@@ -81,7 +81,9 @@ export function useOrbState(): OrbState {
     ? 'var(--orb-online, #0ea5e9)'
     : 'var(--orb-idle, #0ea5e9)';
 
-  const status_: OrbStatus = isBusy
+  const status_: OrbStatus = isConnected && asleep
+    ? 'sleeping'
+    : isBusy
     ? 'busy'
     : isSpeaking
     ? 'speaking'
@@ -93,7 +95,9 @@ export function useOrbState(): OrbState {
     ? 'connecting'
     : 'idle';
 
-  const statusLabel = isBusy
+  const statusLabel = isConnected && asleep
+    ? 'EN VEILLE'
+    : isBusy
     ? 'TRAITEMENT'
     : isSpeaking
     ? 'RÉPOND'
@@ -106,6 +110,8 @@ export function useOrbState(): OrbState {
     : 'PRÊT';
 
   const toggleConnection = () => {
+    // Orbe endormie : un clic la réveille au lieu de couper la session.
+    if (isConnected && asleep) { wake(); return; }
     if (isConnected) disconnect();
     else if (!isConnecting) {
       const savedMode = (typeof localStorage !== 'undefined' 

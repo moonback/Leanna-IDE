@@ -99,7 +99,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
       skills: string[],
       sessionMode: 'full' | 'ask',
       initAudio: () => Promise<void>,
-      cleanupAudio: () => void,
+      cleanupAudio: (keepSleep?: boolean) => void,
       conversationId: string | null,
     ) => {
       setStatus('connecting');
@@ -203,7 +203,7 @@ export function useWebSocket({ onMessage, onAudioChunk, onLog }: UseWebSocketOpt
         };
 
         ws.onclose = (evt) => {
-          cleanupAudio();
+          cleanupAudio(goAwayPendingRef.current); // GoAway : on garde la veille
 
           // Déconnexion volontaire de l'utilisateur → pas de reconnexion
           if (intentionalDisconnectRef.current) {

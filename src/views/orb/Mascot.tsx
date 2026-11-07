@@ -19,6 +19,7 @@ export type MascotMood = 'sleep' | 'search' | 'idle' | 'listen' | 'talk' | 'thin
 export function moodFromStatus(status: OrbStatus, muted: boolean, hovered: boolean, celebrate: boolean): MascotMood {
   if (status === 'idle') return hovered ? 'happy' : 'sleep';
   if (status === 'connecting') return 'search';
+  if (status === 'sleeping') return 'sleep';
   if (celebrate) return 'celebrate';
   if (status === 'speaking') return 'talk';
   if (status === 'busy') return 'think';

@@ -226,18 +226,23 @@ export function useLiveAPI() {
 
     const {
       muted,
+      asleep,
+      wakeWordFailed,
       toggleMute,
       wake,
+      markActivity,
       playAudioChunk,
       handleInterrupt,
       initAudio,
       cleanupAudio,
       getInputAmplitude,
       getOutputAmplitude,
-    } = useAudio({ 
+    } = useAudio({
       onAudioData: handleAudioData,
       autoMuteEnabled: profile.autoMuteEnabled,
       autoMuteTimeout: profile.autoMuteTimeout,
+      isBusy,
+      wakeWordEnabled: profile.wakeWordEnabled,
       vadEnabled: profile.vadEnabled,
       vadThreshold: profile.vadThreshold,
       vadSilenceDuration: profile.vadSilenceDuration,
@@ -684,8 +689,8 @@ export function useLiveAPI() {
   });
 
   const connect = useCallback((activeSkills: string[] = [], mode: 'full' | 'ask' = 'full', conversationId?: string) => {
-    connectWebSocket(activeSkills, mode, initAudio, () => {
-      cleanupAudio();
+    connectWebSocket(activeSkills, mode, initAudio, (keepSleep?: boolean) => {
+      cleanupAudio(keepSleep);
       clearTokenUsage();
       resetActivityState();
     }, conversationId);
@@ -702,7 +707,8 @@ export function useLiveAPI() {
   const sendTextMessage = useCallback((text: string, displayText = text) => {
     sendWSMessage(text);
     addTranscript('user', displayText);
-  }, [sendWSMessage, addTranscript]);
+    markActivity();
+  }, [sendWSMessage, addTranscript, markActivity]);
 
   // ── Injection de contexte éditeur ──────────────────────────────────────────
   // Envoie le contexte de l'éditeur (fichier actif, sélection, position curseur)
@@ -952,7 +958,7 @@ export function useLiveAPI() {
   return {
       status, connected, connecting,
       connect, disconnect,
-      muted, toggleMute,
+      muted, asleep, wakeWordFailed, toggleMute,
       wake,
       logs, transcript, clearTranscript, restoreTranscript,
       auditSteps,

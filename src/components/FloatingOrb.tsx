@@ -55,7 +55,7 @@ export function FloatingOrb() {
         onClick={toggleConnection}
         className="fixed pointer-events-auto select-none"
         style={{ zIndex: 'var(--z-orb)' as any, bottom: 24, right: 24, cursor: isConnecting ? 'wait' : 'grab' }}
-        title={`Leanna — ${statusLabel}. Cliquer pour ${isConnected ? 'déconnecter' : 'connecter'}. Glisser pour déplacer.`}
+        title={`Leanna — ${statusLabel}. Cliquer pour ${orb.status === 'sleeping' ? 'réveiller' : isConnected ? 'déconnecter' : 'connecter'}. Glisser pour déplacer.`}
         role="button"
         aria-label={`Leanna ${statusLabel}`}
         tabIndex={0}

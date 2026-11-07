@@ -54,7 +54,7 @@ export default function OrbLiveView() {
   const aiName = profile.aiName || 'Leanna';
   const orb = useOrbState();
   const {
-    status, connect, disconnect, muted, toggleMute, sendTextMessage,
+    status, connect, disconnect, muted, asleep, wakeWordFailed, toggleMute, sendTextMessage,
     transcript, clearTranscript, lastLatencyMs,
   } = useLiveAPIContext();
   const { isSharing, toggleScreenShare } = useScreenShare();
@@ -135,9 +135,10 @@ export default function OrbLiveView() {
   }, [completedAgents, connected, triggerCelebrate]);
 
   const handleToggleConnection = useCallback(() => {
-    if (connected) disconnect();
+    if (connected && asleep) orb.wake(); // orbe endormie : un clic la réveille
+    else if (connected) disconnect();
     else if (!connecting) connect([], mode);
-  }, [connected, connecting, disconnect, connect, mode]);
+  }, [connected, connecting, asleep, orb, disconnect, connect, mode]);
 
   const handleSelectMode = useCallback((next: 'full' | 'ask') => {
     setMode(next);
@@ -203,6 +204,9 @@ export default function OrbLiveView() {
     : celebrate && completedAgents > 0 && elapsed > 2 ? 'Tâche terminée ✨'
     : orb.isSpeaking ? `${aiName} répond…`
     : orb.isBusy ? 'Je réfléchis…'
+    : asleep ? (profile.wakeWordEnabled && !wakeWordFailed
+      ? 'En veille — dis « Leanna » pour me réveiller'
+      : 'En veille — clique sur moi pour me réveiller')
     : muted ? 'Micro coupé'
     : orb.isListening ? 'À l\'écoute…' : 'Je t\'écoute, parle-moi !';
 
