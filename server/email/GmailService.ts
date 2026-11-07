@@ -11,7 +11,7 @@ import { encrypt, decrypt, isEncrypted } from "../utils/crypto.js";
 export type GmailAccountId = "leanna" | "personal";
 export type EmailProvider = "gmail" | "custom";
 export type MailServerSettings = {
-  imapHost: string; imapPort: number; imapSecure: true;
+  imapHost: string; imapPort: number; imapSecurity: "ssl" | "starttls";
   smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls";
 };
 type StoredAccount = { email: string; appPassword: string; provider: EmailProvider; servers: MailServerSettings; connectedAt: string };
@@ -23,11 +23,11 @@ type EmailConfig = {
 const MAX_RESULTS = 50;
 const MAX_BODY_CHARS = 100_000;
 const GMAIL_SERVERS: MailServerSettings = {
-  imapHost: "imap.gmail.com", imapPort: 993, imapSecure: true,
+  imapHost: "imap.gmail.com", imapPort: 993, imapSecurity: "ssl",
   smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
 };
 const INFOMANIAK_SERVERS: MailServerSettings = {
-  imapHost: "mail.infomaniak.com", imapPort: 993, imapSecure: true,
+  imapHost: "mail.infomaniak.com", imapPort: 993, imapSecurity: "ssl",
   smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecurity: "starttls",
 };
 const DEFAULT_CUSTOM_SERVERS = INFOMANIAK_SERVERS;
@@ -44,10 +44,10 @@ export function validateServerSettings(value: unknown): MailServerSettings {
     if (!Number.isInteger(input) || Number(input) < 1 || Number(input) > 65535) throw new Error(`Port ${label} invalide.`);
     return Number(input);
   };
-  if (v.imapSecure !== true) throw new Error("IMAP doit obligatoirement utiliser SSL/TLS.");
+  if (v.imapSecurity !== "ssl" && v.imapSecurity !== "starttls") throw new Error("IMAP doit utiliser SSL/TLS ou STARTTLS.");
   if (v.smtpSecurity !== "ssl" && v.smtpSecurity !== "starttls") throw new Error("SMTP doit utiliser SSL/TLS ou STARTTLS.");
   return {
-    imapHost: host(v.imapHost, "IMAP"), imapPort: port(v.imapPort, "IMAP"), imapSecure: true,
+    imapHost: host(v.imapHost, "IMAP"), imapPort: port(v.imapPort, "IMAP"), imapSecurity: v.imapSecurity,
     smtpHost: host(v.smtpHost, "SMTP"), smtpPort: port(v.smtpPort, "SMTP"), smtpSecurity: v.smtpSecurity,
   };
 }
@@ -86,7 +86,8 @@ function createImapClient(account: StoredAccount): ImapFlow {
   return new ImapFlow({
     host: account.servers.imapHost,
     port: account.servers.imapPort,
-    secure: true,
+    secure: account.servers.imapSecurity === "ssl",
+    doSTARTTLS: account.servers.imapSecurity === "starttls",
     auth: { user: account.email, pass: account.appPassword },
     logger: false,
     socketTimeout: 20_000,
