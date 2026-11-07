@@ -345,6 +345,7 @@ export class GmailService {
   async readMessage(id: GmailAccountId, messageId: string) {
     if (!/^\d+$/.test(messageId)) throw new Error("Identifiant IMAP invalide.");
     const account = this.requireAccount(id);
+    if (!account.servers.receiveEnabled) throw new Error("La réception des e-mails est désactivée pour ce compte.");
     await assertPublicMailHost(account.servers.imapHost);
     const client = createImapClient(account);
     try {
