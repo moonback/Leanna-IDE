@@ -1,7 +1,6 @@
 /**
- * Notebook AI Debate — orchestration vocale séquentielle de deux sessions Gemini Live.
- * Un seul speaker est actif à la fois : l'orchestrateur contrôle les tours,
- * la pause et la durée afin d'éviter les chevauchements audio.
+ * Orchestrates a grounded, sequential three-role Notebook debate over Gemini Live.
+ * Only one role speaks at a time; pause is honored between turns.
  */
 import { WebSocket, WebSocketServer } from "ws";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
@@ -11,12 +10,11 @@ import { SELF_ROOT } from "../utils/selfRoot.js";
 import type { ProfileConfig } from "../prompts/systemInstruction.js";
 
 const MODEL = "gemini-3.8-live";
-const MAX_DURATION_MS = 10 * 60 * 1000;
-const MAX_TURNS = 6;
-const MAX_TOPIC_LENGTH = 500;
-
-type Speaker = "analyst" | "critic" | "moderator";
-type DebateMessage = { speaker: Speaker; text: string; at: string; citations: Array<{sourceId:string;sourceTitle:string;chunkId:string;excerpt:string;relevance:number}> };
+const MAX_DURATION_MS = 10 * 60_000;
+const ROLES = ["analyst", "critic", "moderator"] as const;
+type Speaker = typeof ROLES[number];
+type Citation = { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number };
+type TurnMessage = { speaker: Speaker; text: string; at: string; citations: Citation[] };
 
 export interface NotebookDebateDeps {
   createGeminiAI: () => GoogleGenAI;
@@ -25,9 +23,9 @@ export interface NotebookDebateDeps {
 }
 
 const ROLE_PROMPTS: Record<Speaker, string> = {
-  analyst: "Tu es l'ANALYSTE. Construis une lecture structurée, nuancée et fidèle aux extraits fournis. Identifie les faits, les mécanismes, les arguments et les limites. Chaque affirmation documentaire doit référencer les identifiants de passages [chunk:ID]. N'invente aucune source. Réponds oralement en français, de façon concise (60 à 100 secondes).",
-  critic: "Tu es le CONTRADICTEUR. Examine rigoureusement l'intervention de l'analyste : cherche les angles morts, les contradictions, les généralisations et les preuves manquantes. Tu dois aussi reconnaître les points solides. N'invente aucune source et cite les passages fournis avec [chunk:ID]. Réponds oralement en français (60 à 100 secondes).",
-  moderator: "Tu es le MODÉRATEUR. Fais une synthèse équilibrée du débat : consensus, désaccords réels, éléments démontrés, incertitudes et questions ouvertes. Ne présente jamais une hypothèse comme un fait. Cite les passages avec [chunk:ID]. Réponds en français, clairement et sans préambule.",
+  analyst: "Tu es l'ANALYSTE du débat. Construis une lecture structurée, nuancée et fidèle aux extraits fournis. Identifie faits, mécanismes, arguments et limites. Chaque affirmation documentaire doit citer un identifiant [chunk:ID] présent dans les extraits. N'invente aucune source. Réponds en français, oralement, en 45 à 75 secondes.",
+  critic: "Tu es le CONTRADICTEUR. Examine rigoureusement l'intervention précédente : angles morts, contradictions, généralisations et preuves manquantes. Reconnais aussi les arguments solides. Chaque affirmation documentaire doit citer un [chunk:ID] fourni. N'invente aucune source. Réponds en français, oralement, en 45 à 75 secondes.",
+  moderator: "Tu es le MODÉRATEUR. Synthétise équitablement : consensus, désaccords, éléments étayés, incertitudes et questions ouvertes. Ne présente jamais une hypothèse comme un fait. Cite les [chunk:ID] fournis. Réponds en français, oralement, de façon concise.",
 };
 
 export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: NotebookDebateDeps): void {
@@ -36,24 +34,25 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
     const notebookId = params.get("notebookId") || "";
     let closed = false;
     let paused = false;
-    let running = false;
     let stopRequested = false;
+    let running = false;
     let deadline = 0;
     let durationTimer: ReturnType<typeof setTimeout> | undefined;
-    let sessions: Partial<Record<Speaker, any>> = {};
-    const transcript: DebateMessage[] = [];
+    const sessions = new Map<Speaker, any>();
+    const turnRunners = new Map<Speaker, (prompt: string, evidence: string) => Promise<string>>();
+    const transcript: TurnMessage[] = [];
+
     const send = (payload: unknown) => {
       if (!closed && ws.readyState === WebSocket.OPEN) {
         try { ws.send(JSON.stringify(payload)); } catch { /* socket closing */ }
       }
     };
     const closeSessions = () => {
-      for (const session of Object.values(sessions)) {
-        if (!session) continue;
+      for (const session of sessions.values()) {
         try { session.close(); } catch { /* already closed */ }
         deps.activeGeminiSessions.delete(session);
       }
-      sessions = {};
+      sessions.clear();
     };
     const cleanup = () => {
       closed = true;
@@ -61,8 +60,8 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
       closeSessions();
     };
     const waitIfPaused = async () => {
-      while (paused && !stopRequested && !closed) {
-        await new Promise(resolve => setTimeout(resolve, 150));
+      while (paused && !stopRequested && !closed && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 120));
       }
     };
 
@@ -74,6 +73,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
     }
 
     const connectAgent = async (speaker: Speaker, voiceName: string, temperature: number) => {
+      let active: { text: string; resolve: (value: string) => void; timer: ReturnType<typeof setTimeout> } | null = null;
       const session = await deps.createGeminiAI().live.connect({
         model: MODEL,
         config: {
@@ -88,92 +88,116 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
             if (message.usageMetadata) {
               recordModelCallUsage({ provider: "gemini", model: MODEL, rawUsage: message.usageMetadata, promptCharCount: 0, outputText: "", toolName: "notebook_ai_debate", kind: "live" });
             }
+            if (!active) return;
+            const parts = message.serverContent?.modelTurn?.parts || [];
+            for (const part of parts) {
+              if (part.text) active.text += part.text;
+              const audio = part.inlineData?.data;
+              if (audio) send({ type: "audio", speaker, data: audio, mimeType: part.inlineData?.mimeType || "audio/pcm;rate=24000" });
+            }
+            const outputText = (message.serverContent as any)?.outputAudioTranscription?.text;
+            if (typeof outputText === "string" && outputText) {
+              active.text += outputText;
+              send({ type: "live_transcript", speaker, text: outputText });
+            }
+            if (message.serverContent?.turnComplete || message.serverContent?.interrupted) {
+              const current = active;
+              active = null;
+              clearTimeout(current.timer);
+              current.resolve(current.text.trim());
+            }
           },
-          onerror: () => send({ type: "error", error: "Une session Gemini Live a rencontré une erreur." }),
+          onerror: () => {
+            if (active) {
+              const current = active;
+              active = null;
+              clearTimeout(current.timer);
+              current.resolve(current.text.trim());
+            }
+            send({ type: "error", error: `La session ${speaker} a rencontré une erreur Gemini Live.` });
+          },
         },
       });
-      sessions[speaker] = session;
+      sessions.set(speaker, session);
       deps.activeGeminiSessions.add(session);
-      return session;
-    };
-
-    const runTurn = async (speaker: Speaker, prompt: string, evidence: string, citations: DebateMessage["citations"]) => {
-      await waitIfPaused();
-      if (stopRequested || closed || Date.now() >= deadline) return;
-      const session = sessions[speaker];
-      if (!session) throw new Error("Session Gemini indisponible.");
-      send({ type: "speaker", speaker, state: "speaking" });
-      let output = "";
-      let settled = false;
-      let resolveTurn!: () => void;
-      const completed = new Promise<void>(resolve => { resolveTurn = resolve; });
-      const timeout = setTimeout(() => { if (!settled) { settled = true; resolveTurn(); } }, 90000);
-      const previous = session.callbacks?.onmessage;
-      // Le SDK appelle le callback défini à la connexion ; le flux est relayé via
-      // les callbacks installés ci-dessous dans la connexion dédiée de chaque agent.
-      session.sendClientContent({
-        turns: [{ role: "user", parts: [{ text:
-          `SUJET DU DÉBAT : ${prompt}\n\nEXTRAITS AUTORISÉS :\n${evidence}\n\nConsigne : ${prompt}`
-        }] }],
-        turnComplete: true,
-      });
-      // Gemini Live pousse la transcription et l'audio via le callback de session.
-      // Le callback générique reçoit ces événements via le registre de tour ci-dessous.
-      const waiter = (session as any).__debateTurn;
-      if (waiter) await waiter;
-      clearTimeout(timeout);
-      void previous;
-      if (!output.trim()) output = (session as any).__lastTranscript || "Intervention audio terminée ; transcription non disponible.";
-      const entry: DebateMessage = { speaker, text: output, at: new Date().toISOString(), citations };
-      transcript.push(entry);
-      send({ type: "transcript", message: entry });
-      send({ type: "speaker", speaker, state: "idle" });
+      turnRunners.set(speaker, (prompt, evidence) => new Promise<string>((resolve, reject) => {
+        if (active) { reject(new Error("Un tour de parole est déjà en cours.")); return; }
+        const timer = setTimeout(() => {
+          if (active) {
+            const current = active;
+            active = null;
+            current.resolve(current.text.trim());
+          }
+        }, 75_000);
+        active = { text: "", resolve, timer };
+        try {
+          session.sendClientContent({
+            turns: [{ role: "user", parts: [{ text: `SUJET ET CONSIGNE : ${prompt}\n\nEXTRAITS AUTORISÉS DU NOTEBOOK :\n${evidence}\n\nRéponds uniquement à partir de ces extraits. Si une preuve manque, dis-le explicitement.` }] }],
+            turnComplete: true,
+          });
+        } catch (error) {
+          clearTimeout(timer);
+          active = null;
+          reject(error);
+        }
+      }));
     };
 
     const startDebate = async (input: { topic?: string; sourceIds?: string[]; durationMinutes?: number }) => {
       if (running) return;
       running = true;
-      const topic = String(input.topic || "").trim().slice(0, MAX_TOPIC_LENGTH);
+      const topic = typeof input.topic === "string" ? input.topic.trim().slice(0, 500) : "";
       if (!topic) { send({ type: "error", error: "Indiquez un sujet de débat." }); running = false; return; }
-      const allowedIds = new Set(notebook!.sources.map(source => source.id));
-      const requested = Array.isArray(input.sourceIds) ? input.sourceIds.filter(id => typeof id === "string" && allowedIds.has(id)) : [];
+      const allowed = new Set(notebook!.sources.map(source => source.id));
+      const requested = Array.isArray(input.sourceIds) ? input.sourceIds.filter((id): id is string => typeof id === "string" && allowed.has(id)) : [];
       const sourceIds = requested.length ? requested : notebook!.sources.map(source => source.id);
+      if (!sourceIds.length) { send({ type: "error", error: "Ajoutez au moins une source au Notebook avant de lancer le débat." }); running = false; return; }
       const durationMinutes = Math.max(1, Math.min(10, Number(input.durationMinutes) || 10));
       deadline = Date.now() + Math.min(durationMinutes * 60_000, MAX_DURATION_MS);
-      durationTimer = setTimeout(() => { stopRequested = true; send({ type: "limit_reached" }); }, deadline - Date.now());
+      durationTimer = setTimeout(() => { stopRequested = true; paused = false; send({ type: "limit_reached" }); }, deadline - Date.now());
       const profile = deps.getCurrentProfile();
-      const voiceA = profile.aiVoice || "Aoede";
-      const voiceB = "Puck";
       send({ type: "status", status: "connecting", topic, durationMinutes, sourceCount: sourceIds.length });
       try {
         await Promise.all([
-          connectAgent("analyst", voiceA, profile.temperature ?? 0.5),
-          connectAgent("critic", voiceB, profile.temperature ?? 0.6),
-          connectAgent("moderator", voiceA, 0.3),
+          connectAgent("analyst", profile.aiVoice || "Aoede", profile.temperature ?? 0.5),
+          connectAgent("critic", "Puck", profile.temperature ?? 0.6),
+          connectAgent("moderator", profile.aiVoice || "Aoede", 0.3),
         ]);
         send({ type: "status", status: "running" });
         let previousText = "";
-        for (let turn = 0; turn < MAX_TURNS && !stopRequested && !closed && Date.now() < deadline; turn++) {
-          const speaker: Speaker = turn === MAX_TURNS - 1 ? "moderator" : turn % 2 === 0 ? "analyst" : "critic";
-          const query = turn === 0 ? topic : `${topic}\nIntervention précédente : ${previousText.slice(-1800)}\nQuel nouvel angle ou contre-argument étayer ?`;
+        for (const speaker of ROLES) {
+          await waitIfPaused();
+          if (stopRequested || closed || Date.now() >= deadline) break;
+          const query = speaker === "analyst"
+            ? topic
+            : `${topic}\nIntervention précédente : ${previousText.slice(-2200)}\nIdentifie les points solides, les limites et les preuves pertinentes.`;
           const results = await ragEngine.searchHybrid(query, notebook!.sources, { maxChunks: 6, minRelevance: 0.12, sourceIds });
-          const evidence = results.map((r, i) => `[chunk:${r.chunk.id}] [source:${r.source.id}] ${r.source.title}\n${r.chunk.content.slice(0, 1800)}`).join("\n\n");
-          const citations = results.map(r => ({ sourceId: r.source.id, sourceTitle: r.source.title, chunkId: r.chunk.id, excerpt: r.chunk.content.slice(0, 240), relevance: r.relevance }));
-          if (!evidence) {
-            send({ type: "error", error: "Aucun passage pertinent trouvé dans les sources sélectionnées." });
-            break;
-          }
-          await runTurn(speaker, turn === 0 ? `Analyse le sujet : ${topic}` : turn === MAX_TURNS - 1 ? `Synthétise le débat sur : ${topic}` : `Réponds à l'intervention précédente sur : ${topic}. ${previousText}`, evidence, citations);
-          previousText = transcript[transcript.length - 1]?.text || previousText;
-          if (turn < MAX_TURNS - 1) await runTurn(speaker === "analyst" ? "critic" : "analyst", `Réagis à l'argument suivant : ${previousText}`, evidence, citations);
-          previousText = transcript[transcript.length - 1]?.text || previousText;
-          if (turn > 0) break;
+          if (!results.length) { send({ type: "error", error: "Aucun passage pertinent trouvé dans les sources sélectionnées." }); break; }
+          const citations: Citation[] = results.map(result => ({
+            sourceId: result.source.id, sourceTitle: result.source.title, chunkId: result.chunk.id,
+            excerpt: result.chunk.content.slice(0, 240), relevance: result.relevance,
+          }));
+          const evidence = results.map(result => `[chunk:${result.chunk.id}] [source:${result.source.id}] ${result.source.title}\n${result.chunk.content.slice(0, 1600)}`).join("\n\n");
+          const prompt = speaker === "analyst"
+            ? `Analyse le sujet : ${topic}`
+            : speaker === "critic"
+              ? `Contredis et teste l'analyse suivante sur « ${topic} » : ${previousText}`
+              : `Produis la synthèse finale du débat sur « ${topic} ». Dernière intervention : ${previousText}`;
+          send({ type: "speaker", speaker, state: "speaking" });
+          const text = await turnRunners.get(speaker)!(prompt, evidence);
+          const message: TurnMessage = { speaker, text: text || "Transcription indisponible ; consultez la sortie audio.", at: new Date().toISOString(), citations };
+          transcript.push(message);
+          previousText = message.text;
+          send({ type: "transcript", message });
+          send({ type: "speaker", speaker, state: "idle" });
         }
         if (!stopRequested && !closed) send({ type: "status", status: "completed", transcript });
+        else if (!closed) send({ type: "status", status: "stopped", transcript });
       } catch (error) {
         send({ type: "error", error: error instanceof Error ? error.message : "Échec du débat." });
       } finally {
         running = false;
+        if (durationTimer) clearTimeout(durationTimer);
         closeSessions();
       }
     };
