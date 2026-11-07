@@ -74,7 +74,7 @@ L'envoi est une action externe sensible. Une confirmation interactive explicite 
 
 ## 8. Exactitude des réponses
 
-- Les résultats IMAP peuvent être limités à la boîte de réception (INBOX) et aux critères réellement pris en charge. Ne pas présenter une recherche comme couvrant tous les dossiers Gmail.
+- Les résultats IMAP peuvent être limités à la boîte de réception (INBOX) et aux critères réellement pris en charge. Ne pas présenter une recherche comme couvrant tous les dossiers du fournisseur.
 - Les résultats sont susceptibles d'être incomplets en cas de déconnexion, d'erreur d'authentification ou de limite de résultats.
 - Signaler explicitement les erreurs d'un compte sans masquer les résultats valides de l'autre.
 - Ne jamais inventer un expéditeur, un objet, une date, un contenu, un identifiant, un statut ou une confirmation d'envoi.
