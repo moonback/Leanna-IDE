@@ -198,7 +198,7 @@ export function AudioOverviewPanel({ notebookId, overviews, sources, onRefresh, 
     try {
       const data = await api<{ audioUrl: string }>(
         `/api/notebooks/${notebookId}/audio-overviews/${selectedOverview.id}/audio-track`,
-        { method: 'POST', json: { hostVoice: 'Aoede', coHostVoice: 'Charon' } },
+        { method: 'POST', json: { hostVoice: 'ff_siwis', coHostVoice: 'am_adam' } },
       );
       const link = document.createElement('a');
       link.href = `${data.audioUrl}?download=1`;
