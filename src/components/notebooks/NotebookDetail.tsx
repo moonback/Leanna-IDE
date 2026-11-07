@@ -575,8 +575,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         data-studio-open={studioOpen}
         data-source-open={sourceRailOpen}
         style={{
-          '--nb-left': `${panelWidths.sources}px`,
-          '--nb-right': `${panelWidths.studio}px`,
+          '--nb-left': sourceRailOpen ? `${panelWidths.sources}px` : 'var(--nb-rail)',
+          '--nb-right': studioOpen ? `${panelWidths.studio}px` : 'var(--nb-rail)',
         } as React.CSSProperties}
       >
         {/* Gauche : Sources */}
