@@ -136,14 +136,29 @@ const Card = React.memo(function Card({
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         borderColor: 'var(--border-base)',
-        backdropFilter: 'blur(14px)',
+        backdropFilter: 'blur(18px)',
         transformStyle: 'preserve-3d',
+        perspective: '1100px',
+        backgroundImage: 'radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 42%)',
         boxShadow: '0 8px 24px color-mix(in srgb, var(--bg) 22%, transparent)',
+        transition: 'border-color 180ms ease, box-shadow 180ms ease',
       }}
       initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={reduce ? { duration: 0.15 } : { ...SPRING, delay: 0.04 * index }}
-      whileHover={reduce ? undefined : { y: -3, rotateX: 1.4, rotateY: -1.2, scale: 1.006, borderColor: 'var(--accent-primary)', boxShadow: '0 16px 34px color-mix(in srgb, var(--accent-primary) 13%, transparent)' }}
+      whileHover={reduce ? undefined : { y: -4, rotateX: 2.2, rotateY: -1.8, scale: 1.008, borderColor: 'var(--accent-primary)', boxShadow: '0 20px 42px color-mix(in srgb, var(--accent-primary) 17%, transparent)' }}
+      onPointerMove={event => {
+        if (reduce || event.pointerType === 'touch') return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        event.currentTarget.style.setProperty('--pointer-x', `${Math.round(x * 100)}%`);
+        event.currentTarget.style.setProperty('--pointer-y', `${Math.round(y * 100)}%`);
+      }}
+      onPointerLeave={event => {
+        event.currentTarget.style.setProperty('--pointer-x', '50%');
+        event.currentTarget.style.setProperty('--pointer-y', '50%');
+      }}
       aria-label={title}
     >
       <header className="mb-2 flex items-center gap-2">
@@ -810,6 +825,8 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [immersiveMode, setImmersiveMode] = useState(false);
 
   useEffect(() => {
     try {
@@ -837,6 +854,12 @@ export const EditorDashboard = React.memo(function EditorDashboard({
     });
     setDraggedSection(null);
   }, [draggedSection]);
+
+  const resetLayout = useCallback(() => {
+    setSectionOrder(DEFAULT_SECTION_ORDER);
+    setDraggedSection(null);
+    try { window.localStorage.removeItem('leanna.dashboard.section-order'); } catch { /* stockage facultatif */ }
+  }, []);
 
   // Connexion seule : le chat reste fermé (bouton « Ouvrir le chat » séparé).
   const handleConnect = useCallback(() => {
@@ -870,7 +893,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <main className="relative z-10 mx-auto w-full max-w-[1480px] px-3 py-4 sm:px-5">
+      <main className={`relative z-10 mx-auto w-full px-3 py-4 transition-[max-width,padding] duration-500 sm:px-5 ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-[1480px]'}`}>
         <motion.header
           className="mb-4 flex flex-wrap items-end justify-between gap-3"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
@@ -905,10 +928,24 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                 <a.icon size={14} className={a.spin && !reduce ? 'animate-spin' : undefined} /> {a.label}
               </motion.button>
             ))}
+            <motion.button type="button" onClick={() => setIsEditMode(value => !value)} whileHover={reduce ? undefined : { y: -2 }} whileTap={reduce ? undefined : { scale: 0.96 }} aria-pressed={isEditMode} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors" style={isEditMode ? { backgroundColor: 'var(--accent-subtle)', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+              <Settings size={14} /> {isEditMode ? 'Terminer' : 'Personnaliser'}
+            </motion.button>
+            {isEditMode && <motion.button type="button" onClick={resetLayout} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} whileTap={reduce ? undefined : { scale: 0.96 }} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              <RefreshCw size={14} /> Réinitialiser
+            </motion.button>}
+            <motion.button type="button" onClick={() => setImmersiveMode(value => !value)} whileHover={reduce ? undefined : { y: -2 }} whileTap={reduce ? undefined : { scale: 0.96 }} aria-pressed={immersiveMode} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" style={immersiveMode ? { backgroundColor: 'var(--accent-subtle)', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+              <Sparkles size={14} /> {immersiveMode ? 'Vue standard' : 'Vue immersive'}
+            </motion.button>
           </nav>
         </motion.header>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Sections du tableau de bord réorganisables">
+        {isEditMode && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
+          <Settings size={14} style={{ color: 'var(--accent-primary)' }} />
+          <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
+          <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
+        </motion.div>}
+        <div className={`grid grid-cols-1 gap-3 transition-[gap] duration-500 md:grid-cols-2 xl:grid-cols-4 ${immersiveMode ? 'gap-5' : ''}`} aria-label="Sections du tableau de bord réorganisables">
           {sectionOrder.map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
@@ -929,17 +966,18 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             return (
               <div
                 key={sectionId}
-                draggable
+                draggable={isEditMode}
                 onDragStart={event => {
+                  if (!isEditMode) return;
                   setDraggedSection(sectionId);
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData('text/plain', sectionId);
                 }}
-                onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
-                onDrop={event => { event.preventDefault(); moveSection(sectionId); }}
+                onDragOver={event => { if (!isEditMode) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                onDrop={event => { if (!isEditMode) return; event.preventDefault(); moveSection(sectionId); }}
                 onDragEnd={() => setDraggedSection(null)}
-                className={`min-w-0 cursor-grab active:cursor-grabbing transition-opacity ${sectionId === 'operations' ? 'md:col-span-2 xl:col-span-4' : sectionId === 'audio' ? 'md:col-span-2' : ''} ${draggedSection === sectionId ? 'opacity-40' : ''}`}
-                title="Faire glisser pour déplacer cette section"
+                className={`min-w-0 transition-all duration-300 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${sectionId === 'operations' ? 'md:col-span-2 xl:col-span-4' : sectionId === 'audio' ? 'md:col-span-2' : ''} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
+                title={isEditMode ? 'Faire glisser pour déplacer cette section' : undefined}
               >
                 {section}
               </div>
