@@ -201,6 +201,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
             transcript.push(userTurn);
             previousText = userText;
             send({ type: "transcript", message: userTurn });
+            send({ type: "intervention_applied" });
             nextSpeaker = "analyst";
           }
 
