@@ -938,7 +938,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                 onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
                 onDrop={event => { event.preventDefault(); moveSection(sectionId); }}
                 onDragEnd={() => setDraggedSection(null)}
-                className={`min-w-0 cursor-grab active:cursor-grabbing transition-opacity ${draggedSection === sectionId ? 'opacity-40' : ''}`}
+                className={`min-w-0 cursor-grab active:cursor-grabbing transition-opacity ${sectionId === 'operations' ? 'md:col-span-2 xl:col-span-4' : sectionId === 'audio' ? 'md:col-span-2' : ''} ${draggedSection === sectionId ? 'opacity-40' : ''}`}
                 title="Faire glisser pour déplacer cette section"
               >
                 {section}
