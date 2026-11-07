@@ -377,8 +377,11 @@ export class ContentGenerator {
     const duration = options.duration || "medium";
     const durationMinutes = duration === "short" ? 5 : duration === "medium" ? 10 : 15;
     const tone = options.tone || "casual";
-    const hostName = (options.hostName || "Leanna").trim().slice(0, 32) || "Leanna";
-    const coHostName = (options.coHostName || "Noah").trim().slice(0, 32) || "Noah";
+    const hostName = (options.hostName || "Leanna").replace(/[:\\r\\n]/g, "").trim().slice(0, 32) || "Leanna";
+    const coHostName = (options.coHostName || "Noah").replace(/[:\\r\\n]/g, "").trim().slice(0, 32) || "Noah";
+    if (hostName.toLocaleLowerCase() === coHostName.toLocaleLowerCase()) {
+      throw new Error("Les deux personnalités doivent avoir des noms différents.");
+    }
     const coHostPersonality = (options.coHostPersonality || "Analytique et curieux : pose des questions pertinentes, nuance les affirmations et apporte un autre point de vue.").trim().slice(0, 600);
 
     // Mapping des tons
