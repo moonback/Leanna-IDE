@@ -28,7 +28,7 @@ export const emailSkill: Skill = {
     },
     {
       name: "email_read_message",
-      description: "Lit le contenu d'un e-mail Gmail identifié par son ID. Il faut préciser le compte et l'identifiant de message.",
+      description: "Lit le contenu d'un e-mail identifié par son ID IMAP. Il faut préciser le compte et l'identifiant de message.",
       parameters: z.object({ account: accountSchema, messageId: z.string().min(1) }),
     },
     {
