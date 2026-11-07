@@ -6,7 +6,8 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
-import { Filter, PenLine, FileBarChart, ArrowRight, Loader2 } from 'lucide-react';
+import { Filter, PenLine, FileBarChart, ArrowRight, Loader2, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import type { SpringTransition } from '../motionTypes.js';
 import { NbButton, NbTextarea, NbSectionLabel, NbBadge } from '../ui/primitives.js';
 import { DOC_TYPES } from './constants.js';
@@ -57,8 +58,40 @@ export function DocTypePicker({
   reduceMotion,
   modalSpring,
 }: Props) {
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [typeSearch, setTypeSearch] = useState('');
   const sourceFilterOn = showSourceFilter || selectedSourceIds.length > 0;
   const promptOn = showCustomPrompt || !!customInstructions.trim();
+
+  const categories = [
+    { key: 'all', label: 'Tout', description: 'Tous les formats disponibles' },
+    { key: 'understand', label: 'Comprendre', description: 'Synthétiser et clarifier les sources' },
+    { key: 'learn', label: 'Apprendre', description: 'Mémoriser et réviser les notions' },
+    { key: 'analyze', label: 'Analyser', description: 'Évaluer, comparer et illustrer' },
+    { key: 'organize', label: 'Organiser', description: 'Structurer les idées et les actions' },
+  ] as const;
+
+  const categoryByType: Record<string, string> = {
+    summary: 'understand',
+    faq: 'understand',
+    glossary: 'understand',
+    'study-guide': 'learn',
+    swot: 'analyze',
+    infographic: 'analyze',
+    'full-report': 'analyze',
+    briefing: 'organize',
+    timeline: 'organize',
+    outline: 'organize',
+    mindmap: 'organize',
+    roadmap: 'organize',
+  };
+
+  const visibleTypes = useMemo(() => DOC_TYPES.filter((type) => {
+    const matchesCategory = activeCategory === 'all' || categoryByType[type.key] === activeCategory;
+    const query = typeSearch.trim().toLocaleLowerCase('fr');
+    const matchesSearch = !query || `${type.label} ${type.desc}`.toLocaleLowerCase('fr').includes(query);
+    return type.key !== 'full-report' && matchesCategory && matchesSearch;
+  }), [activeCategory, typeSearch]);
   return (
     <>
       {/* Quick config bar — chips à gauche, compteur de sources à droite */}
@@ -160,92 +193,125 @@ export function DocTypePicker({
         )}
       </AnimatePresence>
 
-      {/* Generate cards — grille 2 colonnes, grandes cartes (style NotebookLM) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <NbSectionLabel>Générer</NbSectionLabel>
+      {/* Catalogue organisé par intention : recherche + filtres de catégories. */}
+      <section className="space-y-3" aria-labelledby="notebook-generation-title">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <NbSectionLabel>Studio de création</NbSectionLabel>
+            <p id="notebook-generation-title" className="mt-1 text-xs text-[var(--text-muted)]">
+              Choisissez ce que vous souhaitez produire à partir de vos sources.
+            </p>
+          </div>
           {activeGenerationIds.size > 0 && (
-            <NbBadge tone="accent" icon={Loader2} className="[&>svg]:animate-spin">
+            <NbBadge tone="accent" icon={Loader2} className="flex-shrink-0 [&>svg]:animate-spin">
               {activeGenerationIds.size > 1 ? `${activeGenerationIds.size} en cours...` : 'En cours...'}
             </NbBadge>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {/* Carte « Rapport complet » — ouvre le modal, avec badge Nouveau ! */}
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-card-bg)] px-3 py-2.5 focus-within:border-[var(--notebook-accent)]">
+          <Search className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]" aria-hidden />
+          <input
+            type="search"
+            value={typeSearch}
+            onChange={(event) => setTypeSearch(event.target.value)}
+            placeholder="Rechercher un format..."
+            aria-label="Rechercher un format de génération"
+            className="min-w-0 flex-1 bg-transparent text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dimmed)]"
+          />
+          {typeSearch && (
+            <button type="button" onClick={() => setTypeSearch('')} aria-label="Effacer la recherche" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          )}
+        </label>
+
+        <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Filtrer les formats par catégorie">
+          {categories.map((category) => (
+            <button
+              key={category.key}
+              type="button"
+              aria-pressed={activeCategory === category.key}
+              title={category.description}
+              onClick={() => setActiveCategory(category.key)}
+              className={clsx(
+                'flex-shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors',
+                activeCategory === category.key
+                  ? 'border-[var(--notebook-accent)] bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]'
+                  : 'border-[var(--notebook-border)] text-[var(--text-secondary)] hover:border-[var(--notebook-accent)] hover:text-[var(--text-primary)]',
+              )}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+
+        {(activeCategory === 'all' || activeCategory === 'analyze') && (!typeSearch || 'rapports rapport complet'.includes(typeSearch.toLocaleLowerCase('fr'))) && (
           <button
             ref={reportModalTriggerRef}
             type="button"
             onClick={onOpenReportModal}
             disabled={sources.length === 0}
-            className="notebook-studio-card notebook-gen-card group active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+            className="notebook-studio-card notebook-gen-card group w-full active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
             title="Choisir un type de rapport • Suggestions IA incluses"
           >
-            <span
-              className="notebook-gen-card-icon"
-              style={{
-                backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)',
-              }}
-            >
+            <span className="notebook-gen-card-icon" style={{ backgroundColor: 'color-mix(in srgb, var(--color-error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)' }}>
               <FileBarChart className="h-4 w-4" style={{ color: 'var(--color-error)' }} aria-hidden />
             </span>
             <span className="notebook-gen-card-label">
-              <span className="notebook-gen-card-text">Rapports</span>
-              <span className="notebook-gen-card-badge">Nouveau !</span>
+              <span className="notebook-gen-card-text">Rapports spécialisés</span>
+              <span className="notebook-gen-card-badge">12 modèles</span>
             </span>
             <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
           </button>
+        )}
 
-          {/* Types rapides */}
-          {DOC_TYPES.filter(t => t.key !== 'full-report').map(({ key, label, icon: Icon, desc, color, badge }) => {
-            const isActive = [...activeGenerationIds].some(taskId => {
-              const task = generationQueue.find(t => t.id === taskId);
-              return task && task.type === key;
-            });
-            return (
-              <motion.button
-                key={key}
-                type="button"
-                ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
-                onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
-                disabled={sources.length === 0}
-                whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
-                className="notebook-studio-card notebook-gen-card group relative disabled:pointer-events-none disabled:opacity-40"
-                style={isActive ? {
-                  borderColor: color,
-                  backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))`,
-                } : undefined}
-                title={desc}
-              >
-                <span
-                  className="notebook-gen-card-icon"
-                  style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}
+        {visibleTypes.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {visibleTypes.map(({ key, label, icon: Icon, desc, color, badge }) => {
+              const isActive = [...activeGenerationIds].some(taskId => {
+                const task = generationQueue.find(t => t.id === taskId);
+                return task && task.type === key;
+              });
+              return (
+                <motion.button
+                  key={key}
+                  type="button"
+                  ref={key === 'infographic' ? infographicModalTriggerRef : undefined}
+                  onClick={() => key === 'infographic' ? onOpenInfographic() : onGenerate(key)}
+                  disabled={sources.length === 0}
+                  whileTap={sources.length > 0 && !reduceMotion ? { scale: 0.98 } : {}}
+                  className="notebook-studio-card notebook-gen-card group relative min-h-[92px] items-start disabled:pointer-events-none disabled:opacity-40"
+                  style={isActive ? { borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 6%, var(--notebook-card-bg))` } : undefined}
+                  title={desc}
+                  aria-label={`${label} : ${desc}`}
                 >
-                  {isActive ? (
-                    <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden />
-                  ) : (
-                    <Icon className="h-4 w-4" style={{ color }} aria-hidden />
+                  <span className="notebook-gen-card-icon" style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 20%, transparent)` }}>
+                    {isActive ? <Loader2 className="h-4 w-4 animate-spin" style={{ color }} aria-hidden /> : <Icon className="h-4 w-4" style={{ color }} aria-hidden />}
+                  </span>
+                  <span className="notebook-gen-card-label min-w-0 flex-1">
+                    <span className="notebook-gen-card-text">{label}</span>
+                    <span className="mt-1 line-clamp-2 text-[10px] font-normal leading-snug text-[var(--text-muted)]">{desc}</span>
+                    {badge && <span className="notebook-gen-card-badge">{badge}</span>}
+                  </span>
+                  {isActive && (
+                    <motion.div layoutId="activeGenType" className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-60" style={{ border: `1.5px solid ${color}` }} />
                   )}
-                </span>
-
-                <span className="notebook-gen-card-label">
-                  <span className="notebook-gen-card-text">{label}</span>
-                  {badge && <span className="notebook-gen-card-badge">{badge}</span>}
-                </span>
-
-                {isActive && (
-                  <motion.div
-                    layoutId="activeGenType"
-                    className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-60"
-                    style={{ border: `1.5px solid ${color}` }}
-                  />
-                )}
-              </motion.button>
-            );
-          })}
-        </div>
-      </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--notebook-border)] px-4 py-7 text-center">
+            <Search className="mx-auto h-5 w-5 text-[var(--text-muted)]" aria-hidden />
+            <p className="mt-2 text-xs font-medium text-[var(--text-primary)]">Aucun format trouvé</p>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">Essayez un autre terme ou une autre catégorie.</p>
+            <button type="button" onClick={() => { setTypeSearch(''); setActiveCategory('all'); }} className="mt-3 text-xs font-medium text-[var(--notebook-accent)] hover:underline">
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* Source count info */}
       {sources.length === 0 && (
