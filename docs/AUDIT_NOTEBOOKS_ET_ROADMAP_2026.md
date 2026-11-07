@@ -659,3 +659,19 @@ Compléments de la dixième passe :
 - Aucun changement du contrat API, du modèle Citation ou du mécanisme de récupération de chunk.
 
 **Validation restante :** vérifier le rendu des citations longues, les interactions clavier, les références sans score valide et l'ouverture du chunk dans la visionneuse ; typecheck, lint et tests UI restent à exécuter localement.
+
+
+### Seizième passe — intégrité du grounding RAG
+
+| Risque constaté | Correction |
+|---|---|
+| Un tableau `sourceIds` non vide mais composé d'identifiants invalides était normalisé en `undefined`, ce qui supprimait le filtre et pouvait élargir la recherche à toutes les sources. | Le parseur conserve un filtre restrictif vide ; `GroundedChat` refuse explicitement la requête et demande de vérifier la sélection. Le tableau vide intentionnel du composer conserve sa convention « toutes les sources ». |
+| Une recherche d'embeddings ne transmettait pas `notebookId` au store vectoriel. | `RAGEngine.searchHybrid` transmet désormais le notebook propriétaire et vérifie aussi que le `sourceId` du vecteur correspond au propriétaire du chunk local avant de fusionner le score. |
+| Des sources de notebooks différents ou des identifiants de chunks dupliqués entre sources pouvaient rendre la fusion ambiguë. | Le pipeline refuse les corpus multi-notebooks et les collisions de chunk IDs au lieu d'associer un score à un mauvais passage. |
+| En l'absence de résultat RAG, le LLM recevait un contexte vide et pouvait tout de même générer une réponse non étayée. | `GroundedChat` répond explicitement qu'aucun passage suffisamment pertinent n'a été trouvé, sans appel de génération ni citation. |
+| Le prompt système ne qualifiait pas explicitement le contenu des documents comme donnée non fiable. | Ajout d'une consigne anti-injection : les instructions contenues dans les sources ne peuvent pas modifier le rôle ou les règles de l'assistant ; les contradictions et incertitudes doivent être exposées. |
+| Une référence `[SOURCE N]` invalide pouvait déclencher le fallback de citations implicites et donner l'apparence d'une citation correcte. | Le fallback top-3 n'est plus appliqué lorsqu'une référence explicite invalide a été tentée. |
+
+**Tests ajoutés dans `RAGEngine.test.ts` :** filtre `sourceIds` vide et référence explicite hors limites avec scores élevés. Les tests existants couvrent déjà la numérotation, le dédoublonnage, le fallback sans référence explicite et le filtre TF-IDF par source.
+
+**Validation restante :** exécuter le test ciblé `node --import tsx --import ./scripts/test-isolation.mjs --test server/notebooks/RAGEngine.test.ts`, `npm run typecheck` et `npm run lint:eslint:notebooks`. La recherche hybride complète dépend d'embeddings et de services LLM ; elle nécessite un test d'intégration avec store isolé et doubles réseau pour valider la portée notebook/source sans appeler les fournisseurs réels.
