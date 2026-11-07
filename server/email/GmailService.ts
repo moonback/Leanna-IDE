@@ -7,8 +7,12 @@ import { Leanna_APP_ROOT } from "../utils/selfRoot.js";
 import { encrypt, decrypt, isEncrypted } from "../utils/crypto.js";
 
 export type GmailAccountId = "leanna" | "personal";
-export type EmailProvider = "gmail" | "infomaniak";
-type StoredAccount = { email: string; appPassword: string; provider: EmailProvider; connectedAt: string };
+export type EmailProvider = "gmail" | "custom";
+export type MailServerSettings = {
+  imapHost: string; imapPort: number; imapSecure: true;
+  smtpHost: string; smtpPort: number; smtpSecurity: "ssl" | "starttls";
+};
+type StoredAccount = { email: string; appPassword: string; provider: EmailProvider; servers: MailServerSettings; connectedAt: string };
 type EmailConfig = {
   accounts: Partial<Record<GmailAccountId, StoredAccount>>;
   personalSendEnabled: boolean;
@@ -16,15 +20,40 @@ type EmailConfig = {
 
 const MAX_RESULTS = 50;
 const MAX_BODY_CHARS = 100_000;
-const PROVIDER_CONFIG: Record<EmailProvider, { imapHost: string; smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpRequireTLS: boolean }> = {
-  gmail: { imapHost: "imap.gmail.com", smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecure: true, smtpRequireTLS: false },
-  infomaniak: { imapHost: "mail.infomaniak.com", smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecure: false, smtpRequireTLS: true },
+const GMAIL_SERVERS: MailServerSettings = {
+  imapHost: "imap.gmail.com", imapPort: 993, imapSecure: true,
+  smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
 };
+const INFOMANIAK_SERVERS: MailServerSettings = {
+  imapHost: "mail.infomaniak.com", imapPort: 993, imapSecure: true,
+  smtpHost: "mail.infomaniak.com", smtpPort: 587, smtpSecurity: "starttls",
+};
+const DEFAULT_CUSTOM_SERVERS = INFOMANIAK_SERVERS;
+function validateServerSettings(value: unknown): MailServerSettings {
+  if (!value || typeof value !== "object") throw new Error("Paramètres IMAP/SMTP manquants.");
+  const v = value as Record<string, unknown>;
+  const host = (input: unknown, label: string) => {
+    if (typeof input !== "string" || input.length > 253 || !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(input) || input.includes("..")) throw new Error(`Nom d'hôte ${label} invalide.`);
+    const normalized = input.toLowerCase();
+    if (["localhost", "localhost.localdomain"].includes(normalized) || /\.(local|internal|localhost|test|invalid)$/.test(normalized)) throw new Error("Les hôtes locaux ou réservés ne sont pas autorisés pour les connexions e-mail.");
+    return normalized;
+  };
+  const port = (input: unknown, label: string) => {
+    if (!Number.isInteger(input) || Number(input) < 1 || Number(input) > 65535) throw new Error(`Port ${label} invalide.`);
+    return Number(input);
+  };
+  if (v.imapSecure !== true) throw new Error("IMAP doit obligatoirement utiliser SSL/TLS.");
+  if (v.smtpSecurity !== "ssl" && v.smtpSecurity !== "starttls") throw new Error("SMTP doit utiliser SSL/TLS ou STARTTLS.");
+  return {
+    imapHost: host(v.imapHost, "IMAP"), imapPort: port(v.imapPort, "IMAP"), imapSecure: true,
+    smtpHost: host(v.smtpHost, "SMTP"), smtpPort: port(v.smtpPort, "SMTP"), smtpSecurity: v.smtpSecurity,
+  };
+}
 
 function createImapClient(account: StoredAccount): ImapFlow {
   return new ImapFlow({
-    host: PROVIDER_CONFIG[account.provider].imapHost,
-    port: 993,
+    host: account.servers.imapHost,
+    port: account.servers.imapPort,
     secure: true,
     auth: { user: account.email, pass: account.appPassword },
     logger: false,
@@ -36,10 +65,10 @@ function createImapClient(account: StoredAccount): ImapFlow {
 
 function createSmtpTransport(account: StoredAccount) {
   return nodemailer.createTransport({
-    host: PROVIDER_CONFIG[account.provider].smtpHost,
-    port: PROVIDER_CONFIG[account.provider].smtpPort,
-    secure: PROVIDER_CONFIG[account.provider].smtpSecure,
-    requireTLS: PROVIDER_CONFIG[account.provider].smtpRequireTLS,
+    host: account.servers.smtpHost,
+    port: account.servers.smtpPort,
+    secure: account.servers.smtpSecurity === "ssl",
+    requireTLS: account.servers.smtpSecurity === "starttls",
     auth: { user: account.email, pass: account.appPassword },
     tls: { minVersion: "TLSv1.2" },
     connectionTimeout: 15_000,
@@ -108,9 +137,13 @@ export class GmailService {
         const saved = data.accounts?.[id];
         if (typeof saved?.email !== "string" || typeof saved?.appPassword !== "string") continue;
         const password = isEncrypted(saved.appPassword) ? decrypt(saved.appPassword) : "";
-        const provider: EmailProvider = saved.provider === "infomaniak" && id === "leanna" ? "infomaniak" : "gmail";
+        const provider: EmailProvider = id === "leanna" && saved.provider !== "gmail" ? "custom" : "gmail";
+        const legacyServers = saved.provider === "infomaniak" ? INFOMANIAK_SERVERS : GMAIL_SERVERS;
+        let servers: MailServerSettings;
+        try { servers = provider === "custom" && saved.servers ? validateServerSettings(saved.servers) : legacyServers; }
+        catch { continue; }
         if (password && !isEncrypted(password)) {
-          accounts[id] = { email: saved.email, appPassword: password, provider, connectedAt: saved.connectedAt || "" };
+          accounts[id] = { email: saved.email, appPassword: password, provider, servers, connectedAt: saved.connectedAt || "" };
         }
       }
       return { accounts, personalSendEnabled: data.personalSendEnabled === true && Boolean(accounts.personal) };
@@ -150,7 +183,7 @@ export class GmailService {
 
   private accountStatus(id: GmailAccountId) {
     const account = this.config.accounts[id];
-    return { connected: Boolean(account?.appPassword), email: account?.email || null, provider: account?.provider || null };
+    return { connected: Boolean(account?.appPassword), email: account?.email || null, provider: account?.provider || null, servers: id === "leanna" ? account?.servers || null : undefined };
   }
 
   private requireAccount(id: GmailAccountId): StoredAccount {
@@ -159,8 +192,10 @@ export class GmailService {
     return account;
   }
 
-  async connectAccount(id: GmailAccountId, email: string, appPassword: string, provider: EmailProvider = "gmail"): Promise<void> {
-    if (id === "personal" && provider !== "gmail") throw new Error("Infomaniak est configuré uniquement pour le compte dédié de Leanna.");
+  async connectAccount(id: GmailAccountId, email: string, appPassword: string, provider: EmailProvider = "gmail", serverInput?: unknown): Promise<void> {
+    if (id === "personal" && provider !== "gmail") throw new Error("Le compte personnel conserve Gmail dans cette configuration.");
+    if (id === "leanna" && provider !== "custom") throw new Error("Le compte dédié de Leanna doit utiliser la configuration IMAP/SMTP générique.");
+    const servers = id === "personal" ? GMAIL_SERVERS : validateServerSettings(serverInput || DEFAULT_CUSTOM_SERVERS);
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPassword = provider === "gmail" ? appPassword.replace(/\s+/g, "") : appPassword.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -173,6 +208,7 @@ export class GmailService {
       email: normalizedEmail,
       appPassword: normalizedPassword,
       provider,
+      servers,
       connectedAt: new Date().toISOString(),
     };
 
