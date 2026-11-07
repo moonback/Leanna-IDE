@@ -112,9 +112,9 @@ export function ChatMessageList({
 
           {/* Messages */}
           <AnimatePresence initial={false}>
-            {visibleEntries.map((entry) => {
+            {visibleEntries.map((entry, visibleIndex) => {
               const index = transcript.findIndex(item => item.id === entry.id);
-              const previous = visibleEntries[visibleEntries.indexOf(entry) - 1];
+              const previous = visibleEntries[visibleIndex - 1];
               const startsNewDay = !previous || dayKey(previous.timestamp) !== dayKey(entry.timestamp);
               return (
                 <div key={entry.id}>
