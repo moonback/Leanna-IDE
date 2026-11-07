@@ -130,7 +130,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
             active = null;
             current.resolve(current.text.trim());
           }
-        }, 75_000);
+        }, Math.min(75_000, Math.max(1, deadline - Date.now())));
         active = { text: "", resolve, timer };
         try {
           session.sendClientContent({
