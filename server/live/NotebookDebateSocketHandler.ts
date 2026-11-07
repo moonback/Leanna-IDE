@@ -16,7 +16,20 @@ const MAX_DURATION_MS = 10 * 60_000;
 const ROLES = ["analyst", "critic", "moderator"] as const;
 type Speaker = typeof ROLES[number];
 type Citation = { sourceId: string; sourceTitle: string; chunkId: string; excerpt: string; relevance: number };
-type TurnMessage = { speaker: Speaker; text: string; at: string; citations: Citation[] };
+type TurnMessage = { speaker: Speaker | "user"; text: string; at: string; citations: Citation[] };
+const MAX_AGENT_TURNS = 8;
+const MIN_AGENT_TURNS = 4;
+
+function chooseNextSpeaker(lastSpeaker: Speaker, turnCount: number, lastText: string): Speaker {
+  if (turnCount >= MAX_AGENT_TURNS) return "moderator";
+  if (turnCount < MIN_AGENT_TURNS) return lastSpeaker === "analyst" ? "critic" : "analyst";
+  if (lastSpeaker === "analyst") return "critic";
+  if (lastSpeaker === "critic") {
+    const unresolved = /\b(question|preuve|manque|incertain|non démontré|contradiction|cependant|pourtant|à vérifier|ne permet pas)\b/i.test(lastText);
+    return unresolved && turnCount < MAX_AGENT_TURNS - 1 ? "analyst" : "moderator";
+  }
+  return "moderator";
+}
 
 export interface NotebookDebateDeps {
   createGeminiAI: () => GoogleGenAI;
@@ -43,6 +56,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
     const sessions = new Map<Speaker, any>();
     const turnRunners = new Map<Speaker, (prompt: string, evidence: string) => Promise<string>>();
     const transcript: TurnMessage[] = [];
+    const interventionQueue: string[] = [];
 
     const send = (payload: unknown) => {
       if (!closed && ws.readyState === WebSocket.OPEN) {
@@ -174,31 +188,51 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
         turnRunners.set("moderator", turnRunners.get("analyst")!);
         send({ type: "status", status: "running" });
         let previousText = "";
-        for (const speaker of ROLES) {
+        let nextSpeaker: Speaker = "analyst";
+        let agentTurnCount = 0;
+        while (agentTurnCount < MAX_AGENT_TURNS) {
           await waitIfPaused();
           if (stopRequested || closed || Date.now() >= deadline) break;
-          const query = speaker === "analyst"
-            ? topic
-            : `${topic}\nIntervention précédente : ${previousText.slice(-2200)}\nIdentifie les points solides, les limites et les preuves pertinentes.`;
+
+          // Injecter les interventions à une frontière de tour, sans couper la voix en cours.
+          while (interventionQueue.length) {
+            const userText = interventionQueue.shift()!;
+            const userTurn: TurnMessage = { speaker: "user", text: userText, at: new Date().toISOString(), citations: [] };
+            transcript.push(userTurn);
+            previousText = userText;
+            send({ type: "transcript", message: userTurn });
+            nextSpeaker = "analyst";
+          }
+
+          const speaker = nextSpeaker;
+          const latestUserQuestion = [...transcript].reverse().find(turn => turn.speaker === "user")?.text;
+          const query = [topic, previousText.slice(-1800), latestUserQuestion || ""].filter(Boolean).join("\n");
           const results = await ragEngine.searchHybrid(query, notebook!.sources, { maxChunks: 6, minRelevance: 0.12, sourceIds });
           if (!results.length) { send({ type: "error", error: "Aucun passage pertinent trouvé dans les sources sélectionnées." }); break; }
           const citations: Citation[] = results.map(result => ({
             sourceId: result.source.id, sourceTitle: result.source.title, chunkId: result.chunk.id,
             excerpt: result.chunk.content.slice(0, 240), relevance: result.relevance,
           }));
-          const evidence = results.map(result => `[chunk:${result.chunk.id}] [source:${result.source.id}] ${result.source.title}\n${result.chunk.content.slice(0, 1600)}`).join("\n\n");
+          const evidence = results.map(result => \`[chunk:\${result.chunk.id}] [source:\${result.source.id}] \${result.source.title}\n\${result.chunk.content.slice(0, 1600)}\`).join("\n\n");
+          const userContext = latestUserQuestion ? \`\nQUESTION DE L'UTILISATEUR À TRAITER : \${latestUserQuestion}\nRéponds explicitement à cette question en t'appuyant sur les extraits.\` : "";
           const prompt = speaker === "analyst"
-            ? `Analyse le sujet : ${topic}`
+            ? \`Analyse le sujet : \${topic}. Tiens compte des interventions utilisateur et des objections précédentes.\${userContext}\nContexte précédent : \${previousText.slice(-2200)}\`
             : speaker === "critic"
-              ? `Contredis et teste l'analyse suivante sur « ${topic} » : ${previousText}`
-              : `Produis la synthèse finale du débat sur « ${topic} ». Dernière intervention : ${previousText}`;
+              ? \`Contredis et teste les arguments précédents sur « \${topic} ». Réponds aussi à la question de l'utilisateur si elle reste ouverte.\${userContext}\nIntervention précédente : \${previousText.slice(-2200)}\`
+              : \`Produis la synthèse finale du débat sur « \${topic} ». Distingue consensus, désaccords persistants et réponses aux questions de l'utilisateur. Dernière intervention : \${previousText.slice(-2200)}\`;
           send({ type: "speaker", speaker, state: "speaking" });
           const text = await turnRunners.get(speaker)!(prompt, evidence);
           const message: TurnMessage = { speaker, text: text || "Transcription indisponible ; consultez la sortie audio.", at: new Date().toISOString(), citations };
           transcript.push(message);
           previousText = message.text;
+          agentTurnCount++;
           send({ type: "transcript", message });
           send({ type: "speaker", speaker, state: "idle" });
+
+          // Choix adaptatif : objections et preuves manquantes prolongent la confrontation.
+          nextSpeaker = chooseNextSpeaker(speaker, agentTurnCount, message.text);
+          send({ type: "orchestration", nextSpeaker, agentTurnCount, maxAgentTurns: MAX_AGENT_TURNS });
+          if (speaker === "moderator") break;
         }
         if (transcript.length && !closed) {
           const report = [
@@ -209,7 +243,7 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
             "",
             "## Interventions",
             ...transcript.flatMap((turn, index) => [
-              `### ${index + 1}. ${turn.speaker === "analyst" ? "Analyste" : turn.speaker === "critic" ? "Contradicteur" : "Modérateur"}`,
+              `### ${index + 1}. ${turn.speaker === "user" ? "Utilisateur" : turn.speaker === "analyst" ? "Analyste" : turn.speaker === "critic" ? "Contradicteur" : "Modérateur"}`,
               turn.text,
               "",
               turn.citations.length ? `Sources consultées : ${turn.citations.map(c => `${c.sourceTitle} (chunk ${c.chunkId})`).join(", ")}` : "Aucune citation associée.",
@@ -242,6 +276,14 @@ export function attachNotebookDebateWebSocket(wss: WebSocketServer, deps: Notebo
       if (message.type === "start") void startDebate(message);
       else if (message.type === "pause") { paused = true; send({ type: "status", status: "paused" }); }
       else if (message.type === "resume") { paused = false; send({ type: "status", status: "running" }); }
+      else if (message.type === "intervene") {
+        const text = typeof message.text === "string" ? message.text.trim().slice(0, 1200) : "";
+        if (!text) { send({ type: "error", error: "Votre intervention est vide." }); return; }
+        if (!running || stopRequested || closed) { send({ type: "error", error: "Le débat n’accepte plus d’intervention." }); return; }
+        if (interventionQueue.length >= 5) { send({ type: "error", error: "La file d’interventions est pleine. Attendez la prochaine réponse." }); return; }
+        interventionQueue.push(text);
+        send({ type: "intervention_queued", text, position: interventionQueue.length });
+      }
       else if (message.type === "stop") { stopRequested = true; paused = false; send({ type: "status", status: "stopping" }); }
     });
     ws.on("close", cleanup);
