@@ -41,7 +41,6 @@ export function UnifiedTimeline({ steps, reasoning }: UnifiedTimelineProps) {
     () => agentTasks.slice(-5).reverse(),
     [agentTasks],
   );
-  const completedAgentCount = recentAgentTasks.filter(t => t.status === 'completed').length;
   const failedAgentCount = recentAgentTasks.filter(t => t.status === 'failed' || t.status === 'incomplete').length;
 
   const phases = useMemo(() => {
