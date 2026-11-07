@@ -1419,7 +1419,7 @@ export class TelegramService {
     if (!targetChatId) return false;
     // Les @usernames sont acceptés par l'API d'envoi, mais les callbacks Telegram
     // exposent un chat.id numérique : normaliser avant d'enregistrer la demande.
-    if (!/^-?\\d+$/.test(String(targetChatId))) {
+    if (!/^-?\d+$/.test(String(targetChatId))) {
       try {
         targetChatId = String((await this.bot.api.getChat(targetChatId)).id);
       } catch {
