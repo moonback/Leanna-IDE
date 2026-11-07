@@ -106,6 +106,7 @@ export function useAutonomyTimeline({
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
   const enabledRef = useRef(enabled);
   const lastConnectStartTs = useRef(0);
@@ -120,6 +121,10 @@ export function useAutonomyTimeline({
   const MIN_CONNECTION_UPTIME_MS = 300;
 
   const cleanupConnection = useCallback((code = 1000, reason = 'cleanup') => {
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -241,7 +246,13 @@ export function useAutonomyTimeline({
 
   useEffect(() => {
     if (enabled) {
-      connect();
+      // Différer l'ouverture d'un tick permet au cleanup immédiat de React
+      // StrictMode (setup → cleanup → setup en développement) d'annuler
+      // la première tentative avant de créer un WebSocket inutile.
+      connectTimerRef.current = setTimeout(() => {
+        connectTimerRef.current = null;
+        connect();
+      }, 0);
     } else {
       cleanupConnection(1000, 'disabled');
     }

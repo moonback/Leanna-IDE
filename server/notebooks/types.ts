@@ -247,6 +247,10 @@ export interface AudioOverview {
   script: string;
   /** Durée estimée en secondes */
   estimatedDuration: number;
+  /** Identités des deux intervenants ; absentes sur les anciens podcasts. */
+  hostName?: string;
+  coHostName?: string;
+  coHostPersonality?: string;
   /** Status de génération */
   status: 'generating' | 'ready' | 'error';
   createdAt: string;

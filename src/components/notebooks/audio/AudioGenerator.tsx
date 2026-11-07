@@ -34,6 +34,12 @@ interface Props {
   deselectAllSources: () => void;
   customInstructions: string;
   setCustomInstructions: (v: string) => void;
+  hostName: string;
+  setHostName: (v: string) => void;
+  coHostName: string;
+  setCoHostName: (v: string) => void;
+  coHostPersonality: string;
+  setCoHostPersonality: (v: string) => void;
 
   generating: boolean;
   onGenerate: () => void;
@@ -70,6 +76,12 @@ export function AudioGenerator({
   deselectAllSources,
   customInstructions,
   setCustomInstructions,
+  hostName,
+  setHostName,
+  coHostName,
+  setCoHostName,
+  coHostPersonality,
+  setCoHostPersonality,
   generating,
   onGenerate,
   onSelectOverview,
@@ -207,6 +219,23 @@ export function AudioGenerator({
                   </div>
                 </div>
               )}
+
+              {/* Personnalités du podcast */}
+              <div className="space-y-2 rounded-lg border border-[var(--notebook-border)] p-3">
+                <NbSectionLabel>Personnalités du podcast</NbSectionLabel>
+                <label className="block space-y-1 text-xs text-[var(--text-muted)]">
+                  <span>Présentatrice principale</span>
+                  <input value={hostName} onChange={e => setHostName(e.target.value)} maxLength={32} className="w-full rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] px-3 py-2 text-sm text-[var(--text-primary)]" />
+                </label>
+                <label className="block space-y-1 text-xs text-[var(--text-muted)]">
+                  <span>Seconde personnalité</span>
+                  <input value={coHostName} onChange={e => setCoHostName(e.target.value)} maxLength={32} className="w-full rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] px-3 py-2 text-sm text-[var(--text-primary)]" />
+                </label>
+                <label className="block space-y-1 text-xs text-[var(--text-muted)]">
+                  <span>Personnalité et rôle du co-animateur</span>
+                  <NbTextarea value={coHostPersonality} onChange={e => setCoHostPersonality(e.target.value)} rows={3} maxLength={600} placeholder="Ex. contradicteur bienveillant, expert technique, journaliste curieux..." className="text-xs leading-relaxed" />
+                </label>
+              </div>
 
               {/* Custom instructions */}
               <div className="space-y-2">

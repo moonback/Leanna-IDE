@@ -205,6 +205,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
   const [panelWidths, setPanelWidths] = useState({ sources: 280, studio: 340 });
   const [panelWidthsReady, setPanelWidthsReady] = useState(false);
+  const [audioDockElement, setAudioDockElement] = useState<HTMLDivElement | null>(null);
   const focusMode = !sourceRailOpen && !studioOpen;
 
   // Les largeurs sont partagées entre notebooks et conservées localement.
@@ -463,7 +464,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         <GeneratedDocsPanel notebookId={notebookId} sources={notebook.sources} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
       </div>
       <div role="tabpanel" id="studio-panel-audio" aria-labelledby="studio-tab-audio" className="h-full transition-opacity duration-150" style={{ display: studioTab === 'audio' ? 'block' : 'none' }}>
-        <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} />
+        <AudioOverviewPanel notebookId={notebookId} overviews={notebook.audioOverviews} sources={notebook.sources.map((s: any) => ({ id: s.id, title: s.title }))} onRefresh={loadNotebook} onViewDoc={(doc) => setViewingGeneratedDoc(doc)} playerDockElement={audioDockElement} />
       </div>
     </>
   );
@@ -748,17 +749,18 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         )}
 
         {/* Centre : Discussion (ou source / document / note ouverts) */}
-        <main className="notebook-panel notebook-main min-w-0">
+        <main className="notebook-panel notebook-main relative min-w-0 flex min-h-0 flex-col overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={showIndexing ? 'indexing' : selectedSourceId || viewingGeneratedDoc?.id || (noteEditorData ? 'note-editor' : notesOpen ? 'notes' : activeTab)}
               {...centerMotion}
               transition={spring}
-              className="h-full"
+              className="min-h-0 flex-1"
             >
               {renderMainContent()}
             </motion.div>
           </AnimatePresence>
+          <div ref={setAudioDockElement} aria-label="Lecteur du podcast" className="absolute inset-0 z-20 flex min-h-0 flex-col overflow-hidden bg-[var(--notebook-surface-elevated)] empty:hidden" />
         </main>
 
         {studioOpen && (

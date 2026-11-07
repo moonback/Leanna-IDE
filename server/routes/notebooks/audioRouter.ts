@@ -21,9 +21,9 @@ export function createAudioRouter(): Router {
 
   router.post("/:id/audio-overview", async (req: Request, res: Response): Promise<void> => {
     try {
-      const { language, duration, sourceIds, tone, customInstructions } = req.body;
+      const { language, duration, sourceIds, tone, customInstructions, hostName, coHostName, coHostPersonality } = req.body;
       const overview = await contentGenerator.generateAudioOverview(req.params.id, {
-        language, duration, sourceIds, tone, customInstructions,
+        language, duration, sourceIds, tone, customInstructions, hostName, coHostName, coHostPersonality,
       });
       res.json({ status: "success", overview });
     } catch (e: any) {
@@ -47,23 +47,24 @@ export function createAudioRouter(): Router {
 
       const { generateSpeech } = await import("../../utils/geminiTTS.js");
 
-      const alexVoice = req.body.alexVoice || "ff_siwis";
-      const samVoice = req.body.samVoice || "Puck";
-
+      const hostName = typeof overview.hostName === "string" && overview.hostName.trim() ? overview.hostName.trim() : "Alex";
+      const coHostName = typeof overview.coHostName === "string" && overview.coHostName.trim() ? overview.coHostName.trim() : "Sam";
+      const hostVoice = req.body.hostVoice || req.body.alexVoice || "ff_siwis";
+      const coHostVoice = req.body.coHostVoice || req.body.samVoice || "Puck";
       const lines = overview.script.split("\n").filter((l: string) => l.trim());
       const dialogueLines: { speaker: string; text: string }[] = [];
 
       for (const line of lines) {
         const trimmed = line.trim();
-        const isAlex = trimmed.startsWith("Alex:") || trimmed.startsWith("Alex :");
-        const isSam = trimmed.startsWith("Sam:") || trimmed.startsWith("Sam :");
-
-        if (isAlex) {
-          dialogueLines.push({ speaker: "alex", text: trimmed.replace(/^Alex\s*:\s*/i, "") });
-        } else if (isSam) {
-          dialogueLines.push({ speaker: "sam", text: trimmed.replace(/^Sam\s*:\s*/i, "") });
+        const separator = trimmed.indexOf(":");
+        const label = separator > 0 ? trimmed.slice(0, separator).trim().toLowerCase() : "";
+        const body = separator > 0 ? trimmed.slice(separator + 1).trim() : trimmed;
+        if (label === hostName.toLowerCase() || label === "alex") {
+          dialogueLines.push({ speaker: "host", text: body });
+        } else if (label === coHostName.toLowerCase() || label === "sam") {
+          dialogueLines.push({ speaker: "cohost", text: body });
         } else if (trimmed) {
-          dialogueLines.push({ speaker: "alex", text: trimmed });
+          dialogueLines.push({ speaker: "host", text: trimmed });
         }
       }
 
@@ -80,13 +81,17 @@ export function createAudioRouter(): Router {
 
       res.write(`event: start\ndata: ${JSON.stringify({ total: dialogueLines.length })}\n\n`);
 
+      let generatedCount = 0;
+      let skippedCount = 0;
       for (let i = 0; i < dialogueLines.length; i++) {
+        if (res.destroyed || res.writableEnded) return;
         const { speaker, text } = dialogueLines[i];
-        const voice = speaker === "alex" ? alexVoice : samVoice;
+        const voice = speaker === "host" ? hostVoice : coHostVoice;
 
         try {
           const audioBase64 = await generateSpeech(text, { voiceName: voice });
           if (audioBase64) {
+            generatedCount++;
             res.write(`event: chunk\ndata: ${JSON.stringify({
               index: i,
               speaker,
@@ -94,14 +99,20 @@ export function createAudioRouter(): Router {
               audio: audioBase64,
             })}\n\n`);
           } else {
-            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "no audio" })}\n\n`);
+            skippedCount++;
+            res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: "Le fournisseur TTS n'a retourné aucun audio." })}\n\n`);
           }
         } catch (ttsErr: any) {
+          skippedCount++;
           res.write(`event: skip\ndata: ${JSON.stringify({ index: i, speaker, reason: ttsErr.message })}\n\n`);
         }
       }
 
-      res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: dialogueLines.length })}\n\n`);
+      if (generatedCount === 0) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: `Aucun audio n'a été généré (${skippedCount} répliques ignorées). Vérifiez les clés API et la disponibilité du fournisseur TTS.` })}\n\n`);
+      } else {
+        res.write(`event: done\ndata: ${JSON.stringify({ totalGenerated: generatedCount, totalSkipped: skippedCount })}\n\n`);
+      }
       res.end();
     } catch (e: any) {
       if (res.headersSent) {
@@ -170,16 +181,16 @@ export function createAudioRouter(): Router {
           continue;
         }
 
-        const isAlex = trimmed.startsWith("Alex:") || trimmed.startsWith("Alex :");
-        const isSam = trimmed.startsWith("Sam:") || trimmed.startsWith("Sam :");
-
-        if (isAlex) {
-          const text = trimmed.replace(/^Alex\s*:\s*/i, "");
-          lines.push(`**🧑 Alex :** ${text}`);
+        const hostName = overview.hostName || "Alex";
+        const coHostName = overview.coHostName || "Sam";
+        const separator = trimmed.indexOf(":");
+        const label = separator > 0 ? trimmed.slice(0, separator).trim().toLowerCase() : "";
+        const body = separator > 0 ? trimmed.slice(separator + 1).trim() : trimmed;
+        if (label === hostName.toLowerCase() || label === "alex") {
+          lines.push(`**🎙️ ${hostName} :** ${body}`);
           lines.push("");
-        } else if (isSam) {
-          const text = trimmed.replace(/^Sam\s*:\s*/i, "");
-          lines.push(`**🤖 Sam :** ${text}`);
+        } else if (label === coHostName.toLowerCase() || label === "sam") {
+          lines.push(`**🤖 ${coHostName} :** ${body}`);
           lines.push("");
         } else {
           lines.push(`*${trimmed}*`);
