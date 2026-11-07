@@ -87,7 +87,12 @@ export interface WakeWordListener {
 }
 
 /** Démarre l'écoute et appelle onWake dès que le nom est entendu. */
-export async function startWakeWordListener(sampleRate: number, onWake: () => void): Promise<WakeWordListener> {
+export async function startWakeWordListener(
+  sampleRate: number,
+  onWake: () => void,
+  /** Lu à chaque résultat : un changement de réglage s'applique sans redémarrer l'écoute. */
+  getStrictness: () => WakeStrictness = () => DEFAULT_WAKE_STRICTNESS,
+): Promise<WakeWordListener> {
   const model = await preloadWakeModel();
   const rec = new model.KaldiRecognizer(sampleRate, GRAMMAR);
   // Détail par mot (confiance, début/fin) pour filtrer les faux réveils.
@@ -96,7 +101,7 @@ export async function startWakeWordListener(sampleRate: number, onWake: () => vo
   // grammaire fermée, déclenchaient au milieu de phrases ordinaires. Le préroll
   // de useAudio rejoue la phrase entière à Gemini après le réveil.
   rec.on('result', (m: any) => {
-    if (isWakeResult(m.result)) onWake();
+    if (isWakeResult(m.result, getStrictness())) onWake();
   });
   return {
     feed: (frame) => rec.acceptWaveformFloat(frame, sampleRate),

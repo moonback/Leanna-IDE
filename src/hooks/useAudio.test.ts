@@ -5,6 +5,7 @@ import { startWakeWordListener } from '../lib/wakeWord.js';
 
 const stop = vi.fn();
 vi.mock('../lib/wakeWord.js', () => ({
+  DEFAULT_WAKE_STRICTNESS: { minConfidence: 0.8, minDurationSec: 0.3, maxWordIndex: 1 },
   preloadWakeModel: vi.fn(async () => ({})),
   startWakeWordListener: vi.fn(async () => ({ feed: vi.fn(), stop })),
 }));
