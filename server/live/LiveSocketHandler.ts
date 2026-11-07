@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import type { SkillManagerV2 } from '../runtime/compat/SkillManagerV2.js';
 import { buildSystemInstruction, type ProfileConfig } from '../prompts/systemInstruction.js';
-import { startConversation, endConversation, saveMessage, getConversationMessages } from '../skills/history.js';
+import { startConversation, endConversation, saveMessage, generateConversationResumeContext } from '../skills/history.js';
 import { isSandboxActive, getSandboxState } from '../utils/sandbox.js';
 import { getNextGeminiKey, describeKey } from '../utils/geminiKeyPool.js';
 import { subscribeToValidation } from '../utils/postEditValidator.js';
@@ -388,35 +388,26 @@ export function attachLiveWebSocket(
         .catch(e => console.error('[History] Erreur démarrage conversation:', e));
     }
 
-    // ── Context resume (après overflow) ──────────────────────────────────
+    // ── Restauration intelligente de conversation ─────────────────────────
+    // Une restauration manuelle relit TOUS les messages et régénère une analyse
+    // structurée. Le champ conversations.summary seul n'est pas suffisant :
+    // il peut être ancien ou ne couvrir que les premiers échanges.
     const isContextResume = urlParams.get('context_resume') === '1';
     let contextResumeSummary = '';
     if (isContextResume && clientConvId && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-        const { data } = await supabase.from('conversations').select('summary').eq('id', clientConvId).single();
-        if (data?.summary) {
-          contextResumeSummary = data.summary;
-          console.log(`[ContextResume] 📋 Résumé trouvé pour ${clientConvId} (${contextResumeSummary.length} chars)`);
-        } else {
-          const messages = await getConversationMessages(clientConvId, 12);
-          if (messages.length >= 4) {
-            const chatMsgs = messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-            const { summary } = await summarizeWithLLM(chatMsgs);
-            contextResumeSummary = summary;
-            console.log(`[ContextResume] 🧠 Résumé généré à la volée (${summary.length} chars)`);
-          }
-          // Les conversations courtes doivent elles aussi retrouver leur contexte.
-          if (!contextResumeSummary && messages.length > 0) {
-            contextResumeSummary = messages
-              .map(m => `${m.role === 'user' ? 'Utilisateur' : 'Leanna'}: ${m.content}`)
-              .join('\n')
-              .slice(-6000);
-            console.log(`[ContextResume] 📚 Historique court restauré (${messages.length} messages)`);
-          }
-        }
+        contextResumeSummary = await generateConversationResumeContext(clientConvId);
+        console.log(`[ContextResume] 🧠 Analyse complète prête pour ${clientConvId} (${contextResumeSummary.length} chars)`);
       } catch (e) {
-        console.warn('[ContextResume] Erreur chargement résumé:', e);
+        console.error('[ContextResume] Échec de l’analyse complète de la conversation :', e);
+        // Ne pas démarrer une session avec un contexte silencieusement incomplet.
+        try {
+          clientWs.send(JSON.stringify({
+            type: 'conversation_resume_error',
+            conversation_id: clientConvId,
+            error: e instanceof Error ? e.message : 'Analyse de la conversation impossible.',
+          }));
+        } catch { /* socket fermé */ }
       }
     }
 
