@@ -5,7 +5,7 @@ import { validateServerSettings } from "./GmailService.js";
 const valid = {
   imapHost: "imap.example.org",
   imapPort: 993,
-  imapSecure: true,
+  imapSecurity: "ssl",
   smtpHost: "smtp.example.org",
   smtpPort: 587,
   smtpSecurity: "starttls",
@@ -15,7 +15,8 @@ test("accepts valid generic IMAP SSL and SMTP STARTTLS settings", () => {
   assert.deepEqual(validateServerSettings(valid), valid);
 });
 
-test("accepts implicit SMTP SSL/TLS", () => {
+test("accepts IMAP STARTTLS and implicit SMTP SSL/TLS", () => {
+  assert.equal(validateServerSettings({ ...valid, imapPort: 143, imapSecurity: "starttls" }).imapSecurity, "starttls");
   assert.equal(validateServerSettings({ ...valid, smtpPort: 465, smtpSecurity: "ssl" }).smtpSecurity, "ssl");
 });
 
@@ -26,7 +27,7 @@ test("rejects missing or invalid hostnames", () => {
 });
 
 test("rejects non-TLS IMAP and non-TLS SMTP", () => {
-  assert.throws(() => validateServerSettings({ ...valid, imapSecure: false }));
+  assert.throws(() => validateServerSettings({ ...valid, imapSecurity: "none" }));
   assert.throws(() => validateServerSettings({ ...valid, smtpSecurity: "none" }));
 });
 
