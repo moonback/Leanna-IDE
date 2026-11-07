@@ -63,6 +63,8 @@ export function NotebookDebatePanel({
   const audioCursorRef = useRef(0);
   const turnsEndRef = useRef<HTMLDivElement>(null);
 
+  const isActive = ["connecting", "running", "paused", "stopping"].includes(status);
+
   useEffect(() => {
     setSelectedSources(current => current.length ? current.filter(id => sources.some(source => source.id === id)) : sources.map(source => source.id));
   }, [sources]);
@@ -240,7 +242,6 @@ export function NotebookDebatePanel({
     if (type === "resume") setStatus("running");
   };
 
-  const isActive = ["connecting", "running", "paused", "stopping"].includes(status);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--notebook-surface)]">
