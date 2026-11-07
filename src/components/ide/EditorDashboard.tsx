@@ -873,7 +873,8 @@ export const EditorDashboard = React.memo(function EditorDashboard({
         </motion.header>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <OperationalOverviewCard index={0} />\n          <AudioCard index={1} />
+          <OperationalOverviewCard index={0} />
+          <AudioCard index={1} />
           <SessionCard index={2} />
           <TokensCard index={3} />
           <ActivityCard index={4} />
