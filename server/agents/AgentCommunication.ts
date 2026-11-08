@@ -77,7 +77,9 @@ export function selectDelegationContext(
   maxChars = 12_000
 ): Record<string, unknown> {
   if (!context || typeof context !== "object" || Array.isArray(context)) return {};
-  const budget = Math.max(512, Math.min(32_000, Math.floor(maxChars)));
+  const requestedBudget = Number.isFinite(maxChars) ? Math.floor(maxChars) : 12_000;
+  const budget = Math.max(512, Math.min(32_000, requestedBudget));
+  const payloadBudget = Math.max(128, budget - 220);
   const priority = [
     "successCriteria", "constraints", "decisions", "securityConstraints",
     "verification", "evidence", "errorDiagnostics", "knownIssues",
@@ -100,23 +102,25 @@ export function selectDelegationContext(
   };
 
   const output: Record<string, unknown> = {};
-  let used = 80; // réserve pour les métadonnées d'enveloppe
-  const entries = Object.entries(context).sort(([a], [b]) => rank(a) - rank(b));
+  let used = 0;
+  const entries = Object.entries(context)
+    .filter(([key]) => key !== "_contextHandoff")
+    .sort(([a], [b]) => rank(a) - rank(b));
   let truncated = false;
   for (const [key, value] of entries) {
     const safeValue = sanitize(value, 0);
-    let serialized = JSON.stringify(safeValue);
+    const serialized = JSON.stringify(safeValue) ?? "null";
     const cost = key.length + serialized.length + 8;
-    if (used + cost <= budget) {
+    if (used + cost <= payloadBudget) {
       output[key] = safeValue;
       used += cost;
       continue;
     }
     truncated = true;
-    const remaining = budget - used - key.length - 16;
+    const remaining = payloadBudget - used - key.length - 16;
     if (remaining >= 96 && typeof safeValue === "string") {
       output[key] = safeValue.slice(0, remaining - 3) + "...";
-      used = budget;
+      used = payloadBudget;
     }
   }
   output._contextHandoff = {
