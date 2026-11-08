@@ -278,6 +278,13 @@ export interface ContextBatch {
   facts: ProjectFact[];
   /** Fichier d'entrée principal (si spécifié) */
   primaryFile?: string;
+  /** Décisions de gouvernance appliquées aux faits candidats (sans contenu mémoire brut). */
+  memoryGovernance?: {
+    assessed: number;
+    included: number;
+    withheld: number;
+    counts: Record<"keep" | "verify" | "refresh" | "merge" | "discard" | "transmit", number>;
+  };
   /** Informations sur la qualité du contexte */
   quality: {
     /** Nombre total de fichiers trouvés */
