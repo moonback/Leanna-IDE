@@ -42,6 +42,31 @@ export class PromptBuilder {
       const boundedMemory = serializedMemory && serializedMemory.length > 6_000
         ? serializedMemory.slice(0, 5_997) + "..."
         : serializedMemory;
+      const memoryDiagnostics = memoryRecord.diagnostics && typeof memoryRecord.diagnostics === "object"
+        ? memoryRecord.diagnostics as Record<string, unknown>
+        : {};
+      task.context.metadata = {
+        ...task.context.metadata,
+        contextObservability: {
+          version: 1,
+          capturedAt: new Date().toISOString(),
+          role: task.role,
+          selectedFileCount: task.context.files.length,
+          memoryChars: serializedMemory?.length ?? 0,
+          injectedMemoryChars: boundedMemory?.length ?? 0,
+          memoryBudgetChars: typeof (memoryRecord.budget as Record<string, unknown> | undefined)?.maxChars === "number"
+            ? (memoryRecord.budget as Record<string, unknown>).maxChars
+            : null,
+          factsMatched: Number(memoryDiagnostics.factsMatched ?? 0),
+          factsEligible: Number(memoryDiagnostics.factsEligible ?? 0),
+          factsIncluded: Number(memoryDiagnostics.factsIncluded ?? 0),
+          staleFactsExcluded: Number(memoryDiagnostics.staleFactsExcluded ?? 0),
+          graphRelationsIncluded: Number(memoryDiagnostics.graphRelationsIncluded ?? 0),
+          previousResultsIncluded: Number(memoryDiagnostics.successfulPreviousResultsIncluded ?? 0),
+          possibleConflicts: possibleConflicts.length,
+          strategy: "adaptive_memory_bridge_v2",
+        },
+      };
       if (boundedMemory) {
         parts.push(
           "",
