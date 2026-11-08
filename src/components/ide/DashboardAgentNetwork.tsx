@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Activity, Bot, Check, CheckCircle2, CircleAlert, Clock3, GitBranch, LayoutGrid, ListFilter, Loader2, Maximize2, Minimize2, Network, Orbit, Pause, Play, Radio, Zap } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Activity, Atom, Bot, Check, CheckCircle2, CircleAlert, Clock3, GitBranch, LayoutGrid, ListFilter, Loader2, Maximize2, Minimize2, Network, Orbit, Pause, Play, Radio, Zap } from 'lucide-react';
 import { AnimatePresence, motion, useAnimationFrame, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from 'motion/react';
 import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
 import { createPortal } from 'react-dom';
 import { Modal } from '../ui/index.js';
 import type { ActivityStep } from '../../hooks/useActivity.js';
+
+// three.js n'est téléchargé qu'à l'affichage de la vue Sphères 3D.
+const AgentNetworkWebGL = React.lazy(() => import('./AgentNetworkWebGL.js'));
 
 interface AgentStat {
   role: string;
@@ -78,7 +81,7 @@ function agentSlot(index: number): { x: number; y: number } {
   return { x: CX + side * (slot < 3 ? 215 : 385), y: 60 + [1, 0, 2][slot % 3] * 120 };
 }
 
-type View = 'orbit' | 'grid';
+type View = 'webgl' | 'orbit' | 'grid';
 type Filter = 'all' | 'active' | 'idle' | 'offline';
 const FILTER_LABEL: Record<Filter, string> = { all: 'Tous les agents', active: 'En exécution / file', idle: 'Disponibles', offline: 'Hors ligne' };
 const RX = 330, RY = 118;
@@ -178,7 +181,9 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const [refreshError, setRefreshError] = useState(false);
   const [tab, setTab] = useState<Tab>('network');
   const [focus, setFocus] = useState(false);
-  const [view, setView] = useState<View>('orbit');
+  const [view, setView] = useState<View>('webgl');
+  const [webglFailed, setWebglFailed] = useState(false);
+  const onWebglUnavailable = useCallback(() => { setWebglFailed(true); setView('orbit'); }, []);
   const [filter, setFilter] = useState<Filter>('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverRole, setHoverRole] = useState<string | null>(null);
@@ -315,7 +320,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const rotateX = useSpring(tiltX, { stiffness: 120, damping: 18 });
   const rotateY = useSpring(tiltY, { stiffness: 120, damping: 18 });
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (reduce) return;
+    if (reduce || view === 'webgl') return;
     const rect = event.currentTarget.getBoundingClientRect();
     tiltY.set(((event.clientX - rect.left) / rect.width - 0.5) * 8);
     tiltX.set(-((event.clientY - rect.top) / rect.height - 0.5) * 6);
@@ -375,7 +380,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
       {tab === 'network' && (
         <div className="mb-1 flex items-center gap-1" role="toolbar" aria-label="Contrôles du réseau">
           <div className="flex rounded-md border p-0.5" style={{ borderColor: 'var(--border-base)' }} role="group" aria-label="Disposition">
-            {([['orbit', 'Orbite 3D', Orbit], ['grid', 'Grille', LayoutGrid]] as const).map(([id, label, Icon]) => (
+            {([['webgl', 'Sphères 3D', Atom], ['orbit', 'Orbite', Orbit], ['grid', 'Grille', LayoutGrid]] as const).filter(([id]) => id !== 'webgl' || !webglFailed).map(([id, label, Icon]) => (
               <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} title={label}
                 className="relative flex items-center gap-1 rounded px-1.5 py-1 text-[10px] focus-visible:outline focus-visible:outline-2"
                 style={{ color: view === id ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
@@ -410,7 +415,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               )}
             </AnimatePresence>
           </div>
-          {view === 'orbit' && !reduce && (
+          {view !== 'grid' && !reduce && (
             <button type="button" onClick={() => setUserPaused(value => !value)} aria-pressed={userPaused}
               aria-label={userPaused ? 'Reprendre la rotation' : 'Mettre la rotation en pause'} title={userPaused ? 'Reprendre la rotation' : 'Pause'}
               className="rounded-md border p-1 focus-visible:outline focus-visible:outline-2" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
@@ -435,6 +440,18 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
             <div className={`relative mx-auto w-full ${focus ? 'min-h-0 flex-1 max-w-none' : 'h-[250px] max-w-[900px] sm:h-[285px] xl:h-auto xl:min-h-[230px] xl:flex-1'}`}
               style={{ perspective: 1100 }} onPointerMove={onPointerMove} onPointerLeave={resetTilt}
               role="group" aria-label="Agents sélectionnables et délégations observées">
+              {view === 'webgl' ? (
+                <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-[11px]" style={{ color: 'var(--text-muted)' }}><Loader2 size={14} className="mr-2 animate-spin"/> Chargement de la scène 3D…</div>}>
+                  <AgentNetworkWebGL
+                    agents={visibleAgents.map(agent => {
+                      const current = runningTaskByRole.get(agent.role);
+                      return { role: agent.role, name: agent.name, status: agent.status, busy: agent.runningTasks > 0,
+                        caption: current ? (current.progress?.label || current.title) : (STATUS_LABEL[agent.status] ?? agent.status) };
+                    })}
+                    selectedRole={selectedRole} hoverRole={hoverRole} orchestrating={orchestrating} paused={userPaused} reduce={reduce}
+                    onSelect={selectAgent} onHover={setHoverRole} onUnavailable={onWebglUnavailable}/>
+                </Suspense>
+              ) : (
               <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}>
                 {/* Sol holographique incliné : grille + orbites, purement décoratif. */}
                 <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 h-[150%] w-[110%]"
@@ -545,6 +562,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
                   </p>
                 )}
               </motion.div>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
               <span className="flex items-center gap-1"><Radio size={11}/> {fleet?.initialized ? 'Registre connecté' : loading ? 'Connexion au registre…' : 'Données partielles / registre indisponible'}</span>
