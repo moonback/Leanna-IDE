@@ -23,7 +23,7 @@ const MEMORY_CATEGORY_PRIORITY: Record<string, number> = {
   pattern: 2, refactoring: 1, todo: 0,
 };
 
-function resolveAdaptiveMemoryBudget(role: string, query: string, phase?: string): number {
+export function resolveAdaptiveMemoryBudget(role: string, query: string, phase?: string): number {
   const roleBudget: Record<string, number> = {
     security: 7_000, architect: 6_500, reviewer: 6_000, debugger: 5_800,
     coder: 5_000, refactor: 5_000, tester: 4_800, performance: 5_500,
@@ -37,15 +37,15 @@ function resolveAdaptiveMemoryBudget(role: string, query: string, phase?: string
   return Math.max(2_000, Math.min(8_000, budget));
 }
 
-function detectMemoryConflicts(facts: Array<{ content: string; category?: string; sourceFile?: string }>): Array<Record<string, unknown>> {
+export function detectMemoryConflicts(facts: Array<{ content: string; category?: string; sourceFile?: string }>): Array<Record<string, unknown>> {
   const polarity = (value: string): number => {
     const text = value.toLowerCase();
-    const negative = /\\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\\s+pas|jamais|désactivé|desactive)\\b/.test(text);
-    const positive = /\\b(yes|always|must|enable[ds]?|allow(?:ed)?|required|autorisé|obligatoire|activé|active)\\b/.test(text);
+    const negative = /\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\\s+pas|jamais|désactivé|desactive)\b/.test(text);
+    const positive = /\b(yes|always|must|enable[ds]?|allow(?:ed)?|required|autorisé|obligatoire|activé|active)\b/.test(text);
     return negative === positive ? 0 : negative ? -1 : 1;
   };
   const tokens = (value: string): Set<string> => new Set(value.toLowerCase()
-    .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .split(/[^a-z0-9_./-]+/).filter((token) => token.length >= 4));
   const conflicts: Array<Record<string, unknown>> = [];
   for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
@@ -216,7 +216,7 @@ export class AgentContextResolver {
       }));
 
     const boundedFacts: Array<Record<string, unknown>> = [];
-    let remaining = Math.max(1_000, budgetChars - JSON.stringify(graphRelations).length
+    let remaining = Math.max(0, budgetChars - JSON.stringify(graphRelations).length
       - JSON.stringify(verifiedPreviousResults).length - 600);
     for (const item of rankedFacts) {
       const fact = item.fact;
