@@ -34,7 +34,7 @@ export function resolveAdaptiveMemoryBudget(role: string, query: string, phase?:
   else if (query.length < 180) budget -= 500;
   if (phase === "verify" || phase === "recovery") budget += 1_000;
   if (phase === "discovery") budget -= 500;
-  return Math.max(2_000, Math.min(8_000, budget));
+  return Math.max(2_000, Math.min(5_500, budget));
 }
 
 export function detectMemoryConflicts(facts: Array<{ content: string; category?: string; sourceFile?: string }>): Array<Record<string, unknown>> {
