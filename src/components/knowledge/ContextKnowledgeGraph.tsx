@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize2, Network, RotateCcw, Search, ZoomIn, ZoomOut } from 'lucide-react';
+import type { PointerEvent } from 'react';
+import { Maximize2, Network, Search, ZoomIn, ZoomOut } from 'lucide-react';
 
 export type GraphRelation = {
   source: { name: string; filePath: string; type?: string };
@@ -29,6 +30,9 @@ type Props = {
   onRelationTypeChange: (value: string) => void;
   relationTypes: string[];
   totalRelations: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 };
 
 const COLORS: Record<string, string> = {
@@ -159,8 +163,10 @@ export default function ContextKnowledgeGraph({
     const nodes = nodesRef.current;
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(size.width * dpr);
-    canvas.height = Math.round(size.height * dpr);
+    const pixelWidth = Math.round(size.width * dpr);
+    const pixelHeight = Math.round(size.height * dpr);
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -251,7 +257,7 @@ export default function ContextKnowledgeGraph({
     return () => cancelAnimationFrame(frame);
   }, [drawGraph]);
 
-  const worldPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const worldPoint = (event: PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const baseScale = Math.min(size.width / 1050, size.height / 650) * zoom;
     return {
@@ -260,7 +266,7 @@ export default function ContextKnowledgeGraph({
     };
   };
 
-  const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     const point = worldPoint(event);
     const nodes = nodesRef.current;
     let hit = -1;
@@ -278,7 +284,7 @@ export default function ContextKnowledgeGraph({
     }
   };
 
-  const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
     if (drag.kind === 'node' && drag.nodeIndex !== undefined) {
@@ -385,8 +391,11 @@ export default function ContextKnowledgeGraph({
         </aside>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-[10px]" style={{ borderColor: 'var(--border-base)', ...mutedStyle }}>
-        <span>Échantillon API : {relations.length} relation(s) chargée(s) / {totalRelations} au total</span>
-        <span>Simulation locale déterministe · données source inchangées</span>
+        <span>{relations.length} relation(s) chargée(s) / {totalRelations} au total</span>
+        <div className="flex items-center gap-3">
+          {hasMore && <button type="button" onClick={onLoadMore} disabled={loadingMore} className="rounded-md border px-2 py-1 font-medium disabled:opacity-50" style={{ borderColor: 'var(--border-base)', color: 'var(--accent-secondary)' }}>{loadingMore ? 'Chargement…' : 'Charger 100 relations suivantes'}</button>}
+          <span>Simulation locale · données source inchangées</span>
+        </div>
       </div>
     </section>
   );
