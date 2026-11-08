@@ -20,6 +20,8 @@ export interface AgentTaskEntry {
   role: string;
   title: string;
   status: 'pending' | 'running' | 'completed' | 'incomplete' | 'failed' | 'cancelled';
+  /** Le serveur a accepté la demande ; l'exécuteur termine son arrêt coopératif. */
+  cancellationRequested?: boolean;
   agentName: string;
   detail?: string;
   summary?: string;
@@ -194,10 +196,20 @@ function handleAgentEvent(e: Event) {
   if (!detail || detail.type !== 'agent_event') return;
 
   const existing = agentTasks.find(t => t.id === detail.taskId);
+  const incomingStatus = mapStatus(detail.status);
+  const isTerminal = (status: AgentTaskEntry['status']) =>
+    status === 'completed' || status === 'incomplete' || status === 'failed' || status === 'cancelled';
+
   if (existing) {
+    // Un événement retardé (progress/running) ne doit jamais ressusciter une
+    // tâche terminale ni effacer une demande d'arrêt déjà acceptée.
+    if (isTerminal(existing.status) && !isTerminal(incomingStatus)) return;
+    if (existing.cancellationRequested && !isTerminal(incomingStatus)) return;
+
     agentTasks = agentTasks.map(t => t.id === detail.taskId ? {
       ...t,
-      status: mapStatus(detail.status),
+      status: incomingStatus,
+      cancellationRequested: isTerminal(incomingStatus) ? false : t.cancellationRequested,
       detail: detail.detail || t.detail,
       summary: detail.summary || t.summary,
       durationMs: detail.durationMs || t.durationMs,
@@ -472,20 +484,22 @@ export async function removeAgentTasks(ids: string[]): Promise<number> {
  */
 function markTaskCancelling(taskId: string) {
   agentTasks = agentTasks.map(t =>
-    t.id === taskId
-      ? { ...t, detail: 'Annulation demandée…', steps: t.steps.includes('Annulation demandée…') ? t.steps : [...t.steps, 'Annulation demandée…'] }
+    t.id === taskId && (t.status === 'running' || t.status === 'pending')
+      ? {
+          ...t,
+          cancellationRequested: true,
+          detail: 'Demande d’arrêt envoyée — interruption en cours…',
+          steps: t.steps.includes('Demande d’arrêt envoyée…') ? t.steps : [...t.steps, 'Demande d’arrêt envoyée…'],
+        }
       : t,
   );
   notify();
 }
 
-/**
- * Applique le statut final d'annulation à une tâche du store.
- */
-function markTaskCancelled(taskId: string) {
+function clearTaskCancelling(taskId: string, message: string) {
   agentTasks = agentTasks.map(t =>
     t.id === taskId
-      ? { ...t, status: 'cancelled' as const, detail: t.detail ?? 'Tâche annulée', durationMs: t.durationMs ?? (Date.now() - t.timestamp) }
+      ? { ...t, cancellationRequested: false, detail: message }
       : t,
   );
   notify();
@@ -493,9 +507,10 @@ function markTaskCancelled(taskId: string) {
 
 /**
  * Demande au serveur d'annuler une tâche agent (pending ou running).
- * Met à jour le store de façon optimiste puis confirme/annule selon la réponse.
+ * Affiche immédiatement l'état « arrêt demandé », mais ne marque la tâche
+ * « annulée » qu'à réception de l'événement terminal émis par l'exécuteur.
  *
- * @returns `true` si le serveur confirme l'annulation, `false` sinon.
+ * @returns `true` si le serveur accepte la demande d'arrêt, `false` sinon.
  */
 export async function cancelAgentTask(taskId: string): Promise<boolean> {
   const task = agentTasks.find(t => t.id === taskId);
@@ -509,20 +524,15 @@ export async function cancelAgentTask(taskId: string): Promise<boolean> {
       method: 'POST',
     });
     if (!res.ok) {
-      // Rollback léger : retirer le marqueur d'annulation en échec.
-      agentTasks = agentTasks.map(t =>
-        t.id === taskId ? { ...t, detail: 'Échec de l’annulation' } : t,
-      );
-      notify();
+      clearTaskCancelling(taskId, 'Impossible d’arrêter cette tâche — elle a peut-être déjà terminé.');
       return false;
     }
-    markTaskCancelled(taskId);
+    // Le serveur peut avoir émis l'événement « cancelled » avant la réponse HTTP
+    // (cas pending). Le helper ne touche donc qu'aux tâches encore actives.
+    markTaskCancelling(taskId);
     return true;
   } catch {
-    agentTasks = agentTasks.map(t =>
-      t.id === taskId ? { ...t, detail: 'Échec de l’annulation (réseau)' } : t,
-    );
-    notify();
+    clearTaskCancelling(taskId, 'Échec réseau : demande d’arrêt non confirmée.');
     return false;
   }
 }
