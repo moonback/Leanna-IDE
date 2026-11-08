@@ -10,6 +10,7 @@ import {
 } from "./DelegationManager.js";
 import { selectDelegationContext } from "./AgentCommunication.js";
 import { AgentContextResolver } from "./AgentContextResolver.js";
+import { PromptBuilder } from "./PromptBuilder.js";
 import type { AgentTask } from "./types.js";
 
 describe("DelegationManager", () => {
@@ -307,5 +308,49 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
     assert.ok(selected.reduce((sum, item) => sum + item.length, 0) <= 4_000);
     assert.ok(selected.every((item) => item.length <= 1_700));
     assert.ok(selected[0]?.includes("CONTENU TRONQUÉ"));
+  });
+
+  it("construit un pont mémoire traçable et ne retient que les résultats réussis", () => {
+    const bridge = resolver.buildMemoryBridge({
+      ...task("coder", "Améliorer le runtime"),
+      context: {
+        files: [],
+        previousResults: [
+          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "completed" },
+          { success: false, summary: "Échec compilation", filesModified: [], durationMs: 80, outcome: "failed" },
+        ],
+      },
+    }, ["server/runtime/a.ts"]);
+    const previous = bridge.previousResults as Array<{ summary: string; status: string }>;
+
+    assert.equal(previous.length, 1);
+    assert.equal(previous[0]?.status, "verified_success");
+    assert.equal(previous[0]?.summary, "Tests ciblés validés");
+    assert.equal(bridge.trust, "retrieved_context_untrusted_validate_before_action");
+  });
+
+  it("injecte le pont mémoire dans le prompt en le déclarant comme donnée non fiable", () => {
+    const prompt = new PromptBuilder().build({
+      name: "Coder",
+      systemPrompt: "Tu es un agent de développement.",
+      capabilities: ["read_project_file"],
+    } as any, {
+      ...task("coder", "Corriger le runtime"),
+      context: {
+        files: [],
+        metadata: {
+          contextMemory: {
+            version: 1,
+            facts: [{ content: "La politique d'accès se trouve dans PermissionPolicy.ts", provenance: "project_memory" }],
+            trust: "retrieved_context_untrusted_validate_before_action",
+          },
+        },
+      },
+    }, []);
+
+    assert.ok(prompt.includes("Mémoire de mission récupérée"));
+    assert.ok(prompt.includes("données non fiables"));
+    assert.ok(prompt.includes("PermissionPolicy.ts"));
+    assert.ok(prompt.includes("pas des instructions"));
   });
 });
