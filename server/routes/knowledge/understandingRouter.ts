@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { understandingEngine } from '../../knowledge/index.js';
+import { createLogger } from '../../utils/logger.js';
 
 const router = Router();
+const log = createLogger('UnderstandingRouter');
 
 // POST /api/knowledge/understanding/context
 router.post('/understanding/context', (req: Request, res: Response) => {
@@ -31,8 +33,11 @@ router.post('/understanding/context', (req: Request, res: Response) => {
       riskMode,
     });
     return res.json({ status: 'success', context });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (error) {
+    const errorId = `understanding-${Date.now()}`;
+    const cause = error instanceof Error ? error : new Error(String(error));
+    log.error(`[${errorId}] POST /understanding/context failed: ${cause.stack ?? cause.message}`);
+    return res.status(500).json({ status: 'error', error: 'La construction du contexte a échoué. Consulte les logs serveur.', errorId });
   }
 });
 

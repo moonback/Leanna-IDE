@@ -275,7 +275,18 @@ export class UnderstandingEngine {
    */
   buildContext(query: string, options: BuildContextOptions = {}): UnderstandingContext {
     const t0 = Date.now();
-    const opts = { ...DEFAULTS, ...options };
+    // Les routes peuvent transmettre des propriétés explicitement undefined.
+    // Ne pas laisser ces valeurs écraser les defaults du moteur.
+    const definedOptions = Object.fromEntries(
+      Object.entries(options).filter(([, value]) => value !== undefined)
+    ) as Partial<BuildContextOptions>;
+    const opts = {
+      ...DEFAULTS,
+      ...definedOptions,
+      existingContext: Array.isArray(definedOptions.existingContext)
+        ? definedOptions.existingContext.filter((item): item is string => typeof item === "string")
+        : DEFAULTS.existingContext,
+    };
     const q = query.trim();
     if (q.length === 0) return this.emptyContext(q, opts, Date.now() - t0);
 
@@ -914,16 +925,30 @@ export class UnderstandingEngine {
     try {
       const lowerQ = query.toLowerCase();
       const fromQuery = knowledgeGraph.searchEntities(query).slice(0, limit);
+      const seen = new Set<string>();
       for (const e of fromQuery) {
         const score = this.computeEntityRelevance(e, lowerQ);
         results.push({ name: e.name, type: e.type, file: e.filePath, score });
+        seen.add(e.name + "\0" + e.filePath);
       }
-      // Compléter avec des entités des fichiers top
+
+      // Indexer les entités par fichier une seule fois au lieu de rescanner tout
+      // le KnowledgeGraph pour chacun des fichiers prioritaires.
+      const entitiesByFile = new Map<string, ReturnType<typeof knowledgeGraph.getEntities>>();
+      for (const entity of knowledgeGraph.getEntities("")) {
+        const fileKey = this.norm(entity.filePath);
+        const bucket = entitiesByFile.get(fileKey);
+        if (bucket) bucket.push(entity);
+        else entitiesByFile.set(fileKey, [entity]);
+      }
+
       const topFiles = files.slice(0, 3).map((f) => this.norm(f.filePath));
       for (const fp of topFiles) {
-        const ents = knowledgeGraph.getEntities("").filter((e) => this.norm(e.filePath) === fp).slice(0, 3);
-        for (const e of ents) {
-          if (!results.find((r) => r.name === e.name && r.file === e.filePath)) {
+        const entities = entitiesByFile.get(fp) ?? [];
+        for (const e of entities.slice(0, 3)) {
+          const key = e.name + "\0" + e.filePath;
+          if (!seen.has(key)) {
+            seen.add(key);
             results.push({ name: e.name, type: e.type, file: e.filePath, score: 0.4 });
           }
         }
@@ -983,8 +1008,12 @@ export class UnderstandingEngine {
 
     // Missing actions seront remplis à l'étape 7
     const missingActions: string[] = [];
+    const existingContext = Array.isArray(opts.existingContext)
+      ? opts.existingContext.filter((item): item is string => typeof item === "string")
+      : [];
+    const existingContextSet = new Set(existingContext.map((item) => this.norm(item)));
     const unreadFiles = batch.files
-      .filter((f) => !opts.existingContext.map(this.norm).includes(this.norm(f.filePath)))
+      .filter((f) => !existingContextSet.has(this.norm(f.filePath)))
       .slice(0, 8)
       .map((f) => f.filePath);
 
@@ -1242,13 +1271,14 @@ export class UnderstandingEngine {
     existing: string[]
   ): UnderstandingContext["coverage"] {
     const existingNorm = existing.map(this.norm);
+    const existingSet = new Set(existingNorm);
     const overlapped: string[] = [];
     const newlyFound: string[] = [];
     const batchSet = new Set(batch.files.map((f) => this.norm(f.filePath)));
     for (const e of existingNorm) if (batchSet.has(e)) overlapped.push(e);
     for (const f of batch.files) {
       const n = this.norm(f.filePath);
-      if (!existingNorm.includes(n)) newlyFound.push(f.filePath);
+      if (!existingSet.has(n)) newlyFound.push(f.filePath);
     }
     return { existing: existingNorm, overlapped, newlyFound };
   }

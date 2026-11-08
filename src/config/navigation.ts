@@ -24,12 +24,13 @@ export const ROUTES = {
   history: '/history',
   lists: '/lists',
   observability: '/observability',
+  contextIntelligence: '/context-intelligence',
 } as const;
 
 export type NavId =
   | 'ide' | 'automation' | 'notebooks' | 'documents' | 'github'
   | 'memories' | 'history' | 'lists'
-  | 'observability';
+  | 'observability' | 'contextIntelligence';
 
 export interface NavItem { id: string; path: string; label: string; icon: LucideIcon }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
@@ -47,6 +48,7 @@ export const NAV_ITEMS: Record<NavId, NavItem> = {
   history:       { id: 'history',       path: inIde('history'),    label: 'Historique',      icon: History },
   lists:         { id: 'lists',         path: inIde('lists'),      label: 'Snippets',        icon: Braces },
   observability: { id: 'observability', path: inIde('observability'), label: 'Observabilité', icon: BarChart2 },
+  contextIntelligence: { id: 'contextIntelligence', path: inIde('contextIntelligence'), label: 'Intelligence du contexte', icon: BrainCircuit },
 };
 
 const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
@@ -58,7 +60,7 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
 export const NAV_GROUPS: NavGroup[] = [
   { id: 'workspace', label: '', items: pick('ide') },
   { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
-  { id: 'operations', label: 'Opérations', items: pick('automation', 'observability') },
+  { id: 'operations', label: 'Opérations', items: pick('automation', 'observability', 'contextIntelligence') },
   { id: 'integrations', label: 'Intégrations', items: pick('github') },
 ];
 
