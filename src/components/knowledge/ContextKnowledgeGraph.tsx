@@ -345,7 +345,7 @@ export default function ContextKnowledgeGraph({
       </div>
 
       <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="relative min-w-0" ref={hostRef} style={{ height: 560, background: 'radial-gradient(ellipse at 50% 45%, rgba(24, 65, 105, 0.24), rgba(7, 14, 26, 0.97) 72%)' }}>
+        <div className="relative min-w-0" ref={hostRef} style={{ height: 'clamp(360px, calc(100vh - 360px), 620px)', background: 'radial-gradient(ellipse at 50% 45%, rgba(24, 65, 105, 0.24), rgba(7, 14, 26, 0.97) 72%)' }}>
           <canvas ref={canvasRef} className="h-full w-full touch-none cursor-grab active:cursor-grabbing" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} aria-label="Graphe interactif. Glisser un nœud pour le déplacer, glisser le fond pour déplacer la vue."/>
           <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
             {Object.entries({ class: 'Classe', function: 'Fonction', component: 'Composant', route: 'Route', test: 'Test' }).map(([type, label]) => (
