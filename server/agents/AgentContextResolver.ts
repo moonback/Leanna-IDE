@@ -69,6 +69,13 @@ export class AgentContextResolver {
         ...task.context.metadata,
         projectContextDiscovered: true,
         projectFileCount: inventory.count,
+        contextSelection: {
+          strategy: "role_mission_relevance_v1",
+          agentRole: task.role,
+          selectedFileCount: selectedFiles.length,
+          explicitFileCount: resolvedMentioned.length,
+          inventoryFileCount: inventory.count,
+        },
       };
       log.info(`[${task.id.slice(0, 8)}] Contexte projet découvert: ${selectedFiles.length}/${inventory.count} fichier(s) sélectionné(s)`);
       return selectedFiles as string[];
@@ -116,17 +123,6 @@ export class AgentContextResolver {
   selectProjectFiles(files: string[], task: AgentTask, resolvedMentioned: string[] = []): string[] {
     const role = String(task.role ?? "").toLowerCase();
     const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
-    const preferredFiles = [
-      ...resolvedMentioned,
-      "package.json",
-      "tsconfig.json",
-      "README.md",
-      "server-bootstrap.ts",
-      "server.ts",
-      "server/agents/AgentExecutor.ts",
-      "server/agents/AgentOrchestrator.ts",
-      "server/skills/agents.ts",
-    ];
     const explicitRank = new Map(resolvedMentioned.map((file, index) => [file.replace(/\\/g, "/"), index]));
     const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/")))]
       .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
