@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent } from 'react';
+import type { PointerEvent, WheelEvent } from 'react';
 import { Maximize2, Network, Search, ZoomIn, ZoomOut } from 'lucide-react';
 
 export type GraphRelation = {
@@ -46,7 +46,7 @@ const COLORS: Record<string, string> = {
 const panelStyle = { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' };
 const mutedStyle = { color: 'var(--text-muted)' };
 
-function makeLayout(relations: GraphRelation[]) {
+export function buildContextGraphLayout(relations: GraphRelation[]) {
   const nodeMap = new Map<string, GraphNode>();
   const rawEdges: Array<{ source: string; target: string; relation: GraphRelation }> = [];
 
@@ -134,7 +134,7 @@ export default function ContextKnowledgeGraph({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const layout = useMemo(() => makeLayout(relations), [relations]);
+  const layout = useMemo(() => buildContextGraphLayout(relations), [relations]);
   useEffect(() => {
     nodesRef.current = layout.nodes.map(node => ({ ...node }));
     setSelectedId(null);
@@ -192,8 +192,14 @@ export default function ContextKnowledgeGraph({
     const activeNeighborIds = new Set<string>();
     if (selectedIndex >= 0) {
       for (const edge of layout.edges) {
-        if (edge.source === selectedIndex) activeNeighborIds.add(nodes[edge.target]?.id);
-        if (edge.target === selectedIndex) activeNeighborIds.add(nodes[edge.source]?.id);
+        if (edge.source === selectedIndex) {
+          const neighbor = nodes[edge.target];
+          if (neighbor) activeNeighborIds.add(neighbor.id);
+        }
+        if (edge.target === selectedIndex) {
+          const neighbor = nodes[edge.source];
+          if (neighbor) activeNeighborIds.add(neighbor.id);
+        }
       }
     }
 
@@ -297,6 +303,11 @@ export default function ContextKnowledgeGraph({
     }
   };
 
+  const onWheel = (event: WheelEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    setZoom(current => Math.max(0.45, Math.min(2.8, current * (event.deltaY < 0 ? 1.12 : 1 / 1.12))));
+  };
+
   const onPointerUp = () => { dragRef.current = null; };
 
   const focusGraph = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
@@ -335,7 +346,7 @@ export default function ContextKnowledgeGraph({
 
       <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="relative min-w-0" ref={hostRef} style={{ height: 560, background: 'radial-gradient(ellipse at 50% 45%, rgba(24, 65, 105, 0.24), rgba(7, 14, 26, 0.97) 72%)' }}>
-          <canvas ref={canvasRef} className="h-full w-full touch-none cursor-grab active:cursor-grabbing" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} aria-label="Graphe interactif. Glisser un nœud pour le déplacer, glisser le fond pour déplacer la vue."/>
+          <canvas ref={canvasRef} className="h-full w-full touch-none cursor-grab active:cursor-grabbing" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} aria-label="Graphe interactif. Glisser un nœud pour le déplacer, glisser le fond pour déplacer la vue."/>
           <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
             {Object.entries({ class: 'Classe', function: 'Fonction', component: 'Composant', route: 'Route', test: 'Test' }).map(([type, label]) => (
               <span key={type} className="flex items-center gap-1 rounded-md border px-2 py-1 text-[10px]" style={{ background: 'rgba(8, 17, 31, 0.78)', borderColor: 'rgba(140,170,200,0.16)', color: '#C5D3E4' }}>
