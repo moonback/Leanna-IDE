@@ -786,8 +786,48 @@ export class UnderstandingEngine {
     const charBudget = Math.max(256, Math.floor(safeTokenBudget * 4 * 0.75));
     let remaining = Math.max(0, charBudget - batch.query.length - (batch.primaryFile?.length ?? 0) - 120);
 
+    const categoryPriority: Record<string, number> = {
+      decision: 5,
+      constraint: 5,
+      architecture: 4,
+      pattern: 3,
+      bug: 3,
+      todo: 2,
+    };
+    const rankedFacts = [...batch.facts].sort((a, b) => {
+      const aPriority = (a.isStructural ? 10 : 0) + (categoryPriority[a.category] ?? 1) * 2 + a.confidence;
+      const bPriority = (b.isStructural ? 10 : 0) + (categoryPriority[b.category] ?? 1) * 2 + b.confidence;
+      return bPriority - aPriority || b.usageCount - a.usageCount;
+    });
+
+    const selectedFacts: ProjectFact[] = [];
+    const addFactsWithin = (allocation: number): void => {
+      let used = 0;
+      for (const fact of rankedFacts) {
+        if (selectedFacts.some((selected) => selected.id === fact.id)) continue;
+        if (remaining < 96 || used >= allocation) break;
+        const metadataCost = fact.id.length + fact.category.length + fact.tags.join(",").length + 64;
+        const contentLimit = Math.min(fact.content.length, 240, remaining - metadataCost, allocation - used - metadataCost);
+        if (contentLimit < 32) continue;
+        selectedFacts.push({ ...fact, content: fact.content.slice(0, contentLimit) });
+        const cost = metadataCost + contentLimit;
+        remaining -= cost;
+        used += cost;
+      }
+    };
+
+    // Réserver une part du budget aux décisions et faits structurels :
+    // les fichiers ne doivent pas évincer toutes les contraintes mémorisées.
+    addFactsWithin(Math.floor(charBudget * 0.3));
+
     const selectedFiles: RelevantFile[] = [];
-    const candidates = [...batch.files].sort((a, b) => b.relevance - a.relevance);
+    const candidates = [...batch.files].sort((a, b) => {
+      if (batch.primaryFile) {
+        if (a.filePath === batch.primaryFile) return -1;
+        if (b.filePath === batch.primaryFile) return 1;
+      }
+      return b.relevance - a.relevance;
+    });
 
     for (const file of candidates) {
       const fileOverhead = file.filePath.length + (file.reason?.length ?? 0) + 48;
@@ -807,29 +847,8 @@ export class UnderstandingEngine {
       selectedFiles.push({ ...file, relevantSections: sections });
     }
 
-    const categoryPriority: Record<string, number> = {
-      decision: 5,
-      constraint: 5,
-      architecture: 4,
-      pattern: 3,
-      bug: 3,
-      todo: 2,
-    };
-    const rankedFacts = [...batch.facts].sort((a, b) => {
-      const aPriority = (a.isStructural ? 10 : 0) + (categoryPriority[a.category] ?? 1) * 2 + a.confidence;
-      const bPriority = (b.isStructural ? 10 : 0) + (categoryPriority[b.category] ?? 1) * 2 + b.confidence;
-      return bPriority - aPriority || b.usageCount - a.usageCount;
-    });
-
-    const selectedFacts: ProjectFact[] = [];
-    for (const fact of rankedFacts) {
-      if (remaining < 96) break;
-      const metadataCost = fact.id.length + fact.category.length + fact.tags.join(",").length + 64;
-      const contentLimit = Math.min(fact.content.length, 240, remaining - metadataCost);
-      if (contentLimit < 32) continue;
-      selectedFacts.push({ ...fact, content: fact.content.slice(0, contentLimit) });
-      remaining -= metadataCost + contentLimit;
-    }
+    // Utiliser le reliquat pour les autres faits pertinents.
+    addFactsWithin(remaining);
 
     return {
       ...batch,
