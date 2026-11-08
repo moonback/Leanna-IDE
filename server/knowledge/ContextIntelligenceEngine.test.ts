@@ -40,3 +40,12 @@ test("marks old unused facts for refresh rather than automatic deletion", () => 
   assert.equal(report.assessments[0].decision, "refresh");
   assert.equal(report.counts.discard, 0);
 });
+
+test("prefers a duplicate whose source still exists over a stale source", () => {
+  const report = new ContextIntelligenceEngine().assess({ facts: [
+    fact({ id: "stale", confidence: 1, usageCount: 20, sourceFile: "server/removed.ts" }),
+    fact({ id: "current", confidence: 0.5, usageCount: 0, sourceFile: "server/auth.ts" }),
+  ], workspaceFiles: new Set(["server/auth.ts"]) });
+  assert.equal(report.assessments.find((x) => x.factId === "current")?.decision, "transmit");
+  assert.notEqual(report.assessments.find((x) => x.factId === "current")?.decision, "merge");
+});
