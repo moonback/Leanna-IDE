@@ -757,15 +757,85 @@ export class UnderstandingEngine {
       }
     }
 
-    // 3. Qualité recalculée
-    working.quality = semanticSearch.estimateQuality(working.files, working.facts);
-
-    // 4. PrimaryFile : si pas déjà défini, prendre le plus pertinent
+    // 3. PrimaryFile : si pas déjà défini, prendre le plus pertinent
     if (!working.primaryFile && working.files.length > 0) {
       working.primaryFile = working.files[0].filePath;
     }
 
-    return working;
+    // 4. Appliquer réellement le budget : cette limite portait auparavant
+    // uniquement le nom maxTokenBudget sans réduire le batch retourné.
+    const budgeted = this.enforceTokenBudget(working, opts.maxTokenBudget);
+
+    // 5. Qualité recalculée après sélection, pour ne pas annoncer une qualité
+    // basée sur des fichiers/faits qui ne seront finalement pas transmis.
+    budgeted.quality = semanticSearch.estimateQuality(budgeted.files, budgeted.facts);
+    return budgeted;
+  }
+
+  /**
+   * Réduit le batch au budget demandé avec une estimation prudente de 4 chars/token.
+   * 25% du budget est réservé au balisage XML, au résumé et aux métadonnées du prompt.
+   * Les faits structurels/décisions fiables passent avant les faits anecdotiques.
+   * Les fichiers restent classés par pertinence et leurs sections sont tronquées
+   * plutôt que supprimées brutalement lorsque le budget est presque épuisé.
+   */
+  private enforceTokenBudget(batch: ContextBatch, maxTokenBudget: number): ContextBatch {
+    const safeTokenBudget = Number.isFinite(maxTokenBudget)
+      ? Math.max(64, Math.floor(maxTokenBudget))
+      : DEFAULTS.maxTokenBudget;
+    const charBudget = Math.max(256, Math.floor(safeTokenBudget * 4 * 0.75));
+    let remaining = Math.max(0, charBudget - batch.query.length - (batch.primaryFile?.length ?? 0) - 120);
+
+    const selectedFiles: RelevantFile[] = [];
+    const candidates = [...batch.files].sort((a, b) => b.relevance - a.relevance);
+
+    for (const file of candidates) {
+      const fileOverhead = file.filePath.length + (file.reason?.length ?? 0) + 48;
+      if (remaining < fileOverhead) continue;
+      remaining -= fileOverhead;
+
+      const sections: RelevantFile["relevantSections"] = [];
+      const rankedSections = [...file.relevantSections].sort((a, b) => b.relevance - a.relevance);
+      for (const section of rankedSections) {
+        if (remaining < 80) break;
+        const contentLimit = Math.min(section.content.length, remaining - 32, 900);
+        if (contentLimit < 48) break;
+        const content = section.content.slice(0, contentLimit);
+        sections.push({ ...section, content });
+        remaining -= content.length + 32;
+      }
+      selectedFiles.push({ ...file, relevantSections: sections });
+    }
+
+    const categoryPriority: Record<string, number> = {
+      decision: 5,
+      constraint: 5,
+      architecture: 4,
+      pattern: 3,
+      bug: 3,
+      todo: 2,
+    };
+    const rankedFacts = [...batch.facts].sort((a, b) => {
+      const aPriority = (a.isStructural ? 10 : 0) + (categoryPriority[a.category] ?? 1) * 2 + a.confidence;
+      const bPriority = (b.isStructural ? 10 : 0) + (categoryPriority[b.category] ?? 1) * 2 + b.confidence;
+      return bPriority - aPriority || b.usageCount - a.usageCount;
+    });
+
+    const selectedFacts: ProjectFact[] = [];
+    for (const fact of rankedFacts) {
+      if (remaining < 96) break;
+      const metadataCost = fact.id.length + fact.category.length + fact.tags.join(",").length + 64;
+      const contentLimit = Math.min(fact.content.length, 240, remaining - metadataCost);
+      if (contentLimit < 32) continue;
+      selectedFacts.push({ ...fact, content: fact.content.slice(0, contentLimit) });
+      remaining -= metadataCost + contentLimit;
+    }
+
+    return {
+      ...batch,
+      files: selectedFiles,
+      facts: selectedFacts,
+    };
   }
 
   // ──────────────────────────────────────────────────────────────────────
