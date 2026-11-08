@@ -63,6 +63,13 @@ export interface MissionDetailData {
     instructions?: string;
     successCriteria: string[];
     previousResultsCount: number;
+    observability?: {
+      version: number; capturedAt?: string; role?: string; strategy?: string;
+      selectedFileCount: number; memoryChars: number; injectedMemoryChars: number;
+      memoryBudgetChars: number; factsMatched: number; factsEligible: number;
+      factsIncluded: number; staleFactsExcluded: number; graphRelationsIncluded: number;
+      previousResultsIncluded: number; possibleConflicts: number;
+    };
   };
   result?: {
     success: boolean;
@@ -676,6 +683,43 @@ export function MissionDetail({
             <div className="mt-2">
               <p className="lea-mission-dt mb-1">Fichiers ciblés</p>
               <FileList files={data.context.files} tone="var(--text-muted)" />
+            </div>
+          )}
+          {data.context?.observability && (
+            <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="lea-mission-dt m-0">Observabilité du contexte</p>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{data.context.observability.strategy ?? 'contexte mesuré'}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  ['Fichiers ciblés', data.context.observability.selectedFileCount],
+                  ['Faits trouvés', data.context.observability.factsMatched],
+                  ['Faits injectés', data.context.observability.factsIncluded],
+                  ['Faits obsolètes écartés', data.context.observability.staleFactsExcluded],
+                  ['Relations graphe', data.context.observability.graphRelationsIncluded],
+                  ['Résultats vérifiés', data.context.observability.previousResultsIncluded],
+                  ['Contradictions possibles', data.context.observability.possibleConflicts],
+                  ['Mémoire injectée', data.context.observability.injectedMemoryChars],
+                ] as Array<[string, number]>).map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-md px-2 py-1.5" style={{ background: 'var(--surface-primary)' }}>
+                    <div className="text-sm font-semibold tabular-nums" style={{ color: label === 'Contradictions possibles' && value > 0 ? 'var(--color-warning)' : 'var(--text-primary)' }}>
+                      {value.toLocaleString('fr-FR')}
+                    </div>
+                    <div className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                <span>Budget mémoire : {data.context.observability.memoryBudgetChars.toLocaleString('fr-FR')} caractères</span>
+                <span>{data.context.observability.capturedAt ? new Date(data.context.observability.capturedAt).toLocaleTimeString('fr-FR') : ''}</span>
+              </div>
+              {data.context.observability.possibleConflicts > 0 && (
+                <p className="mt-2 text-[11px]" style={{ color: 'var(--color-warning)' }}>
+                  <AlertTriangle size={12} className="mr-1 inline" />
+                  Certaines connaissances nécessitent une vérification dans les sources actuelles.
+                </p>
+              )}
             </div>
           )}
         </Section>
