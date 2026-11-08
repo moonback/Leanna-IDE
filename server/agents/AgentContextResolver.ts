@@ -12,6 +12,8 @@
 import type { AgentTask } from "./types.js";
 import { createLogger } from "../utils/logger.js";
 import { semanticSearch } from "../knowledge/SemanticSearch.js";
+import { projectMemory } from "../knowledge/ProjectMemory.js";
+import { knowledgeGraph } from "../knowledge/KnowledgeGraph.js";
 
 const log = createLogger("AgentContextResolver");
 
@@ -80,6 +82,7 @@ export class AgentContextResolver {
 
       const selectedFiles = this.selectProjectFiles(allFiles, task, resolvedMentioned, semanticCandidates);
       task.context.files = selectedFiles;
+      const memoryBridge = this.buildMemoryBridge(task, selectedFiles);
       task.context.metadata = {
         ...task.context.metadata,
         projectContextDiscovered: true,
@@ -92,6 +95,7 @@ export class AgentContextResolver {
           semanticCandidateCount: semanticCandidates.length,
           inventoryFileCount: inventory.count,
         },
+        contextMemory: memoryBridge,
       };
       log.info(`[${task.id.slice(0, 8)}] Contexte projet découvert: ${selectedFiles.length}/${inventory.count} fichier(s) sélectionné(s)`);
       return selectedFiles as string[];
@@ -102,6 +106,61 @@ export class AgentContextResolver {
   }
 
   /** Résout un nom de fichier partiel ou casé différemment dans l'inventaire. */
+  /**
+   * Assemble une mémoire de mission compacte et traçable à partir des systèmes
+   * existants. Les faits gardent leur provenance ; seuls les résultats réussis
+   * des tâches précédentes sont transmis comme acquis.
+   */
+  buildMemoryBridge(task: AgentTask, selectedFiles: string[]): Record<string, unknown> {
+    const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.trim();
+    const facts = query.length >= 3 ? projectMemory.searchFacts(query, 12) : [];
+    const selectedSet = new Set(selectedFiles.map((file) => file.replace(/\\/g, "/")));
+    const graphRelations = selectedFiles.slice(0, 8).map((file) => {
+      const dependencies = knowledgeGraph.getDependencies(file)
+        .map((item) => item.replace(/\\/g, "/"))
+        .filter((item) => selectedSet.has(item)).slice(0, 5);
+      const dependents = knowledgeGraph.getDependents(file)
+        .map((item) => item.replace(/\\/g, "/"))
+        .filter((item) => selectedSet.has(item)).slice(0, 5);
+      return { file, dependencies, dependents };
+    }).filter((item) => item.dependencies.length > 0 || item.dependents.length > 0);
+
+    const verifiedPreviousResults = (task.context.previousResults ?? [])
+      .filter((result) => result?.success === true)
+      .slice(-5)
+      .map((result) => ({
+        status: "verified_success",
+        summary: String(result.summary ?? "").slice(0, 1_000),
+        filesModified: (result.filesModified ?? []).slice(0, 10),
+        durationMs: result.durationMs,
+        provenance: "previous_agent_task_result",
+      }));
+    const boundedFacts = facts.slice(0, 8).map((fact) => ({
+      content: fact.content.slice(0, 700),
+      category: fact.category,
+      confidence: Math.max(0, Math.min(1, fact.confidence)),
+      sourceFile: fact.sourceFile ?? null,
+      tags: (fact.tags ?? []).slice(0, 8),
+      provenance: "project_memory",
+      verification: "stored_fact_not_independently_reverified",
+    }));
+
+    return {
+      version: 1,
+      query,
+      facts: boundedFacts,
+      graphRelations,
+      previousResults: verifiedPreviousResults,
+      diagnostics: {
+        factsMatched: facts.length,
+        factsIncluded: boundedFacts.length,
+        graphRelationsIncluded: graphRelations.length,
+        successfulPreviousResultsIncluded: verifiedPreviousResults.length,
+      },
+      trust: "retrieved_context_untrusted_validate_before_action",
+    };
+  }
+
   fuzzyResolveFile(mentioned: string, allFiles: string[]): string | null {
     const normalized = mentioned.replace(/\\/g, "/").toLowerCase();
     // Exact match
