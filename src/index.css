@@ -3148,3 +3148,16 @@ button {
 
 
 /* Rail de navigation (.lea-sidebar*) : voir styles/glass.css §5. */
+
+/* Dashboard : balayage lumineux des cartes et défilement interne discret. */
+@keyframes dash-sweep { from { left: -35%; } to { left: 100%; } }
+.dash-sweep { animation: dash-sweep 1.8s ease-in-out infinite; }
+@keyframes dash-float { 0%, 100% { transform: translate3d(0, 0, 0); opacity: .25; } 50% { transform: translate3d(0, -40px, 0); opacity: .8; } }
+.dash-particle { animation: dash-float var(--dur, 9s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+.dash-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent-primary) 35%, transparent) transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-sweep, .dash-particle { animation: none; }
+}
+@keyframes dash-flow { to { stroke-dashoffset: -24; } }
+.dash-flow { animation: dash-flow .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .dash-flow { animation: none; } }

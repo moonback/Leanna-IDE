@@ -1,21 +1,39 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  Activity, AudioLines, BookOpen, Bot, CalendarClock, Coins, Cpu, FilePlus, GitBranch,
-  History, ListChecks, Loader2, Mail, MessageSquare, Mic, MicOff, Moon, Search, Settings,
+  Activity, AudioLines, BookOpen, Bot, CalendarClock, ChevronDown, Coins, Cpu, FilePlus, GitBranch,
+  History, ListChecks, Loader2, Mail, Maximize2, MessageSquare, Mic, MicOff, Moon, MoreHorizontal, Search, Settings, Command,
   Sparkles, Timer, Workflow, CheckCircle2, XCircle, KeyRound, Power, PowerOff, RefreshCw, Sun,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { useWorkspaceState } from '../../hooks/useWorkspaceState.js';
-import { StatusBadge } from '../ui/index.js';
+import { Modal, StatusBadge } from '../ui/index.js';
 import { useGitInfo, useGeminiStatus, type EmptyEditorStateProps } from './EmptyEditorState.js';
+import { DashboardCore } from './DashboardCore.js';
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
 const SPRING = { type: 'spring' as const, bounce: 0.15, duration: 0.5 };
 const AUDIT_POLL_MS = 30_000; // même cadence que SystemHealthDashboard
 const BARS = 40;
+
+const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
+
+// En xl : 1 bandeau (12 col.) puis 2 rangées de 12 colonnes chacune ; grid-flow dense comble les trous après réorganisation.
+const SECTION_SPAN: Record<string, string> = {
+  operations: 'md:col-span-4 xl:col-span-12',
+  audio: 'md:col-span-2 xl:col-span-3',
+  session: 'md:col-span-2 xl:col-span-2',
+  tokens: 'md:col-span-2 xl:col-span-2',
+  activity: 'md:col-span-2 xl:col-span-3',
+  plan: 'md:col-span-2 xl:col-span-2',
+  transcript: 'md:col-span-2 xl:col-span-3',
+  system: 'md:col-span-2 xl:col-span-3',
+  automations: 'md:col-span-2 xl:col-span-2',
+  project: 'md:col-span-2 xl:col-span-2',
+  recent: 'md:col-span-2 xl:col-span-2',
+};
 
 const fmtInt = (n: number) => n.toLocaleString('fr-FR');
 const fmtTime = (d: Date) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -119,8 +137,10 @@ function useRecentConversations(workspacePath?: string) {
 
 // ─── Briques visuelles ───────────────────────────────────────────────────
 
+interface CardAction { label: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; onClick: () => void }
+
 const Card = React.memo(function Card({
-  title, icon: Icon, index, className = '', right, children,
+  title, icon: Icon, index, className = '', right, children, menu = [], expanded,
 }: {
   title: string;
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
@@ -128,36 +148,102 @@ const Card = React.memo(function Card({
   className?: string;
   right?: React.ReactNode;
   children: React.ReactNode;
+  /** Actions supplémentaires du menu ⋯ (« Agrandir » est toujours présent). */
+  menu?: CardAction[];
+  /** Contenu détaillé de la modale ; à défaut, le contenu de la carte. */
+  expanded?: React.ReactNode;
 }) {
   const reduce = !!useReducedMotion();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+  const items: CardAction[] = [{ label: 'Agrandir', icon: Maximize2, onClick: () => setModalOpen(true) }, ...menu];
   return (
+    <>
     <motion.section
-      className={`relative flex min-w-0 flex-col rounded-xl border p-3 ${className}`}
+      className={`group relative flex h-full min-h-0 min-w-0 flex-col rounded-xl border p-2.5 ${className}`}
       style={{
+        zIndex: menuOpen ? 30 : undefined,
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         borderColor: 'var(--border-base)',
-        backdropFilter: 'blur(14px)',
+        backdropFilter: 'blur(18px)',
         transformStyle: 'preserve-3d',
+        perspective: '1100px',
+        backgroundImage: 'radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 42%)',
         boxShadow: '0 8px 24px color-mix(in srgb, var(--bg) 22%, transparent)',
+        transition: 'border-color 180ms ease, box-shadow 180ms ease',
       }}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, rotateX: -14, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
       transition={reduce ? { duration: 0.15 } : { ...SPRING, delay: 0.04 * index }}
-      whileHover={reduce ? undefined : { y: -3, rotateX: 1.4, rotateY: -1.2, scale: 1.006, borderColor: 'var(--accent-primary)', boxShadow: '0 16px 34px color-mix(in srgb, var(--accent-primary) 13%, transparent)' }}
+      whileHover={reduce ? undefined : { y: -4, rotateX: 2.2, rotateY: -1.8, scale: 1.008, borderColor: 'var(--accent-primary)', boxShadow: '0 20px 42px color-mix(in srgb, var(--accent-primary) 17%, transparent)' }}
+      onPointerMove={event => {
+        if (reduce || event.pointerType === 'touch') return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        event.currentTarget.style.setProperty('--pointer-x', `${Math.round(x * 100)}%`);
+        event.currentTarget.style.setProperty('--pointer-y', `${Math.round(y * 100)}%`);
+      }}
+      onPointerLeave={event => {
+        event.currentTarget.style.setProperty('--pointer-x', '50%');
+        event.currentTarget.style.setProperty('--pointer-y', '50%');
+      }}
       aria-label={title}
     >
-      <header className="mb-2 flex items-center gap-2">
+      {/* Filet lumineux qui balaie le haut de la carte au survol. */}
+      <span aria-hidden className="pointer-events-none absolute inset-x-4 top-0 h-px overflow-hidden opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <span className="dash-sweep absolute inset-y-0 w-1/3" style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)' }} />
+      </span>
+      <header className="mb-1.5 flex shrink-0 items-center gap-2">
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-lg"
-          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+          className="flex h-6 w-6 items-center justify-center rounded-lg transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110"
+          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)', boxShadow: '0 0 12px color-mix(in srgb, var(--accent-primary) 22%, transparent)' }}
         >
           <Icon size={13} />
         </span>
-        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{title}</h2>
-        {right && <div className="ml-auto flex items-center gap-1.5">{right}</div>}
+        <h2 className="truncate text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{title}</h2>
+        <div className="ml-auto flex items-center gap-1.5">
+          {right}
+          <div ref={menuRef} className="relative">
+            <MiniButton label={`Options : ${title}`} icon={MoreHorizontal} onClick={() => setMenuOpen(value => !value)} active={menuOpen} />
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div role="menu" aria-label={`Options ${title}`}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: -6, rotateX: -20, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border p-1 shadow-2xl"
+                  style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', transformOrigin: 'top right', boxShadow: '0 18px 40px rgba(0,0,0,.4)' }}>
+                  {items.map(item => (
+                    <button key={item.label} type="button" role="menuitem"
+                      onClick={() => { setMenuOpen(false); item.onClick(); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
+                      style={{ color: 'var(--text-primary)' }}>
+                      <item.icon size={13} style={{ color: 'var(--accent-primary)' }} /> {item.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </header>
-      {children}
+      <div className="dash-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
     </motion.section>
+    <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={title} size="lg">
+      <Modal.Body>{expanded ?? children}</Modal.Body>
+    </Modal>
+    </>
   );
 });
 
@@ -220,11 +306,11 @@ function MiniButton({ label, icon: Icon, onClick, active = false, spin = false }
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-3 text-sm" style={{ color: 'var(--text-dimmed)' }}>{children}</p>;
+  return <p className="py-1.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>{children}</p>;
 }
 
 function Ring({ percent, label, color = 'var(--accent-primary)' }: { percent: number; label: string; color?: string }) {
-  const r = 26;
+  const r = 21;
   const c = 2 * Math.PI * r;
   const p = Math.min(100, Math.max(0, percent));
   return (
@@ -266,7 +352,7 @@ function Sparkline({ values, max: fixedMax }: { values: number[]; max?: number }
   const max = fixedMax ?? Math.max(...values, 1);
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${38 - (v / max) * 34}`).join(' ');
   return (
-    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-12 w-full" aria-hidden>
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-8 w-full" aria-hidden>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.35" />
@@ -307,10 +393,10 @@ function LiveClock() {
   return (
     <div>
       <div className="flex items-baseline gap-1 font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        <span className="text-4xl font-bold tracking-tight">{hm}</span>
-        <span className="text-xl" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
+        <span className="text-2xl font-bold tracking-tight">{hm}</span>
+        <span className="text-base" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
       </div>
-      <div className="text-sm first-letter:uppercase" style={{ color: 'var(--text-muted)' }}>{date}</div>
+      <div className="text-xs first-letter:uppercase" style={{ color: 'var(--text-muted)' }}>{date}</div>
     </div>
   );
 }
@@ -369,7 +455,7 @@ function AudioCard({ index }: { index: number }) {
   const state = !connected ? 'Hors ligne' : muted ? 'Micro coupé' : asleep ? 'En veille' : isBusy ? 'Outil en cours' : 'À l\'écoute';
 
   const bars = (refs: React.MutableRefObject<(HTMLSpanElement | null)[]>, color: string) => (
-    <div className="flex h-8 flex-1 items-end gap-[2px]" aria-hidden>
+    <div className="flex h-6 flex-1 items-end gap-[2px]" aria-hidden>
       {Array.from({ length: BARS }, (_, k) => (
         <span
           key={k}
@@ -382,7 +468,8 @@ function AudioCard({ index }: { index: number }) {
   );
 
   return (
-    <Card title="Audio en direct" icon={AudioLines} index={index} className="md:col-span-2"
+    <Card title="Audio en direct" icon={AudioLines} index={index}
+      menu={connected ? [{ label: muted ? 'Activer le micro' : 'Couper le micro', icon: muted ? Mic : MicOff, onClick: toggleMute }] : []}
       right={<>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{state}</span>
         {connected && asleep && !muted && (
@@ -392,8 +479,8 @@ function AudioCard({ index }: { index: number }) {
           <MiniButton label={muted ? 'Activer le micro' : 'Couper le micro'} icon={muted ? Mic : MicOff} onClick={toggleMute} active={muted} />
         )}
       </>}>
-      <div className="flex items-center gap-4">
-        <div className="relative flex h-20 w-20 flex-shrink-0 items-center justify-center">
+      <div className="flex items-center gap-3">
+        <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center">
           <div
             ref={orbRef}
             className="absolute inset-0 rounded-full"
@@ -409,12 +496,12 @@ function AudioCard({ index }: { index: number }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Micro</span>
+            <span className="w-12 text-[10px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Micro</span>
             {bars(inRefs, micColor)}
             <span ref={inPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: micInactive ? 'var(--text-dimmed)' : 'var(--text-muted)' }}>0</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-14 text-[11px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Leanna</span>
+            <span className="w-12 text-[10px] uppercase" style={{ color: 'var(--text-dimmed)' }}>Leanna</span>
             {bars(outRefs, 'var(--color-success, #22c55e)')}
             <span ref={outPeakRef} className="w-7 text-right font-mono text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>0</span>
           </div>
@@ -478,8 +565,22 @@ function ActivityCard({ index }: { index: number }) {
   const steps = activity.slice(-7).reverse();
   const done = activity.filter(a => a.status === 'done').length;
   const errors = activity.filter(a => a.status === 'error').length;
+  const full = activity.length === 0 ? <Empty>Aucun outil appelé pour l'instant.</Empty> : (
+    <ul className="flex flex-col gap-1">
+      {[...activity].reverse().map(s => (
+        <li key={s.id} className="rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.status === 'running' ? 'var(--accent-primary)' : s.status === 'done' ? 'var(--color-success, #22c55e)' : 'var(--color-error)' }} />
+            <span style={{ color: 'var(--text-primary)' }}>{s.label}</span>
+            <span className="ml-auto shrink-0 font-mono text-[11px]" style={{ color: 'var(--text-dimmed)' }}>{fmtTime(s.timestamp)}{s.endTimestamp ? ` · ${fmtDuration(s.endTimestamp.getTime() - s.timestamp.getTime())}` : ''}</span>
+          </div>
+          <div className="mt-0.5 font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>{s.tool}{s.detail ? ` — ${s.detail}` : ''}</div>
+        </li>
+      ))}
+    </ul>
+  );
   return (
-    <Card title="Activité des outils" icon={Bot} index={index} className="md:col-span-2"
+    <Card title="Activité des outils" icon={Bot} index={index} expanded={full}
       right={<span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
         {done} ✓ · {errors} ✗{isBusy && ' · en cours'}
       </span>}>
@@ -525,10 +626,22 @@ function ActivityCard({ index }: { index: number }) {
 function TranscriptCard({ index, aiName, onOpenChat }: { index: number; aiName: string; onOpenChat?: () => void }) {
   const { transcript } = useLiveAPIContext();
   const reduce = !!useReducedMotion();
-  const last = transcript.filter(t => t.text?.trim()).slice(-4);
+  const all = transcript.filter(t => t.text?.trim());
+  const last = all.slice(-4);
+  const full = all.length === 0 ? <Empty>Aucun échange pour l'instant.</Empty> : (
+    <ul className="flex flex-col gap-2">
+      {all.map(t => (
+        <li key={t.id} className="rounded-lg px-3 py-2 text-sm leading-relaxed"
+          style={{ backgroundColor: t.role === 'user' ? 'var(--bg-secondary)' : 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
+          <div className="mb-0.5 text-[11px] font-semibold" style={{ color: t.role === 'user' ? 'var(--text-muted)' : 'var(--accent-primary)' }}>{t.role === 'user' ? 'Vous' : aiName}</div>
+          <div className="whitespace-pre-wrap">{t.text}</div>
+        </li>
+      ))}
+    </ul>
+  );
   return (
-    <Card title="Conversation en direct" icon={MessageSquare} index={index}
-      right={onOpenChat && <MiniButton label="Ouvrir le chat" icon={MessageSquare} onClick={onOpenChat} />}>
+    <Card title="Conversation en direct" icon={MessageSquare} index={index} expanded={full}
+      menu={onOpenChat ? [{ label: 'Ouvrir le chat', icon: MessageSquare, onClick: onOpenChat }] : []}>
       {last.length === 0 ? <Empty>Parlez à {aiName} : les derniers échanges s'afficheront ici.</Empty> : (
         <ul className="flex flex-col gap-1.5">
           <AnimatePresence initial={false}>
@@ -566,7 +679,7 @@ function PlanCard({ index }: { index: number }) {
       {!currentPlan ? <Empty>Aucun plan en cours.</Empty> : (
         <>
           {progress && <div className="mb-2"><Bar percent={(progress.done / progress.total) * 100} /></div>}
-          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs" style={{ color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
+          <pre className="whitespace-pre-wrap text-xs" style={{ color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
             {currentPlan}
           </pre>
         </>
@@ -622,6 +735,7 @@ function SystemCard({ index }: { index: number }) {
   ];
   return (
     <Card title="Système" icon={Cpu} index={index}
+      menu={[{ label: 'Actualiser', icon: RefreshCw, onClick: reload }]}
       right={<>
         {updatedAt && <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>il y a {fmtDuration(now - updatedAt)}</span>}
         {refresh}
@@ -716,7 +830,8 @@ function OperationalOverviewCard({ index }: { index: number }) {
   const now = useNow(1000);
   const total = data ? data.agents + data.missions + data.emailAccounts : null;
   return (
-    <Card title="Données opérationnelles en temps réel" icon={Activity} index={index} className="md:col-span-2 xl:col-span-4"
+    <Card title="Données opérationnelles en temps réel" icon={Activity} index={index}
+      menu={[{ label: 'Actualiser les données', icon: RefreshCw, onClick: () => void reload() }]}
       right={<>
         {updatedAt && <span className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>Actualisé il y a {fmtDuration(now - updatedAt)}</span>}
         <MiniButton label="Actualiser les données" icon={RefreshCw} onClick={() => void reload()} spin={loading} />
@@ -724,19 +839,19 @@ function OperationalOverviewCard({ index }: { index: number }) {
       {data ? (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Bot size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Agents disponibles" value={fmtInt(data.agents)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.runningAgentTasks)} tâche(s) active(s) · {fmtInt(data.agentTasks)} au total</div></div>
             </div>
-            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Workflow size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Missions" value={fmtInt(data.missions)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.activeMissions)} active(s)</div></div>
             </div>
-            <div className="flex items-center gap-3 rounded-lg p-2.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               <Mail size={20} style={{ color: 'var(--accent-primary)' }} />
               <div><Stat label="Comptes e-mail" value={fmtInt(data.emailAccounts)} /><div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtInt(data.configuredEmailAccounts)} configuré(s)</div></div>
             </div>
-            <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+            <div className="rounded-xl px-3 py-1.5" style={{ backgroundColor: 'var(--accent-subtle)' }}>
               <Stat label="Total recensé" value={fmtInt(total ?? 0)} hint="Agents disponibles + missions enregistrées + comptes e-mail connectés" />
               <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Agents + missions + comptes connectés</div>
             </div>
@@ -802,14 +917,18 @@ function RecentCard({ index, onResumeConversation }: { index: number; onResumeCo
 export const EditorDashboard = React.memo(function EditorDashboard({
   onCreateFile, onShowSettings, onOpenSearch, onOpenChat, onOpenNotebooks, onResumeConversation,
 }: EmptyEditorStateProps) {
-  const { connected, connecting, connect, disconnect, clearTranscript, clearActivity } = useLiveAPIContext();
+  const { connected, connecting, connect, disconnect, clearTranscript, clearActivity, activity, isBusy, reasoning } = useLiveAPIContext();
   const { profile } = useProfile();
   const reduce = !!useReducedMotion();
   const aiName = profile.aiName || 'Leanna';
   const userName = profile.userName?.trim();
-  const DEFAULT_SECTION_ORDER = ['operations', 'audio', 'session', 'tokens', 'activity', 'transcript', 'plan', 'system', 'automations', 'project', 'recent'];
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [immersiveMode, setImmersiveMode] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
 
   useEffect(() => {
     try {
@@ -838,6 +957,12 @@ export const EditorDashboard = React.memo(function EditorDashboard({
     setDraggedSection(null);
   }, [draggedSection]);
 
+  const resetLayout = useCallback(() => {
+    setSectionOrder(DEFAULT_SECTION_ORDER);
+    setDraggedSection(null);
+    try { window.localStorage.removeItem('leanna.dashboard.section-order'); } catch { /* stockage facultatif */ }
+  }, []);
+
   // Connexion seule : le chat reste fermé (bouton « Ouvrir le chat » séparé).
   const handleConnect = useCallback(() => {
     if (connecting) return;
@@ -845,23 +970,26 @@ export const EditorDashboard = React.memo(function EditorDashboard({
     clearTranscript(); clearActivity(); connect([], 'full');
   }, [connected, connecting, connect, disconnect, clearTranscript, clearActivity]);
 
-  const actions: { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; onClick?: () => void; primary?: boolean; spin?: boolean }[] = [
-    connecting
-      ? { label: 'Connexion…', icon: Loader2, primary: true, spin: true }
-      : connected
-        ? { label: `Déconnecter ${aiName}`, icon: PowerOff, onClick: handleConnect }
-        : { label: `Connecter ${aiName}`, icon: Power, onClick: handleConnect, primary: true },
+  type DashboardAction = { label: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>; onClick?: () => void };
+  // Les callbacks facultatifs absents sont retirés : pas d'entrée de menu qui planterait au clic.
+  const actions = ([
     { label: 'Ouvrir le chat', icon: MessageSquare, onClick: onOpenChat },
     { label: 'Nouveau fichier', icon: FilePlus, onClick: onCreateFile },
     { label: 'Rechercher', icon: Search, onClick: onOpenSearch },
     { label: 'Notebooks', icon: BookOpen, onClick: onOpenNotebooks },
     { label: 'Paramètres', icon: Settings, onClick: () => onShowSettings() },
-  ];
+    { label: isEditMode ? 'Terminer la personnalisation' : 'Personnaliser', icon: Settings, onClick: () => setIsEditMode(value => !value) },
+    { label: immersiveMode ? 'Vue standard' : 'Vue immersive', icon: Sparkles, onClick: () => setImmersiveMode(value => !value) },
+  ] as DashboardAction[]).filter((action): action is Required<DashboardAction> => typeof action.onClick === 'function');
+
+  const paletteMatches = actions.filter(action => action.label.toLowerCase().includes(paletteQuery.trim().toLowerCase()));
+  const runPaletteAction = (action: (typeof actions)[number]) => { setPaletteOpen(false); setPaletteQuery(''); action.onClick(); };
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-y-auto" style={{ backgroundColor: 'var(--bg)' }}>
-      {/* Halo d'accent qui dérive lentement en fond */}
-      {!reduce && (
+    // À partir de xl, le tableau de bord tient dans la fenêtre : seules les cartes défilent en interne.
+    <div className="relative flex flex-1 flex-col overflow-y-auto xl:overflow-hidden" style={{ backgroundColor: 'var(--bg)', perspective: 1400 }}>
+      {/* Halos d'accent qui dérivent lentement en fond */}
+      {!reduce && (<>
         <motion.div
           aria-hidden
           className="pointer-events-none absolute -top-32 left-1/4 h-96 w-96 rounded-full blur-3xl"
@@ -869,10 +997,30 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           animate={{ x: [0, 160, -80, 0], y: [0, 60, 120, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
         />
-      )}
-      <main className="relative z-10 mx-auto w-full max-w-[1480px] px-3 py-4 sm:px-5">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-40 right-1/5 h-[28rem] w-[28rem] rounded-full blur-3xl"
+          style={{ background: 'var(--color-success, #22c55e)', opacity: 0.05 }}
+          animate={{ x: [0, -140, 60, 0], y: [0, -80, -30, 0] }}
+          transition={{ duration: 38, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        {/* Particules flottantes */}
+        {Array.from({ length: 14 }, (_, k) => (
+          <span key={k} aria-hidden className="dash-particle pointer-events-none absolute h-1 w-1 rounded-full"
+            style={{ left: `${(k * 37) % 100}%`, top: `${20 + ((k * 53) % 75)}%`, background: 'var(--accent-primary)', boxShadow: '0 0 6px var(--accent-primary)',
+              ['--dur' as string]: `${7 + (k % 5) * 2}s`, ['--delay' as string]: `${(k % 7) * -1.3}s` }} />
+        ))}
+      </>)}
+      {/* Sol holographique en perspective au bas de l'écran */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 overflow-hidden" style={{ perspective: 600 }}>
+        <div className="absolute inset-x-[-50%] bottom-[-30%] h-full"
+          style={{ transform: 'rotateX(72deg)', transformOrigin: 'bottom',
+            backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent-primary) 18%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 18%, transparent) 1px, transparent 1px)',
+            backgroundSize: '56px 56px', maskImage: 'linear-gradient(to top, black, transparent 80%)', WebkitMaskImage: 'linear-gradient(to top, black, transparent 80%)', opacity: 0.35 }} />
+      </div>
+      <main className={`relative z-10 mx-auto w-full px-3 py-2 transition-[max-width,padding] duration-500 sm:px-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-none'}`}>
         <motion.header
-          className="mb-4 flex flex-wrap items-end justify-between gap-3"
+          className="mb-1.5 flex shrink-0 flex-wrap items-end justify-between gap-2"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={SPRING}
@@ -888,27 +1036,121 @@ export const EditorDashboard = React.memo(function EditorDashboard({
               </div>
             </div>
           </div>
-          <nav className="flex flex-wrap gap-2" aria-label="Actions rapides">
-            {actions.map(a => (
+          <nav className="flex items-center gap-2" aria-label="Actions rapides">
+            <motion.button
+              type="button"
+              onClick={handleConnect}
+              disabled={connecting}
+              whileHover={reduce ? undefined : { y: -2 }}
+              whileTap={reduce ? undefined : { scale: 0.97 }}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold shadow-lg transition-all disabled:cursor-wait disabled:opacity-70"
+              style={connected
+                ? { backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 14%, var(--bg-panel))', borderColor: 'var(--color-success, #22c55e)', color: 'var(--color-success, #22c55e)', boxShadow: '0 0 18px color-mix(in srgb, var(--color-success, #22c55e) 16%, transparent)' }
+                : { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 28%, transparent)' }}
+              aria-label={connecting ? 'Connexion à Leanna en cours' : connected ? 'Déconnecter Leanna' : 'Connecter Leanna'}
+            >
+              {connecting ? <Loader2 size={14} className={reduce ? undefined : 'animate-spin'} /> : connected ? <PowerOff size={14} /> : <Power size={14} />}
+              {connecting ? 'Connexion…' : connected ? 'Leanna connectée' : 'Connecter Leanna'}
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: connected ? 'var(--color-success, #22c55e)' : 'rgba(255,255,255,.8)' }} />
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              whileHover={reduce ? undefined : { y: -2, rotateX: 10 }}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium"
+              style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+              aria-haspopup="dialog"
+            >
+              <Command size={14} style={{ color: 'var(--accent-primary)' }} /> Commandes
+            </motion.button>
+            {/* <div className="relative">
               <motion.button
-                key={a.label}
                 type="button"
-                onClick={a.onClick}
-                disabled={!a.onClick}
-                whileHover={reduce ? undefined : { y: -2 }}
-                whileTap={reduce ? undefined : { scale: 0.96 }}
-                className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-                style={a.primary
-                  ? { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white' }
-                  : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                onClick={() => setQuickMenuOpen(value => !value)}
+                aria-haspopup="menu"
+                aria-expanded={quickMenuOpen}
+                className="inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium"
+                style={{ backgroundColor: quickMenuOpen ? 'var(--accent-subtle)' : 'var(--bg-panel)', borderColor: quickMenuOpen ? 'var(--accent-primary)' : 'var(--border-base)', color: 'var(--text-primary)' }}
               >
-                <a.icon size={14} className={a.spin && !reduce ? 'animate-spin' : undefined} /> {a.label}
+                <Settings size={14} /> Menu <ChevronDown size={13} className={quickMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
               </motion.button>
-            ))}
+              <AnimatePresence>
+                {quickMenuOpen && (
+                  <motion.div
+                    role="menu"
+                    aria-label="Actions du tableau de bord"
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border p-1.5 shadow-2xl"
+                    style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', boxShadow: '0 18px 48px rgba(0,0,0,.38)' }}
+                  >
+                    {actions.map(action => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setQuickMenuOpen(false); action.onClick(); }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <action.icon size={14} style={{ color: 'var(--accent-primary)' }} />
+                        <span>{action.label}</span>
+                        {action.label.includes('personnalisation') && <span className="ml-auto text-[10px]" style={{ color: 'var(--accent-primary)' }}>ACTIF</span>}
+                      </button>
+                    ))}
+                    {isEditMode && (
+                      <button type="button" role="menuitem" onClick={() => { setQuickMenuOpen(false); resetLayout(); }} className="mt-1 flex w-full items-center gap-2.5 rounded-lg border-t px-3 py-2.5 text-left text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+                        <RefreshCw size={14} /> Réinitialiser la disposition
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div> */}
           </nav>
         </motion.header>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Sections du tableau de bord réorganisables">
+        <div className="xl:min-h-0 xl:flex-[0_0_44%]">
+          <DashboardCore aiName={aiName} connected={connected} connecting={connecting} activity={activity} isBusy={isBusy} reasoningActive={!!reasoning?.active} />
+        </div>
+
+        <Modal open={paletteOpen} onClose={() => { setPaletteOpen(false); setPaletteQuery(''); }} title="Palette de commandes" size="md">
+          <Modal.Body>
+            <input
+              autoFocus
+              value={paletteQuery}
+              onChange={event => setPaletteQuery(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter' && paletteMatches[0]) runPaletteAction(paletteMatches[0]); }}
+              placeholder="Rechercher une action…"
+              aria-label="Rechercher une action"
+              className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--accent-primary)]"
+              style={{ borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            />
+            <ul className="flex flex-col gap-1">
+              {paletteMatches.map((action, k) => (
+                <motion.li key={action.label} initial={reduce ? false : { opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: k * 0.03 }}>
+                  <button type="button" onClick={() => runPaletteAction(action)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-[var(--accent-subtle)]"
+                    style={{ color: 'var(--text-primary)' }}>
+                    <action.icon size={15} className="shrink-0" />
+                    {action.label}
+                    {k === 0 && <span className="ml-auto font-mono text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Entrée</span>}
+                  </button>
+                </motion.li>
+              ))}
+              {paletteMatches.length === 0 && <Empty>Aucune action ne correspond.</Empty>}
+            </ul>
+          </Modal.Body>
+        </Modal>
+
+        {isEditMode && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
+          <Settings size={14} style={{ color: 'var(--accent-primary)' }} />
+          <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
+          <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
+        </motion.div>}
+        <div className={`grid grid-cols-1 items-stretch gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:min-h-0 xl:flex-1 xl:grid-flow-row-dense xl:grid-cols-12 xl:grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
           {sectionOrder.map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
@@ -929,17 +1171,18 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             return (
               <div
                 key={sectionId}
-                draggable
+                draggable={isEditMode}
                 onDragStart={event => {
+                  if (!isEditMode) return;
                   setDraggedSection(sectionId);
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData('text/plain', sectionId);
                 }}
-                onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
-                onDrop={event => { event.preventDefault(); moveSection(sectionId); }}
+                onDragOver={event => { if (!isEditMode) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                onDrop={event => { if (!isEditMode) return; event.preventDefault(); moveSection(sectionId); }}
                 onDragEnd={() => setDraggedSection(null)}
-                className={`min-w-0 cursor-grab active:cursor-grabbing transition-opacity ${sectionId === 'operations' ? 'md:col-span-2 xl:col-span-4' : sectionId === 'audio' ? 'md:col-span-2' : ''} ${draggedSection === sectionId ? 'opacity-40' : ''}`}
-                title="Faire glisser pour déplacer cette section"
+                className={`min-w-0 transition-all duration-300 xl:min-h-0 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${SECTION_SPAN[sectionId] ?? 'md:col-span-2 xl:col-span-2'} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
+                title={isEditMode ? 'Faire glisser pour déplacer cette section' : undefined}
               >
                 {section}
               </div>
