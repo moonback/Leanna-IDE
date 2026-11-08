@@ -333,7 +333,7 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
   it("adapte le budget mémoire au rôle et à la phase de mission", () => {
     const securityBudget = resolveAdaptiveMemoryBudget("security", "x".repeat(1_300), "verify");
     const writerBudget = resolveAdaptiveMemoryBudget("writer", "Résumé court", "discovery");
-    assert.equal(securityBudget, 8_000);
+    assert.equal(securityBudget, 5_500);
     assert.equal(writerBudget, 2_800);
   });
 
