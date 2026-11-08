@@ -98,7 +98,7 @@ export default function ContextIntelligenceView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <ViewHeader {...viewHeaderProps('observability')} description="Pilotage de la mémoire, inspection du contexte et qualité des connaissances" badge="Context Intelligence" />
+      <ViewHeader {...viewHeaderProps('observability')} title="Intelligence du contexte" description="Pilotage de la mémoire, inspection du contexte et qualité des connaissances" badge="Context Intelligence" />
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex shrink-0 gap-1 overflow-x-auto border-b px-3" style={{ borderColor: 'var(--border-base)' }} role="tablist" aria-label="Sections Context Intelligence">
           {TABS.map(({ id, label, icon: Icon }) => (
