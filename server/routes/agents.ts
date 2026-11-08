@@ -48,7 +48,7 @@ const clip = (v: unknown, max: number): string | undefined =>
 const clipList = (v: unknown, max = 200): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, max) : [];
 
-function serializeTaskDetail(task: any) {
+export function serializeTaskDetail(task: any) {
   const r = task.result;
   const ev = r?.evidence;
   return {
