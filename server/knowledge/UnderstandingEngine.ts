@@ -155,7 +155,7 @@ export interface BuildContextOptions {
   includeRisk?: boolean;
   /** Mode ImpactAnalyzer si includeRisk=true */
   riskMode?: ImpactMode;
-  /** Nombre minimal de tokens disponibles dans le prompt (influence la taille du contexte) */
+  /** Budget maximal approximatif en tokens pour le contexte récupéré */
   maxTokenBudget?: number;
   /** Historique des précédentes actions (pour apprentissage incrémental) */
   history?: string[];
@@ -781,7 +781,7 @@ export class UnderstandingEngine {
    */
   private enforceTokenBudget(batch: ContextBatch, maxTokenBudget: number): ContextBatch {
     const safeTokenBudget = Number.isFinite(maxTokenBudget)
-      ? Math.max(64, Math.floor(maxTokenBudget))
+      ? Math.min(128_000, Math.max(64, Math.floor(maxTokenBudget)))
       : DEFAULTS.maxTokenBudget;
     const charBudget = Math.max(256, Math.floor(safeTokenBudget * 4 * 0.75));
     let remaining = Math.max(0, charBudget - batch.query.length - (batch.primaryFile?.length ?? 0) - 120);
