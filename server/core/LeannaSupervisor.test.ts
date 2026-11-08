@@ -546,3 +546,28 @@ test("an unknown side effect in the durable ledger blocks automatic mission repl
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test("passes the selected repair strategy into the next runner attempt", async () => {
+  const { sup, dir } = makeSupervisor();
+  const recoveryStrategies: Array<string | undefined> = [];
+  let attempts = 0;
+  const runner: MissionRunner = async (ctx) => {
+    recoveryStrategies.push(ctx.recovery);
+    attempts++;
+    if (attempts === 1) {
+      return {
+        success: false,
+        error: "TypeScript TS2322 type error",
+        evidence: { typecheck: { name: "tsc", passed: false, details: "TS2322" } },
+      };
+    }
+    return { success: true, evidence: { testsExecuted: [{ name: "unit", passed: true }] } };
+  };
+
+  const result = await sup.runMission({ missionId: "m-repair-context", goal: "repair types", runner });
+  assert.equal(result.finalState, "COMPLETED");
+  assert.deepEqual(recoveryStrategies, [undefined, "repair"]);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
