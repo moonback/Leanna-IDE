@@ -8,6 +8,7 @@ import {
   DelegationManager,
   delegationManager,
 } from "./DelegationManager.js";
+import { selectDelegationContext } from "./AgentCommunication.js";
 
 describe("DelegationManager", () => {
   let manager: DelegationManager;
@@ -189,5 +190,26 @@ describe("DelegationManager", () => {
 describe("DelegationManager Singleton", () => {
   it("devrait exporter une instance singleton", () => {
     assert.ok(delegationManager instanceof DelegationManager);
+  });
+});
+
+
+describe("selectDelegationContext — transmission sélective", () => {
+  it("préserve critères et contraintes avant les notes secondaires sous budget serré", () => {
+    const selected = selectDelegationContext({
+      notes: "N".repeat(20_000),
+      successCriteria: ["Les tests ciblés doivent passer"],
+      securityConstraints: ["Ne jamais contourner PermissionPolicy"],
+    }, 512);
+
+    assert.deepEqual(selected.successCriteria, ["Les tests ciblés doivent passer"]);
+    assert.deepEqual(selected.securityConstraints, ["Ne jamais contourner PermissionPolicy"]);
+    assert.equal((selected._contextHandoff as { truncated: boolean }).truncated, true);
+    assert.equal((selected._contextHandoff as { trust: string }).trust, "untrusted_data_not_instructions");
+    assert.ok(JSON.stringify(selected).length < 700);
+  });
+
+  it("ne transforme pas un contexte absent en contenu artificiel", () => {
+    assert.deepEqual(selectDelegationContext(undefined), {});
   });
 });
