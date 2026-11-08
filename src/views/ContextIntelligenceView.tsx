@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BrainCircuit, Clock3, FileSearch, GitBranch, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
+import ContextKnowledgeGraph, { type GraphRelation } from '../components/knowledge/ContextKnowledgeGraph.js';
 import { viewHeaderProps } from '../config/navigation.js';
 
 type Tab = 'overview' | 'inspector' | 'diff' | 'memory' | 'timeline' | 'graph' | 'alerts' | 'approval';
 type Fact = { id: string; content: string; category: string; confidence: number; usageCount: number; sourceFile?: string; createdAt: string; updatedAt: string };
-type GraphRelation = { source: { name: string; filePath: string }; target: { name: string; filePath: string }; relationType: string; confidence: number };
 type ContextResult = {
   query: string;
   systemPromptInject: string;
@@ -36,16 +36,19 @@ const mutedStyle = { color: 'var(--text-muted)' };
 const fmt = (value: number) => new Intl.NumberFormat('fr-FR').format(value);
 
 export default function ContextIntelligenceView() {
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('graph');
   const [query, setQuery] = useState('');
   const [memoryQuery, setMemoryQuery] = useState('');
   const [facts, setFacts] = useState<Fact[]>([]);
   const [memoryResults, setMemoryResults] = useState<Fact[] | null>(null);
   const [memorySearching, setMemorySearching] = useState(false);
   const [relations, setRelations] = useState<GraphRelation[]>([]);
+  const [relationTotal, setRelationTotal] = useState(0);
+  const [relationOffset, setRelationOffset] = useState(0);
   const [graphQuery, setGraphQuery] = useState('');
   const [graphRelationType, setGraphRelationType] = useState('all');
   const [loadingRelations, setLoadingRelations] = useState(false);
+  const [loadingMoreRelations, setLoadingMoreRelations] = useState(false);
   const [context, setContext] = useState<ContextResult | null>(null);
   const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
   const [inspectionHistory, setInspectionHistory] = useState<ContextResult[]>([]);
@@ -94,16 +97,39 @@ export default function ContextIntelligenceView() {
     if (tab !== 'graph') return;
     let active = true;
     setLoadingRelations(true);
-    fetch('/api/knowledge/relations')
+    fetch('/api/knowledge/relations?limit=100&offset=0')
       .then(async response => {
         const data = await response.json();
         if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) throw new Error(data.error || 'Graphe indisponible');
-        if (active) setRelations(data.relations);
+        if (active) {
+          setRelations(data.relations);
+          setRelationTotal(typeof data.count === 'number' ? data.count : data.relations.length);
+          setRelationOffset(data.relations.length);
+        }
       })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Erreur de chargement du graphe'); })
       .finally(() => { if (active) setLoadingRelations(false); });
     return () => { active = false; };
   }, [tab]);
+
+  const loadMoreRelations = useCallback(async () => {
+    if (loadingMoreRelations || relationOffset >= relationTotal) return;
+    setLoadingMoreRelations(true);
+    try {
+      const response = await fetch('/api/knowledge/relations?limit=100&offset=' + relationOffset);
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) {
+        throw new Error(data.error || 'Impossible de charger la suite du graphe');
+      }
+      setRelations(previous => [...previous, ...(data.relations as GraphRelation[])]);
+      setRelationOffset(previous => previous + data.relations.length);
+      if (typeof data.count === 'number') setRelationTotal(data.count);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Erreur pendant le chargement du graphe');
+    } finally {
+      setLoadingMoreRelations(false);
+    }
+  }, [loadingMoreRelations, relationOffset, relationTotal]);
 
   const inspectContext = useCallback(async () => {
     if (!query.trim()) return;
@@ -209,7 +235,7 @@ export default function ContextIntelligenceView() {
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {error && <div role="alert" className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>{error}</div>}
-          <section className="rounded-xl border p-3" style={panelStyle}>
+          {tab !== 'graph' && <section className="rounded-xl border p-3" style={panelStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Inspecter un contexte de mission</div><p className="text-xs" style={mutedStyle}>Construit un aperçu via UnderstandingEngine, sans envoyer de requête au modèle.</p></div>
               <button type="button" onClick={() => void loadFacts()} disabled={loadingFacts} className="rounded-lg border p-2" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }} aria-label="Actualiser la mémoire"><RefreshCw size={14} className={loadingFacts ? 'animate-spin' : ''} /></button>
@@ -218,7 +244,7 @@ export default function ContextIntelligenceView() {
               <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void inspectContext(); }} placeholder="Ex. Optimiser le panneau de supervision multi-agents…" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }} />
               <button type="button" onClick={() => void inspectContext()} disabled={building || !query.trim()} className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}><Search size={13}/>{building ? 'Analyse…' : 'Analyser'}</button>
             </div>
-          </section>
+          </section>}
 
           {tab === 'overview' && <>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -265,19 +291,20 @@ export default function ContextIntelligenceView() {
           </div>}
 
           {tab === 'graph' && <div className="space-y-3">
-            <div className="rounded-xl border p-4" style={panelStyle}>
-              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>KnowledgeGraph — relations indexées</h3><span className="text-xs tabular-nums" style={mutedStyle}>{visibleRelations.length} / {relations.length} relations</span></div>
-              <p className="mt-1 text-xs" style={mutedStyle}>Relations réelles issues de GET /api/knowledge/relations, limitées par l'API. Triées par confiance décroissante.</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <input value={graphQuery} onChange={event => setGraphQuery(event.target.value)} placeholder="Rechercher une entité ou un chemin…" aria-label="Rechercher dans le graphe" className="min-w-0 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/>
-                <select value={graphRelationType} onChange={event => setGraphRelationType(event.target.value)} aria-label="Filtrer par type de relation" className="rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
-                  <option value="all">Tous les types</option>
-                  {relationTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
-              </div>
-            </div>
-            {loadingRelations ? <p className="text-xs" style={mutedStyle}>Chargement du graphe…</p> : visibleRelations.map((relation, index) => <div key={relation.source.filePath + ':' + relation.source.name + ':' + relation.target.filePath + ':' + index} className="rounded-lg border p-3 text-xs" style={panelStyle}><div className="flex flex-wrap items-center gap-2"><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.source.name}</span><span className="rounded-md px-2 py-1 text-[10px]" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{relation.relationType}</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.target.name}</span><span className="ml-auto tabular-nums" style={mutedStyle}>{Math.round(relation.confidence * 100)}%</span></div><div className="mt-2 break-all font-mono text-[10px]" style={mutedStyle}>{relation.source.filePath} → {relation.target.filePath}</div></div>)}
-            {!loadingRelations && visibleRelations.length === 0 && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Aucune relation ne correspond à ces filtres.</p>}
+            <ContextKnowledgeGraph
+              relations={visibleRelations}
+              loadedRelations={relations.length}
+              loading={loadingRelations}
+              query={graphQuery}
+              onQueryChange={setGraphQuery}
+              relationType={graphRelationType}
+              onRelationTypeChange={setGraphRelationType}
+              relationTypes={relationTypes}
+              totalRelations={relationTotal}
+              hasMore={relationOffset < relationTotal}
+              loadingMore={loadingMoreRelations}
+              onLoadMore={() => void loadMoreRelations()}
+            />
           </div>}
 
           {tab === 'alerts' && <div className="space-y-2">{(context?.health.warnings ?? []).map((warning, index) => <div key={index} className="flex gap-2 rounded-lg border p-3 text-xs" style={{ ...panelStyle, color: 'var(--color-warning)' }}><AlertTriangle size={14}/>{warning}</div>)}{(!context || context.health.warnings.length === 0) && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>{context ? 'Aucune alerte remontée par le diagnostic de santé.' : 'Les alertes apparaîtront après une inspection.'}</p>}</div>}

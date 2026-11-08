@@ -313,6 +313,8 @@ router.get('/relations', (req: Request, res: Response) => {
     const entity = typeof req.query.entity === 'string' ? req.query.entity.trim() : '';
     const file = typeof req.query.file === 'string' ? req.query.file.trim() : '';
     const type = typeof req.query.type === 'string' ? req.query.type.trim() : '';
+    const limit = clampIntParam(req.query.limit, 100, 1, 100);
+    const offset = clampIntParam(req.query.offset, 0, 0, 1_000_000);
 
     let relations = knowledgeGraph.getRelations();
 
@@ -329,7 +331,10 @@ router.get('/relations', (req: Request, res: Response) => {
     res.json({
       status: 'success',
       count: relations.length,
-      relations: relations.slice(0, 100),
+      limit,
+      offset,
+      hasMore: offset + limit < relations.length,
+      relations: relations.slice(offset, offset + limit),
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
