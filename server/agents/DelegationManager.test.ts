@@ -316,7 +316,7 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
       context: {
         files: [],
         previousResults: [
-          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "completed" },
+          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "success" },
           { success: false, summary: "Échec compilation", filesModified: [], durationMs: 80, outcome: "failed" },
         ],
       },
@@ -331,9 +331,13 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
 
   it("injecte le pont mémoire dans le prompt en le déclarant comme donnée non fiable", () => {
     const prompt = new PromptBuilder().build({
+      role: "coder",
       name: "Coder",
+      description: "Agent de développement",
       systemPrompt: "Tu es un agent de développement.",
       capabilities: ["read_project_file"],
+      maxConcurrency: 1,
+      defaultTimeoutMs: 10_000,
     } as any, {
       ...task("coder", "Corriger le runtime"),
       context: {
