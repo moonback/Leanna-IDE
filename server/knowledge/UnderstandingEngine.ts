@@ -559,17 +559,40 @@ export class UnderstandingEngine {
   // 0. Cache
   // ──────────────────────────────────────────────────────────────────────
 
+  /**
+   * Cache key complet : les limites, le contexte déjà fourni et les options
+   * de risque changent le résultat. Une clé réduite à query/strategy/detail
+   * pouvait renvoyer un batch construit pour une autre mission ou un autre budget.
+   */
+  private cacheKey(query: string, opts: BuildContextOptions): string {
+    return JSON.stringify([
+      query,
+      opts.strategy ?? DEFAULTS.strategy,
+      opts.detail ?? DEFAULTS.detail,
+      opts.maxFiles ?? DEFAULTS.maxFiles,
+      opts.maxFacts ?? DEFAULTS.maxFacts,
+      opts.maxTokenBudget ?? DEFAULTS.maxTokenBudget,
+      opts.includeRisk ?? DEFAULTS.includeRisk,
+      opts.riskMode ?? DEFAULTS.riskMode,
+      [...(opts.existingContext ?? DEFAULTS.existingContext)].sort(),
+      opts.missionId ?? null,
+      opts.history ?? null,
+    ]);
+  }
+
   private cacheGet(query: string, opts: BuildContextOptions): UnderstandingContext | null {
     const now = Date.now();
-    const key = `${query}::${opts.strategy}::${opts.detail}`;
+    const key = this.cacheKey(query, opts);
     const entry = this.usageCache.find(
-      (c) => `${c.query}::balanced::standard` === key && now - c.timestamp < UnderstandingEngine.CACHE_TTL_MS
+      (candidate) => candidate.query === key && now - candidate.timestamp < UnderstandingEngine.CACHE_TTL_MS
     );
     return entry ? entry.context : null;
   }
 
   private cachePut(query: string, opts: BuildContextOptions, context: UnderstandingContext): void {
-    const key = `${query}::${opts.strategy}::${opts.detail}`;
+    const key = this.cacheKey(query, opts);
+    // Remplacer une entrée identique évite de consommer le cache avec des doublons.
+    this.usageCache = this.usageCache.filter((candidate) => candidate.query !== key);
     this.usageCache.push({ query: key, timestamp: Date.now(), context });
     if (this.usageCache.length > UnderstandingEngine.CACHE_MAX) this.usageCache.shift();
   }
