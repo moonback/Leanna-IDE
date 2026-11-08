@@ -26,9 +26,11 @@ export class ContextIntelligenceEngine {
     const config = { ...DEFAULTS, ...options }, now = config.now ?? Date.now();
     const sourceIsCurrent = (fact: ProjectFact): boolean => !fact.sourceFile ||
       input.workspaceFiles.has(fact.sourceFile.replace(/\\/g, "/"));
-    const rank = (fact: ProjectFact): number =>
-      (sourceIsCurrent(fact) ? 10 : 0) + fact.confidence * (1 + fact.usageCount);
-    const ranked = [...input.facts].sort((a, b) => rank(b) - rank(a));
+    const rank = (fact: ProjectFact): number => fact.confidence * (1 + fact.usageCount);
+    const ranked = [...input.facts].sort((a, b) => {
+      const sourceDelta = Number(sourceIsCurrent(b)) - Number(sourceIsCurrent(a));
+      return sourceDelta || rank(b) - rank(a);
+    });
     const assessments: ContextFactAssessment[] = [], canonical: ProjectFact[] = [];
     for (const fact of ranked) {
       const age = Math.max(0, now - timestamp(fact.updatedAt || fact.createdAt));
