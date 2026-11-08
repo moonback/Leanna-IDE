@@ -325,7 +325,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
     for (const edge of delegations) { if (edge.from === hoverRole) set.add(edge.to); if (edge.to === hoverRole) set.add(edge.from); }
     return set;
   }, [hoverRole, delegations]);
-  const selectAgent = useCallback((role: string) => setSelectedRole(value => value === role ? null : role), []);
+  const selectAgent = useCallback((role: string) => setSelectedRole(role), []);
   const ping = () => { setPingKey(key => key + 1); void refresh(); };
   const assignTask = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
