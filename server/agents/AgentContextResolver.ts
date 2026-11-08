@@ -34,19 +34,25 @@ export class AgentContextResolver {
 
     // Si des fichiers explicites sont fournis par l'appelant (pas extraits), les utiliser directement
     if (hardExplicitFiles.length > 0 && !capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10) as string[];
+      const selected = hardExplicitFiles.slice(0, 10) as string[];
+      this.attachMemoryBridge(task, selected);
+      return selected;
     }
 
     // Toujours découvrir l'inventaire pour résoudre les noms partiels/fuzzy
     if (!capabilities.includes("list_project_files")) {
-      return hardExplicitFiles.slice(0, 10) as string[];
+      const selected = hardExplicitFiles.slice(0, 10) as string[];
+      this.attachMemoryBridge(task, selected);
+      return selected;
     }
 
     try {
       const inventory = await this.callTool("list_project_files", { path: ".", recursive: true });
       if (inventory?.status !== "success" || !Array.isArray(inventory.files)) {
         log.warn(`[${task.id.slice(0, 8)}] Découverte de contexte indisponible: ${inventory?.error ?? inventory?.message ?? "réponse invalide"}`);
-        return hardExplicitFiles.slice(0, 10) as string[];
+        const selected = hardExplicitFiles.slice(0, 10) as string[];
+        this.attachMemoryBridge(task, selected);
+        return selected;
       }
 
       const allFiles: string[] = inventory.files;
@@ -101,7 +107,9 @@ export class AgentContextResolver {
       return selectedFiles as string[];
     } catch (error) {
       log.warn(`[${task.id.slice(0, 8)}] Échec de découverte du contexte: ${(error as Error).message}`);
-      return hardExplicitFiles.slice(0, 10) as string[];
+      const selected = hardExplicitFiles.slice(0, 10) as string[];
+      this.attachMemoryBridge(task, selected);
+      return selected;
     }
   }
 
@@ -111,6 +119,13 @@ export class AgentContextResolver {
    * existants. Les faits gardent leur provenance ; seuls les résultats réussis
    * des tâches précédentes sont transmis comme acquis.
    */
+  private attachMemoryBridge(task: AgentTask, files: string[]): void {
+    task.context.metadata = {
+      ...task.context.metadata,
+      contextMemory: this.buildMemoryBridge(task, files),
+    };
+  }
+
   buildMemoryBridge(task: AgentTask, selectedFiles: string[]): Record<string, unknown> {
     const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.trim();
     const facts = query.length >= 3 ? projectMemory.searchFacts(query, 12) : [];
