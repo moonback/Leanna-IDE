@@ -63,6 +63,8 @@ export type MissionRunner = (ctx: {
   missionId: string;
   goal: string;
   attempt: number;
+  /** Recovery strategy selected after the previous failed attempt. */
+  recovery?: RecoveryDecision;
   /** Signal d'annulation déclenché sur timeout runner (ou annulation externe). */
   signal?: AbortSignal;
   beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
