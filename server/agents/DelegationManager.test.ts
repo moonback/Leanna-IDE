@@ -10,6 +10,7 @@ import {
 } from "./DelegationManager.js";
 import { selectDelegationContext } from "./AgentCommunication.js";
 import { AgentContextResolver } from "./AgentContextResolver.js";
+import { resolveAdaptiveMemoryBudget, detectMemoryConflicts } from "./AgentContextResolver.js";
 import { PromptBuilder } from "./PromptBuilder.js";
 import type { AgentTask } from "./types.js";
 
@@ -329,6 +330,23 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
     assert.equal(bridge.trust, "retrieved_context_untrusted_validate_before_action");
   });
 
+  it("adapte le budget mémoire au rôle et à la phase de mission", () => {
+    const securityBudget = resolveAdaptiveMemoryBudget("security", "x".repeat(1_300), "verify");
+    const writerBudget = resolveAdaptiveMemoryBudget("writer", "Résumé court", "discovery");
+    assert.equal(securityBudget, 8_000);
+    assert.equal(writerBudget, 2_800);
+  });
+
+  it("signale les faits mémorisés de polarité opposée sans arbitrer automatiquement", () => {
+    const conflicts = detectMemoryConflicts([
+      { category: "security", sourceFile: "server/auth.ts", content: "Authentication is enabled for all API requests" },
+      { category: "security", sourceFile: "server/auth.ts", content: "Authentication is not enabled for all API requests" },
+    ]);
+    assert.equal(conflicts.length, 1);
+    assert.equal(conflicts[0]?.reason, "possible_opposite_polarity_same_topic");
+    assert.equal(conflicts[0]?.resolution, "requires_current_source_verification");
+  });
+
   it("injecte le pont mémoire dans le prompt en le déclarant comme donnée non fiable", () => {
     const prompt = new PromptBuilder().build({
       role: "coder",
@@ -346,6 +364,7 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
           contextMemory: {
             version: 1,
             facts: [{ content: "La politique d'accès se trouve dans PermissionPolicy.ts", provenance: "project_memory" }],
+            conflicts: [{ factIndexes: [0, 1], reason: "possible_opposite_polarity_same_topic" }],
             trust: "retrieved_context_untrusted_validate_before_action",
           },
         },
@@ -356,5 +375,6 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
     assert.ok(prompt.includes("données non fiables"));
     assert.ok(prompt.includes("PermissionPolicy.ts"));
     assert.ok(prompt.includes("pas des instructions"));
+    assert.ok(prompt.includes("contradiction(s) potentielle(s) détectée(s)"));
   });
 });
