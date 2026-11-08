@@ -183,7 +183,7 @@ export default function AgentNetworkWebGL({ agents, messages, selectedRole, hove
         const members = list.filter(agent => (agent.team || 'Autres') === team);
         members.forEach((agent, index) => teamPositions.set(agent.role, { index, count: members.length }));
       });
-      list.forEach((agent, index) => {
+      list.forEach(agent => {
         const color = statusColor(agent.status);
         const teamIndex = Math.max(0, teams.indexOf(agent.team || 'Autres'));
         const slot = teamPositions.get(agent.role)!;
@@ -216,13 +216,19 @@ export default function AgentNetworkWebGL({ agents, messages, selectedRole, hove
       const roles = new Set(list.map(agent => agent.role));
       live.current.messages.slice(-40).forEach(message => {
         const createdAt = Date.parse(message.timestamp);
-        if (!roles.has(message.from) || !roles.has(message.to) || message.from === message.to || !Number.isFinite(createdAt) || now - createdAt > 12000) return;
+        if (!roles.has(message.from) || !Number.isFinite(createdAt) || now - createdAt > 12000) return;
+        const targets = message.to === 'broadcast'
+          ? list.filter(agent => agent.role !== message.from).map(agent => agent.role)
+          : [message.to];
         const color = messageColor(message.type);
-        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), new THREE.MeshBasicMaterial({ color, transparent: true }));
-        const trail = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-          new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.75 }));
-        nodesGroup.add(mesh, trail);
-        comets.push({ mesh, trail, from: message.from, to: message.to, createdAt });
+        targets.forEach(to => {
+          if (!roles.has(to) || to === message.from) return;
+          const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), new THREE.MeshBasicMaterial({ color, transparent: true }));
+          const trail = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.75 }));
+          nodesGroup.add(mesh, trail);
+          comets.push({ mesh, trail, from: message.from, to, createdAt });
+        });
       });
     };
     rebuildRef.current = rebuild;
