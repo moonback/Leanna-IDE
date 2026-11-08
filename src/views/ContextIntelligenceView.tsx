@@ -5,6 +5,7 @@ import { viewHeaderProps } from '../config/navigation.js';
 
 type Tab = 'overview' | 'inspector' | 'diff' | 'memory' | 'timeline' | 'graph' | 'alerts' | 'approval';
 type Fact = { id: string; content: string; category: string; confidence: number; usageCount: number; sourceFile?: string; createdAt: string; updatedAt: string };
+type GraphRelation = { source: { name: string; filePath: string }; target: { name: string; filePath: string }; relationType: string; confidence: number };
 type ContextResult = {
   query: string;
   systemPromptInject: string;
@@ -39,6 +40,10 @@ export default function ContextIntelligenceView() {
   const [query, setQuery] = useState('');
   const [memoryQuery, setMemoryQuery] = useState('');
   const [facts, setFacts] = useState<Fact[]>([]);
+  const [memoryResults, setMemoryResults] = useState<Fact[] | null>(null);
+  const [memorySearching, setMemorySearching] = useState(false);
+  const [relations, setRelations] = useState<GraphRelation[]>([]);
+  const [loadingRelations, setLoadingRelations] = useState(false);
   const [context, setContext] = useState<ContextResult | null>(null);
   const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
   const [loadingFacts, setLoadingFacts] = useState(true);
@@ -62,6 +67,41 @@ export default function ContextIntelligenceView() {
 
   useEffect(() => { void loadFacts(); }, [loadFacts]);
 
+  useEffect(() => {
+    const term = memoryQuery.trim();
+    if (!term) { setMemoryResults(null); setMemorySearching(false); return; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setMemorySearching(true);
+      try {
+        const response = await fetch('/api/knowledge/memory/search?q=' + encodeURIComponent(term) + '&limit=50');
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success' || !Array.isArray(data.results)) throw new Error(data.error || 'Recherche mémoire indisponible');
+        if (active) setMemoryResults(data.results);
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Erreur de recherche mémoire');
+      } finally {
+        if (active) setMemorySearching(false);
+      }
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [memoryQuery]);
+
+  useEffect(() => {
+    if (tab !== 'graph') return;
+    let active = true;
+    setLoadingRelations(true);
+    fetch('/api/knowledge/relations')
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) throw new Error(data.error || 'Graphe indisponible');
+        if (active) setRelations(data.relations);
+      })
+      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Erreur de chargement du graphe'); })
+      .finally(() => { if (active) setLoadingRelations(false); });
+    return () => { active = false; };
+  }, [tab]);
+
   const inspectContext = useCallback(async () => {
     if (!query.trim()) return;
     setBuilding(true);
@@ -84,10 +124,10 @@ export default function ContextIntelligenceView() {
     }
   }, [query, context]);
 
-  const visibleFacts = useMemo(() => {
+  const visibleFacts = memoryResults ?? facts.filter(fact => {
     const term = memoryQuery.trim().toLocaleLowerCase();
-    return term ? facts.filter(f => [f.content, f.category, f.sourceFile ?? ''].join(' ').toLocaleLowerCase().includes(term)) : facts;
-  }, [facts, memoryQuery]);
+    return !term || [fact.content, fact.category, fact.sourceFile ?? ''].join(' ').toLocaleLowerCase().includes(term);
+  });
 
   const currentFactIds = new Set(context?.batch.facts.map(f => f.id) ?? []);
   const previousFactIds = new Set(previousContext?.batch.facts.map(f => f.id) ?? []);
@@ -166,11 +206,15 @@ export default function ContextIntelligenceView() {
             </>}
           </div>}
 
-          {tab === 'memory' && <section className="space-y-3"><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={mutedStyle}/><input value={memoryQuery} onChange={e => setMemoryQuery(e.target.value)} placeholder="Rechercher un fait, une catégorie ou un fichier source…" className="w-full rounded-lg border py-2 pl-9 pr-3 text-xs" style={{ ...panelStyle, color: 'var(--text-primary)' }}/></div>{loadingFacts ? <p className="text-xs" style={mutedStyle}>Chargement…</p> : visibleFacts.map(fact => <article key={fact.id} className="rounded-xl border p-3" style={panelStyle}><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--accent-secondary)' }}>{fact.category}</span><span className="text-[11px]" style={mutedStyle}>Confiance {Math.round(fact.confidence * 100)}% · {fact.usageCount} utilisation(s)</span></div><p className="mt-2 text-xs" style={{ color: 'var(--text-primary)' }}>{fact.content}</p><p className="mt-2 truncate font-mono text-[10px]" style={mutedStyle}>{fact.sourceFile || 'Source non renseignée'}</p></article>)}{!loadingFacts && visibleFacts.length === 0 && <p className="py-6 text-center text-xs" style={mutedStyle}>Aucun fait correspondant.</p>}</section>}
+          {tab === 'memory' && <section className="space-y-3"><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={mutedStyle}/><input value={memoryQuery} onChange={e => setMemoryQuery(e.target.value)} placeholder="Rechercher un fait, une catégorie ou un fichier source…" className="w-full rounded-lg border py-2 pl-9 pr-3 text-xs" style={{ ...panelStyle, color: 'var(--text-primary)' }}/></div>{loadingFacts || memorySearching ? <p className="text-xs" style={mutedStyle}>Recherche…</p> : visibleFacts.map(fact => <article key={fact.id} className="rounded-xl border p-3" style={panelStyle}><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--accent-secondary)' }}>{fact.category}</span><span className="text-[11px]" style={mutedStyle}>Confiance {Math.round(fact.confidence * 100)}% · {fact.usageCount} utilisation(s)</span></div><p className="mt-2 text-xs" style={{ color: 'var(--text-primary)' }}>{fact.content}</p><p className="mt-2 truncate font-mono text-[10px]" style={mutedStyle}>{fact.sourceFile || 'Source non renseignée'}</p></article>)}{!loadingFacts && visibleFacts.length === 0 && <p className="py-6 text-center text-xs" style={mutedStyle}>Aucun fait correspondant.</p>}</section>}
 
           {tab === 'timeline' && <div className="rounded-xl border p-5" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Historique de la dernière inspection</h3>{context ? <div className="mt-3 space-y-2 text-xs" style={mutedStyle}><p>{new Date(context.generatedAt).toLocaleString('fr-FR')} — Contexte construit en {context.computationMs} ms.</p><p>{context.batch.memoryGovernance?.assessed ?? 0} fait(s) évalué(s), {context.batch.memoryGovernance?.included ?? 0} inclus, {context.batch.memoryGovernance?.withheld ?? 0} écartés.</p></div> : <p className="mt-2 text-xs" style={mutedStyle}>L'historique persistant des décisions n'est pas encore exposé par l'API. Les événements de cette session seront visibles après inspection.</p>}</div>}
 
-          {tab === 'graph' && <div className="rounded-xl border p-5" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Fichiers liés au contexte</h3><p className="mt-1 text-xs" style={mutedStyle}>Vue de voisinage issue des fichiers sélectionnés par UnderstandingEngine ; ce n'est pas encore une visualisation complète du KnowledgeGraph.</p>{context?.batch.files.map(file => <div key={file.filePath} className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}><GitBranch size={12}/><span className="truncate font-mono">{file.filePath}</span></div>) ?? <p className="mt-3 text-xs" style={mutedStyle}>Inspecte une mission pour afficher les fichiers.</p>}</div>}
+          {tab === 'graph' && <div className="space-y-3">
+            <div className="rounded-xl border p-4" style={panelStyle}><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>KnowledgeGraph — relations indexées</h3><span className="text-xs" style={mutedStyle}>{relations.length} relations chargées</span></div><p className="mt-1 text-xs" style={mutedStyle}>Données issues de GET /api/knowledge/relations, limitées aux 100 premières relations par l'API.</p></div>
+            {loadingRelations ? <p className="text-xs" style={mutedStyle}>Chargement du graphe…</p> : relations.map((relation, index) => <div key={relation.source.filePath + ':' + relation.source.name + ':' + relation.target.filePath + ':' + index} className="rounded-lg border p-3 text-xs" style={panelStyle}><div className="flex flex-wrap items-center gap-2"><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.source.name}</span><span style={mutedStyle}>— {relation.relationType} →</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.target.name}</span><span className="ml-auto" style={mutedStyle}>{Math.round(relation.confidence * 100)}%</span></div><div className="mt-1 break-all font-mono text-[10px]" style={mutedStyle}>{relation.source.filePath} → {relation.target.filePath}</div></div>)}
+            {!loadingRelations && relations.length === 0 && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Aucune relation indexée disponible.</p>}
+          </div>}
 
           {tab === 'alerts' && <div className="space-y-2">{(context?.health.warnings ?? []).map((warning, index) => <div key={index} className="flex gap-2 rounded-lg border p-3 text-xs" style={{ ...panelStyle, color: 'var(--color-warning)' }}><AlertTriangle size={14}/>{warning}</div>)}{(!context || context.health.warnings.length === 0) && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>{context ? 'Aucune alerte remontée par le diagnostic de santé.' : 'Les alertes apparaîtront après une inspection.'}</p>}</div>}
 
