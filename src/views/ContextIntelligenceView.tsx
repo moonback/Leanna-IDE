@@ -89,6 +89,14 @@ export default function ContextIntelligenceView() {
     return term ? facts.filter(f => [f.content, f.category, f.sourceFile ?? ''].join(' ').toLocaleLowerCase().includes(term)) : facts;
   }, [facts, memoryQuery]);
 
+  const currentFactIds = new Set(context?.batch.facts.map(f => f.id) ?? []);
+  const previousFactIds = new Set(previousContext?.batch.facts.map(f => f.id) ?? []);
+  const addedFacts = context?.batch.facts.filter(f => !previousFactIds.has(f.id)) ?? [];
+  const removedFacts = previousContext?.batch.facts.filter(f => !currentFactIds.has(f.id)) ?? [];
+  const currentFiles = new Set(context?.batch.files.map(f => f.filePath) ?? []);
+  const previousFiles = new Set(previousContext?.batch.files.map(f => f.filePath) ?? []);
+  const addedFiles = context?.batch.files.filter(f => !previousFiles.has(f.filePath)) ?? [];
+  const removedFiles = previousContext?.batch.files.filter(f => !currentFiles.has(f.filePath)) ?? [];
   const estimatedPromptTokens = context ? Math.ceil(context.systemPromptInject.length / 4) : 0;
   const governance = context?.batch.memoryGovernance;
   const Stat = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => (
