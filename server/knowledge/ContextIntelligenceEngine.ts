@@ -25,19 +25,19 @@ export class ContextIntelligenceEngine {
   assess(input: { facts: ProjectFact[]; workspaceFiles: ReadonlySet<string>; missions?: VerifiedMissionLearning[] }, options: ContextIntelligenceOptions = {}): ContextIntelligenceReport {
     const config = { ...DEFAULTS, ...options }, now = config.now ?? Date.now();
     const ranked = [...input.facts].sort((a, b) => (b.confidence * (1 + b.usageCount)) - (a.confidence * (1 + a.usageCount)));
-    const assessments: ContextFactAssessment[] = [], assigned = new Set<string>();
+    const assessments: ContextFactAssessment[] = [], canonical: ProjectFact[] = [];
     for (const fact of ranked) {
-      if (assigned.has(fact.id)) continue;
       const age = Math.max(0, now - timestamp(fact.updatedAt || fact.createdAt));
       const source = fact.sourceFile?.replace(/\\/g, "/");
       const sourceMissing = Boolean(source && !input.workspaceFiles.has(source));
-      const duplicate = ranked.find((candidate) => candidate.id !== fact.id && !assigned.has(candidate.id) &&
-        candidate.category === fact.category && similarity(fact.content, candidate.content) >= config.duplicateSimilarity);
+      const duplicate = canonical.find((candidate) => candidate.category === fact.category &&
+        similarity(fact.content, candidate.content) >= config.duplicateSimilarity);
       if (duplicate) {
         assessments.push({ factId: fact.id, decision: "merge", confidence: fact.confidence,
           reasons: ["Contenu similaire à un fait mieux classé ; fusion à proposer, sans suppression automatique."], duplicateOf: duplicate.id });
-        assigned.add(fact.id); continue;
+        continue;
       }
+      canonical.push(fact);
       let decision: MemoryDecision = "keep";
       const reasons: string[] = [];
       if (sourceMissing) { decision = "verify"; reasons.push("Le fichier source est absent de l'inventaire actuel du workspace."); }
