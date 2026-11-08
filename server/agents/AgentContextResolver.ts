@@ -127,7 +127,7 @@ export class AgentContextResolver {
       "server/agents/AgentOrchestrator.ts",
       "server/skills/agents.ts",
     ];
-    const preferredRank = new Map(preferredFiles.map((file, index) => [file.replace(/\\/g, "/"), index]));
+    const explicitRank = new Map(resolvedMentioned.map((file, index) => [file.replace(/\\/g, "/"), index]));
     const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/")))]
       .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
 
@@ -157,7 +157,8 @@ export class AgentContextResolver {
     };
     const score = (file: string): number => {
       const lower = file.toLowerCase();
-      const base = preferredRank.has(file) ? 100 - (preferredRank.get(file) ?? 0) * 2 : 0;
+      const explicitBase = explicitRank.has(file) ? 1_000 - (explicitRank.get(file) ?? 0) * 10 : 0;
+      const structuralBase = file === "package.json" || file === "tsconfig.json" ? 2 : file === "README.md" ? 1 : 0;
       const pathTokens = lower.split(/[/.\\_-]+/).filter(Boolean);
       let relevance = 0;
       for (const term of terms) {
@@ -173,7 +174,7 @@ export class AgentContextResolver {
       if (role === "security" && /security|permission|auth|policy|guard|sandbox/.test(lower)) relevance += 10;
       if (role === "ui_ux" && /components|pages|styles|\.tsx$|\.css$/.test(lower)) relevance += 8;
       if (role === "documentation" && /\.md$|^docs\\//.test(lower)) relevance += 8;
-      return base + relevance;
+      return explicitBase + structuralBase + relevance;
     };
 
     return normalizedFiles
