@@ -18,7 +18,7 @@ import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import type { AgentRole } from '../../context/UserProfileContext.js';
 import {
   getToolActivities, getAgentTasks, subscribe,
-  clearCompletedTools, clearCompletedTasks, cancelAgentTask, removeAgentTasks,
+  clearCompletedTools, clearCompletedTasks, cancelAgentTask, cancelAllAgentTasks, removeAgentTasks,
   type ToolActivityEntry, type AgentTaskEntry,
 } from '../../stores/agentActivityStore.js';
 
@@ -267,6 +267,8 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
 
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [tab, setTab] = useState<'roster' | 'live' | 'delegated'>('roster');
+  const [confirmCancelAll, setConfirmCancelAll] = useState(false);
+  const [cancellingAll, setCancellingAll] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-switch to delegated tab when agents arrive
@@ -305,6 +307,21 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
   // Stats
   const liveRunning = toolActivities.filter(a => a.status === 'running').length;
   const delegatedRunning = delegatedTasks.filter(t => t.status === 'running' || t.status === 'pending').length;
+  const cancellableTasks = delegatedTasks.filter(t => (t.status === 'running' || t.status === 'pending') && !t.cancellationRequested).length;
+
+  const handleCancelAll = useCallback(async () => {
+    if (!confirmCancelAll) {
+      setConfirmCancelAll(true);
+      return;
+    }
+    setCancellingAll(true);
+    setConfirmCancelAll(false);
+    try {
+      await cancelAllAgentTasks();
+    } finally {
+      setCancellingAll(false);
+    }
+  }, [confirmCancelAll]);
   const delegatedDone = delegatedTasks.filter(t => t.status === 'completed').length;
   const delegatedFailed = delegatedTasks.filter(t => (t.status === 'failed' || t.status === 'incomplete')).length;
   const totalDone = toolActivities.filter(a => a.status === 'done').length;
@@ -344,6 +361,25 @@ export function AgentPanel({ inline = false, docked = false, onClose }: AgentPan
             <Bot size={10} /> Tâches
           </TabBtn>
           <div className="flex-1" />
+          {tab === 'delegated' && delegatedRunning > 0 && (
+            <button
+              type="button"
+              onClick={handleCancelAll}
+              disabled={cancellingAll || cancellableTasks === 0}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-colors disabled:opacity-50"
+              style={{
+                color: confirmCancelAll ? 'var(--color-error)' : 'var(--text-muted)',
+                backgroundColor: confirmCancelAll ? 'var(--color-error-subtle)' : 'var(--bg-input)',
+                border: '1px solid var(--border-base)',
+              }}
+              title={confirmCancelAll ? 'Confirmer l’arrêt de toutes les tâches actives' : 'Demander l’arrêt de toutes les tâches actives'}
+              aria-label={confirmCancelAll ? 'Confirmer l’arrêt de toutes les tâches' : 'Arrêter toutes les tâches'}
+              aria-busy={cancellingAll}
+            >
+              {cancellingAll ? <Loader2 size={11} className="animate-spin" /> : <Ban size={11} />}
+              {cancellingAll ? 'Arrêt…' : confirmCancelAll ? 'Confirmer ?' : 'Tout arrêter'}
+            </button>
+          )}
           {tab !== 'roster' && (
             <IconButton
               variant="default"
