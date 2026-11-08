@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  Activity, AudioLines, BookOpen, Bot, CalendarClock, Coins, Cpu, FilePlus, GitBranch,
+  Activity, AudioLines, BookOpen, Bot, CalendarClock, ChevronDown, Coins, Cpu, FilePlus, GitBranch,
   History, ListChecks, Loader2, Mail, MessageSquare, Mic, MicOff, Moon, Search, Settings,
   Sparkles, Timer, Workflow, CheckCircle2, XCircle, KeyRound, Power, PowerOff, RefreshCw, Sun,
 } from 'lucide-react';
@@ -829,6 +829,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [immersiveMode, setImmersiveMode] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -870,17 +871,14 @@ export const EditorDashboard = React.memo(function EditorDashboard({
     clearTranscript(); clearActivity(); connect([], 'full');
   }, [connected, connecting, connect, disconnect, clearTranscript, clearActivity]);
 
-  const actions: { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; onClick?: () => void; primary?: boolean; spin?: boolean }[] = [
-    connecting
-      ? { label: 'Connexion…', icon: Loader2, primary: true, spin: true }
-      : connected
-        ? { label: `Déconnecter ${aiName}`, icon: PowerOff, onClick: handleConnect }
-        : { label: `Connecter ${aiName}`, icon: Power, onClick: handleConnect, primary: true },
+  const actions: { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; onClick: () => void }[] = [
     { label: 'Ouvrir le chat', icon: MessageSquare, onClick: onOpenChat },
     { label: 'Nouveau fichier', icon: FilePlus, onClick: onCreateFile },
     { label: 'Rechercher', icon: Search, onClick: onOpenSearch },
     { label: 'Notebooks', icon: BookOpen, onClick: onOpenNotebooks },
     { label: 'Paramètres', icon: Settings, onClick: () => onShowSettings() },
+    { label: isEditMode ? 'Terminer la personnalisation' : 'Personnaliser', icon: Settings, onClick: () => setIsEditMode(value => !value) },
+    { label: immersiveMode ? 'Vue standard' : 'Vue immersive', icon: Sparkles, onClick: () => setImmersiveMode(value => !value) },
   ];
 
   return (
@@ -913,36 +911,73 @@ export const EditorDashboard = React.memo(function EditorDashboard({
               </div>
             </div>
           </div>
-          <nav className="flex flex-wrap gap-2" aria-label="Actions rapides">
-            {actions.map(a => (
+          <nav className="flex items-center gap-2" aria-label="Actions rapides">
+            <motion.button
+              type="button"
+              onClick={handleConnect}
+              disabled={connecting}
+              whileHover={reduce ? undefined : { y: -2 }}
+              whileTap={reduce ? undefined : { scale: 0.97 }}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold shadow-lg transition-all disabled:cursor-wait disabled:opacity-70"
+              style={connected
+                ? { backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 14%, var(--bg-panel))', borderColor: 'var(--color-success, #22c55e)', color: 'var(--color-success, #22c55e)', boxShadow: '0 0 18px color-mix(in srgb, var(--color-success, #22c55e) 16%, transparent)' }
+                : { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 28%, transparent)' }}
+              aria-label={connecting ? 'Connexion à Leanna en cours' : connected ? 'Déconnecter Leanna' : 'Connecter Leanna'}
+            >
+              {connecting ? <Loader2 size={14} className={reduce ? undefined : 'animate-spin'} /> : connected ? <PowerOff size={14} /> : <Power size={14} />}
+              {connecting ? 'Connexion…' : connected ? 'Leanna connectée' : 'Connecter Leanna'}
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: connected ? 'var(--color-success, #22c55e)' : 'rgba(255,255,255,.8)' }} />
+            </motion.button>
+            <div className="relative">
               <motion.button
-                key={a.label}
                 type="button"
-                onClick={a.onClick}
-                disabled={!a.onClick}
-                whileHover={reduce ? undefined : { y: -2 }}
-                whileTap={reduce ? undefined : { scale: 0.96 }}
-                className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium disabled:opacity-40"
-                style={a.primary
-                  ? { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white' }
-                  : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                onClick={() => setQuickMenuOpen(value => !value)}
+                aria-haspopup="menu"
+                aria-expanded={quickMenuOpen}
+                className="inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium"
+                style={{ backgroundColor: quickMenuOpen ? 'var(--accent-subtle)' : 'var(--bg-panel)', borderColor: quickMenuOpen ? 'var(--accent-primary)' : 'var(--border-base)', color: 'var(--text-primary)' }}
               >
-                <a.icon size={14} className={a.spin && !reduce ? 'animate-spin' : undefined} /> {a.label}
+                <Settings size={14} /> Menu <ChevronDown size={13} className={quickMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
               </motion.button>
-            ))}
-            <motion.button type="button" onClick={() => setIsEditMode(value => !value)} whileHover={reduce ? undefined : { y: -2 }} whileTap={reduce ? undefined : { scale: 0.96 }} aria-pressed={isEditMode} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors" style={isEditMode ? { backgroundColor: 'var(--accent-subtle)', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
-              <Settings size={14} /> {isEditMode ? 'Terminer' : 'Personnaliser'}
-            </motion.button>
-            {isEditMode && <motion.button type="button" onClick={resetLayout} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} whileTap={reduce ? undefined : { scale: 0.96 }} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
-              <RefreshCw size={14} /> Réinitialiser
-            </motion.button>}
-            <motion.button type="button" onClick={() => setImmersiveMode(value => !value)} whileHover={reduce ? undefined : { y: -2 }} whileTap={reduce ? undefined : { scale: 0.96 }} aria-pressed={immersiveMode} className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" style={immersiveMode ? { backgroundColor: 'var(--accent-subtle)', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
-              <Sparkles size={14} /> {immersiveMode ? 'Vue standard' : 'Vue immersive'}
-            </motion.button>
+              <AnimatePresence>
+                {quickMenuOpen && (
+                  <motion.div
+                    role="menu"
+                    aria-label="Actions du tableau de bord"
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border p-1.5 shadow-2xl"
+                    style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', boxShadow: '0 18px 48px rgba(0,0,0,.38)' }}
+                  >
+                    {actions.map(action => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setQuickMenuOpen(false); action.onClick(); }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs transition-colors hover:bg-[var(--accent-subtle)]"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <action.icon size={14} style={{ color: 'var(--accent-primary)' }} />
+                        <span>{action.label}</span>
+                        {action.label.includes('personnalisation') && <span className="ml-auto text-[10px]" style={{ color: 'var(--accent-primary)' }}>ACTIF</span>}
+                      </button>
+                    ))}
+                    {isEditMode && (
+                      <button type="button" role="menuitem" onClick={() => { setQuickMenuOpen(false); resetLayout(); }} className="mt-1 flex w-full items-center gap-2.5 rounded-lg border-t px-3 py-2.5 text-left text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+                        <RefreshCw size={14} /> Réinitialiser la disposition
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </nav>
         </motion.header>
 
-        <DashboardCore aiName={aiName} connected={connected} connecting={connecting} onToggleConnection={handleConnect} activity={activity} isBusy={isBusy} reasoningActive={!!reasoning?.active} />
+        <DashboardCore aiName={aiName} connected={connected} connecting={connecting} activity={activity} isBusy={isBusy} reasoningActive={!!reasoning?.active} />
 
         {isEditMode && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
           <Settings size={14} style={{ color: 'var(--accent-primary)' }} />
