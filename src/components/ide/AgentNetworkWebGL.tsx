@@ -19,6 +19,8 @@ export interface WebGLAgent {
 }
 export interface WebGLBusMessage { id: string; type: string; from: string; to: string; timestamp: string; summary?: string; }
 
+const RING = 4.4;
+
 interface Props {
   agents: WebGLAgent[];
   messages: WebGLBusMessage[];
