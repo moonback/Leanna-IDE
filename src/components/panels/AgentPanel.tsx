@@ -114,6 +114,7 @@ function StatusBadge({ status }: { status: string }) {
     completed: { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
     incomplete:{ color: 'var(--color-warning)', bg: 'var(--color-warning-subtle)', label: 'Incomplet', icon: <ShieldAlert size={9} /> },
     failed:    { color: 'var(--color-error)', bg: 'var(--color-error-subtle)', label: 'Erreur', icon: <XCircle size={9} /> },
+    cancelling:{ color: 'var(--color-warning)', bg: 'var(--color-warning-subtle)', label: 'Arrêt…', icon: <Loader2 size={9} className="animate-spin" /> },
     cancelled: { color: 'var(--text-muted)', bg: 'rgba(113,113,122,0.12)', label: 'Annulée', icon: <Ban size={9} /> },
     done:      { color: 'var(--color-success)', bg: 'var(--color-success-subtle)', label: 'OK', icon: <CheckCircle2 size={9} /> },
   };
@@ -1107,7 +1108,8 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
   const Icon = meta.icon;
   const isRunning = task.status === 'running';
   const isPending = task.status === 'pending';
-  const canCancel = isRunning || isPending;
+  const isCancelling = Boolean(task.cancellationRequested);
+  const canCancel = (isRunning || isPending) && !isCancelling;
   const [cancelling, setCancelling] = useState(false);
 
   // Progression explicite si le serveur l'a fournie, sinon dérivée des étapes.
@@ -1211,18 +1213,25 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {isRunning && <RunningElapsed startTime={task.timestamp} />}
-          <StatusBadge status={task.status} />
-          {/* Bouton d'annulation pour les tâches en cours ou en attente (masqué en mode sélection) */}
-          {!selectMode && canCancel && (
+          <StatusBadge status={isCancelling || cancelling ? 'cancelling' : task.status} />
+          {/* Action explicite : arrêt coopératif, distinct de la suppression historique. */}
+          {!selectMode && (isRunning || isPending) && (
             <button
+              type="button"
               onClick={handleCancel}
-              disabled={cancelling}
-              title={isPending ? 'Retirer de la file' : 'Annuler la tâche en cours'}
-              aria-label="Annuler la tâche"
-              className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--color-error-subtle)] disabled:opacity-50"
-              style={{ color: 'var(--color-error)' }}
+              disabled={isCancelling || cancelling}
+              title={isCancelling ? 'Arrêt demandé — attente de confirmation du moteur' : isPending ? 'Retirer cette tâche de la file' : 'Arrêter cet agent'}
+              aria-label={isCancelling ? 'Arrêt de la tâche en cours' : 'Arrêter cette tâche'}
+              aria-busy={isCancelling || cancelling}
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-all hover:bg-[var(--color-error-subtle)] hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-70"
+              style={{
+                color: isCancelling || cancelling ? 'var(--color-warning)' : 'var(--color-error)',
+                border: '1px solid color-mix(in srgb, var(--color-error) 22%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-error) 5%, transparent)',
+              }}
             >
-              {cancelling ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />}
+              {isCancelling || cancelling ? <Loader2 size={11} className="animate-spin" /> : <Ban size={11} />}
+              <span>{isCancelling || cancelling ? 'Arrêt…' : 'Arrêter'}</span>
             </button>
           )}
         </div>
@@ -1233,16 +1242,18 @@ function DelegatedTaskCard({ task, queuePosition, queueTotal, selectMode, select
         )}
       </div>
 
-      {/* Barre de progression pour les tâches en cours */}
-      {isRunning && progressPct > 0 && (
-        <div className="px-2.5 pb-1.5">
+      {/* Progression déterminée ou animation indéterminée si le moteur n'en fournit pas encore. */}
+      {isRunning && (
+        <div className="px-2.5 pb-1.5" aria-label={progressPct > 0 ? `Progression : ${Math.round(progressPct)}%` : 'Agent en activité'}>
           <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-base)' }}>
             <motion.div
               className="h-full rounded-full"
-              style={{ backgroundColor: meta.color }}
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPct}%` }}
-              transition={{ duration: 0.3 }}
+              style={{ backgroundColor: meta.color, width: progressPct > 0 ? undefined : '34%' }}
+              initial={progressPct > 0 ? { width: 0 } : { x: '-100%' }}
+              animate={progressPct > 0 ? { width: `${progressPct}%` } : { x: ['-100%', '300%'] }}
+              transition={progressPct > 0
+                ? { duration: 0.3, ease: 'easeOut' }
+                : { duration: 1.35, repeat: Infinity, ease: 'linear' }}
             />
           </div>
         </div>
