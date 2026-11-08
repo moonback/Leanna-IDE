@@ -1,5 +1,6 @@
-import React from 'react';
-import { Activity, Bot } from 'lucide-react';
+import React, { useSyncExternalStore } from 'react';
+import { Activity, Bot, Clock3, Loader2 } from 'lucide-react';
+import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
 import { motion, useReducedMotion } from 'motion/react';
 import type { ActivityStep } from '../../hooks/useActivity.js';
 import { DashboardAgentNetwork } from './DashboardAgentNetwork.js';
@@ -20,10 +21,19 @@ export const DashboardCore = React.memo(function DashboardCore({
   const reduce = !!useReducedMotion();
   const status = connecting ? 'Connexion en cours' : connected ? 'Session connectée' : 'En attente de connexion';
   const accent = connected ? 'var(--color-success, #22c55e)' : 'var(--accent-primary)';
+  const tasks = useSyncExternalStore(subscribe, getAgentTasks);
+  const current = [...tasks].reverse().find(task => task.status === 'running');
+  const recentSteps = activity.slice(-4).reverse();
+  const stats = [
+    { label: 'En cours', value: tasks.filter(task => task.status === 'running').length, color: 'var(--accent-primary)' },
+    { label: 'Terminées', value: tasks.filter(task => task.status === 'completed').length, color: 'var(--color-success, #22c55e)' },
+    { label: 'Échecs', value: tasks.filter(task => task.status === 'failed' || task.status === 'incomplete').length, color: 'var(--color-error, #ef4444)' },
+    { label: 'Outils Live', value: activity.length, color: 'var(--accent-primary)' },
+  ];
 
   return (
     <section
-      className="relative mb-2 grid min-h-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-xl border p-2.5 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,2fr)] lg:gap-4 lg:px-4"
+      className="relative mb-2 grid min-h-0 grid-cols-1 items-stretch gap-3 overflow-hidden rounded-xl border p-2.5 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,2fr)] lg:gap-4 lg:px-4"
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--border-base))',
         background: 'linear-gradient(115deg, color-mix(in srgb, var(--bg-panel) 96%, var(--accent-primary) 4%), color-mix(in srgb, var(--bg-secondary) 90%, transparent))',
@@ -34,7 +44,8 @@ export const DashboardCore = React.memo(function DashboardCore({
     >
       <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden
         style={{ backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px)', backgroundSize: '28px 28px', maskImage: 'linear-gradient(90deg, transparent, black 35%, black 75%, transparent)' }} />
-      <div className="relative z-10 flex min-w-0 items-center gap-3">
+      <div className="relative z-10 flex min-w-0 flex-col gap-3 self-stretch">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="relative flex h-16 w-16 shrink-0 items-center justify-center" style={{ perspective: '600px' }}>
           <motion.div className="absolute inset-1 rounded-full border"
             style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 55%, transparent)', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 18%, transparent)' }}
@@ -62,7 +73,30 @@ export const DashboardCore = React.memo(function DashboardCore({
           </div>
         </div>
       </div>
-      <div className="relative z-10 flex min-w-0 items-center justify-between gap-3 lg:col-start-1 lg:row-start-2 lg:mt-0 lg:items-end">
+      <div className="grid grid-cols-2 gap-2">
+        {stats.map(stat => (
+          <div key={stat.label} className="rounded-lg border px-2.5 py-2" style={{ borderColor: 'var(--border-base)', background: 'color-mix(in srgb, var(--bg-panel) 80%, transparent)' }}>
+            <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{stat.label}</div>
+            <div className="font-mono text-lg font-semibold leading-tight" style={{ color: stat.value ? stat.color : 'var(--text-primary)' }}>{stat.value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col rounded-lg border p-2.5" style={{ borderColor: current ? 'var(--accent-primary)' : 'var(--border-base)', background: 'color-mix(in srgb, var(--bg-panel) 80%, transparent)', transition: 'border-color .4s' }}>
+        <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {current ? <Loader2 size={10} className={reduce ? undefined : 'animate-spin'} style={{ color: 'var(--accent-primary)' }}/> : <Clock3 size={10}/>} En ce moment
+        </div>
+        <div className="truncate text-xs font-medium" style={{ color: 'var(--text-primary)' }} title={current?.title}>{current ? current.title : isBusy ? 'Leanna réfléchit…' : 'Aucune exécution en cours'}</div>
+        {current && <div className="truncate text-[10px]" style={{ color: 'var(--accent-primary)' }}>{current.agentName}{current.progress?.label ? ` · ${current.progress.label}` : ''}</div>}
+        <ul className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: 'var(--border-base)' }} aria-label="Dernières actions des outils">
+          {recentSteps.length ? recentSteps.map(step => (
+            <li key={step.id} className="flex items-center gap-1.5 text-[10px]">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: step.status === 'error' ? 'var(--color-error)' : step.status === 'running' ? 'var(--accent-primary)' : 'var(--color-success, #22c55e)' }}/>
+              <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{step.label}</span>
+            </li>
+          )) : <li className="text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Les appels d'outils s'afficheront ici.</li>}
+        </ul>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="text-right">
           <div className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>SESSION LIVE</div>
           <div className="text-sm font-semibold" style={{ color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-primary)' }}>{connected ? 'ACTIVE' : connecting ? 'CONNECTING' : 'IDLE'}</div>
@@ -72,7 +106,8 @@ export const DashboardCore = React.memo(function DashboardCore({
           {connecting ? 'Connexion…' : connected ? 'Session active' : 'Session hors ligne'}
         </div>
       </div>
-      <div className="min-w-0 lg:col-start-2 lg:row-span-2"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
+      </div>
+      <div className="min-w-0"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
     </section>
   );
 });

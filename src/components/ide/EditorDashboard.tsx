@@ -135,7 +135,7 @@ const Card = React.memo(function Card({
   const reduce = !!useReducedMotion();
   return (
     <motion.section
-      className={`relative flex min-w-0 flex-col rounded-xl border p-2.5 ${className}`}
+      className={`relative flex h-full min-w-0 flex-col rounded-xl border p-2.5 ${className}`}
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         borderColor: 'var(--border-base)',
@@ -984,7 +984,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
           <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
         </motion.div>}
-        <div className={`grid grid-cols-1 items-start gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:grid-cols-12 ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
+        <div className={`grid grid-cols-1 items-stretch gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:grid-cols-12 ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
           {sectionOrder.map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
