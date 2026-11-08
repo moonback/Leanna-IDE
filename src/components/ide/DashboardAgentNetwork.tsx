@@ -129,10 +129,10 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
 
   const positions = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
-    const radiusX = 205, radiusY = 88;
+    const radiusX = 340, radiusY = 126;
     visibleAgents.forEach((agent, index) => {
       const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(visibleAgents.length, 1);
-      map.set(agent.role, { x: 300 + Math.cos(angle) * radiusX, y: 165 + Math.sin(angle) * radiusY });
+      map.set(agent.role, { x: 450 + Math.cos(angle) * radiusX, y: 180 + Math.sin(angle) * radiusY });
     });
     return map;
   }, [visibleAgents]);
@@ -162,20 +162,20 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         </div>
       </div>
 
-      <div className="relative mx-auto h-[205px] max-w-[700px] sm:h-[225px]" role="group" aria-label="Agents sélectionnables et délégations observées">
-        <svg viewBox="0 0 600 330" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <div className="relative mx-auto h-[250px] w-full max-w-[900px] sm:h-[285px]" role="group" aria-label="Agents sélectionnables et délégations observées">
+        <svg viewBox="0 0 900 360" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <radialGradient id="leanna-agent-core"><stop offset="0%" stopColor="var(--accent-primary)" stopOpacity=".28"/><stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/></radialGradient>
           </defs>
-          <circle cx="300" cy="165" r="82" fill="url(#leanna-agent-core)"/>
+          <circle cx="450" cy="180" r="92" fill="url(#leanna-agent-core)"/>
           {delegations.map((edge, index) => {
             const from = positions.get(edge.from), to = positions.get(edge.to);
             if (!from || !to) return null;
             return <g key={`${edge.from}-${edge.to}`}>
-              <path d={`M ${from.x} ${from.y} Q 300 165 ${to.x} ${to.y}`} fill="none"
+              <path d={`M ${from.x} ${from.y} Q 450 180 ${to.x} ${to.y}`} fill="none"
                 stroke="var(--accent-primary)" strokeOpacity=".48" strokeWidth={Math.min(3, 1 + edge.count * .35)} strokeDasharray="5 5"/>
               {!reduce && <motion.circle r="3" fill="var(--accent-primary)"
-                animate={{ cx: [from.x, 300, to.x], cy: [from.y, 165, to.y], opacity: [.15, .95, .15] }}
+                animate={{ cx: [from.x, 450, to.x], cy: [from.y, 180, to.y], opacity: [.15, .95, .15] }}
                 transition={{ duration: 2.5 + index * .2, repeat: Infinity, ease: 'linear' }}/>}
             </g>;
           })}
@@ -189,8 +189,8 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               <circle cx={point.x} cy={point.y} r="4" fill={color}/>
             </g>;
           })}
-          <circle cx="300" cy="165" r="43" fill="var(--bg-panel)" stroke="var(--accent-primary)" strokeWidth="1.5"/>
-          <circle cx="300" cy="165" r="34" fill="var(--accent-subtle)"/>
+          <circle cx="450" cy="180" r="43" fill="var(--bg-panel)" stroke="var(--accent-primary)" strokeWidth="1.5"/>
+          <circle cx="450" cy="180" r="34" fill="var(--accent-subtle)"/>
         </svg>
         <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center text-center">
           <motion.div animate={reduce || !isBusy ? undefined : { scale: [1, 1.12, 1] }} transition={{ duration: 1.6, repeat: Infinity }}>
@@ -205,8 +205,8 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
           const color = STATUS_COLOR[agent.status] ?? STATUS_COLOR.offline;
           return <button key={agent.role} type="button" onClick={() => setSelectedRole(current => current === agent.role ? null : agent.role)}
             aria-pressed={selected}
-            className="absolute z-20 flex w-[104px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            style={{ left: `${point.x / 6}%`, top: `${point.y / 3.3}%`, borderColor: selected ? 'var(--accent-primary)' : 'var(--border-base)', background: selected ? 'var(--accent-subtle)' : 'var(--bg-panel)' }}>
+            className="absolute z-20 flex w-[124px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-lg border px-2 py-2 text-center shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ left: `${point.x / 9}%`, top: `${point.y / 3.6}%`, borderColor: selected ? 'var(--accent-primary)' : 'var(--border-base)', background: selected ? 'var(--accent-subtle)' : 'var(--bg-panel)' }}>
             <span className="flex max-w-full items-center gap-1">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }}/>
               <span className="truncate text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>{agent.name}</span>
@@ -217,7 +217,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         })}
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
         <span className="flex items-center gap-1"><Radio size={11}/> {fleet?.initialized ? 'Registre connecté' : loading ? 'Connexion au registre…' : 'Données partielles / registre indisponible'}</span>
         <span className="flex items-center gap-1"><GitBranch size={11}/> {delegations.length} relation(s) de délégation observée(s)</span>
         {refreshError && <span className="flex items-center gap-1" style={{ color: 'var(--color-error)' }}><CircleAlert size={11}/> Actualisation impossible</span>}
