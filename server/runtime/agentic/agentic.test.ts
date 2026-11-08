@@ -41,6 +41,8 @@ import {
 } from "./index.js";
 import { emptyBudgetUsage, normalizeBudget, criticalReserve } from "./types.js";
 import { AgentRuntime as DIRuntime } from "../AgentRuntime.js";
+import { UnderstandingEngine } from "../../knowledge/UnderstandingEngine.js";
+import type { ContextBatch } from "../../knowledge/types.js";
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -490,5 +492,44 @@ describe("accountCost — tokens mesurés vs appels sans mesure", () => {
     assert.equal(session.usage.promptChars, "user prompt".length + "another prompt".length);
     assert.equal(session.usage.systemPromptChars, "system prompt".length);
     assert.equal(session.usage.promptCalls, 3);
+  });
+});
+
+
+describe("UnderstandingEngine — budget adaptatif du contexte", () => {
+  it("préserve le fichier principal et les faits de sécurité sous un budget serré", () => {
+    const engine = new UnderstandingEngine();
+    const batch = {
+      query: "corriger authentification",
+      primaryFile: "src/auth.ts",
+      quality: { totalFiles: 2, averageConfidence: 0.9, sufficient: true },
+      files: [
+        {
+          filePath: "src/secondary.ts",
+          relevance: 0.99,
+          reason: "Correspondance secondaire",
+          relevantSections: [{ lineStart: 1, lineEnd: 30, relevance: 0.9, content: "S".repeat(600) }],
+        },
+        {
+          filePath: "src/auth.ts",
+          relevance: 0.6,
+          reason: "Fichier principal",
+          relevantSections: [{ lineStart: 1, lineEnd: 30, relevance: 0.8, content: "P".repeat(600) }],
+        },
+      ],
+      facts: [
+        { id: "pattern-1", category: "pattern", content: "Pattern secondaire à conserver si le budget le permet", tags: ["pattern"], confidence: 0.9, usageCount: 8 },
+        { id: "security-1", category: "security", content: "Ne jamais contourner le contrôle d'autorisation", tags: ["security", "structural"], confidence: 0.95, usageCount: 2, isStructural: true },
+      ],
+    } as unknown as ContextBatch;
+
+    const select = (engine as unknown as {
+      enforceTokenBudget(value: ContextBatch, budget: number): ContextBatch;
+    }).enforceTokenBudget.bind(engine);
+    const result = select(batch, 256);
+
+    assert.ok(result.files.some((file) => file.filePath === "src/auth.ts"));
+    assert.ok(result.facts.some((fact) => fact.id === "security-1"));
+    assert.ok(result.files.every((file) => file.relevantSections.every((section) => section.content.length <= 900)));
   });
 });
