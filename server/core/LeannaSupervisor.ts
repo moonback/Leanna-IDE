@@ -219,6 +219,7 @@ export class LeannaSupervisor {
     this.ensureReady(machine);
 
     let attempt = 0;
+    let nextRecovery: RecoveryDecision | undefined;
     let lastEvidence: EvidenceBundle | undefined;
     let rollbackResidualFiles: string[] = [];
 
@@ -278,7 +279,7 @@ export class LeannaSupervisor {
       };
       machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "executing", updatedAt: new Date().toISOString() });
       this.store.save(machine);
-      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
+      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, recovery: nextRecovery, beforeToolCall });
 
       // A timed-out runner may ignore AbortSignal. Never race a live writer
       // against checkpoint rollback: quarantine the mission and leave the
@@ -344,6 +345,7 @@ export class LeannaSupervisor {
         }
 
         const decision = this.decideRecovery(outcome, attempt);
+        nextRecovery = decision;
 
         if (decision === "escalate" || attempt >= this.maxAttempts) {
           this.advance(machine, "ESCALATED", `recovery=${decision}, attempts=${attempt}`);
@@ -464,7 +466,7 @@ export class LeannaSupervisor {
    */
   private async runAttempt(
     runner: MissionRunner,
-    ctx: { missionId: string; goal: string; attempt: number; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
+    ctx: { missionId: string; goal: string; attempt: number; recovery?: RecoveryDecision; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
