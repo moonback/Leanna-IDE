@@ -537,6 +537,23 @@ export async function cancelAgentTask(taskId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Demande l'arrêt de toutes les tâches actives visibles dans le store.
+ * Chaque tâche conserve son propre cycle de confirmation terminale.
+ */
+export async function cancelAllAgentTasks(): Promise<{ requested: number; failed: number }> {
+  const activeIds = agentTasks
+    .filter(t => (t.status === 'running' || t.status === 'pending') && !t.cancellationRequested)
+    .map(t => t.id);
+  if (activeIds.length === 0) return { requested: 0, failed: 0 };
+
+  const results = await Promise.all(activeIds.map(id => cancelAgentTask(id)));
+  return {
+    requested: results.filter(Boolean).length,
+    failed: results.filter(ok => !ok).length,
+  };
+}
+
 export function subscribe(fn: Listener): () => void {
   listeners.push(fn);
   return () => {
