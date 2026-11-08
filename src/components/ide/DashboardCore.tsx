@@ -88,7 +88,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           <span className="absolute right-0.5 top-1 h-2 w-2 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 10px ${accent}` }} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
             <Activity size={10} /> Centre de contrôle
           </div>
           <h2 className="truncate text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{aiName} Core</h2>
@@ -140,7 +140,7 @@ export const DashboardCore = React.memo(function DashboardCore({
               ? <motion.span className="block h-full w-1/3 rounded-full" style={{ background: 'var(--accent-primary)' }} animate={reduce ? undefined : { x: ['-100%', '300%'] }} transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}/>
               : <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${currentPct}%`, background: 'var(--accent-primary)' }}/>}
           </div>
-        </> : <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{isBusy ? `${aiName} réfléchit…` : 'Aucune exécution en cours'}</div>}
+        </> : <div className="rounded-md px-2 py-1 text-xs" style={{ color: 'var(--text-dimmed)', background: 'color-mix(in srgb, var(--bg) 45%, transparent)' }}>{isBusy ? `${aiName} réfléchit…` : 'Aucune exécution en cours'}</div>}
 
         <div className="mt-1.5 flex items-center justify-between border-t pt-1.5 text-[9px] uppercase tracking-wider" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
           <span>Derniers outils</span>
