@@ -205,7 +205,7 @@ export class AgentContextResolver {
         const raw = content.content as string;
         let bounded = raw;
         if (raw.length > allowance) {
-          const marker = "\n\n/* … CONTENU TRONQUÉ : " + (raw.length - allowance + 96) + " caractères omis … */\n\n";
+          const marker = "\n\n/* … CONTENU TRONQUÉ — budget de contexte atteint … */\n\n";
           const available = Math.max(0, allowance - marker.length);
           const headLength = Math.floor(available * 0.7);
           const tailLength = available - headLength;
