@@ -158,7 +158,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
           <span className="rounded-full px-2 py-1" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{agents.length} agents</span>
           <span style={{ color: 'var(--color-success, #22c55e)' }}>{runningTasks} actifs</span>
           <span style={{ color: failedTasks ? 'var(--color-error)' : 'var(--text-dimmed)' }}>{failedTasks} alertes</span>
-          <span style={{ color: 'var(--text-dimmed)' }}>{totalMessages} messages</span>
+          <span style={{ color: 'var(--text-dimmed)' }}>{totalMessages} messages · {activity.length} outils Live</span>
         </div>
       </div>
 
@@ -175,8 +175,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               <path d={`M ${from.x} ${from.y} Q 300 165 ${to.x} ${to.y}`} fill="none"
                 stroke="var(--accent-primary)" strokeOpacity=".48" strokeWidth={Math.min(3, 1 + edge.count * .35)} strokeDasharray="5 5"/>
               {!reduce && <motion.circle r="3" fill="var(--accent-primary)"
-                animate={{ offsetDistance: ['0%', '100%'] }}
-                style={{ offsetPath: `path('M ${from.x} ${from.y} Q 300 165 ${to.x} ${to.y}')` }}
+                animate={{ cx: [from.x, 300, to.x], cy: [from.y, 165, to.y], opacity: [.15, .95, .15] }}
                 transition={{ duration: 2.5 + index * .2, repeat: Infinity, ease: 'linear' }}/>}
             </g>;
           })}
