@@ -2253,7 +2253,7 @@ npx tsx --test server/runtime/agentic/mission-harness.test.ts
 
 ### Matrice d'attribution des outils
 
-Les **210+ outils** du `ToolRegistry` sont audités et cartographiés dans
+Le catalogue dynamique du `ToolRegistry` (outils intégrés, MCP et personnalisés ; total variable selon le runtime) est audité et cartographié dans
 [`docs/TOOL_OWNERSHIP_MATRIX.md`](docs/TOOL_OWNERSHIP_MATRIX.md). Les outils
 sensibles (`project_scaffold`, `quality_loop`, `create/update/delete_custom_skill`,
 `workflow_run`, `git_push`) sont verrouillés dans `SENSITIVE_TOOL_ATTRIBUTION` pour
@@ -2261,6 +2261,30 @@ interdire tout routage imprévisible par heuristique.
 
 <br><img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="separator" width="100%"><br>
 
+## 🧭 État du dépôt — 8 novembre 2026
+
+Cette section complète les descriptions fonctionnelles par un état de référence daté. La présence d'un composant dans le dépôt ne signifie pas qu'il est activé sur tous les chemins ni validé en production.
+
+| Indicateur | État constaté |
+|---|---|
+| Version déclarée | **2.3.0** (package.json) |
+| Branche de référence | main |
+| Inventaire des tests | **227 fichiers** recensés : 203 backend, 23 UI et 1 autre |
+| Dernière exécution chiffrée documentée | **15 octobre 2026** ; cette mise à jour ne revendique aucune relance des tests |
+| Vérifications disponibles | Typecheck, tests backend/UI, lint, audit des dépendances, audit UI, smoke test Brain, tests de missions et soak test |
+| Outils | Catalogue dynamique : outils intégrés, MCP et outils personnalisés ; total variable selon le runtime |
+
+### Limites techniques à connaître
+
+- **Noyau P0 conditionnel.** La machine à états, le ledger, les checkpoints, l'Evidence Engine, le Supervisor et le Safety Gate sont présents. Leur activation dépend toutefois du bootstrap, de la configuration et du chemin d'exécution ; leur présence ne prouve pas que chaque mission passe systématiquement par toutes ces gardes.
+- **Deux chemins d'exécution coexistent.** Le système de missions historique et le runtime agentique partagent des composants, mais leur gouvernance, leur récupération et leur finalisation doivent rester cohérentes. Ne pas présenter le Supervisor comme une autorité transactionnelle universelle tant que cette convergence n'est pas démontrée par des tests d'intégration.
+- **Permissions.** Le mode enforce applique une politique ; il ne signifie pas à lui seul « moindre privilège ». Définissez explicitement les permissions accordées et évitez les permissions larges ou dangereuses.
+- **Reprise après incident.** Un checkpoint ou une preuve de fichier n'annule pas les effets externes (API, e-mail, base de données, commandes distantes). Ces opérations exigent une stratégie d'idempotence, de compensation ou de réconciliation.
+- **Qualité CI.** Le workflow CI existe, mais le lint est non bloquant. Une exécution verte ne doit donc pas être interprétée comme une validation exhaustive de la qualité statique ou de la sûreté des missions longues.
+
+Les détails et critères de clôture sont suivis dans [ROADMAP.md](ROADMAP.md), notamment la phase **R9 — Fiabilisation production & expérience opérateur**. Les fonctionnalités en branches de travail ne sont pas considérées comme livrées sur main.
+
+---
 ## 📡 API
 
 Leanna expose une API HTTP et des points de terminaison WebSocket. La référence
