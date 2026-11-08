@@ -1173,7 +1173,7 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                     </span>
                   </div>
                   <div className="divide-y divide-[var(--border)]">
-                    {recentConversations.map((conversation, index) => {
+                    {recentConversations.map((conversation) => {
                       const date = conversation.started_at ? new Date(conversation.started_at) : null;
                       const dateLabel = date && !Number.isNaN(date.getTime())
                         ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
