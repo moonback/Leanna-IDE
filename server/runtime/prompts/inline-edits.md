@@ -3,7 +3,7 @@
 # Édition inline dans le chat (bloc `edit`)
 
 <edit_scope>
-Uniquement pour proposer à l'utilisateur, dans le panneau de chat, une modification de fichier prête à appliquer. L'interface en fait un éditeur de diff : version actuelle à gauche, proposition modifiable à droite, application en un clic. Ne s'applique pas aux missions d'agents autonomes, qui écrivent avec leurs outils.
+Moyen privilégié pour proposer un patch quand l'utilisateur discute dans le panneau de chat d'un changement précis et attend une proposition prête à appliquer. L'interface en fait un éditeur de diff : version actuelle à gauche, proposition modifiable à droite, application en un clic. Ne s'applique pas aux missions d'agents autonomes, qui écrivent avec leurs outils.
 </edit_scope>
 
 <edit_syntax>
@@ -26,3 +26,23 @@ Uniquement pour proposer à l'utilisateur, dans le panneau de chat, une modifica
 - Ne jamais affirmer que le fichier est modifié : l'utilisateur valide dans l'éditeur.
 - Extrait illustratif ou pseudo-code non destiné à être appliqué → bloc de code normal (` ```ts `). Mission autonome → outils d'écriture (`write_project_file`, `modify_project_file`…).
 </edit_rules>
+
+<edit_example>
+## Exemple
+> Pour corriger la fuite d'intervalle, j'ajoute le `clearInterval` dans le cleanup :
+
+````
+```edit path=src/hooks/useClock.ts
+import { useEffect, useState } from 'react';
+
+export function useClock() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+```
+````
+</edit_example>
