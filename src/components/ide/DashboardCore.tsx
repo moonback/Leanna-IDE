@@ -24,7 +24,7 @@ export const DashboardCore = React.memo(function DashboardCore({
 
   return (
     <section
-      className="relative mb-2 flex min-h-0 flex-col items-center justify-between gap-2 overflow-hidden rounded-xl border p-2.5 sm:flex-row sm:px-4"
+      className="relative mb-2 grid min-h-0 grid-cols-1 items-center gap-3 overflow-hidden rounded-xl border p-2.5 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,2fr)] lg:gap-4 lg:px-4"
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--border-base))',
         background: 'linear-gradient(115deg, color-mix(in srgb, var(--bg-panel) 96%, var(--accent-primary) 4%), color-mix(in srgb, var(--bg-secondary) 90%, transparent))',
@@ -35,7 +35,7 @@ export const DashboardCore = React.memo(function DashboardCore({
     >
       <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden
         style={{ backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px)', backgroundSize: '28px 28px', maskImage: 'linear-gradient(90deg, transparent, black 35%, black 75%, transparent)' }} />
-      <div className="relative z-10 flex items-center gap-4">
+      <div className="relative z-10 flex min-w-0 items-center gap-3">
         <div className="relative flex h-16 w-16 shrink-0 items-center justify-center" style={{ perspective: '600px' }}>
           <motion.div className="absolute inset-1 rounded-full border"
             style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 55%, transparent)', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 18%, transparent)' }}
@@ -63,7 +63,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           </div>
         </div>
       </div>
-      <div className="relative z-10 flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-col sm:items-end">
+      <div className="relative z-10 flex min-w-0 items-center justify-between gap-3 lg:col-start-1 lg:row-start-1 lg:mt-20 lg:items-end">
         <div className="text-right">
           <div className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>SESSION LIVE</div>
           <div className="text-sm font-semibold" style={{ color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-primary)' }}>{connected ? 'ACTIVE' : connecting ? 'CONNECTING' : 'IDLE'}</div>
@@ -77,7 +77,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           {connecting ? 'Connexion…' : connected ? 'Déconnecter' : 'Connecter Leanna'}
         </button>
       </div>
-      <DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} />
+      <div className="min-w-0 lg:col-start-2 lg:row-span-2"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
     </section>
   );
 });
