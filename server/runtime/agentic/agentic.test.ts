@@ -453,8 +453,8 @@ describe("buildObservationHistory — historique borné", () => {
     const recent = writeObservation(4, "latest.ts");
     const history = buildObservationHistory([old, writeObservation(2, "middle-a.ts"), writeObservation(3, "middle-b.ts"), recent], 10_000);
     assert.match(history, /TS2322/);
-    assert.match(history, /raisonnement \\(résumé\\)/);
-    assert.match(history, /latest\\.ts/);
+    assert.match(history, /raisonnement \(résumé\)/);
+    assert.match(history, /latest\.ts/);
     assert.ok(history.length < 10_000);
   });
 
