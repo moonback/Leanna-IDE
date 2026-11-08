@@ -143,7 +143,8 @@ export function buildContextGraphLayout(relations: GraphRelation[]) {
 }
 
 export default function ContextKnowledgeGraph({
-  relations, loading, query, onQueryChange, relationType, onRelationTypeChange, relationTypes, totalRelations,
+  relations, loadedRelations, loading, query, onQueryChange, relationType,
+  onRelationTypeChange, relationTypes, totalRelations, hasMore, loadingMore, onLoadMore,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
