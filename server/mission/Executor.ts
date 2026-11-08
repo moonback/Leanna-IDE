@@ -733,11 +733,9 @@ export class Executor {
     // Fichiers ciblés connus avant exécution (pour le snapshot/rollback).
     const plannedFiles = this.collectPlannedFiles(mission).map(resolveWorkspaceTarget);
 
-    const runner: MissionRunner = async ({ signal, beforeToolCall }) => {
+    const runner: MissionRunner = async ({ signal, beforeToolCall, attempt, recovery }) => {
       if (beforeToolCall) this.supervisorWriteHooks.set(mission.id, beforeToolCall);
-      // Relayer l'annulation du Supervisor au contrôleur réellement transmis
-      // aux skills. Sans ce pont, son AbortSignal ne pouvait pas interrompre
-      // l'action en cours dans l'Executor.
+      // Relay Supervisor cancellation to the actual skills' controller.
       const abortFromSupervisor = () => {
         mission.cancel("Annulation demandée par le Supervisor (timeout/arrêt).");
         this.abortMission(mission.id, "Annulation demandée par le Supervisor.");
@@ -746,14 +744,40 @@ export class Executor {
       else signal?.addEventListener("abort", abortFromSupervisor, { once: true });
 
       try {
-        // Une tentative = une passe complète de la boucle d'objectifs. On réutilise
-        // l'infrastructure existante (pause, anti-boucle, vérification par preuve).
-        await this.executeMission(mission, availableSkills);
-        const outcome = this.buildMissionOutcome(mission);
-        // executeMission finalise la mission (retry/replan internes épuisés) : une
-        // nouvelle tentative du Supervisor ne rejouerait rien → escalade honnête.
-        if (!outcome.success && mission.isCompleted()) outcome.suggestedRecovery = "escalate";
-        return outcome;
+        if (attempt > 1) {
+          // Capture failed-goal context before clearing the previous attempt.
+          const recoveryTargets = Object.values(mission.getState().goals)
+            .filter((goal) => goal.parentId !== null && (goal.status === "failed" || goal.status === "blocked"))
+            .map((goal) => ({
+              goalId: goal.id,
+              action: [...goal.plannedActions].reverse().find((action) => action.status === "failed")
+                ?? goal.plannedActions[goal.plannedActions.length - 1],
+              reason: goal.blockReason ?? String(goal.result?.summary ?? "Previous supervised attempt failed."),
+            }));
+
+          // The previous attempt was rolled back. Its completed goals and
+          // action results are stale and must not be reused as proof.
+          mission.resetForSupervisedAttempt();
+
+          if (recovery === "repair" || recovery === "replan") {
+            for (const target of recoveryTargets) {
+              if (!target.action) continue;
+              const replanned = await this.planner.replan(
+                mission,
+                target.goalId,
+                { ...target.action },
+                target.reason,
+                availableSkills
+              );
+              if (replanned.length > 0) mission.setPlanForGoal(target.goalId, replanned);
+            }
+          }
+        }
+
+        // Executor performs one attempt only; Supervisor owns commit/rollback
+        // and the terminal mission lifecycle.
+        await this.executeMission(mission, availableSkills, { supervised: true });
+        return this.buildMissionOutcome(mission);
       } finally {
         signal?.removeEventListener("abort", abortFromSupervisor);
         this.supervisorWriteHooks.delete(mission.id);
@@ -1142,7 +1166,11 @@ export class Executor {
 
   // ─── Boucle d'exécution ───────────────────────────────────────────────────
 
-  private async executeMission(mission: Mission, availableSkills: string[]): Promise<void> {
+  private async executeMission(
+    mission: Mission,
+    availableSkills: string[],
+    options: { supervised?: boolean } = {}
+  ): Promise<void> {
     const rootGoal = mission.rootGoal;
     mission.pushGoal(rootGoal.id);
 
@@ -1204,10 +1232,12 @@ export class Executor {
       });
     }
 
-    // Si la mission a déjà été finalisée entre-temps (annulation/timeout via
-    // cancelMission/watchdog), ne pas la finaliser ni émettre une 2e fois.
-    // Correctif audit (point 4) : évite le doublon et l'émission de
-    // mission_completed après mission_cancelled.
+    // If the Supervisor owns the lifecycle, leave terminalization, learning,
+    // telemetry closure and public completion events to runSupervised().
+    if (options.supervised) return;
+
+    // If the mission has already been finalized between runs (annulation/watchdog),
+    // do not finalize or emit twice.
     if (this.finalizedMissions.has(mission.id)) {
       return;
     }
