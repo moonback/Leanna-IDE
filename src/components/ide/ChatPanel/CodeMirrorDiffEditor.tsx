@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import {
+  EditorView,
+  drawSelection,
+  dropCursor,
+  highlightActiveLineGutter,
+  lineNumbers,
+} from '@codemirror/view';
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { MergeView, unifiedMergeView } from '@codemirror/merge';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -22,20 +28,21 @@ interface CodeMirrorDiffEditorProps {
   onChange: (value: string) => void;
 }
 
-function languageExtension(language: string) {
-  switch (language.toLowerCase()) {
+export function languageExtension(language: string) {
+  const normalized = language.trim().toLowerCase();
+  switch (normalized) {
     case 'typescript':
     case 'ts':
     case 'tsx':
     case 'mts':
     case 'cts':
-      return javascript({ typescript: true, jsx: language === 'tsx' });
+      return javascript({ typescript: true, jsx: normalized === 'tsx' });
     case 'javascript':
     case 'js':
     case 'mjs':
     case 'cjs':
     case 'jsx':
-      return javascript({ jsx: language === 'jsx' });
+      return javascript({ jsx: normalized === 'jsx' });
     case 'json':
     case 'jsonc':
       return json();
@@ -123,8 +130,15 @@ export default function CodeMirrorDiffEditor({
     const host = hostRef.current;
     if (!host) return;
 
+    // Configuration volontairement minimale : un diff n'a pas besoin de la
+    // recherche, de l'autocomplétion ni des commandes d'édition de basicSetup.
+    // Cela évite d'embarquer des fonctionnalités et dépendances inutiles.
     const commonExtensions = [
-      basicSetup,
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      drawSelection(),
+      dropCursor(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       languageExtension(language),
       editorTheme(dark),
       EditorView.lineWrapping,
