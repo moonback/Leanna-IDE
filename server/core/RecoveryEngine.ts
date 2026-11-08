@@ -118,6 +118,8 @@ export class RecoveryEngine {
         return attempt === 1
           ? { category, decision: "retry", reason: "One bounded retry for an unclassified failure.", retryable: true }
           : { category, decision: "replan", reason: "Unclassified failure persisted after retry.", retryable: true };
+      default:
+        return { category: "unknown", decision: "escalate", reason: "Unsupported failure category; safe escalation required.", retryable: false };
     }
   }
 }
