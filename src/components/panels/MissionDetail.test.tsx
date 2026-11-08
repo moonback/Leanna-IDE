@@ -101,6 +101,32 @@ describe('MissionDetail — tokens mesurés', () => {
     execution: { ...TASK.execution!, budget: { ...TASK.execution!.budget, ...extra } },
   });
 
+  it("affiche les diagnostics du contexte mémoire sans exposer les faits bruts", async () => {
+    const observed: MissionDetailData = {
+      ...TASK,
+      context: {
+        files: ["src/agents/Agent.ts"],
+        instructions: "Vérifier la sélection",
+        successCriteria: [],
+        previousResultsCount: 1,
+        observability: {
+          version: 1, strategy: "adaptive_memory_bridge_v2",
+          selectedFileCount: 1, memoryChars: 1200, injectedMemoryChars: 1100,
+          memoryBudgetChars: 5000, factsMatched: 12, factsEligible: 8,
+          factsIncluded: 4, staleFactsExcluded: 4, graphRelationsIncluded: 2,
+          previousResultsIncluded: 1, possibleConflicts: 1,
+        },
+      },
+    };
+    mockFetchRouter([{ match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: observed }) }]);
+    renderWithProviders(<MissionDetail taskId="task-1" status="completed" color="#4f8cff" />);
+    expect(await screen.findByText("Observabilité du contexte")).toBeInTheDocument();
+    expect(screen.getByText("Faits injectés")).toBeInTheDocument();
+    expect(screen.getByText("Faits obsolètes écartés")).toBeInTheDocument();
+    expect(screen.getByText(/connaissances nécessitent une vérification/)).toBeInTheDocument();
+    expect(screen.queryByText(/contenu privé du souvenir/)).not.toBeInTheDocument();
+  });
+
   it("n'affiche aucune ligne de tokens quand rien n'est mesuré (pas de zéro trompeur)", async () => {
     mockFetchRouter([{ match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: TASK }) }]);
     renderWithProviders(<MissionDetail taskId="task-1" status="completed" color="#4f8cff" />);
