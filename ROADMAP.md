@@ -1,18 +1,17 @@
 # Roadmap — Leanna AI Operating System
 
-> **Mise à jour documentaire : 6 novembre 2026** · **Version du dépôt : 2.3.0** · Licence BUSL 1.1
-> **Dernière revue fonctionnelle détaillée : 15 octobre 2026** (les statuts de roadmap
-> restent à revalider contre les changements postérieurs à cette date).
+> **Mise à jour documentaire : 8 novembre 2026** · **Version du dépôt : 2.3.0** · Licence BUSL 1.1
+> **Audit statique ciblé du dépôt main : 8 novembre 2026** ; il complète l'audit
+> fonctionnel du 15 octobre sans le remplacer par une validation d'exécution.
 >
-> Cette roadmap conserve l'audit fonctionnel du **2026-10-15** comme référence
-> historique. Elle distingue ce qui était alors *réellement livré et solide*,
-> le *scaffolding en attente de câblage* et les éléments *planifiés*. Les statuts
-> ne doivent pas être interprétés comme une validation complète du HEAD du
-> 2026-11-06 sans nouvel audit de chaque composant.
+> Cette roadmap distingue les composants présents, les intégrations partielles,
+> les risques identifiés et les évolutions planifiées. Les audits statiques ne
+> prouvent ni le comportement en production ni le passage des tests. Les statuts
+> historiques R0–R8 restent à revalider lorsqu'une phase est reprise.
 >
-> **Inventaire et exécution des tests.** L'arbre Git actuel recense **193 fichiers
-> backend** `server/**/*.test.ts` et **19 fichiers UI**
-> `src/**/*.{test,spec}.{ts,tsx}`. La dernière exécution documentée reste celle
+> **Inventaire et exécution des tests.** L'arbre Git actuel recense **203 fichiers
+> backend** `server/**/*.test.ts`, **23 fichiers UI**
+> `src/**/*.{test,spec}.{ts,tsx}` et un fichier de test supplémentaire (227 au total). La dernière exécution documentée reste celle
 > du 2026-10-15 : `npm test` → **1460 cas / 174 suites · 0 échec** (184 fichiers) ;
 > `npm run test:ui` → **90 cas · 0 échec** (18 fichiers). Ces résultats sont
 > historiques et n'ont pas été rejoués pendant cette revue documentaire.
@@ -29,6 +28,7 @@ Leanna est un **OS agentique local-first** : un IDE, un runtime d'agents autonom
 
 | Version | Date | Changements majeurs |
 |---|---|---|
+| **2.0.0** | 2026-11-08 | **Actualisation post-audit du dépôt main.** Inventaire statique : 227 fichiers de tests (203 backend, 23 UI, 1 autre), sans prétendre qu'ils ont tous été exécutés. Ajout de la phase R9 : convergence des chemins d'exécution, autorité de récupération unique, sûreté des effets de bord, permissions minimales, durcissement Electron, CI bloquante et cockpit opérateur. Les chantiers UI 3D, dashboard compact/personnalisable, e-mail et transferts Telegram restent à valider/terminer sur main avant d'être déclarés livrés. |
 | **1.9.0** | 2026-10-15 | **Re-audit documentaire + harmonisation README ⇄ ROADMAP.** Suites **exécutées** et recalées : backend **1460 cas / 174 suites · 0 échec** (184 fichiers), UI **90 cas · 0 échec** (18 fichiers) — au lieu des estimations historiques ~1326/171 et ~45/14. Correction des chemins de plugins de rôles (`server/runtime/agents/`), du nombre de migrations Supabase (**14**, l'item « une seule migration » retiré de la section 🔴), et clarification que le total d'outils est **runtime-variable** (builtin + MCP + custom). Harmonisation des docs techniques (`API_DOCS.md`, `ARCHITECTURE.md`, `DB_SCHEMA.md`). Aucune case de statut promue sans preuve ; aucun code applicatif modifié. Audits de référence consultés : `docs/LEANNA_EXECUTION_AUDIT_2026-10-15.md`, `docs/LEANNA_TOKEN_TELEMETRY_AUDIT_2026-10-15.md`, `docs/TOOL_OWNERSHIP_MATRIX.md`. |
 | **1.8.0** | 2026-10-13 | **Refonte stratégique + nouvelle Phase R8 (20 fonctionnalités innovantes).** Vision portée au niveau supérieur : time-travel debugging, dry-run global de mission, harness d'évaluation scoré, auto-amélioration (Leanna code Leanna), inférence locale Ollama, voix comme interface principale, agent de revue de PR, mémoire épisodique sémantique, graphe causal de mission, et 11 autres chantiers — chacun ancré sur un composant **déjà présent** (`MissionTimeTravel`, `MissionSimulator`, `MissionEvolution`, `LearningEngine`, `PredictionEngine`, `textGeneration`, `/orb-live`, `EvidenceEngine`…). **Recalage factuel** : comptes de tests réels (~1326 backend / 171 fichiers · ~45 UI / 14 fichiers) répercutés dans le README. Découverte d'audit : `MissionTimeTravel.ts`, `MissionSimulator.ts`, `MissionEvolution.ts`, `LearningEngine.ts`, `PredictionEngine.ts`, `ReasoningPipeline.ts` existent déjà en scaffolding → plusieurs items R8 sont donc du *câblage*, pas du *greenfield*. |
 | **1.7.0** | 2026-10-11 | **Boucle humaine (HITL) câblée bout-en-bout** : file d'approbation interactive côté UI (`AutonomyView` → `PendingApprovalsCard`, `usePendingApprovals`, `MissionPanel.resolveApproval`, pastille `StatusBar`) adossée au backend `Executor.requestApproval/resolveApproval` + routes REST `POST /missions/:id/approve|pause|resume|cancel`, `DELETE /missions/:id`. **Centre de propositions** `AnticipationProposal` dans `MissionControlView` (lancer une mission depuis une proposition). **Compression de contexte automatique** réellement déclenchée au seuil de tokens (`LiveSocketHandler.autoSummarizeContext`). **Contract-net en production** (`AgentOrchestrator` + `DelegationDispatcher` appellent `contractNetNegotiator.negotiate`). **Reconnexion WebSocket `/live`** avec backoff exponentiel borné (`useWebSocket`). **Marketplace** (backend local + UI) et **Workflow builder** (éditeur par étapes). **Correctif** : le rôle `planner` n'a plus `delete_project_file` (contradiction P1 soldée). |
@@ -400,6 +400,92 @@ R8 #19 (OTLP) ──promeut──▶  R7 #17  (même brique, priorité relevée 
 
 ---
 
+## Phase R9 — Fiabilisation production & expérience opérateur (nouveau · 2026-11-08)
+
+> **Objectif :** transformer les composants agentiques existants en un système
+> cohérent, mesurable et sûr de bout en bout, puis rendre son activité lisible et
+> pilotable depuis le cockpit. Cette phase privilégie le câblage et la fiabilité
+> avant l'ajout de nouveaux sous-systèmes.
+
+### R9.0 — P0 : une seule autorité d'exécution et de récupération
+
+**Priorité : P0 · Bloquant avant toute revendication de transactionnalité universelle.**
+
+- [ ] Définir un contrat de tentative non terminale entre Mission Executor et Supervisor ; l'Executor ne doit pas finaliser une mission avant la décision finale du superviseur.
+- [ ] Faire converger les chemins Mission System et AgenticRuntime vers une politique commune de cycle de vie, de budget, d'approbation, d'annulation et de récupération.
+- [ ] Propager AbortSignal jusqu'aux handlers, skills, commandes et sous-processus ; ne jamais lancer un rollback tant qu'un runner peut encore écrire.
+- [ ] Persister un AttemptJournal corrélé à missionId, attemptId, checkpointId, actionId et décision de recovery.
+- [ ] Réconcilier au redémarrage l'état de mission, le checkpoint et le ledger ; une action au résultat inconnu ne doit jamais être rejouée automatiquement.
+- [ ] Exiger la capture préalable pour toute mutation supervisée du workspace ; refuser les nouveaux outils d'écriture non enregistrés dans la politique de checkpoint.
+- [ ] Distinguer rollback de fichiers et compensation des effets externes (API, e-mail, DB, Git, commandes distantes).
+
+**Critères de sortie :** tests d'intégration sur succès, échec, timeout, annulation, crash à chaque frontière transactionnelle, double reprise concurrente et effet externe incertain ; aucune mission ne doit être déclarée durable si sa persistance critique a échoué.
+
+### R9.1 — P0/P1 : sécurité effective et configuration explicite
+
+- [ ] Définir une allowlist de permissions minimale par profil et par outil ; le mode enforce ne doit pas être assimilé à une politique least-privilege.
+- [ ] Auditer les chemins de bootstrap pour garantir que les garde-fous attendus (Supervisor, idempotence, Safety Gate, DryRun) sont réellement branchés, ou afficher clairement leur état désactivé.
+- [ ] Remplacer les dégradations de configuration silencieuses par des diagnostics structurés, avec distinction entre valeur absente, valeur invalide et fallback volontaire.
+- [ ] Durcir les fenêtres Electron : sandbox, contextIsolation, nodeIntegration, preload minimal, CSP et validation IPC ; documenter les exceptions nécessaires.
+- [ ] Étendre les frontières de confiance aux contenus RAG, notebooks, documents, résultats web, e-mails et messages Telegram ; séparer instructions fiables et données récupérées.
+- [ ] Cartographier les secrets sur l'ensemble des sources, bundles, logs, exports et historiques Git ; ne pas limiter le contrôle aux seuls fichiers .env.
+
+**Critères de sortie :** matrice permissions/risques testée, tests d'injection de prompt sur contenus récupérés, tests Electron/IPC et validation des erreurs de configuration.
+
+### R9.2 — P1 : fiabilité, observabilité et coût mesurable
+
+- [ ] Ajouter une limite de concurrence globale partagée entre TaskScheduler, BrainScheduler, missions et orchestrateur ; conserver les limites locales comme garde-fous secondaires.
+- [ ] Uniformiser timeout, cancellation, retry, circuit breaker et dead-letter sur toutes les files et tous les fournisseurs.
+- [ ] Persister les métriques du ModelRouter : latence, coût, tokens, erreurs, qualité observée et succès par type de tâche.
+- [ ] Réduire le contexte envoyé au modèle via ToolPromptBuilder : outils pertinents par étape, schémas à la demande, résumé d'état et budgets par phase.
+- [ ] Ajouter des tests de chaos/soak pour les missions longues, les providers indisponibles, les redémarrages, les files saturées et les dépendances Redis/Supabase absentes.
+- [ ] Rendre le lint bloquant après réduction progressive de la dette ; publier les rapports de typecheck, tests, audit dépendances et bundle.
+
+**Critères de sortie :** SLO mesurés (succès mission, temps de récupération, coût par mission réussie, latence p95, taux d'intervention humaine) et CI bloquante sur les portes de qualité convenues.
+
+### R9.3 — P1 : cockpit opérateur, supervision visuelle et ergonomie
+
+- [ ] Finaliser le cockpit multi-agents 3D : agents regroupés par équipe, liens de délégation, événements animés et flux d'erreurs/résultats, avec réduction de mouvement et mode 2D accessible.
+- [ ] Ajouter une timeline interactive corrélée mission → étape → agent → outil → preuve, avec filtres, recherche et accès au détail d'une exécution.
+- [ ] Permettre de déplacer, redimensionner, masquer et réordonner les sections du dashboard ; persister les layouts par utilisateur/projet.
+- [ ] Réduire la densité visuelle et les espaces inutiles, clarifier les niveaux de priorité et regrouper les actions secondaires dans un menu unique.
+- [ ] Unifier l'état de connexion et éviter les commandes de connexion dupliquées ; rendre l'état réel des providers immédiatement visible.
+- [ ] Prévoir un mode compact sans scroll excessif, ainsi que des vues adaptées aux petits écrans.
+
+**Critères de sortie :** interactions clavier/souris testées, état temps réel sans duplication, performance stable avec une flotte active, tests d'accessibilité et persistance du layout.
+
+### R9.4 — P1/P2 : intégrations cohérentes et transferts contrôlés
+
+- [ ] Finaliser le provider e-mail générique avec configuration indépendante de l'envoi SMTP et de la réception IMAP ; autoriser envoi seul, réception seule ou les deux.
+- [ ] Harmoniser les providers e-mail (configuration, validation, statut, tests de connexion, erreurs et secrets) sans imposer OAuth2 lorsque le provider utilise des identifiants serveur.
+- [ ] Compléter les transferts Telegram dans les deux sens pour documents, images et fichiers, avec limites de taille, allowlist de chemins, validation MIME et confirmation pour les actions sensibles.
+- [ ] Uniformiser les intégrations externes autour d'un contrat commun : configuration, permissions, santé, retry, journal d'audit et révocation.
+
+**Critères de sortie :** tests d'intégration IMAP/SMTP et Telegram avec erreurs réseau, pièces jointes volumineuses, chemins interdits, doublons et reprise après interruption.
+
+### R9.5 — P2 : nouvelles capacités IA différenciantes
+
+- [ ] Mission Replay : rejouer une mission en environnement isolé à partir de ses événements, sans répéter ses effets externes.
+- [ ] Mission Simulator : comparer un plan à plusieurs stratégies et estimer coût, durée, risques et dépendances avant exécution.
+- [ ] Évaluation continue des agents : jeux de tâches versionnés, scores par rôle/modèle, régressions et comparaison de prompts.
+- [ ] Mémoire épisodique avec provenance : relier chaque souvenir à une mission, une preuve, une date d'expiration et un niveau de confiance.
+- [ ] Routage adaptatif par tâche : arbitrer qualité, latence, coût, confidentialité et disponibilité des modèles, avec seuils explicables.
+- [ ] Centre de connaissances projet : visualiser les dépendances, impacts, décisions, risques et évolutions détectées par l'indexation.
+
+**Critères de sortie :** chaque capacité doit être reliée à un usage concret, disposer d'un mode désactivable, d'une mesure de valeur et de tests sans effets de bord réels.
+
+### Ordre d'exécution recommandé
+
+1. **R9.0** — sûreté des effets de bord et autorité de récupération unique.
+2. **R9.1** — permissions, bootstrap, configuration, Electron et confiance des données.
+3. **R9.2** — concurrence globale, observabilité, coûts, tests de chaos et CI bloquante.
+4. **R9.3** — cockpit visuel et expérience opérateur, en intégrant les branches UI après revue.
+5. **R9.4** — e-mail et Telegram, une fois les contrats d'intégration et de sécurité stabilisés.
+6. **R9.5** — capacités différenciantes, après consolidation des fondations.
+
+**Règle de statut :** une fonctionnalité présente dans une branche de travail, un composant isolé ou un test unitaire ne devient pas ✅ sur main avant intégration, tests d'intégration et preuve d'usage bout-en-bout.
+
+---
 ## Registre des risques
 
 | Risque | Impact | Mitigation |
