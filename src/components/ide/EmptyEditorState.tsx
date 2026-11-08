@@ -857,6 +857,23 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
   const [recentConversations, setRecentConversations] = useState<Array<{ id: string; title: string | null; message_count: number; started_at: string }>>([]);
   const [loadingLastConversation, setLoadingLastConversation] = useState(true);
   const [showConversationHistory, setShowConversationHistory] = useState(false);
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
+    setDeletingConversationId(conversationId);
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setRecentConversations(prev => prev.filter(conversation => conversation.id !== conversationId));
+    } catch (error) {
+      console.warn('[EmptyEditorState] Impossible de supprimer la conversation:', error);
+    } finally {
+      setDeletingConversationId(null);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1182,28 +1199,43 @@ export const EmptyEditorState = React.memo(function EmptyEditorState({
                         conversation.title,
                         `Discussion du ${dateLabel.split(' à ')[0]}`,
                       );
+                      const isDeleting = deletingConversationId === conversation.id;
                       return (
-                        <button
+                        <div
                           key={conversation.id}
-                          type="button"
-                          onClick={() => onResumeConversation?.(conversation.id)}
-                          disabled={!onResumeConversation}
-                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label={`Reprendre ${displayTitle}, ${conversation.message_count} messages, ${dateLabel}`}
+                          className="group flex w-full items-center gap-2 pr-2 transition-colors hover:bg-[var(--surface-hover)]"
                         >
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--muted)]">
-                            <MessageSquare size={16} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-[var(--text)]">
-                              {displayTitle}
+                          <button
+                            type="button"
+                            onClick={() => onResumeConversation?.(conversation.id)}
+                            disabled={!onResumeConversation || isDeleting}
+                            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={`Reprendre ${displayTitle}, ${conversation.message_count} messages, ${dateLabel}`}
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--muted)]">
+                              <MessageSquare size={16} />
                             </span>
-                            <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">
-                              {dateLabel} · {conversation.message_count} message{conversation.message_count > 1 ? 's' : ''}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-[var(--text)]">
+                                {displayTitle}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">
+                                {dateLabel} · {conversation.message_count} message{conversation.message_count > 1 ? 's' : ''}
+                              </span>
                             </span>
-                          </span>
-                          <ChevronRight size={17} className="shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text)]" />
-                        </button>
+                            <ChevronRight size={17} className="shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text)]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteConversation(conversation.id)}
+                            disabled={isDeleting}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] opacity-0 transition-all hover:bg-[color-mix(in_srgb,var(--color-error)_12%,transparent)] hover:text-[var(--color-error)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)] group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={`Supprimer ${displayTitle}`}
+                            title="Supprimer cette conversation"
+                          >
+                            {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

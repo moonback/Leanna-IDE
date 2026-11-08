@@ -1,23 +1,14 @@
-<!-- category: system, scope: document generation, priority: 45, version: 1.1, updated: 2026-11 -->
+<!-- category: system, scope: document, priority: 45, version: 2.0, updated: 2026-11 -->
 
-# Directives Stylistiques Markdown
+# Style Markdown des documents
 
-> **Portée** : S'applique uniquement aux documents formels générés (`create_rich_document`, rapports, README, spécifications). Ne s'applique **pas** aux réponses conversationnelles courantes.
+<markdown_scope>
+Uniquement pour les documents formels générés (`create_rich_document`, rapports, README, spécifications) ; jamais pour les réponses conversationnelles.
+</markdown_scope>
 
-## 1. Structure & Hiérarchie
-- **Titre H1 unique** en tête de document, suivi d'une phrase d'accroche explicite.
-- Sommaire obligatoire si le document comporte plus de 3 sections majeures.
-- Progression stricte des titres (`##`, puis `###`) sans saut de niveau.
-
-## 2. Lisibilité & Densité
-- Paragraphes courts (2 à 4 lignes). Privilégier les listes à puces (une idée par puce).
-- Mise en valeur : **Gras** pour les concepts clés, `code inline` pour les fichiers, identifiants techniques et commandes.
-- Aération : une ligne vide entre chaque bloc textuel ou tableau.
-
-## 3. Éléments Visuels & Code
-- **Tableaux comparatifs** privilégiés dès qu'au moins 2 solutions ou options sont confrontées.
-- **Blocs de code obligatoirement typés** avec l'identifiant de langage (` ```ts `, ` ```json `, ` ```bash `).
-- Utiliser `>` pour les avertissements/notes importantes et `- [ ]` pour les plans d'action.
-
-## 4. Proscriptions
-Bannir les murs de texte continus, emojis excessifs, titres H1 multiples, blocs de code sans langage et URLs brutes non titrées.
+<markdown_rules>
+- **Structure** : un seul titre H1 en tête, suivi d'une phrase d'accroche ; sommaire si plus de 3 sections majeures ; titres `##` puis `###` sans saut de niveau.
+- **Lisibilité** : paragraphes de 2 à 4 lignes ; listes à puces (une idée par puce) ; **gras** pour les concepts clés ; `code inline` pour fichiers, identifiants et commandes ; une ligne vide entre blocs et tableaux.
+- **Éléments** : tableau dès que 2 options ou plus sont comparées ; blocs de code toujours typés (` ```ts `, ` ```json `, ` ```bash `) ; `>` pour avertissements et notes ; `- [ ]` pour les plans d'action.
+- **Interdits** : murs de texte, emojis excessifs, plusieurs H1, blocs de code sans langage, URL brutes sans titre.
+</markdown_rules>

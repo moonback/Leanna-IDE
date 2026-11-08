@@ -793,6 +793,7 @@ export class ProjectMemory {
    * Optimisé pour consommer peu de tokens.
    */
   toContextSummary(maxFacts: number = 10): string {
+    this.syncToCurrentWorkspace();
     const lines: string[] = [];
     lines.push("📚 MÉMOIRE PROJET");
     lines.push(`   Total: ${this.facts.size} faits`);
@@ -987,6 +988,7 @@ export class ProjectMemory {
    * Retourne le nombre de faits en mémoire.
    */
   get size(): number {
+    this.syncToCurrentWorkspace();
     return this.facts.size;
   }
 

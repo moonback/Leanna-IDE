@@ -168,7 +168,7 @@ export const missionSkill: Skill = {
     },
     {
       name: "mission_list",
-      description: "Liste toutes les missions actives et récemment complétées.",
+      description: "Liste les missions actives, les missions interrompues par un redémarrage (en attente de reprise ou d'effacement) et les missions récemment complétées.",
       parameters: {
         type: "OBJECT",
         properties: {},
@@ -203,7 +203,7 @@ export const missionSkill: Skill = {
     {
       name: "mission_resume",
       description:
-        "▶️ Reprend une mission précédemment mise en pause avec `mission_pause`. L'exécution redémarre là où elle s'était arrêtée.",
+        "▶️ Reprend une mission mise en pause avec `mission_pause`, ou une mission interrompue par un redémarrage (statut `interrupted` dans `mission_list`). Pour une mission interrompue, n'appeler que sur demande explicite de l'utilisateur. L'exécution redémarre là où elle s'était arrêtée.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -447,6 +447,11 @@ export const missionSkill: Skill = {
               completed: true,
             };
           }
+          // Mission interrompue par un redémarrage : persistée, en attente de décision.
+          const interrupted = executor.listPendingResumes().find((p) => p.missionId === missionId);
+          if (interrupted) {
+            return { ...interrupted, status: "interrupted", awaitingDecision: true, lastStatus: interrupted.status };
+          }
           return { error: `Mission ${missionId} non trouvée.` };
         }
 
@@ -493,10 +498,22 @@ export const missionSkill: Skill = {
             completedAt: m.getState().completedAt,
           }));
 
+        // Après un redémarrage, les missions non terminées ne sont plus en mémoire :
+        // elles attendent une décision (reprendre / effacer) dans pendingResumes.
+        const interrupted = executor.listPendingResumes().map((p) => ({
+          id: p.missionId,
+          title: p.title,
+          status: "interrupted",
+          lastStatus: p.status,
+          priority: p.priority,
+          updatedAt: p.updatedAt,
+        }));
+
         return {
           active,
+          interrupted,
           completed,
-          total: active.length + completed.length,
+          total: active.length + interrupted.length + completed.length,
         };
       }
 
@@ -506,7 +523,10 @@ export const missionSkill: Skill = {
           args
         );
 
-        const success = executor.cancelMission(missionId);
+        // Mission interrompue (non chargée en mémoire) : l'annuler = l'effacer du store.
+        const success = executor.listPendingResumes().some((p) => p.missionId === missionId)
+          ? executor.confirmResume(missionId, "delete")
+          : executor.cancelMission(missionId);
         return {
           success,
           message: success
@@ -530,7 +550,10 @@ export const missionSkill: Skill = {
 
       case "mission_resume": {
         const { missionId } = validateArgs(missionSkill.inputSchemas!["mission_resume"], args);
-        const success = executor.resumeMission(missionId);
+        const isInterrupted = executor.listPendingResumes().some((p) => p.missionId === missionId);
+        const success = isInterrupted
+          ? executor.confirmResume(missionId, "reactivate")
+          : executor.resumeMission(missionId);
         return {
           success,
           missionId,
