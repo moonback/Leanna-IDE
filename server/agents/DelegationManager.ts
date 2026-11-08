@@ -21,6 +21,7 @@ import { agentMessageBus } from "./AgentMessageBus.js";
 import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import type { TaskRequestPayload } from "./AgentCommunication.js";
+import { selectDelegationContext } from "./AgentCommunication.js";
 
 const log = createLogger("DelegationManager");
 
@@ -313,6 +314,7 @@ export class DelegationManager {
       
       // Créer la tâche
       const taskId = randomUUID();
+      const handoffContext = selectDelegationContext(validatedDelegation.context);
       const task: AgentTask = {
         id: taskId,
         role: validatedDelegation.targetRole,
@@ -323,7 +325,7 @@ export class DelegationManager {
         context: {
           files: validatedDelegation.files ?? [],
           instructions: validatedDelegation.instructions,
-          metadata: validatedDelegation.context
+          metadata: handoffContext
         } as TaskContext,
         createdAt: timestamp,
         timeoutMs: validatedDelegation.timeoutMs

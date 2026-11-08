@@ -155,7 +155,7 @@ export interface BuildContextOptions {
   includeRisk?: boolean;
   /** Mode ImpactAnalyzer si includeRisk=true */
   riskMode?: ImpactMode;
-  /** Nombre minimal de tokens disponibles dans le prompt (influence la taille du contexte) */
+  /** Budget maximal approximatif en tokens pour le contexte récupéré */
   maxTokenBudget?: number;
   /** Historique des précédentes actions (pour apprentissage incrémental) */
   history?: string[];
@@ -559,17 +559,40 @@ export class UnderstandingEngine {
   // 0. Cache
   // ──────────────────────────────────────────────────────────────────────
 
+  /**
+   * Cache key complet : les limites, le contexte déjà fourni et les options
+   * de risque changent le résultat. Une clé réduite à query/strategy/detail
+   * pouvait renvoyer un batch construit pour une autre mission ou un autre budget.
+   */
+  private cacheKey(query: string, opts: BuildContextOptions): string {
+    return JSON.stringify([
+      query,
+      opts.strategy ?? DEFAULTS.strategy,
+      opts.detail ?? DEFAULTS.detail,
+      opts.maxFiles ?? DEFAULTS.maxFiles,
+      opts.maxFacts ?? DEFAULTS.maxFacts,
+      opts.maxTokenBudget ?? DEFAULTS.maxTokenBudget,
+      opts.includeRisk ?? DEFAULTS.includeRisk,
+      opts.riskMode ?? DEFAULTS.riskMode,
+      [...(opts.existingContext ?? DEFAULTS.existingContext)].sort(),
+      opts.missionId ?? null,
+      opts.history ?? null,
+    ]);
+  }
+
   private cacheGet(query: string, opts: BuildContextOptions): UnderstandingContext | null {
     const now = Date.now();
-    const key = `${query}::${opts.strategy}::${opts.detail}`;
+    const key = this.cacheKey(query, opts);
     const entry = this.usageCache.find(
-      (c) => `${c.query}::balanced::standard` === key && now - c.timestamp < UnderstandingEngine.CACHE_TTL_MS
+      (candidate) => candidate.query === key && now - candidate.timestamp < UnderstandingEngine.CACHE_TTL_MS
     );
     return entry ? entry.context : null;
   }
 
   private cachePut(query: string, opts: BuildContextOptions, context: UnderstandingContext): void {
-    const key = `${query}::${opts.strategy}::${opts.detail}`;
+    const key = this.cacheKey(query, opts);
+    // Remplacer une entrée identique évite de consommer le cache avec des doublons.
+    this.usageCache = this.usageCache.filter((candidate) => candidate.query !== key);
     this.usageCache.push({ query: key, timestamp: Date.now(), context });
     if (this.usageCache.length > UnderstandingEngine.CACHE_MAX) this.usageCache.shift();
   }
@@ -734,15 +757,110 @@ export class UnderstandingEngine {
       }
     }
 
-    // 3. Qualité recalculée
-    working.quality = semanticSearch.estimateQuality(working.files, working.facts);
-
-    // 4. PrimaryFile : si pas déjà défini, prendre le plus pertinent
+    // 3. PrimaryFile : si pas déjà défini, prendre le plus pertinent
     if (!working.primaryFile && working.files.length > 0) {
       working.primaryFile = working.files[0].filePath;
     }
 
-    return working;
+    // 4. Appliquer réellement le budget : cette limite portait auparavant
+    // uniquement le nom maxTokenBudget sans réduire le batch retourné.
+    const budgeted = this.enforceTokenBudget(working, opts.maxTokenBudget);
+
+    // 5. Qualité recalculée après sélection, pour ne pas annoncer une qualité
+    // basée sur des fichiers/faits qui ne seront finalement pas transmis.
+    budgeted.quality = semanticSearch.estimateQuality(budgeted.files, budgeted.facts);
+    return budgeted;
+  }
+
+  /**
+   * Réduit le batch au budget demandé avec une estimation prudente de 4 chars/token.
+   * 25% du budget est réservé au balisage XML, au résumé et aux métadonnées du prompt.
+   * Les faits structurels/décisions fiables passent avant les faits anecdotiques.
+   * Les fichiers restent classés par pertinence et leurs sections sont tronquées
+   * plutôt que supprimées brutalement lorsque le budget est presque épuisé.
+   */
+  private enforceTokenBudget(batch: ContextBatch, maxTokenBudget: number): ContextBatch {
+    const safeTokenBudget = Number.isFinite(maxTokenBudget)
+      ? Math.min(128_000, Math.max(64, Math.floor(maxTokenBudget)))
+      : DEFAULTS.maxTokenBudget;
+    const charBudget = Math.max(256, Math.floor(safeTokenBudget * 4 * 0.75));
+    let remaining = Math.max(0, charBudget - batch.query.length - (batch.primaryFile?.length ?? 0) - 120);
+
+    const categoryPriority: Record<string, number> = {
+      decision: 7,
+      security: 7,
+      architecture: 6,
+      convention: 5,
+      "known-bug": 5,
+      workflow: 4,
+      api: 4,
+      stack: 4,
+      module: 3,
+      pattern: 3,
+      refactoring: 2,
+      todo: 1,
+    };
+    const rankedFacts = [...batch.facts].sort((a, b) => {
+      const aPriority = (a.isStructural ? 10 : 0) + (categoryPriority[a.category] ?? 1) * 2 + a.confidence;
+      const bPriority = (b.isStructural ? 10 : 0) + (categoryPriority[b.category] ?? 1) * 2 + b.confidence;
+      return bPriority - aPriority || b.usageCount - a.usageCount;
+    });
+
+    const selectedFacts: ProjectFact[] = [];
+    const addFactsWithin = (allocation: number): void => {
+      let used = 0;
+      for (const fact of rankedFacts) {
+        if (selectedFacts.some((selected) => selected.id === fact.id)) continue;
+        if (remaining < 96 || used >= allocation) break;
+        const metadataCost = fact.id.length + fact.category.length + fact.tags.join(",").length + 64;
+        const contentLimit = Math.min(fact.content.length, 240, remaining - metadataCost, allocation - used - metadataCost);
+        if (contentLimit < 32) continue;
+        selectedFacts.push({ ...fact, content: fact.content.slice(0, contentLimit) });
+        const cost = metadataCost + contentLimit;
+        remaining -= cost;
+        used += cost;
+      }
+    };
+
+    // Réserver une part du budget aux décisions et faits structurels :
+    // les fichiers ne doivent pas évincer toutes les contraintes mémorisées.
+    addFactsWithin(Math.floor(charBudget * 0.3));
+
+    const selectedFiles: RelevantFile[] = [];
+    const candidates = [...batch.files].sort((a, b) => {
+      if (batch.primaryFile) {
+        if (a.filePath === batch.primaryFile) return -1;
+        if (b.filePath === batch.primaryFile) return 1;
+      }
+      return b.relevance - a.relevance;
+    });
+
+    for (const file of candidates) {
+      const fileOverhead = file.filePath.length + (file.reason?.length ?? 0) + 48;
+      if (remaining < fileOverhead) continue;
+      remaining -= fileOverhead;
+
+      const sections: RelevantFile["relevantSections"] = [];
+      const rankedSections = [...file.relevantSections].sort((a, b) => b.relevance - a.relevance);
+      for (const section of rankedSections) {
+        if (remaining < 80) break;
+        const contentLimit = Math.min(section.content.length, remaining - 32, 900);
+        if (contentLimit < 48) break;
+        const content = section.content.slice(0, contentLimit);
+        sections.push({ ...section, content });
+        remaining -= content.length + 32;
+      }
+      selectedFiles.push({ ...file, relevantSections: sections });
+    }
+
+    // Utiliser le reliquat pour les autres faits pertinents.
+    addFactsWithin(remaining);
+
+    return {
+      ...batch,
+      files: selectedFiles,
+      facts: selectedFacts,
+    };
   }
 
   // ──────────────────────────────────────────────────────────────────────

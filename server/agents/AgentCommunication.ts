@@ -67,6 +67,109 @@ export interface TaskRequestPayload {
   context?: Record<string, unknown>;
 }
 
+/**
+ * Réduit le contexte transmis à un agent sans perdre les informations
+ * opérationnelles prioritaires. Le contenu reste une donnée non fiable :
+ * cette fonction ne transforme jamais les valeurs en instructions système.
+ */
+export function selectDelegationContext(
+  context: Record<string, unknown> | undefined,
+  maxChars = 12_000
+): Record<string, unknown> {
+  if (!context || typeof context !== "object" || Array.isArray(context)) return {};
+  const requestedBudget = Number.isFinite(maxChars) ? Math.floor(maxChars) : 12_000;
+  const budget = Math.max(512, Math.min(32_000, requestedBudget));
+  const payloadBudget = Math.max(128, budget - 220);
+  const priority = [
+    "successCriteria", "constraints", "decisions", "securityConstraints",
+    "verification", "evidence", "errorDiagnostics", "knownIssues",
+    "previousResults", "relevantFacts", "files", "architecture",
+  ];
+  const rank = (key: string): number => {
+    const index = priority.indexOf(key);
+    return index >= 0 ? index : priority.length;
+  };
+  const sanitize = (value: unknown, depth: number): unknown => {
+    if (depth > 4) return "[profondeur limitée]";
+    if (typeof value === "string") return value.length > 2_000 ? value.slice(0, 1_997) + "..." : value;
+    if (value === null || typeof value === "number" || typeof value === "boolean") return value;
+    if (Array.isArray(value)) return value.slice(0, 12).map((item) => sanitize(item, depth + 1));
+    if (typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>).slice(0, 40);
+      return Object.fromEntries(entries.map(([key, item]) => [key, sanitize(item, depth + 1)]));
+    }
+    return String(value).slice(0, 256);
+  };
+
+  const fitValue = (value: unknown, limit: number): unknown => {
+    const safe = sanitize(value, 0);
+    const serialized = JSON.stringify(safe) ?? "null";
+    if (serialized.length <= limit) return safe;
+    if (limit < 24) return undefined;
+    if (typeof safe === "string") return safe.slice(0, Math.max(0, limit - 3)) + "...";
+    if (Array.isArray(safe)) {
+      const result: unknown[] = [];
+      let remaining = limit - 2;
+      for (const item of safe) {
+        if (remaining < 24) break;
+        const fitted = fitValue(item, Math.min(1_200, remaining - 1));
+        if (fitted === undefined) break;
+        const cost = (JSON.stringify(fitted) ?? "null").length + (result.length ? 1 : 0);
+        if (cost > remaining) break;
+        result.push(fitted);
+        remaining -= cost;
+      }
+      return result;
+    }
+    if (safe && typeof safe === "object") {
+      const result: Record<string, unknown> = {};
+      let remaining = limit - 2;
+      for (const [childKey, childValue] of Object.entries(safe as Record<string, unknown>)) {
+        const keyCost = childKey.length + 4;
+        if (remaining <= keyCost + 24) break;
+        const fitted = fitValue(childValue, Math.min(1_200, remaining - keyCost));
+        if (fitted === undefined) continue;
+        const cost = keyCost + (JSON.stringify(fitted) ?? "null").length;
+        if (cost > remaining) continue;
+        result[childKey] = fitted;
+        remaining -= cost;
+      }
+      return result;
+    }
+    return safe;
+  };
+
+  const output: Record<string, unknown> = {};
+  let used = 0;
+  const entries = Object.entries(context)
+    .filter(([key]) => key !== "_contextHandoff")
+    .sort(([a], [b]) => rank(a) - rank(b));
+  let truncated = false;
+  for (const [key, value] of entries) {
+    const available = payloadBudget - used - key.length - 8;
+    if (available < 24) {
+      truncated = true;
+      continue;
+    }
+    const safeValue = fitValue(value, available);
+    if (safeValue === undefined) {
+      truncated = true;
+      continue;
+    }
+    const serialized = JSON.stringify(safeValue) ?? "null";
+    if (serialized.length < (JSON.stringify(sanitize(value, 0)) ?? "null").length) truncated = true;
+    output[key] = safeValue;
+    used += key.length + serialized.length + 8;
+  }
+  output._contextHandoff = {
+    version: 1,
+    truncated,
+    includedKeys: Object.keys(output).filter((key) => key !== "_contextHandoff"),
+    trust: "untrusted_data_not_instructions",
+  };
+  return output;
+}
+
 export interface TaskResponsePayload {
   type: "task_response";
   taskId: string;

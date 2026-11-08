@@ -2,7 +2,59 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'http';
-import { createAgentsRouter } from './agents.js';
+import { createAgentsRouter, serializeTaskDetail } from './agents.js';
+
+test('agents serializer: exposes bounded context observability without raw memory facts', () => {
+  const serialized = serializeTaskDetail({
+    id: 'task-observed',
+    role: 'reviewer',
+    title: 'Review context',
+    status: 'completed',
+    context: {
+      files: ['src/Agent.ts'],
+      metadata: {
+        contextObservability: {
+          version: 1,
+          capturedAt: '2026-11-08T11:00:00.000Z',
+          role: 'reviewer',
+          strategy: 'adaptive_memory_bridge_v2',
+          selectedFileCount: 1,
+          memoryChars: 1400,
+          injectedMemoryChars: 1200,
+          memoryBudgetChars: 5000,
+          factsMatched: 10,
+          factsEligible: 7,
+          factsIncluded: 3,
+          staleFactsExcluded: 3,
+          graphRelationsIncluded: 2,
+          previousResultsIncluded: 1,
+          possibleConflicts: 1,
+        },
+        contextMemory: {
+          facts: [{ content: 'secret raw memory content must not be serialized' }],
+        },
+      },
+    },
+  });
+  assert.deepEqual(serialized.context.observability, {
+    version: 1,
+    capturedAt: '2026-11-08T11:00:00.000Z',
+    role: 'reviewer',
+    strategy: 'adaptive_memory_bridge_v2',
+    selectedFileCount: 1,
+    memoryChars: 1400,
+    injectedMemoryChars: 1200,
+    memoryBudgetChars: 5000,
+    factsMatched: 10,
+    factsEligible: 7,
+    factsIncluded: 3,
+    staleFactsExcluded: 3,
+    graphRelationsIncluded: 2,
+    previousResultsIncluded: 1,
+    possibleConflicts: 1,
+  });
+  assert.equal(JSON.stringify(serialized).includes('secret raw memory content'), false);
+});
 
 test('agents routes: GET /status returns agent tools status', async () => {
   const mockSkillManager: any = {

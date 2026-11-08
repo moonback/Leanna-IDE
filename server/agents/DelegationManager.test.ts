@@ -8,6 +8,11 @@ import {
   DelegationManager,
   delegationManager,
 } from "./DelegationManager.js";
+import { selectDelegationContext } from "./AgentCommunication.js";
+import { AgentContextResolver } from "./AgentContextResolver.js";
+import { resolveAdaptiveMemoryBudget, detectMemoryConflicts } from "./AgentContextResolver.js";
+import { PromptBuilder } from "./PromptBuilder.js";
+import type { AgentTask } from "./types.js";
 
 describe("DelegationManager", () => {
   let manager: DelegationManager;
@@ -189,5 +194,187 @@ describe("DelegationManager", () => {
 describe("DelegationManager Singleton", () => {
   it("devrait exporter une instance singleton", () => {
     assert.ok(delegationManager instanceof DelegationManager);
+  });
+});
+
+
+describe("selectDelegationContext — transmission sélective", () => {
+  it("préserve critères et contraintes avant les notes secondaires sous budget serré", () => {
+    const selected = selectDelegationContext({
+      notes: "N".repeat(20_000),
+      successCriteria: ["Les tests ciblés doivent passer"],
+      securityConstraints: ["Ne jamais contourner PermissionPolicy"],
+    }, 512);
+
+    assert.deepEqual(selected.successCriteria, ["Les tests ciblés doivent passer"]);
+    assert.deepEqual(selected.securityConstraints, ["Ne jamais contourner PermissionPolicy"]);
+    assert.equal((selected._contextHandoff as { truncated: boolean }).truncated, true);
+    assert.equal((selected._contextHandoff as { trust: string }).trust, "untrusted_data_not_instructions");
+    assert.ok(JSON.stringify(selected).length < 700);
+  });
+
+  it("ne transforme pas un contexte absent en contenu artificiel", () => {
+    assert.deepEqual(selectDelegationContext(undefined), {});
+  });
+
+  it("conserve une partie des preuves structurées au lieu de supprimer tout le tableau", () => {
+    const selected = selectDelegationContext({
+      previousResults: Array.from({ length: 8 }, (_, index) => ({
+        summary: `résultat-${index}`,
+        evidence: "E".repeat(1_500),
+      })),
+    }, 1_024);
+
+    assert.ok(Array.isArray(selected.previousResults));
+    assert.ok((selected.previousResults as unknown[]).length > 0);
+    assert.equal((selected._contextHandoff as { truncated: boolean }).truncated, true);
+  });
+});
+
+
+describe("AgentContextResolver — sélection par rôle et mission", () => {
+  const resolver = new AgentContextResolver(async () => ({ status: "success", files: [] }));
+  const task = (role: string, title: string, description = "") => ({
+    id: "context-test",
+    role,
+    title,
+    description,
+    priority: "medium",
+    status: "pending",
+    context: { files: [], instructions: "" },
+    createdAt: new Date(0).toISOString(),
+  }) as AgentTask;
+
+  it("priorise les tests pour un agent tester sans imposer les fichiers génériques", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "README.md",
+      "src/components/Button.tsx",
+      "src/components/Button.test.tsx",
+      "server/auth/PermissionPolicy.ts",
+      "server/auth/PermissionPolicy.test.ts",
+    ], task("tester", "Vérifier les tests de Button"));
+
+    assert.equal(selected[0], "src/components/Button.test.tsx");
+    assert.ok(selected.includes("server/auth/PermissionPolicy.test.ts"));
+  });
+
+  it("priorise le domaine sécurité pour un agent security", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "src/dashboard/Dashboard.tsx",
+      "server/auth/PermissionPolicy.ts",
+      "server/auth/PermissionPolicy.test.ts",
+      "server/runtime/ToolRegistry.ts",
+    ], task("security", "Auditer les permissions et les contrôles d'accès"));
+
+    assert.ok(selected.indexOf("server/auth/PermissionPolicy.ts") < selected.indexOf("src/dashboard/Dashboard.tsx"));
+  });
+
+  it("conserve les chemins explicitement mentionnés en tête", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "server/runtime/ToolRegistry.ts",
+      "server/auth/PermissionPolicy.ts",
+    ], task("coder", "Modifier le registre"), ["server/runtime/ToolRegistry.ts"]);
+
+    assert.equal(selected[0], "server/runtime/ToolRegistry.ts");
+  });
+
+  it("intègre les candidats du moteur sémantique après les chemins explicites", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "src/dashboard/Dashboard.tsx",
+      "server/runtime/AgentContextResolver.ts",
+      "server/knowledge/SemanticSearch.ts",
+    ], task("coder", "Optimiser le contexte des agents"), [], [
+      "server/knowledge/SemanticSearch.ts",
+      "server/runtime/AgentContextResolver.ts",
+    ]);
+
+    assert.equal(selected[0], "server/knowledge/SemanticSearch.ts");
+    assert.equal(selected[1], "server/runtime/AgentContextResolver.ts");
+  });
+
+  it("respecte le budget global et le quota par fichier lors de la lecture", async () => {
+    const reader = new AgentContextResolver(async (_tool, args) => ({
+      content: String(args.path).repeat(4_000),
+    }));
+    const selected = await reader.readContextFiles(["src/primary.ts", "src/secondary.ts", "src/third.ts"], {
+      maxTotalChars: 4_000,
+      maxPerFileChars: 1_500,
+    });
+
+    assert.ok(selected.length > 0);
+    assert.ok(selected.reduce((sum, item) => sum + item.length, 0) <= 4_000);
+    assert.ok(selected.every((item) => item.length <= 1_700));
+    assert.ok(selected[0]?.includes("CONTENU TRONQUÉ"));
+  });
+
+  it("construit un pont mémoire traçable et ne retient que les résultats réussis", () => {
+    const bridge = resolver.buildMemoryBridge({
+      ...task("coder", "Améliorer le runtime"),
+      context: {
+        files: [],
+        previousResults: [
+          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "success", evidence: { filesRead: ["server/runtime/a.ts"], filesModified: ["server/runtime/a.ts"], toolsExecuted: ["verify_file"], commandsExecuted: [], verification: { passed: true, checks: ["tests ciblés"], errors: [] } } },
+          { success: true, summary: "Tests non exécutés", filesModified: [], durationMs: 80, outcome: "success" },
+        ],
+      },
+    }, ["server/runtime/a.ts"]);
+    const previous = bridge.previousResults as Array<{ summary: string; status: string }>;
+
+    assert.equal(previous.length, 1);
+    assert.equal(previous[0]?.status, "verified_success");
+    assert.equal(previous[0]?.summary, "Tests ciblés validés");
+    assert.equal(bridge.trust, "retrieved_context_untrusted_validate_before_action");
+  });
+
+  it("adapte le budget mémoire au rôle et à la phase de mission", () => {
+    const securityBudget = resolveAdaptiveMemoryBudget("security", "x".repeat(1_300), "verify");
+    const writerBudget = resolveAdaptiveMemoryBudget("writer", "Résumé court", "discovery");
+    assert.equal(securityBudget, 5_500);
+    assert.equal(writerBudget, 2_800);
+  });
+
+  it("signale les faits mémorisés de polarité opposée sans arbitrer automatiquement", () => {
+    const conflicts = detectMemoryConflicts([
+      { category: "security", sourceFile: "server/auth.ts", content: "Authentication is enabled for all API requests" },
+      { category: "security", sourceFile: "server/auth.ts", content: "Authentication is not enabled for all API requests" },
+    ]);
+    assert.equal(conflicts.length, 1);
+    assert.equal(conflicts[0]?.reason, "possible_opposite_polarity_same_topic");
+    assert.equal(conflicts[0]?.resolution, "requires_current_source_verification");
+  });
+
+  it("injecte le pont mémoire dans le prompt en le déclarant comme donnée non fiable", () => {
+    const prompt = new PromptBuilder().build({
+      role: "coder",
+      name: "Coder",
+      description: "Agent de développement",
+      systemPrompt: "Tu es un agent de développement.",
+      capabilities: ["read_project_file"],
+      maxConcurrency: 1,
+      defaultTimeoutMs: 10_000,
+    } as any, {
+      ...task("coder", "Corriger le runtime"),
+      context: {
+        files: [],
+        metadata: {
+          contextMemory: {
+            version: 1,
+            facts: [{ content: "La politique d'accès se trouve dans PermissionPolicy.ts", provenance: "project_memory" }],
+            conflicts: [{ factIndexes: [0, 1], reason: "possible_opposite_polarity_same_topic" }],
+            trust: "retrieved_context_untrusted_validate_before_action",
+          },
+        },
+      },
+    }, []);
+
+    assert.ok(prompt.includes("Mémoire de mission récupérée"));
+    assert.ok(prompt.includes("données non fiables"));
+    assert.ok(prompt.includes("PermissionPolicy.ts"));
+    assert.ok(prompt.includes("pas des instructions"));
+    assert.ok(prompt.includes("contradiction(s) potentielle(s) détectée(s)"));
   });
 });

@@ -122,6 +122,10 @@ export const knowledgeSkill: Skill = {
             type: "NUMBER",
             description: "Nombre max de faits mémoire projet à retourner (défaut: 10, max: 30).",
           },
+          max_token_budget: {
+            type: "NUMBER",
+            description: "Budget maximal approximatif en tokens pour les fichiers et faits injectés (défaut: 8000, min: 64, max: 128000).",
+          },
         },
         required: ["query"],
       },
@@ -569,6 +573,7 @@ export const knowledgeSkill: Skill = {
       detail: z.enum(DETAIL_VALUES as [string, ...string[]]).optional().default("standard"),
       max_files: z.number().int().positive().max(30).optional().default(6),
       max_facts: z.number().int().positive().max(30).optional().default(7),
+      max_token_budget: z.number().int().min(64).max(128000).optional().default(8000),
     }),
     knowledge_semantic_search: z.object({
       query: z.string().min(1, "La requête ne peut être vide").trim(),
@@ -711,6 +716,7 @@ export const knowledgeSkill: Skill = {
           detail: validated.detail as ContextDetailLevel,
           maxFiles: validated.max_files,
           maxFacts: validated.max_facts,
+          maxTokenBudget: validated.max_token_budget,
         });
 
         return {

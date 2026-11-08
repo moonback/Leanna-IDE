@@ -26,6 +26,7 @@ import type {
   CollaborationRequestPayload,
   StatusResponsePayload,
 } from "./AgentCommunication.js";
+import { selectDelegationContext } from "./AgentCommunication.js";
 import { isDelegationAllowed } from "./AgentCommunication.js";
 import { AgentMessageBus } from "./AgentMessageBus.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
@@ -171,7 +172,8 @@ export class AutonomousAgent {
     description: string,
     files: string[] = [],
     instructions?: string,
-    priority: TaskPriority = "medium"
+    priority: TaskPriority = "medium",
+    context?: Record<string, unknown>
   ): Promise<TaskResult | null> {
     // Vérifier la matrice de délégation (inclut support des agents personnalisés)
     if (!isDelegationAllowed(this.role, targetRole)) {
@@ -208,6 +210,7 @@ export class AutonomousAgent {
           description,
           files,
           instructions,
+          context: selectDelegationContext(context),
         } as TaskRequestPayload,
         metadata: { delegatedBy: this.role, delegationReason: title },
       };
@@ -392,10 +395,12 @@ export class AutonomousAgent {
           ? ((payload.context as Record<string, unknown>).successCriteria as string[])
           : undefined,
         metadata: {
+          ...((payload.context as Record<string, unknown>) ?? {}),
+          // Les champs système restent autoritaires : le contexte transmis
+          // par un agent parent ne peut pas usurper l'identité ni le mode.
           delegatedBy: message.from,
           autonomous: isAutonomous,
           negotiation: message.metadata?.negotiated === true,
-          ...((payload.context as Record<string, unknown>) ?? {}),
         },
       },
       createdAt: new Date().toISOString(),

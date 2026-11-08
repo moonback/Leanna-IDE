@@ -86,6 +86,12 @@ export interface ExecutionTrace {
     tokens?: number;
     /** Appels LLM sans mesure de tokens (le total ci-dessus est alors partiel). */
     unmeasuredLlmCalls?: number;
+    /** Caractères des prompts utilisateur (mesure de taille, pas de tokens). */
+    promptChars?: number;
+    /** Caractères des prompts système (mesure de taille, pas de tokens). */
+    systemPromptChars?: number;
+    /** Nombre d'appels LLM observés. */
+    promptCalls?: number;
   };
   recoveries: number;
   replans: number;
@@ -224,6 +230,12 @@ export interface BudgetUsage {
   tokens: number;
   /** Appels LLM sans `tokenUsage` : leurs tokens sont inconnus (pas comptés à 0). */
   unmeasuredLlmCalls: number;
+  /** Caractères cumulés des prompts utilisateur envoyés au modèle. */
+  promptChars: number;
+  /** Caractères cumulés des prompts système envoyés au modèle. */
+  systemPromptChars: number;
+  /** Nombre d'appels modèle instrumentés. */
+  promptCalls: number;
 }
 
 /** Fabrique un `BudgetUsage` vierge. */
@@ -243,6 +255,9 @@ export function emptyBudgetUsage(): BudgetUsage {
     cost: 0,
     tokens: 0,
     unmeasuredLlmCalls: 0,
+    promptChars: 0,
+    systemPromptChars: 0,
+    promptCalls: 0,
   };
 }
 

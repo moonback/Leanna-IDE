@@ -23,6 +23,9 @@ export {
   buildToolSection,
   buildBudgetSection,
   buildObservationHistory,
+  resolveObservationHistoryBudget,
+  estimateTokensFromChars,
+  OBSERVATION_HISTORY_BUDGETS,
 } from "./ToolPromptBuilder.js";
 export {
   DEFAULT_AGENT_BUDGET,

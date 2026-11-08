@@ -95,7 +95,30 @@ export function buildBudgetSection(budget: AgentBudget, usage: BudgetUsage, phas
  */
 const RECENT_TURNS_FULL_FIDELITY = 2;
 const RECENT_RESULT_CHARS = 8_000;
-const OLD_RESULT_CHARS = 400;
+const OLD_RESULT_CHARS = 320;
+const OLD_REASONING_CHARS = 180;
+const OLD_PARAM_VALUE_CHARS = 100;
+
+/**
+ * Budget d'historique par phase (en caractères, pas en tokens).
+ * Les diagnostics de vérification/récupération disposent d'une réserve plus
+ * large ; la découverte reste volontairement compacte. Estimation indicative:
+ * ~4 caractères/token, variable selon langue et code.
+ */
+export const OBSERVATION_HISTORY_BUDGETS: Readonly<Record<string, number>> = {
+  discovery: 8_000,
+  write: 12_000,
+  verify: 16_000,
+  recovery: 18_000,
+};
+
+export function resolveObservationHistoryBudget(phase: string): number {
+  return OBSERVATION_HISTORY_BUDGETS[phase] ?? 10_000;
+}
+
+export function estimateTokensFromChars(chars: number): number {
+  return Math.ceil(Math.max(0, chars) / 4);
+}
 
 /** Clés rendues en premier : statut, erreur et diagnostic structuré d'abord. */
 const PRIORITY_KEYS = [
@@ -130,11 +153,11 @@ export function buildObservationHistory(
         ? (o.cached ? "OK (cache)" : "OK")
         : `ERREUR: ${guardUntrustedContent(o.error ?? "inconnue", source).text}`;
       const preview = guardUntrustedContent(renderResultForModel(o.result, resultChars), source).text;
-      return `  • ${o.invocation.name}(${renderParams(o.invocation.parameters)}) → ${status}${preview ? `\n${indent(preview)}` : ""}`;
+      return `  • ${o.invocation.name}(${renderParams(o.invocation.parameters, recent ? 200 : OLD_PARAM_VALUE_CHARS)}) → ${status}${preview ? `\n${indent(preview)}` : ""}`;
     });
     const block = [
       `— Tour ${obs.iteration} —`,
-      obs.reasoning ? `raisonnement: ${truncate(obs.reasoning, recent ? 1_500 : 600)}` : "",
+      obs.reasoning ? `raisonnement${recent ? "" : " (résumé)"}: ${truncate(obs.reasoning, recent ? 1_500 : OLD_REASONING_CHARS)}` : "",
       toolLines.length ? `actions:\n${toolLines.join("\n")}` : "(aucune action)",
     ]
       .filter(Boolean)
@@ -195,11 +218,11 @@ export function renderResultForModel(result: unknown, maxChars: number): string 
 }
 
 /** Paramètres d'appel compacts : les longs contenus écrits ne sont pas re-cités. */
-function renderParams(params: Record<string, unknown>): string {
+function renderParams(params: Record<string, unknown>, maxValueChars = 200): string {
   const compact: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
-    compact[key] = typeof value === "string" && value.length > 200
-      ? `${value.slice(0, 200)}… [${value.length} car.]`
+    compact[key] = typeof value === "string" && value.length > maxValueChars
+      ? `${value.slice(0, maxValueChars)}… [${value.length} car.]`
       : value;
   }
   return safeStringify(compact);

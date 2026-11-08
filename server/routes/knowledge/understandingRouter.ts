@@ -6,13 +6,14 @@ const router = Router();
 // POST /api/knowledge/understanding/context
 router.post('/understanding/context', (req: Request, res: Response) => {
   try {
-    const { query, strategy, detail, existingContext, maxFiles, maxFacts, includeRisk, riskMode } = req.body as {
+    const { query, strategy, detail, existingContext, maxFiles, maxFacts, maxTokenBudget, includeRisk, riskMode } = req.body as {
       query?: string;
       strategy?: 'balanced' | 'code_first' | 'memory_first' | 'graph_first' | 'minimal';
       detail?: 'compact' | 'standard' | 'verbose';
       existingContext?: string[];
       maxFiles?: number;
       maxFacts?: number;
+      maxTokenBudget?: number;
       includeRisk?: boolean;
       riskMode?: 'quick' | 'standard' | 'deep' | 'reverse';
     };
@@ -25,6 +26,7 @@ router.post('/understanding/context', (req: Request, res: Response) => {
       existingContext,
       maxFiles,
       maxFacts,
+      maxTokenBudget,
       includeRisk,
       riskMode,
     });

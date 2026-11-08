@@ -38,6 +38,7 @@ import {
   buildToolSection,
   buildBudgetSection,
   buildObservationHistory,
+  resolveObservationHistoryBudget,
 } from "./ToolPromptBuilder.js";
 import { buildPhaseGuidance } from "../../agents/phasePrompts.js";
 import { parseFinalReport, noteItems, proposedDelegations } from "../../agents/FinalReportParser.js";
@@ -108,7 +109,6 @@ const CACHEABLE_TOOLS = new Set([
   "analyze_project_file",
 ]);
 
-const MAX_HISTORY_CHARS = 60_000;
 
 /**
  * Nombre maximum d'étapes retenues dans un plan. Chaque étape coûte au moins un
@@ -603,7 +603,7 @@ export class AgenticRuntime implements IAgentRuntime {
       .join("\n");
 
     const response = await this.callLLM(agent, planPrompt);
-    this.accountCost(session, response);
+    this.accountCost(session, response, planPrompt, agent.systemPrompt);
 
     const parsed = parseJsonObject(response.text);
     const rawSteps = Array.isArray(parsed?.steps) ? parsed!.steps : [];
@@ -659,7 +659,7 @@ export class AgenticRuntime implements IAgentRuntime {
       step.suggestedTools?.length ? `OUTILS SUGGÉRÉS : ${step.suggestedTools.join(", ")}` : "",
       step.verification ? `VÉRIFICATION ATTENDUE : ${step.verification}` : "",
       session.pendingInstruction ? `CONSIGNE CORRECTIVE : ${session.pendingInstruction}` : "",
-      buildObservationHistory(session.observations, MAX_HISTORY_CHARS),
+      buildObservationHistory(session.observations, resolveObservationHistoryBudget(session.phase)),
       "",
       "Décide de la prochaine action : soit des tool_calls JSON, soit une réponse finale.",
     ]
@@ -669,7 +669,7 @@ export class AgenticRuntime implements IAgentRuntime {
     session.pendingInstruction = undefined;
 
     const response = await this.callLLM(agent, stepPrompt, systemPrompt);
-    this.accountCost(session, response);
+    this.accountCost(session, response, stepPrompt, systemPrompt);
     const text = response.text.trim();
 
     const calls = extractToolCalls(text);
@@ -1168,7 +1168,7 @@ export class AgenticRuntime implements IAgentRuntime {
       `OBJECTIF : ${task.goal}`,
       `FICHIERS MODIFIÉS : ${[...session.filesModified].join(", ") || "aucun"}`,
       `OUTILS EXÉCUTÉS : ${[...new Set(session.toolsExecuted)].join(", ") || "aucun"}`,
-      buildObservationHistory(session.observations, 20_000),
+      buildObservationHistory(session.observations, resolveObservationHistoryBudget("recovery")),
       "",
       "Produis une synthèse finale en JSON strict :",
       JSON.stringify({ summary: "", details: "", deliverables: [], suggestions: [] }, null, 0),
@@ -1185,7 +1185,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
     try {
       const response = await this.callLLM(agent, finalPrompt);
-      this.accountCost(session, response);
+      this.accountCost(session, response, finalPrompt, agent.systemPrompt);
       const parsed = parseJsonObject(response.text);
       if (parsed) {
         final = {
@@ -1249,7 +1249,10 @@ export class AgenticRuntime implements IAgentRuntime {
     });
   }
 
-  private accountCost(session: RunSession, response: GenerateTextResult): void {
+  private accountCost(session: RunSession, response: GenerateTextResult, prompt = "", systemPrompt = ""): void {
+    session.usage.promptChars += prompt.length;
+    session.usage.systemPromptChars += systemPrompt.length;
+    session.usage.promptCalls += 1;
     const usage = response.tokenUsage;
     const cost = usage ? usage.totalTokens / 1000 : 1; // ~1 unité si non renseigné
     session.usage.cost += cost;
@@ -1640,6 +1643,9 @@ function buildExecutionTrace(plan: Plan, session: RunSession): ExecutionTrace {
       recoveryCalls: usage.recoveryCalls,
       tokens: usage.tokens,
       unmeasuredLlmCalls: usage.unmeasuredLlmCalls,
+      promptChars: usage.promptChars,
+      systemPromptChars: usage.systemPromptChars,
+      promptCalls: usage.promptCalls,
     },
     recoveries: session.recoveries.length,
     replans: session.replans,

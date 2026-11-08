@@ -31,6 +31,8 @@ import {
   resolveAgentTools,
   buildBudgetSection,
   buildObservationHistory,
+  resolveObservationHistoryBudget,
+  estimateTokensFromChars,
   DEFAULT_AGENT_BUDGET,
   createAgentRuntime,
   AgenticRuntime,
@@ -39,6 +41,8 @@ import {
 } from "./index.js";
 import { emptyBudgetUsage, normalizeBudget, criticalReserve } from "./types.js";
 import { AgentRuntime as DIRuntime } from "../AgentRuntime.js";
+import { UnderstandingEngine } from "../../knowledge/UnderstandingEngine.js";
+import type { ContextBatch } from "../../knowledge/types.js";
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -403,6 +407,29 @@ describe("buildBudgetSection — quotas absolus + réserves", () => {
   });
 });
 
+
+describe("Context budget — allocation par phase", () => {
+  it("réserve davantage de contexte aux phases critiques", () => {
+    const discovery = resolveObservationHistoryBudget("discovery");
+    const write = resolveObservationHistoryBudget("write");
+    const verify = resolveObservationHistoryBudget("verify");
+    const recovery = resolveObservationHistoryBudget("recovery");
+    assert.ok(discovery < write);
+    assert.ok(write < verify);
+    assert.ok(verify < recovery);
+    assert.equal(recovery, 18_000);
+  });
+
+  it("garde une valeur de repli pour une phase inconnue", () => {
+    assert.equal(resolveObservationHistoryBudget("unknown"), 10_000);
+  });
+
+  it("estime les tokens sans présenter l'estimation comme une mesure provider", () => {
+    assert.equal(estimateTokensFromChars(0), 0);
+    assert.equal(estimateTokensFromChars(4_001), 1_001);
+  });
+});
+
 describe("buildObservationHistory — historique borné", () => {
   it("rend les actions et reste borné", () => {
     const obs: Observation[] = [writeObservation(1, "a.ts")];
@@ -410,6 +437,27 @@ describe("buildObservationHistory — historique borné", () => {
     assert.match(history, /modify_project_file/);
     const tiny = buildObservationHistory(obs, 40);
     assert.ok(tiny.length <= 200);
+  });
+
+  it("compresse les tours anciens tout en conservant les diagnostics structurés", () => {
+    const old: Observation = {
+      iteration: 1,
+      reasoning: "raisonnement ancien ".repeat(80),
+      isFinal: false,
+      toolOutcomes: [{
+        invocation: { name: "verify_typecheck", parameters: { path: "src/example.ts", content: "x".repeat(500) } },
+        success: false,
+        error: "typecheck failed",
+        result: { status: "failed", parsedErrors: [{ code: "TS2322", file: "src/example.ts", message: "Type mismatch" }], stdout: "x".repeat(2_000) },
+        durationMs: 1,
+      }],
+    };
+    const recent = writeObservation(4, "latest.ts");
+    const history = buildObservationHistory([old, writeObservation(2, "middle-a.ts"), writeObservation(3, "middle-b.ts"), recent], 10_000);
+    assert.match(history, /TS2322/);
+    assert.match(history, /raisonnement \(résumé\)/);
+    assert.match(history, /latest\.ts/);
+    assert.ok(history.length < 10_000);
   });
 
   it("neutralise une injection de prompt dans un résultat d'outil (AUDIT-006)", () => {
@@ -435,11 +483,53 @@ describe("accountCost — tokens mesurés vs appels sans mesure", () => {
   it("cumule les tokens rapportés et compte à part les appels sans tokenUsage", () => {
     const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
     const session = rt._seedSessionForTest({ role: "test_tokens", goal: "g", id: "tok" });
-    const account = (rt as unknown as { accountCost(s: unknown, r: unknown): void }).accountCost.bind(rt);
-    account(session, { text: "a", tokenUsage: { promptTokens: 60, completionTokens: 40, totalTokens: 100 } });
-    account(session, { text: "b" });
+    const account = (rt as unknown as { accountCost(s: unknown, r: unknown, prompt?: string, systemPrompt?: string): void }).accountCost.bind(rt);
+    account(session, { text: "a", tokenUsage: { promptTokens: 60, completionTokens: 40, totalTokens: 100 } }, "user prompt", "system prompt");
+    account(session, { text: "b" }, "another prompt");
     account(session, { text: "c", tokenUsage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 } });
     assert.equal(session.usage.tokens, 125);
     assert.equal(session.usage.unmeasuredLlmCalls, 1);
+    assert.equal(session.usage.promptChars, "user prompt".length + "another prompt".length);
+    assert.equal(session.usage.systemPromptChars, "system prompt".length);
+    assert.equal(session.usage.promptCalls, 3);
+  });
+});
+
+
+describe("UnderstandingEngine — budget adaptatif du contexte", () => {
+  it("préserve le fichier principal et les faits de sécurité sous un budget serré", () => {
+    const engine = new UnderstandingEngine();
+    const batch = {
+      query: "corriger authentification",
+      primaryFile: "src/auth.ts",
+      quality: { totalFiles: 2, averageConfidence: 0.9, sufficient: true },
+      files: [
+        {
+          filePath: "src/secondary.ts",
+          relevance: 0.99,
+          reason: "Correspondance secondaire",
+          relevantSections: [{ lineStart: 1, lineEnd: 30, relevance: 0.9, content: "S".repeat(600) }],
+        },
+        {
+          filePath: "src/auth.ts",
+          relevance: 0.6,
+          reason: "Fichier principal",
+          relevantSections: [{ lineStart: 1, lineEnd: 30, relevance: 0.8, content: "P".repeat(600) }],
+        },
+      ],
+      facts: [
+        { id: "pattern-1", category: "pattern", content: "Pattern secondaire à conserver si le budget le permet", tags: ["pattern"], confidence: 0.9, usageCount: 8 },
+        { id: "security-1", category: "security", content: "Ne jamais contourner le contrôle d'autorisation", tags: ["security", "structural"], confidence: 0.95, usageCount: 2, isStructural: true },
+      ],
+    } as unknown as ContextBatch;
+
+    const select = (engine as unknown as {
+      enforceTokenBudget(value: ContextBatch, budget: number): ContextBatch;
+    }).enforceTokenBudget.bind(engine);
+    const result = select(batch, 256);
+
+    assert.ok(result.files.some((file) => file.filePath === "src/auth.ts"));
+    assert.ok(result.facts.some((fact) => fact.id === "security-1"));
+    assert.ok(result.files.every((file) => file.relevantSections.every((section) => section.content.length <= 900)));
   });
 });
