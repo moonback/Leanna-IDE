@@ -927,16 +927,31 @@ export class UnderstandingEngine {
     try {
       const lowerQ = query.toLowerCase();
       const fromQuery = knowledgeGraph.searchEntities(query).slice(0, limit);
+      const seen = new Set<string>();
       for (const e of fromQuery) {
         const score = this.computeEntityRelevance(e, lowerQ);
         results.push({ name: e.name, type: e.type, file: e.filePath, score });
+        seen.add(e.name + "\0" + e.filePath);
       }
-      // Compléter avec des entités des fichiers top
+
+      // Indexer les entités par fichier une seule fois. L'ancienne boucle relisait
+      // et filtrait l'intégralité du KnowledgeGraph pour chacun des 3 fichiers top.
+      const entitiesByFile = new Map<string, ReturnType<typeof knowledgeGraph.getEntities>>();
+      for (const entity of knowledgeGraph.getEntities("")) {
+        const fileKey = this.norm(entity.filePath);
+        const bucket = entitiesByFile.get(fileKey);
+        if (bucket) bucket.push(entity);
+        else entitiesByFile.set(fileKey, [entity]);
+      }
+
+      // Compléter avec les entités des fichiers top en conservant l'ordre du graphe.
       const topFiles = files.slice(0, 3).map((f) => this.norm(f.filePath));
       for (const fp of topFiles) {
-        const ents = knowledgeGraph.getEntities("").filter((e) => this.norm(e.filePath) === fp).slice(0, 3);
-        for (const e of ents) {
-          if (!results.find((r) => r.name === e.name && r.file === e.filePath)) {
+        const entities = entitiesByFile.get(fp) ?? [];
+        for (const e of entities.slice(0, 3)) {
+          const key = e.name + "\0" + e.filePath;
+          if (!seen.has(key)) {
+            seen.add(key);
             results.push({ name: e.name, type: e.type, file: e.filePath, score: 0.4 });
           }
         }
@@ -1262,13 +1277,14 @@ export class UnderstandingEngine {
     existing: string[]
   ): UnderstandingContext["coverage"] {
     const existingNorm = existing.map(this.norm);
+    const existingSet = new Set(existingNorm);
     const overlapped: string[] = [];
     const newlyFound: string[] = [];
     const batchSet = new Set(batch.files.map((f) => this.norm(f.filePath)));
     for (const e of existingNorm) if (batchSet.has(e)) overlapped.push(e);
     for (const f of batch.files) {
       const n = this.norm(f.filePath);
-      if (!existingNorm.includes(n)) newlyFound.push(f.filePath);
+      if (!existingSet.has(n)) newlyFound.push(f.filePath);
     }
     return { existing: existingNorm, overlapped, newlyFound };
   }
