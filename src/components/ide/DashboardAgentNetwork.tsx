@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Activity, Bot, CheckCircle2, CircleAlert, Clock3, GitBranch, Loader2, Maximize2, Minimize2, Network, Radio, X } from 'lucide-react';
+import { Activity, Bot, CheckCircle2, CircleAlert, Clock3, GitBranch, Loader2, Maximize2, Minimize2, Network, Radio } from 'lucide-react';
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
+import { Modal } from '../ui/index.js';
 import type { ActivityStep } from '../../hooks/useActivity.js';
 
 interface AgentStat {
@@ -195,7 +196,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   ];
 
   return (
-    <section className={focus ? 'fixed inset-4 z-50 overflow-auto rounded-xl border p-4 shadow-2xl' : 'mt-2 overflow-hidden rounded-xl border p-2'}
+    <section className={focus ? 'fixed inset-4 z-50 flex flex-col overflow-auto rounded-xl border p-4 shadow-2xl' : 'relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-2'}
       style={{ borderColor: orchestrating ? 'color-mix(in srgb, var(--accent-primary) 55%, var(--border-base))' : 'var(--border-base)',
         backgroundColor: focus ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--bg-secondary) 66%, transparent)', backdropFilter: 'blur(12px)',
         boxShadow: orchestrating ? '0 0 24px color-mix(in srgb, var(--accent-primary) 18%, transparent)' : undefined, transition: 'border-color .5s, box-shadow .5s' }}
@@ -241,8 +242,9 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
       <AnimatePresence mode="wait" initial={false}>
         {tab === 'network' && (
           <motion.div key="network" id="agent-panel-network" role="tabpanel" aria-labelledby="agent-tab-network"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .15 }}>
-            <div className={`relative mx-auto w-full ${focus ? 'h-[min(70vh,640px)] max-w-[1200px]' : 'h-[250px] max-w-[900px] sm:h-[285px]'}`}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .15 }}
+            className="flex min-h-0 flex-1 flex-col">
+            <div className={`relative mx-auto w-full ${focus ? 'h-[min(70vh,640px)] max-w-[1200px]' : 'h-[250px] max-w-[900px] sm:h-[285px] xl:h-auto xl:min-h-[230px] xl:flex-1'}`}
               style={{ perspective: 1100 }} onPointerMove={onPointerMove} onPointerLeave={resetTilt}
               role="group" aria-label="Agents sélectionnables et délégations observées">
               <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}>
@@ -367,7 +369,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         {tab === 'activity' && (
           <motion.div key="activity" id="agent-panel-activity" role="tabpanel" aria-labelledby="agent-tab-activity"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .15 }}
-            className={`overflow-auto pr-1 ${focus ? 'max-h-[70vh]' : 'max-h-[300px]'}`}>
+            className={`overflow-auto pr-1 ${focus ? 'max-h-[70vh]' : 'max-h-[300px] xl:max-h-none xl:min-h-0 xl:flex-1'}`}>
             {tasks.length ? <ul className="space-y-1.5" aria-live="polite">
               {tasks.slice(-30).reverse().map(task => {
                 const pct = task.progress?.total ? Math.round((task.progress.current / task.progress.total) * 100) : null;
@@ -396,7 +398,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         {tab === 'delegations' && (
           <motion.div key="delegations" id="agent-panel-delegations" role="tabpanel" aria-labelledby="agent-tab-delegations"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: .15 }}
-            className={`grid gap-3 overflow-auto pr-1 md:grid-cols-2 ${focus ? 'max-h-[70vh]' : 'max-h-[300px]'}`}>
+            className={`grid gap-3 overflow-auto pr-1 md:grid-cols-2 ${focus ? 'max-h-[70vh]' : 'max-h-[300px] xl:max-h-none xl:min-h-0 xl:flex-1'}`}>
             <div>
               <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}><Network size={11}/> Relations</div>
               {delegations.length ? <ul className="space-y-1">
@@ -427,19 +429,12 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         )}
       </AnimatePresence>
 
-      <AnimatePresence mode="wait">
-        {selectedAgent && tab === 'network' && (
-          <motion.div key={selectedAgent.role} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            className="mt-3 rounded-lg border p-3" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-panel)' }}>
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  <Bot size={13} style={{ color: 'var(--accent-primary)' }}/>{selectedAgent.name}
-                  <span className="rounded px-1.5 py-0.5 text-[9px] font-normal" style={{ color: STATUS_COLOR[selectedAgent.status] ?? 'var(--text-muted)', background: 'var(--accent-subtle)' }}>{STATUS_LABEL[selectedAgent.status] ?? selectedAgent.status}</span>
-                </div>
-                <div className="mt-0.5 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Rôle : {selectedAgent.role} · {selectedAgent.delegatedSubTasks} sous-tâches déléguées · {selectedAgent.delegationSuccess} réussies</div>
-              </div>
-              <button type="button" onClick={() => setSelectedRole(null)} aria-label="Fermer le détail" className="rounded p-1" style={{ color: 'var(--text-muted)' }}><X size={14}/></button>
+      <Modal open={!!selectedAgent} onClose={() => setSelectedRole(null)} title={selectedAgent?.name ?? 'Agent'} size="md">
+        {selectedAgent && (
+          <Modal.Body>
+            <div className="mb-3">
+              <span className="rounded px-1.5 py-0.5 text-[11px]" style={{ color: STATUS_COLOR[selectedAgent.status] ?? 'var(--text-muted)', background: 'var(--accent-subtle)' }}>{STATUS_LABEL[selectedAgent.status] ?? selectedAgent.status}</span>
+              <div className="mt-1.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>Rôle : {selectedAgent.role} · {selectedAgent.delegatedSubTasks} sous-tâches déléguées · {selectedAgent.delegationSuccess} réussies</div>
             </div>
             <div className="mb-2 flex flex-wrap gap-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
               <span>{selectedAgent.runningTasks} mission(s) active(s)</span><span>{selectedAgent.queuedTasks} en attente</span>
@@ -452,9 +447,9 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
                 <span className="shrink-0 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{TASK_LABEL[task.status] ?? task.status}</span>
               </li>)}
             </ul> : <p className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>Aucune mission récente attribuée à cet agent.</p>}
-          </motion.div>
+          </Modal.Body>
         )}
-      </AnimatePresence>
+      </Modal>
       {agents.length === 0 && <p className="mt-2 text-center text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Aucun agent exposé pour le moment. Les nœuds apparaîtront après initialisation du registre.</p>}
       {reasoningActive && <div className="mt-2 flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--accent-primary)' }}><Activity size={11}/> Raisonnement Live détecté</div>}
     </section>

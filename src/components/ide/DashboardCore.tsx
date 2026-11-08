@@ -33,7 +33,7 @@ export const DashboardCore = React.memo(function DashboardCore({
 
   return (
     <section
-      className="relative mb-2 grid min-h-0 grid-cols-1 items-stretch gap-3 overflow-hidden rounded-xl border p-2.5 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,2fr)] lg:gap-4 lg:px-4"
+      className="relative mb-2 grid min-h-0 grid-cols-1 items-stretch gap-3 xl:mb-0 xl:h-full xl:grid-rows-[minmax(0,1fr)] overflow-hidden rounded-xl border p-2.5 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,2fr)] lg:gap-4 lg:px-4"
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--border-base))',
         background: 'linear-gradient(115deg, color-mix(in srgb, var(--bg-panel) 96%, var(--accent-primary) 4%), color-mix(in srgb, var(--bg-secondary) 90%, transparent))',
@@ -81,7 +81,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           </div>
         ))}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col rounded-lg border p-2.5" style={{ borderColor: current ? 'var(--accent-primary)' : 'var(--border-base)', background: 'color-mix(in srgb, var(--bg-panel) 80%, transparent)', transition: 'border-color .4s' }}>
+      <div className="dash-scroll flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border p-2.5" style={{ borderColor: current ? 'var(--accent-primary)' : 'var(--border-base)', background: 'color-mix(in srgb, var(--bg-panel) 80%, transparent)', transition: 'border-color .4s' }}>
         <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
           {current ? <Loader2 size={10} className={reduce ? undefined : 'animate-spin'} style={{ color: 'var(--accent-primary)' }}/> : <Clock3 size={10}/>} En ce moment
         </div>
@@ -107,7 +107,7 @@ export const DashboardCore = React.memo(function DashboardCore({
         </div>
       </div>
       </div>
-      <div className="min-w-0"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
+      <div className="min-h-0 min-w-0"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
     </section>
   );
 });
