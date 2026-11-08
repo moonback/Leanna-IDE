@@ -129,7 +129,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
 
   const positions = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
-    const radiusX = 225, radiusY = 112;
+    const radiusX = 205, radiusY = 88;
     visibleAgents.forEach((agent, index) => {
       const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(visibleAgents.length, 1);
       map.set(agent.role, { x: 300 + Math.cos(angle) * radiusX, y: 165 + Math.sin(angle) * radiusY });
@@ -142,10 +142,10 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const totalMessages = messages.length;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border p-3"
+    <section className="mt-2 overflow-hidden rounded-xl border p-2"
       style={{ borderColor: 'var(--border-base)', backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 66%, transparent)' }}
       aria-label="Supervision multi-agents en temps réel">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
             <Activity size={13} style={{ color: 'var(--accent-primary)' }} /> Réseau multi-agents
@@ -162,7 +162,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         </div>
       </div>
 
-      <div className="relative mx-auto h-[285px] max-w-[760px] sm:h-[330px]" role="group" aria-label="Agents sélectionnables et délégations observées">
+      <div className="relative mx-auto h-[205px] max-w-[700px] sm:h-[225px]" role="group" aria-label="Agents sélectionnables et délégations observées">
         <svg viewBox="0 0 600 330" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <radialGradient id="leanna-agent-core"><stop offset="0%" stopColor="var(--accent-primary)" stopOpacity=".28"/><stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/></radialGradient>
@@ -217,7 +217,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
         })}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
         <span className="flex items-center gap-1"><Radio size={11}/> {fleet?.initialized ? 'Registre connecté' : loading ? 'Connexion au registre…' : 'Données partielles / registre indisponible'}</span>
         <span className="flex items-center gap-1"><GitBranch size={11}/> {delegations.length} relation(s) de délégation observée(s)</span>
         {refreshError && <span className="flex items-center gap-1" style={{ color: 'var(--color-error)' }}><CircleAlert size={11}/> Actualisation impossible</span>}
