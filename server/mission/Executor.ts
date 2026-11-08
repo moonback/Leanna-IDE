@@ -737,8 +737,15 @@ export class Executor {
       if (beforeToolCall) this.supervisorWriteHooks.set(mission.id, beforeToolCall);
       // Relay Supervisor cancellation to the actual skills' controller.
       const abortFromSupervisor = () => {
-        mission.cancel("Annulation demandée par le Supervisor (timeout/arrêt).");
-        this.abortMission(mission.id, "Annulation demandée par le Supervisor.");
+        const abortReason = signal?.reason instanceof Error
+          ? signal.reason.message
+          : String(signal?.reason ?? "");
+        // A runner timeout is recoverable once the runner has actually stopped;
+        // an operator cancellation remains terminal and must never be retried.
+        if (!/runner timeout/i.test(abortReason)) {
+          mission.cancel("Annulation demandée par le Supervisor (arrêt externe).");
+        }
+        this.abortMission(mission.id, abortReason || "Annulation demandée par le Supervisor.");
       };
       if (signal?.aborted) abortFromSupervisor();
       else signal?.addEventListener("abort", abortFromSupervisor, { once: true });
@@ -872,7 +879,9 @@ export class Executor {
     //   - un objectif bloqué (escaladé) → escalate ;
     //   - un échec « simple » → replan (changer de stratégie au tour suivant).
     let suggestedRecovery: RecoveryDecision | undefined;
-    if (!allCompleted) {
+    if (mission.status === "cancelled") {
+      suggestedRecovery = "escalate";
+    } else if (!allCompleted) {
       if (anyBlocked) suggestedRecovery = "escalate";
       else if (anyFailed) suggestedRecovery = "replan";
     }
