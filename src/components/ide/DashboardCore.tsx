@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Bot, Power, PowerOff } from 'lucide-react';
+import { Activity, Bot } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { ActivityStep } from '../../hooks/useActivity.js';
 import { DashboardAgentNetwork } from './DashboardAgentNetwork.js';
@@ -8,7 +8,6 @@ interface DashboardCoreProps {
   aiName: string;
   connected: boolean;
   connecting: boolean;
-  onToggleConnection: () => void;
   activity: ActivityStep[];
   isBusy: boolean;
   reasoningActive: boolean;
@@ -16,7 +15,7 @@ interface DashboardCoreProps {
 
 /** Noyau visuel du dashboard : son état est exclusivement dérivé de la session Live réelle. */
 export const DashboardCore = React.memo(function DashboardCore({
-  aiName, connected, connecting, onToggleConnection, activity, isBusy, reasoningActive,
+  aiName, connected, connecting, activity, isBusy, reasoningActive,
 }: DashboardCoreProps) {
   const reduce = !!useReducedMotion();
   const status = connecting ? 'Connexion en cours' : connected ? 'Session connectée' : 'En attente de connexion';
@@ -68,14 +67,10 @@ export const DashboardCore = React.memo(function DashboardCore({
           <div className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>SESSION LIVE</div>
           <div className="text-sm font-semibold" style={{ color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-primary)' }}>{connected ? 'ACTIVE' : connecting ? 'CONNECTING' : 'IDLE'}</div>
         </div>
-        <button type="button" onClick={onToggleConnection} disabled={connecting}
-          className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-50"
-          style={connected
-            ? { borderColor: 'var(--border-base)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)' }
-            : { borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-primary)', color: 'white' }}>
-          {connected ? <PowerOff size={13} /> : <Power size={13} />}
-          {connecting ? 'Connexion…' : connected ? 'Déconnecter' : 'Connecter Leanna'}
-        </button>
+        <div className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-semibold" style={{ borderColor: connected ? 'var(--color-success, #22c55e)' : 'var(--border-base)', backgroundColor: connected ? 'color-mix(in srgb, var(--color-success, #22c55e) 10%, var(--bg-panel))' : 'var(--bg-panel)', color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-muted)' }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 8px ${accent}` }} />
+          {connecting ? 'Connexion…' : connected ? 'Session active' : 'Session hors ligne'}
+        </div>
       </div>
       <div className="min-w-0 lg:col-start-2 lg:row-span-2"><DashboardAgentNetwork activity={activity} reasoningActive={reasoningActive} isBusy={isBusy} /></div>
     </section>
