@@ -43,6 +43,8 @@ export default function ContextIntelligenceView() {
   const [memoryResults, setMemoryResults] = useState<Fact[] | null>(null);
   const [memorySearching, setMemorySearching] = useState(false);
   const [relations, setRelations] = useState<GraphRelation[]>([]);
+  const [graphQuery, setGraphQuery] = useState('');
+  const [graphRelationType, setGraphRelationType] = useState('all');
   const [loadingRelations, setLoadingRelations] = useState(false);
   const [context, setContext] = useState<ContextResult | null>(null);
   const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
@@ -145,6 +147,14 @@ export default function ContextIntelligenceView() {
   const memoryHealthScore = context
     ? Math.round(Math.max(0, Math.min(1, context.health.freshness)) * 50 + Math.max(0, Math.min(1, context.batch.quality.averageConfidence)) * 50)
     : null;
+  const relationTypes = [...new Set(relations.map(relation => relation.relationType))].sort();
+  const visibleRelations = relations
+    .filter(relation => graphRelationType === 'all' || relation.relationType === graphRelationType)
+    .filter(relation => {
+      const term = graphQuery.trim().toLocaleLowerCase();
+      return !term || [relation.source.name, relation.source.filePath, relation.target.name, relation.target.filePath, relation.relationType].join(' ').toLocaleLowerCase().includes(term);
+    })
+    .sort((a, b) => b.confidence - a.confidence);
   const duplicateGroups = (() => {
     const groups = new Map<string, Fact[]>();
     for (const fact of facts) {
@@ -236,9 +246,19 @@ export default function ContextIntelligenceView() {
           </div>}
 
           {tab === 'graph' && <div className="space-y-3">
-            <div className="rounded-xl border p-4" style={panelStyle}><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>KnowledgeGraph — relations indexées</h3><span className="text-xs" style={mutedStyle}>{relations.length} relations chargées</span></div><p className="mt-1 text-xs" style={mutedStyle}>Données issues de GET /api/knowledge/relations, limitées aux 100 premières relations par l'API.</p></div>
-            {loadingRelations ? <p className="text-xs" style={mutedStyle}>Chargement du graphe…</p> : relations.map((relation, index) => <div key={relation.source.filePath + ':' + relation.source.name + ':' + relation.target.filePath + ':' + index} className="rounded-lg border p-3 text-xs" style={panelStyle}><div className="flex flex-wrap items-center gap-2"><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.source.name}</span><span style={mutedStyle}>— {relation.relationType} →</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.target.name}</span><span className="ml-auto" style={mutedStyle}>{Math.round(relation.confidence * 100)}%</span></div><div className="mt-1 break-all font-mono text-[10px]" style={mutedStyle}>{relation.source.filePath} → {relation.target.filePath}</div></div>)}
-            {!loadingRelations && relations.length === 0 && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Aucune relation indexée disponible.</p>}
+            <div className="rounded-xl border p-4" style={panelStyle}>
+              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>KnowledgeGraph — relations indexées</h3><span className="text-xs tabular-nums" style={mutedStyle}>{visibleRelations.length} / {relations.length} relations</span></div>
+              <p className="mt-1 text-xs" style={mutedStyle}>Relations réelles issues de GET /api/knowledge/relations, limitées par l'API. Triées par confiance décroissante.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input value={graphQuery} onChange={event => setGraphQuery(event.target.value)} placeholder="Rechercher une entité ou un chemin…" aria-label="Rechercher dans le graphe" className="min-w-0 rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}/>
+                <select value={graphRelationType} onChange={event => setGraphRelationType(event.target.value)} aria-label="Filtrer par type de relation" className="rounded-lg border px-3 py-2 text-xs" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+                  <option value="all">Tous les types</option>
+                  {relationTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </div>
+            </div>
+            {loadingRelations ? <p className="text-xs" style={mutedStyle}>Chargement du graphe…</p> : visibleRelations.map((relation, index) => <div key={relation.source.filePath + ':' + relation.source.name + ':' + relation.target.filePath + ':' + index} className="rounded-lg border p-3 text-xs" style={panelStyle}><div className="flex flex-wrap items-center gap-2"><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.source.name}</span><span className="rounded-md px-2 py-1 text-[10px]" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{relation.relationType}</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{relation.target.name}</span><span className="ml-auto tabular-nums" style={mutedStyle}>{Math.round(relation.confidence * 100)}%</span></div><div className="mt-2 break-all font-mono text-[10px]" style={mutedStyle}>{relation.source.filePath} → {relation.target.filePath}</div></div>)}
+            {!loadingRelations && visibleRelations.length === 0 && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Aucune relation ne correspond à ces filtres.</p>}
           </div>}
 
           {tab === 'alerts' && <div className="space-y-2">{(context?.health.warnings ?? []).map((warning, index) => <div key={index} className="flex gap-2 rounded-lg border p-3 text-xs" style={{ ...panelStyle, color: 'var(--color-warning)' }}><AlertTriangle size={14}/>{warning}</div>)}{(!context || context.health.warnings.length === 0) && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>{context ? 'Aucune alerte remontée par le diagnostic de santé.' : 'Les alertes apparaîtront après une inspection.'}</p>}</div>}
