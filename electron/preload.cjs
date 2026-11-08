@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openOrbWindow: () =>
     ipcRenderer.invoke('electron/open-orb-window'),
 
+  // Ouvre la fenêtre dédiée « Réseau multi-agents » sur /agents-live
+  // (pensée pour un second écran : supervision des agents en temps réel).
+  openAgentNetworkWindow: () =>
+    ipcRenderer.invoke('electron/open-agent-network-window'),
+
   // Relaie une action de la fenêtre orb vers la fenêtre IDE principale.
   //   name   : nom de l'événement (ex: 'Leanna-action')
   //   detail : charge utile de l'événement

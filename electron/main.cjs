@@ -535,6 +535,49 @@ app.whenReady().then(() => {
     return true;
   });
 
+  // ── Fenêtre dédiée « Réseau multi-agents » (second écran) ──────────────────
+  // Ouvre une vraie fenêtre Electron sur la route /agents-live. Les données
+  // viennent du serveur partagé (/api/agents/*), la fenêtre reste donc
+  // synchronisée avec l'IDE. Fenêtre unique : si elle existe déjà, on la
+  // ramène au premier plan au lieu d'en créer une seconde.
+  let agentNetworkWindow = null;
+  handleTrusted('electron/open-agent-network-window', function () {
+    if (agentNetworkWindow && !agentNetworkWindow.isDestroyed()) {
+      if (agentNetworkWindow.isMinimized()) agentNetworkWindow.restore();
+      agentNetworkWindow.focus();
+      return true;
+    }
+
+    agentNetworkWindow = new BrowserWindow({
+      width: 1100,
+      height: 760,
+      minWidth: 560,
+      minHeight: 420,
+      show: false,
+      title: 'Leanna — Réseau multi-agents',
+      backgroundColor: '#09090b',
+      autoHideMenuBar: true,
+      icon: getWindowIcon(),
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+        preload: path.join(__dirname, 'preload.cjs'),
+      },
+    });
+
+    const port = process.env.VITE_SERVER_PORT || 4000;
+    const base = process.env.ELECTRON_START_URL || `http://127.0.0.1:${port}`;
+    loadAppUrl(agentNetworkWindow, `${base}/agents-live`);
+
+    agentNetworkWindow.webContents.on('did-finish-load', () => {
+      if (agentNetworkWindow && !agentNetworkWindow.isDestroyed()) agentNetworkWindow.show();
+    });
+    agentNetworkWindow.on('closed', () => { agentNetworkWindow = null; });
+
+    return true;
+  });
+
   // ── Pont inter-fenêtres : relaie une action depuis la fenêtre orb vers l'IDE ──
   // La fenêtre orb a sa propre session live ; quand l'assistant y déclenche une
   // action IDE (ouvrir un fichier, naviguer, piloter le navigateur…), on la

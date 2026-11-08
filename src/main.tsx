@@ -42,6 +42,7 @@ const DocumentsView = lazy(() => import('./views/DocumentsView.js'));
 const NotebooksView = lazy(() => import('./views/NotebooksView.js'));
 const ObservabilityView = lazy(() => import('./views/ObservabilityView.js'));
 const OrbLiveView = lazy(() => import('./views/OrbLiveView.js'));
+const AgentsLiveView = lazy(() => import('./views/AgentsLiveView.js'));
 // Typographie : Arial (police système) — aucun fichier de police à charger.
 import './index.css';
 import { dedupKeyFor } from './lib/fetchDedup.js';
@@ -766,13 +767,31 @@ function OrbLiveWindow() {
 }
 
 /**
- * AppRoot — Aiguille entre l'application complète (Layout) et la fenêtre orb
- * dédiée selon le chemin courant. La fenêtre /orb-live ne doit PAS monter le
- * Layout global (sidebar, routes, orb flottant) : c'est une surface isolée.
+ * AgentsLiveWindow — Racine autonome pour la fenêtre dédiée « Réseau
+ * multi-agents » (/agents-live), pensée pour un second écran.
+ *
+ * Surface isolée : pas de sidebar ni de Layout global, seulement le panneau
+ * réseau plein écran. Les données arrivent du serveur partagé, la fenêtre reste
+ * donc synchronisée avec l'IDE sans partager son état React.
+ */
+function AgentsLiveWindow() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <AgentsLiveView />
+    </Suspense>
+  );
+}
+
+/**
+ * AppRoot — Aiguille entre l'application complète (Layout) et les fenêtres
+ * dédiées selon le chemin courant. Les fenêtres /orb-live et /agents-live ne
+ * doivent PAS monter le Layout global (sidebar, routes, orb flottant) : ce sont
+ * des surfaces isolées.
  */
 function AppRoot() {
   const { pathname } = useLocation();
   if (pathname === '/orb-live') return <OrbLiveWindow />;
+  if (pathname === '/agents-live') return <AgentsLiveWindow />;
   return <Layout />;
 }
 

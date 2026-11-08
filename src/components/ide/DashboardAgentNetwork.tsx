@@ -1,13 +1,10 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Activity, Atom, Bot, Check, CheckCircle2, CircleAlert, Clock3, GitBranch, LayoutGrid, ListFilter, Loader2, Maximize2, Minimize2, Network, Orbit, Pause, Play, Radio, Zap } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Activity, Bot, Check, CheckCircle2, CircleAlert, Clock3, ExternalLink, GitBranch, LayoutGrid, ListFilter, Loader2, Maximize2, Minimize2, Network, Orbit, Pause, Play, Radio, Zap } from 'lucide-react';
 import { AnimatePresence, motion, useAnimationFrame, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from 'motion/react';
 import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
 import { createPortal } from 'react-dom';
 import { Modal } from '../ui/index.js';
 import type { ActivityStep } from '../../hooks/useActivity.js';
-
-// three.js n'est téléchargé qu'à l'affichage de la vue Sphères 3D.
-const AgentNetworkWebGL = React.lazy(() => import('./AgentNetworkWebGL.js'));
 
 interface AgentStat {
   role: string;
@@ -41,8 +38,21 @@ interface DashboardAgentNetworkProps {
   activity: ActivityStep[];
   reasoningActive: boolean;
   isBusy: boolean;
+  /** Vrai lorsque le panneau est rendu dans sa fenêtre détachée (/agents-live). */
+  standalone?: boolean;
 }
 type Tab = 'network' | 'activity' | 'delegations';
+
+/** Ouvre le réseau multi-agents dans une fenêtre dédiée (second écran).
+ *  En Electron : vraie BrowserWindow via IPC ; en web : repli sur un onglet. */
+function openDetachedAgentNetwork(): void {
+  const api = (window as unknown as { electronAPI?: { openAgentNetworkWindow?: () => Promise<unknown> } }).electronAPI;
+  if (api?.openAgentNetworkWindow) {
+    void api.openAgentNetworkWindow();
+  } else {
+    window.open('/agents-live', '_blank', 'noopener,noreferrer,width=1100,height=760');
+  }
+}
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'Disponible', busy: 'En exécution', overloaded: 'Surchargé', offline: 'Hors ligne',
@@ -81,7 +91,7 @@ function agentSlot(index: number): { x: number; y: number } {
   return { x: CX + side * (slot < 3 ? 215 : 385), y: 60 + [1, 0, 2][slot % 3] * 120 };
 }
 
-type View = 'webgl' | 'orbit' | 'grid';
+type View = 'orbit' | 'grid';
 type Filter = 'all' | 'active' | 'idle' | 'offline';
 const FILTER_LABEL: Record<Filter, string> = { all: 'Tous les agents', active: 'En exécution / file', idle: 'Disponibles', offline: 'Hors ligne' };
 const RX = 330, RY = 118;
@@ -170,7 +180,7 @@ function OrbitLink({ angle, index, count, busy, highlighted, reduce }: { angle: 
 
 /** Supervision visuelle alimentée par le registre, le bus et le store de missions temps réel. */
 export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
-  activity, reasoningActive, isBusy,
+  activity, reasoningActive, isBusy, standalone = false,
 }: DashboardAgentNetworkProps) {
   const reduce = !!useReducedMotion();
   const tasks = useSyncExternalStore(subscribe, getAgentTasks);
@@ -181,9 +191,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const [refreshError, setRefreshError] = useState(false);
   const [tab, setTab] = useState<Tab>('network');
   const [focus, setFocus] = useState(false);
-  const [view, setView] = useState<View>('webgl');
-  const [webglFailed, setWebglFailed] = useState(false);
-  const onWebglUnavailable = useCallback(() => { setWebglFailed(true); setView('orbit'); }, []);
+  const [view, setView] = useState<View>('orbit');
   const [filter, setFilter] = useState<Filter>('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [hoverRole, setHoverRole] = useState<string | null>(null);
@@ -320,7 +328,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const rotateX = useSpring(tiltX, { stiffness: 120, damping: 18 });
   const rotateY = useSpring(tiltY, { stiffness: 120, damping: 18 });
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (reduce || view === 'webgl') return;
+    if (reduce) return;
     const rect = event.currentTarget.getBoundingClientRect();
     tiltY.set(((event.clientX - rect.left) / rect.width - 0.5) * 8);
     tiltX.set(-((event.clientY - rect.top) / rect.height - 0.5) * 6);
@@ -334,9 +342,12 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   ];
 
   const content = (
-    <section className={focus ? 'fixed inset-0 z-[80] flex flex-col overflow-hidden border-0 p-4 sm:p-6' : 'relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-2'}
+    <section className={
+      standalone ? 'relative flex h-full min-h-0 flex-col overflow-hidden border-0 p-4 sm:p-6'
+        : focus ? 'fixed inset-0 z-[80] flex flex-col overflow-hidden border-0 p-4 sm:p-6'
+        : 'relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-2'}
       style={{ borderColor: orchestrating ? 'color-mix(in srgb, var(--accent-primary) 55%, var(--border-base))' : 'var(--border-base)',
-        backgroundColor: focus ? 'var(--bg)' : 'color-mix(in srgb, var(--bg-secondary) 66%, transparent)', backdropFilter: 'blur(12px)',
+        backgroundColor: focus || standalone ? 'var(--bg)' : 'color-mix(in srgb, var(--bg-secondary) 66%, transparent)', backdropFilter: 'blur(12px)',
         boxShadow: orchestrating ? '0 0 24px color-mix(in srgb, var(--accent-primary) 18%, transparent)' : undefined, transition: 'border-color .5s, box-shadow .5s' }}
       role={focus ? 'dialog' : undefined} aria-modal={focus || undefined}
       aria-label="Supervision multi-agents en temps réel">
@@ -354,12 +365,22 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
           <span className="rounded-full px-2 py-1" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{agents.length} agents</span>
           <span style={{ color: failedTasks ? 'var(--color-error)' : 'var(--text-dimmed)' }}>{failedTasks} alertes</span>
           <span style={{ color: 'var(--text-dimmed)' }}>{messages.length} messages · {activity.length} outils Live</span>
-          <button type="button" onClick={() => setFocus(value => !value)} aria-pressed={focus}
-            aria-label={focus ? 'Quitter le plein écran (Échap)' : 'Afficher le réseau en plein écran'} title={focus ? 'Quitter le plein écran (Échap)' : 'Plein écran'}
-            className="rounded-md border p-1 focus-visible:outline focus-visible:outline-2"
-            style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
-            {focus ? <Minimize2 size={12}/> : <Maximize2 size={12}/>}
-          </button>
+          {!standalone && (
+            <button type="button" onClick={openDetachedAgentNetwork}
+              aria-label="Détacher le réseau dans une fenêtre dédiée (second écran)" title="Détacher sur un second écran"
+              className="rounded-md border p-1 focus-visible:outline focus-visible:outline-2"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              <ExternalLink size={12}/>
+            </button>
+          )}
+          {!standalone && (
+            <button type="button" onClick={() => setFocus(value => !value)} aria-pressed={focus}
+              aria-label={focus ? 'Quitter le plein écran (Échap)' : 'Afficher le réseau en plein écran'} title={focus ? 'Quitter le plein écran (Échap)' : 'Plein écran'}
+              className="rounded-md border p-1 focus-visible:outline focus-visible:outline-2"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              {focus ? <Minimize2 size={12}/> : <Maximize2 size={12}/>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -380,7 +401,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
       {tab === 'network' && (
         <div className="mb-1 flex items-center gap-1" role="toolbar" aria-label="Contrôles du réseau">
           <div className="flex rounded-md border p-0.5" style={{ borderColor: 'var(--border-base)' }} role="group" aria-label="Disposition">
-            {([['webgl', 'Sphères 3D', Atom], ['orbit', 'Orbite', Orbit], ['grid', 'Grille', LayoutGrid]] as const).filter(([id]) => id !== 'webgl' || !webglFailed).map(([id, label, Icon]) => (
+            {([['orbit', 'Orbite', Orbit], ['grid', 'Grille', LayoutGrid]] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} title={label}
                 className="relative flex items-center gap-1 rounded px-1.5 py-1 text-[10px] focus-visible:outline focus-visible:outline-2"
                 style={{ color: view === id ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
@@ -437,21 +458,9 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
           <motion.div key="network" id="agent-panel-network" role="tabpanel" aria-labelledby="agent-tab-network"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .15 }}
             className="flex min-h-0 flex-1 flex-col">
-            <div className={`relative mx-auto w-full ${focus ? 'min-h-0 flex-1 max-w-none' : 'h-[250px] max-w-[900px] sm:h-[285px] xl:h-auto xl:min-h-[230px] xl:flex-1'}`}
+            <div className={`relative mx-auto w-full ${focus || standalone ? 'min-h-0 flex-1 max-w-none' : 'h-[250px] max-w-[900px] sm:h-[285px] xl:h-auto xl:min-h-[230px] xl:flex-1'}`}
               style={{ perspective: 1100 }} onPointerMove={onPointerMove} onPointerLeave={resetTilt}
               role="group" aria-label="Agents sélectionnables et délégations observées">
-              {view === 'webgl' ? (
-                <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-[11px]" style={{ color: 'var(--text-muted)' }}><Loader2 size={14} className="mr-2 animate-spin"/> Chargement de la scène 3D…</div>}>
-                  <AgentNetworkWebGL
-                    agents={visibleAgents.map(agent => {
-                      const current = runningTaskByRole.get(agent.role);
-                      return { role: agent.role, name: agent.name, status: agent.status, busy: agent.runningTasks > 0,
-                        caption: current ? (current.progress?.label || current.title) : (STATUS_LABEL[agent.status] ?? agent.status) };
-                    })}
-                    selectedRole={selectedRole} hoverRole={hoverRole} orchestrating={orchestrating} paused={userPaused} reduce={reduce}
-                    onSelect={selectAgent} onHover={setHoverRole} onUnavailable={onWebglUnavailable}/>
-                </Suspense>
-              ) : (
               <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}>
                 {/* Sol holographique incliné : grille + orbites, purement décoratif. */}
                 <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 h-[150%] w-[110%]"
@@ -562,7 +571,6 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
                   </p>
                 )}
               </motion.div>
-              )}
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
               <span className="flex items-center gap-1"><Radio size={11}/> {fleet?.initialized ? 'Registre connecté' : loading ? 'Connexion au registre…' : 'Données partielles / registre indisponible'}</span>
