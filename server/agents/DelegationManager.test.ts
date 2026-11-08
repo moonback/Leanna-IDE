@@ -9,6 +9,8 @@ import {
   delegationManager,
 } from "./DelegationManager.js";
 import { selectDelegationContext } from "./AgentCommunication.js";
+import { AgentContextResolver } from "./AgentContextResolver.js";
+import type { AgentTask } from "./types.js";
 
 describe("DelegationManager", () => {
   let manager: DelegationManager;
@@ -224,5 +226,56 @@ describe("selectDelegationContext — transmission sélective", () => {
     assert.ok(Array.isArray(selected.previousResults));
     assert.ok((selected.previousResults as unknown[]).length > 0);
     assert.equal((selected._contextHandoff as { truncated: boolean }).truncated, true);
+  });
+});
+
+
+describe("AgentContextResolver — sélection par rôle et mission", () => {
+  const resolver = new AgentContextResolver(async () => ({ status: "success", files: [] }));
+  const task = (role: string, title: string, description = "") => ({
+    id: "context-test",
+    role,
+    title,
+    description,
+    priority: "medium",
+    status: "pending",
+    context: { files: [], instructions: "" },
+    createdAt: new Date(0).toISOString(),
+  }) as AgentTask;
+
+  it("priorise les tests pour un agent tester sans imposer les fichiers génériques", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "README.md",
+      "src/components/Button.tsx",
+      "src/components/Button.test.tsx",
+      "server/auth/PermissionPolicy.ts",
+      "server/auth/PermissionPolicy.test.ts",
+    ], task("tester", "Vérifier les tests de Button"));
+
+    assert.equal(selected[0], "src/components/Button.test.tsx");
+    assert.ok(selected.includes("server/auth/PermissionPolicy.test.ts"));
+  });
+
+  it("priorise le domaine sécurité pour un agent security", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "src/dashboard/Dashboard.tsx",
+      "server/auth/PermissionPolicy.ts",
+      "server/auth/PermissionPolicy.test.ts",
+      "server/runtime/ToolRegistry.ts",
+    ], task("security", "Auditer les permissions et les contrôles d'accès"));
+
+    assert.ok(selected.indexOf("server/auth/PermissionPolicy.ts") < selected.indexOf("src/dashboard/Dashboard.tsx"));
+  });
+
+  it("conserve les chemins explicitement mentionnés en tête", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "server/runtime/ToolRegistry.ts",
+      "server/auth/PermissionPolicy.ts",
+    ], task("coder", "Modifier le registre"), ["server/runtime/ToolRegistry.ts"]);
+
+    assert.equal(selected[0], "server/runtime/ToolRegistry.ts");
   });
 });
