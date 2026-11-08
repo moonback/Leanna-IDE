@@ -45,7 +45,7 @@ export class ContextIntelligenceEngine {
       else if (fact.confidence < config.minimumKeepConfidence) { decision = "verify"; reasons.push("Confiance sous le seuil de conservation sans vérification."); }
       else if (source && input.workspaceFiles.has(source)) { decision = "transmit"; reasons.push("Source présente dans le workspace ; injection à condition que la mission soit pertinente."); }
       else reasons.push("Fait conservé ; aucune preuve suffisante pour le déclasser.");
-      assessments.push({ factId: fact.id, decision, confidence: fact.confidence, reasons }); assigned.add(fact.id);
+      assessments.push({ factId: fact.id, decision, confidence: fact.confidence, reasons });
     }
     const learningCandidates = (input.missions ?? [])
       .filter((m) => m.overallSuccess && m.verificationPassed && m.evidenceIds.length > 0 && m.summary.trim().length >= 30)
