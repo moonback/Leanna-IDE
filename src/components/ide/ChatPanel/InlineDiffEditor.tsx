@@ -21,7 +21,7 @@ function isTestFile(p: string): boolean {
 // ÉDITABLE). L'utilisateur peut ajuster la proposition puis l'appliquer en un
 // clic (écriture via ideApi.saveFile) ou l'écarter.
 //
-// Réutilise le motif de chargement paresseux de Monaco (bundlé, pas de CDN)
+// Charge CodeMirror à la demande (bundlé, pas de CDN)
 // et la discipline de disposition des modèles de MarkdownPromptDiff / DiffViewer.
 // ═══════════════════════════════════════════════════════════════════════════
 
