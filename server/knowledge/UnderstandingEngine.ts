@@ -787,12 +787,18 @@ export class UnderstandingEngine {
     let remaining = Math.max(0, charBudget - batch.query.length - (batch.primaryFile?.length ?? 0) - 120);
 
     const categoryPriority: Record<string, number> = {
-      decision: 5,
-      constraint: 5,
-      architecture: 4,
+      decision: 7,
+      security: 7,
+      architecture: 6,
+      convention: 5,
+      "known-bug": 5,
+      workflow: 4,
+      api: 4,
+      stack: 4,
+      module: 3,
       pattern: 3,
-      bug: 3,
-      todo: 2,
+      refactoring: 2,
+      todo: 1,
     };
     const rankedFacts = [...batch.facts].sort((a, b) => {
       const aPriority = (a.isStructural ? 10 : 0) + (categoryPriority[a.category] ?? 1) * 2 + a.confidence;
