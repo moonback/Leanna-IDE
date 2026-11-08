@@ -40,7 +40,7 @@ export function resolveAdaptiveMemoryBudget(role: string, query: string, phase?:
 export function detectMemoryConflicts(facts: Array<{ content: string; category?: string; sourceFile?: string }>): Array<Record<string, unknown>> {
   const polarity = (value: string): number => {
     const text = value.toLowerCase();
-    const negative = /\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\\s+pas|jamais|désactivé|desactive)\b/.test(text);
+    const negative = /\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\s+pas|jamais|désactivé|desactive)\b/.test(text);
     const positive = /\b(yes|always|must|enable[ds]?|allow(?:ed)?|required|autorisé|obligatoire|activé|active)\b/.test(text);
     return negative ? -1 : positive ? 1 : 0;
   };
@@ -195,11 +195,11 @@ export class AgentContextResolver {
       fact.confidence >= 0.35 && (ageDays === null || ageDays <= maxAgeDays || fact.isStructural)
     ).sort((a, b) => b.score - a.score);
 
-    const selectedSet = new Set(selectedFiles.map((file) => file.replace(/\\\\/g, "/")));
+    const selectedSet = new Set(selectedFiles.map((file) => file.replace(/\\/g, "/")));
     const graphRelations = selectedFiles.slice(0, 8).map((file) => {
-      const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\\\/g, "/"))
+      const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
-      const dependents = knowledgeGraph.getDependents(file).map((item) => item.replace(/\\\\/g, "/"))
+      const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
       return { file, dependencies, dependents };
     }).filter((item) => item.dependencies.length > 0 || item.dependents.length > 0);
