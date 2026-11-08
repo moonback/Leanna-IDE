@@ -79,6 +79,9 @@ export type {
 // Sprint 2 — DependencyGraph
 export { DependencyGraph, dependencyGraph } from "./DependencyGraph.js";
 
+// Context Intelligence Engine v3 — advisory memory lifecycle and evidence-gated learning
+export { ContextIntelligenceEngine, type ContextIntelligenceReport, type ContextFactAssessment, type ContextIntelligenceOptions, type MemoryDecision, type VerifiedMissionLearning, type LearningCandidate } from "./ContextIntelligenceEngine.js";
+
 // Sprint 3 — ProjectMemory
 export { ProjectMemory, projectMemory } from "./ProjectMemory.js";
 

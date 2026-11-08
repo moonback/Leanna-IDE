@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  Activity, AudioLines, BookOpen, Bot, CalendarClock, ChevronDown, Coins, Cpu, FilePlus, GitBranch,
+  Activity, AudioLines, BookOpen, Bot, CalendarClock, Coins, Cpu, FilePlus, GitBranch,
   History, ListChecks, Loader2, Mail, Maximize2, MessageSquare, Mic, MicOff, Moon, MoreHorizontal, Search, Settings, Command,
   Sparkles, Timer, Workflow, CheckCircle2, XCircle, KeyRound, Power, PowerOff, RefreshCw, Sun,
 } from 'lucide-react';
@@ -926,7 +926,6 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [immersiveMode, setImmersiveMode] = useState(false);
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
 
@@ -956,12 +955,6 @@ export const EditorDashboard = React.memo(function EditorDashboard({
     });
     setDraggedSection(null);
   }, [draggedSection]);
-
-  const resetLayout = useCallback(() => {
-    setSectionOrder(DEFAULT_SECTION_ORDER);
-    setDraggedSection(null);
-    try { window.localStorage.removeItem('leanna.dashboard.section-order'); } catch { /* stockage facultatif */ }
-  }, []);
 
   // Connexion seule : le chat reste fermé (bouton « Ouvrir le chat » séparé).
   const handleConnect = useCallback(() => {

@@ -79,7 +79,7 @@ describe('MissionPanel', () => {
 
     await user.click(screen.getByRole('tab', { name: /terminées/ }));
     expect(screen.getByText('Indexation interrompue')).toBeInTheDocument();
-    expect(screen.queryByText('État futur')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('État futur')).not.toBeInTheDocument());
   });
 
   it('montre la dernière erreur et l’auto-évaluation, puis relance la mission', async () => {

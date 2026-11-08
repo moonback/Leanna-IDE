@@ -21,6 +21,12 @@ type EmailConfig = {
   personalSendEnabled: boolean;
 };
 
+function toIsoDate(value?: Date | string | null): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
 const MAX_RESULTS = 50;
 const MAX_BODY_CHARS = 100_000;
 const GMAIL_SERVERS: MailServerSettings = {
@@ -329,7 +335,7 @@ export class GmailService {
             from: formatAddress(message.envelope?.from),
             to: formatAddress(message.envelope?.to),
             subject: message.envelope?.subject || "(sans objet)",
-            date: message.internalDate?.toISOString() || message.envelope?.date?.toISOString() || "",
+            date: toIsoDate(message.internalDate) || toIsoDate(message.envelope?.date),
             snippet: "",
             unread: !message.flags?.has("\\Seen"),
           })),
@@ -355,7 +361,7 @@ export class GmailService {
         const message = await client.fetchOne(Number(messageId), {
           uid: true, envelope: true, internalDate: true, flags: true, source: true,
         }, { uid: true });
-        if (!message?.source) throw new Error("E-mail introuvable dans la boîte de réception.");
+        if (!message || !message.source) throw new Error("E-mail introuvable dans la boîte de réception.");
         if (message.source.length > 25 * 1024 * 1024) throw new Error("E-mail trop volumineux pour être lu dans Leanna (limite : 25 Mo).");
         const parsed = await simpleParser(message.source);
         return {
@@ -365,7 +371,7 @@ export class GmailService {
           to: (parsed.to as any)?.text || formatAddress(message.envelope?.to),
           cc: (parsed.cc as any)?.text || "",
           subject: parsed.subject || "(sans objet)",
-          date: parsed.date?.toISOString() || message.internalDate?.toISOString() || "",
+          date: toIsoDate(parsed.date) || toIsoDate(message.internalDate),
           snippet: parsed.text?.slice(0, 240) || "",
           body: (parsed.text || parsed.html || "").slice(0, MAX_BODY_CHARS),
           attachments: parsed.attachments.map(item => ({
