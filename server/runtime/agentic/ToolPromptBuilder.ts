@@ -97,6 +97,27 @@ const RECENT_TURNS_FULL_FIDELITY = 2;
 const RECENT_RESULT_CHARS = 8_000;
 const OLD_RESULT_CHARS = 400;
 
+/**
+ * Budget d'historique par phase (en caractères, pas en tokens).
+ * Les diagnostics de vérification/récupération disposent d'une réserve plus
+ * large ; la découverte reste volontairement compacte. Estimation indicative:
+ * ~4 caractères/token, variable selon langue et code.
+ */
+export const OBSERVATION_HISTORY_BUDGETS: Readonly<Record<string, number>> = {
+  discovery: 8_000,
+  write: 12_000,
+  verify: 16_000,
+  recovery: 18_000,
+};
+
+export function resolveObservationHistoryBudget(phase: string): number {
+  return OBSERVATION_HISTORY_BUDGETS[phase] ?? 10_000;
+}
+
+export function estimateTokensFromChars(chars: number): number {
+  return Math.ceil(Math.max(0, chars) / 4);
+}
+
 /** Clés rendues en premier : statut, erreur et diagnostic structuré d'abord. */
 const PRIORITY_KEYS = [
   "status", "ok", "success", "error", "message", "path", "exitCode",
