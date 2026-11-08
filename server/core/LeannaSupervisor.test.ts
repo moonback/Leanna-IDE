@@ -599,8 +599,8 @@ test("unknown side effects in the execution ledger force escalation without repl
   };
 
   const result = await sup.runMission({ missionId: "m-unknown-effect", goal: "send once", runner });
-  assert.equal(result.finalState, "ESCALATED");
-  assert.equal(attempts, 1, "unknown external side effects must never be blindly replayed");
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(attempts, 0, "quarantine must prevent the runner from replaying an uncertain effect");
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
