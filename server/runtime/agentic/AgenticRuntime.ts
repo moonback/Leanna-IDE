@@ -603,7 +603,7 @@ export class AgenticRuntime implements IAgentRuntime {
       .join("\n");
 
     const response = await this.callLLM(agent, planPrompt);
-    this.accountCost(session, response);
+    this.accountCost(session, response, planPrompt);
 
     const parsed = parseJsonObject(response.text);
     const rawSteps = Array.isArray(parsed?.steps) ? parsed!.steps : [];
@@ -669,7 +669,7 @@ export class AgenticRuntime implements IAgentRuntime {
     session.pendingInstruction = undefined;
 
     const response = await this.callLLM(agent, stepPrompt, systemPrompt);
-    this.accountCost(session, response);
+    this.accountCost(session, response, stepPrompt, systemPrompt);
     const text = response.text.trim();
 
     const calls = extractToolCalls(text);
@@ -1185,7 +1185,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
     try {
       const response = await this.callLLM(agent, finalPrompt);
-      this.accountCost(session, response);
+      this.accountCost(session, response, finalPrompt);
       const parsed = parseJsonObject(response.text);
       if (parsed) {
         final = {
@@ -1249,7 +1249,10 @@ export class AgenticRuntime implements IAgentRuntime {
     });
   }
 
-  private accountCost(session: RunSession, response: GenerateTextResult): void {
+  private accountCost(session: RunSession, response: GenerateTextResult, prompt = "", systemPrompt = ""): void {
+    session.usage.promptChars += prompt.length;
+    session.usage.systemPromptChars += systemPrompt.length;
+    session.usage.promptCalls += 1;
     const usage = response.tokenUsage;
     const cost = usage ? usage.totalTokens / 1000 : 1; // ~1 unité si non renseigné
     session.usage.cost += cost;
@@ -1640,6 +1643,9 @@ function buildExecutionTrace(plan: Plan, session: RunSession): ExecutionTrace {
       recoveryCalls: usage.recoveryCalls,
       tokens: usage.tokens,
       unmeasuredLlmCalls: usage.unmeasuredLlmCalls,
+      promptChars: usage.promptChars,
+      systemPromptChars: usage.systemPromptChars,
+      promptCalls: usage.promptCalls,
     },
     recoveries: session.recoveries.length,
     replans: session.replans,
