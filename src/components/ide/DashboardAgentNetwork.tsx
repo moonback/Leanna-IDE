@@ -348,7 +348,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               <Loader2 size={9} className={reduce ? undefined : 'animate-spin'}/> {runningTasks || 1} en exécution
             </span>}
           </div>
-          <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>Registre · missions temps réel · délégations observées sur le bus</p>
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>Registre · missions temps réel · délégations observées sur le bus</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 font-mono text-[10px]">
           <span className="rounded-full px-2 py-1" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{agents.length} agents</span>
@@ -564,7 +564,7 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               </motion.div>
               )}
             </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px]" style={{ color: 'var(--text-dimmed)' }}>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]" style={{ color: 'var(--text-dimmed)' }}>
               <span className="flex items-center gap-1"><Radio size={11}/> {fleet?.initialized ? 'Registre connecté' : loading ? 'Connexion au registre…' : 'Données partielles / registre indisponible'}</span>
               {agents.length > MAX_NODES && <span>{visibleAgents.length} agents affichés sur {agents.length} (les agents actifs sont toujours visibles)</span>}
               <span className="flex items-center gap-1"><GitBranch size={11}/> {delegations.length} relation(s) de délégation</span>
