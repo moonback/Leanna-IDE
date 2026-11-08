@@ -34,13 +34,13 @@ export interface InlineDiffEditorProps {
   path: string;
   /** Contenu proposé par l'assistante. */
   proposed: string;
-  /** Langage pour la coloration Monaco (déduit du chemin si absent). */
+  /** Langage pour la coloration CodeMirror (déduit du chemin si absent). */
   language?: string;
   /** Notifie le parent après application réussie (ex. toast / changelog). */
   onApplied?: (path: string) => void;
 }
 
-/** Détecte le thème clair de l'app pour accorder Monaco (défaut : sombre). */
+/** Détecte le thème clair de l'app pour accorder le comparateur (défaut : sombre). */
 function isLightTheme(): boolean {
   if (typeof document === 'undefined') return false;
   const t = document.documentElement.dataset.theme;
