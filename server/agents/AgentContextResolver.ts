@@ -169,7 +169,7 @@ export class AgentContextResolver {
       if (role === "tester" && /test|spec|__tests__/.test(lower)) relevance += 12;
       if (role === "security" && /security|permission|auth|policy|guard|sandbox/.test(lower)) relevance += 10;
       if (role === "ui_ux" && /components|pages|styles|\.tsx$|\.css$/.test(lower)) relevance += 8;
-      if (role === "documentation" && /\.md$|^docs\\//.test(lower)) relevance += 8;
+      if (role === "documentation" && /\.md$|^docs\//.test(lower)) relevance += 8;
       return explicitBase + structuralBase + relevance;
     };
 
