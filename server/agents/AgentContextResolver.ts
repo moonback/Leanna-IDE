@@ -108,8 +108,14 @@ export class AgentContextResolver {
     return [...new Set(matches)];
   }
 
-  /** Conserve les fichiers d'entrée utiles sans dépasser le budget de contexte. */
-  selectProjectFiles(files: string[], _task: AgentTask, resolvedMentioned: string[] = []): string[] {
+  /**
+   * Sélectionne les fichiers en fonction du rôle et de l'intention de la mission.
+   * Les chemins explicitement mentionnés restent prioritaires ; les fichiers
+   * simplement structurels ne doivent pas évincer les fichiers du domaine visé.
+   */
+  selectProjectFiles(files: string[], task: AgentTask, resolvedMentioned: string[] = []): string[] {
+    const role = String(task.role ?? "").toLowerCase();
+    const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
     const preferredFiles = [
       ...resolvedMentioned,
       "package.json",
@@ -125,12 +131,54 @@ export class AgentContextResolver {
     const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/")))]
       .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
 
+    const roleTerms: Record<string, string[]> = {
+      coder: ["src/", "server/", "components", "routes", "services"],
+      refactor: ["src/", "server/", "components", "utils"],
+      debugger: ["test", "spec", "error", "logger", "src/", "server/"],
+      reviewer: ["test", "spec", "security", "permission", "src/", "server/"],
+      tester: ["test", "spec", "__tests__", "vitest", "jest"],
+      security: ["security", "permission", "auth", "policy", "guard", "sandbox"],
+      architect: ["runtime", "architecture", "types", "config", "server/", "src/"],
+      ui_ux: ["src/", "components", ".css", ".scss", ".tsx"],
+      accessibility: ["src/", "components", ".tsx", ".css"],
+      performance: ["runtime", "cache", "worker", "performance", "src/", "server/"],
+      documentation: [".md", "docs/"],
+      writer: [".md", "docs/"],
+      seo: ["seo", "meta", "sitemap", "src/"],
+    };
+    const terms = [...new Set([
+      ...query.split(/[^a-zà-ÿ0-9_./-]+/).filter((word) => word.length >= 3),
+      ...(roleTerms[role] ?? []),
+    ])];
+    const ignoredForRole = (file: string): boolean => {
+      const isTest = /(^|[./_-])(test|spec)([./_-]|$)|__tests__/.test(file.toLowerCase());
+      if (role === "tester" || role === "debugger" || role === "reviewer") return false;
+      return isTest;
+    };
+    const score = (file: string): number => {
+      const lower = file.toLowerCase();
+      const base = preferredRank.has(file) ? 100 - (preferredRank.get(file) ?? 0) * 2 : 0;
+      const pathTokens = lower.split(/[/.\\_-]+/).filter(Boolean);
+      let relevance = 0;
+      for (const term of terms) {
+        if (term.includes("/") || term.startsWith(".")) {
+          if (lower.includes(term)) relevance += 3;
+        } else if (pathTokens.some((token) => token === term)) {
+          relevance += 4;
+        } else if (lower.includes(term)) {
+          relevance += 1;
+        }
+      }
+      if (role === "tester" && /test|spec|__tests__/.test(lower)) relevance += 12;
+      if (role === "security" && /security|permission|auth|policy|guard|sandbox/.test(lower)) relevance += 10;
+      if (role === "ui_ux" && /components|pages|styles|\.tsx$|\.css$/.test(lower)) relevance += 8;
+      if (role === "documentation" && /\.md$|^docs\\//.test(lower)) relevance += 8;
+      return base + relevance;
+    };
+
     return normalizedFiles
-      .sort((left, right) => {
-        const leftRank = preferredRank.get(left) ?? preferredFiles.length + 999;
-        const rightRank = preferredRank.get(right) ?? preferredFiles.length + 999;
-        return leftRank - rightRank || left.localeCompare(right);
-      })
+      .filter((file) => !ignoredForRole(file))
+      .sort((left, right) => score(right) - score(left) || left.localeCompare(right))
       .slice(0, 10);
   }
 
