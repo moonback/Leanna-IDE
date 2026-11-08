@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic, MicOff, X, Trash2, Power, GripVertical, Minus, PanelRight,
@@ -6,7 +6,7 @@ import {
   Hash, Loader2, Volume2, FileSearch, Search, Sparkles, History,
 } from 'lucide-react';
 import { MenuButton } from './MenuButton.js';
-import { ProfileSwitcher } from './ProfileSwitcher.js';
+import { ProfileMenuSection, ProfileModal } from './ProfileSwitcher.js';
 import { ExportMenuSection } from './ExportMenuSection.js';
 import type { ExportFormat } from './exportConversation.js';
 
@@ -64,6 +64,8 @@ export function ChatHeader({
   onToggleMinimized, onToggleConnect, onClose,
 }: ChatHeaderProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  // Modale de sélection du profil de comportement (ouverte depuis le menu).
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Fermer le menu au clic extérieur.
   useEffect(() => {
@@ -145,8 +147,8 @@ export function ChatHeader({
             )}
           </div>
 
-          {/* Ligne 2 : Pastille de statut + Sélecteur de profil */}
-          {/* overflow-hidden retiré : il clippait le dropdown absolu du ProfileSwitcher */}
+          {/* Ligne 2 : Pastille de statut (le sélecteur de profil vit désormais
+              dans le menu « Plus d'options ») */}
           <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
             <span
               className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
@@ -176,15 +178,6 @@ export function ChatHeader({
               </span>
             </span>
 
-            {/* Sélecteur de profil de comportement */}
-            {onSelectProfile && (
-              <ProfileSwitcher
-                activeId={activeProfileId}
-                connected={connected}
-                reduceMotion={reduceMotion}
-                onSelect={onSelectProfile}
-              />
-            )}
           </div>
         </div>
       </div>
@@ -356,6 +349,17 @@ export function ChatHeader({
                     </span>
                   </div>
 
+                  {/* Sélecteur de profil de comportement : ouvre une modale */}
+                  {onSelectProfile && (
+                    <ProfileMenuSection
+                      activeId={activeProfileId}
+                      onOpenModal={() => {
+                        setShowProfileModal(true);
+                        onToggleMenu(); // ferme le menu « Plus d'options »
+                      }}
+                    />
+                  )}
+
                   <MenuButton
                     icon={<Volume2 size={13} style={{ color: 'var(--accent-primary)' }} />}
                     label="Tester la voix"
@@ -448,6 +452,17 @@ export function ChatHeader({
           </motion.button>
         )}
       </div>
+
+      {/* Modale de sélection du profil de comportement (rendue en portail) */}
+      {onSelectProfile && (
+        <ProfileModal
+          open={showProfileModal}
+          activeId={activeProfileId}
+          connected={connected}
+          onClose={() => setShowProfileModal(false)}
+          onSelect={onSelectProfile}
+        />
+      )}
     </div>
   );
 }
