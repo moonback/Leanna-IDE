@@ -996,8 +996,15 @@ export class UnderstandingEngine {
 
     // Missing actions seront remplis à l'étape 7
     const missingActions: string[] = [];
+    // Défense en profondeur : computeUnderstandingScore peut être appelé depuis
+    // d'autres chemins que buildContext ; ne jamais supposer que existingContext
+    // est présent ou correctement formé.
+    const existingContext = Array.isArray(opts.existingContext)
+      ? opts.existingContext.filter((item): item is string => typeof item === "string")
+      : [];
+    const existingContextSet = new Set(existingContext.map((item) => this.norm(item)));
     const unreadFiles = batch.files
-      .filter((f) => !opts.existingContext.map(this.norm).includes(this.norm(f.filePath)))
+      .filter((f) => !existingContextSet.has(this.norm(f.filePath)))
       .slice(0, 8)
       .map((f) => f.filePath);
 
