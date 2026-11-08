@@ -47,6 +47,7 @@ export default function ContextIntelligenceView() {
   const [graphQuery, setGraphQuery] = useState('');
   const [graphRelationType, setGraphRelationType] = useState('all');
   const [loadingRelations, setLoadingRelations] = useState(false);
+  const [loadingMoreRelations, setLoadingMoreRelations] = useState(false);
   const [context, setContext] = useState<ContextResult | null>(null);
   const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
   const [inspectionHistory, setInspectionHistory] = useState<ContextResult[]>([]);
@@ -95,7 +96,7 @@ export default function ContextIntelligenceView() {
     if (tab !== 'graph') return;
     let active = true;
     setLoadingRelations(true);
-    fetch('/api/knowledge/relations')
+    fetch('/api/knowledge/relations?limit=100&offset=0')
       .then(async response => {
         const data = await response.json();
         if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) throw new Error(data.error || 'Graphe indisponible');
@@ -108,6 +109,37 @@ export default function ContextIntelligenceView() {
       .finally(() => { if (active) setLoadingRelations(false); });
     return () => { active = false; };
   }, [tab]);
+
+  const loadMoreRelations = useCallback(async () => {
+    if (loadingMoreRelations || relations.length >= relationTotal) return;
+    setLoadingMoreRelations(true);
+    try {
+      const response = await fetch('/api/knowledge/relations?limit=100&offset=' + relations.length);
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) {
+        throw new Error(data.error || 'Impossible de charger la suite du graphe');
+      }
+      setRelations(previous => {
+        const known = new Set(previous.map(relation =>
+          relation.source.filePath + '\\0' + relation.source.name + '\\0' +
+          relation.target.filePath + '\\0' + relation.target.name + '\\0' + relation.relationType
+        ));
+        const additions = (data.relations as GraphRelation[]).filter(relation => {
+          const key = relation.source.filePath + '\\0' + relation.source.name + '\\0' +
+            relation.target.filePath + '\\0' + relation.target.name + '\\0' + relation.relationType;
+          if (known.has(key)) return false;
+          known.add(key);
+          return true;
+        });
+        return [...previous, ...additions];
+      });
+      if (typeof data.count === 'number') setRelationTotal(data.count);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Erreur pendant le chargement du graphe');
+    } finally {
+      setLoadingMoreRelations(false);
+    }
+  }, [loadingMoreRelations, relations, relationTotal]);
 
   const inspectContext = useCallback(async () => {
     if (!query.trim()) return;
@@ -284,6 +316,9 @@ export default function ContextIntelligenceView() {
               onRelationTypeChange={setGraphRelationType}
               relationTypes={relationTypes}
               totalRelations={relationTotal}
+              hasMore={relations.length < relationTotal}
+              loadingMore={loadingMoreRelations}
+              onLoadMore={() => void loadMoreRelations()}
             />
           </div>}
 
