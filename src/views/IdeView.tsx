@@ -26,6 +26,7 @@ const INLINE_PAGES: Record<string, ComponentType> = {
   history: lazy(() => import('./HistoryView.js')),
   automation: lazy(() => import('./AutomationView.js')),
   observability: lazy(() => import('./ObservabilityView.js')),
+  contextIntelligence: lazy(() => import('./ContextIntelligenceView.js')),
   settings: lazy(() => import('./SettingsView.js')),
 };
 const RichDocumentViewerLazy = lazy(() => import('../components/ide/RichDocumentViewer.js').then(m => ({ default: m.RichDocumentViewer })));
