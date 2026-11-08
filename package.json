@@ -130,8 +130,7 @@
     "@codemirror/lang-yaml": "^6.1.2",
     "@codemirror/merge": "^6.12.3",
     "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.39.14",
-    "codemirror": "^6.0.2"
+    "@codemirror/view": "^6.39.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
