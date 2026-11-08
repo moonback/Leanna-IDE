@@ -571,3 +571,36 @@ test("passes the selected repair strategy into the next runner attempt", async (
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test("unknown side effects in the execution ledger force escalation without replay", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-ledger-recovery-"));
+  const ledgerPath = path.join(dir, "actions.jsonl");
+  const interrupted = new ExecutionLedger(ledgerPath);
+  interrupted.begin({
+    missionId: "m-unknown-effect",
+    stepId: "send-1",
+    tool: "send_email",
+    args: { to: "recipient@example.test" },
+  }, true);
+  // Rehydration converts an orphaned started side effect into unknown.
+  const ledger = new ExecutionLedger(ledgerPath);
+  const sup = new LeannaSupervisor({
+    maxAttempts: 3,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+    ledger,
+  });
+  let attempts = 0;
+  const runner: MissionRunner = async () => {
+    attempts++;
+    return { success: false, error: "temporary connection failure" };
+  };
+
+  const result = await sup.runMission({ missionId: "m-unknown-effect", goal: "send once", runner });
+  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(attempts, 1, "unknown external side effects must never be blindly replayed");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
