@@ -31,6 +31,8 @@ import {
   resolveAgentTools,
   buildBudgetSection,
   buildObservationHistory,
+  resolveObservationHistoryBudget,
+  estimateTokensFromChars,
   DEFAULT_AGENT_BUDGET,
   createAgentRuntime,
   AgenticRuntime,
@@ -403,7 +405,29 @@ describe("buildBudgetSection — quotas absolus + réserves", () => {
   });
 });
 
-describe("buildObservationHistory — historique borné", () => {
+
+describe("Context budget — allocation par phase", () => {
+  it("réserve davantage de contexte aux phases critiques", () => {
+    const discovery = resolveObservationHistoryBudget("discovery");
+    const write = resolveObservationHistoryBudget("write");
+    const verify = resolveObservationHistoryBudget("verify");
+    const recovery = resolveObservationHistoryBudget("recovery");
+    assert.ok(discovery < write);
+    assert.ok(write < verify);
+    assert.ok(verify < recovery);
+    assert.equal(recovery, 18_000);
+  });
+
+  it("garde une valeur de repli pour une phase inconnue", () => {
+    assert.equal(resolveObservationHistoryBudget("unknown"), 10_000);
+  });
+
+  it("estime les tokens sans présenter l'estimation comme une mesure provider", () => {
+    assert.equal(estimateTokensFromChars(0), 0);
+    assert.equal(estimateTokensFromChars(4_001), 1_001);
+  });
+});
+\ndescribe("buildObservationHistory — historique borné", () => {
   it("rend les actions et reste borné", () => {
     const obs: Observation[] = [writeObservation(1, "a.ts")];
     const history = buildObservationHistory(obs, 10_000);
