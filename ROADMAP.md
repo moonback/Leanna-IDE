@@ -1,6 +1,6 @@
 # Roadmap — Leanna AI Operating System
 
-> **Mise à jour documentaire : 8 novembre 2026** · **Version du dépôt : 2.3.0** · Licence BUSL 1.1
+> **Mise à jour documentaire : 8 novembre 2026** · **Version du dépôt : 2.4.0** · Licence BUSL 1.1
 > **Audit statique ciblé du dépôt main : 8 novembre 2026** ; il complète l'audit
 > fonctionnel du 15 octobre sans le remplacer par une validation d'exécution.
 >

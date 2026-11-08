@@ -39,7 +39,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 &nbsp;
 <img src="https://img.shields.io/badge/outils%20agent-runtime%20(builtin%2BMCP%2Bcustom)-38BDF8?style=for-the-badge" alt="Outils agent" />
 &nbsp;
-<img src="https://img.shields.io/badge/version-2.3.0-A78BFA?style=for-the-badge" alt="Version" />
+<img src="https://img.shields.io/badge/version-2.4.0-A78BFA?style=for-the-badge" alt="Version" />
 
 <br>
 
@@ -2272,7 +2272,7 @@ Cette section complète les descriptions fonctionnelles par un état de référe
 
 | Indicateur | État constaté |
 |---|---|
-| Version déclarée | **2.3.0** (package.json) |
+| Version déclarée | **2.4.0** (package.json) |
 | Branche de référence | main |
 | Inventaire des tests | **227 fichiers** recensés : 203 backend, 23 UI et 1 autre |
 | Dernière exécution chiffrée documentée | **15 octobre 2026** ; cette mise à jour ne revendique aucune relance des tests |
@@ -2420,5 +2420,5 @@ fichier `LICENSE` pour les termes complets.
 <br>
 
 <div align="center">
-<sub>Leanna · v2.3.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
+<sub>Leanna · v2.4.0 · Comprendre → Planifier → Agir → Vérifier → Récupérer → Terminer</sub>
 </div>
