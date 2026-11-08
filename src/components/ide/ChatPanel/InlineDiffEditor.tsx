@@ -1,7 +1,6 @@
 import {
   lazy, Suspense, useCallback, useEffect, useRef, useState,
 } from 'react';
-import type { editor } from 'monaco-editor';
 import {
   Check, X, FileCode, Loader2, RotateCcw, AlertCircle, SplitSquareHorizontal, ExternalLink,
   FlaskConical, ChevronDown, ChevronRight,
@@ -26,15 +25,7 @@ function isTestFile(p: string): boolean {
 // et la discipline de disposition des modèles de MarkdownPromptDiff / DiffViewer.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DiffEditorLazy = lazy(() =>
-  Promise.all([
-    import('@monaco-editor/react'),
-    import('monaco-editor'),
-  ]).then(([monacoReact, monacoInstance]) => {
-    monacoReact.loader.config({ monaco: monacoInstance });
-    return { default: monacoReact.DiffEditor };
-  }),
-);
+const CodeMirrorDiffEditorLazy = lazy(() => import('./CodeMirrorDiffEditor.js'));
 
 type Status = 'loading' | 'ready' | 'applying' | 'applied' | 'error';
 
@@ -86,7 +77,6 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
   const [testError, setTestError] = useState<string | null>(null);
   const [testOutputOpen, setTestOutputOpen] = useState(false);
 
-  const diffRef = useRef<editor.IStandaloneDiffEditor | null>(null);
   const lang = language || languageFromPath(path);
   const dark = !isLightTheme();
   const testable = isTestFile(path);
@@ -113,36 +103,6 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
     return () => { cancelled = true; };
   }, [path]);
 
-  // ── Montage Monaco : écoute les éditions du panneau de droite ────────────
-  const handleMount = useCallback((diffEditor: editor.IStandaloneDiffEditor) => {
-    diffRef.current = diffEditor;
-    diffEditor.updateOptions({ renderSideBySide: sideBySide });
-    const modified = diffEditor.getModifiedEditor();
-    modified.onDidChangeModelContent(() => setCurrent(modified.getValue()));
-  }, [sideBySide]);
-
-  // Bascule côte-à-côte / unifié à chaud.
-  useEffect(() => {
-    diffRef.current?.updateOptions({ renderSideBySide: sideBySide });
-  }, [sideBySide]);
-
-  // Disposition propre des modèles au démontage (évite les rejets « Canceled »).
-  useEffect(() => {
-    return () => {
-      const ed = diffRef.current;
-      if (!ed) return;
-      diffRef.current = null;
-      try {
-        const model = ed.getModel();
-        const o = model?.original;
-        const m = model?.modified;
-        ed.setModel(null);
-        ed.dispose();
-        o?.dispose();
-        m?.dispose();
-      } catch { /* déjà disposé */ }
-    };
-  }, []);
 
   // ── Application de la modification ───────────────────────────────────────
   const apply = useCallback(async () => {
@@ -187,10 +147,6 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
 
   const reset = useCallback(() => {
     setCurrent(proposed);
-    // Remet le panneau de droite à la proposition initiale.
-    const ed = diffRef.current;
-    const modified = ed?.getModifiedEditor();
-    modified?.setValue(proposed);
   }, [proposed]);
 
   const openFile = useCallback(() => {
@@ -267,7 +223,7 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
         </button>
       </div>
 
-      {/* Corps : diff Monaco */}
+      {/* Corps : diff CodeMirror, chargé uniquement lorsqu'un bloc edit est affiché */}
       {status === 'loading' ? (
         <div className="flex items-center justify-center gap-2 text-xs py-8" style={{ color: 'var(--text-muted)' }}>
           <Loader2 className="h-4 w-4 animate-spin" /> Chargement de la version actuelle…
@@ -280,31 +236,14 @@ export function InlineDiffEditor({ path, proposed, language, onApplied }: Inline
             </div>
           }
         >
-          <DiffEditorLazy
+          <CodeMirrorDiffEditorLazy
             original={original}
             modified={current}
             language={lang}
-            theme={dark ? 'vs-dark' : 'vs'}
-            height="320px"
-            onMount={handleMount}
-            options={{
-              renderSideBySide: sideBySide,
-              renderSideBySideInlineBreakpoint: 0,
-              useInlineViewWhenSpaceIsLimited: false,
-              readOnly: applied,
-              originalEditable: false,
-              fontSize: 12,
-              lineHeight: 18,
-              wordWrap: 'on',
-              diffWordWrap: 'on',
-              ignoreTrimWhitespace: false,
-              renderWhitespace: 'none',
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              renderOverviewRuler: false,
-              scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
-            }}
+            dark={dark}
+            sideBySide={sideBySide}
+            readOnly={applied}
+            onChange={setCurrent}
           />
         </Suspense>
       )}
