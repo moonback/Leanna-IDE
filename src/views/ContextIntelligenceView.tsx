@@ -44,6 +44,7 @@ export default function ContextIntelligenceView() {
   const [memorySearching, setMemorySearching] = useState(false);
   const [relations, setRelations] = useState<GraphRelation[]>([]);
   const [relationTotal, setRelationTotal] = useState(0);
+  const [relationOffset, setRelationOffset] = useState(0);
   const [graphQuery, setGraphQuery] = useState('');
   const [graphRelationType, setGraphRelationType] = useState('all');
   const [loadingRelations, setLoadingRelations] = useState(false);
@@ -103,6 +104,7 @@ export default function ContextIntelligenceView() {
         if (active) {
           setRelations(data.relations);
           setRelationTotal(typeof data.count === 'number' ? data.count : data.relations.length);
+          setRelationOffset(data.relations.length);
         }
       })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Erreur de chargement du graphe'); })
@@ -111,35 +113,23 @@ export default function ContextIntelligenceView() {
   }, [tab]);
 
   const loadMoreRelations = useCallback(async () => {
-    if (loadingMoreRelations || relations.length >= relationTotal) return;
+    if (loadingMoreRelations || relationOffset >= relationTotal) return;
     setLoadingMoreRelations(true);
     try {
-      const response = await fetch('/api/knowledge/relations?limit=100&offset=' + relations.length);
+      const response = await fetch('/api/knowledge/relations?limit=100&offset=' + relationOffset);
       const data = await response.json();
       if (!response.ok || data.status !== 'success' || !Array.isArray(data.relations)) {
         throw new Error(data.error || 'Impossible de charger la suite du graphe');
       }
-      setRelations(previous => {
-        const known = new Set(previous.map(relation =>
-          relation.source.filePath + '\\0' + relation.source.name + '\\0' +
-          relation.target.filePath + '\\0' + relation.target.name + '\\0' + relation.relationType
-        ));
-        const additions = (data.relations as GraphRelation[]).filter(relation => {
-          const key = relation.source.filePath + '\\0' + relation.source.name + '\\0' +
-            relation.target.filePath + '\\0' + relation.target.name + '\\0' + relation.relationType;
-          if (known.has(key)) return false;
-          known.add(key);
-          return true;
-        });
-        return [...previous, ...additions];
-      });
+      setRelations(previous => [...previous, ...(data.relations as GraphRelation[])]);
+      setRelationOffset(previous => previous + data.relations.length);
       if (typeof data.count === 'number') setRelationTotal(data.count);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Erreur pendant le chargement du graphe');
     } finally {
       setLoadingMoreRelations(false);
     }
-  }, [loadingMoreRelations, relations, relationTotal]);
+  }, [loadingMoreRelations, relationOffset, relationTotal]);
 
   const inspectContext = useCallback(async () => {
     if (!query.trim()) return;
@@ -245,7 +235,7 @@ export default function ContextIntelligenceView() {
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {error && <div role="alert" className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>{error}</div>}
-          <section className="rounded-xl border p-3" style={panelStyle}>
+          {tab !== 'graph' && <section className="rounded-xl border p-3" style={panelStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Inspecter un contexte de mission</div><p className="text-xs" style={mutedStyle}>Construit un aperçu via UnderstandingEngine, sans envoyer de requête au modèle.</p></div>
               <button type="button" onClick={() => void loadFacts()} disabled={loadingFacts} className="rounded-lg border p-2" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }} aria-label="Actualiser la mémoire"><RefreshCw size={14} className={loadingFacts ? 'animate-spin' : ''} /></button>
@@ -254,7 +244,7 @@ export default function ContextIntelligenceView() {
               <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void inspectContext(); }} placeholder="Ex. Optimiser le panneau de supervision multi-agents…" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }} />
               <button type="button" onClick={() => void inspectContext()} disabled={building || !query.trim()} className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}><Search size={13}/>{building ? 'Analyse…' : 'Analyser'}</button>
             </div>
-          </section>
+          </section>}
 
           {tab === 'overview' && <>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -301,12 +291,6 @@ export default function ContextIntelligenceView() {
           </div>}
 
           {tab === 'graph' && <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Nœuds visibles" value={fmt(new Set(visibleRelations.flatMap(relation => [relation.source.filePath + ':' + relation.source.name, relation.target.filePath + ':' + relation.target.name])).size)} hint="Entités distinctes" />
-              <Stat label="Relations chargées" value={fmt(relations.length)} hint={relationTotal > relations.length ? "Échantillon API limité" : "Relations disponibles"} />
-              <Stat label="Confiance moyenne" value={relations.length ? Math.round(relations.reduce((sum, relation) => sum + relation.confidence, 0) / relations.length * 100) + "%" : "—"} hint="Sur les relations chargées" />
-              <Stat label="Types de relations" value={relationTypes.length} hint="Catégories détectées" />
-            </div>
             <ContextKnowledgeGraph
               relations={visibleRelations}
               loading={loadingRelations}
@@ -316,7 +300,7 @@ export default function ContextIntelligenceView() {
               onRelationTypeChange={setGraphRelationType}
               relationTypes={relationTypes}
               totalRelations={relationTotal}
-              hasMore={relations.length < relationTotal}
+              hasMore={relationOffset < relationTotal}
               loadingMore={loadingMoreRelations}
               onLoadMore={() => void loadMoreRelations()}
             />
