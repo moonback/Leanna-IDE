@@ -63,7 +63,7 @@ export const DashboardCore = React.memo(function DashboardCore({
           </div>
         </div>
       </div>
-      <div className="relative z-10 flex min-w-0 items-center justify-between gap-3 lg:col-start-1 lg:row-start-1 lg:mt-20 lg:items-end">
+      <div className="relative z-10 flex min-w-0 items-center justify-between gap-3 lg:col-start-1 lg:row-start-2 lg:mt-0 lg:items-end">
         <div className="text-right">
           <div className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>SESSION LIVE</div>
           <div className="text-sm font-semibold" style={{ color: connected ? 'var(--color-success, #22c55e)' : 'var(--text-primary)' }}>{connected ? 'ACTIVE' : connecting ? 'CONNECTING' : 'IDLE'}</div>
