@@ -88,19 +88,38 @@ export function buildContextGraphLayout(relations: GraphRelation[]) {
   });
 
   const desiredLength = Math.max(55, Math.min(125, 360 / Math.sqrt(Math.max(1, nodes.length))));
-  for (let iteration = 0; iteration < 90; iteration += 1) {
+  const iterations = nodes.length > 700 ? 26 : nodes.length > 350 ? 42 : 72;
+  const anchorStride = nodes.length > 350 ? Math.ceil(nodes.length / 180) : 1;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
     const forces = nodes.map(() => ({ x: 0, y: 0 }));
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const dx = nodes[i].x - nodes[j].x;
-        const dy = nodes[i].y - nodes[j].y;
-        const distanceSq = Math.max(36, dx * dx + dy * dy);
-        const distance = Math.sqrt(distanceSq);
-        const force = Math.min(2.8, 1700 / distanceSq);
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-        forces[i].x += fx; forces[i].y += fy;
-        forces[j].x -= fx; forces[j].y -= fy;
+    if (nodes.length <= 350) {
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const distanceSq = Math.max(36, dx * dx + dy * dy);
+          const distance = Math.sqrt(distanceSq);
+          const force = Math.min(2.8, 1700 / distanceSq);
+          const fx = (dx / distance) * force;
+          const fy = (dy / distance) * force;
+          forces[i].x += fx; forces[i].y += fy;
+          forces[j].x -= fx; forces[j].y -= fy;
+        }
+      }
+    } else {
+      // Au-delà de 350 nœuds, échantillonner les forces de répulsion évite
+      // une simulation quadratique complète lors du chargement des pages suivantes.
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = 0; j < nodes.length; j += anchorStride) {
+          if (i === j) continue;
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const distanceSq = Math.max(36, dx * dx + dy * dy);
+          const distance = Math.sqrt(distanceSq);
+          const force = Math.min(2.8, 1700 / distanceSq);
+          forces[i].x += (dx / distance) * force;
+          forces[i].y += (dy / distance) * force;
+        }
       }
     }
     for (const edge of edges) {
@@ -112,7 +131,7 @@ export function buildContextGraphLayout(relations: GraphRelation[]) {
       forces[edge.source].x += fx; forces[edge.source].y += fy;
       forces[edge.target].x -= fx; forces[edge.target].y -= fy;
     }
-    const cooling = 0.72 * (1 - iteration / 125);
+    const cooling = 0.72 * (1 - iteration / (iterations + 35));
     nodes.forEach((node, index) => {
       forces[index].x -= node.x * 0.0018;
       forces[index].y -= node.y * 0.0018;
@@ -134,6 +153,7 @@ export default function ContextKnowledgeGraph({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   const layout = useMemo(() => buildContextGraphLayout(relations), [relations]);
   useEffect(() => {
@@ -142,6 +162,14 @@ export default function ContextKnowledgeGraph({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [layout]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -213,7 +241,7 @@ export default function ContextKnowledgeGraph({
       ctx.strokeStyle = active ? 'rgba(91, 169, 226, ' + (0.16 + Math.max(0, Math.min(1, edge.relation.confidence)) * 0.38) + ')' : 'rgba(110, 130, 160, 0.055)';
       ctx.lineWidth = (active ? 1.15 : 0.7) / scale;
       ctx.stroke();
-      if (active) {
+      if (active && !reducedMotion) {
         const phase = (performance.now() / 2600 + edge.source * 0.137 + edge.target * 0.071) % 1;
         const px = a.x + (b.x - a.x) * phase;
         const py = a.y + (b.y - a.y) * phase;
@@ -248,9 +276,13 @@ export default function ContextKnowledgeGraph({
       }
     }
     ctx.restore();
-  }, [layout.edges, selectedId, size, zoom, pan]);
+  }, [layout.edges, selectedId, size, zoom, pan, reducedMotion]);
 
   useEffect(() => {
+    if (reducedMotion) {
+      drawGraph();
+      return;
+    }
     let frame = 0;
     let lastDraw = 0;
     const render = (time: number) => {
@@ -262,7 +294,7 @@ export default function ContextKnowledgeGraph({
     };
     frame = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame);
-  }, [drawGraph]);
+  }, [drawGraph, reducedMotion]);
 
   const worldPoint = (event: PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
