@@ -27,6 +27,7 @@ import { recordModelCallUsage } from '../utils/textGeneration.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { Supervisor } from '../autonomy/index.js';
 import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
+import { fetchStartupMemories, fetchStartupConversations } from './startupMemory.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
 import { agentEventStream } from '../agents/AgentEventStream.js';
@@ -767,12 +768,12 @@ export function attachLiveWebSocket(
       if ((!requestedSkills || requestedSkills.includes('memory')) && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
           const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-          const { data } = await supabase.from('memories').select('content').order('created_at', { ascending: false }).limit(maxMemories);
-          if (data && data.length > 0) {
+          const data = await fetchStartupMemories(supabase, maxMemories);
+          if (data.length > 0) {
             let usedTokens = 0;
             const optimizedMemories: string[] = [];
-            for (const m of data) {
-              const content = m.content.length > 200 ? m.content.slice(0, 200) + '…' : m.content;
+            for (const raw of data) {
+              const content = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
               const estimated = Math.ceil(content.length / 4);
               if (usedTokens + estimated > memoryBudgetTokens) break;
               optimizedMemories.push(content);
@@ -785,11 +786,7 @@ export function attachLiveWebSocket(
 
           const isNewSession = !clientConvId;
           if (!isNewSession && (!requestedSkills || requestedSkills.includes('history'))) {
-            const { data: recentConvs } = await supabase
-              .from('conversations')
-              .select('title, summary, started_at, message_count')
-              .order('started_at', { ascending: false })
-              .limit(maxConversations);
+            const recentConvs = await fetchStartupConversations(supabase, maxConversations);
 
             if (recentConvs && recentConvs.length > 0) {
               memoryContext += '\n\n[Conversations récentes]\n' +
