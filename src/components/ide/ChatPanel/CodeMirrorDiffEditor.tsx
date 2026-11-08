@@ -25,21 +25,33 @@ interface CodeMirrorDiffEditorProps {
 function languageExtension(language: string) {
   switch (language.toLowerCase()) {
     case 'typescript':
-      return javascript({ typescript: true });
+    case 'ts':
+    case 'tsx':
+    case 'mts':
+    case 'cts':
+      return javascript({ typescript: true, jsx: language === 'tsx' });
     case 'javascript':
+    case 'js':
+    case 'mjs':
+    case 'cjs':
     case 'jsx':
       return javascript({ jsx: language === 'jsx' });
     case 'json':
+    case 'jsonc':
       return json();
     case 'css':
       return css();
     case 'html':
+    case 'htm':
+    case 'xml':
+    case 'svg':
       return html();
     case 'markdown':
       return markdown();
     case 'python':
       return python();
     case 'yaml':
+    case 'yml':
       return yaml();
     case 'sql':
       return sql();
