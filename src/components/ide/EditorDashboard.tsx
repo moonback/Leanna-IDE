@@ -135,7 +135,7 @@ const Card = React.memo(function Card({
   const reduce = !!useReducedMotion();
   return (
     <motion.section
-      className={`relative flex min-w-0 flex-col rounded-xl border p-3 ${className}`}
+      className={`relative flex min-w-0 flex-col rounded-xl border p-2.5 ${className}`}
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
         borderColor: 'var(--border-base)',
@@ -164,7 +164,7 @@ const Card = React.memo(function Card({
       }}
       aria-label={title}
     >
-      <header className="mb-2 flex items-center gap-2">
+      <header className="mb-1.5 flex items-center gap-2">
         <span
           className="flex h-6 w-6 items-center justify-center rounded-lg"
           style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
@@ -238,11 +238,11 @@ function MiniButton({ label, icon: Icon, onClick, active = false, spin = false }
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-3 text-sm" style={{ color: 'var(--text-dimmed)' }}>{children}</p>;
+  return <p className="py-1.5 text-xs" style={{ color: 'var(--text-dimmed)' }}>{children}</p>;
 }
 
 function Ring({ percent, label, color = 'var(--accent-primary)' }: { percent: number; label: string; color?: string }) {
-  const r = 26;
+  const r = 21;
   const c = 2 * Math.PI * r;
   const p = Math.min(100, Math.max(0, percent));
   return (
@@ -284,7 +284,7 @@ function Sparkline({ values, max: fixedMax }: { values: number[]; max?: number }
   const max = fixedMax ?? Math.max(...values, 1);
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${38 - (v / max) * 34}`).join(' ');
   return (
-    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-12 w-full" aria-hidden>
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-8 w-full" aria-hidden>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.35" />
@@ -325,10 +325,10 @@ function LiveClock() {
   return (
     <div>
       <div className="flex items-baseline gap-1 font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        <span className="text-4xl font-bold tracking-tight">{hm}</span>
-        <span className="text-xl" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
+        <span className="text-3xl font-bold tracking-tight">{hm}</span>
+        <span className="text-base" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
       </div>
-      <div className="text-sm first-letter:uppercase" style={{ color: 'var(--text-muted)' }}>{date}</div>
+      <div className="text-xs first-letter:uppercase" style={{ color: 'var(--text-muted)' }}>{date}</div>
     </div>
   );
 }
@@ -895,9 +895,9 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <main className={`relative z-10 mx-auto w-full px-3 py-4 transition-[max-width,padding] duration-500 sm:px-5 ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-[1480px]'}`}>
+      <main className={`relative z-10 mx-auto w-full px-3 py-2 transition-[max-width,padding] duration-500 sm:px-4 ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-[1480px]'}`}>
         <motion.header
-          className="mb-4 flex flex-wrap items-end justify-between gap-3"
+          className="mb-2 flex flex-wrap items-end justify-between gap-2"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={SPRING}
@@ -922,7 +922,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                 disabled={!a.onClick}
                 whileHover={reduce ? undefined : { y: -2 }}
                 whileTap={reduce ? undefined : { scale: 0.96 }}
-                className="flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+                className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium disabled:opacity-40"
                 style={a.primary
                   ? { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white' }
                   : { backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
@@ -949,7 +949,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
           <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
         </motion.div>}
-        <div className={`grid grid-cols-1 gap-3 transition-[gap] duration-500 md:grid-cols-2 xl:grid-cols-4 ${immersiveMode ? 'gap-5' : ''}`} aria-label="Sections du tableau de bord réorganisables">
+        <div className={`grid grid-cols-1 gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:grid-cols-6 ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
           {sectionOrder.map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
@@ -980,7 +980,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                 onDragOver={event => { if (!isEditMode) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
                 onDrop={event => { if (!isEditMode) return; event.preventDefault(); moveSection(sectionId); }}
                 onDragEnd={() => setDraggedSection(null)}
-                className={`min-w-0 transition-all duration-300 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${sectionId === 'operations' ? 'md:col-span-2 xl:col-span-4' : sectionId === 'audio' ? 'md:col-span-2' : ''} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
+                className={`min-w-0 transition-all duration-300 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${sectionId === 'operations' ? 'md:col-span-4 xl:col-span-6' : ['audio','activity','transcript'].includes(sectionId) ? 'md:col-span-2' : ['session','tokens','plan','system'].includes(sectionId) ? 'md:col-span-1' : 'md:col-span-2'} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
                 title={isEditMode ? 'Faire glisser pour déplacer cette section' : undefined}
               >
                 {section}
