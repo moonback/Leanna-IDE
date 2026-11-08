@@ -68,6 +68,7 @@ export class AgentContextResolver {
       if (priorityFiles.length >= 10) {
         const selected: string[] = priorityFiles.slice(0, 10);
         task.context.files = selected;
+        this.attachMemoryBridge(task, selected);
         log.info(`[${task.id.slice(0, 8)}] Contexte explicite résolu: ${selected.length} fichier(s)`);
         return selected;
       }
@@ -141,14 +142,15 @@ export class AgentContextResolver {
     }).filter((item) => item.dependencies.length > 0 || item.dependents.length > 0);
 
     const verifiedPreviousResults = (task.context.previousResults ?? [])
-      .filter((result) => result?.success === true)
+      .filter((result) => result?.success === true && result.evidence?.verification?.passed === true)
       .slice(-5)
       .map((result) => ({
         status: "verified_success",
         summary: String(result.summary ?? "").slice(0, 1_000),
-        filesModified: (result.filesModified ?? []).slice(0, 10),
+        filesModified: (result.evidence?.filesModified ?? result.filesModified ?? []).slice(0, 10),
+        verificationChecks: (result.evidence?.verification?.checks ?? []).slice(0, 10),
         durationMs: result.durationMs,
-        provenance: "previous_agent_task_result",
+        provenance: "previous_agent_task_result_with_passing_evidence",
       }));
     const boundedFacts = facts.slice(0, 8).map((fact) => ({
       content: fact.content.slice(0, 700),
