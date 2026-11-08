@@ -603,7 +603,7 @@ export class AgenticRuntime implements IAgentRuntime {
       .join("\n");
 
     const response = await this.callLLM(agent, planPrompt);
-    this.accountCost(session, response, planPrompt);
+    this.accountCost(session, response, planPrompt, agent.systemPrompt);
 
     const parsed = parseJsonObject(response.text);
     const rawSteps = Array.isArray(parsed?.steps) ? parsed!.steps : [];
@@ -1185,7 +1185,7 @@ export class AgenticRuntime implements IAgentRuntime {
 
     try {
       const response = await this.callLLM(agent, finalPrompt);
-      this.accountCost(session, response, finalPrompt);
+      this.accountCost(session, response, finalPrompt, agent.systemPrompt);
       const parsed = parseJsonObject(response.text);
       if (parsed) {
         final = {
