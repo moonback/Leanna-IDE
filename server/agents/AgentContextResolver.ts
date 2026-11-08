@@ -17,6 +17,56 @@ import { knowledgeGraph } from "../knowledge/KnowledgeGraph.js";
 
 const log = createLogger("AgentContextResolver");
 
+const MEMORY_CATEGORY_PRIORITY: Record<string, number> = {
+  security: 10, "known-bug": 9, decision: 8, architecture: 7,
+  api: 6, convention: 5, workflow: 4, stack: 3, module: 2,
+  pattern: 2, refactoring: 1, todo: 0,
+};
+
+function resolveAdaptiveMemoryBudget(role: string, query: string, phase?: string): number {
+  const roleBudget: Record<string, number> = {
+    security: 7_000, architect: 6_500, reviewer: 6_000, debugger: 5_800,
+    coder: 5_000, refactor: 5_000, tester: 4_800, performance: 5_500,
+    researcher: 5_500, planner: 4_000, documentation: 3_800, writer: 3_800,
+  };
+  let budget = roleBudget[role.toLowerCase()] ?? 4_000;
+  if (query.length > 1_200) budget += 1_000;
+  else if (query.length < 180) budget -= 500;
+  if (phase === "verify" || phase === "recovery") budget += 1_000;
+  if (phase === "discovery") budget -= 500;
+  return Math.max(2_000, Math.min(8_000, budget));
+}
+
+function detectMemoryConflicts(facts: Array<{ content: string; category?: string; sourceFile?: string }>): Array<Record<string, unknown>> {
+  const polarity = (value: string): number => {
+    const text = value.toLowerCase();
+    const negative = /\\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\\s+pas|jamais|désactivé|desactive)\\b/.test(text);
+    const positive = /\\b(yes|always|must|enable[ds]?|allow(?:ed)?|required|autorisé|obligatoire|activé|active)\\b/.test(text);
+    return negative === positive ? 0 : negative ? -1 : 1;
+  };
+  const tokens = (value: string): Set<string> => new Set(value.toLowerCase()
+    .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+    .split(/[^a-z0-9_./-]+/).filter((token) => token.length >= 4));
+  const conflicts: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
+    const left = facts[i], right = facts[j];
+    if (!left || !right) continue;
+    const lp = polarity(left.content), rp = polarity(right.content);
+    if (!lp || lp === rp || (left.category !== right.category && left.sourceFile !== right.sourceFile)) continue;
+    const a = tokens(left.content), b = tokens(right.content);
+    const intersection = [...a].filter((token) => b.has(token)).length;
+    const union = new Set([...a, ...b]).size;
+    const similarity = union ? intersection / union : 0;
+    if (similarity >= 0.45) conflicts.push({
+      factIndexes: [i, j], similarity: Number(similarity.toFixed(2)),
+      reason: "possible_opposite_polarity_same_topic",
+      resolution: "requires_current_source_verification",
+    });
+  }
+  return conflicts.slice(0, 5);
+}
+
+
 /** Appelle un outil du workspace (déjà borné par timeout). */
 export type ToolCaller = (toolName: string, args: Record<string, unknown>) => Promise<any>;
 
@@ -129,22 +179,34 @@ export class AgentContextResolver {
 
   buildMemoryBridge(task: AgentTask, selectedFiles: string[]): Record<string, unknown> {
     const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.trim();
-    const facts = query.length >= 3 ? projectMemory.searchFacts(query, 12) : [];
-    const selectedSet = new Set(selectedFiles.map((file) => file.replace(/\\/g, "/")));
+    const role = String(task.role ?? "default");
+    const phase = typeof task.context.metadata?.phase === "string" ? task.context.metadata.phase : undefined;
+    const budgetChars = resolveAdaptiveMemoryBudget(role, query, phase);
+    const rawFacts = query.length >= 3 ? projectMemory.searchFacts(query, 24) : [];
+    const maxAgeDays = 180;
+    const rankedFacts = rawFacts.map((fact) => {
+      const updatedAt = Date.parse(fact.updatedAt || fact.createdAt);
+      const ageDays = Number.isFinite(updatedAt) ? Math.max(0, (Date.now() - updatedAt) / 86_400_000) : null;
+      const freshness = ageDays === null ? 0.65 : Math.max(0.25, 1 - ageDays / 365);
+      const categoryPriority = MEMORY_CATEGORY_PRIORITY[fact.category] ?? 0;
+      const score = fact.confidence * 0.55 + freshness * 0.2 + (categoryPriority / 10) * 0.25;
+      return { fact, ageDays, freshness, score };
+    }).filter(({ fact, ageDays }) =>
+      fact.confidence >= 0.35 && (ageDays === null || ageDays <= maxAgeDays || fact.isStructural)
+    ).sort((a, b) => b.score - a.score);
+
+    const selectedSet = new Set(selectedFiles.map((file) => file.replace(/\\\\/g, "/")));
     const graphRelations = selectedFiles.slice(0, 8).map((file) => {
-      const dependencies = knowledgeGraph.getDependencies(file)
-        .map((item) => item.replace(/\\/g, "/"))
+      const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
-      const dependents = knowledgeGraph.getDependents(file)
-        .map((item) => item.replace(/\\/g, "/"))
+      const dependents = knowledgeGraph.getDependents(file).map((item) => item.replace(/\\\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
       return { file, dependencies, dependents };
     }).filter((item) => item.dependencies.length > 0 || item.dependents.length > 0);
 
     const verifiedPreviousResults = (task.context.previousResults ?? [])
       .filter((result) => result?.success === true && result.evidence?.verification?.passed === true)
-      .slice(-5)
-      .map((result) => ({
+      .slice(-5).map((result) => ({
         status: "verified_success",
         summary: String(result.summary ?? "").slice(0, 1_000),
         filesModified: (result.evidence?.filesModified ?? result.filesModified ?? []).slice(0, 10),
@@ -152,27 +214,42 @@ export class AgentContextResolver {
         durationMs: result.durationMs,
         provenance: "previous_agent_task_result_with_passing_evidence",
       }));
-    const boundedFacts = facts.slice(0, 8).map((fact) => ({
-      content: fact.content.slice(0, 700),
-      category: fact.category,
-      confidence: Math.max(0, Math.min(1, fact.confidence)),
-      sourceFile: fact.sourceFile ?? null,
-      tags: (fact.tags ?? []).slice(0, 8),
-      provenance: "project_memory",
-      verification: "stored_fact_not_independently_reverified",
-    }));
+
+    const boundedFacts: Array<Record<string, unknown>> = [];
+    let remaining = Math.max(1_000, budgetChars - JSON.stringify(graphRelations).length
+      - JSON.stringify(verifiedPreviousResults).length - 600);
+    for (const item of rankedFacts) {
+      const fact = item.fact;
+      const candidate = {
+        id: fact.id, content: fact.content.slice(0, 700), category: fact.category,
+        confidence: Math.max(0, Math.min(1, fact.confidence)), sourceFile: fact.sourceFile ?? null,
+        tags: (fact.tags ?? []).slice(0, 8), createdAt: fact.createdAt, updatedAt: fact.updatedAt,
+        ageDays: item.ageDays === null ? null : Math.round(item.ageDays),
+        freshness: Number(item.freshness.toFixed(2)), provenance: "project_memory",
+        verification: "stored_fact_not_independently_reverified",
+      };
+      const size = JSON.stringify(candidate).length;
+      if (size > remaining) continue;
+      boundedFacts.push(candidate);
+      remaining -= size;
+      if (boundedFacts.length >= 12) break;
+    }
+    const conflicts = detectMemoryConflicts(boundedFacts.map((fact) => ({
+      content: String(fact.content ?? ""),
+      category: typeof fact.category === "string" ? fact.category : undefined,
+      sourceFile: typeof fact.sourceFile === "string" ? fact.sourceFile : undefined,
+    })));
 
     return {
-      version: 1,
-      query,
-      facts: boundedFacts,
-      graphRelations,
-      previousResults: verifiedPreviousResults,
+      version: 2, query, role, phase: phase ?? "unspecified",
+      budget: { maxChars: budgetChars, usedForFacts: budgetChars - remaining },
+      facts: boundedFacts, graphRelations, previousResults: verifiedPreviousResults, conflicts,
       diagnostics: {
-        factsMatched: facts.length,
-        factsIncluded: boundedFacts.length,
+        factsMatched: rawFacts.length, factsEligible: rankedFacts.length,
+        factsIncluded: boundedFacts.length, staleFactsExcluded: rawFacts.length - rankedFacts.length,
         graphRelationsIncluded: graphRelations.length,
         successfulPreviousResultsIncluded: verifiedPreviousResults.length,
+        possibleConflicts: conflicts.length,
       },
       trust: "retrieved_context_untrusted_validate_before_action",
     };
