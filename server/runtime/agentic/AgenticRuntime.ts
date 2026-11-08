@@ -1168,7 +1168,7 @@ export class AgenticRuntime implements IAgentRuntime {
       `OBJECTIF : ${task.goal}`,
       `FICHIERS MODIFIÉS : ${[...session.filesModified].join(", ") || "aucun"}`,
       `OUTILS EXÉCUTÉS : ${[...new Set(session.toolsExecuted)].join(", ") || "aucun"}`,
-      buildObservationHistory(session.observations, 20_000),
+      buildObservationHistory(session.observations, resolveObservationHistoryBudget("recovery")),
       "",
       "Produis une synthèse finale en JSON strict :",
       JSON.stringify({ summary: "", details: "", deliverables: [], suggestions: [] }, null, 0),
