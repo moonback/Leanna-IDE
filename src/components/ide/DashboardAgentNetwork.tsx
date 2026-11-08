@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Activity, Bot, CheckCircle2, CircleAlert, Clock3, GitBranch, Loader2, Radio, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { getAgentTasks, subscribe, type AgentTaskEntry } from '../../stores/agentActivityStore.js';
+import { getAgentTasks, subscribe } from '../../stores/agentActivityStore.js';
 import type { ActivityStep } from '../../hooks/useActivity.js';
 
 interface AgentStat {
