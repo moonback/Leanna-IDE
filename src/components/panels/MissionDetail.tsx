@@ -33,6 +33,7 @@ export interface ExecutionTrace {
     toolCalls: number; maxToolCalls: number;
     readCalls: number; writeCalls: number; verifyCalls: number; recoveryCalls: number;
     tokens?: number; unmeasuredLlmCalls?: number;
+    promptChars?: number; systemPromptChars?: number; promptCalls?: number;
   };
   recoveries: number;
   replans: number;
@@ -372,6 +373,24 @@ function BudgetMeters({ budget }: { budget: ExecutionTrace['budget'] }) {
             {(budget.tokens ?? 0) > 0 ? budget.tokens!.toLocaleString('fr-FR') : 'non mesurés'}
             {(budget.unmeasuredLlmCalls ?? 0) > 0 && ` · ${budget.unmeasuredLlmCalls} appel(s) LLM sans mesure (total partiel)`}
           </span>
+        </div>
+      )}
+      {(budget.promptChars ?? 0) + (budget.systemPromptChars ?? 0) > 0 && (
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="lea-mission-dt">Contexte envoyé (caractères)</span>
+            <span className="tabular-nums">
+              {((budget.promptChars ?? 0) + (budget.systemPromptChars ?? 0)).toLocaleString('fr-FR')}
+            </span>
+          </div>
+          <div className="flex items-center justify-between lea-mission-dt">
+            <span>Prompt utilisateur · système</span>
+            <span className="tabular-nums">{(budget.promptChars ?? 0).toLocaleString('fr-FR')} · {(budget.systemPromptChars ?? 0).toLocaleString('fr-FR')}</span>
+          </div>
+          <div className="flex items-center justify-between lea-mission-dt">
+            <span>Appels LLM observés</span>
+            <span className="tabular-nums">{budget.promptCalls ?? 0}</span>
+          </div>
         </div>
       )}
     </div>
