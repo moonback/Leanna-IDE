@@ -24,7 +24,7 @@ export const DashboardCore = React.memo(function DashboardCore({
 
   return (
     <section
-      className="relative mb-4 flex min-h-[150px] flex-col items-center justify-between gap-4 overflow-hidden rounded-2xl border p-4 sm:flex-row sm:px-6"
+      className="relative mb-2 flex min-h-0 flex-col items-center justify-between gap-2 overflow-hidden rounded-xl border p-2.5 sm:flex-row sm:px-4"
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--border-base))',
         background: 'linear-gradient(115deg, color-mix(in srgb, var(--bg-panel) 96%, var(--accent-primary) 4%), color-mix(in srgb, var(--bg-secondary) 90%, transparent))',
@@ -36,7 +36,7 @@ export const DashboardCore = React.memo(function DashboardCore({
       <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden
         style={{ backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, transparent) 1px, transparent 1px)', backgroundSize: '28px 28px', maskImage: 'linear-gradient(90deg, transparent, black 35%, black 75%, transparent)' }} />
       <div className="relative z-10 flex items-center gap-4">
-        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center" style={{ perspective: '600px' }}>
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center" style={{ perspective: '600px' }}>
           <motion.div className="absolute inset-1 rounded-full border"
             style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 55%, transparent)', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 18%, transparent)' }}
             animate={reduce ? undefined : { rotate: 360 }}
@@ -49,15 +49,15 @@ export const DashboardCore = React.memo(function DashboardCore({
             style={{ background: `radial-gradient(circle, color-mix(in srgb, ${accent} 35%, transparent), color-mix(in srgb, ${accent} 8%, transparent) 65%, transparent)`, boxShadow: `0 0 30px color-mix(in srgb, ${accent} 24%, transparent)` }}
             animate={reduce ? undefined : { scale: [0.92, 1.08, 0.92], opacity: [0.72, 1, 0.72] }}
             transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
-          <Bot size={25} style={{ color: 'var(--text-primary)', zIndex: 1, filter: `drop-shadow(0 0 8px ${accent})` }} />
+          <Bot size={20} style={{ color: 'var(--text-primary)', zIndex: 1, filter: `drop-shadow(0 0 8px ${accent})` }} />
           <span className="absolute right-2 top-3 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 12px ${accent}` }} />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--accent-primary)' }}>
             <Activity size={12} /> Centre de contrôle
           </div>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{aiName} Core</h2>
-          <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <h2 className="mt-0.5 text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{aiName} Core</h2>
+          <div className="mt-0.5 flex items-center gap-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
             {status}
           </div>
