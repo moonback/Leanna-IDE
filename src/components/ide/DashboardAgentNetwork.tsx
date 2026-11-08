@@ -69,6 +69,14 @@ async function fetchJSON<T>(url: string): Promise<T> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json() as Promise<T>;
 }
+function agentTeam(role: string): string {
+  const value = role.toLowerCase();
+  if (/coder|code|debug|refactor|architect|writer|formatter/.test(value)) return 'Code';
+  if (/test|review|security|accessibility|performance|proofread/.test(value)) return 'Qualité';
+  if (/research|vision|seo|translat|summar|documentation/.test(value)) return 'Recherche';
+  if (/plan|planner/.test(value)) return 'Orchestration';
+  return 'Autres';
+}
 function timeAgo(ms: number): string {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
   return s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
@@ -189,6 +197,11 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   const [hoverRole, setHoverRole] = useState<string | null>(null);
   const [userPaused, setUserPaused] = useState(false);
   const [pingKey, setPingKey] = useState(0);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+  const [taskLog, setTaskLog] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!filterOpen) return;
@@ -314,6 +327,47 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
   }, [hoverRole, delegations]);
   const selectAgent = useCallback((role: string) => setSelectedRole(value => value === role ? null : role), []);
   const ping = () => { setPingKey(key => key + 1); void refresh(); };
+  const assignTask = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedAgent || !taskTitle.trim() || !taskDescription.trim() || actionBusy) return;
+    setActionBusy(true); setActionError('');
+    try {
+      const response = await fetch('/api/agents/delegate-autonomous', {
+        method: 'POST', headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedAgent.role, title: taskTitle.trim(), description: taskDescription.trim(), priority: 'medium' }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setTaskTitle(''); setTaskDescription('');
+      await refresh();
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'Délégation impossible.'); }
+    finally { setActionBusy(false); }
+  }, [selectedAgent, taskTitle, taskDescription, actionBusy, refresh]);
+  const cancelTask = useCallback(async (taskId: string) => {
+    if (actionBusy) return;
+    setActionBusy(true); setActionError('');
+    try {
+      const response = await fetch(`/api/agents/tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST', headers: apiHeaders() });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      await refresh();
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'Annulation impossible.'); }
+    finally { setActionBusy(false); }
+  }, [actionBusy, refresh]);
+  const openTaskLog = useCallback(async (taskId: string) => {
+    setTaskLog('Chargement des journaux…');
+    try {
+      const data = await fetchJSON<{ task?: { title?: string; status?: string; result?: { summary?: string; details?: string; error?: string; evidence?: { toolsExecuted?: string[]; commandsExecuted?: string[]; verification?: { checks?: string[]; errors?: string[] } } }; execution?: { steps?: Array<{ description?: string; status?: string }> } } }>(`/api/agents/tasks/${encodeURIComponent(taskId)}`);
+      const task = data.task;
+      setTaskLog([task?.title, `État : ${task?.status ?? 'inconnu'}`, task?.result?.summary, task?.result?.error, task?.result?.details,
+        ...(task?.execution?.steps ?? []).map(step => `[${step.status ?? '—'}] ${step.description ?? ''}`),
+        ...(task?.result?.evidence?.toolsExecuted ?? []).map(tool => `Outil : ${tool}`),
+        ...(task?.result?.evidence?.commandsExecuted ?? []).map(command => `Commande : ${command}`),
+        ...(task?.result?.evidence?.verification?.checks ?? []).map(check => `Vérification : ${check}`),
+        ...(task?.result?.evidence?.verification?.errors ?? []).map(error => `Erreur de vérification : ${error}`),
+      ].filter(Boolean).join('\n'));
+    } catch (error) { setTaskLog(error instanceof Error ? error.message : 'Journaux indisponibles.'); }
+  }, []);
 
   // Parallaxe 3D : la scène s'incline légèrement en suivant le pointeur.
   const tiltX = useMotionValue(0), tiltY = useMotionValue(0);
@@ -446,8 +500,10 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
                     agents={visibleAgents.map(agent => {
                       const current = runningTaskByRole.get(agent.role);
                       return { role: agent.role, name: agent.name, status: agent.status, busy: agent.runningTasks > 0,
+                        team: agentTeam(agent.role), runningTasks: agent.runningTasks, queuedTasks: agent.queuedTasks,
                         caption: current ? (current.progress?.label || current.title) : (STATUS_LABEL[agent.status] ?? agent.status) };
                     })}
+                    messages={messages}
                     selectedRole={selectedRole} hoverRole={hoverRole} orchestrating={orchestrating} paused={userPaused} reduce={reduce}
                     onSelect={selectAgent} onHover={setHoverRole} onUnavailable={onWebglUnavailable}/>
                 </Suspense>
@@ -647,13 +703,43 @@ export const DashboardAgentNetwork = React.memo(function DashboardAgentNetwork({
               <span>{selectedAgent.runningTasks} mission(s) active(s)</span><span>{selectedAgent.queuedTasks} en attente</span>
               <span>{messages.filter(message => message.from === selectedAgent.role || message.to === selectedAgent.role).length} échanges récents</span>
             </div>
-            {selectedTasks.length ? <ul className="space-y-1.5">
-              {selectedTasks.map(task => <li key={task.id} className="flex items-start gap-2 text-xs">
-                {task.status === 'running' ? <Loader2 size={12} className="mt-0.5 shrink-0 animate-spin" style={{ color: 'var(--accent-primary)' }}/> : TERMINAL.has(task.status) ? <CheckCircle2 size={12} className="mt-0.5 shrink-0" style={{ color: task.status === 'failed' || task.status === 'incomplete' ? 'var(--color-error)' : 'var(--color-success)' }}/> : <Clock3 size={12} className="mt-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}/>}
-                <span className="min-w-0 flex-1" style={{ color: 'var(--text-primary)' }}>{task.title}</span>
-                <span className="shrink-0 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{TASK_LABEL[task.status] ?? task.status}</span>
+            <div className="mb-3 rounded-lg border p-2.5" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-secondary)' }}>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Confier une mission</div>
+              <form onSubmit={assignTask} className="space-y-2">
+                <input value={taskTitle} onChange={event => setTaskTitle(event.target.value)} required maxLength={160} placeholder="Titre de la mission"
+                  className="w-full rounded-md border px-2.5 py-2 text-xs outline-none focus:border-[var(--accent-primary)]"
+                  style={{ borderColor: 'var(--border-base)', background: 'var(--bg-panel)', color: 'var(--text-primary)' }}/>
+                <textarea value={taskDescription} onChange={event => setTaskDescription(event.target.value)} required rows={2} maxLength={8000} placeholder="Instructions détaillées pour l'agent…"
+                  className="w-full resize-y rounded-md border px-2.5 py-2 text-xs outline-none focus:border-[var(--accent-primary)]"
+                  style={{ borderColor: 'var(--border-base)', background: 'var(--bg-panel)', color: 'var(--text-primary)' }}/>
+                <button type="submit" disabled={actionBusy || !taskTitle.trim() || !taskDescription.trim()}
+                  className="rounded-md px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                  style={{ background: 'var(--accent-primary)', color: '#fff' }}>{actionBusy ? 'Traitement…' : 'Déléguer à cet agent'}</button>
+              </form>
+              {actionError && <p role="alert" className="mt-2 text-[10px]" style={{ color: 'var(--color-error)' }}>{actionError}</p>}
+            </div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Missions et journaux</div>
+            {selectedTasks.length ? <ul className="space-y-2">
+              {selectedTasks.map(task => <li key={task.id} className="rounded-md border p-2" style={{ borderColor: 'var(--border-base)' }}>
+                <div className="flex items-start gap-2 text-xs">
+                  {task.status === 'running' ? <Loader2 size={12} className="mt-0.5 shrink-0 animate-spin" style={{ color: 'var(--accent-primary)' }}/> : TERMINAL.has(task.status) ? <CheckCircle2 size={12} className="mt-0.5 shrink-0" style={{ color: task.status === 'failed' || task.status === 'incomplete' ? 'var(--color-error)' : 'var(--color-success)' }}/> : <Clock3 size={12} className="mt-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}/>}
+                  <span className="min-w-0 flex-1" style={{ color: 'var(--text-primary)' }}>{task.title}</span>
+                  <span className="shrink-0 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{TASK_LABEL[task.status] ?? task.status}</span>
+                </div>
+                {(task.status === 'running' || task.status === 'pending') && <button type="button" disabled={actionBusy} onClick={() => void cancelTask(task.id)}
+                  className="mt-1.5 rounded border px-2 py-1 text-[10px] disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>Annuler la mission</button>}
+                <button type="button" onClick={() => void openTaskLog(task.id)} className="ml-2 mt-1.5 rounded border px-2 py-1 text-[10px]"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>Ouvrir les journaux</button>
+                {task.summary && <p className="mt-1 text-[10px]" style={{ color: 'var(--text-dimmed)' }}>{task.summary}</p>}
               </li>)}
             </ul> : <p className="text-[11px]" style={{ color: 'var(--text-dimmed)' }}>Aucune mission récente attribuée à cet agent.</p>}
+            {taskLog && <div className="mt-3 rounded-lg border p-2" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-secondary)' }}>
+              <div className="mb-1 flex items-center justify-between text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Journal d'exécution <button type="button" onClick={() => setTaskLog(null)} aria-label="Fermer les journaux">×</button>
+              </div>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[10px]" style={{ color: 'var(--text-secondary)' }}>{taskLog}</pre>
+            </div>}
           </Modal.Body>
         )}
       </Modal>
