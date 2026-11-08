@@ -395,10 +395,12 @@ export class AutonomousAgent {
           ? ((payload.context as Record<string, unknown>).successCriteria as string[])
           : undefined,
         metadata: {
+          ...((payload.context as Record<string, unknown>) ?? {}),
+          // Les champs système restent autoritaires : le contexte transmis
+          // par un agent parent ne peut pas usurper l'identité ni le mode.
           delegatedBy: message.from,
           autonomous: isAutonomous,
           negotiation: message.metadata?.negotiated === true,
-          ...((payload.context as Record<string, unknown>) ?? {}),
         },
       },
       createdAt: new Date().toISOString(),
