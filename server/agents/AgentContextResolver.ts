@@ -199,7 +199,7 @@ export class AgentContextResolver {
     const graphRelations = selectedFiles.slice(0, 8).map((file) => {
       const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
-      const dependencies = knowledgeGraph.getDependencies(file).map((item) => item.replace(/\\/g, "/"))
+      const dependents = knowledgeGraph.getDependents(file).map((item) => item.replace(/\\/g, "/"))
         .filter((item) => selectedSet.has(item)).slice(0, 5);
       return { file, dependencies, dependents };
     }).filter((item) => item.dependencies.length > 0 || item.dependents.length > 0);
