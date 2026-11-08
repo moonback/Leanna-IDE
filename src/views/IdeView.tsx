@@ -677,9 +677,9 @@ export default function IdeView() {
       }
 
       const restoredMessages = allMessages
-        .filter((message: { role?: string; content?: unknown }) =>
+        .filter((message): message is { id?: string; role: 'user' | 'assistant'; content: string; created_at?: string } =>
           (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
-        .map((message: { id?: string; role: 'user' | 'assistant'; content: string; created_at?: string }, index: number) => ({
+        .map((message, index) => ({
           id: message.id || `restored-${conversationId}-${index}`,
           role: message.role,
           text: message.content,
