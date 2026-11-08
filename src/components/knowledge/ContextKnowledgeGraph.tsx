@@ -23,6 +23,7 @@ type GraphNode = {
 type GraphEdge = { source: number; target: number; relation: GraphRelation };
 type Props = {
   relations: GraphRelation[];
+  loadedRelations: number;
   loading: boolean;
   query: string;
   onQueryChange: (value: string) => void;
@@ -402,7 +403,7 @@ export default function ContextKnowledgeGraph({
         </aside>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-[10px]" style={{ borderColor: 'var(--border-base)', ...mutedStyle }}>
-        <span>{relations.length} relation(s) chargée(s) / {totalRelations} au total</span>
+        <span>{loadedRelations} relation(s) chargée(s) / {totalRelations} au total</span>
         <div className="flex items-center gap-3">
           {hasMore && <button type="button" onClick={onLoadMore} disabled={loadingMore} className="rounded-md border px-2 py-1 font-medium disabled:opacity-50" style={{ borderColor: 'var(--border-base)', color: 'var(--accent-secondary)' }}>{loadingMore ? 'Chargement…' : 'Charger 100 relations suivantes'}</button>}
           <span>Simulation locale · données source inchangées</span>
