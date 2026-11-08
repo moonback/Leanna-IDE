@@ -742,23 +742,6 @@ export class UnderstandingEngine {
       }
     }
 
-    // 2. Gouvernance mémoire v3 : vérifier la présence des sources et retirer
-    // les doublons/faits périmés du contexte injecté. Les faits restent persistés.
-    const workspaceFiles = new Set(Object.keys(knowledgeGraph.getState().files ?? {}));
-    const governance = contextIntelligence.assess({ facts: working.facts, workspaceFiles });
-    const eligibleIds = new Set(governance.assessments
-      .filter((item) => item.decision === "keep" || item.decision === "transmit")
-      .map((item) => item.factId));
-    working.memoryGovernance = {
-      assessed: governance.assessments.length,
-      included: eligibleIds.size,
-      withheld: governance.assessments.length - eligibleIds.size,
-      counts: governance.counts,
-    };
-    working.facts = working.facts.filter((fact) => eligibleIds.has(fact.id));
-
-    // 3. Respect du budget token approximatif
-    working.quality = semanticSearch.estimateQuality(working.files, working.facts);
     if (opts.detail === "compact") {
       working.files = working.files.map((f) => ({
         ...f,
@@ -775,16 +758,32 @@ export class UnderstandingEngine {
       }
     }
 
-    // 3. PrimaryFile : si pas déjà défini, prendre le plus pertinent
+    // 3. Gouvernance mémoire v3 après toutes les stratégies et enrichissements
+    // (y compris verbose) afin qu'aucune branche ne réinjecte un fait non validé.
+    const workspaceFiles = new Set(Object.keys(knowledgeGraph.getState().files ?? {}));
+    const governance = contextIntelligence.assess({ facts: working.facts, workspaceFiles });
+    const eligibleIds = new Set(governance.assessments
+      .filter((item) => item.decision === "keep" || item.decision === "transmit")
+      .map((item) => item.factId));
+    working.memoryGovernance = {
+      assessed: governance.assessments.length,
+      included: eligibleIds.size,
+      withheld: governance.assessments.length - eligibleIds.size,
+      counts: governance.counts,
+    };
+    working.facts = working.facts.filter((fact) => eligibleIds.has(fact.id));
+    working.quality = semanticSearch.estimateQuality(working.files, working.facts);
+
+    // 4. PrimaryFile : si pas déjà défini, prendre le plus pertinent
     if (!working.primaryFile && working.files.length > 0) {
       working.primaryFile = working.files[0].filePath;
     }
 
-    // 4. Appliquer réellement le budget : cette limite portait auparavant
+    // 5. Appliquer réellement le budget : cette limite portait auparavant
     // uniquement le nom maxTokenBudget sans réduire le batch retourné.
     const budgeted = this.enforceTokenBudget(working, opts.maxTokenBudget);
 
-    // 5. Qualité recalculée après sélection, pour ne pas annoncer une qualité
+    // 6. Qualité recalculée après sélection, pour ne pas annoncer une qualité
     // basée sur des fichiers/faits qui ne seront finalement pas transmis.
     budgeted.quality = semanticSearch.estimateQuality(budgeted.files, budgeted.facts);
     return budgeted;
