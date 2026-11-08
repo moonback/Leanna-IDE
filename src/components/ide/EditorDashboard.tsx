@@ -1063,7 +1063,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             >
               <Command size={14} style={{ color: 'var(--accent-primary)' }} /> Commandes
             </motion.button>
-            <div className="relative">
+            {/* <div className="relative">
               <motion.button
                 type="button"
                 onClick={() => setQuickMenuOpen(value => !value)}
@@ -1108,7 +1108,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </div> */}
           </nav>
         </motion.header>
 

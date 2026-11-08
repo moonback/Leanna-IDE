@@ -3158,3 +3158,6 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .dash-sweep, .dash-particle { animation: none; }
 }
+@keyframes dash-flow { to { stroke-dashoffset: -24; } }
+.dash-flow { animation: dash-flow .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .dash-flow { animation: none; } }
