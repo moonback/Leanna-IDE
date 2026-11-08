@@ -24,7 +24,11 @@ function timestamp(value: string): number { const parsed = Date.parse(value); re
 export class ContextIntelligenceEngine {
   assess(input: { facts: ProjectFact[]; workspaceFiles: ReadonlySet<string>; missions?: VerifiedMissionLearning[] }, options: ContextIntelligenceOptions = {}): ContextIntelligenceReport {
     const config = { ...DEFAULTS, ...options }, now = config.now ?? Date.now();
-    const ranked = [...input.facts].sort((a, b) => (b.confidence * (1 + b.usageCount)) - (a.confidence * (1 + a.usageCount)));
+    const sourceIsCurrent = (fact: ProjectFact): boolean => !fact.sourceFile ||
+      input.workspaceFiles.has(fact.sourceFile.replace(/\\/g, "/"));
+    const rank = (fact: ProjectFact): number =>
+      (sourceIsCurrent(fact) ? 10 : 0) + fact.confidence * (1 + fact.usageCount);
+    const ranked = [...input.facts].sort((a, b) => rank(b) - rank(a));
     const assessments: ContextFactAssessment[] = [], canonical: ProjectFact[] = [];
     for (const fact of ranked) {
       const age = Math.max(0, now - timestamp(fact.updatedAt || fact.createdAt));
