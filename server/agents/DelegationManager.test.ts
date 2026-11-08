@@ -278,4 +278,19 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
 
     assert.equal(selected[0], "server/runtime/ToolRegistry.ts");
   });
+
+  it("respecte le budget global et le quota par fichier lors de la lecture", async () => {
+    const reader = new AgentContextResolver(async (_tool, args) => ({
+      content: String(args.path).repeat(4_000),
+    }));
+    const selected = await reader.readContextFiles(["src/primary.ts", "src/secondary.ts", "src/third.ts"], {
+      maxTotalChars: 4_000,
+      maxPerFileChars: 1_500,
+    });
+
+    assert.ok(selected.length > 0);
+    assert.ok(selected.reduce((sum, item) => sum + item.length, 0) <= 4_000);
+    assert.ok(selected.every((item) => item.length <= 1_700));
+    assert.ok(selected[0]?.includes("CONTENU TRONQUÉ"));
+  });
 });
