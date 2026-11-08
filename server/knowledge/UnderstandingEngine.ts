@@ -275,7 +275,20 @@ export class UnderstandingEngine {
    */
   buildContext(query: string, options: BuildContextOptions = {}): UnderstandingContext {
     const t0 = Date.now();
-    const opts = { ...DEFAULTS, ...options };
+    // Les routes construisent parfois l'objet options avec des propriétés
+    // explicitement undefined (valeurs absentes du body HTTP). Un spread brut
+    // écraserait alors les valeurs par défaut et ferait notamment planter
+    // computeUnderstandingScore() sur existingContext.map().
+    const definedOptions = Object.fromEntries(
+      Object.entries(options).filter(([, value]) => value !== undefined)
+    ) as Partial<BuildContextOptions>;
+    const opts = {
+      ...DEFAULTS,
+      ...definedOptions,
+      existingContext: Array.isArray(definedOptions.existingContext)
+        ? definedOptions.existingContext.filter((item): item is string => typeof item === "string")
+        : DEFAULTS.existingContext,
+    };
     const q = query.trim();
     if (q.length === 0) return this.emptyContext(q, opts, Date.now() - t0);
 
