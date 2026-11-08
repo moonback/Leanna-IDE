@@ -46,6 +46,7 @@ export default function ContextIntelligenceView() {
   const [loadingRelations, setLoadingRelations] = useState(false);
   const [context, setContext] = useState<ContextResult | null>(null);
   const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
+  const [inspectionHistory, setInspectionHistory] = useState<ContextResult[]>([]);
   const [loadingFacts, setLoadingFacts] = useState(true);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +117,7 @@ export default function ContextIntelligenceView() {
       if (!response.ok || data.status !== 'success' || !data.context) throw new Error(data.error || 'Impossible de construire le contexte');
       setPreviousContext(context);
       setContext(data.context as ContextResult);
+      setInspectionHistory(previous => [...previous, data.context as ContextResult].slice(-20));
       setTab('inspector');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Erreur pendant l’inspection');
@@ -227,7 +229,11 @@ export default function ContextIntelligenceView() {
             <div className="rounded-xl border p-3" style={panelStyle}><div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Doublons exacts potentiels</h3><span className="text-xs" style={mutedStyle}>{duplicateGroups.length} groupe(s)</span></div><p className="mt-1 text-[10px]" style={mutedStyle}>Regroupement local sur le texte normalisé ; les similarités sémantiques ne sont pas évaluées et aucune fusion n'est automatique.</p>{duplicateGroups.map(group => <div key={group[0].id} className="mt-2 rounded-lg p-2 text-xs" style={{ backgroundColor: 'var(--bg-secondary)' }}><p style={{ color: 'var(--text-primary)' }}>{group[0].content}</p><p className="mt-1 text-[10px]" style={mutedStyle}>{group.length} occurrences · {group.map(f => f.sourceFile || 'source inconnue').join(' · ')}</p></div>)}</div>
           </section>}
 
-          {tab === 'timeline' && <div className="rounded-xl border p-5" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Historique de la dernière inspection</h3>{context ? <div className="mt-3 space-y-2 text-xs" style={mutedStyle}><p>{new Date(context.generatedAt).toLocaleString('fr-FR')} — Contexte construit en {context.computationMs} ms.</p><p>{context.batch.memoryGovernance?.assessed ?? 0} fait(s) évalué(s), {context.batch.memoryGovernance?.included ?? 0} inclus, {context.batch.memoryGovernance?.withheld ?? 0} écartés.</p></div> : <p className="mt-2 text-xs" style={mutedStyle}>L'historique persistant des décisions n'est pas encore exposé par l'API. Les événements de cette session seront visibles après inspection.</p>}</div>}
+          {tab === 'timeline' && <div className="space-y-2">
+            <div className="rounded-xl border p-4" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Historique des inspections de cette session</h3><p className="mt-1 text-xs" style={mutedStyle}>Les 20 dernières inspections sont conservées en mémoire dans cette vue. Cet historique n'est pas persistant après fermeture ou rechargement.</p></div>
+            {inspectionHistory.slice().reverse().map((entry,index) => <button key={entry.generatedAt + ':' + index} type="button" onClick={() => { setPreviousContext(inspectionHistory[Math.max(0, inspectionHistory.length - 2 - index)] ?? null); setContext(entry); setQuery(entry.query); setTab('inspector'); }} className="w-full rounded-lg border p-3 text-left" style={panelStyle}><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{entry.query}</span><span className="text-[10px]" style={mutedStyle}>{new Date(entry.generatedAt).toLocaleString('fr-FR')}</span></div><p className="mt-1 text-[11px]" style={mutedStyle}>{entry.batch.facts.length} faits · {entry.batch.files.length} fichiers · {entry.computationMs} ms</p></button>)}
+            {inspectionHistory.length === 0 && <p className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Aucune inspection dans cette session.</p>}
+          </div>}
 
           {tab === 'graph' && <div className="space-y-3">
             <div className="rounded-xl border p-4" style={panelStyle}><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>KnowledgeGraph — relations indexées</h3><span className="text-xs" style={mutedStyle}>{relations.length} relations chargées</span></div><p className="mt-1 text-xs" style={mutedStyle}>Données issues de GET /api/knowledge/relations, limitées aux 100 premières relations par l'API.</p></div>
