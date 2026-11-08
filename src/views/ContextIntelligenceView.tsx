@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, BrainCircuit, Clock3, FileSearch, GitBranch, RefreshCw, Search, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Activity, AlertTriangle, BrainCircuit, Clock3, FileSearch, GitBranch, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { viewHeaderProps } from '../config/navigation.js';
 
@@ -138,6 +138,22 @@ export default function ContextIntelligenceView() {
   const addedFiles = context?.batch.files.filter(f => !previousFiles.has(f.filePath)) ?? [];
   const removedFiles = previousContext?.batch.files.filter(f => !currentFiles.has(f.filePath)) ?? [];
   const estimatedPromptTokens = context ? Math.ceil(context.systemPromptInject.length / 4) : 0;
+  const previousEstimatedTokens = previousContext ? Math.ceil(previousContext.systemPromptInject.length / 4) : 0;
+  const tokenDelta = estimatedPromptTokens - previousEstimatedTokens;
+  const memoryHealthScore = context
+    ? Math.round(Math.max(0, Math.min(1, context.health.freshness)) * 50 + Math.max(0, Math.min(1, context.batch.quality.averageConfidence)) * 50)
+    : null;
+  const duplicateGroups = (() => {
+    const groups = new Map<string, Fact[]>();
+    for (const fact of facts) {
+      const normalized = fact.content.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+      if (!normalized) continue;
+      const group = groups.get(normalized) ?? [];
+      group.push(fact);
+      groups.set(normalized, group);
+    }
+    return [...groups.values()].filter(group => group.length > 1);
+  })();
   const governance = context?.batch.memoryGovernance;
   const Stat = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => (
     <div className="min-w-0 rounded-xl border p-3" style={panelStyle}>
@@ -176,6 +192,7 @@ export default function ContextIntelligenceView() {
           {tab === 'overview' && <>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <Stat label="Faits en mémoire" value={fmt(facts.length)} hint="Source : ProjectMemory" />
+              <Stat label="Santé du contexte" value={memoryHealthScore === null ? "—" : memoryHealthScore + "/100"} hint="50 % fraîcheur · 50 % confiance moyenne" />
               <Stat label="Faits évalués" value={governance?.assessed ?? '—'} hint="Dernière inspection" />
               <Stat label="Faits injectés" value={governance?.included ?? '—'} hint="Dernière inspection" />
               <Stat label="Faits écartés" value={governance?.withheld ?? '—'} hint="Dernière inspection" />
@@ -197,7 +214,7 @@ export default function ContextIntelligenceView() {
 
           {tab === 'diff' && <div className="space-y-3">
             {!context || !previousContext ? <div className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Le comparateur devient disponible après deux inspections successives. La comparaison porte sur les identifiants de faits et chemins de fichiers retournés par UnderstandingEngine.</div> : <>
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Stat label="Faits ajoutés" value={addedFacts.length}/><Stat label="Faits retirés" value={removedFacts.length}/><Stat label="Fichiers ajoutés" value={addedFiles.length}/><Stat label="Fichiers retirés" value={removedFiles.length}/></div>
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Stat label="Faits ajoutés" value={addedFacts.length}/><Stat label="Faits retirés" value={removedFacts.length}/><Stat label="Fichiers ajoutés" value={addedFiles.length}/><Stat label="Fichiers retirés" value={removedFiles.length}/><Stat label="Écart tokens estimés" value={(tokenDelta > 0 ? "+" : "") + fmt(tokenDelta)} hint="Estimation caractères / 4" /></div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border p-3" style={panelStyle}><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Nouveaux éléments</h3><p className="mt-2 text-[11px]" style={mutedStyle}>Faits</p>{addedFacts.map(f => <p key={f.id} className="border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>{f.content}</p>)}<p className="mt-2 text-[11px]" style={mutedStyle}>Fichiers</p>{addedFiles.map(f => <p key={f.filePath} className="py-1 font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{f.filePath}</p>)}</div>
                 <div className="rounded-xl border p-3" style={panelStyle}><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Éléments retirés</h3><p className="mt-2 text-[11px]" style={mutedStyle}>Faits</p>{removedFacts.map(f => <p key={f.id} className="border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>{f.content}</p>)}<p className="mt-2 text-[11px]" style={mutedStyle}>Fichiers</p>{removedFiles.map(f => <p key={f.filePath} className="py-1 font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{f.filePath}</p>)}</div>
@@ -206,7 +223,9 @@ export default function ContextIntelligenceView() {
             </>}
           </div>}
 
-          {tab === 'memory' && <section className="space-y-3"><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={mutedStyle}/><input value={memoryQuery} onChange={e => setMemoryQuery(e.target.value)} placeholder="Rechercher un fait, une catégorie ou un fichier source…" className="w-full rounded-lg border py-2 pl-9 pr-3 text-xs" style={{ ...panelStyle, color: 'var(--text-primary)' }}/></div>{loadingFacts || memorySearching ? <p className="text-xs" style={mutedStyle}>Recherche…</p> : visibleFacts.map(fact => <article key={fact.id} className="rounded-xl border p-3" style={panelStyle}><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--accent-secondary)' }}>{fact.category}</span><span className="text-[11px]" style={mutedStyle}>Confiance {Math.round(fact.confidence * 100)}% · {fact.usageCount} utilisation(s)</span></div><p className="mt-2 text-xs" style={{ color: 'var(--text-primary)' }}>{fact.content}</p><p className="mt-2 truncate font-mono text-[10px]" style={mutedStyle}>{fact.sourceFile || 'Source non renseignée'}</p></article>)}{!loadingFacts && visibleFacts.length === 0 && <p className="py-6 text-center text-xs" style={mutedStyle}>Aucun fait correspondant.</p>}</section>}
+          {tab === 'memory' && <section className="space-y-3"><div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={mutedStyle}/><input value={memoryQuery} onChange={e => setMemoryQuery(e.target.value)} placeholder="Rechercher un fait, une catégorie ou un fichier source…" className="w-full rounded-lg border py-2 pl-9 pr-3 text-xs" style={{ ...panelStyle, color: 'var(--text-primary)' }}/></div>{loadingFacts || memorySearching ? <p className="text-xs" style={mutedStyle}>Recherche…</p> : visibleFacts.map(fact => <article key={fact.id} className="rounded-xl border p-3" style={panelStyle}><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--accent-secondary)' }}>{fact.category}</span><span className="text-[11px]" style={mutedStyle}>Confiance {Math.round(fact.confidence * 100)}% · {fact.usageCount} utilisation(s)</span></div><p className="mt-2 text-xs" style={{ color: 'var(--text-primary)' }}>{fact.content}</p><p className="mt-2 truncate font-mono text-[10px]" style={mutedStyle}>{fact.sourceFile || 'Source non renseignée'}</p></article>)}{!loadingFacts && visibleFacts.length === 0 && <p className="py-6 text-center text-xs" style={mutedStyle}>Aucun fait correspondant.</p>}
+            <div className="rounded-xl border p-3" style={panelStyle}><div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Doublons exacts potentiels</h3><span className="text-xs" style={mutedStyle}>{duplicateGroups.length} groupe(s)</span></div><p className="mt-1 text-[10px]" style={mutedStyle}>Regroupement local sur le texte normalisé ; les similarités sémantiques ne sont pas évaluées et aucune fusion n'est automatique.</p>{duplicateGroups.map(group => <div key={group[0].id} className="mt-2 rounded-lg p-2 text-xs" style={{ backgroundColor: 'var(--bg-secondary)' }}><p style={{ color: 'var(--text-primary)' }}>{group[0].content}</p><p className="mt-1 text-[10px]" style={mutedStyle}>{group.length} occurrences · {group.map(f => f.sourceFile || 'source inconnue').join(' · ')}</p></div>)}</div>
+          </section>}
 
           {tab === 'timeline' && <div className="rounded-xl border p-5" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Historique de la dernière inspection</h3>{context ? <div className="mt-3 space-y-2 text-xs" style={mutedStyle}><p>{new Date(context.generatedAt).toLocaleString('fr-FR')} — Contexte construit en {context.computationMs} ms.</p><p>{context.batch.memoryGovernance?.assessed ?? 0} fait(s) évalué(s), {context.batch.memoryGovernance?.included ?? 0} inclus, {context.batch.memoryGovernance?.withheld ?? 0} écartés.</p></div> : <p className="mt-2 text-xs" style={mutedStyle}>L'historique persistant des décisions n'est pas encore exposé par l'API. Les événements de cette session seront visibles après inspection.</p>}</div>}
 
