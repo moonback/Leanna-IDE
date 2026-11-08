@@ -803,6 +803,21 @@ export class Executor {
       },
     });
 
+    // Finalize the domain mission only after the Supervisor has committed
+    // or conclusively escalated it. A quarantined/live runner must remain active.
+    if (
+      mission.isCompleted() &&
+      !result.recoveryRequired &&
+      result.finalState !== "RECOVERY_REQUIRED" &&
+      !this.finalizedMissions.has(mission.id)
+    ) {
+      this.finalizeMission(mission);
+      const success = mission.status === "completed";
+      telemetryService.endMissionTrace(mission.id, success);
+      telemetryService.clearMissionBudget(mission.id);
+      this.emit("mission_completed", { missionId: mission.id, success });
+    }
+
     this.emit("mission_supervised", {
       missionId: mission.id,
       lifecycleState: result.finalState,
