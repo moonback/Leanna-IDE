@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, BrainCircuit, Clock3, FileSearch, GitBranch, R
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { viewHeaderProps } from '../config/navigation.js';
 
-type Tab = 'overview' | 'inspector' | 'memory' | 'timeline' | 'graph' | 'alerts' | 'approval';
+type Tab = 'overview' | 'inspector' | 'diff' | 'memory' | 'timeline' | 'graph' | 'alerts' | 'approval';
 type Fact = { id: string; content: string; category: string; confidence: number; usageCount: number; sourceFile?: string; createdAt: string; updatedAt: string };
 type ContextResult = {
   query: string;
@@ -22,6 +22,7 @@ type ContextResult = {
 const TABS: Array<{ id: Tab; label: string; icon: typeof Activity }> = [
   { id: 'overview', label: 'Vue globale', icon: Activity },
   { id: 'inspector', label: 'Context Inspector', icon: FileSearch },
+  { id: 'diff', label: 'Comparateur', icon: GitBranch },
   { id: 'memory', label: 'Mémoire', icon: BrainCircuit },
   { id: 'timeline', label: 'Historique', icon: Clock3 },
   { id: 'graph', label: 'Graphe', icon: GitBranch },
@@ -39,6 +40,7 @@ export default function ContextIntelligenceView() {
   const [memoryQuery, setMemoryQuery] = useState('');
   const [facts, setFacts] = useState<Fact[]>([]);
   const [context, setContext] = useState<ContextResult | null>(null);
+  const [previousContext, setPreviousContext] = useState<ContextResult | null>(null);
   const [loadingFacts, setLoadingFacts] = useState(true);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export default function ContextIntelligenceView() {
       });
       const data = await response.json();
       if (!response.ok || data.status !== 'success' || !data.context) throw new Error(data.error || 'Impossible de construire le contexte');
+      setPreviousContext(context);
       setContext(data.context as ContextResult);
       setTab('inspector');
     } catch (cause) {
@@ -79,7 +82,7 @@ export default function ContextIntelligenceView() {
     } finally {
       setBuilding(false);
     }
-  }, [query]);
+  }, [query, context]);
 
   const visibleFacts = useMemo(() => {
     const term = memoryQuery.trim().toLocaleLowerCase();
@@ -141,6 +144,17 @@ export default function ContextIntelligenceView() {
               <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Stat label="Durée de calcul" value={context.computationMs + ' ms'} /><Stat label="Tokens estimés" value={fmt(estimatedPromptTokens)} hint="Estimation caractères / 4, pas un comptage provider" /><Stat label="Faits retenus" value={context.batch.facts.length} /><Stat label="Fichiers pertinents" value={context.batch.files.length} /></div>
               <div className="rounded-xl border p-4" style={panelStyle}><div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}><Sparkles size={14}/> Aperçu du prompt construit</div><pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg p-3 text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>{context.systemPromptInject || 'Aucun prompt généré.'}</pre></div>
               <div className="rounded-xl border p-4" style={panelStyle}><h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Fichiers sélectionnés</h3>{context.batch.files.map(file => <div key={file.filePath} className="flex flex-wrap justify-between gap-2 border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--border-base)' }}><span className="font-mono" style={{ color: 'var(--text-primary)' }}>{file.filePath}</span><span style={mutedStyle}>{Math.round(file.relevance * 100)}% · {file.reason}</span></div>)}</div>
+            </>}
+          </div>}
+
+          {tab === 'diff' && <div className="space-y-3">
+            {!context || !previousContext ? <div className="rounded-xl border p-5 text-xs" style={{ ...panelStyle, ...mutedStyle }}>Le comparateur devient disponible après deux inspections successives. La comparaison porte sur les identifiants de faits et chemins de fichiers retournés par UnderstandingEngine.</div> : <>
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Stat label="Faits ajoutés" value={addedFacts.length}/><Stat label="Faits retirés" value={removedFacts.length}/><Stat label="Fichiers ajoutés" value={addedFiles.length}/><Stat label="Fichiers retirés" value={removedFiles.length}/></div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border p-3" style={panelStyle}><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Nouveaux éléments</h3><p className="mt-2 text-[11px]" style={mutedStyle}>Faits</p>{addedFacts.map(f => <p key={f.id} className="border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>{f.content}</p>)}<p className="mt-2 text-[11px]" style={mutedStyle}>Fichiers</p>{addedFiles.map(f => <p key={f.filePath} className="py-1 font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{f.filePath}</p>)}</div>
+                <div className="rounded-xl border p-3" style={panelStyle}><h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Éléments retirés</h3><p className="mt-2 text-[11px]" style={mutedStyle}>Faits</p>{removedFacts.map(f => <p key={f.id} className="border-b py-2 text-xs last:border-0" style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>{f.content}</p>)}<p className="mt-2 text-[11px]" style={mutedStyle}>Fichiers</p>{removedFiles.map(f => <p key={f.filePath} className="py-1 font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{f.filePath}</p>)}</div>
+              </div>
+              <p className="text-[10px]" style={mutedStyle}>Comparaison entre les deux derniers aperçus construits, pas entre deux prompts réellement envoyés à un fournisseur.</p>
             </>}
           </div>}
 
