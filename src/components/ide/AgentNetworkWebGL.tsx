@@ -13,10 +13,15 @@ export interface WebGLAgent {
   busy: boolean;
   /** Libellé court sous la sphère (tâche en cours ou statut). */
   caption: string;
+  team: string;
+  runningTasks: number;
+  queuedTasks: number;
 }
+export interface WebGLBusMessage { id: string; type: string; from: string; to: string; timestamp: string; summary?: string; }
 
 interface Props {
   agents: WebGLAgent[];
+  messages: WebGLBusMessage[];
   selectedRole: string | null;
   hoverRole: string | null;
   orchestrating: boolean;
@@ -53,20 +58,26 @@ function glowTexture(): THREE.Texture {
   return texture;
 }
 
-function agentPosition(index: number, count: number): THREE.Vector3 {
-  const angle = (2 * Math.PI * index) / Math.max(count, 1);
-  return new THREE.Vector3(Math.cos(angle) * RING, Math.sin(index * 1.7) * 0.55, Math.sin(angle) * RING);
+function agentPosition(index: number, count: number, teamIndex: number): THREE.Vector3 {
+  const angle = (2 * Math.PI * index) / Math.max(count, 1) + teamIndex * 0.22;
+  const radius = 3.0 + teamIndex * 1.15;
+  return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(index * 1.7 + teamIndex) * 0.42, Math.sin(angle) * radius);
 }
-
-interface NodeObjects { sphere: THREE.Mesh; glow: THREE.Sprite; line: THREE.Line; ring: THREE.Mesh; sparks: THREE.Sprite[]; base: THREE.Vector3 }
+const TEAM_COLORS = ['#38bdf8', '#a78bfa', '#34d399', '#f59e0b', '#f472b6', '#2dd4bf'];
+function messageColor(type: string): THREE.Color {
+  const value = type.toLowerCase();
+  return new THREE.Color(value.includes('error') || value.includes('fail') ? '#fb526b' : value.includes('result') || value.includes('complete') || value.includes('response') ? '#34d399' : '#38bdf8');
+}
+interface NodeObjects { sphere: THREE.Mesh; glow: THREE.Sprite; line: THREE.Line; ring: THREE.Mesh; loadRing: THREE.Mesh; sparks: THREE.Sprite[]; base: THREE.Vector3 }
+interface CometObject { mesh: THREE.Mesh; trail: THREE.Line; from: string; to: string; createdAt: number }
 
 /** Scène WebGL du réseau multi-agents : sphères lumineuses, halo du cœur, bloom, brouillard de profondeur, caméra orbitale. */
-export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover, onUnavailable }: Props) {
+export default function AgentNetworkWebGL({ agents, messages, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover, onUnavailable }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const labelRefs = useRef(new Map<string, HTMLButtonElement>());
   // État lu par la boucle de rendu sans relancer l'effet de construction de la scène.
-  const live = useRef({ agents, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover });
-  live.current = { agents, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover };
+  const live = useRef({ agents, messages, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover });
+  live.current = { agents, messages, selectedRole, hoverRole, orchestrating, paused, reduce, onSelect, onHover };
   const rebuildRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -144,8 +155,10 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
     const nodesGroup = new THREE.Group();
     scene.add(nodesGroup);
     let nodes = new Map<string, NodeObjects>();
+    let comets: CometObject[] = [];
 
     const disposeNodes = () => {
+      comets = [];
       nodesGroup.traverse(object => {
         const mesh = object as THREE.Mesh;
         mesh.geometry?.dispose?.();
@@ -158,9 +171,23 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
     const rebuild = () => {
       disposeNodes();
       const list = live.current.agents;
+      const teams = [...new Set(list.map(agent => agent.team || 'Autres'))];
+      teams.forEach((team, teamIndex) => {
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(3.0 + teamIndex * 1.15, 0.012, 6, 160),
+          new THREE.MeshBasicMaterial({ color: TEAM_COLORS[teamIndex % TEAM_COLORS.length], transparent: true, opacity: 0.32 }));
+        halo.rotation.x = -Math.PI / 2;
+        nodesGroup.add(halo);
+      });
+      const teamPositions = new Map<string, { index: number; count: number }>();
+      teams.forEach(team => {
+        const members = list.filter(agent => (agent.team || 'Autres') === team);
+        members.forEach((agent, index) => teamPositions.set(agent.role, { index, count: members.length }));
+      });
       list.forEach((agent, index) => {
         const color = statusColor(agent.status);
-        const base = agentPosition(index, list.length);
+        const teamIndex = Math.max(0, teams.indexOf(agent.team || 'Autres'));
+        const slot = teamPositions.get(agent.role)!;
+        const base = agentPosition(slot.index, slot.count, teamIndex);
         const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.26, 32, 32), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: agent.busy ? 1.1 : 0.35, roughness: 0.3, metalness: 0.2, transparent: true }));
         sphere.position.copy(base);
         sphere.userData.role = agent.role;
@@ -171,14 +198,31 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
           new THREE.LineBasicMaterial({ color: agent.busy ? accent : dimmed, transparent: true, opacity: agent.busy ? 0.9 : 0.22 }));
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.02, 8, 64), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0 }));
         ring.position.copy(base);
+        const load = Math.min(1, (agent.runningTasks + agent.queuedTasks * 0.5) / 3);
+        const overloaded = agent.status === 'overloaded' || agent.runningTasks + agent.queuedTasks > 3;
+        const loadRing = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.035, 8, 64, Math.max(0.08, Math.PI * 2 * load)),
+          new THREE.MeshBasicMaterial({ color: overloaded ? '#fb526b' : TEAM_COLORS[teamIndex % TEAM_COLORS.length], transparent: true, opacity: 0.95 }));
+        loadRing.position.copy(base);
         const sparks = agent.busy ? [0, 1, 2].map(() => {
           const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color: accent, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
           spark.scale.setScalar(0.32);
           nodesGroup.add(spark);
           return spark;
         }) : [];
-        nodesGroup.add(line, sphere, glow, ring);
-        nodes.set(agent.role, { sphere, glow, line, ring, sparks, base });
+        nodesGroup.add(line, sphere, glow, ring, loadRing);
+        nodes.set(agent.role, { sphere, glow, line, ring, loadRing, sparks, base });
+      });
+      const now = Date.now();
+      const roles = new Set(list.map(agent => agent.role));
+      live.current.messages.slice(-40).forEach(message => {
+        const createdAt = Date.parse(message.timestamp);
+        if (!roles.has(message.from) || !roles.has(message.to) || message.from === message.to || !Number.isFinite(createdAt) || now - createdAt > 12000) return;
+        const color = messageColor(message.type);
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), new THREE.MeshBasicMaterial({ color, transparent: true }));
+        const trail = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+          new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.75 }));
+        nodesGroup.add(mesh, trail);
+        comets.push({ mesh, trail, from: message.from, to: message.to, createdAt });
       });
     };
     rebuildRef.current = rebuild;
@@ -268,6 +312,8 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
         node.glow.position.copy(node.sphere.position);
         node.ring.position.copy(node.sphere.position);
         node.ring.lookAt(camera.position);
+        node.loadRing.position.copy(node.sphere.position);
+        node.loadRing.lookAt(camera.position);
         const pulse = agent.busy && motion ? 1 + Math.sin(t * 5 + index) * 0.12 : 1;
         const grow = (selected || state.hoverRole === agent.role) ? 1.25 : 1;
         node.sphere.scale.setScalar(pulse * grow);
@@ -299,6 +345,24 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
           label.style.zIndex = String(Math.round(depth * 100));
         }
       });
+      comets = comets.filter(comet => {
+        const age = (Date.now() - comet.createdAt) / 1000;
+        const from = nodes.get(comet.from), to = nodes.get(comet.to);
+        if (!from || !to || age > 12) {
+          nodesGroup.remove(comet.mesh, comet.trail);
+          comet.mesh.geometry.dispose(); (comet.mesh.material as THREE.Material).dispose();
+          comet.trail.geometry.dispose(); (comet.trail.material as THREE.Material).dispose();
+          return false;
+        }
+        const progress = (age % 2.4) / 2.4;
+        const start = from.sphere.position, end = to.sphere.position;
+        const point = new THREE.Vector3().lerpVectors(start, end, progress);
+        point.y += Math.sin(progress * Math.PI) * 0.85;
+        comet.mesh.position.copy(point);
+        const positions = comet.trail.geometry.attributes.position as THREE.BufferAttribute;
+        positions.setXYZ(0, start.x, start.y, start.z); positions.setXYZ(1, point.x, point.y, point.z); positions.needsUpdate = true;
+        return true;
+      });
       composer.render();
     };
     tick();
@@ -325,8 +389,9 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
   }, [onUnavailable]);
 
   // Reconstruit les sphères quand la composition ou l'état des agents change.
-  const signature = agents.map(agent => `${agent.role}:${agent.status}:${agent.busy}`).join('|');
-  useEffect(() => { rebuildRef.current(); }, [signature]);
+  const signature = agents.map(agent => `${agent.role}:${agent.status}:${agent.busy}:${agent.runningTasks}:${agent.queuedTasks}:${agent.team}`).join('|');
+  const messageSignature = messages.map(message => `${message.id}:${message.timestamp}`).join('|');
+  useEffect(() => { rebuildRef.current(); }, [signature, messageSignature]);
 
   return (
     <div ref={hostRef} className="absolute inset-0 overflow-hidden rounded-lg">
@@ -335,6 +400,7 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
         <button key={agent.role} type="button"
           ref={element => { if (element) labelRefs.current.set(agent.role, element); else labelRefs.current.delete(agent.role); }}
           onClick={() => onSelect(agent.role)}
+          onContextMenu={event => { event.preventDefault(); onSelect(agent.role); }}
           onFocus={() => onHover(agent.role)} onBlur={() => onHover(null)}
           onPointerEnter={() => onHover(agent.role)} onPointerLeave={() => onHover(null)}
           aria-label={`${agent.name} — ${agent.caption}. Ouvrir le détail`}
@@ -342,6 +408,7 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
           style={{ background: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)', backdropFilter: 'blur(6px)', opacity: 0, willChange: 'transform' }}>
           <span className="block truncate text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>{agent.name}</span>
           <span className="block truncate text-[9px]" style={{ color: agent.busy ? 'var(--accent-primary)' : 'var(--text-muted)' }}>{agent.caption}</span>
+          <span className="block text-[8px] font-mono" style={{ color: agent.runningTasks + agent.queuedTasks > 3 ? '#fb526b' : 'var(--text-dimmed)' }}>{agent.runningTasks} actifs · {agent.queuedTasks} attente</span>
         </button>
       ))}
     </div>
