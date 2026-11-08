@@ -427,7 +427,8 @@ describe("Context budget — allocation par phase", () => {
     assert.equal(estimateTokensFromChars(4_001), 1_001);
   });
 });
-\ndescribe("buildObservationHistory — historique borné", () => {
+
+describe("buildObservationHistory — historique borné", () => {
   it("rend les actions et reste borné", () => {
     const obs: Observation[] = [writeObservation(1, "a.ts")];
     const history = buildObservationHistory(obs, 10_000);
