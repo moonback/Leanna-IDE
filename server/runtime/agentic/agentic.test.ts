@@ -481,7 +481,7 @@ describe("accountCost — tokens mesurés vs appels sans mesure", () => {
   it("cumule les tokens rapportés et compte à part les appels sans tokenUsage", () => {
     const rt = makeRuntime({ content: new Map(), verifyOk: () => true });
     const session = rt._seedSessionForTest({ role: "test_tokens", goal: "g", id: "tok" });
-    const account = (rt as unknown as { accountCost(s: unknown, r: unknown): void }).accountCost.bind(rt);
+    const account = (rt as unknown as { accountCost(s: unknown, r: unknown, prompt?: string, systemPrompt?: string): void }).accountCost.bind(rt);
     account(session, { text: "a", tokenUsage: { promptTokens: 60, completionTokens: 40, totalTokens: 100 } }, "user prompt", "system prompt");
     account(session, { text: "b" }, "another prompt");
     account(session, { text: "c", tokenUsage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 } });
