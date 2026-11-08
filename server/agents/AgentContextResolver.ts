@@ -11,6 +11,7 @@
  */
 import type { AgentTask } from "./types.js";
 import { createLogger } from "../utils/logger.js";
+import { semanticSearch } from "../knowledge/SemanticSearch.js";
 
 const log = createLogger("AgentContextResolver");
 
@@ -63,17 +64,32 @@ export class AgentContextResolver {
         return selected;
       }
 
-      const selectedFiles = this.selectProjectFiles(allFiles, task, resolvedMentioned);
+      // Réutiliser le moteur sémantique existant (KnowledgeGraph + index TF-IDF).
+      // En cas d'index indisponible, la sélection lexicale/rôle reste un fallback.
+      let semanticCandidates: string[] = [];
+      const missionQuery = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.trim();
+      if (missionQuery.length >= 3) {
+        try {
+          semanticCandidates = semanticSearch.searchAll(missionQuery)
+            .slice(0, 8)
+            .map((result) => result.filePath);
+        } catch (error) {
+          log.debug(`Recherche sémantique indisponible pour [${task.id.slice(0, 8)}]: ${(error as Error).message}`);
+        }
+      }
+
+      const selectedFiles = this.selectProjectFiles(allFiles, task, resolvedMentioned, semanticCandidates);
       task.context.files = selectedFiles;
       task.context.metadata = {
         ...task.context.metadata,
         projectContextDiscovered: true,
         projectFileCount: inventory.count,
         contextSelection: {
-          strategy: "role_mission_relevance_v1",
+          strategy: "semantic_role_mission_relevance_v2",
           agentRole: task.role,
           selectedFileCount: selectedFiles.length,
           explicitFileCount: resolvedMentioned.length,
+          semanticCandidateCount: semanticCandidates.length,
           inventoryFileCount: inventory.count,
         },
       };
@@ -120,10 +136,11 @@ export class AgentContextResolver {
    * Les chemins explicitement mentionnés restent prioritaires ; les fichiers
    * simplement structurels ne doivent pas évincer les fichiers du domaine visé.
    */
-  selectProjectFiles(files: string[], task: AgentTask, resolvedMentioned: string[] = []): string[] {
+  selectProjectFiles(files: string[], task: AgentTask, resolvedMentioned: string[] = [], semanticCandidates: string[] = []): string[] {
     const role = String(task.role ?? "").toLowerCase();
     const query = `${task.title} ${task.description} ${task.context.instructions ?? ""}`.toLowerCase();
     const explicitRank = new Map(resolvedMentioned.map((file, index) => [file.replace(/\\/g, "/"), index]));
+    const semanticRank = new Map(semanticCandidates.map((file, index) => [file.replace(/\\/g, "/"), index]));
     const normalizedFiles = [...new Set(files.map((file) => file.replace(/\\/g, "/")))]
       .filter((file) => !file.startsWith(".git/") && !file.startsWith(".Leanna/") && !file.includes("/node_modules/"));
 
@@ -154,6 +171,7 @@ export class AgentContextResolver {
     const score = (file: string): number => {
       const lower = file.toLowerCase();
       const explicitBase = explicitRank.has(file) ? 1_000 - (explicitRank.get(file) ?? 0) * 10 : 0;
+      const semanticBase = semanticRank.has(file) ? 80 - (semanticRank.get(file) ?? 0) * 6 : 0;
       const structuralBase = file === "package.json" || file === "tsconfig.json" ? 2 : file === "README.md" ? 1 : 0;
       const pathTokens = lower.split(/[/.\\_-]+/).filter(Boolean);
       let relevance = 0;
@@ -170,7 +188,7 @@ export class AgentContextResolver {
       if (role === "security" && /security|permission|auth|policy|guard|sandbox/.test(lower)) relevance += 10;
       if (role === "ui_ux" && /components|pages|styles|\.tsx$|\.css$/.test(lower)) relevance += 8;
       if (role === "documentation" && /\.md$|^docs\//.test(lower)) relevance += 8;
-      return explicitBase + structuralBase + relevance;
+      return explicitBase + semanticBase + structuralBase + relevance;
     };
 
     return normalizedFiles
