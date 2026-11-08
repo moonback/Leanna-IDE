@@ -90,6 +90,9 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     host.prepend(renderer.domElement);
     renderer.domElement.style.display = 'block';
+    renderer.domElement.style.background = 'transparent';
+    renderer.domElement.style.maskImage = 'radial-gradient(ellipse 78% 72% at 50% 48%, #000 58%, transparent 100%)';
+    renderer.domElement.style.webkitMaskImage = 'radial-gradient(ellipse 78% 72% at 50% 48%, #000 58%, transparent 100%)';
 
     const scene = new THREE.Scene();
     scene.background = background;
@@ -341,7 +344,7 @@ export default function AgentNetworkWebGL({ agents, selectedRole, hoverRole, orc
           className="absolute left-0 top-0 max-w-[140px] rounded-md px-1.5 py-0.5 text-center leading-tight focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2"
           style={{ background: 'color-mix(in srgb, var(--bg-panel) 90%, transparent)', border: '1px solid var(--border-base)', backdropFilter: 'blur(6px)', opacity: 0, willChange: 'transform' }}>
           <span className="block truncate text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>{agent.name}</span>
-          <span className="block truncate text-[9px]" style={{ color: agent.busy ? 'var(--accent-primary)' : 'var(--text-muted)' }}>{agent.caption}</span>
+          <span className="block truncate text-[10px]" style={{ color: agent.busy ? 'var(--accent-primary)' : 'var(--text-muted)' }}>{agent.caption}</span>
         </button>
       ))}
     </div>
