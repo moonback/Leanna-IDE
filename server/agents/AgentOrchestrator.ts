@@ -12,6 +12,7 @@ import { AgentRuntimeExecutor } from "./AgentRuntimeExecutor.js";
 import { TaskScheduler, validateOrchestrationPlan, type TaskRunner } from "./TaskScheduler.js";
 import type { AgenticRuntime } from "../runtime/agentic/AgenticRuntime.js";
 import type { CoreKernel } from "../core/kernel.js";
+import type { SupervisionMode } from "../core/supervisionConfig.js";
 import { ProgressNotifier, ProgressCallback, EventBroadcaster } from "./ProgressNotifier.js";
 import { AgentRegistry, agentRegistry } from "./AgentRegistry.js";
 import { agentMessageBus } from "./AgentMessageBus.js";
@@ -103,9 +104,9 @@ export class AgentOrchestrator {
    * Fait passer les tâches du runtime agentique par le LeannaSupervisor (F-05).
    * Sans effet tant que `enableAgenticRuntime` n'a pas été appelé. `null` retire.
    */
-  setAgentSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null): boolean {
+  setAgentSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null, mode?: SupervisionMode): boolean {
     if (!(this.executor instanceof AgentRuntimeExecutor)) return false;
-    this.executor.setSupervision(run);
+    this.executor.setSupervision(run, mode);
     return true;
   }
 

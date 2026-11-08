@@ -15,6 +15,7 @@ import {
   PermissionPolicy,
   PermissionDeniedError,
   ALL_PERMISSIONS,
+  DEFAULT_GRANTED_PERMISSIONS,
   UNDECLARED_PERMISSION,
   AGENT_NOT_ALLOWED,
 } from "./PermissionPolicy.js";
@@ -165,9 +166,16 @@ describe("PermissionPolicy", () => {
     assert.deepEqual(policy.getGranted(), ["read", "network"]);
   });
 
-  it("fromEnv accorde toutes les permissions par défaut", () => {
+  it("IMP-01 : fromEnv n'accorde PAS dangerous par défaut (moindre privilège)", () => {
     const policy = PermissionPolicy.fromEnv({} as NodeJS.ProcessEnv);
     assert.equal(policy.getMode(), "enforce");
+    assert.deepEqual(policy.getGranted(), normalizePermissions([...DEFAULT_GRANTED_PERMISSIONS]));
+    assert.equal(policy.evaluate("delete_x", ["dangerous"]).allowed, false);
+    assert.equal(new PermissionPolicy().isGranted("dangerous"), false);
+  });
+
+  it("fromEnv accepte \"all\" pour accorder explicitement toutes les permissions", () => {
+    const policy = PermissionPolicy.fromEnv({ Leanna_GRANTED_PERMISSIONS: "all" } as NodeJS.ProcessEnv);
     assert.deepEqual(policy.getGranted(), normalizePermissions([...ALL_PERMISSIONS]));
   });
 
@@ -516,5 +524,38 @@ describe("SkillAdapter — permissions déclarées", () => {
     };
     const [def] = adaptSkill(skill);
     assert.deepEqual(def.permissions, []);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMP-01 — `dangerous` : refus par défaut, levé uniquement par approbation humaine
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("ToolRegistry — dangerous non accordé par défaut", () => {
+  function makeRegistry() {
+    const runs = { count: 0 };
+    const registry = new ToolRegistry({
+      permissionPolicy: PermissionPolicy.fromEnv({} as NodeJS.ProcessEnv),
+      dryRun: new DryRunController({ enabled: false }),
+      enableMetrics: false,
+    });
+    registry.register({
+      declaration: { name: "delete_thing", description: "x", parameters: { type: "object", properties: {} } },
+      handler: async () => ++runs.count,
+      permissions: ["dangerous"],
+    } as unknown as ToolDefinition);
+    return { registry, runs };
+  }
+
+  it("refuse sans canal d'approbation (agent autonome)", async () => {
+    const { registry, runs } = makeRegistry();
+    await assert.rejects(() => registry.call("delete_thing", {}), PermissionDeniedError);
+    assert.equal(runs.count, 0);
+  });
+
+  it("autorise quand l'appelant a déjà obtenu l'approbation (autonomyApproved)", async () => {
+    const { registry, runs } = makeRegistry();
+    await registry.call("delete_thing", {}, { autonomyApproved: true });
+    assert.equal(runs.count, 1);
   });
 });

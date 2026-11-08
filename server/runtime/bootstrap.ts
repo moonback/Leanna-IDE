@@ -21,7 +21,8 @@ import { PermissionPolicy } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { loadPromptTemplates } from "./prompts/loader.js";
 import { defaultAgents, setAgenticRuntimeProvider } from "./agents/index.js";
-import { createCoreKernel, supervisionEnabledFromEnv, type CoreKernel } from "../core/kernel.js";
+import { createCoreKernel, type CoreKernel } from "../core/kernel.js";
+import { supervisionModeFromEnv, type SupervisionMode } from "../core/supervisionConfig.js";
 import type { RuntimeConfig } from "./types.js";
 import type { LegacySkill } from "./compat/SkillAdapter.js";
 import * as path from "path";
@@ -59,16 +60,16 @@ export interface BootstrapConfig {
   promptsDir?: string;
   /**
    * Force l'activation de la garde d'idempotence P0 sur le ToolRegistry.
-   * Par défaut, lue depuis `LEANNA_IDEMPOTENCY`. Non branchée = comportement
-   * strictement inchangé.
+   * Par défaut, lue depuis `LEANNA_IDEMPOTENCY` (active sauf "false"/"0").
    */
   enableIdempotency?: boolean;
   /**
    * Fait passer les tâches du runtime agentique par le LeannaSupervisor
-   * (preuve avant succès, rollback des fichiers déclarés). Par défaut, lu depuis
-   * `LEANNA_SUPERVISED` ; désactivé sinon.
+   * (preuve avant succès, rollback des fichiers déclarés). `true` = toutes les
+   * tâches, `false` = aucune. Par défaut, lu depuis `LEANNA_SUPERVISED`
+   * (défaut "risky" : tâches capables de muter le workspace).
    */
-  enableAgentSupervision?: boolean;
+  enableAgentSupervision?: boolean | SupervisionMode;
   /**
    * Callback exécuté APRÈS `runtime.start()` mais AVANT les audits de boot
    * (`applyAttributionAndAudits`). C'est le point d'enregistrement des outils
@@ -102,6 +103,29 @@ export interface BootstrapResult {
    * strictement inchangé.
    */
   kernel: CoreKernel;
+}
+
+/** Résout le mode de supervision : option explicite, sinon `LEANNA_SUPERVISED`. */
+function resolveSupervisionMode(option: boolean | SupervisionMode | undefined): SupervisionMode {
+  if (option === true) return "all";
+  if (option === false) return "off";
+  return option ?? supervisionModeFromEnv();
+}
+
+/** Avertit au boot quand la gouvernance est affaiblie (IMP-01/02/03). */
+function warnWeakGovernance(permissionPolicy: PermissionPolicy, kernel: CoreKernel): void {
+  if (permissionPolicy.getMode() !== "enforce") {
+    console.warn(`[Bootstrap] ⚠️  Permissions en mode "${permissionPolicy.getMode()}" — aucun refus n'est appliqué.`);
+  }
+  if (permissionPolicy.isGranted("dangerous")) {
+    console.warn(`[Bootstrap] ⚠️  Permission "dangerous" accordée globalement — plus d'approbation humaine par défaut.`);
+  }
+  if (!kernel.idempotencyEnabled) {
+    console.warn(`[Bootstrap] ⚠️  Idempotence désactivée — une action peut être rejouée après reprise.`);
+  }
+  if (kernel.safetyGateMode === "off") {
+    console.warn(`[Bootstrap] ⚠️  Safety gate Jev inactif (LEANNA_SAFETY_GATE=off ou aucune clé OpenRouter).`);
+  }
 }
 
 /**
@@ -272,15 +296,19 @@ export async function bootstrapRuntime(config: BootstrapConfig = {}): Promise<Bo
     registry: runtime.tools,
     enableIdempotency: config.enableIdempotency,
   });
+  warnWeakGovernance(permissionPolicy, kernel);
   if (kernel.idempotencyEnabled) {
     console.log(
       `[Bootstrap] 🔒 Idempotence P0 ACTIVÉE — les actions à effet de bord sont ` +
       `journalisées ; un rejeu après crash est bloqué.`
     );
   }
-  if (config.enableAgentSupervision ?? supervisionEnabledFromEnv()) {
-    agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission);
-    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (LEANNA_SUPERVISED).`);
+  const supervisionMode = resolveSupervisionMode(config.enableAgentSupervision);
+  if (supervisionMode !== "off") {
+    agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission, supervisionMode);
+    console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (mode "${supervisionMode}").`);
+  } else {
+    console.warn(`[Bootstrap] ⚠️  Supervision désactivée (LEANNA_SUPERVISED=off) — aucune preuve ni rollback garantis.`);
   }
   if (kernel.safetyGateMode !== "off") {
     console.log(
@@ -366,12 +394,12 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
   // éviter la dépendance circulaire ; best-effort en mode synchrone).
   // Le callback s'exécute après le retour de cette fonction : `kernel` (déclaré
   // plus bas) est alors initialisé. La supervision suit enableAgenticRuntime.
-  const superviseAgents = config.enableAgentSupervision ?? supervisionEnabledFromEnv();
+  const supervisionMode = resolveSupervisionMode(config.enableAgentSupervision);
   import("../agents/AgentOrchestrator.js")
     .then(({ agentOrchestrator }) => {
       agentOrchestrator.enableAgenticRuntime(agentic);
-      if (superviseAgents && agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission)) {
-        console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (mode synchrone).`);
+      if (supervisionMode !== "off" && agentOrchestrator.setAgentSupervision(kernel.runSupervisedAgenticMission, supervisionMode)) {
+        console.log(`[Bootstrap] 🧭 Tâches agents gouvernées par le LeannaSupervisor (mode "${supervisionMode}", synchrone).`);
       }
     })
     .catch((err) => console.error("[Bootstrap] enableAgenticRuntime (sync) échec:", err));
@@ -382,6 +410,7 @@ export function bootstrapRuntimeSync(config: BootstrapConfig = {}): BootstrapRes
     registry: runtime.tools,
     enableIdempotency: config.enableIdempotency,
   });
+  warnWeakGovernance(permissionPolicy, kernel);
   if (kernel.idempotencyEnabled) {
     console.log(`[Bootstrap] 🔒 Idempotence P0 ACTIVÉE (mode synchrone).`);
   }

@@ -18,6 +18,7 @@ import { getAgentDefinition, getAgentDefinitionOrThrow, hasAgent } from "./roles
 import type { AgentTask, TaskResult, TaskOutcome } from "./types.js";
 import type { AgentTaskRunner } from "./AgentTaskRunner.js";
 import type { CoreKernel } from "../core/kernel.js";
+import { requiresSupervision, type SupervisionMode } from "../core/supervisionConfig.js";
 import { ProgressNotifier } from "./ProgressNotifier.js";
 import { randomUUID } from "node:crypto";
 import { createLogger } from "../utils/logger.js";
@@ -52,6 +53,8 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
    * déclarés, récupération bornée). Absente → exécution directe (défaut).
    */
   private supervise: CoreKernel["runSupervisedAgenticMission"] | null = null;
+  /** Politique partagée avec le Mission Executor (IMP-04/05). */
+  private supervisionMode: SupervisionMode = "all";
 
   constructor(
     private readonly agentic: AgenticRuntime,
@@ -59,9 +62,22 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
     private readonly defaultBudget?: Partial<AgentBudget>
   ) {}
 
-  /** Branche (ou retire avec `null`) la gouvernance du Supervisor. */
-  setSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null): void {
-    this.supervise = run;
+  /**
+   * Branche (ou retire avec `null`) la gouvernance du Supervisor. `mode` décide
+   * quelles tâches y passent : "all" (défaut) ou "risky" (rôle mutant ou
+   * fichiers ciblés).
+   */
+  setSupervision(run: CoreKernel["runSupervisedAgenticMission"] | null, mode: SupervisionMode = "all"): void {
+    this.supervise = mode === "off" ? null : run;
+    this.supervisionMode = mode;
+  }
+
+  /** La tâche doit-elle passer par le Supervisor ? (règle commune IMP-05) */
+  requiresSupervision(task: AgentTask): boolean {
+    if (!this.supervise) return false;
+    if (this.supervisionMode !== "risky") return requiresSupervision(this.supervisionMode, { mutates: true });
+    const mutates = (task.context.files?.length ?? 0) > 0 || this.agentic.roleCanMutate(task.role);
+    return requiresSupervision(this.supervisionMode, { mutates });
   }
 
   isSupervised(): boolean {
@@ -161,7 +177,7 @@ export class AgentRuntimeExecutor implements AgentTaskRunner {
         },
       };
 
-      const result = this.supervise
+      const result = this.supervise && this.requiresSupervision(task)
         ? await this.runSupervised(this.supervise, task, agenticTask)
         : await this.agentic.run(agenticTask);
       // Le runtime agentique représente encore l'arrêt coopératif comme

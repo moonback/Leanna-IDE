@@ -25,7 +25,7 @@ import { selfEvaluationEngine, type SelfEvalMissionView } from "./SelfEvaluation
 import { missionEvolutionStore } from "../knowledge/MissionEvolution.js";
 import { PlanEstimator } from "./PlanEstimator.js";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
-import { supervisionEnabledFromEnv } from "../core/supervisionConfig.js";
+import { requiresSupervision, supervisionModeFromEnv, type SupervisionMode } from "../core/supervisionConfig.js";
 import * as path from "node:path";
 import { SELF_ROOT } from "../utils/selfRoot.js";
 
@@ -125,6 +125,8 @@ export class Executor {
    * (true/1), surchargé par `setSupervisor`.
    */
   private supervisedMode = false;
+  /** Politique partagée avec les tâches agents (IMP-04/05). */
+  private supervisionMode: SupervisionMode = "off";
 
   /** Curseur d'autonomie (optionnel). */
   private autonomy: AutonomyPolicy | null = null;
@@ -314,7 +316,8 @@ export class Executor {
     const raw = (process.env.LEANNA_MISSION_EVIDENCE ?? "").toLowerCase().trim();
     this.evidenceVerification = raw === "true" || raw === "1";
     // Mode supervisé (couture Supervisor) activable par défaut via l'environnement.
-    this.supervisedMode = supervisionEnabledFromEnv();
+    this.supervisionMode = supervisionModeFromEnv();
+    this.supervisedMode = this.supervisionMode !== "off";
   }
 
   // ─── Configuration ────────────────────────────────────────────────────────
@@ -393,14 +396,25 @@ export class Executor {
    * Branche l'autorité de gouvernance (`LeannaSupervisor`) et active le mode
    * supervisé (audit, point 5 / unification). `enabled` par défaut `true`.
    */
-  setSupervisor(supervisor: LeannaSupervisor, enabled = true): void {
+  setSupervisor(supervisor: LeannaSupervisor, enabled: boolean | SupervisionMode = true): void {
     this.supervisor = supervisor;
-    this.supervisedMode = enabled;
+    this.setSupervisedMode(enabled);
   }
 
-  /** Active/désactive le mode supervisé à chaud (si un Supervisor est branché). */
-  setSupervisedMode(enabled: boolean): void {
-    this.supervisedMode = enabled;
+  /**
+   * Active/désactive le mode supervisé à chaud (si un Supervisor est branché).
+   * `true` = toutes les missions, "risky" = missions réelles (non simulées).
+   */
+  setSupervisedMode(enabled: boolean | SupervisionMode): void {
+    this.supervisionMode = enabled === true ? "all" : enabled === false ? "off" : enabled;
+    this.supervisedMode = this.supervisionMode !== "off";
+  }
+
+  /** La mission doit-elle passer par le Supervisor ? (règle commune IMP-05) */
+  requiresSupervision(mission: Mission): boolean {
+    if (!this.supervisor || !this.supervisedMode) return false;
+    // shortcut: toute mission réelle est jugée mutante (le plan n'existe pas encore au lancement).
+    return requiresSupervision(this.supervisionMode, { mutates: !mission.getConfig().dryRun });
   }
 
   /**
@@ -600,7 +614,7 @@ export class Executor {
     // missions concurrentes ne partagent plus un missionId global.
     const execute = () =>
       runWithTelemetryContext({ missionId: mission.id }, () =>
-        this.supervisor && this.supervisedMode
+        this.requiresSupervision(mission)
           ? this.runSupervised(mission, availableSkills)
           : this.executeMission(mission, availableSkills)
       );
@@ -2128,7 +2142,7 @@ JSON:`;
     // En mode supervisé, le Supervisor juge la mission sur ces mêmes faits : les
     // objectifs doivent l'être aussi, sinon une mission "completed" peut voir
     // ses fichiers restaurés par un Supervisor qui refuse la preuve (F-07).
-    const supervised = this.supervisor !== null && this.supervisedMode;
+    const supervised = this.requiresSupervision(mission);
     if (supervised && !this.evidence) this.evidence = new EvidenceEngine();
     if (this.evidence && (this.evidenceVerification || supervised)) {
       const verdict = this.verifyByEvidence(mission, goal, executed);

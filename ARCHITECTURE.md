@@ -272,7 +272,7 @@ Le noyau est **non intrusif par défaut** : les gardes ne sont branchées sur le
 
 | Garde | Variable d'env | Comportement |
 |---|---|---|
-| Idempotence (`LedgerGuard`) | `LEANNA_IDEMPOTENCY` (`true`/`1`) | Déduit `sideEffect` des permissions ; `skip`/`block`/`execute` à la reprise |
+| Idempotence (`LedgerGuard`) | `LEANNA_IDEMPOTENCY` (actif par défaut ; `false`/`0` pour désactiver) | Déduit `sideEffect` des permissions ; `skip`/`block`/`execute` à la reprise |
 | Safety Gate (`JevSafetyGate`) | `LEANNA_SAFETY_GATE` (`off`/`audit`/`enforce`) | Jugement Jev typé ; `enforce` est **fail-closed** (`review` et `block` refusés) |
 
 Le `JevSafetyGate` s'appuie sur `server/utils/jevGating.ts` (politique pure

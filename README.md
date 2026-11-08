@@ -501,15 +501,16 @@ complete/fail`.
 
 La garde est branchée sur le point de passage unique des outils via `LedgerGuard`
 (adaptateur `IdempotencyGuard`, hooké par `ToolRegistry.setIdempotencyGuard`). Elle
-s'active via `.env` :
+est **active par défaut** et se désactive explicitement via `.env` :
 
 ```env
-# Idempotence (ledger d'exécution + reprise sûre après crash).
-LEANNA_IDEMPOTENCY="false"
+# Idempotence (ledger d'exécution + reprise sûre après crash). "false" pour désactiver.
+LEANNA_IDEMPOTENCY="true"
 ```
 
-Sans configuration, aucun outil n'est impacté — le comportement reste strictement
-inchangé.
+Seuls les appels portant une étape identifiée (`missionId` + `stepId`) sont
+dédupliqués ; les autres passent inchangés. La clé est dérivée de
+`missionId:stepId:outil:hash(arguments)`, arguments canonisés à tous les niveaux.
 
 <br>
 
@@ -645,8 +646,8 @@ action ordinaire réversible            → allow
 
 | Mode | Comportement |
 |---|---|
-| `off` | Désactivé (défaut) — comportement strictement inchangé, garde non branchée |
-| `audit` | Évalue et journalise les verdicts **sans jamais bloquer** |
+| `off` | Désactivé — garde non branchée (défaut sans clé OpenRouter) |
+| `audit` | Évalue et journalise les verdicts **sans jamais bloquer ni attendre Jev** (défaut avec clé OpenRouter) |
 | `enforce` | Bloque les actions jugées risquées — **`review` ET `block` sont refusés** |
 
 En mode `enforce`, le garde est **fail-closed** : en cas de panne, d'erreur ou
@@ -654,8 +655,8 @@ d'absence de clé OpenRouter, `jevGating` route l'action vers `review`, donc ver
 blocage, plutôt que de la laisser passer.
 
 ```env
-# off | audit | enforce
-LEANNA_SAFETY_GATE="off"
+# off | audit | enforce — non défini : audit si clé OpenRouter, sinon off.
+# LEANNA_SAFETY_GATE="audit"
 ```
 
 ```bash
@@ -669,9 +670,9 @@ npx tsx scripts/jev-gate-calibrate.ts --model typesafe/jev-latest
 `createCoreKernel(options?)` assemble les briques et retourne un `CoreKernel`
 (`ledger`, `guard`, `checkpoints`, `evidence`, `missionStore`, `supervisor`,
 `idempotencyEnabled`, `safetyGate?`, `safetyGateMode`, `runSupervisedAgenticMission`).
-Les gardes ne sont branchées sur le `ToolRegistry` que si un registre est fourni et
-que l'activation est demandée (via `enableIdempotency` / `LEANNA_IDEMPOTENCY` et
-`safetyGateMode` / `LEANNA_SAFETY_GATE`). `runSupervisedAgenticMission()` génère un
+Les gardes sont branchées sur le `ToolRegistry` dès qu'un registre est fourni, sauf
+opt-out (`enableIdempotency: false` / `LEANNA_IDEMPOTENCY="false"`, et
+`safetyGateMode` / `LEANNA_SAFETY_GATE`, qui vaut `off` faute de clé OpenRouter). `runSupervisedAgenticMission()` génère un
 `missionId`, construit le runner agentique, fixe le contexte ambiant sur les gardes
 puis appelle `supervisor.runMission`, en nettoyant le contexte dans un `finally`.
 
@@ -1395,9 +1396,12 @@ LedgerGuard · JevSafetyGate · SkillWorker · agentDefinitionSchema · AgentLoa
 
 ### Permissions
 
-Catégories de permission : `read`, `write`, `network`, `exec`, `dangerous`. La
-configuration par défaut (`.env.example`) accorde `read,write,network,exec` tout en
-gardant `dangerous` hors de l'ensemble recommandé.
+Catégories de permission : `read`, `write`, `network`, `exec`, `dangerous`. Par
+défaut (variable vide ou absente), seules `read,write,network,exec` sont accordées.
+Une action `dangerous` (suppressions, etc.) est alors refusée, sauf approbation
+humaine au cas par cas ; sans canal d'approbation (agent autonome), elle est
+refusée. `Leanna_GRANTED_PERMISSIONS="all"` accorde explicitement toutes les
+permissions.
 
 Modes d'application (`Leanna_PERMISSION_MODE`) :
 
@@ -2156,9 +2160,10 @@ Leanna_PERMISSION_MODE="enforce"         # enforce | audit | off
 Leanna_GRANTED_PERMISSIONS="read,write,network,exec"
 Leanna_DRY_RUN="false"
 
-# Noyau P0 (optionnel, non-intrusif par défaut)
-LEANNA_IDEMPOTENCY="false"               # ledger d'idempotence + reprise après crash
-LEANNA_SAFETY_GATE="off"                 # off | audit | enforce (Jev)
+# Noyau P0 (actif par défaut)
+LEANNA_IDEMPOTENCY="true"                # ledger d'idempotence + reprise après crash ("false" = opt-out)
+# LEANNA_SAFETY_GATE="audit"             # off | audit | enforce (Jev) ; défaut : audit si clé OpenRouter, sinon off
+LEANNA_SUPERVISED="risky"                # risky | all | off — supervision des missions et tâches agents
 
 # Audits de boot
 Leanna_ATTRIBUTION_ENFORCEMENT="warn"    # off | warn | strict
@@ -2312,8 +2317,9 @@ lecture seule). Codes de réponse courants : 200 / 202 / 400 / 401 / 403 / 404 /
 6. **Politiques d'autonomie explicites** — `suggest` ou `ask` sont des points de
    départ plus sûrs que `auto`.
 7. **Restreignez l'automatisation du navigateur** via `AUTOMATION_ALLOWED_DOMAINS`.
-8. **Activez le noyau P0** (`LEANNA_IDEMPOTENCY`, `LEANNA_SAFETY_GATE=enforce`) pour
-   les workflows à effet de bord sensibles.
+8. **Gardez le noyau P0 actif** (idempotence et supervision `risky` par défaut) et
+   passez `LEANNA_SAFETY_GATE=enforce` (avec une clé OpenRouter) pour les workflows
+   à effet de bord sensibles.
 
 ### Modèle de menaces
 

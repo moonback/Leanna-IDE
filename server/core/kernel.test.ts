@@ -6,6 +6,9 @@ import os from "node:os";
 import { ToolRegistry } from "../runtime/ToolRegistry.js";
 import { PermissionPolicy } from "../runtime/PermissionPolicy.js";
 import { createCoreKernel, idempotencyEnabledFromEnv, supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./kernel.js";
+import { supervisionModeFromEnv, requiresSupervision } from "./supervisionConfig.js";
+import { safetyGateModeFromEnv } from "./JevSafetyGate.js";
+import { hashArguments } from "./ExecutionLedger.js";
 
 function ledgerFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-kernel-"));
@@ -22,7 +25,9 @@ test("idempotencyEnabledFromEnv reads LEANNA_IDEMPOTENCY", () => {
   assert.equal(idempotencyEnabledFromEnv({ LEANNA_IDEMPOTENCY: "true" } as NodeJS.ProcessEnv), true);
   assert.equal(idempotencyEnabledFromEnv({ LEANNA_IDEMPOTENCY: "1" } as NodeJS.ProcessEnv), true);
   assert.equal(idempotencyEnabledFromEnv({ LEANNA_IDEMPOTENCY: "false" } as NodeJS.ProcessEnv), false);
-  assert.equal(idempotencyEnabledFromEnv({} as NodeJS.ProcessEnv), false);
+  assert.equal(idempotencyEnabledFromEnv({ LEANNA_IDEMPOTENCY: "0" } as NodeJS.ProcessEnv), false);
+  // IMP-03 : actif par défaut, opt-out explicite uniquement.
+  assert.equal(idempotencyEnabledFromEnv({} as NodeJS.ProcessEnv), true);
 });
 
 test("kernel exposes all P0 bricks", () => {
@@ -152,5 +157,43 @@ test("one canonical supervision flag governs missions and agents with legacy fal
   assert.equal(supervisionEnabledFromEnv({ LEANNA_MISSION_SUPERVISED: "false", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), true,
     "either legacy opt-in enables supervision when the canonical flag is absent");
   assert.equal(supervisionEnabledFromEnv({ LEANNA_AGENT_SUPERVISED: "1" } as NodeJS.ProcessEnv), true);
-  assert.equal(supervisionEnabledFromEnv({} as NodeJS.ProcessEnv), false);
+  // IMP-04 : supervisé par défaut (mode "risky").
+  assert.equal(supervisionEnabledFromEnv({} as NodeJS.ProcessEnv), true);
+  assert.equal(supervisionEnabledFromEnv({ LEANNA_SUPERVISED: "off" } as NodeJS.ProcessEnv), false);
+});
+
+test("IMP-04/05 : une seule règle de supervision par risque pour missions et agents", () => {
+  assert.equal(supervisionModeFromEnv({} as NodeJS.ProcessEnv), "risky");
+  assert.equal(supervisionModeFromEnv({ LEANNA_SUPERVISED: "all" } as NodeJS.ProcessEnv), "all");
+  assert.equal(supervisionModeFromEnv({ LEANNA_SUPERVISED: "risky", LEANNA_AGENT_SUPERVISED: "true" } as NodeJS.ProcessEnv), "risky");
+  assert.equal(requiresSupervision("risky", { mutates: true }), true);
+  assert.equal(requiresSupervision("risky", { mutates: false }), false);
+  assert.equal(requiresSupervision("all", { mutates: false }), true);
+  assert.equal(requiresSupervision("off", { mutates: true }), false);
+});
+
+test("IMP-04/05 : Mission Executor applique la même règle (mission réelle supervisée, simulation non)", async () => {
+  const { Executor } = await import("../mission/Executor.js");
+  const { LeannaSupervisor } = await import("./LeannaSupervisor.js");
+  const ex = new Executor();
+  const mission = (dryRun: boolean) => ({ getConfig: () => ({ dryRun }) }) as any;
+  ex.setSupervisor(new LeannaSupervisor(), "risky");
+  assert.equal(ex.requiresSupervision(mission(false)), true);
+  assert.equal(ex.requiresSupervision(mission(true)), false);
+  ex.setSupervisedMode(false);
+  assert.equal(ex.requiresSupervision(mission(false)), false);
+});
+
+test("IMP-02 : Jev observe par défaut quand un juge est disponible, explicite prioritaire", () => {
+  assert.equal(safetyGateModeFromEnv({} as NodeJS.ProcessEnv), "off");
+  assert.equal(safetyGateModeFromEnv({ OPENROUTER_API_KEY: "k" } as NodeJS.ProcessEnv), "audit");
+  assert.equal(safetyGateModeFromEnv({ OPENROUTER_API_KEY: "k", LEANNA_SAFETY_GATE: "off" } as NodeJS.ProcessEnv), "off");
+  assert.equal(safetyGateModeFromEnv({ LEANNA_SAFETY_GATE: "enforce" } as NodeJS.ProcessEnv), "enforce");
+});
+
+test("IMP-03 : le hash d'arguments tient compte des clés imbriquées", () => {
+  const a = hashArguments({ edits: [{ old: "a", new: "b" }] });
+  const b = hashArguments({ edits: [{ old: "a", new: "c" }] });
+  assert.notEqual(a, b, "deux éditions différentes ne doivent jamais partager une clé");
+  assert.equal(hashArguments({ x: { b: 1, a: 2 } }), hashArguments({ x: { a: 2, b: 1 } }), "ordre des clés indifférent");
 });

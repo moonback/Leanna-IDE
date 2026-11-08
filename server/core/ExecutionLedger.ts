@@ -48,9 +48,19 @@ export interface ActionKeyParts {
   stepId?: string;
 }
 
-/** Hash SHA-256 stable d'arguments (clés triées pour un ordre déterministe). */
+/** Tri récursif des clés d'objet (un tableau-replacer filtrerait les clés imbriquées). */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object" && (value as object).constructor === Object) {
+    const src = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(src).sort().map((k) => [k, canonicalize(src[k])]));
+  }
+  return value;
+}
+
+/** Hash SHA-256 stable d'arguments (clés triées à tous les niveaux). */
 export function hashArguments(args: Record<string, unknown>): string {
-  const stable = JSON.stringify(args, Object.keys(args ?? {}).sort());
+  const stable = JSON.stringify(canonicalize(args ?? {}));
   return createHash("sha256").update(stable, "utf8").digest("hex");
 }
 

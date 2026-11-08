@@ -21,7 +21,7 @@ import type {
   ToolCallMetrics,
 } from "./types.js";
 import type { EventBus } from "./EventBus.js";
-import { PermissionPolicy, PermissionDeniedError } from "./PermissionPolicy.js";
+import { PermissionPolicy, PermissionDeniedError, isDangerousOnlyDenial } from "./PermissionPolicy.js";
 import { DryRunController } from "./DryRun.js";
 import { AuthorizationGate } from "./AuthorizationGate.js";
 import type { AutonomyPolicy } from "../mission/AutonomyPolicy.js";
@@ -419,25 +419,59 @@ export class ToolRegistry {
     // s'applique TOUJOURS — c'est l'exigence « appliqué au runtime ».
     // Point de passage unique des autorisations : AuthorizationGate combine la
     // politique de permissions et, si branché, le curseur d'autonomie.
-    const verdict = new AuthorizationGate({
-      permissionPolicy: this.permissionPolicy,
-      ...(this.autonomyPolicy ? { autonomyPolicy: this.autonomyPolicy } : {}),
-    }).authorize({
-      toolName: name,
-      required: entry.definition.permissions,
-      attribution: entry.definition.attribution,
-      agentId: options.agentId,
-      args,
-    });
+    const authorize = (permissionPolicy: PermissionPolicy) =>
+      new AuthorizationGate({
+        permissionPolicy,
+        ...(this.autonomyPolicy ? { autonomyPolicy: this.autonomyPolicy } : {}),
+      }).authorize({
+        toolName: name,
+        required: entry.definition.permissions,
+        attribution: entry.definition.attribution,
+        agentId: options.agentId,
+        args,
+      });
+    let verdict = authorize(this.permissionPolicy);
+    const simulated = options.dryRun ?? this.dryRun.isEnabled();
+    let humanApproved = false;
     if (!verdict.permissionDecision.allowed) {
-      throw new PermissionDeniedError(verdict.permissionDecision);
+      // IMP-01 : `dangerous` n'est pas accordé par défaut. Le refus peut être
+      // levé au cas par cas par une approbation humaine (ou par l'appelant qui
+      // l'a déjà obtenue : autonomyApproved), jamais automatiquement.
+      if (!isDangerousOnlyDenial(verdict.permissionDecision)) {
+        throw new PermissionDeniedError(verdict.permissionDecision);
+      }
+      if (!simulated && !options.autonomyApproved) {
+        const emit = options.context?.emitToClient;
+        humanApproved =
+          typeof emit === "function" &&
+          (await requestConfirmation(
+            name,
+            "tool-call",
+            emit,
+            `Action « dangerous » non accordée par la politique de permissions — approbation humaine requise.`,
+            "high"
+          ));
+        if (!humanApproved) throw new PermissionDeniedError(verdict.permissionDecision);
+      }
+      // Octroi limité à CET appel : les autres axes (agent, sandbox, autonomie)
+      // sont réévalués normalement.
+      verdict = authorize(
+        new PermissionPolicy({
+          mode: this.permissionPolicy.getMode(),
+          granted: [...this.permissionPolicy.getGranted(), "dangerous"],
+        })
+      );
+      if (!verdict.permissionDecision.allowed) {
+        throw new PermissionDeniedError(verdict.permissionDecision);
+      }
     }
     // Une simulation n'agit pas : le curseur ne s'applique qu'aux exécutions réelles.
-    if (!(options.dryRun ?? this.dryRun.isEnabled()) && !options.autonomyApproved) {
+    if (!simulated && !options.autonomyApproved) {
       if (verdict.decision === "deny") {
         throw new AutonomyDeniedError(name, verdict.reason);
       }
-      if (verdict.decision === "ask") {
+      // Déjà approuvée ci-dessus (dangerous) : pas de seconde demande.
+      if (verdict.decision === "ask" && !humanApproved) {
         const emit = options.context?.emitToClient;
         // Sans canal d'approbation (agent autonome…), on refuse : fail-closed.
         const approved =

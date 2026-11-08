@@ -14,7 +14,7 @@ import fs from "fs";
 import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
 import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
-import { supervisionEnabledFromEnv } from "./server/core/supervisionConfig.js";
+import { supervisionModeFromEnv } from "./server/core/supervisionConfig.js";
 
 import { knowledgeGraph, projectMemory } from "./server/knowledge/index.js";
 
@@ -295,7 +295,7 @@ import { LeannaCore } from "./server/autonomy/LeannaCore.js";
 import { AutonomyPersistence } from "./server/autonomy/AutonomyPersistence.js";
 import { RedisEventBridge } from "./server/runtime/RedisEventBridge.js";
 
-const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
+const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
   skills: [
     automationSkill, browserSkill, codebaseSkill, githubSkill,
     guidelinesSkill, historySkill, knowledgeSkill, listSkill,
@@ -416,17 +416,14 @@ const { runtime, skillManager, agentic } = bootstrapRuntimeSync({
         console.warn(`[Bootstrap] ⚠️ EvidenceEngine non branché: ${(err as Error).message}`);
       }
 
-      // Unification (audit, point 5) : brancher le LeannaSupervisor comme
-      // autorité de gouvernance, activable par LEANNA_SUPERVISED (alias historiques acceptés). En mode
-      // supervisé, l'exécution transite dans la boucle du Supervisor (état durable,
-      // snapshots/rollback, preuve). Réversible : sans le flag, exécution directe.
+      // Unification (IMP-04/05) : le Mission Executor partage le LeannaSupervisor
+      // du noyau (mêmes stores durables, mêmes checkpoints) et la même politique
+      // LEANNA_SUPERVISED que les tâches agents (défaut "risky").
       try {
-        const { LeannaSupervisor } = await import("./server/core/LeannaSupervisor.js");
-        const supervisedEnabled = supervisionEnabledFromEnv();
-        // Timeout runner optionnel aligné sur le timeout global de mission.
-        executor.setSupervisor(new LeannaSupervisor(), supervisedEnabled);
-        if (supervisedEnabled) {
-          console.log(`[Bootstrap] ✓ Mode supervisé activé (LeannaSupervisor gouverne le cycle de mission).`);
+        const supervisionMode = supervisionModeFromEnv();
+        executor.setSupervisor(kernel.supervisor, supervisionMode);
+        if (supervisionMode !== "off") {
+          console.log(`[Bootstrap] ✓ Mode supervisé "${supervisionMode}" (LeannaSupervisor gouverne le cycle de mission).`);
         }
       } catch (err) {
         console.warn(`[Bootstrap] ⚠️ LeannaSupervisor non branché: ${(err as Error).message}`);

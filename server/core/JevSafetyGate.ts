@@ -8,9 +8,10 @@
  * call, appelle `gateAgentAction`, puis traduit le verdict pour le registry.
  *
  * Modes (LEANNA_SAFETY_GATE) :
- *   - "off"     (défaut) : aucun jugement (le gate n'est même pas branché).
+ *   - "off"     : aucun jugement (le gate n'est même pas branché).
  *   - "enforce" : une action jugée `review` ou `block` est REFUSÉE.
- *   - "audit"   : on journalise le verdict mais on laisse toujours passer.
+ *   - "audit"   : on journalise le verdict sans jamais bloquer ni attendre Jev.
+ * Défaut (IMP-02) : "audit" si une clé OpenRouter est disponible, sinon "off".
  *
  * Le contexte ambiant (missionId/taskId) est réglé par l'orchestrateur autour
  * d'une exécution, car `ToolRegistry.call` ne le fournit pas directement.
@@ -166,7 +167,7 @@ export class JevSafetyGate implements SafetyGate {
 
     const { target, summary, facts } = summarize(tool, args, permissions);
     const ctx = this.scoped.getStore() ?? this.ctx;
-    const decision = await gateAgentAction(
+    const judged = gateAgentAction(
       { tool, target, summary, facts },
       {
         apiKey: this.opts.apiKey,
@@ -175,19 +176,21 @@ export class JevSafetyGate implements SafetyGate {
         taskId: ctx.taskId,
       },
     );
-
-    const label = `${tool} → ${decision.action}` + (decision.reasons.length ? ` (${decision.reasons.join("; ")})` : "");
+    const labelOf = (d: { action: GateAction; reasons: string[] }) =>
+      `${tool} → ${d.action}` + (d.reasons.length ? ` (${d.reasons.join("; ")})` : "");
 
     if (this.mode === "audit") {
-      // On observe sans jamais bloquer.
-      if (decision.action !== "allow") {
-        console.warn(`[JevSafetyGate:AUDIT] ${label}`);
-      }
+      // On observe sans jamais bloquer : le verdict est journalisé en arrière-plan,
+      // l'exécution n'attend pas l'appel LLM.
+      void judged.then((d) => {
+        if (d.action !== "allow") console.warn(`[JevSafetyGate:AUDIT] ${labelOf(d)}`);
+      }, () => undefined);
       return { decision: "allow" };
     }
 
     // enforce : allow passe, review ET block sont refusés (fail-closed).
-    return mapVerdict(decision.action, decision.reasons, label);
+    const decision = await judged;
+    return mapVerdict(decision.action, decision.reasons, labelOf(decision));
   }
 }
 
@@ -201,8 +204,10 @@ function mapVerdict(
   return { decision: "block", reason: reasons.join("; ") || "action jugée risquée" };
 }
 
-/** Lit le mode depuis l'environnement. */
+/** Lit le mode depuis l'environnement (valeur explicite prioritaire). */
 export function safetyGateModeFromEnv(env: NodeJS.ProcessEnv = process.env): SafetyGateMode {
-  const raw = (env.LEANNA_SAFETY_GATE ?? "off").toLowerCase().trim();
-  return raw === "enforce" || raw === "audit" ? raw : "off";
+  const raw = (env.LEANNA_SAFETY_GATE ?? "").toLowerCase().trim();
+  if (raw === "enforce" || raw === "audit" || raw === "off") return raw;
+  // Non configuré : observer par défaut dès qu'un juge est joignable (IMP-02).
+  return env.OPENROUTER_API_KEY?.trim() || env.OPENROUTER_FREE_API_KEY?.trim() ? "audit" : "off";
 }

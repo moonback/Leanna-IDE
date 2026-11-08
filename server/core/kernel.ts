@@ -4,14 +4,14 @@
  * Fournit une fabrique unique qui instancie les briques P0 (ledger, checkpoints,
  * evidence, state store, supervisor) et les relie au runtime existant SANS le
  * casser :
- *   - la garde d'idempotence n'est branchée sur le `ToolRegistry` que si elle
- *     est explicitement activée (`enableIdempotency`), sinon comportement
- *     strictement inchangé ;
+ *   - la garde d'idempotence est branchée par défaut sur le `ToolRegistry`
+ *     (IMP-03) ; elle ne déduplique que les appels portant une étape identifiée
+ *     (missionId + stepId), les autres passent inchangés ;
  *   - tout le reste est disponible pour les appelants qui veulent gouverner une
  *     mission via le Supervisor.
  *
  * Activation par variable d'environnement (convention du projet) :
- *   LEANNA_IDEMPOTENCY = "true" | "1"  → branche la garde d'idempotence.
+ *   LEANNA_IDEMPOTENCY = "false" | "0"  → désactive la garde d'idempotence (défaut : active).
  */
 
 import type { ToolRegistry } from "../runtime/ToolRegistry.js";
@@ -116,10 +116,10 @@ export interface CoreKernelOptions {
   missionStoreDir?: string;
 }
 
-/** Lit l'activation de l'idempotence depuis l'environnement. */
+/** Lit l'activation de l'idempotence depuis l'environnement (IMP-03 : active sauf opt-out explicite). */
 export function idempotencyEnabledFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = (env.LEANNA_IDEMPOTENCY ?? "").toLowerCase().trim();
-  return raw === "true" || raw === "1";
+  return raw !== "false" && raw !== "0";
 }
 
 export { supervisionEnabledFromEnv, agentSupervisionEnabledFromEnv, missionSupervisionEnabledFromEnv } from "./supervisionConfig.js";

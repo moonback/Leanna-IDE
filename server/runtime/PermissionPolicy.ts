@@ -27,13 +27,26 @@ import type { EventBus } from "./EventBus.js";
 
 export type PermissionMode = "enforce" | "audit" | "off";
 
-/** Toutes les permissions accordées par défaut (comportement ouvert). */
+/** Toutes les permissions (jeu ouvert — à accorder explicitement). */
 export const ALL_PERMISSIONS: readonly ToolPermission[] = [
   "read",
   "write",
   "network",
   "exec",
   "dangerous",
+];
+
+/**
+ * Jeu accordé par défaut (IMP-01, moindre privilège) : tout sauf `dangerous`.
+ * Une action `dangerous` exige soit un octroi explicite
+ * (`Leanna_GRANTED_PERMISSIONS`), soit une approbation humaine au cas par cas
+ * (voir ToolRegistry.call).
+ */
+export const DEFAULT_GRANTED_PERMISSIONS: readonly ToolPermission[] = [
+  "read",
+  "write",
+  "network",
+  "exec",
 ];
 
 export interface PermissionDecision {
@@ -96,7 +109,7 @@ export interface ToolAgentAuthorization {
 export interface PermissionPolicyConfig {
   /** Mode d'application. Défaut : "enforce". */
   mode?: PermissionMode;
-  /** Permissions accordées globalement. Défaut : toutes. */
+  /** Permissions accordées globalement. Défaut : DEFAULT_GRANTED_PERMISSIONS (sans `dangerous`). */
   granted?: ToolPermission[];
   /**
    * Refuse en mode "enforce" tout outil qui ne déclare AUCUNE permission.
@@ -138,7 +151,7 @@ export class PermissionPolicy {
   constructor(config: PermissionPolicyConfig = {}) {
     this.mode = config.mode ?? "enforce";
     this.granted = new Set(
-      normalizePermissions(config.granted ?? [...ALL_PERMISSIONS])
+      normalizePermissions(config.granted ?? [...DEFAULT_GRANTED_PERMISSIONS])
     );
     this.denyUndeclared = config.denyUndeclared ?? true;
     this.eventBus = config.eventBus;
@@ -337,7 +350,8 @@ export class PermissionPolicy {
    * Construit une politique depuis les variables d'environnement :
    *   - Leanna_PERMISSION_MODE   : enforce | audit | off (défaut: enforce)
    *   - Leanna_GRANTED_PERMISSIONS : liste CSV (ex: "read,write,network")
-   *                                  défaut : toutes les permissions
+   *                                  défaut : DEFAULT_GRANTED_PERMISSIONS
+   *                                  ("all" ou "*" = toutes, explicitement)
    */
   static fromEnv(
     env: NodeJS.ProcessEnv = process.env,
@@ -350,15 +364,27 @@ export class PermissionPolicy {
         : "enforce";
 
     const rawGranted = env.Leanna_GRANTED_PERMISSIONS?.trim();
-    const granted = rawGranted
-      ? (rawGranted
-          .split(",")
-          .map((s) => s.trim().toLowerCase())
-          .filter(Boolean) as ToolPermission[])
-      : [...ALL_PERMISSIONS];
+    const tokens = (rawGranted ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const granted =
+      tokens.length === 0
+        ? [...DEFAULT_GRANTED_PERMISSIONS]
+        : tokens.includes("all") || tokens.includes("*")
+          ? [...ALL_PERMISSIONS]
+          : (tokens as ToolPermission[]);
 
     return new PermissionPolicy({ mode, granted, ...extra });
   }
+}
+
+/**
+ * Vrai si le seul motif de refus est `dangerous` : le refus peut alors être
+ * levé par une approbation humaine explicite (IMP-01), jamais automatiquement.
+ */
+export function isDangerousOnlyDenial(decision: PermissionDecision): boolean {
+  return decision.missing.length === 1 && decision.missing[0] === "dangerous";
 }
 
 /**

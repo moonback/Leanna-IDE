@@ -88,8 +88,8 @@ Les chiffres ne doivent donc pas être copiés comme constantes dans une documen
 | Permissions | `server/runtime/PermissionPolicy.ts` | Selon `Leanna_PERMISSION_MODE` et permissions accordées |
 | Dry-run | `server/runtime/DryRun.ts` | Selon le contrôleur et les options d'appel |
 | Autorisation agent/outils sensibles | `server/agents/toolAgentMapper.ts` + `PermissionPolicy` | Attribution appliquée au bootstrap |
-| Idempotence / ledger | `server/core/ExecutionLedger.ts`, `LedgerGuard.ts` | Branchée si `LEANNA_IDEMPOTENCY` est activé |
-| Safety Gate Jev | `server/core/JevSafetyGate.ts` | Mode `LEANNA_SAFETY_GATE=off|audit|enforce` |
+| Idempotence / ledger | `server/core/ExecutionLedger.ts`, `LedgerGuard.ts` | Branchée par défaut (opt-out `LEANNA_IDEMPOTENCY=false`) |
+| Safety Gate Jev | `server/core/JevSafetyGate.ts` | Mode `LEANNA_SAFETY_GATE=off|audit|enforce` (défaut : `audit` non bloquant si clé OpenRouter, sinon `off`) |
 | Supervisor agentique | `server/core/LeannaSupervisor.ts` | Chemin supervisé opt-in, notamment `LEANNA_AGENT_SUPERVISED=1` |
 | Sandbox | `server/utils/sandbox.ts` et helpers de skills | Selon le chemin et l'outil d'écriture |
 

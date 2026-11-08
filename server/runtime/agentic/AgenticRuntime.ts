@@ -308,6 +308,19 @@ export class AgenticRuntime implements IAgentRuntime {
     return this.registry.call(name, args);
   }
 
+  /**
+   * Le rôle dispose-t-il d'au moins un outil mutant (write/exec/dangerous) ?
+   * Fait de risque utilisé par la politique de supervision (IMP-04).
+   */
+  roleCanMutate(role: string): boolean {
+    if (!hasAgent(role)) return false;
+    return getAgentDefinitionOrThrow(role).capabilities.some((name) =>
+      (this.registry.getDefinition(name)?.permissions ?? []).some(
+        (p) => p === "write" || p === "exec" || p === "dangerous"
+      )
+    );
+  }
+
   // ─── run : orchestration complète ─────────────────────────────────────────
 
   async run(task: AgentTask): Promise<AgentResult> {
