@@ -212,4 +212,17 @@ describe("selectDelegationContext — transmission sélective", () => {
   it("ne transforme pas un contexte absent en contenu artificiel", () => {
     assert.deepEqual(selectDelegationContext(undefined), {});
   });
+
+  it("conserve une partie des preuves structurées au lieu de supprimer tout le tableau", () => {
+    const selected = selectDelegationContext({
+      previousResults: Array.from({ length: 8 }, (_, index) => ({
+        summary: `résultat-${index}`,
+        evidence: "E".repeat(1_500),
+      })),
+    }, 1_024);
+
+    assert.ok(Array.isArray(selected.previousResults));
+    assert.ok((selected.previousResults as unknown[]).length > 0);
+    assert.equal((selected._contextHandoff as { truncated: boolean }).truncated, true);
+  });
 });
