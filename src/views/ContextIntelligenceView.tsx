@@ -293,6 +293,7 @@ export default function ContextIntelligenceView() {
           {tab === 'graph' && <div className="space-y-3">
             <ContextKnowledgeGraph
               relations={visibleRelations}
+              loadedRelations={relations.length}
               loading={loadingRelations}
               query={graphQuery}
               onQueryChange={setGraphQuery}
