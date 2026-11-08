@@ -179,25 +179,47 @@ export class AgentContextResolver {
       .slice(0, 10);
   }
 
-  async readContextFiles(files: string[]): Promise<string[]> {
+  async readContextFiles(
+    files: string[],
+    options: { maxTotalChars?: number; maxPerFileChars?: number; maxFiles?: number } = {}
+  ): Promise<string[]> {
+    const maxTotalChars = Math.max(2_000, Math.min(48_000, options.maxTotalChars ?? 24_000));
+    const maxPerFileChars = Math.max(1_000, Math.min(16_000, options.maxPerFileChars ?? 8_000));
+    const maxFiles = Math.max(1, Math.min(10, options.maxFiles ?? 10));
     const fileContents: string[] = [];
-    for (const [index, file] of files.slice(0, 10).entries()) {
+    let remaining = maxTotalChars;
+
+    for (const [index, file] of files.slice(0, maxFiles).entries()) {
+      if (remaining < 512) break;
       try {
-        // Le premier fichier est le fichier principal résolu par la tâche :
-        // injecter son contenu complet évite que le modèle travaille sur une
-        // simple fenêtre startLine/endLine ou sur les 50 premières lignes.
+        // Le fichier principal est lu intégralement côté outil, mais l'injection
+        // est plafonnée. Chaque autre fichier dispose de son propre quota.
         const content = await this.callTool("read_project_file", {
           path: file,
           ...(index === 0 ? { full: true } : {}),
         });
-        if (content && typeof content === "object" && content.content) {
-          fileContents.push(`--- ${file} ---\n${content.content}`);
+        if (!content || typeof content !== "object" || typeof content.content !== "string") continue;
+
+        const allowance = Math.min(maxPerFileChars, remaining - Math.min(160, remaining));
+        if (allowance < 256) break;
+        const raw = content.content as string;
+        let bounded = raw;
+        if (raw.length > allowance) {
+          const marker = "\n\n/* … CONTENU TRONQUÉ : " + (raw.length - allowance + 96) + " caractères omis … */\n\n";
+          const available = Math.max(0, allowance - marker.length);
+          const headLength = Math.floor(available * 0.7);
+          const tailLength = available - headLength;
+          bounded = raw.slice(0, headLength) + marker + (tailLength > 0 ? raw.slice(-tailLength) : "");
         }
+        const rendered = `--- ${file} ---\n${bounded}`;
+        if (rendered.length > remaining) break;
+        fileContents.push(rendered);
+        remaining -= rendered.length;
       } catch (err) {
         log.debug(`Échec lecture: ${file} — ${(err as Error).message}`);
       }
     }
-    log.debug(`Fichiers lus: ${fileContents.length}/${files.length}; principal=${files[0] ?? "aucun"}`);
+    log.debug(`Fichiers lus: ${fileContents.length}/${Math.min(files.length, maxFiles)}; caractères injectables=${maxTotalChars - remaining}; principal=${files[0] ?? "aucun"}`);
     return fileContents;
   }
 }
