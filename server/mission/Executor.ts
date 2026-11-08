@@ -753,8 +753,13 @@ export class Executor {
       try {
         if (attempt > 1) {
           // Capture failed-goal context before clearing the previous attempt.
-          const recoveryTargets = Object.values(mission.getState().goals)
-            .filter((goal) => goal.parentId !== null && (goal.status === "failed" || goal.status === "blocked"))
+          const previousGoals = Object.values(mission.getState().goals);
+          const hasSubGoals = previousGoals.some((goal) => goal.parentId !== null);
+          const recoveryTargets = previousGoals
+            .filter((goal) =>
+              (hasSubGoals ? goal.parentId !== null : goal.parentId === null) &&
+              (goal.status === "failed" || goal.status === "blocked")
+            )
             .map((goal) => ({
               goalId: goal.id,
               action: [...goal.plannedActions].reverse().find((action) => action.status === "failed")
