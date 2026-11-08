@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BrainCircuit, Clock3, FileSearch, GitBranch, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader.js';
 import { viewHeaderProps } from '../config/navigation.js';
@@ -140,34 +140,41 @@ export default function ContextIntelligenceView() {
     }
   }, [query, context]);
 
-  const visibleFacts = memoryResults ?? facts.filter(fact => {
+  const visibleFacts = useMemo(() => memoryResults ?? facts.filter(fact => {
     const term = memoryQuery.trim().toLocaleLowerCase();
     return !term || [fact.content, fact.category, fact.sourceFile ?? ''].join(' ').toLocaleLowerCase().includes(term);
-  });
+  }), [memoryResults, facts, memoryQuery]);
 
-  const currentFactIds = new Set(context?.batch.facts.map(f => f.id) ?? []);
-  const previousFactIds = new Set(previousContext?.batch.facts.map(f => f.id) ?? []);
-  const addedFacts = context?.batch.facts.filter(f => !previousFactIds.has(f.id)) ?? [];
-  const removedFacts = previousContext?.batch.facts.filter(f => !currentFactIds.has(f.id)) ?? [];
-  const currentFiles = new Set(context?.batch.files.map(f => f.filePath) ?? []);
-  const previousFiles = new Set(previousContext?.batch.files.map(f => f.filePath) ?? []);
-  const addedFiles = context?.batch.files.filter(f => !previousFiles.has(f.filePath)) ?? [];
-  const removedFiles = previousContext?.batch.files.filter(f => !currentFiles.has(f.filePath)) ?? [];
+  const { addedFacts, removedFacts, addedFiles, removedFiles } = useMemo(() => {
+    const currentFactIds = new Set(context?.batch.facts.map(f => f.id) ?? []);
+    const previousFactIds = new Set(previousContext?.batch.facts.map(f => f.id) ?? []);
+    const currentFiles = new Set(context?.batch.files.map(f => f.filePath) ?? []);
+    const previousFiles = new Set(previousContext?.batch.files.map(f => f.filePath) ?? []);
+    return {
+      addedFacts: context?.batch.facts.filter(f => !previousFactIds.has(f.id)) ?? [],
+      removedFacts: previousContext?.batch.facts.filter(f => !currentFactIds.has(f.id)) ?? [],
+      addedFiles: context?.batch.files.filter(f => !previousFiles.has(f.filePath)) ?? [],
+      removedFiles: previousContext?.batch.files.filter(f => !currentFiles.has(f.filePath)) ?? [],
+    };
+  }, [context, previousContext]);
   const estimatedPromptTokens = context ? Math.ceil(context.systemPromptInject.length / 4) : 0;
   const previousEstimatedTokens = previousContext ? Math.ceil(previousContext.systemPromptInject.length / 4) : 0;
   const tokenDelta = estimatedPromptTokens - previousEstimatedTokens;
   const memoryHealthScore = context
     ? Math.round(Math.max(0, Math.min(1, context.health.freshness)) * 50 + Math.max(0, Math.min(1, context.batch.quality.averageConfidence)) * 50)
     : null;
-  const relationTypes = [...new Set(relations.map(relation => relation.relationType))].sort();
-  const visibleRelations = relations
-    .filter(relation => graphRelationType === 'all' || relation.relationType === graphRelationType)
-    .filter(relation => {
-      const term = graphQuery.trim().toLocaleLowerCase();
-      return !term || [relation.source.name, relation.source.filePath, relation.target.name, relation.target.filePath, relation.relationType].join(' ').toLocaleLowerCase().includes(term);
-    })
-    .sort((a, b) => b.confidence - a.confidence);
-  const duplicateGroups = (() => {
+  const relationTypes = useMemo(
+    () => [...new Set(relations.map(relation => relation.relationType))].sort(),
+    [relations],
+  );
+  const visibleRelations = useMemo(() => {
+    const term = graphQuery.trim().toLocaleLowerCase();
+    return relations
+      .filter(relation => graphRelationType === 'all' || relation.relationType === graphRelationType)
+      .filter(relation => !term || [relation.source.name, relation.source.filePath, relation.target.name, relation.target.filePath, relation.relationType].join(' ').toLocaleLowerCase().includes(term))
+      .sort((a, b) => b.confidence - a.confidence);
+  }, [relations, graphRelationType, graphQuery]);
+  const duplicateGroups = useMemo(() => {
     const groups = new Map<string, Fact[]>();
     for (const fact of facts) {
       const normalized = fact.content.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
@@ -177,7 +184,7 @@ export default function ContextIntelligenceView() {
       groups.set(normalized, group);
     }
     return [...groups.values()].filter(group => group.length > 1);
-  })();
+  }, [facts]);
   const governance = context?.batch.memoryGovernance;
   const Stat = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => (
     <div className="min-w-0 rounded-xl border p-3" style={panelStyle}>
