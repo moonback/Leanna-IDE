@@ -42,7 +42,7 @@ export function detectMemoryConflicts(facts: Array<{ content: string; category?:
     const text = value.toLowerCase();
     const negative = /\b(no|not|never|without|cannot|can't|disable[ds]?|forbid(?:den)?|interdit|sans|ne\\s+pas|jamais|désactivé|desactive)\b/.test(text);
     const positive = /\b(yes|always|must|enable[ds]?|allow(?:ed)?|required|autorisé|obligatoire|activé|active)\b/.test(text);
-    return negative === positive ? 0 : negative ? -1 : 1;
+    return negative ? -1 : positive ? 1 : 0;
   };
   const tokens = (value: string): Set<string> => new Set(value.toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
