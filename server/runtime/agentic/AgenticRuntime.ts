@@ -38,6 +38,7 @@ import {
   buildToolSection,
   buildBudgetSection,
   buildObservationHistory,
+  resolveObservationHistoryBudget,
 } from "./ToolPromptBuilder.js";
 import { buildPhaseGuidance } from "../../agents/phasePrompts.js";
 import { parseFinalReport, noteItems, proposedDelegations } from "../../agents/FinalReportParser.js";
@@ -108,7 +109,6 @@ const CACHEABLE_TOOLS = new Set([
   "analyze_project_file",
 ]);
 
-const MAX_HISTORY_CHARS = 60_000;
 
 /**
  * Nombre maximum d'étapes retenues dans un plan. Chaque étape coûte au moins un
@@ -659,7 +659,7 @@ export class AgenticRuntime implements IAgentRuntime {
       step.suggestedTools?.length ? `OUTILS SUGGÉRÉS : ${step.suggestedTools.join(", ")}` : "",
       step.verification ? `VÉRIFICATION ATTENDUE : ${step.verification}` : "",
       session.pendingInstruction ? `CONSIGNE CORRECTIVE : ${session.pendingInstruction}` : "",
-      buildObservationHistory(session.observations, MAX_HISTORY_CHARS),
+      buildObservationHistory(session.observations, resolveObservationHistoryBudget(session.phase)),
       "",
       "Décide de la prochaine action : soit des tool_calls JSON, soit une réponse finale.",
     ]
