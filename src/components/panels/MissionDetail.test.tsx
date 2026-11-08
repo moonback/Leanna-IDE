@@ -120,6 +120,7 @@ describe('MissionDetail — tokens mesurés', () => {
     };
     mockFetchRouter([{ match: '/api/agents/tasks/task-1', respond: () => jsonResponse({ task: observed }) }]);
     renderWithProviders(<MissionDetail taskId="task-1" status="completed" color="#4f8cff" />);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Brief de mission/ }));
     expect(await screen.findByText("Observabilité du contexte")).toBeInTheDocument();
     expect(screen.getByText("Faits injectés")).toBeInTheDocument();
     expect(screen.getByText("Faits obsolètes écartés")).toBeInTheDocument();
