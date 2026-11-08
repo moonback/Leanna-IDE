@@ -101,6 +101,44 @@ export function selectDelegationContext(
     return String(value).slice(0, 256);
   };
 
+  const fitValue = (value: unknown, limit: number): unknown => {
+    const safe = sanitize(value, 0);
+    const serialized = JSON.stringify(safe) ?? "null";
+    if (serialized.length <= limit) return safe;
+    if (limit < 24) return undefined;
+    if (typeof safe === "string") return safe.slice(0, Math.max(0, limit - 3)) + "...";
+    if (Array.isArray(safe)) {
+      const result: unknown[] = [];
+      let remaining = limit - 2;
+      for (const item of safe) {
+        if (remaining < 24) break;
+        const fitted = fitValue(item, Math.min(1_200, remaining - 1));
+        if (fitted === undefined) break;
+        const cost = (JSON.stringify(fitted) ?? "null").length + (result.length ? 1 : 0);
+        if (cost > remaining) break;
+        result.push(fitted);
+        remaining -= cost;
+      }
+      return result;
+    }
+    if (safe && typeof safe === "object") {
+      const result: Record<string, unknown> = {};
+      let remaining = limit - 2;
+      for (const [childKey, childValue] of Object.entries(safe as Record<string, unknown>)) {
+        const keyCost = childKey.length + 4;
+        if (remaining <= keyCost + 24) break;
+        const fitted = fitValue(childValue, Math.min(1_200, remaining - keyCost));
+        if (fitted === undefined) continue;
+        const cost = keyCost + (JSON.stringify(fitted) ?? "null").length;
+        if (cost > remaining) continue;
+        result[childKey] = fitted;
+        remaining -= cost;
+      }
+      return result;
+    }
+    return safe;
+  };
+
   const output: Record<string, unknown> = {};
   let used = 0;
   const entries = Object.entries(context)
@@ -108,20 +146,20 @@ export function selectDelegationContext(
     .sort(([a], [b]) => rank(a) - rank(b));
   let truncated = false;
   for (const [key, value] of entries) {
-    const safeValue = sanitize(value, 0);
-    const serialized = JSON.stringify(safeValue) ?? "null";
-    const cost = key.length + serialized.length + 8;
-    if (used + cost <= payloadBudget) {
-      output[key] = safeValue;
-      used += cost;
+    const available = payloadBudget - used - key.length - 8;
+    if (available < 24) {
+      truncated = true;
       continue;
     }
-    truncated = true;
-    const remaining = payloadBudget - used - key.length - 16;
-    if (remaining >= 96 && typeof safeValue === "string") {
-      output[key] = safeValue.slice(0, remaining - 3) + "...";
-      used = payloadBudget;
+    const safeValue = fitValue(value, available);
+    if (safeValue === undefined) {
+      truncated = true;
+      continue;
     }
+    const serialized = JSON.stringify(safeValue) ?? "null";
+    if (serialized.length < (JSON.stringify(sanitize(value, 0)) ?? "null").length) truncated = true;
+    output[key] = safeValue;
+    used += key.length + serialized.length + 8;
   }
   output._contextHandoff = {
     version: 1,
