@@ -279,6 +279,21 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
     assert.equal(selected[0], "server/runtime/ToolRegistry.ts");
   });
 
+  it("intègre les candidats du moteur sémantique après les chemins explicites", () => {
+    const selected = resolver.selectProjectFiles([
+      "package.json",
+      "src/dashboard/Dashboard.tsx",
+      "server/runtime/AgentContextResolver.ts",
+      "server/knowledge/SemanticSearch.ts",
+    ], task("coder", "Optimiser le contexte des agents"), [], [
+      "server/knowledge/SemanticSearch.ts",
+      "server/runtime/AgentContextResolver.ts",
+    ]);
+
+    assert.equal(selected[0], "server/knowledge/SemanticSearch.ts");
+    assert.equal(selected[1], "server/runtime/AgentContextResolver.ts");
+  });
+
   it("respecte le budget global et le quota par fichier lors de la lecture", async () => {
     const reader = new AgentContextResolver(async (_tool, args) => ({
       content: String(args.path).repeat(4_000),
