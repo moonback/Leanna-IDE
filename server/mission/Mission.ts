@@ -128,6 +128,43 @@ export class Mission {
     return this.config;
   }
 
+  /**
+   * Reset the mutable execution state before a new Supervisor-controlled
+   * attempt. The plan and accumulated context are retained; every goal/action
+   * is reopened because the previous attempt's workspace changes were rolled
+   * back and its completion evidence is therefore stale.
+   *
+   * Historical counters are intentionally preserved to keep retry budgets
+   * monotonic across attempts.
+   */
+  resetForSupervisedAttempt(): void {
+    if (this.state.status === "cancelled") {
+      throw new Error("A cancelled mission cannot be retried.");
+    }
+
+    for (const goal of Object.values(this.state.goals)) {
+      goal.status = "pending";
+      goal.result = undefined;
+      goal.startedAt = undefined;
+      goal.completedAt = undefined;
+      goal.blockedBy = undefined;
+      goal.blockReason = undefined;
+
+      for (const action of goal.plannedActions) {
+        action.status = "pending";
+        action.result = undefined;
+        action.reflection = undefined;
+        action.durationMs = undefined;
+      }
+    }
+
+    this.state.status = "pending";
+    this.state.goalStack = [];
+    this.state.activeGoalId = null;
+    this.state.completedAt = undefined;
+    this.state.updatedAt = new Date().toISOString();
+  }
+
   isCompleted(): boolean {
     return (
       this.state.status === "completed" ||
