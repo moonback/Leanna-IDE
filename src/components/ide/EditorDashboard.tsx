@@ -172,9 +172,9 @@ const Card = React.memo(function Card({
       className={`group relative flex h-full min-h-0 min-w-0 flex-col rounded-xl border p-2.5 ${className}`}
       style={{
         zIndex: menuOpen ? 30 : undefined,
-        backgroundColor: 'color-mix(in srgb, var(--bg-panel) 88%, transparent)',
-        borderColor: 'var(--border-base)',
-        backdropFilter: 'blur(18px)',
+        backgroundColor: 'color-mix(in srgb, var(--bg-panel) 92%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--border-base) 58%, transparent)',
+        backdropFilter: 'blur(14px)',
         transformStyle: 'preserve-3d',
         perspective: '1100px',
         backgroundImage: 'radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 42%)',
@@ -214,7 +214,9 @@ const Card = React.memo(function Card({
         <div className="ml-auto flex items-center gap-1.5">
           {right}
           <div ref={menuRef} className="relative">
-            <MiniButton label={`Options : ${title}`} icon={MoreHorizontal} onClick={() => setMenuOpen(value => !value)} active={menuOpen} />
+            <span className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+              <MiniButton label={`Options : ${title}`} icon={MoreHorizontal} onClick={() => setMenuOpen(value => !value)} active={menuOpen} />
+            </span>
             <AnimatePresence>
               {menuOpen && (
                 <motion.div role="menu" aria-label={`Options ${title}`}
@@ -250,7 +252,7 @@ const Card = React.memo(function Card({
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div className="min-w-0" title={hint}>
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-dimmed)' }}>{label}</div>
+      <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="truncate font-mono text-base font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
         <AnimatedValue value={value} />
       </div>
@@ -393,8 +395,8 @@ function LiveClock() {
   return (
     <div>
       <div className="flex items-baseline gap-1 font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        <span className="text-2xl font-bold tracking-tight">{hm}</span>
-        <span className="text-base" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
+        <span className="text-xl font-bold tracking-tight">{hm}</span>
+        <span className="text-sm" style={{ color: 'var(--accent-primary)' }}><AnimatedValue value={sec} /></span>
       </div>
       <div className="text-xs first-letter:uppercase" style={{ color: 'var(--text-muted)' }}>{date}</div>
     </div>
@@ -926,6 +928,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [immersiveMode, setImmersiveMode] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
@@ -1037,6 +1040,11 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             </div>
           </div>
           <nav className="flex items-center gap-2" aria-label="Actions rapides">
+            <button type="button" onClick={() => setDebugOpen(value => !value)} aria-expanded={debugOpen}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+              style={{ backgroundColor: debugOpen ? 'var(--accent-subtle)' : 'var(--bg-panel)', borderColor: debugOpen ? 'color-mix(in srgb, var(--accent-primary) 45%, transparent)' : 'color-mix(in srgb, var(--border-base) 65%, transparent)', color: debugOpen ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+              <Cpu size={13} /> Diagnostic <span className="font-mono text-[11px]">{debugOpen ? '−' : '+'}</span>
+            </button>
             <motion.button
               type="button"
               onClick={handleConnect}
@@ -1046,7 +1054,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
               className="inline-flex min-h-9 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold shadow-lg transition-all disabled:cursor-wait disabled:opacity-70"
               style={connected
                 ? { backgroundColor: 'color-mix(in srgb, var(--color-success, #22c55e) 14%, var(--bg-panel))', borderColor: 'var(--color-success, #22c55e)', color: 'var(--color-success, #22c55e)', boxShadow: '0 0 18px color-mix(in srgb, var(--color-success, #22c55e) 16%, transparent)' }
-                : { backgroundColor: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'white', boxShadow: '0 0 22px color-mix(in srgb, var(--accent-primary) 28%, transparent)' }}
+                : { background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 88%, white 12%), var(--accent-primary))', borderColor: 'color-mix(in srgb, var(--accent-primary) 72%, white 28%)', color: 'white', boxShadow: '0 0 20px color-mix(in srgb, var(--accent-primary) 24%, transparent)' }}
               aria-label={connecting ? 'Connexion à Leanna en cours' : connected ? 'Déconnecter Leanna' : 'Connecter Leanna'}
             >
               {connecting ? <Loader2 size={14} className={reduce ? undefined : 'animate-spin'} /> : connected ? <PowerOff size={14} /> : <Power size={14} />}
@@ -1150,8 +1158,8 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
           <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
         </motion.div>}
-        <div className={`grid grid-cols-1 items-stretch gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:min-h-0 xl:flex-1 xl:grid-flow-row-dense xl:grid-cols-12 xl:grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
-          {sectionOrder.map((sectionId, index) => {
+        <div className={`grid grid-cols-1 items-stretch gap-4 transition-[gap] duration-500 md:grid-cols-4 xl:min-h-0 xl:flex-1 xl:grid-flow-row-dense xl:grid-cols-12 xl:grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] ${immersiveMode ? 'gap-6' : ''}`} aria-label="Sections du tableau de bord réorganisables">
+          {sectionOrder.filter(sectionId => !['tokens', 'system', 'automations'].includes(sectionId)).map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
                 case 'operations': return <OperationalOverviewCard index={index} />;
@@ -1189,6 +1197,48 @@ export const EditorDashboard = React.memo(function EditorDashboard({
             );
           })}
         </div>
+        <AnimatePresence>
+          {debugOpen && (
+            <motion.section
+              initial={{ opacity: 0, height: 0, y: -6 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 max-h-[34vh] shrink-0 overflow-auto rounded-xl border p-3"
+              style={{ borderColor: 'color-mix(in srgb, var(--border-base) 65%, transparent)', background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)', backdropFilter: 'blur(18px)' }}
+              aria-label="Panneau de diagnostic"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <Cpu size={14} style={{ color: 'var(--text-muted)' }} />
+                <h2 className="text-xs font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>Monitoring & diagnostics</h2>
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Système · Tokens · Automatisations</span>
+                <button type="button" onClick={() => setDebugOpen(false)} className="ml-auto rounded-md px-2 py-1 text-[11px] hover:bg-[var(--bg-panel)]" style={{ color: 'var(--text-muted)' }}>Réduire</button>
+              </div>
+              <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-3">
+                {sectionOrder.filter(sectionId => ['tokens', 'system', 'automations'].includes(sectionId)).map((sectionId, index) => {
+                  const section = sectionId === 'tokens' ? <TokensCard index={index} />
+                    : sectionId === 'system' ? <SystemCard index={index} />
+                    : <AutomationsCard index={index} />;
+                  return (
+                    <div key={sectionId} draggable={isEditMode}
+                      onDragStart={event => {
+                        if (!isEditMode) return;
+                        setDraggedSection(sectionId);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', sectionId);
+                      }}
+                      onDragOver={event => { if (!isEditMode) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={event => { if (!isEditMode) return; event.preventDefault(); moveSection(sectionId); }}
+                      onDragEnd={() => setDraggedSection(null)}
+                      className={`min-w-0 md:col-span-1 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
+                      title={isEditMode ? 'Faire glisser pour déplacer cette section' : undefined}
+                    >{section}</div>
+                  );
+                })}
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
