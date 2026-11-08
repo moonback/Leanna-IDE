@@ -33,8 +33,6 @@ interface Props {
   onUnavailable: () => void;
 }
 
-const RING = 4.4;
-
 function cssColor(el: Element, name: string, fallback: string): THREE.Color {
   const raw = getComputedStyle(el).getPropertyValue(name).trim();
   const color = new THREE.Color();
@@ -271,10 +269,15 @@ export default function AgentNetworkWebGL({ agents, messages, selectedRole, hove
       const role = pick(event);
       if (role) live.current.onSelect(role);
     };
+    const onContextMenu = (event: MouseEvent) => {
+      const role = pick(event);
+      if (role) { event.preventDefault(); live.current.onSelect(role); }
+    };
     const onLeave = () => { if (hovered) { hovered = null; live.current.onHover(null); } };
     renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerdown', onDown);
     renderer.domElement.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('contextmenu', onContextMenu);
     renderer.domElement.addEventListener('pointerleave', onLeave);
 
     const projected = new THREE.Vector3();
@@ -373,6 +376,7 @@ export default function AgentNetworkWebGL({ agents, messages, selectedRole, hove
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerdown', onDown);
       renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('contextmenu', onContextMenu);
       renderer.domElement.removeEventListener('pointerleave', onLeave);
       controls.dispose();
       disposeNodes();
