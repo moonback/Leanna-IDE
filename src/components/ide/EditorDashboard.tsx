@@ -895,7 +895,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <main className={`relative z-10 mx-auto w-full px-3 py-2 transition-[max-width,padding] duration-500 sm:px-4 ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-[1480px]'}`}>
+      <main className={`relative z-10 mx-auto w-full px-3 py-2 transition-[max-width,padding] duration-500 sm:px-4 ${immersiveMode ? 'max-w-none sm:px-8' : 'max-w-none'}`}>
         <motion.header
           className="mb-2 flex flex-wrap items-end justify-between gap-2"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
@@ -949,7 +949,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
           <span>Mode personnalisation actif — faites glisser les sections pour modifier leur ordre.</span>
           <span className="ml-auto font-mono" style={{ color: 'var(--text-muted)' }}>{sectionOrder.length} widgets</span>
         </motion.div>}
-        <div className={`grid grid-cols-1 gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:grid-cols-6 ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
+        <div className={`grid grid-cols-1 items-start gap-2 transition-[gap] duration-500 md:grid-cols-4 xl:grid-cols-12 ${immersiveMode ? 'gap-4' : ''}`} aria-label="Sections du tableau de bord réorganisables">
           {sectionOrder.map((sectionId, index) => {
             const section = (() => {
               switch (sectionId) {
@@ -980,7 +980,7 @@ export const EditorDashboard = React.memo(function EditorDashboard({
                 onDragOver={event => { if (!isEditMode) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
                 onDrop={event => { if (!isEditMode) return; event.preventDefault(); moveSection(sectionId); }}
                 onDragEnd={() => setDraggedSection(null)}
-                className={`min-w-0 transition-all duration-300 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${sectionId === 'operations' ? 'md:col-span-4 xl:col-span-6' : ['audio','activity','transcript'].includes(sectionId) ? 'md:col-span-2' : ['session','tokens','plan','system'].includes(sectionId) ? 'md:col-span-1' : 'md:col-span-2'} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
+                className={`min-w-0 transition-all duration-300 ${isEditMode ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-primary)]/20 rounded-xl' : ''} ${sectionId === 'operations' ? 'md:col-span-4 xl:col-span-12' : sectionId === 'audio' ? 'md:col-span-2 xl:col-span-6' : ['session','tokens'].includes(sectionId) ? 'md:col-span-1 xl:col-span-3' : ['activity','transcript','plan','system'].includes(sectionId) ? 'md:col-span-2 xl:col-span-3' : 'md:col-span-2 xl:col-span-4'} ${draggedSection === sectionId ? 'scale-[0.985] opacity-40' : ''}`}
                 title={isEditMode ? 'Faire glisser pour déplacer cette section' : undefined}
               >
                 {section}
