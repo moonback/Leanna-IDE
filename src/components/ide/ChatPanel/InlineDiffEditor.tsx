@@ -1,5 +1,5 @@
 import {
-  lazy, Suspense, useCallback, useEffect, useRef, useState,
+  lazy, Suspense, useCallback, useEffect, useState,
 } from 'react';
 import {
   Check, X, FileCode, Loader2, RotateCcw, AlertCircle, SplitSquareHorizontal, ExternalLink,
