@@ -346,7 +346,7 @@ export class LeannaSupervisor {
           throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
         }
 
-        const decision = this.decideRecovery(outcome, attempt);
+        const decision = this.decideRecovery(outcome, attempt, missionId);
         nextRecovery = decision;
 
         if (decision === "escalate" || attempt >= this.maxAttempts) {
@@ -557,7 +557,11 @@ export class LeannaSupervisor {
    * suggestion du runner si fournie, sinon applique une escalade progressive :
    * les premières tentatives réessaient/réparent, la dernière escalade.
    */
-  private decideRecovery(outcome: RunnerOutcome, attempt: number): RecoveryDecision {
+  private decideRecovery(outcome: RunnerOutcome, attempt: number, missionId: string): RecoveryDecision {
+    // The ledger is authoritative for uncertain external effects. Even when a
+    // runner error is poorly worded, never replay a non-idempotent operation
+    // whose outcome has not been reconciled.
+    if (this.ledger.listUnknownSideEffects(missionId).length > 0) return "escalate";
     return this.recoveryEngine.assess(outcome, attempt, this.maxAttempts).decision;
   }
 }
