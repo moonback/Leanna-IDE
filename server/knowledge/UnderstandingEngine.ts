@@ -33,6 +33,9 @@ import type {
 } from "./types.js";
 import type { ImpactMode } from "./ImpactAnalyzer.js";
 import { impactAnalyzer } from "./ImpactAnalyzer.js";
+import { ContextIntelligenceEngine } from "./ContextIntelligenceEngine.js";
+
+const contextIntelligence = new ContextIntelligenceEngine();
 
 const log = createLogger("UnderstandingEngine");
 
@@ -739,7 +742,22 @@ export class UnderstandingEngine {
       }
     }
 
-    // 2. Respect du budget token approximatif
+    // 2. Gouvernance mémoire v3 : vérifier la présence des sources et retirer
+    // les doublons/faits périmés du contexte injecté. Les faits restent persistés.
+    const workspaceFiles = new Set(Object.keys(knowledgeGraph.getState().files ?? {}));
+    const governance = contextIntelligence.assess({ facts: working.facts, workspaceFiles });
+    const eligibleIds = new Set(governance.assessments
+      .filter((item) => item.decision === "keep" || item.decision === "transmit")
+      .map((item) => item.factId));
+    working.memoryGovernance = {
+      assessed: governance.assessments.length,
+      included: eligibleIds.size,
+      withheld: governance.assessments.length - eligibleIds.size,
+      counts: governance.counts,
+    };
+    working.facts = working.facts.filter((fact) => eligibleIds.has(fact.id));
+
+    // 3. Respect du budget token approximatif
     working.quality = semanticSearch.estimateQuality(working.files, working.facts);
     if (opts.detail === "compact") {
       working.files = working.files.map((f) => ({
