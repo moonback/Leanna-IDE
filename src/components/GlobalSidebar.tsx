@@ -853,7 +853,7 @@ function IdeAssistantBlock({
             />
           )}
           <Bot size={15} className="relative" />
-          {!collapsed && <span className="relative">Connecter l'IA</span>}
+          {!collapsed && <span className="relative">Connecter Leanna</span>}
         </motion.button>
       </div>
     );
