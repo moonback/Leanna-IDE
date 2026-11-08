@@ -78,6 +78,29 @@ function serializeTaskDetail(task: any) {
       instructions: clip(task.context?.instructions, 4000),
       successCriteria: clipList(task.context?.successCriteria, 50),
       previousResultsCount: Array.isArray(task.context?.previousResults) ? task.context.previousResults.length : 0,
+      observability: (() => {
+        const value = task.context?.metadata?.contextObservability;
+        if (!value || typeof value !== "object") return undefined;
+        const v = value as Record<string, unknown>;
+        const numberOrZero = (key: string) => typeof v[key] === "number" && Number.isFinite(v[key]) ? v[key] : 0;
+        return {
+          version: numberOrZero("version"),
+          capturedAt: clip(v.capturedAt, 64),
+          role: clip(v.role, 64),
+          strategy: clip(v.strategy, 80),
+          selectedFileCount: numberOrZero("selectedFileCount"),
+          memoryChars: numberOrZero("memoryChars"),
+          injectedMemoryChars: numberOrZero("injectedMemoryChars"),
+          memoryBudgetChars: numberOrZero("memoryBudgetChars"),
+          factsMatched: numberOrZero("factsMatched"),
+          factsEligible: numberOrZero("factsEligible"),
+          factsIncluded: numberOrZero("factsIncluded"),
+          staleFactsExcluded: numberOrZero("staleFactsExcluded"),
+          graphRelationsIncluded: numberOrZero("graphRelationsIncluded"),
+          previousResultsIncluded: numberOrZero("previousResultsIncluded"),
+          possibleConflicts: numberOrZero("possibleConflicts"),
+        };
+      })(),
     },
     result: r ? {
       success: Boolean(r.success),
