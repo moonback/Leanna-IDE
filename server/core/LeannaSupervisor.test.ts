@@ -546,3 +546,61 @@ test("an unknown side effect in the durable ledger blocks automatic mission repl
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test("passes the selected repair strategy into the next runner attempt", async () => {
+  const { sup, dir } = makeSupervisor();
+  const recoveryStrategies: Array<string | undefined> = [];
+  let attempts = 0;
+  const runner: MissionRunner = async (ctx) => {
+    recoveryStrategies.push(ctx.recovery);
+    attempts++;
+    if (attempts === 1) {
+      return {
+        success: false,
+        error: "TypeScript TS2322 type error",
+        evidence: { typecheck: { name: "tsc", passed: false, details: "TS2322" } },
+      };
+    }
+    return { success: true, evidence: { testsExecuted: [{ name: "unit", passed: true }] } };
+  };
+
+  const result = await sup.runMission({ missionId: "m-repair-context", goal: "repair types", runner });
+  assert.equal(result.finalState, "COMPLETED");
+  assert.deepEqual(recoveryStrategies, [undefined, "repair"]);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+
+test("unknown side effects in the execution ledger force escalation without replay", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-ledger-recovery-"));
+  const ledgerPath = path.join(dir, "actions.jsonl");
+  const interrupted = new ExecutionLedger(ledgerPath);
+  interrupted.begin({
+    missionId: "m-unknown-effect",
+    stepId: "send-1",
+    tool: "send_email",
+    args: { to: "recipient@example.test" },
+  }, true);
+  // Rehydration converts an orphaned started side effect into unknown.
+  const ledger = new ExecutionLedger(ledgerPath);
+  const sup = new LeannaSupervisor({
+    maxAttempts: 3,
+    missionStore: new DurableMissionStore(path.join(dir, "missions")),
+    checkpoints: new CheckpointManager({ gateway: memGateway(), dirOverride: path.join(dir, "cp") }),
+    evidence: new EvidenceEngine(path.join(dir, "ev")),
+    ledger,
+  });
+  let attempts = 0;
+  const runner: MissionRunner = async () => {
+    attempts++;
+    return { success: false, error: "temporary connection failure" };
+  };
+
+  const result = await sup.runMission({ missionId: "m-unknown-effect", goal: "send once", runner });
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(attempts, 0, "quarantine must prevent the runner from replaying an uncertain effect");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});

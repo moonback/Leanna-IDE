@@ -34,6 +34,7 @@ import { CheckpointManager } from "./CheckpointManager.js";
 import { EvidenceEngine, type EvidenceInput, type EvidenceBundle } from "./EvidenceEngine.js";
 import { ExecutionLedger } from "./ExecutionLedger.js";
 import { MissionExecutionLease } from "./MissionExecutionLease.js";
+import { RecoveryEngine } from "./RecoveryEngine.js";
 
 /** Décision de récupération à quatre niveaux (audit §17). */
 export type RecoveryDecision = "retry" | "repair" | "replan" | "escalate";
@@ -62,6 +63,8 @@ export type MissionRunner = (ctx: {
   missionId: string;
   goal: string;
   attempt: number;
+  /** Recovery strategy selected after the previous failed attempt. */
+  recovery?: RecoveryDecision;
   /** Signal d'annulation déclenché sur timeout runner (ou annulation externe). */
   signal?: AbortSignal;
   beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
@@ -129,6 +132,7 @@ export class LeannaSupervisor {
   private readonly evidence: EvidenceEngine;
   private readonly ledger: ExecutionLedger;
   private readonly runnerTimeoutMs: number;
+  private readonly recoveryEngine: RecoveryEngine;
 
   constructor(config: Partial<SupervisorConfig> = {}) {
     this.maxAttempts = config.maxAttempts ?? 3;
@@ -137,6 +141,7 @@ export class LeannaSupervisor {
     this.evidence = config.evidence ?? new EvidenceEngine();
     this.ledger = config.ledger ?? new ExecutionLedger();
     this.runnerTimeoutMs = config.runnerTimeoutMs ?? 0;
+    this.recoveryEngine = new RecoveryEngine();
   }
 
   /** Persiste une transition et renvoie l'état atteint. */
@@ -216,6 +221,7 @@ export class LeannaSupervisor {
     this.ensureReady(machine);
 
     let attempt = 0;
+    let nextRecovery: RecoveryDecision | undefined;
     let lastEvidence: EvidenceBundle | undefined;
     let rollbackResidualFiles: string[] = [];
 
@@ -275,7 +281,7 @@ export class LeannaSupervisor {
       };
       machine.setActiveAttempt({ attempt, checkpointId: checkpoint.id, phase: "executing", updatedAt: new Date().toISOString() });
       this.store.save(machine);
-      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, beforeToolCall });
+      const outcome = await this.runAttempt(runner, { missionId, goal, attempt, recovery: nextRecovery, beforeToolCall });
 
       // A timed-out runner may ignore AbortSignal. Never race a live writer
       // against checkpoint rollback: quarantine the mission and leave the
@@ -340,7 +346,8 @@ export class LeannaSupervisor {
           throw new Error(`Rollback incomplet : ${rollbackResidualFiles.join(", ")}`);
         }
 
-        const decision = this.decideRecovery(outcome, attempt);
+        const decision = this.decideRecovery(outcome, attempt, missionId);
+        nextRecovery = decision;
 
         if (decision === "escalate" || attempt >= this.maxAttempts) {
           this.advance(machine, "ESCALATED", `recovery=${decision}, attempts=${attempt}`);
@@ -461,7 +468,7 @@ export class LeannaSupervisor {
    */
   private async runAttempt(
     runner: MissionRunner,
-    ctx: { missionId: string; goal: string; attempt: number; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
+    ctx: { missionId: string; goal: string; attempt: number; recovery?: RecoveryDecision; beforeToolCall?: (toolName: string, args: Record<string, unknown>) => Promise<void> }
   ): Promise<RunnerOutcome> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -550,10 +557,11 @@ export class LeannaSupervisor {
    * suggestion du runner si fournie, sinon applique une escalade progressive :
    * les premières tentatives réessaient/réparent, la dernière escalade.
    */
-  private decideRecovery(outcome: RunnerOutcome, attempt: number): RecoveryDecision {
-    if (outcome.suggestedRecovery) return outcome.suggestedRecovery;
-    if (attempt >= this.maxAttempts) return "escalate";
-    if (attempt === 1) return "retry";
-    return "replan";
+  private decideRecovery(outcome: RunnerOutcome, attempt: number, missionId: string): RecoveryDecision {
+    // The ledger is authoritative for uncertain external effects. Even when a
+    // runner error is poorly worded, never replay a non-idempotent operation
+    // whose outcome has not been reconciled.
+    if (this.ledger.listUnknownSideEffects(missionId).length > 0) return "escalate";
+    return this.recoveryEngine.assess(outcome, attempt, this.maxAttempts).decision;
   }
 }
