@@ -113,10 +113,22 @@ export default function ContextIntelligenceView() {
       const response = await fetch('/api/knowledge/understanding/context', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim(), strategy: 'balanced', detail: 'standard', includeRisk: true }),
+        body: JSON.stringify({
+          query: query.trim(),
+          strategy: 'balanced',
+          detail: 'standard',
+          maxFiles: 6,
+          maxFacts: 7,
+          maxTokenBudget: 3000,
+          includeRisk: false,
+        }),
       });
-      const data = await response.json();
-      if (!response.ok || data.status !== 'success' || !data.context) throw new Error(data.error || 'Impossible de construire le contexte');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status !== 'success' || !data.context) {
+        const detail = typeof data.error === 'string' ? data.error : 'Réponse serveur invalide';
+        const diagnostic = typeof data.errorId === 'string' ? ' (diagnostic ' + data.errorId + ')' : '';
+        throw new Error(detail + diagnostic);
+      }
       setPreviousContext(context);
       setContext(data.context as ContextResult);
       setInspectionHistory(previous => [...previous, data.context as ContextResult].slice(-20));
