@@ -659,7 +659,7 @@ export function MissionDetail({
         </Section>
       )}
 
-      {(data.description || data.context?.instructions || criteria.length > 0) && (
+      {(data.description || data.context?.instructions || data.context?.files.length || data.context?.observability || criteria.length > 0) && (
         <Section icon={Target} title="Brief de mission" count={criteria.length || undefined} color={color} defaultOpen={live}>
           {data.description && <p className="whitespace-pre-wrap text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{data.description}</p>}
           {data.context?.instructions && (
