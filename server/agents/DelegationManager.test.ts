@@ -316,8 +316,8 @@ describe("AgentContextResolver — sélection par rôle et mission", () => {
       context: {
         files: [],
         previousResults: [
-          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "success" },
-          { success: false, summary: "Échec compilation", filesModified: [], durationMs: 80, outcome: "failed" },
+          { success: true, summary: "Tests ciblés validés", filesModified: ["server/runtime/a.ts"], durationMs: 120, outcome: "success", evidence: { filesRead: ["server/runtime/a.ts"], filesModified: ["server/runtime/a.ts"], toolsExecuted: ["verify_file"], commandsExecuted: [], verification: { passed: true, checks: ["tests ciblés"], errors: [] } } },
+          { success: true, summary: "Tests non exécutés", filesModified: [], durationMs: 80, outcome: "success" },
         ],
       },
     }, ["server/runtime/a.ts"]);
