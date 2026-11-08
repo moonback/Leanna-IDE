@@ -24,11 +24,11 @@ export interface RecoveryAssessment {
   retryable: boolean;
 }
 
+const PERMISSION_PATTERNS = [/authorization denied|permission denied|not authorized|approval refused|access denied/i];
 const SAFETY_PATTERNS = [
   /prompt.?injection/i,
   /policy violation/i,
   /unsafe|security violation|blocked by safety/i,
-  /authorization denied|permission denied|not authorized|approval refused/i,
 ];
 const UNKNOWN_EFFECT_PATTERNS = [
   /unknown side.?effect/i,
@@ -67,6 +67,7 @@ export function classifyFailure(outcome: RunnerOutcome): FailureCategory {
     ...failedChecks.map((check) => `${check.name}: ${check.details ?? ""}`),
   ].join("\n");
 
+  if (matchesAny(message, PERMISSION_PATTERNS)) return "permission";
   if (matchesAny(message, SAFETY_PATTERNS)) return "safety";
   if (matchesAny(message, UNKNOWN_EFFECT_PATTERNS)) return "side_effect_unknown";
   if (matchesAny(message, QUOTA_PATTERNS)) return "provider_quota";
