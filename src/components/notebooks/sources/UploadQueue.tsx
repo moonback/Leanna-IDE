@@ -1,10 +1,8 @@
 /**
- * UploadQueue — affichage de la file d'upload (barre de progression globale +
- * statut par fichier). Composant purement présentationnel.
+ * UploadQueue — progression réelle de l'ingestion et de l'indexation des sources.
  */
-
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle, Clock3, FileText } from 'lucide-react';
 import type { UploadFileStatus } from './constants.js';
 import type { SpringTransition } from '../motionTypes.js';
 
@@ -15,53 +13,98 @@ interface Props {
   spring: SpringTransition;
 }
 
+function getStage(file: UploadFileStatus): string {
+  if (file.status === 'success') return 'Importation terminée';
+  if (file.status === 'error') return 'Échec de l’importation';
+  if (file.status === 'pending') return 'En attente dans la file';
+  const progress = file.progress ?? 0;
+  if (progress < 10) return 'Préparation du document';
+  if (progress < 70) return 'Extraction et analyse du contenu';
+  if (progress < 90) return 'Enregistrement et préparation RAG';
+  return 'Finalisation de l’indexation';
+}
+
 export function UploadQueue({ uploadQueue, uploadDone, uploadErrors, spring }: Props) {
+  const total = uploadQueue.length;
+  const completed = uploadDone + uploadErrors;
+  const progress = total
+    ? Math.round(uploadQueue.reduce((sum, file) => sum + (file.status === 'success' ? 100 : file.progress ?? 0), 0) / total)
+    : 0;
+  const active = uploadQueue.some(file => file.status === 'pending' || file.status === 'uploading');
+
   return (
     <AnimatePresence>
-      {uploadQueue.length > 0 && (
+      {total > 0 && (
         <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
+          initial={{ height: 0, opacity: 0, y: -6 }}
+          animate={{ height: 'auto', opacity: 1, y: 0 }}
+          exit={{ height: 0, opacity: 0, y: -6 }}
           transition={spring}
           className="overflow-hidden"
         >
-          <div className="space-y-2 rounded-xl border border-[var(--notebook-accent)] bg-[var(--notebook-surface)] p-3">
-            <div className="flex items-center gap-2">
-              {uploadDone === uploadQueue.length ? (
-                <CheckCircle2 className="h-3.5 w-3.5 text-[var(--color-success)]" aria-hidden />
-              ) : (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--notebook-accent)]" aria-hidden />
-              )}
-              <p className="text-xs font-semibold text-[var(--text-primary)]">
-                Upload {uploadDone}/{uploadQueue.length}
-                {uploadErrors > 0 && <span className="text-[var(--color-error)]"> · {uploadErrors} erreur{uploadErrors > 1 ? 's' : ''}</span>}
-              </p>
+          <section
+            className="space-y-3 rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-3.5"
+            aria-label="Progression de l’importation des sources"
+            aria-live="polite"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                {active ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--notebook-accent)]" aria-hidden />
+                  : completed === total && uploadErrors === 0 ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--color-success)]" aria-hidden />
+                  : <FileText className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden />}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">Importation et indexation</p>
+                  <p className="text-[11px] text-[var(--text-muted)]">{completed}/{total} documents traités{uploadErrors ? ` · ${uploadErrors} erreur(s)` : ''}</p>
+                </div>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--notebook-accent)]">{progress}%</span>
             </div>
-            {/* Progress bar */}
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--notebook-canvas)]">
+
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-[var(--notebook-canvas)]"
+              role="progressbar"
+              aria-label="Progression globale de l’importation"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+            >
               <motion.div
                 className="h-full rounded-full bg-[var(--notebook-accent)]"
-                initial={{ width: '0%' }}
-                animate={{ width: `${(uploadDone / uploadQueue.length) * 100}%` }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
               />
             </div>
-            <div className="custom-scrollbar max-h-32 space-y-1 overflow-y-auto">
-              {uploadQueue.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  {f.status === 'pending' && <Loader2 className="h-3 w-3 flex-shrink-0 opacity-30" aria-hidden />}
-                  {f.status === 'uploading' && <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin text-[var(--notebook-accent)]" aria-hidden />}
-                  {f.status === 'success' && <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-[var(--color-success)]" aria-hidden />}
-                  {f.status === 'error' && <XCircle className="h-3 w-3 flex-shrink-0 text-[var(--color-error)]" aria-hidden />}
-                  <span className={f.status === 'error' ? 'flex-1 truncate text-[var(--color-error)]' : 'flex-1 truncate text-[var(--text-primary)]'}>
-                    {f.name}
-                  </span>
-                  {f.error && <span className="max-w-[150px] truncate text-xs text-[var(--text-muted)]" title={f.error}>{f.error}</span>}
-                </div>
-              ))}
+
+            <div className="space-y-2.5">
+              {uploadQueue.map((file, index) => {
+                const value = file.status === 'success' ? 100 : Math.max(0, Math.min(100, file.progress ?? 0));
+                return (
+                  <div key={file.taskId || `${file.name}-${index}`} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      {file.status === 'success' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--color-success)]" aria-hidden />
+                        : file.status === 'error' ? <XCircle className="h-3.5 w-3.5 shrink-0 text-[var(--color-error)]" aria-hidden />
+                        : file.status === 'pending' ? <Clock3 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+                        : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--notebook-accent)]" aria-hidden />}
+                      <span className={`min-w-0 flex-1 truncate text-xs ${file.status === 'error' ? 'text-[var(--color-error)]' : 'text-[var(--text-primary)]'}`} title={file.name}>{file.name}</span>
+                      <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">{value}%</span>
+                    </div>
+                    <div className="ml-5 h-1.5 overflow-hidden rounded-full bg-[var(--notebook-canvas)]">
+                      <motion.div
+                        className={`h-full rounded-full ${file.status === 'error' ? 'bg-[var(--color-error)]' : file.status === 'success' ? 'bg-[var(--color-success)]' : 'bg-[var(--notebook-accent)]'}`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${value}%` }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <div className="ml-5 flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[10px] text-[var(--text-muted)]">{file.error || getStage(file)}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          </section>
         </motion.div>
       )}
     </AnimatePresence>
