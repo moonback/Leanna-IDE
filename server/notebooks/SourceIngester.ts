@@ -137,7 +137,7 @@ export class SourceIngester {
 
     if (mimeType === "application/pdf") {
       onProgress?.(12, "pdf-extraction", "Lecture et extraction des pages PDF");
-      rawText = await this.extractPDF(buffer);
+      rawText = await this.extractPDF(buffer, onProgress);
       sourceType = "pdf";
     } else if (mimeType.startsWith("image/")) {
       // Image file — store as base64 and attempt vision-based description
@@ -1063,16 +1063,41 @@ Sois exhaustif et précis sur le texte visible.`;
 
   // ─── Extraction PDF ──────────────────────────────────────────────────────
 
-  private async extractPDF(buffer: Buffer): Promise<string> {
+  private async extractPDF(buffer: Buffer, onProgress?: SourceIngestionProgress): Promise<string> {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
     try {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: buffer });
+      const info = await parser.getInfo();
+      const totalPages = Math.max(0, Number(info.total) || 0);
+
+      // pdf-parse v2 expose la sélection de pages via getText({ partial }).
+      // Extraire page par page permet de rapporter une progression mesurée,
+      // sans inventer un pourcentage pendant un appel monolithique.
+      if (totalPages > 0) {
+        const pageTexts: string[] = [];
+        for (let page = 1; page <= totalPages; page++) {
+          const result = await parser.getText({ partial: [page] });
+          pageTexts.push(result.text || "");
+          const progress = 12 + Math.round((page / totalPages) * 23);
+          onProgress?.(
+            progress,
+            "pdf-extraction",
+            `Page ${page}/${totalPages} extraite`
+          );
+        }
+        return pageTexts.join("\\n\\n");
+      }
+
       const result = await parser.getText();
-      await parser.destroy();
+      onProgress?.(35, "pdf-extraction", "Extraction PDF terminée");
       return result.text || "";
     } catch (e: any) {
       log.error(`Erreur extraction PDF: ${e.message}`);
       throw new Error(`Impossible de lire le PDF: ${e.message}`);
+    } finally {
+      await parser.destroy().catch((error: any) =>
+        log.warn(`Échec de fermeture du parseur PDF: ${error?.message || error}`)
+      );
     }
   }
 
