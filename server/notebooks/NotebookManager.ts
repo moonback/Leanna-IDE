@@ -485,9 +485,13 @@ export class NotebookManager {
         source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
         source.id,
         notebookId,
-        (completed, total) => {
+        (completed, total, succeeded) => {
           const ratio = total > 0 ? completed / total : 1;
-          onProgress?.(74 + Math.round(ratio * 20), "embeddings", `${completed}/${total} chunk(s) vectorisé(s)`);
+          onProgress?.(
+            74 + Math.round(ratio * 20),
+            "embeddings",
+            `${succeeded}/${total} embeddings valides · ${completed}/${total} chunks traités`
+          );
         }
       );
       if (this.sourceIndexRuns.get(runKey) !== runId
