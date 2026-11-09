@@ -423,6 +423,10 @@ export class NotebookManager {
     const persisted = notebook.sources.find(item => item.id === source.id)
       ?? notebook.sources.find(item => item.origin === source.origin && item.type === source.type);
     if (!persisted) return undefined;
+    if (persisted.indexingStatus === "indexed") {
+      onProgress?.(96, "vector-index", `${persisted.chunks.length} embeddings déjà indexés`);
+      return persisted;
+    }
     await this.indexSourceChunks(notebookId, persisted.id, false, onProgress);
     return persisted;
   }
