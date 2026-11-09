@@ -8,7 +8,7 @@
  * - Droite : Studio (Générer, Notes, Historique, Audio)
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft, FileText, StickyNote, Sparkles, Mic, Clock, Plus, Activity,
@@ -195,6 +195,10 @@ function NoteEditorCenter({
 export function NotebookDetail({ notebookId, onBack }: Props) {
   const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
+  // Reflète la valeur courante de `notebook` sans faire dépendre loadNotebook de
+  // l'état (sa référence doit rester stable pour les effets/écouteurs qui l'utilisent).
+  const notebookRef = useRef<NotebookData | null>(null);
+  notebookRef.current = notebook;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Centre = discussion par défaut (comme NotebookLM) ; 'sources' ouvre le
@@ -251,8 +255,14 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const { spring, fadeOnly } = useFluidTransition();
   const prefersReducedMotion = useReducedMotion();
 
+  // Un rechargement en arrière-plan (onRefresh après une génération, un ajout de
+  // source, etc.) ne doit PAS afficher le skeleton plein écran : cela démonterait
+  // la vue — et donc l'état de la file de génération (tâches en cours/en attente)
+  // dans GeneratePanel. Le skeleton n'est affiché que tant qu'aucun notebook n'est
+  // encore chargé en mémoire (premier chargement ou rechargement après erreur).
   const loadNotebook = useCallback(async () => {
-    setLoading(true);
+    const hadNotebook = notebookRef.current !== null;
+    if (!hadNotebook) setLoading(true);
     setLoadError(null);
     try {
       const data = await api<{ notebook: NotebookData }>(`/api/notebooks/${notebookId}`);
@@ -260,10 +270,14 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         throw new Error('Les données du notebook sont incomplètes ou invalides.');
       }
       setNotebook(data.notebook);
+    } catch (e) {
+      // Ne pas effacer un notebook déjà affiché sur une erreur de refresh en
+      // arrière-plan : on garde l'affichage courant plutôt que de tout démonter.
+      if (!notebookRef.current) setLoadError(e instanceof Error ? e.message : 'Erreur de chargement du notebook.');
     } finally {
-      setLoading(false);
+      if (!hadNotebook) setLoading(false);
     }
-  }, [notebookId, toastError]);
+  }, [notebookId]);
 
   useEffect(() => { loadNotebook(); }, [loadNotebook]);
 
