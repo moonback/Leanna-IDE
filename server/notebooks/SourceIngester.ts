@@ -21,6 +21,8 @@ const GITHUB_TIMEOUT_MS = 30_000;
 
 const log = createLogger("SourceIngester");
 
+export type SourceIngestionProgress = (progress: number, stage: string, detail?: string) => void;
+
 // ─── GitHub API Utilities ─────────────────────────────────────────────────────────
 
 function getGitHubHeaders(): Record<string, string> {
@@ -122,7 +124,8 @@ export class SourceIngester {
     buffer: Buffer,
     filename: string,
     mimeType: string,
-    notebookId: string
+    notebookId: string,
+    onProgress?: SourceIngestionProgress
   ): Promise<Source> {
     log.info(`📥 Ingestion: "${filename}" (${mimeType}, ${(buffer.length / 1024).toFixed(1)} KB)`);
 
@@ -157,11 +160,12 @@ export class SourceIngester {
       sourceType = "text";
     }
 
+    onProgress?.(35, "extraction", sourceType === "pdf" ? "Extraction du texte PDF terminée" : "Lecture et extraction du fichier terminées");
     if (!rawText.trim()) {
       throw new Error("Impossible d'extraire du texte depuis ce fichier.");
     }
 
-    const source = await this.buildSource(rawText, filename, sourceType, filename, notebookId);
+    const source = await this.buildSource(rawText, filename, sourceType, filename, notebookId, onProgress);
 
     // Attach image data to the source for rendering in the viewer
     if (imageBase64 && imageMimeType) {
@@ -179,7 +183,7 @@ export class SourceIngester {
 
   // ─── Ingestion depuis une URL ────────────────────────────────────────────
 
-  async ingestFromURL(url: string, notebookId: string): Promise<Source> {
+  async ingestFromURL(url: string, notebookId: string, onProgress?: SourceIngestionProgress): Promise<Source> {
     log.info(`🌐 Ingestion URL: ${url}`);
 
     let rawText = "";
@@ -255,7 +259,8 @@ export class SourceIngester {
       throw new Error("Impossible d'extraire du contenu depuis cette URL.");
     }
 
-    return this.buildSource(rawText, title, sourceType, url, notebookId);
+    onProgress?.(35, "extraction", "Contenu de la page extrait");
+    return this.buildSource(rawText, title, sourceType, url, notebookId, onProgress);
   }
 
   // ─── Ingestion depuis un dépôt GitHub public ─────────────────────────────────
@@ -560,7 +565,10 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     const id = randomUUID();
 
     // Découpage intelligent en chunks (adapté au type de contenu)
+    onProgress?.(42, "cleaning", "Normalisation du contenu et préparation du découpage");
+    onProgress?.(48, "chunking", "Analyse de la structure et découpage sémantique");
     const chunks = this.chunkText(rawText, id, type);
+    onProgress?.(62, "chunking", `${chunks.length} chunk(s) généré(s)`);
 
     // Comptage de mots
     const wordCount = rawText.split(/\s+/).filter(w => w.length > 0).length;
@@ -570,7 +578,9 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
 
     // L'ingester ne déclenche pas l'indexation : NotebookManager persiste
     // d'abord la source, puis lance l'indexation de manière récupérable.
+    onProgress?.(64, "metadata", "Génération du résumé et des mots-clés");
     const { summary, keywords } = await this.generateSummaryAndKeywords(rawText, title);
+    onProgress?.(68, "metadata", "Métadonnées du document prêtes");
 
     const source: Source = {
       id,
