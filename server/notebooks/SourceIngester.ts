@@ -560,7 +560,8 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     title: string,
     type: SourceType,
     origin: string,
-    notebookId: string
+    notebookId: string,
+    onProgress?: SourceIngestionProgress
   ): Promise<Source> {
     const id = randomUUID();
 
