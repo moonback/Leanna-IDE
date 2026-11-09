@@ -139,7 +139,7 @@ export function NotebookVoicePanel({ prefersReducedMotion }: Props) {
         aria-label="Démarrer l'assistant vocal"
       >
         <Mic className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-        <span className="hidden sm:inline">Interroger à la voix</span>
+        <span className="hidden sm:inline">Mode vocal</span>
       </motion.button>
     );
   }
