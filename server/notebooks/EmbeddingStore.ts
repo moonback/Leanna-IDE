@@ -341,10 +341,11 @@ export class EmbeddingStore {
    * Vectorise un ensemble de textes via l'API Gemini embeddings.
    * Gère le batching automatique pour les grands ensembles.
    */
-  async embedTexts(texts: string[], onProgress?: (completed: number, total: number) => void): Promise<number[][]> {
+  async embedTexts(texts: string[], onProgress?: (completed: number, total: number, succeeded: number) => void): Promise<number[][]> {
     if (texts.length === 0) return [];
 
     const allVectors: number[][] = [];
+    let succeeded = 0;
 
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
@@ -357,14 +358,16 @@ export class EmbeddingStore {
 
         // embedTextsOpenRouter renvoie un tableau aligné sur `batch`.
         for (let j = 0; j < batch.length; j++) {
-          allVectors.push(vectors[j] || []);
+          const vector = vectors[j] || [];
+          allVectors.push(vector);
+          if (vector.length > 0) succeeded++;
         }
       } catch (e: any) {
         log.error(`Erreur embedding batch ${i}-${i + batch.length}: ${e.message}`);
         for (let j = 0; j < batch.length; j++) allVectors.push([]);
       }
 
-      onProgress?.(Math.min(i + batch.length, texts.length), texts.length);
+      onProgress?.(Math.min(i + batch.length, texts.length), texts.length, succeeded);
 
       // Délai réduit entre les batches (200 ms au lieu de 500 ms)
       if (i + BATCH_SIZE < texts.length) {
@@ -408,7 +411,7 @@ export class EmbeddingStore {
     chunks: { id: string; content: string }[],
     sourceId: string,
     notebookId: string,
-    onProgress?: (completed: number, total: number) => void
+    onProgress?: (completed: number, total: number, succeeded: number) => void
   ): Promise<number> {
     if (chunks.length === 0) { onProgress?.(0, 0); return 0; }
 
