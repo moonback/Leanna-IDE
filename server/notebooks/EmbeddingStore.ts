@@ -341,7 +341,7 @@ export class EmbeddingStore {
    * Vectorise un ensemble de textes via l'API Gemini embeddings.
    * Gère le batching automatique pour les grands ensembles.
    */
-  async embedTexts(texts: string[]): Promise<number[][]> {
+  async embedTexts(texts: string[], onProgress?: (completed: number, total: number) => void): Promise<number[][]> {
     if (texts.length === 0) return [];
 
     const allVectors: number[][] = [];
@@ -363,6 +363,8 @@ export class EmbeddingStore {
         log.error(`Erreur embedding batch ${i}-${i + batch.length}: ${e.message}`);
         for (let j = 0; j < batch.length; j++) allVectors.push([]);
       }
+
+      onProgress?.(Math.min(i + batch.length, texts.length), texts.length);
 
       // Délai réduit entre les batches (200 ms au lieu de 500 ms)
       if (i + BATCH_SIZE < texts.length) {
@@ -405,9 +407,10 @@ export class EmbeddingStore {
   async indexChunks(
     chunks: { id: string; content: string }[],
     sourceId: string,
-    notebookId: string
+    notebookId: string,
+    onProgress?: (completed: number, total: number) => void
   ): Promise<number> {
-    if (chunks.length === 0) return 0;
+    if (chunks.length === 0) { onProgress?.(0, 0); return 0; }
 
     // S'assurer que le notebook est en mémoire avant de dédupliquer
     this.ensureNotebookLoaded(notebookId);
@@ -444,7 +447,7 @@ export class EmbeddingStore {
     // Tronquer à 2048 chars (limite Gemini ~2048 tokens)
     const texts = newChunks.map(c => c.content.slice(0, 2048));
 
-    const vectors = await this.embedTexts(texts);
+    const vectors = await this.embedTexts(texts, onProgress);
 
     // Une source peut avoir été remplacée pendant l'appel réseau. Ne jamais
     // publier les vecteurs calculés pour son ancienne version.
