@@ -416,7 +416,7 @@ export class NotebookManager {
   async addSourceAndWaitForIndex(
     notebookId: string,
     source: Source,
-    onProgress?: (progress: number, stage: string, detail?: string),
+    onProgress?: (progress: number, stage: string, detail?: string) => void,
   ): Promise<Source | undefined> {
     const notebook = this.addSource(notebookId, source, onProgress);
     if (!notebook) return undefined;
