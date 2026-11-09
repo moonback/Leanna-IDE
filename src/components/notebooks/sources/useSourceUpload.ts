@@ -46,62 +46,92 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
 
-  // ─── Multi-file upload ──────────────────────────────────────────────────────
+  // ─── Upload avec suivi réel de la file backend ──────────────────────────────
 
   const handleMultiUpload = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
+    if (files.length === 0 || uploading) return;
 
     setUploading(true);
-    setUploadQueue(files.map(f => ({ name: f.name, status: 'pending' })));
+    setUploadQueue(files.map(f => ({ name: f.name, status: 'pending', progress: 0 })));
 
-    if (files.length === 1) {
-      const file = files[0];
-      setUploadQueue([{ name: file.name, status: 'uploading' }]);
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const data = await api<{ source: { title: string; wordCount: number; chunksCount: number } }>(
-          `/api/notebooks/${notebookId}/sources/upload`,
-          { method: 'POST', body: formData },
-        );
-        setUploadQueue([{ name: file.name, status: 'success' }]);
-        onSuccess(`Source "${data.source.title}" ajoutée (${data.source.wordCount} mots, ${data.source.chunksCount} chunks)`);
-        onRefresh();
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Upload failed';
-        setUploadQueue([{ name: file.name, status: 'error', error: message }]);
-        onError(message);
+    try {
+      const formData = new FormData();
+      for (const file of files) formData.append('files', file);
+
+      const queued = await api<{ taskIds: string[]; message: string }>(
+        `/api/notebooks/${notebookId}/sources/upload-queued`,
+        { method: 'POST', body: formData },
+      );
+
+      if (!queued.taskIds?.length) {
+        throw new Error("Aucune tâche d'importation n'a été créée.");
       }
-    } else {
-      setUploadQueue(files.map(f => ({ name: f.name, status: 'uploading' })));
-      try {
-        const formData = new FormData();
-        for (const file of files) formData.append('files', file);
-        const data = await api<{
-          results: { filename: string; status: UploadFileStatus['status']; error?: string }[];
-          successCount: number;
-          errorCount: number;
-          total: number;
-        }>(`/api/notebooks/${notebookId}/sources/upload-multi`, { method: 'POST', body: formData });
-        setUploadQueue(data.results.map((r) => ({
-          name: r.filename, status: r.status, error: r.error,
-        })));
-        if (data.successCount > 0) {
-          onSuccess(`${data.successCount}/${data.total} source(s) ajoutée(s)`);
-          onRefresh();
+
+      const tracked = files.slice(0, queued.taskIds.length).map((file, index) => ({
+        name: file.name,
+        taskId: queued.taskIds[index],
+        status: 'pending' as UploadFileStatus['status'],
+        progress: 0,
+      }));
+      setUploadQueue(tracked);
+
+      const pollTask = async (item: typeof tracked[number]) => {
+        let consecutiveErrors = 0;
+        while (true) {
+          try {
+            const response = await api<{
+              task: {
+                status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+                progress: number;
+                error?: string;
+                result?: { title?: string; sourceId?: string; wordCount?: number; chunksCount?: number };
+              };
+            }>(`/api/notebooks/${notebookId}/sources/tasks/${item.taskId}`);
+
+            consecutiveErrors = 0;
+            const task = response.task;
+            const terminal = ['completed', 'failed', 'cancelled'].includes(task.status);
+            const status: UploadFileStatus['status'] =
+              task.status === 'completed' ? 'success'
+              : task.status === 'failed' || task.status === 'cancelled' ? 'error'
+              : task.status === 'processing' ? 'uploading' : 'pending';
+
+            setUploadQueue(current => current.map(file => file.taskId === item.taskId
+              ? { ...file, status, progress: terminal ? (status === 'success' ? 100 : file.progress ?? 0) : Math.max(0, Math.min(100, task.progress || 0)), error: task.error }
+              : file));
+
+            if (terminal) {
+              if (task.status !== 'completed') throw new Error(task.error || (task.status === 'cancelled' ? 'Importation annulée.' : 'Échec de l’importation.'));
+              return task.result;
+            }
+          } catch (error) {
+            if (error instanceof Error && !/fetch|network|réseau|timeout/i.test(error.message)) throw error;
+            consecutiveErrors += 1;
+            if (consecutiveErrors >= 5) throw error;
+          }
+          await new Promise(resolve => window.setTimeout(resolve, 700));
         }
-        if (data.errorCount > 0) onError(`${data.errorCount} fichier(s) en erreur`);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Upload failed';
-        setUploadQueue(files.map(f => ({ name: f.name, status: 'error', error: message })));
-        onError(message);
-      }
-    }
+      };
 
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setTimeout(() => setUploadQueue([]), 5000);
-  }, [notebookId, onSuccess, onError, onRefresh]);
+      const results = await Promise.allSettled(tracked.map(pollTask));
+      const succeeded = results.filter(result => result.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+
+      if (succeeded > 0) {
+        onSuccess(`${succeeded}/${results.length} source(s) ajoutée(s) et indexée(s)`);
+        onRefresh();
+      }
+      if (failed > 0) onError(`${failed} fichier(s) en échec. Consultez le détail dans la file d'importation.`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Échec de l’importation';
+      setUploadQueue(files.map(f => ({ name: f.name, status: 'error', progress: 0, error: message })));
+      onError(message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      window.setTimeout(() => setUploadQueue([]), 8000);
+    }
+  }, [notebookId, uploading, onSuccess, onError, onRefresh]);
 
   // ─── Drag & Drop ───────────────────────────────────────────────────────────
 
