@@ -114,7 +114,11 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
     loadGeneratedDocs();
   }, [loadGeneratedDocs]);
 
-  // Rafraîchir quand l'assistant vocal génère un document pour ce notebook.
+  // Rafraîchir la liste quand :
+  //  - l'assistant vocal génère un document ('notebook-generated-docs-changed'), ou
+  //  - on (ré)ouvre l'onglet Historique ('notebook-generated-docs-refresh').
+  // Les deux rechargent la liste ; seul le premier incrémente le badge (géré
+  // dans NotebookDetail).
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ notebookId?: string }>).detail;
@@ -123,7 +127,11 @@ export function GeneratedDocsPanel({ notebookId, sources, onRefresh, onViewDoc }
       }
     };
     window.addEventListener('notebook-generated-docs-changed', handler as EventListener);
-    return () => window.removeEventListener('notebook-generated-docs-changed', handler as EventListener);
+    window.addEventListener('notebook-generated-docs-refresh', handler as EventListener);
+    return () => {
+      window.removeEventListener('notebook-generated-docs-changed', handler as EventListener);
+      window.removeEventListener('notebook-generated-docs-refresh', handler as EventListener);
+    };
   }, [notebookId, loadGeneratedDocs]);
 
   // Supprimer un document

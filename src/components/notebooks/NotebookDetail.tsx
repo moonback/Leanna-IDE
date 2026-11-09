@@ -193,7 +193,6 @@ function NoteEditorCenter({
 }
 
 export function NotebookDetail({ notebookId, onBack }: Props) {
-  const { error: toastError } = useToast();
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   // Reflète la valeur courante de `notebook` sans faire dépendre loadNotebook de
   // l'état (sa référence doit rester stable pour les effets/écouteurs qui l'utilisent).
@@ -374,7 +373,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
         if (e.key === '3') { e.preventDefault(); setNotesOpen(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setShowIndexing(false); }
         if (e.key === '4') { e.preventDefault(); setStudioTab('generate'); setStudioOpen(true); }
         if (e.key === '5') { e.preventDefault(); setStudioTab('audio'); setStudioOpen(true); }
-        if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); }
+        if (e.key === '6') { e.preventDefault(); setStudioTab('history'); setStudioOpen(true); window.dispatchEvent(new CustomEvent('notebook-generated-docs-refresh', { detail: { notebookId } })); }
         if (e.key === '7') { e.preventDefault(); setShowIndexing(true); setSelectedSourceId(null); setViewingGeneratedDoc(null); setNoteEditorData(null); setNotesOpen(false); }
         if (e.key === '\\') { e.preventDefault(); setStudioOpen(v => !v); }
         if (e.key === '0') {
@@ -421,9 +420,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   }
 
   const studioTabs: { key: StudioTab; icon: typeof StickyNote; label: string; badge?: number }[] = [
-    { key: 'generate', icon: Sparkles, label: 'Générer', badge: generatedCount },
+    { key: 'generate', icon: Sparkles, label: 'Générer' },
+    // Seul l'onglet Historique affiche un compteur (nombre de documents générés).
     { key: 'history', icon: Clock, label: 'Historique', badge: generatedCount },
-    { key: 'audio', icon: Mic, label: 'Vocal', badge: notebook.audioOverviews.length },
+    { key: 'audio', icon: Mic, label: 'Vocal' },
   ];
   const studioShortcuts: Record<StudioTab, string> = {
     generate: 'Ctrl+4 / ⌘4',
@@ -465,6 +465,16 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const openStudioTab = (key: StudioTab) => {
     setStudioTab(key);
     setStudioOpen(true);
+    // Les panneaux du Studio restent montés (display:none) pour préserver leur
+    // état : ouvrir « Historique » ne les remonte donc pas. On force un
+    // rafraîchissement de la liste des documents générés via l'événement déjà
+    // écouté par GeneratedDocsPanel.
+    if (key === 'history') {
+      // Événement « refresh seul » : recharge la liste de l'historique sans
+      // toucher au compteur (contrairement à 'notebook-generated-docs-changed'
+      // qui signale une NOUVELLE génération et incrémente le badge).
+      window.dispatchEvent(new CustomEvent('notebook-generated-docs-refresh', { detail: { notebookId } }));
+    }
   };
 
   /** Renders all studio panels simultaneously — active one is visible, others are hidden.
@@ -845,7 +855,7 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                         id={`studio-tab-${key}`}
                         aria-selected={isActive}
                         aria-controls={`studio-panel-${key}`}
-                        onClick={() => setStudioTab(key)}
+                        onClick={() => openStudioTab(key)}
                         className="notebook-studio-tab"
                         data-active={isActive}
                         title={`${label} (${studioShortcuts[key]})`}
@@ -864,8 +874,8 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
                         <span className="notebook-studio-tab-inner">
                           <Icon className="h-4 w-4 flex-shrink-0" aria-hidden />
                           <span className="notebook-studio-tab-label">{label}</span>
-                          {/* Compteur visible sur tous les onglets de la barre segmentée */}
-                          {badge !== undefined && badge > 0 && (
+                          {/* Compteur visible uniquement sur l'onglet Historique */}
+                          {key === 'history' && badge !== undefined && badge > 0 && (
                             <span className="notebook-studio-tab-badge" data-active={isActive || undefined}>
                               {badge > 99 ? '99+' : badge}
                             </span>
