@@ -44,6 +44,8 @@ export interface QueueTask<T = unknown> {
   nextAttemptAt?: string;
   /** Progression (0-100) */
   progress: number;
+  progressStage?: string;
+  progressDetail?: string;
 }
 
 export interface QueueConfig {
@@ -70,7 +72,7 @@ export interface QueueStats {
   errorRate: number;
 }
 
-type TaskHandler<T> = (task: QueueTask<T>, onProgress: (pct: number) => void) => Promise<unknown>;
+type TaskHandler<T> = (task: QueueTask<T>, onProgress: (pct: number, stage?: string, detail?: string) => void) => Promise<unknown>;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -230,6 +232,8 @@ export class ProcessingQueue<T = unknown> {
       maxAttempts: options?.maxAttempts ?? this.config.maxRetries,
       createdAt: new Date().toISOString(),
       progress: 0,
+      progressStage: "queued",
+      progressDetail: "En attente de traitement",
     };
 
     // Insérer selon la priorité
@@ -302,14 +306,18 @@ export class ProcessingQueue<T = unknown> {
     this.emit(task.id, task);
 
     try {
-      const result = await this.handler(task, (pct) => {
+      const result = await this.handler(task, (pct, stage, detail) => {
         task.progress = Math.min(100, Math.max(0, pct));
+        if (stage) task.progressStage = stage;
+        if (detail !== undefined) task.progressDetail = detail;
         this.emit(task.id, task);
       });
 
       task.status = "completed";
       task.result = result;
       task.progress = 100;
+      task.progressStage = "completed";
+      task.progressDetail = "Importation et indexation terminées";
       task.completedAt = new Date().toISOString();
 
       const duration = Date.now() - new Date(task.startedAt!).getTime();
