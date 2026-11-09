@@ -1085,7 +1085,7 @@ Sois exhaustif et précis sur le texte visible.`;
             `Page ${page}/${totalPages} extraite`
           );
         }
-        return pageTexts.join("\\n\\n");
+        return pageTexts.join("\n\n");
       }
 
       const result = await parser.getText();
