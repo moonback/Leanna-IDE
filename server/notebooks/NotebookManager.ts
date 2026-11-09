@@ -310,7 +310,7 @@ export class NotebookManager {
 
   // ─── Gestion des Sources ─────────────────────────────────────────────────
 
-  addSource(notebookId: string, source: Source): Notebook | undefined {
+  addSource(notebookId: string, source: Source, onIndexProgress?: (progress: number, stage: string, detail?: string) => void): Notebook | undefined {
     const notebook = this.notebooks.get(notebookId);
     if (!notebook) return undefined;
 
@@ -337,7 +337,7 @@ export class NotebookManager {
         }
         Object.assign(source, sameOrigin);
         if (sameOrigin.indexingStatus !== "indexed") {
-          void this.indexSourceChunks(notebookId, sameOrigin.id);
+          void this.indexSourceChunks(notebookId, sameOrigin.id, false, onIndexProgress);
         }
         log.info(`⏭️ Source identique, import ignoré: "${sameOrigin.title}" (${sameOrigin.id})`);
         return notebook;
@@ -379,7 +379,7 @@ export class NotebookManager {
       // le compteur de génération de l'EmbeddingStore.
       Object.assign(source, sameOrigin);
       embeddingStore.removeSource(sameOrigin.id, notebookId);
-      void this.indexSourceChunks(notebookId, sameOrigin.id, true);
+      void this.indexSourceChunks(notebookId, sameOrigin.id, true, onIndexProgress);
 
       chatResponseCache.invalidateNotebook(notebookId);
       ragSearchCache.invalidateNotebook(notebookId);
@@ -403,7 +403,7 @@ export class NotebookManager {
       throw new Error("La source n'a pas pu être enregistrée durablement ; indexation annulée.");
     }
 
-    void this.indexSourceChunks(notebookId, source.id);
+    void this.indexSourceChunks(notebookId, source.id, false, onIndexProgress);
 
     chatResponseCache.invalidateNotebook(notebookId);
     ragSearchCache.invalidateNotebook(notebookId);
@@ -412,17 +412,36 @@ export class NotebookManager {
   }
 
 
+  /** Ajoute une source puis attend réellement la fin de son indexation vectorielle. */
+  async addSourceAndWaitForIndex(
+    notebookId: string,
+    source: Source,
+    onProgress?: (progress: number, stage: string, detail?: string) => void,
+  ): Promise<Source | undefined> {
+    const notebook = this.addSource(notebookId, source, onProgress);
+    if (!notebook) return undefined;
+    const persisted = notebook.sources.find(item => item.id === source.id)
+      ?? notebook.sources.find(item => item.origin === source.origin && item.type === source.type);
+    if (!persisted) return undefined;
+    if (persisted.indexingStatus === "indexed") {
+      onProgress?.(96, "vector-index", `${persisted.chunks.length} embeddings déjà indexés`);
+      return persisted;
+    }
+    await this.indexSourceChunks(notebookId, persisted.id, false, onProgress);
+    return persisted;
+  }
+
   /**
    * Indexe une source et persiste son état. Une opération interrompue reste
    * marquée pending ; elle pourra être reprise au prochain démarrage.
    */
-  private indexSourceChunks(notebookId: string, sourceId: string, force = false): Promise<void> {
+  private indexSourceChunks(notebookId: string, sourceId: string, force = false, onProgress?: (progress: number, stage: string, detail?: string) => void): Promise<void> {
     const runKey = `${notebookId}:${sourceId}`;
     const inFlight = this.sourceIndexInFlight.get(runKey);
     if (inFlight && !force) return inFlight;
     const run = inFlight
-      ? inFlight.catch(() => undefined).then(() => this.performSourceIndexChunks(notebookId, sourceId))
-      : this.performSourceIndexChunks(notebookId, sourceId);
+      ? inFlight.catch(() => undefined).then(() => this.performSourceIndexChunks(notebookId, sourceId, onProgress))
+      : this.performSourceIndexChunks(notebookId, sourceId, onProgress);
     this.sourceIndexInFlight.set(runKey, run);
     const cleanup = () => {
       if (this.sourceIndexInFlight.get(runKey) === run) this.sourceIndexInFlight.delete(runKey);
@@ -431,7 +450,7 @@ export class NotebookManager {
     return run;
   }
 
-  private async performSourceIndexChunks(notebookId: string, sourceId: string): Promise<void> {
+  private async performSourceIndexChunks(notebookId: string, sourceId: string, onProgress?: (progress: number, stage: string, detail?: string) => void): Promise<void> {
     const notebook = this.notebooks.get(notebookId);
     const source = notebook?.sources.find(item => item.id === sourceId);
     if (!notebook || !source) return;
@@ -461,10 +480,15 @@ export class NotebookManager {
       // Retirer les vecteurs d'une version précédente avant de reconstruire
       // l'index de la version courante.
       embeddingStore.removeSource(source.id, notebookId);
+      onProgress?.(72, "embeddings", `Préparation de ${source.chunks.length} chunk(s) pour la vectorisation`);
       const indexed = await embeddingStore.indexChunks(
         source.chunks.map(chunk => ({ id: chunk.id, content: chunk.content })),
         source.id,
-        notebookId
+        notebookId,
+        (completed, total) => {
+          const ratio = total > 0 ? completed / total : 1;
+          onProgress?.(74 + Math.round(ratio * 20), "embeddings", `${completed}/${total} chunk(s) vectorisé(s)`);
+        }
       );
       if (this.sourceIndexRuns.get(runKey) !== runId
         || notebook.sources.find(item => item.id === sourceId)?.contentHash !== expectedContentHash) {
@@ -478,6 +502,7 @@ export class NotebookManager {
         message: complete ? undefined : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`,
       });
       source.indexingStatus = complete ? "indexed" : "partial";
+      onProgress?.(complete ? 96 : 94, "vector-index", complete ? `${indexed}/${source.chunks.length} embeddings indexés` : `Indexation partielle : ${indexed}/${source.chunks.length} embeddings`);
       source.indexingError = complete
         ? undefined
         : `${source.chunks.length - indexed} chunk(s) sans embedding après indexation.`;
@@ -497,6 +522,7 @@ export class NotebookManager {
         durationMs: Date.now() - startedAt, message: errorMessage,
       });
       source.indexingStatus = "failed";
+      onProgress?.(94, "vector-index", `Échec de l’indexation : ${errorMessage}`);
       source.indexingError = errorMessage;
       source.indexingUpdatedAt = new Date().toISOString();
       if (category === "transient") this.scheduleSourceIndexRetry(notebookId, source);
