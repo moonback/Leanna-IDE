@@ -83,6 +83,8 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
               task: {
                 status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
                 progress: number;
+                progressStage?: string;
+                progressDetail?: string;
                 error?: string;
                 result?: { title?: string; sourceId?: string; wordCount?: number; chunksCount?: number };
               };
@@ -97,7 +99,7 @@ export function useSourceUpload({ notebookId, onRefresh, onSuccess, onError }: U
               : task.status === 'processing' ? 'uploading' : 'pending';
 
             setUploadQueue(current => current.map(file => file.taskId === item.taskId
-              ? { ...file, status, progress: terminal ? (status === 'success' ? 100 : file.progress ?? 0) : Math.max(0, Math.min(100, task.progress || 0)), error: task.error }
+              ? { ...file, status, progress: terminal ? (status === 'success' ? 100 : file.progress ?? 0) : Math.max(0, Math.min(100, task.progress || 0)), progressStage: task.progressStage, progressDetail: task.progressDetail, error: task.error }
               : file));
 
             if (terminal) {
