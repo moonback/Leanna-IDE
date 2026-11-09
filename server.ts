@@ -98,26 +98,32 @@ sourceProcessingQueue.setHandler(async (task, onProgress) => {
   if (!notebookManager.getNotebook(notebookId, SELF_ROOT || undefined)) {
     throw new Error("Notebook introuvable dans le workspace actif ; tâche d'ingestion refusée.");
   }
-  onProgress(10);
+  onProgress(5, "preparation", "Vérification du notebook et préparation de la tâche");
 
   // Les anciennes tâches persistées sans kind restent compatibles (upload binaire).
+  const reportProgress = (progress: number, stage: string, detail?: string) => onProgress(progress, stage, detail);
   const source = payload.kind === "url"
-    ? await sourceIngester.ingestFromURL(String(payload.url || ""), notebookId)
+    ? await sourceIngester.ingestFromURL(String(payload.url || ""), notebookId, reportProgress)
     : await sourceIngester.ingestFromBuffer(
         Buffer.from(payload.buffer || []),
         String(payload.fileName || "Source"),
         String(payload.mimeType || "text/plain"),
-        notebookId
+        notebookId,
+        reportProgress
       );
-  onProgress(70);
 
-  notebookManager.addSource(notebookId, source);
-  onProgress(90);
+  onProgress(70, "persistence", "Enregistrement durable de la source dans le notebook");
+  const indexedSource = await notebookManager.addSourceAndWaitForIndex(notebookId, source, reportProgress);
+  if (!indexedSource) throw new Error("La source n’a pas pu être enregistrée dans le notebook.");
+  if (indexedSource.indexingStatus !== "indexed") {
+    throw new Error(indexedSource.indexingError || `Indexation vectorielle ${indexedSource.indexingStatus || "incomplète"}.`);
+  }
+  onProgress(98, "finalization", "Indexation terminée, finalisation du notebook");
 
   // Invalider le cache pour ce notebook (nouvelles sources = réponses périmées)
   chatResponseCache.invalidateNotebook(notebookId);
   ragSearchCache.invalidateNotebook(notebookId);
-  onProgress(100);
+  onProgress(100, "completed", "Importation et indexation terminées");
 
   return {
     sourceId: source.id,

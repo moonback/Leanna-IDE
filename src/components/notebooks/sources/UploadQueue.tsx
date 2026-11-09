@@ -16,7 +16,8 @@ interface Props {
 function getStage(file: UploadFileStatus): string {
   if (file.status === 'success') return 'Importation terminée';
   if (file.status === 'error') return 'Échec de l’importation';
-  if (file.status === 'pending') return 'En attente dans la file';
+  if (file.status === 'pending') return file.progressDetail || 'En attente dans la file';
+  if (file.progressDetail) return file.progressDetail;
   const progress = file.progress ?? 0;
   if (progress < 10) return 'Préparation du document';
   if (progress < 70) return 'Extraction et analyse du contenu';
