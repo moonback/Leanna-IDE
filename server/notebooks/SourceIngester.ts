@@ -161,7 +161,9 @@ export class SourceIngester {
       sourceType = "text";
     }
 
-    onProgress?.(35, "extraction", sourceType === "pdf" ? "Extraction du texte PDF terminée" : "Lecture et extraction du fichier terminées");
+    if (sourceType !== "pdf") {
+      onProgress?.(35, "extraction", "Lecture et extraction du fichier terminées");
+    }
     if (!rawText.trim()) {
       throw new Error("Impossible d'extraire du texte depuis ce fichier.");
     }
