@@ -35,6 +35,9 @@ export interface UploadFileStatus {
   name: string;
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
+  /** Real backend task progress, 0–100. */
+  progress?: number;
+  taskId?: string;
 }
 
 export const TYPE_ICONS: Record<string, string> = {
