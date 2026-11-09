@@ -149,7 +149,7 @@ const DEFAULT_PROFILE: UserProfile = {
   temperature:      0.9,
   topP:             0.95,
   textProvider:     'openrouter',
-  openrouterModel:  'minimax/minimax-m3',
+  openrouterModel:  'openai/gpt-6-luna',
   openrouterApiKey: '',
   openrouterImageModel: 'google/gemini-3.6-flash-image',
   notebookModel:    '',
