@@ -5,7 +5,7 @@
 
 import {
   FileBarChart, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale,
+  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale, FilePlus2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -50,6 +50,18 @@ export const REPORT_TYPES: DocTypeEntry[] = [
   { key: 'synthesis-report', label: 'Rapport de synthèse', icon: Scale, desc: 'Aide à la décision : options, arbitrages, recommandation', color: 'var(--color-success)' },
 ];
 
+/**
+ * Rapport « vierge » / personnalisé — n'apparaît pas dans la grille des modèles :
+ * la structure est définie par le détail textuel saisi par l'utilisateur.
+ */
+export const CUSTOM_REPORT_TYPE: DocTypeEntry = {
+  key: 'custom-report',
+  label: 'Rapport personnalisé',
+  icon: FilePlus2,
+  desc: 'Décrivez vous-même le rapport à générer (structure et contenu libres)',
+  color: 'var(--notebook-accent)',
+};
+
 /** Thèmes disponibles pour le code */
 export const CODE_THEMES: Record<string, { bg: string; text: string; border: string }> = {
   default: { bg: 'var(--notebook-canvas)', text: 'var(--text-primary)', border: 'var(--notebook-border)' },
@@ -62,12 +74,16 @@ export const SLIDE_EXCLUDED_TYPES = new Set(['infographic', 'mindmap']);
 
 /** Libellé affichable d'un type de document. */
 export function getDocTypeLabel(typeKey: string): string {
-  const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
+  const docType = DOC_TYPES.find(t => t.key === typeKey)
+    || REPORT_TYPES.find(t => t.key === typeKey)
+    || (typeKey === CUSTOM_REPORT_TYPE.key ? CUSTOM_REPORT_TYPE : undefined);
   return docType?.label || typeKey;
 }
 
 /** Couleur associée à un type de document. */
 export function getDocTypeColor(typeKey: string): string {
-  const docType = DOC_TYPES.find(t => t.key === typeKey) || REPORT_TYPES.find(t => t.key === typeKey);
+  const docType = DOC_TYPES.find(t => t.key === typeKey)
+    || REPORT_TYPES.find(t => t.key === typeKey)
+    || (typeKey === CUSTOM_REPORT_TYPE.key ? CUSTOM_REPORT_TYPE : undefined);
   return docType?.color || 'var(--text-muted)';
 }

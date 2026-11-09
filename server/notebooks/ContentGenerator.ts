@@ -49,7 +49,7 @@ export class ContentGenerator {
 
     // Construire le contexte des sources : passages répartis sur tout chaque
     // document, dans un budget plus large pour les rapports longs.
-    const isLongReport = type === "full-report" || type.startsWith("report-") || type === "synthesis-report";
+    const isLongReport = type === "full-report" || type.startsWith("report-") || type === "synthesis-report" || type === "custom-report";
     const sourcesContext = buildSourcesContext(sources, {
       budgetChars: isLongReport ? REPORT_CONTEXT_BUDGET : DEFAULT_CONTEXT_BUDGET,
     });
@@ -163,6 +163,10 @@ export class ContentGenerator {
         title = "Rapport de synthèse décisionnel";
         prompt = this.buildSynthesisReportPrompt(sourcesContext, lang);
         break;
+      case "custom-report":
+        title = "Rapport personnalisé";
+        prompt = this.buildCustomReportPrompt(sourcesContext, lang);
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -177,7 +181,7 @@ export class ContentGenerator {
     let generatedText = "";
 
     // Plus de tokens pour les rapports
-    const maxTokens = (type === "full-report" || type.startsWith("report-")) ? 16384 : 8192;
+    const maxTokens = (type === "full-report" || type.startsWith("report-") || type === "custom-report") ? 16384 : 8192;
 
     // Override de modèle choisi dans les Settings (Notebooks). Vide = provider
     // de texte actif (comportement par défaut). Un ID non vide force OpenRouter
@@ -886,6 +890,28 @@ RÈGLE SPÉCIALE : Ce document doit être CONCIS (max 2 pages). Chaque mot compt
 
   private buildSynthesisReportPrompt(context: string, lang: string): string {
     return notebookPromptStore.render("content.synthesisReport", { lang: langInstructionFor(lang), context });
+  }
+
+  /**
+   * Rapport « vierge » / personnalisé : la structure et le périmètre ne sont pas
+   * imposés par un modèle — ils sont entièrement définis par le brief textuel de
+   * l'utilisateur, ajouté ensuite au prompt sous « INSTRUCTIONS SUPPLÉMENTAIRES ».
+   */
+  private buildCustomReportPrompt(context: string, lang: string): string {
+    return `${langInstructionFor(lang)}
+
+Tu es un analyste expert. Rédige un rapport professionnel en Markdown à partir des sources fournies ci-dessous, en suivant STRICTEMENT le brief de l'utilisateur donné dans la section « INSTRUCTIONS SUPPLÉMENTAIRES DE L'UTILISATEUR » (plus bas).
+
+RÈGLES :
+- La structure, le plan, les sections et le périmètre du rapport doivent découler du brief de l'utilisateur — n'impose aucun modèle prédéfini.
+- Si le brief demande des sections précises, respecte-les dans l'ordre indiqué.
+- Commence par un titre de niveau 1 (# …) reflétant le sujet du brief.
+- Appuie-toi uniquement sur les informations présentes dans les sources ; signale explicitement toute information manquante au lieu de l'inventer.
+- Structure claire : titres (##, ###), listes, tableaux et mises en gras lorsque c'est utile.
+- Reste factuel, précis et bien organisé.
+
+═══ SOURCES ═══
+${context}`;
   }
 
   // ─── Suggestions intelligentes de rapports ──────────────────────────────────

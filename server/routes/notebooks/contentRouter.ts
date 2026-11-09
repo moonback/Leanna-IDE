@@ -25,7 +25,7 @@ const NON_PROSE_DOC_TYPES = new Set<string>(["infographic", "visualization", "ch
 /** Types acceptés par /generate et /generate/stream. */
 const GENERATABLE_TYPES: GeneratedDocType[] = [
   "summary", "faq", "study-guide", "briefing", "timeline", "outline", "mindmap", "swot", "glossary",
-  "infographic", "full-report", "roadmap", "comparative-analysis", "synthesis-report",
+  "infographic", "full-report", "roadmap", "comparative-analysis", "synthesis-report", "custom-report",
   "report-business", "report-market", "report-technical", "report-competitive", "report-financial",
   "report-marketing", "report-product", "report-risk", "report-executive", "report-project",
 ];

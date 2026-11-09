@@ -6,7 +6,7 @@
  * restitution du focus sont gérés par la primitive.
  */
 
-import { FileBarChart, Lightbulb, RefreshCw, Sparkles, Zap, ArrowRight } from 'lucide-react';
+import { FileBarChart, FilePlus2, Lightbulb, RefreshCw, Sparkles, Zap, ArrowRight } from 'lucide-react';
 import { NbModal, NbButton, NbBadge } from '../ui/primitives.js';
 import { DOC_TYPES, REPORT_TYPES } from './constants.js';
 
@@ -28,6 +28,8 @@ interface Props {
   onLoadSuggestions: () => void;
   onSelectSuggestion: (suggestion: Suggestion) => void;
   onSelectType: (type: string) => void;
+  /** Ouvre le flux « rapport vierge » : saisie textuelle du détail du rapport. */
+  onSelectCustom: () => void;
 }
 
 /** Carte cliquable de la grille (suggestion ou type de rapport). */
@@ -36,7 +38,7 @@ const GRID_CARD =
 
 export function ReportModal({
   show, sources, suggestions, loadingSuggestions,
-  onClose, onLoadSuggestions, onSelectSuggestion, onSelectType,
+  onClose, onLoadSuggestions, onSelectSuggestion, onSelectType, onSelectCustom,
 }: Props) {
   return (
     <NbModal open={show} onClose={onClose} size="2xl">
@@ -57,6 +59,37 @@ export function ReportModal({
 
       {/* Modal content — scrollable */}
       <NbModal.Body className="space-y-6 p-6">
+        {/* Rapport vierge — l'utilisateur décrit lui-même le rapport */}
+        <button
+          type="button"
+          data-interactive="true"
+          onClick={onSelectCustom}
+          disabled={sources.length === 0}
+          className={`${GRID_CARD} flex items-center gap-3 p-4 disabled:pointer-events-none disabled:opacity-40`}
+          title="Décrire vous-même le rapport à générer"
+        >
+          <span
+            className="absolute bottom-0 left-0 top-0 w-1 opacity-80 transition-all group-hover:w-1.5"
+            style={{ backgroundColor: 'var(--notebook-accent)' }}
+          />
+          <div
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--notebook-accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--notebook-accent) 25%, transparent)' }}
+          >
+            <FilePlus2 className="h-4 w-4 text-[var(--notebook-accent)]" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Rapport vierge</p>
+            <p className="mt-0.5 text-xs leading-snug text-[var(--text-dimmed)]">
+              Décrivez vous-même le rapport — structure et contenu libres
+            </p>
+          </div>
+          <ArrowRight
+            className="h-3.5 w-3.5 flex-shrink-0 -translate-x-1 text-[var(--notebook-accent)] opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+            aria-hidden
+          />
+        </button>
+
         {/* Suggestions IA */}
         <div className="space-y-4 rounded-xl border border-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-warning)_7%,transparent),color-mix(in_srgb,var(--notebook-accent)_5%,transparent))] p-4">
           <div className="flex items-center gap-3">

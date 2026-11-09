@@ -25,6 +25,7 @@ import { DocTypePicker } from './generation/DocTypePicker.js';
 import { DocViewer } from './generation/DocViewer.js';
 import { ReportModal } from './generation/ReportModal.js';
 import { InfographicModal } from './generation/InfographicModal.js';
+import { CustomReportModal } from './generation/CustomReportModal.js';
 import type { SourceItem, DocRef } from './generation/types.js';
 
 interface Props {
@@ -72,6 +73,8 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
   const reportModalTriggerRef = useRef<HTMLButtonElement>(null);
   const [showInfographicModal, setShowInfographicModal] = useState(false);
   const infographicModalTriggerRef = useRef<HTMLButtonElement>(null);
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
+  const [customReportDetail, setCustomReportDetail] = useState('');
   const [showSlideModal, setShowSlideModal] = useState(false);
   const [infraOrientation, setInfraOrientation] = useState<'portrait' | 'landscape' | 'square'>('portrait');
   const [infraStyle, setInfraStyle] = useState<string>('auto');
@@ -179,6 +182,24 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
     }, 100);
   }, [infraOrientation, infraStyle, infraDetail, infraLang, infraDescription, handleGenerate]);
 
+  // ── Rapport vierge (custom-report) ────────────────────────────────────────
+  // Ouvre le modal de saisie textuelle depuis le ReportModal.
+  const openCustomReportModal = useCallback(() => {
+    setShowReportModal(false);
+    setTimeout(() => setShowCustomReportModal(true), 100);
+  }, []);
+
+  // Génère le rapport à partir du détail textuel saisi par l'utilisateur.
+  const handleCustomReportGenerate = useCallback(() => {
+    const detail = customReportDetail.trim();
+    if (!detail) return;
+    setShowCustomReportModal(false);
+    setTimeout(() => {
+      handleGenerate('custom-report', detail);
+      setCustomReportDetail('');
+    }, 100);
+  }, [customReportDetail, handleGenerate]);
+
   const toggleSourceSelection = useCallback((sourceId: string) => {
     setSelectedSourceIds(prev =>
       prev.includes(sourceId) ? prev.filter(id => id !== sourceId) : [...prev, sourceId]
@@ -261,6 +282,7 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         onLoadSuggestions={loadSuggestions}
         onSelectSuggestion={handleSelectSuggestion}
         onSelectType={handleModalGenerate}
+        onSelectCustom={openCustomReportModal}
       />
 
       <InfographicModal
@@ -279,6 +301,16 @@ export function GeneratePanel({ notebookId, sources, onRefresh, fullView = false
         setInfraDescription={setInfraDescription}
         onClose={() => { setShowInfographicModal(false); infographicModalTriggerRef.current?.focus(); }}
         onGenerate={handleInfographicGenerate}
+      />
+
+      <CustomReportModal
+        show={showCustomReportModal}
+        sources={sources}
+        selectedSourceIds={selectedSourceIds}
+        detail={customReportDetail}
+        setDetail={setCustomReportDetail}
+        onClose={() => { setShowCustomReportModal(false); reportModalTriggerRef.current?.focus(); }}
+        onGenerate={handleCustomReportGenerate}
       />
 
       {showSlideModal && selectedDoc && (
