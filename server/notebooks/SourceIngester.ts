@@ -568,7 +568,7 @@ Sois exhaustif sur les aspects techniques. Pas d'explication supplémentaire, un
     const id = randomUUID();
 
     // Découpage intelligent en chunks (adapté au type de contenu)
-    onProgress?.(42, "cleaning", "Normalisation du contenu et préparation du découpage");
+    onProgress?.(42, "preparation", "Préparation du contenu avant le découpage");
     onProgress?.(48, "chunking", "Analyse de la structure et découpage sémantique");
     const chunks = this.chunkText(rawText, id, type);
     onProgress?.(62, "chunking", `${chunks.length} chunk(s) généré(s)`);
