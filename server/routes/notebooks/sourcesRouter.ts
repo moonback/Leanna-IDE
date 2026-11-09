@@ -170,6 +170,8 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         type: task.type,
         status: task.status,
         progress: task.progress,
+        progressStage: task.progressStage,
+        progressDetail: task.progressDetail,
         attempts: task.attempts,
         maxAttempts: task.maxAttempts,
         error: task.error,
