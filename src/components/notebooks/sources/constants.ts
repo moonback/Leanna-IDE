@@ -38,6 +38,8 @@ export interface UploadFileStatus {
   /** Real backend task progress, 0–100. */
   progress?: number;
   taskId?: string;
+  progressStage?: string;
+  progressDetail?: string;
 }
 
 export const TYPE_ICONS: Record<string, string> = {
