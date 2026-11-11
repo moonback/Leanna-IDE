@@ -257,19 +257,10 @@ export class ProjectIndexer {
             `⚡ Projet inchangé — utilisation du cache existant (${cachedFiles.length} fichiers, ${stats.totalEntities} entités) (${durationMs}ms)`
           );
 
-          // Construire le Call-Graph AST en arrière-plan sans bloquer le démarrage.
-          // Perf 6 : ne parser que les fichiers absents de l'astIndex en mémoire —
-          // évite de tout reparser si scanAll() est rappelé alors que l'index
-          // est déjà chaud (ex. rechargement sandbox).
-          // Le watcher met à jour l'astIndex au fil de l'eau ; les seuls fichiers
-          // absents sont ceux jamais vus depuis le démarrage du process.
-          const missingFromAst = files.filter(f => !knowledgeGraph.getASTResult(f));
-          if (missingFromAst.length > 0) {
-            this.buildASTIndex(missingFromAst).catch((err) => {
-              log.warn(`⚠️ Échec initialisation AST en arrière-plan: ${(err as Error).message}`);
-            });
-          }
-
+          // L'index AST est volontairement éphémère. Ne pas reparcourir et
+          // reparser tout le workspace au démarrage uniquement pour le reconstruire :
+          // les fichiers modifiés seront enrichis par le watcher. Les opérations qui
+          // exigent le call-graph complet doivent déclencher buildASTIndex à la demande.
           return {
             totalFiles: cachedFiles.length,
             totalEntities: stats.totalEntities,
