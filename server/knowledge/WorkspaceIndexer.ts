@@ -277,6 +277,10 @@ export class WorkspaceIndexer {
       if (doc) {
         const store = getDocumentStore(root);
         this.upsertDocument(store, doc);
+        const stat = fs.statSync(path.join(root, relativePath));
+        const manifest = this.loadManifest(root);
+        manifest[relativePath] = { size: stat.size, mtimeMs: stat.mtimeMs };
+        this.saveManifest(root, manifest);
         store.save();
         this.extractedPaths.add(relativePath);
         log.info(`📝 Document extrait: ${relativePath} (${doc.metadata.wordCount} mots, ${doc.sections.length} sections)`);
@@ -301,6 +305,9 @@ export class WorkspaceIndexer {
       store.removeDocument(existing.id);
       store.save();
       this.extractedPaths.delete(relativePath);
+      const manifest = this.loadManifest(root);
+      delete manifest[relativePath];
+      this.saveManifest(root, manifest);
       log.info(`🗑️ Document retiré: ${relativePath}`);
     }
   }
