@@ -413,7 +413,7 @@ app.whenReady().then(() => {
 
   // Durcissement : interdire aux pages du <webview> d'ouvrir des popups ou de
   // nouvelles fenêtres non contrôlées, et bloquer la navigation du shell lui-même.
-  app.on('web-contents-created', (_event, contents) => {
+  function hardenContents(contents) {
     // Toute tentative d'ouverture de fenêtre (window.open, target=_blank) est refusée.
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\//i.test(url)) {
@@ -422,16 +422,24 @@ app.whenReady().then(() => {
       }
       return { action: 'deny' };
     });
-    // Empêcher le shell principal (fenêtre React) de naviguer ailleurs que l'app.
-    if (contents === win.webContents) {
+    // Empêcher toute fenêtre de l'app (IDE, orb, réseau d'agents) de naviguer
+    // ailleurs que l'app. Les <webview> du navigateur intégré restent libres.
+    // Comparaison d'ORIGINE : un préfixe acceptait http://127.0.0.1:4000.evil.com
+    // et http://127.0.0.1:4000@evil.com.
+    if (contents.getType() !== 'webview') {
       contents.on('will-navigate', (navEvent, navUrl) => {
         const startBase = process.env.ELECTRON_START_URL || `http://127.0.0.1:${process.env.VITE_SERVER_PORT || 4000}`;
-        if (!navUrl.startsWith(startBase)) {
-          navEvent.preventDefault();
-        }
+        let allowed = false;
+        try { allowed = new URL(navUrl).origin === new URL(startBase).origin; } catch { /* URL invalide → refus */ }
+        if (!allowed) navEvent.preventDefault();
       });
     }
-  });
+  }
+  // La fenêtre principale et le splash existent déjà : `web-contents-created`
+  // ne se déclenche que pour les suivants, il faut donc les durcir explicitement.
+  const { webContents: allWebContents } = require('electron');
+  allWebContents.getAllWebContents().forEach(hardenContents);
+  app.on('web-contents-created', (_event, contents) => hardenContents(contents));
 
   // Créer le tray une fois la fenêtre prête
   createTray(win);
@@ -650,7 +658,8 @@ app.whenReady().then(() => {
     }
 
     try {
-      await execFileAsync('git', ['clone', '--progress', url, clonePath], {
+      // `--` : ni l'URL ni le chemin ne peuvent être interprétés comme une option git.
+      await execFileAsync('git', ['clone', '--progress', '--', url, clonePath], {
         timeout: 300000, // 5 minutes max
         windowsHide: true,
       });

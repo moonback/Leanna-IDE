@@ -19,9 +19,20 @@ function readTokenCookie(cookieHeader: string | string[] | undefined): string | 
   if (!raw) return undefined;
   for (const part of raw.split(';')) {
     const [name, ...rest] = part.trim().split('=');
-    if (name === 'Leanna_token') return decodeURIComponent(rest.join('='));
+    if (name === 'Leanna_token') {
+      // Cookie mal encodé (%E0%A4%A) : URIError → 401 propre, pas un 500.
+      try { return decodeURIComponent(rest.join('=')); } catch { return undefined; }
+    }
   }
   return undefined;
+}
+
+/** Comparaison de secrets à temps constant (pas de fuite par timing). */
+function tokensMatch(candidate: string | null | undefined, expected: string): boolean {
+  if (typeof candidate !== 'string') return false;
+  const a = crypto.createHash('sha256').update(candidate).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 export function authenticateRequest(
@@ -52,7 +63,7 @@ export function authenticateRequest(
 
   const cookieToken = readTokenCookie(req.headers?.cookie);
 
-  if (headerToken === configuredToken || queryToken === configuredToken || cookieToken === configuredToken) {
+  if (tokensMatch(headerToken, configuredToken) || tokensMatch(queryToken, configuredToken) || tokensMatch(cookieToken, configuredToken)) {
     return { ok: true };
   }
 
@@ -106,14 +117,21 @@ export const EXCLUDED_WORKSPACE_FILES = new Set<string>([
   '.gemini-keys.json',
 ]);
 
+const EXCLUDED_DIRECTORIES_LOWER = new Set([...EXCLUDED_WORKSPACE_DIRECTORIES].map((n) => n.toLowerCase()));
+const EXCLUDED_FILES_LOWER = new Set([...EXCLUDED_WORKSPACE_FILES].map((n) => n.toLowerCase()));
+
 /**
  * Returns true when a single path segment (directory or file name) should be
  * hidden from the workspace surface. Covers the excluded directory/file sets
  * plus any `.env` / `.env.*` variant.
  */
-export function isExcludedWorkspaceEntry(name: string): boolean {
-  if (EXCLUDED_WORKSPACE_DIRECTORIES.has(name)) return true;
-  if (EXCLUDED_WORKSPACE_FILES.has(name)) return true;
+export function isExcludedWorkspaceEntry(rawName: string): boolean {
+  // Windows/macOS résolvent `.ENV`, `.env ` , `.env.` et `.env::$DATA` (flux NTFS)
+  // vers le même fichier que `.env` : on compare la forme canonique, sur toutes
+  // les plateformes (fail-closed).
+  const name = rawName.split(':')[0].replace(/[. ]+$/, '').toLowerCase();
+  if (EXCLUDED_DIRECTORIES_LOWER.has(name)) return true;
+  if (EXCLUDED_FILES_LOWER.has(name)) return true;
   // .env, .env.local, .env.example, .env.production, ...
   if (name === '.env' || name.startsWith('.env.')) return true;
   return false;
@@ -164,7 +182,7 @@ export function authenticateToken(token: string | null | undefined, apiToken: st
   if (!apiToken) {
     return { ok: true };
   }
-  if (token === apiToken) {
+  if (tokensMatch(token, apiToken)) {
     return { ok: true };
   }
   return { ok: false, status: 401, error: 'Unauthorized' };
