@@ -102,6 +102,8 @@ export class ProjectIndexer {
 
   // ── Coalescing des scans concurrents ──────────────────────────────────────
   private inFlight: Promise<ScanAllResult> | null = null;
+  /** Coalesce les reconstructions AST déclenchées à la demande. */
+  private astBuildInFlight: Promise<void> | null = null;
   private pendingRescan = false;
 
   // ── Cache contenu pour refreshSemanticRelations ───────────────────────────
@@ -399,8 +401,11 @@ export class ProjectIndexer {
 
     // Construire le graphe d'appels AST en mémoire
     if (astResults.size > 0) {
+      // Résoudre les appels inter-fichiers contre l'index AST complet, y compris
+      // les fichiers déjà indexés lors d'une précédente demande à la demande.
+      const allAstResults = knowledgeGraph.getAllASTResults();
       for (const [, astResult] of astResults) {
-        astCallGraph.updateFile(astResult, astResults);
+        astCallGraph.updateFile(astResult, allAstResults);
       }
       const cgStats = astCallGraph.getStats();
       log.info(`📊 Call-graph AST: ${cgStats.totalNodes} fonctions, ${cgStats.totalEdges} appels (${cgStats.crossFileEdges} cross-file, ${cgStats.resolvedEdges} résolus)`);
@@ -657,6 +662,33 @@ export class ProjectIndexer {
    *   mis à jour de façon incrémentale sans clear() — évite la collision avec
    *   le watcher qui utilise lui aussi updateFile().
    */
+  /**
+   * Garantit que le call-graph AST est disponible sans le reconstruire au démarrage.
+   * Plusieurs consommateurs simultanés partagent la même reconstruction.
+   * Seuls les fichiers analysables absents de l'index AST sont parsés.
+   */
+  async ensureASTIndex(): Promise<void> {
+    if (this.astBuildInFlight) {
+      await this.astBuildInFlight;
+      return;
+    }
+
+    const missingFiles = knowledgeGraph.getAllFiles()
+      .filter(file => ANALYZABLE_EXTENSIONS.has(path.extname(file.path)))
+      .filter(file => !knowledgeGraph.getASTResult(file.path))
+      .map(file => file.path);
+
+    if (missingFiles.length === 0) return;
+
+    const build = this.buildASTIndex(missingFiles);
+    this.astBuildInFlight = build;
+    try {
+      await build;
+    } finally {
+      if (this.astBuildInFlight === build) this.astBuildInFlight = null;
+    }
+  }
+
   async buildASTIndex(filesToProcess?: string[]): Promise<void> {
     await astParser.init();
     if (!astParser.isReady) {
