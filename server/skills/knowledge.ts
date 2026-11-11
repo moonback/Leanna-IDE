@@ -20,6 +20,12 @@ import type { ContextStrategy, ContextDetailLevel } from "../knowledge/Understan
 import type { ImpactMode } from "../knowledge/ImpactAnalyzer.js";
 import type { ProjectKnowledgeCategory } from "../knowledge/types.js";
 
+/** Initialise le call-graph AST uniquement lorsqu'un outil en a réellement besoin. */
+async function ensureKnowledgeAstIndex(): Promise<void> {
+  const { projectIndexer } = await import("../knowledge/ProjectIndexer.js");
+  await projectIndexer.ensureASTIndex();
+}
+
 const CATEGORY_VALUES: ProjectKnowledgeCategory[] = [
   "architecture",
   "convention",
@@ -1194,6 +1200,7 @@ export const knowledgeSkill: Skill = {
       try {
         const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_callers, args);
         log(`ast_callers fn='${validated.function_name}' file='${validated.file_path ?? ""}'`);
+        await ensureKnowledgeAstIndex();
 
         const callers = await knowledgeGraph.getFunctionCallers(
           validated.function_name,
@@ -1225,6 +1232,7 @@ export const knowledgeSkill: Skill = {
       try {
         const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_callees, args);
         log(`ast_callees fn='${validated.function_name}' file='${validated.file_path ?? ""}'`);
+        await ensureKnowledgeAstIndex();
 
         const callees = await knowledgeGraph.getFunctionCallees(
           validated.function_name,
@@ -1258,6 +1266,7 @@ export const knowledgeSkill: Skill = {
       try {
         const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_call_chain, args);
         log(`ast_call_chain fn='${validated.function_name}' depth=${validated.depth}`);
+        await ensureKnowledgeAstIndex();
 
         const { astCallGraph } = await import("../knowledge/index.js");
         const chain = astCallGraph.getCallChain(
@@ -1399,6 +1408,7 @@ export const knowledgeSkill: Skill = {
       try {
         const validated = validateArgs(knowledgeSkill.inputSchemas!.knowledge_ast_file_inspect, args);
         log(`ast_file_inspect file='${validated.file_path}'`);
+        await ensureKnowledgeAstIndex();
 
         const astData = knowledgeGraph.getASTResult(validated.file_path);
         const { astCallGraph } = await import("../knowledge/index.js");
