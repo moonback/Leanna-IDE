@@ -179,20 +179,33 @@ export class WorkspaceIndexer {
     await this.walkDirectory(root, files, root);
     log.info(`📋 ${files.length} document(s) trouvé(s)`);
 
-    // 2. Extraire chaque document
+    // 2. Synchronisation différentielle persistante : seuls les nouveaux
+    // documents ou ceux dont la taille/mtime a changé sont réextraits.
     const store = getDocumentStore(root);
+    const manifest = this.loadManifest(root);
+    const diskPaths = new Set(files);
     let totalExtracted = 0;
     let totalSections = 0;
     let totalWords = 0;
     let skipped = 0;
     let errors = 0;
+    let unchanged = 0;
 
     for (const relativePath of files.slice(0, MAX_DOCUMENTS)) {
       try {
+        const absolutePath = path.join(root, relativePath);
+        const stat = fs.statSync(absolutePath);
+        const previous = manifest[relativePath];
+        if (previous && previous.size === stat.size && Math.abs(previous.mtimeMs - stat.mtimeMs) <= 2) {
+          unchanged++;
+          this.extractedPaths.add(relativePath);
+          continue;
+        }
+
         const doc = await this.extractDocument(relativePath, root);
         if (doc) {
-          // Ajouter ou mettre à jour dans le store
           this.upsertDocument(store, doc);
+          manifest[relativePath] = { size: stat.size, mtimeMs: stat.mtimeMs };
           this.extractedPaths.add(relativePath);
           totalExtracted++;
           totalSections += doc.sections.length;
@@ -206,12 +219,49 @@ export class WorkspaceIndexer {
       }
     }
 
+    // Nettoyer le manifeste et le store des documents disparus.
+    for (const relativePath of Object.keys(manifest)) {
+      if (!diskPaths.has(relativePath)) {
+        this.removeDocument(relativePath);
+        delete manifest[relativePath];
+      }
+    }
+    this.saveManifest(root, manifest);
     store.save();
 
     const durationMs = Date.now() - startTime;
-    log.info(`✅ Extraction terminée: ${totalExtracted} documents, ${totalSections} sections, ${totalWords} mots (${(durationMs / 1000).toFixed(1)}s)`);
+    log.info(`✅ Synchronisation documentaire: ${totalExtracted} extrait(s), ${unchanged} inchangé(s), ${totalSections} sections, ${totalWords} mots (${(durationMs / 1000).toFixed(1)}s)`);
 
     return { totalFiles: files.length, totalExtracted, totalSections, totalWords, skipped, errors, durationMs };
+  }
+
+  /** Manifeste local de synchronisation documentaire, indépendant du store RAG. */
+  private manifestPath(root: string): string {
+    return path.join(root, ".Leanna", "workspace-index-manifest.json");
+  }
+
+  private loadManifest(root: string): Record<string, { size: number; mtimeMs: number }> {
+    try {
+      const file = this.manifestPath(root);
+      if (!fs.existsSync(file)) return {};
+      const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      log.warn(`Manifeste documentaire illisible, synchronisation de sécurité: ${(error as Error).message}`);
+      return {};
+    }
+  }
+
+  private saveManifest(root: string, manifest: Record<string, { size: number; mtimeMs: number }>): void {
+    try {
+      const file = this.manifestPath(root);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const temporary = `${file}.tmp`;
+      fs.writeFileSync(temporary, JSON.stringify(manifest), "utf-8");
+      fs.renameSync(temporary, file);
+    } catch (error) {
+      log.warn(`Impossible de sauvegarder le manifeste documentaire: ${(error as Error).message}`);
+    }
   }
 
   /**
