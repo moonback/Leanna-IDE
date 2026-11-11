@@ -69,7 +69,9 @@ export interface DocumentStoreData {
 // Constantes
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const MAX_DOCUMENTS = 50;
+// Aligné sur WorkspaceIndexer.MAX_DOCUMENTS pour éviter que le manifeste
+// valide des documents évincés du store au cours d'une même extraction.
+const MAX_DOCUMENTS = 200;
 const MAX_EXTRACTED_TEXT = 30_000;
 const STORE_VERSION = 1;
 
