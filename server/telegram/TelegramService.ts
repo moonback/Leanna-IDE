@@ -98,9 +98,17 @@ export class TelegramService {
     const envToken = envTokenRaw.startsWith("gcm:") ? decrypt(envTokenRaw) : envTokenRaw;
     const validEnvToken = envToken.startsWith("gcm:") ? "" : envToken;
 
+    // Utilisateurs autorisés définis dans .env (IDs numériques ou @usernames, séparés par des virgules)
+    const envAllowedUsers = (process.env.TELEGRAM_ALLOWED_USERS || "")
+      .split(/[,;\s]+/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    const mergeAllowed = (fromFile: string[] = []): string[] =>
+      Array.from(new Set([...envAllowedUsers, ...fromFile.map((u) => String(u).trim()).filter(Boolean)]));
+
     const defaultConfig: TelegramConfig = {
       botToken: validEnvToken,
-      allowedUsers: [],
+      allowedUsers: mergeAllowed(),
       autoStart: false,
       notificationsEnabled: true,
       defaultChatId: "",
@@ -126,7 +134,7 @@ export class TelegramService {
           ...defaultConfig,
           ...data,
           botToken: token,
-          allowedUsers: Array.isArray(data.allowedUsers) ? data.allowedUsers : [],
+          allowedUsers: mergeAllowed(Array.isArray(data.allowedUsers) ? data.allowedUsers : []),
         };
       }
     } catch (e) {
