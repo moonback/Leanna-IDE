@@ -1292,6 +1292,7 @@ export const browserSkill: Skill = {
       title?: string;
       content?: string;
       contentLength?: number;
+      truncated?: boolean;
       promptInjection?: ReturnType<typeof guardUntrustedContent>["promptInjection"];
       message: string;
     }> => {
@@ -1429,7 +1430,8 @@ export const browserSkill: Skill = {
         title: result.title ?? "",
         content: result.content ?? "",
         contentLength: result.contentLength ?? 0,
-        message: `Page "${result.title || normalized}" chargée et lue (${result.contentLength ?? 0} caractères).`,
+        truncated: result.truncated ?? false,
+        message: `Page "${result.title || normalized}" chargée et lue (${result.contentLength ?? 0} caractères)${result.truncated ? " — contenu tronqué" : ""}.`,
       };
     }
 
@@ -1452,6 +1454,7 @@ export const browserSkill: Skill = {
         title: result.title ?? "",
         content: result.content ?? "",
         contentLength: result.contentLength ?? 0,
+        truncated: result.truncated ?? false,
         message: result.message,
       };
     }
