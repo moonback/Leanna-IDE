@@ -446,12 +446,50 @@ export function BrowserPanel({
   // ── Écoute des commandes directes via CustomEvent (fallback / scroll) ───────
 
   useEffect(() => {
-    const handleNav = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
+    const handleNav = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { url?: string; requestId?: string };
       if (!detail?.url) return;
       setAssistantNavActive(true);
+      const wv = webviewRef.current;
+      if (!wv) {
+        if (detail.requestId) await postActionResult(detail.requestId, null, 'Webview non disponible.');
+        setAssistantNavActive(false);
+        return;
+      }
+
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = () => {
+        if (timeout) clearTimeout(timeout);
+        wv.removeEventListener('did-stop-loading', onStop);
+        wv.removeEventListener('did-fail-load', onFail);
+      };
+      const finish = async (error?: string) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (detail.requestId) {
+          if (error) await postActionResult(detail.requestId, null, error);
+          else await postActionResult(detail.requestId, { url: wv.getURL(), title: wv.getTitle?.() ?? '' });
+        }
+        setAssistantNavActive(false);
+      };
+      const onStop = () => { void finish(); };
+      const onFail = (event: Event) => {
+        const failure = event as WebviewFailLoadEvent;
+        if (failure.isMainFrame === false || failure.errorCode === -3) return;
+        void finish('Échec du chargement (' + failure.errorCode + ') : ' + (failure.errorDescription || 'erreur réseau'));
+      };
+
+      if (detail.requestId) {
+        wv.addEventListener('did-stop-loading', onStop);
+        wv.addEventListener('did-fail-load', onFail);
+        timeout = setTimeout(() => {
+          void finish('Délai dépassé : la page n’a pas terminé son chargement dans les 25 secondes.');
+        }, 25_000);
+      }
       navigateTo(detail.url);
-      setTimeout(() => setAssistantNavActive(false), 3000);
+      if (!detail.requestId) setTimeout(() => setAssistantNavActive(false), 3000);
     };
 
     // Ouvrir une URL dans un nouvel onglet (depuis browser_new_tab).
