@@ -22,8 +22,11 @@ import {
   MoreHorizontal,
   Power,
   Network,
+  ListChecks,
   type LucideIcon,
 } from 'lucide-react';
+import { StartupTasksPill } from './StartupTasksPill.js';
+import { useStartupTasks } from '../../hooks/useStartupTasks.js';
 import { useLiveAPIContext } from '../../context/LiveAPIContext.js';
 import { useProfile } from '../../context/UserProfileContext.js';
 import { QuitConfirmDialog } from '../sidebar/QuitConfirmDialog.js';
@@ -781,6 +784,10 @@ export const StatusBar = memo(function StatusBar({
     };
   }, []);
 
+  // ── Tâches de démarrage ───────────────────────────────────────────────────
+  const startupTasks = useStartupTasks();
+  const [showStartupTasks, setShowStartupTasks] = useState(false);
+
   // ── Manual reindex ────────────────────────────────────────────────────────
 
   const [reindexing, setReindexing] = useState(false);
@@ -863,6 +870,16 @@ export const StatusBar = memo(function StatusBar({
       description: "Logs de l'assistant et des agents",
       onClick: () => { onToggleLogs?.(); setShowToolsMenu(false); },
       iconColor: 'var(--accent-secondary)',
+    },
+    {
+      key: 'startup-tasks',
+      icon: ListChecks,
+      label: 'Tâches de démarrage',
+      description: startupTasks.some(t => t.status === 'running')
+        ? 'Indexation et chargement en cours'
+        : 'Voir l’état du chargement du projet',
+      onClick: () => { setShowStartupTasks(true); setShowToolsMenu(false); },
+      iconColor: 'var(--accent-primary)',
     },
     {
       key: 'reindex',
@@ -978,6 +995,14 @@ export const StatusBar = memo(function StatusBar({
               <CountBadge value={sandboxModifiedCount} color="var(--accent-primary)" />
             )}
           </button>
+
+          {/* Tâches de démarrage du projet (indexation, documents, workflows…) */}
+          <StartupTasksPill
+            tasks={startupTasks}
+            open={showStartupTasks}
+            onOpenChange={setShowStartupTasks}
+            pillClassName={PILL}
+          />
 
           <Divider />
 

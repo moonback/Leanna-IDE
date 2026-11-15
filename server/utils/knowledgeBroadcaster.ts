@@ -14,6 +14,11 @@ export function setKnowledgeBroadcaster(fn: (msg: object) => void): void {
   _broadcast = fn;
 }
 
+/** Send an arbitrary event to all connected WebSocket clients (no-op until the WS server is ready). */
+export function broadcastServerEvent(msg: object): void {
+  _broadcast?.(msg);
+}
+
 /** Send a knowledge_progress event to all connected WebSocket clients. */
 export function broadcastKnowledgeProgress(
   phase: 'incremental' | 'parse' | 'ast' | 'relations' | 'done',

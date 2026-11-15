@@ -12,6 +12,7 @@ import { ideApi } from '../services/ideApi.js';
 import { useToast } from '../components/ui/Toast.js';
 import { QuitConfirmDialog } from './sidebar/QuitConfirmDialog.js';
 import { useOverlay } from '../hooks/useOverlay.js';
+import { beginProjectOpening, endProjectOpening } from '../utils/projectOpening.js';
 // @ts-ignore - Asset handled by bundler
 import logo from '../../assets/images/icon-sombre.png';
 
@@ -317,6 +318,7 @@ export function StartupProjectModal() {
   const openWorkspaceItem = useCallback(async (ws: WorkspaceItem, options?: { silent?: boolean }): Promise<boolean> => {
     try {
       setIsOpeningLast(true);
+      beginProjectOpening(ws.path);
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -324,12 +326,15 @@ export function StartupProjectModal() {
       });
       const data = await res.json();
       if (data.status === 'success') {
+        endProjectOpening(true);
         await activate(data.newRoot || ws.path);
         navigate('/ide');
         return true;
       }
+      endProjectOpening(false, data.error || "Erreur lors de l'ouverture du projet");
       if (!options?.silent) setError(data.error || "Erreur lors de l'ouverture du projet");
     } catch (e: any) {
+      endProjectOpening(false, e?.message || 'Erreur réseau');
       if (!options?.silent) setError(e?.message || 'Erreur réseau');
     } finally {
       setIsOpeningLast(false);
@@ -449,6 +454,7 @@ export function StartupProjectModal() {
     }
     if (!selectedPath) return;
     setLoading(true); setError(null);
+    beginProjectOpening(selectedPath);
     try {
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
@@ -456,9 +462,13 @@ export function StartupProjectModal() {
         body: JSON.stringify({ path: selectedPath, userConfirmed: true, siteUrl: '' }),
       });
       const data = await res.json();
-      if (data.status === 'success') await activate(data.newRoot);
-      else setError(data.error || 'Erreur lors de la création du workspace');
+      if (data.status === 'success') { endProjectOpening(true); await activate(data.newRoot); }
+      else {
+        endProjectOpening(false, data.error || 'Erreur lors de la création du workspace');
+        setError(data.error || 'Erreur lors de la création du workspace');
+      }
     } catch (e: any) {
+      endProjectOpening(false, e.message || 'Erreur réseau');
       setError(e.message || 'Erreur réseau');
     } finally {
       setLoading(false);
@@ -475,6 +485,7 @@ export function StartupProjectModal() {
       catch { setSiteUrlError('URL invalide — ex: https://mon-site.com'); return; }
     }
     setLoading(true); setError(null);
+    beginProjectOpening(pathToOpen);
     try {
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
@@ -482,9 +493,13 @@ export function StartupProjectModal() {
         body: JSON.stringify({ path: pathToOpen, userConfirmed: true, siteUrl: urlTrimmed }),
       });
       const data = await res.json();
-      if (data.status === 'success') await activate(data.newRoot);
-      else setError(data.error || 'Erreur lors du changement de répertoire');
+      if (data.status === 'success') { endProjectOpening(true); await activate(data.newRoot); }
+      else {
+        endProjectOpening(false, data.error || 'Erreur lors du changement de répertoire');
+        setError(data.error || 'Erreur lors du changement de répertoire');
+      }
     } catch (e: any) {
+      endProjectOpening(false, e.message || 'Erreur réseau');
       setError(e.message || 'Erreur réseau');
     } finally {
       setLoading(false);

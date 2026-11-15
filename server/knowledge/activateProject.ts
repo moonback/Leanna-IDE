@@ -27,6 +27,7 @@ import { projectMemory } from "./ProjectMemory.js";
 import { projectIndexer } from "./ProjectIndexer.js";
 import { isDocumentExtractionEnabled } from "./knowledgeSettings.js";
 import { broadcastKnowledgeProgress } from "../utils/knowledgeBroadcaster.js";
+import { startTask, updateTask, finishTask, failTask, skipTask } from "../utils/startupTasks.js";
 
 /** Options d'activation. */
 export interface ActivateProjectOptions {
@@ -52,25 +53,52 @@ export interface ActivateProjectOptions {
 export function activateProjectKnowledge(options: ActivateProjectOptions = {}): void {
   const { refreshProfile = true } = options;
 
+  // Tâches visibles dans l'UI (barre de statut → panneau « Tâches de démarrage »).
+  startTask("kg-load", "Chargement du graphe et de la mémoire", "knowledge");
+
   // 1. Charger graphe + mémoire persistés pour le projet courant.
   try {
     knowledgeGraph.load();
     projectMemory.load();
+    finishTask("kg-load");
   } catch (e: any) {
     console.error("[KnowledgeGraph] ❌ Erreur chargement:", e?.message ?? e);
+    failTask("kg-load", e);
   }
 
   // 2. Charger immédiatement le profil projet (avant enrichissement par le scan).
   if (refreshProfile) {
+    startTask("project-profile", "Profil du projet", "knowledge");
     void refreshProjectProfileSafe();
   }
 
   // 3. Scan complet, puis armement des watchers et extraction documentaire.
+  startTask("kg-scan", "Indexation du projet", "knowledge");
   projectIndexer
     .scanAll({
-      onProgress: (p) => broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file }),
+      onProgress: (p) => {
+        broadcastKnowledgeProgress(p.phase, p.current, p.total, { file: p.file });
+        if (p.phase !== "done") {
+          updateTask("kg-scan", {
+            current: p.current,
+            total: p.total,
+            detail:
+              p.phase === "relations"
+                ? "Extraction des relations…"
+                : p.phase === "incremental"
+                  ? `Mise à jour incrémentale · ${p.file ?? ""}`
+                  : p.file,
+          });
+        }
+      },
     })
     .then((stats: any) => {
+      finishTask(
+        "kg-scan",
+        stats.cached
+          ? `${stats.totalFiles} fichiers · cache (${stats.durationMs}ms)`
+          : `${stats.totalFiles} fichiers · ${stats.totalEntities} entités · ${(stats.durationMs / 1000).toFixed(1)}s`,
+      );
       broadcastKnowledgeProgress("done", stats.totalFiles, stats.totalFiles, {
         totalEntities: stats.totalEntities,
         durationMs: stats.durationMs,
@@ -88,11 +116,13 @@ export function activateProjectKnowledge(options: ActivateProjectOptions = {}): 
 
       // Enrichir le profil une fois l'indexation terminée.
       if (refreshProfile) {
-        void refreshProjectProfileSafe();
+        void refreshProjectProfileSafe().then(() => finishTask("project-profile"));
       }
 
       // 3b. Armer l'indexation incrémentale via FileWatcher.
       projectIndexer.startWatching();
+      startTask("kg-watch", "Surveillance des fichiers", "knowledge");
+      finishTask("kg-watch", "Indexation incrémentale active");
 
       // 4. Extraction automatique des documents du workspace + watcher.
       //    Respecte le réglage utilisateur : si l'extraction documentaire est
@@ -102,7 +132,9 @@ export function activateProjectKnowledge(options: ActivateProjectOptions = {}): 
         console.log(
           "[WorkspaceIndexer] ⏭️ Extraction documentaire désactivée dans les paramètres — étape ignorée."
         );
+        skipTask("doc-extract", "Extraction des documents", "documents", "Désactivée dans les paramètres");
       } else {
+        startTask("doc-extract", "Extraction des documents", "documents");
         import("./WorkspaceIndexer.js")
           .then(({ workspaceIndexer }) => {
             workspaceIndexer
@@ -111,19 +143,27 @@ export function activateProjectKnowledge(options: ActivateProjectOptions = {}): 
                 console.log(
                   `[WorkspaceIndexer] ✅ ${docStats.totalExtracted} document(s) extrait(s), ${docStats.totalWords} mots, ${docStats.totalSections} sections (${(docStats.durationMs / 1000).toFixed(1)}s)`
                 );
+                finishTask(
+                  "doc-extract",
+                  `${docStats.totalExtracted} document(s) · ${docStats.totalWords} mots · ${(docStats.durationMs / 1000).toFixed(1)}s`,
+                );
                 workspaceIndexer.startWatching();
               })
               .catch((e: any) => {
                 console.error("[WorkspaceIndexer] ❌ Erreur extraction:", e?.message ?? e);
+                failTask("doc-extract", e);
               });
           })
           .catch((e: any) => {
             console.error("[WorkspaceIndexer] ❌ Erreur import:", e?.message ?? e);
+            failTask("doc-extract", e);
           });
       }
     })
     .catch((e: any) => {
       console.error("[KnowledgeGraph] ❌ Erreur indexation:", e?.message ?? e);
+      failTask("kg-scan", e);
+      if (refreshProfile) failTask("project-profile", "Indexation en échec");
     });
 }
 
