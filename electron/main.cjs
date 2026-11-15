@@ -440,7 +440,7 @@ app.whenReady().then(() => {
         try {
           const parsed = new URL(rawUrl);
           if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-          const host = parsed.hostname.toLowerCase().replace(/^\\[|\\]$/g, '').replace(/\\.$/, '');
+          const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
           if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
               host.endsWith('.internal') || host === 'metadata.google.internal') return false;
           if (host.includes(':')) {
