@@ -60,6 +60,9 @@ export function ChatMessageList({
   const visibleEntries = transcript.filter(
     entry => !hasSearch || !matchedIds || matchedIds.has(entry.id),
   );
+  // Index par id : évite un findIndex O(n) par message (O(n²) au total).
+  const indexById = new Map<string, number>();
+  transcript.forEach((entry, i) => indexById.set(entry.id, i));
   const dayKey = (date: Date) =>
     `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
   const dayLabel = (date: Date) => {
@@ -113,7 +116,7 @@ export function ChatMessageList({
           {/* Messages */}
           <AnimatePresence initial={false}>
             {visibleEntries.map((entry, visibleIndex) => {
-              const index = transcript.findIndex(item => item.id === entry.id);
+              const index = indexById.get(entry.id) ?? -1;
               const previous = visibleEntries[visibleIndex - 1];
               const startsNewDay = !previous || dayKey(previous.timestamp) !== dayKey(entry.timestamp);
               return (

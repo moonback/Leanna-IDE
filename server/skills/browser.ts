@@ -1148,6 +1148,10 @@ export const browserSkill: Skill = {
   handleToolCall: async (name: string, args: any, context?: any) => {
     const emit = context?.emitIdeAction as ((action: any) => void) | undefined;
     const signal: AbortSignal | undefined = context?.signal;
+    // Diagnostic : url/query seulement (jamais le texte saisi, potentiellement sensible).
+    console.log(`[Browser] ${name}`, args?.url ?? args?.query ?? "",
+      emit ? "" : "(emitIdeAction ABSENT)",
+      context?.browserActionPending ? "" : "(browserActionPending ABSENT)");
 
     // Helper générique pour les actions async (click/type/snapshot/inspect/get-links)
     // qui utilisent le registre browserActionPending de server.ts.
@@ -1161,6 +1165,7 @@ export const browserSkill: Skill = {
       if (!emit) return "[ERREUR] emitIdeAction non disponible.";
 
       const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const startedAt = Date.now();
       return await new Promise<any>((resolve, reject) => {
         const timer = setTimeout(() => {
           pending.delete(requestId);
@@ -1168,7 +1173,13 @@ export const browserSkill: Skill = {
         }, timeoutMs);
         pending.set(requestId, { resolve, reject, timer });
         emit({ requestId, ...action });
-      }).catch((err: Error) => `[ERREUR ACTION] ${err.message}`);
+      }).then((value) => {
+        console.log(`[Browser] ${action.type} ${requestId} ✓ ${Date.now() - startedAt}ms`);
+        return value;
+      }).catch((err: Error) => {
+        console.warn(`[Browser] ${action.type} ${requestId} ✗ ${Date.now() - startedAt}ms : ${err.message}`);
+        return `[ERREUR ACTION] ${err.message}`;
+      });
     };
 
     // Helper avec retry exponentiel (Sprint 1 — J2)

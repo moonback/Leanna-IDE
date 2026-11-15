@@ -72,9 +72,11 @@ export function ChatMinimap({
   );
 
   // Recalcule les positions des segments à partir du DOM réel.
-  const measure = useCallback(() => {
+  const measureNow = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
+    // Fil court : la minimap est masquée, inutile de mesurer le DOM.
+    if (kinds.length < minMessages) return;
     const scrollHeight = container.scrollHeight || 1;
     const clientHeight = container.clientHeight || 1;
     const scrollTop = container.scrollTop;
@@ -103,7 +105,22 @@ export function ChatMinimap({
     }
     setSegments(next);
     setGeom({ scrollTop, scrollHeight, clientHeight });
-  }, [kinds, scrollRef]);
+  }, [kinds, scrollRef, minMessages]);
+
+  // Mesure coalescée : au plus une par frame (évite les reflows forcés pendant
+  // le streaming, où transcript et ResizeObserver déclenchent en rafale).
+  const measureRafRef = useRef<number | null>(null);
+  const measure = useCallback(() => {
+    if (measureRafRef.current !== null) cancelAnimationFrame(measureRafRef.current);
+    measureRafRef.current = requestAnimationFrame(() => {
+      measureRafRef.current = null;
+      measureNow();
+    });
+  }, [measureNow]);
+
+  useEffect(() => () => {
+    if (measureRafRef.current !== null) cancelAnimationFrame(measureRafRef.current);
+  }, []);
 
   // Mesure initiale + à chaque changement de transcript.
   useLayoutEffect(() => { measure(); }, [measure]);

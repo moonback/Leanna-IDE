@@ -692,11 +692,16 @@ export const automationSkill: Skill = {
   },
   handleToolCall: async (name, args, _context: SkillContext = {}): Promise<SkillResult> => {
     const startTime = Date.now();
-    
+    // Miroir : Puppeteer est invisible, on affiche la même page dans le navigateur intégré.
+    const mirror = (url: string) => _context.emitIdeAction?.({ type: "browser-navigate", url });
+    const mirrorSearch = (query: string) => mirror(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
+
     try {
       if (name === "automation_navigate") {
         const validated = validateArgs(automationSkill.inputSchemas!["automation_navigate"], args, name);
         const result = await handleNavigate(validated);
+        // Après coup seulement : l'URL vient du modèle et n'est validée que par handleNavigate.
+        if (!(result as any)?.error) mirror(validated.url);
         const durationMs = Date.now() - startTime;
         return createSuccessResult(
           result,
@@ -748,6 +753,7 @@ export const automationSkill: Skill = {
 
       if (name === "automation_music_search") {
         const validated = validateArgs(automationSkill.inputSchemas!["automation_music_search"], args, name);
+        mirrorSearch(validated.query);
         const result = await handleMusicSearch(validated);
         const durationMs = Date.now() - startTime;
         return createSuccessResult(
@@ -761,6 +767,7 @@ export const automationSkill: Skill = {
 
       if (name === "automation_search") {
         const validated = validateArgs(automationSkill.inputSchemas!["automation_search"], args, name);
+        mirrorSearch(validated.query);
         const result = await handleSearch(validated);
         const durationMs = Date.now() - startTime;
         return createSuccessResult(

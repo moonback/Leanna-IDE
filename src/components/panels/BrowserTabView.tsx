@@ -9,7 +9,7 @@
  * continuent de piloter l'onglet actif sans modification.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   WebviewElement,
   WebviewFailLoadEvent,
@@ -98,6 +98,9 @@ export function BrowserTabView({
   onActiveWebview,
 }: BrowserTabViewProps) {
   const webviewRef = useRef<WebviewElement>(null);
+  // Figé au montage : le parent passe tab.url (mis à jour à chaque did-navigate) ;
+  // réécrire l'attribut src relancerait un loadURL qui avorte la navigation en cours (ERR_ABORTED -3).
+  const [initialSrc] = useState(initialUrl);
   const domReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
   const consoleBufferRef = useRef<ConsoleEntry[]>([]);
@@ -240,7 +243,7 @@ export function BrowserTabView({
     <webview
       // key gérée par le parent (tabId+partition). ref natif pour cet onglet.
       ref={webviewRef}
-      src={initialUrl}
+      src={initialSrc}
       partition={partition}
       style={{
         position: 'absolute',
