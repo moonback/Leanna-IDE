@@ -318,6 +318,14 @@ const TOOL_RESPONSE_TEXT_FIELDS = [
   "summary",
   "snippet",
   "preview",
+  // Champs spécifiques aux résultats du navigateur intégré.
+  "pageContent",
+  "title",
+  "value",
+  "links",
+  "inputs",
+  "buttons",
+  "elements",
 ] as const;
 
 /**
