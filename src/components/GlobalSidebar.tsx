@@ -505,26 +505,21 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               )}
             </div>
 
-            {/* Pied : présence vocale + changer de projet + paramètres */}
-            <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 flex-col gap-0.5 px-2 py-2">
-              <NavButton
-                item={{ id: 'orb-live', path: '', label: 'Présence vocale', icon: Radio }}
-                active={false}
-                collapsed={collapsed}
-                onClick={handleOpenOrbWindow}
-              />
-              <NavButton
-                item={{ id: 'switch-workspace', path: '', label: 'Changer de projet', icon: FolderInput }}
-                active={false}
-                collapsed={collapsed}
-                onClick={handleSwitchWorkspace}
-              />
-              <NavButton
-                item={{ id: 'settings', path: '/ide?page=settings', label: 'Paramètres', icon: Settings }}
-                active={pathname === '/settings' || search.includes('page=settings')}
-                collapsed={collapsed}
+            {/* Pied compact : actions en icônes sur une seule ligne, libellés accessibles via tooltip. */}
+            <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 items-center justify-center gap-2 px-2 py-2">
+              <IconButton label="Présence vocale" onClick={handleOpenOrbWindow}>
+                <Radio size={17} />
+              </IconButton>
+              <IconButton label="Changer de projet" onClick={handleSwitchWorkspace}>
+                <FolderInput size={17} />
+              </IconButton>
+              <IconButton
+                label="Paramètres"
                 onClick={() => navigate('/ide?page=settings')}
-              />
+                style={{ color: pathname === '/settings' || search.includes('page=settings') ? 'var(--accent-primary)' : undefined }}
+              >
+                <Settings size={17} />
+              </IconButton>
             </div>
 
             {/* Marqueur de thème (invisible, garde le thème réactif pour l'outillage) */}
