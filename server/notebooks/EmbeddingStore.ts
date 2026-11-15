@@ -413,7 +413,7 @@ export class EmbeddingStore {
     notebookId: string,
     onProgress?: (completed: number, total: number, succeeded: number) => void
   ): Promise<number> {
-    if (chunks.length === 0) { onProgress?.(0, 0); return 0; }
+    if (chunks.length === 0) { onProgress?.(0, 0, 0); return 0; }
 
     // S'assurer que le notebook est en mémoire avant de dédupliquer
     this.ensureNotebookLoaded(notebookId);

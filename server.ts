@@ -149,6 +149,7 @@ process.on('uncaughtException', (error) => {
 });
 
 import { setKnowledgeBroadcaster } from "./server/utils/knowledgeBroadcaster.js";
+import { startTask, finishTask, failTask, skipTask, getStartupTasks } from "./server/utils/startupTasks.js";
 import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaster.js";
 
 // ─── Séquence de démarrage async ──────────────────────────────────────────────
@@ -163,25 +164,51 @@ import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaste
     initSelfRoot();
 
     // 1. Tâches planifiées (indépendant)
-    await loadScheduledTasks();
+    startTask("scheduled-tasks", "Tâches planifiées", "workflows");
+    try {
+      await loadScheduledTasks();
+      finishTask("scheduled-tasks");
+    } catch (e) {
+      failTask("scheduled-tasks", e);
+      throw e;
+    }
 
     // 2. Workflows depuis la BDD
-    await loadWorkflows();
+    startTask("workflows", "Chargement des workflows", "workflows");
+    try {
+      await loadWorkflows();
+      finishTask("workflows");
+    } catch (e) {
+      failTask("workflows", e);
+      throw e;
+    }
 
     // 3. Seulement après le chargement complet, vérifier/créer l'audit workflow
-    const { ensureAuditWorkflow } = await import("./server/workflows/audit-workflow.js");
-    await ensureAuditWorkflow();
+    startTask("audit-workflow", "Workflow d'audit", "workflows");
+    try {
+      const { ensureAuditWorkflow } = await import("./server/workflows/audit-workflow.js");
+      await ensureAuditWorkflow();
+      finishTask("audit-workflow");
+    } catch (e) {
+      failTask("audit-workflow", e);
+      throw e;
+    }
 
     // 4. Restauration des tâches agents depuis Supabase (recovery crash)
     const { agentOrchestrator: orch, agentPersistence } = await import("./server/agents/index.js");
     if (agentPersistence.isAvailable) {
+      startTask("agent-restore", "Restauration des agents", "agents");
       orch.restoreFromPersistence().then(({ tasks, orchestrations }: any) => {
+        finishTask("agent-restore", `${tasks} tâche(s) · ${orchestrations} orchestration(s)`);
         if (tasks > 0 || orchestrations > 0) {
           console.log(`[AgentPersistence] ✅ Restauré: ${tasks} tâche(s), ${orchestrations} orchestration(s)`);
         }
       }).catch((e: Error) => {
+        failTask("agent-restore", e);
         console.warn(`[AgentPersistence] Restauration échouée (non bloquant): ${e.message}`);
       });
+    } else {
+      skipTask("agent-restore", "Restauration des agents", "agents", "Persistance indisponible");
     }
 
     // 5. Indexation du Knowledge Graph — seulement si un projet est actif.
@@ -195,6 +222,7 @@ import { registerIdeActionBroadcaster } from "./server/utils/ideActionBroadcaste
       activateProjectKnowledge();
     } else {
       console.log('[KnowledgeGraph] ⏸️ Aucun projet actif — indexation différée.');
+      skipTask("kg-scan", "Indexation du projet", "knowledge", "Aucun projet actif");
     }
   } catch (e) {
     console.error('[Startup] Erreur séquence de démarrage:', e);
@@ -850,6 +878,10 @@ async function startServer() {
   app.use("/api/data", dataPurgeRouter);
   app.use("/api/lists", listsRouter);
   app.use("/api/terminal", createTerminalRouter({ apiToken }));
+  // Snapshot des tâches de démarrage (le flux temps réel passe par le WebSocket).
+  app.get("/api/startup/tasks", (_req, res) => {
+    res.json({ tasks: getStartupTasks() });
+  });
   app.use("/api/knowledge", knowledgeRouter);
   app.use("/api/knowledge", memoryRouter);
   app.use("/api/knowledge", impactRouter);

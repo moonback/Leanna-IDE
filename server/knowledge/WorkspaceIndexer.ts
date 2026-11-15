@@ -18,8 +18,10 @@
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { SELF_ROOT } from "../utils/selfRoot.js";
+import { isExcludedWorkspaceEntry } from "../security.js";
 import { getDocumentStore } from "./DocumentStore.js";
 import { isDocumentExtractionEnabled } from "./knowledgeSettings.js";
 import { fileWatcher } from "./FileWatcher.js";
@@ -83,6 +85,26 @@ const MAX_DOC_SIZE = 1_000_000;
 /** Nombre max de documents à indexer */
 const MAX_DOCUMENTS = 200;
 
+/**
+ * Version du pipeline d'extraction. À incrémenter dès que extractDocument()
+ * change de comportement : un manifeste d'une autre version est ignoré, ce qui
+ * force une resynchronisation complète (une seule fois).
+ */
+export const EXTRACTION_PIPELINE_VERSION = 2;
+
+/** Sauvegarde intermédiaire (store + manifeste) tous les N documents extraits. */
+const CHECKPOINT_EVERY = 25;
+
+interface ManifestEntry {
+  size: number;
+  mtimeMs: number;
+  /** SHA-1 du contenu : évite de réextraire quand seul le mtime a changé (git checkout). */
+  hash?: string;
+  /** Fichier vu mais non indexable (binaire, vide, trop gros) : ne pas le relire. */
+  skipped?: boolean;
+}
+type Manifest = Record<string, ManifestEntry>;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ExtractedDocument {
@@ -135,6 +157,8 @@ export interface ExtractionStats {
 
 export class WorkspaceIndexer {
   private extractedPaths: Set<string> = new Set();
+  private syncInFlight: Promise<ExtractionStats> | null = null;
+  private unsubscribeWatcher: (() => void) | null = null;
 
   /**
    * Retourne la racine du workspace actif.
@@ -156,6 +180,15 @@ export class WorkspaceIndexer {
    * À appeler au démarrage après le scan du ProjectIndexer.
    */
   async extractAll(): Promise<ExtractionStats> {
+    // Démarrage + route /extract peuvent se chevaucher : une seule synchro à la fois,
+    // sinon deux passes écrivent le même manifeste et le même store en parallèle.
+    if (!this.syncInFlight) {
+      this.syncInFlight = this.runExtractAll().finally(() => { this.syncInFlight = null; });
+    }
+    return this.syncInFlight;
+  }
+
+  private async runExtractAll(): Promise<ExtractionStats> {
     const startTime = Date.now();
 
     // Respecter le réglage utilisateur (défense en profondeur : même si une
@@ -173,31 +206,77 @@ export class WorkspaceIndexer {
     }
 
     log.info(`📄 Extraction documentaire du workspace: ${root}`);
+    this.extractedPaths = new Set(); // singleton : ne pas garder les chemins du projet précédent
 
     // 1. Lister les fichiers documents
     const files: string[] = [];
     await this.walkDirectory(root, files, root);
     log.info(`📋 ${files.length} document(s) trouvé(s)`);
 
-    // 2. Extraire chaque document
+    // 2. Synchronisation différentielle persistante : seuls les nouveaux
+    // documents ou ceux dont la taille/mtime a changé sont réextraits.
     const store = getDocumentStore(root);
+    const manifest = this.loadManifest(root);
+    const diskPaths = new Set(files);
+    // Le manifeste ne fait foi que si le store contient encore le document :
+    // sinon un documents.json supprimé/corrompu ne serait jamais reconstruit.
+    const indexed = new Set(store.getAllDocuments().map(d => d.fileName));
     let totalExtracted = 0;
     let totalSections = 0;
     let totalWords = 0;
     let skipped = 0;
     let errors = 0;
+    let unchanged = 0;
+
+    if (files.length > MAX_DOCUMENTS) {
+      log.warn(`${files.length} documents trouvés, seuls les ${MAX_DOCUMENTS} premiers sont indexés (MAX_DOCUMENTS).`);
+    }
+
+    // Store avant manifeste : après un arrêt brutal le manifeste ne référence
+    // jamais un document absent du store.
+    const flush = () => { store.save(); this.saveManifest(root, manifest); };
 
     for (const relativePath of files.slice(0, MAX_DOCUMENTS)) {
       try {
-        const doc = await this.extractDocument(relativePath, root);
+        const absolutePath = path.join(root, relativePath);
+        const stat = fs.statSync(absolutePath);
+        const previous = manifest[relativePath];
+        const usable = previous && (previous.skipped || indexed.has(relativePath)) ? previous : null;
+        const keep = () => {
+          if (usable!.skipped) skipped++;
+          else { unchanged++; this.extractedPaths.add(relativePath); }
+        };
+
+        if (usable && usable.size === stat.size && Math.abs(usable.mtimeMs - stat.mtimeMs) <= 2) {
+          keep();
+          continue;
+        }
+
+        const indexable = stat.isFile() && stat.size > 0 && stat.size <= MAX_DOC_SIZE;
+        const hash = indexable ? this.hashFile(absolutePath) : undefined;
+        if (usable && hash && usable.hash === hash) {
+          // Seul le mtime a bougé (git checkout, copie) : contenu identique.
+          manifest[relativePath] = { ...usable, size: stat.size, mtimeMs: stat.mtimeMs };
+          keep();
+          continue;
+        }
+
+        const doc = indexable ? await this.extractDocument(relativePath, root) : null;
         if (doc) {
-          // Ajouter ou mettre à jour dans le store
           this.upsertDocument(store, doc);
+          indexed.add(relativePath);
+          manifest[relativePath] = { size: stat.size, mtimeMs: stat.mtimeMs, hash };
           this.extractedPaths.add(relativePath);
           totalExtracted++;
           totalSections += doc.sections.length;
           totalWords += doc.metadata.wordCount;
+          if (totalExtracted % CHECKPOINT_EVERY === 0) flush();
         } else {
+          // Devenu non indexable : retirer l'ancienne version, mémoriser le refus.
+          if (indexed.has(relativePath)) this.removeFromStore(store, relativePath);
+          indexed.delete(relativePath);
+          this.extractedPaths.delete(relativePath);
+          manifest[relativePath] = { size: stat.size, mtimeMs: stat.mtimeMs, hash, skipped: true };
           skipped++;
         }
       } catch (err) {
@@ -206,12 +285,61 @@ export class WorkspaceIndexer {
       }
     }
 
-    store.save();
+    // Nettoyer le manifeste et le store des documents disparus.
+    for (const relativePath of Object.keys(manifest)) {
+      if (!diskPaths.has(relativePath)) {
+        this.removeFromStore(store, relativePath);
+        this.extractedPaths.delete(relativePath);
+        delete manifest[relativePath];
+      }
+    }
+    flush();
 
     const durationMs = Date.now() - startTime;
-    log.info(`✅ Extraction terminée: ${totalExtracted} documents, ${totalSections} sections, ${totalWords} mots (${(durationMs / 1000).toFixed(1)}s)`);
+    log.info(`✅ Synchronisation documentaire: ${totalExtracted} extrait(s), ${unchanged} inchangé(s), ${skipped} ignoré(s), ${errors} erreur(s), ${totalSections} sections, ${totalWords} mots (${(durationMs / 1000).toFixed(1)}s)`);
 
     return { totalFiles: files.length, totalExtracted, totalSections, totalWords, skipped, errors, durationMs };
+  }
+
+  private hashFile(absolutePath: string): string {
+    return crypto.createHash("sha1").update(fs.readFileSync(absolutePath)).digest("hex");
+  }
+
+  private removeFromStore(store: ReturnType<typeof getDocumentStore>, relativePath: string): boolean {
+    const existing = store.getAllDocuments().find(d => d.fileName === relativePath);
+    if (existing) store.removeDocument(existing.id);
+    return Boolean(existing);
+  }
+
+  /** Manifeste local de synchronisation documentaire, indépendant du store RAG. */
+  private manifestPath(root: string): string {
+    return path.join(root, ".Leanna", "workspace-index-manifest.json");
+  }
+
+  private loadManifest(root: string): Manifest {
+    try {
+      const file = this.manifestPath(root);
+      if (!fs.existsSync(file)) return {};
+      const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
+      // Ancien format (sans version) ou autre version du pipeline → resynchronisation complète.
+      if (parsed?.version !== EXTRACTION_PIPELINE_VERSION || !parsed.entries || typeof parsed.entries !== "object") return {};
+      return parsed.entries;
+    } catch (error) {
+      log.warn(`Manifeste documentaire illisible, synchronisation de sécurité: ${(error as Error).message}`);
+      return {};
+    }
+  }
+
+  private saveManifest(root: string, manifest: Manifest): void {
+    try {
+      const file = this.manifestPath(root);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const temporary = `${file}.tmp`;
+      fs.writeFileSync(temporary, JSON.stringify({ version: EXTRACTION_PIPELINE_VERSION, entries: manifest }), "utf-8");
+      fs.renameSync(temporary, file);
+    } catch (error) {
+      log.warn(`Impossible de sauvegarder le manifeste documentaire: ${(error as Error).message}`);
+    }
   }
 
   /**
@@ -227,7 +355,12 @@ export class WorkspaceIndexer {
       if (doc) {
         const store = getDocumentStore(root);
         this.upsertDocument(store, doc);
+        const absolutePath = path.join(root, relativePath);
+        const stat = fs.statSync(absolutePath);
         store.save();
+        const manifest = this.loadManifest(root);
+        manifest[relativePath] = { size: stat.size, mtimeMs: stat.mtimeMs, hash: this.hashFile(absolutePath) };
+        this.saveManifest(root, manifest);
         this.extractedPaths.add(relativePath);
         log.info(`📝 Document extrait: ${relativePath} (${doc.metadata.wordCount} mots, ${doc.sections.length} sections)`);
       }
@@ -246,12 +379,16 @@ export class WorkspaceIndexer {
     if (!root) return;
 
     const store = getDocumentStore(root);
-    const existing = store.getAllDocuments().find(d => d.fileName === relativePath);
-    if (existing) {
-      store.removeDocument(existing.id);
+    if (this.removeFromStore(store, relativePath)) {
       store.save();
-      this.extractedPaths.delete(relativePath);
       log.info(`🗑️ Document retiré: ${relativePath}`);
+    }
+    this.extractedPaths.delete(relativePath);
+    // Hors du `if` : une entrée « skipped » n'a pas de document dans le store.
+    const manifest = this.loadManifest(root);
+    if (manifest[relativePath]) {
+      delete manifest[relativePath];
+      this.saveManifest(root, manifest);
     }
   }
 
@@ -644,7 +781,8 @@ export class WorkspaceIndexer {
     }
 
     for (const entry of entries) {
-      if (EXCLUDED_DIRS.has(entry.name)) continue;
+      // isExcludedWorkspaceEntry : même filtre de secrets (.env*, clés) que l'IDE.
+      if (EXCLUDED_DIRS.has(entry.name) || isExcludedWorkspaceEntry(entry.name)) continue;
 
       const fullPath = path.join(dir, entry.name);
       const relativePath = path.relative(baseRoot, fullPath).replace(/\\/g, "/");
@@ -669,7 +807,10 @@ export class WorkspaceIndexer {
    * À appeler après extractAll().
    */
   startWatching(): void {
-    fileWatcher.onChange(async (events: FileChangeEvent[]) => {
+    // Appelé à chaque activation de projet : sans cette garde les handlers
+    // s'empilaient et chaque changement était extrait N fois.
+    if (this.unsubscribeWatcher) return;
+    this.unsubscribeWatcher = fileWatcher.onChange(async (events: FileChangeEvent[]) => {
       await this.handleFileChanges(events);
     });
     log.info("👁️ Extraction documentaire incrémentale activée");

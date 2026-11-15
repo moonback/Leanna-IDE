@@ -19,6 +19,7 @@ import { CriticalEditConfirm } from './components/CriticalEditConfirm.js';
 import { MissionApprovalModal } from './components/MissionApprovalModal.js';
 import { MissionCreatedPrompt } from './components/MissionCreatedPrompt.js';
 import { StartupProjectModal } from './components/StartupProjectModal.js';
+import { ProjectOpeningOverlay } from './components/ProjectOpeningOverlay.js';
 import { EnvSetupModal } from './components/EnvSetupModal.js';
 import { useProfile } from './context/UserProfileContext.js';
 import { useAgentEventStream } from './hooks/useAgentEventStream.js';
@@ -728,6 +729,8 @@ function Layout() {
         <GlobalCommandPalette />
         {/* Écran de démarrage & sélection du projet (reprise auto, ouvrir, cloner, notebooks) */}
         <StartupProjectModal />
+        {/* Progression centrale dès le clic sur « Ouvrir le projet » */}
+        <ProjectOpeningOverlay />
         {/* Assistant de première configuration des clés .env (après le splash) */}
         <EnvSetupModal />
       </ScreenShareProvider>

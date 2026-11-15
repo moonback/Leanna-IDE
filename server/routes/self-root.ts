@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { z } from 'zod';
 import { requestConfirmation } from '../utils/confirmationBridge.js';
+import { startTask, finishTask, failTask } from '../utils/startupTasks.js';
 
 export function createSelfRootRouter(
   getWss: () => WebSocketServer | null,
@@ -264,18 +265,32 @@ export function createSelfRootRouter(
       // Déconnecter l'ANCIEN projet avant toute bascule : serveurs MCP,
       // terminaux (ancien cwd) et sessions Live. Sans cela, l'ancien projet
       // resterait « connecté » (processus vivants) en parallèle du nouveau.
-      await teardownOldProject();
+      // Chaque étape est publiée comme tâche (overlay central « Ouverture du projet »).
+      startTask('open-teardown', "Fermeture de l'ancien projet", 'system');
+      try {
+        await teardownOldProject();
+        finishTask('open-teardown');
+      } catch (e) { failTask('open-teardown', e); throw e; }
 
       const { switchSandboxProject } = await import('../utils/sandbox.js');
 
       // La transition verrouille synchroniquement les écritures, recopie le
       // sandbox, redémarre le watcher, puis seulement publie l'état READY.
-      const newRoot = await switchSandboxProject(newPath.trim());
+      startTask('open-sandbox', 'Préparation du workspace (sandbox)', 'system');
+      let newRoot: string;
+      try {
+        newRoot = await switchSandboxProject(newPath.trim());
+        finishTask('open-sandbox', newRoot);
+      } catch (e) { failTask('open-sandbox', e); throw e; }
       console.log(`[Sandbox] Sandbox READY pour le nouveau projet: ${newRoot}`);
 
       // Reconnecter MCP pour le NOUVEAU projet (lit <newRoot>/.Leanna/mcp.json
       // et spawn les serveurs avec le bon cwd).
-      await reconnectMcpForActiveProject();
+      startTask('open-mcp', 'Connexion des serveurs MCP', 'system');
+      try {
+        await reconnectMcpForActiveProject();
+        finishTask('open-mcp');
+      } catch (e) { failTask('open-mcp', e); throw e; }
 
       // Persister l'URL du site et nom si fournis
       const { setWorkspaceSiteUrl, addOrUpdateWorkspace } = await import('../utils/selfRoot.js');

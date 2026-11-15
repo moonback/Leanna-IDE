@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Section, Field, InfoRow } from './SettingsPrimitives.js';
 import { ideApi } from '../../services/ideApi.js';
+import { beginProjectOpening, endProjectOpening } from '../../utils/projectOpening.js';
 
 interface SelfRootStatus {
   rootPath: string | null;
@@ -130,6 +131,7 @@ export function SelfRootSection() {
     setPendingPath(null);
     setSaving(true);
     setFeedback(null);
+    beginProjectOpening(trimmed);
     try {
       const res = await fetch('/api/self-root/change', {
         method: 'POST',
@@ -137,6 +139,7 @@ export function SelfRootSection() {
         body: JSON.stringify({ path: trimmed, userConfirmed: true, siteUrl, name }),
       });
       const data = await res.json();
+      endProjectOpening(data.status === 'success', data.status === 'success' ? undefined : data.error);
       if (data.status === 'success') {
         setFeedback({ type: 'success', msg: `Workspace verrouillé avec succès → ${data.newRoot}` });
         ideApi.invalidateCache();
@@ -147,6 +150,7 @@ export function SelfRootSection() {
         setFeedback({ type: 'error', msg: data.error || 'Erreur' });
       }
     } catch (e: any) {
+      endProjectOpening(false, e.message || 'Erreur réseau');
       setFeedback({ type: 'error', msg: e.message || 'Erreur réseau' });
     } finally {
       setSaving(false);
