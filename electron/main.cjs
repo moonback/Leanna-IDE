@@ -310,10 +310,10 @@ function createWindow(splash, splashMinEnd) {
     permissionGuardedPartitions.add(partition);
     try {
       const ses = hardenSession.fromPartition(partition);
-      ses.setPermissionRequestHandler((_wc, permission, callback) => {
-        callback(!DENIED_WEBVIEW_PERMISSIONS.has(permission));
-      });
-      ses.setPermissionCheckHandler((_wc, permission) => !DENIED_WEBVIEW_PERMISSIONS.has(permission));
+      // Principe fail-closed : aucune permission web n'est accordée implicitement.
+      // Les permissions futures/inconnues restent refusées jusqu'à une décision explicite.
+      ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+      ses.setPermissionCheckHandler(() => false);
       // Téléchargements : refusés par défaut dans le navigateur intégré.
       ses.on('will-download', (event) => {
         log('[webview] Téléchargement bloqué (non supporté dans le navigateur intégré).');
@@ -433,6 +433,38 @@ app.whenReady().then(() => {
         try { allowed = new URL(navUrl).origin === new URL(startBase).origin; } catch { /* URL invalide → refus */ }
         if (!allowed) navEvent.preventDefault();
       });
+    } else {
+      // Les webviews ne doivent jamais atteindre l'API locale, les réseaux privés
+      // ou les schémas non HTTP(S), y compris après un clic ou une redirection.
+      const isAllowedBrowserUrl = (rawUrl) => {
+        try {
+          const parsed = new URL(rawUrl);
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+          const host = parsed.hostname.toLowerCase().replace(/^\\[|\\]$/g, '').replace(/\\.$/, '');
+          if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
+              host.endsWith('.internal') || host === 'metadata.google.internal') return false;
+          if (host.includes(':')) {
+            if (host === '::' || host === '::1' || /^f[cd]/.test(host) || /^fe[89ab]/.test(host)) return false;
+            if (/^::ffff:/.test(host)) return false;
+          }
+          const octets = host.split('.').map(Number);
+          if (octets.length === 4 && octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+            const [a, b] = octets;
+            if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
+                (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+                (a === 100 && b >= 64 && b <= 127)) return false;
+          }
+          return true;
+        } catch { return false; }
+      };
+      const blockUnsafeNavigation = (event, targetUrl) => {
+        if (!isAllowedBrowserUrl(targetUrl)) {
+          event.preventDefault();
+          log('[webview] Navigation privée/locale ou schéma interdit bloqué:', String(targetUrl).slice(0, 180));
+        }
+      };
+      contents.on('will-navigate', blockUnsafeNavigation);
+      contents.on('will-redirect', blockUnsafeNavigation);
     }
   }
   // La fenêtre principale et le splash existent déjà : `web-contents-created`
