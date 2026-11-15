@@ -65,6 +65,29 @@ interface BrowserTabViewProps {
 
 const MAX_CONSOLE_ENTRIES = 300;
 
+/**
+ * Electron rejects webview.loadURL() with ERR_ABORTED when a newer navigation
+ * supersedes the current one. This is an expected lifecycle event, not a
+ * renderer-level unhandled rejection. Keep genuine failures observable.
+ */
+function loadUrlSafely(webview: WebviewElement, url: string): void {
+  try {
+    void Promise.resolve(webview.loadURL(url)).catch((error: unknown) => {
+      const candidate = error as { code?: string; errno?: number; message?: string };
+      if (candidate?.code === 'ERR_ABORTED' || candidate?.errno === -3 ||
+          /ERR_ABORTED|\\(-3\\)/i.test(candidate?.message ?? '')) {
+        return;
+      }
+      console.warn('[BrowserTabView] Échec loadURL:', url, error);
+    });
+  } catch (error) {
+    const candidate = error as { code?: string; errno?: number; message?: string };
+    if (candidate?.code === 'ERR_ABORTED' || candidate?.errno === -3 ||
+        /ERR_ABORTED|\\(-3\\)/i.test(candidate?.message ?? '')) return;
+    console.warn('[BrowserTabView] Échec synchrone loadURL:', url, error);
+  }
+}
+
 export function BrowserTabView({
   tabId,
   active,
@@ -103,7 +126,7 @@ export function BrowserTabView({
 
     const handle: BrowserTabHandle = {
       loadURL: (url: string) => {
-        if (domReadyRef.current) wv.loadURL(url);
+        if (domReadyRef.current) loadUrlSafely(wv, url);
         else pendingUrlRef.current = url;
       },
       reload: () => wv.reload(),
@@ -118,7 +141,7 @@ export function BrowserTabView({
     const onDomReady = () => {
       domReadyRef.current = true;
       if (pendingUrlRef.current) {
-        wv.loadURL(pendingUrlRef.current);
+        loadUrlSafely(wv, pendingUrlRef.current);
         pendingUrlRef.current = null;
       }
     };
