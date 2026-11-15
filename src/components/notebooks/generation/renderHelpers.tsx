@@ -324,17 +324,27 @@ export function renderInlineMarkdown(text: string): JSX.Element {
       },
     ];
 
-    for (const pattern of patterns) {
-      pattern.regex.lastIndex = 0;
-      let match;
-      while ((match = pattern.regex.exec(text)) !== null) {
-        hasMatch = true;
-        if (match.index > lastIndex) {
-          result.push(text.slice(lastIndex, match.index));
+    // Une seule passe : à chaque étape on retient le motif qui matche le plus
+    // tôt (priorité à l'ordre de la liste en cas d'égalité), puis on continue
+    // après ce match. Évite qu'un motif (ex. italique) re-matche à l'intérieur
+    // d'un texte déjà consommé par un autre (ex. gras `**x**`).
+    while (lastIndex < text.length) {
+      let best: { pattern: (typeof patterns)[number]; match: RegExpExecArray } | null = null;
+      for (const pattern of patterns) {
+        pattern.regex.lastIndex = lastIndex;
+        const match = pattern.regex.exec(text);
+        if (match && (!best || match.index < best.match.index)) {
+          best = { pattern, match };
         }
-        result.push(pattern.render(match[1], match[0], match.index));
-        lastIndex = match.index + match[0].length;
       }
+      if (!best) break;
+      hasMatch = true;
+      const { pattern, match } = best;
+      if (match.index > lastIndex) {
+        result.push(text.slice(lastIndex, match.index));
+      }
+      result.push(pattern.render(match[1], match[0], match.index));
+      lastIndex = match.index + match[0].length;
     }
 
     if (hasMatch) {
