@@ -614,6 +614,30 @@ export function BrowserPanel({
       } catch {/* silent */ }
     };
 
+    // Confirmation explicite avant toute action pouvant exposer des données
+    // sensibles ou produire un effet externe. Cette boîte native est déclenchée
+    // dans l'interface utilisateur, jamais par le contenu de la page.
+    const confirmBrowserSensitiveAction = (message: string): boolean => {
+      try {
+        return window.confirm(message + '\\n\\nCette action a été demandée par Leanna. Voulez-vous continuer ?');
+      } catch {
+        return false;
+      }
+    };
+
+    const inspectSensitiveField = async (wv: WebviewElement, selector: string): Promise<boolean> => {
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        var type = String(el.type || '').toLowerCase();
+        var autocomplete = String(el.autocomplete || el.getAttribute('autocomplete') || '').toLowerCase();
+        var identity = [el.name, el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder'), autocomplete].join(' ').toLowerCase();
+        return type === 'password' || /current-password|new-password|one-time-code/.test(autocomplete)
+          || /password|passwd|secret|token|api[_-]?key|credit.?card|cvv|cvc/.test(identity);
+      })()`;
+      return Boolean(await wv.executeJavaScript(script));
+    };
+
     // ── Curseur simulé : injection + animation dans la webview ──────────────
     // Injecte (une seule fois) un curseur SVG flottant dans la page,
     // puis l'anime vers la position d'un élément cible avant une action.
@@ -696,6 +720,19 @@ export function BrowserPanel({
         return;
       }
       try {
+        const clickRisk = await wv.executeJavaScript(`(function(){
+          var el = document.querySelector(${JSON.stringify(detail.selector)});
+          if (!el) return { found: false };
+          var form = el.closest('form');
+          var label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+          var submit = (el.matches('button[type="submit"],input[type="submit"]') || (form && el.tagName === 'BUTTON' && el.type !== 'button'));
+          var destructive = /delete|remove|erase|purchase|buy|pay|checkout|send|publish|submit|confirm|supprimer|effacer|payer|acheter|commander|envoyer|publier|valider/.test(label);
+          return { found: true, sensitive: Boolean(submit || destructive), reason: submit ? 'soumission de formulaire' : 'action potentiellement irréversible' };
+        })()`);
+        if (clickRisk?.sensitive && !confirmBrowserSensitiveAction('Leanna souhaite effectuer une ' + clickRisk.reason + ' sur la page actuelle.')) {
+          await postActionResult(detail.requestId, null, 'Action annulée : confirmation utilisateur refusée.');
+          return;
+        }
         // Animer le curseur vers la cible avant le clic
         await moveCursorToElement(wv, detail.selector);
 
@@ -740,6 +777,11 @@ export function BrowserPanel({
         return;
       }
       try {
+        if (await inspectSensitiveField(wv, detail.selector)
+          && !confirmBrowserSensitiveAction('Leanna souhaite saisir une information sensible (mot de passe, jeton ou donnée de paiement).')) {
+          await postActionResult(detail.requestId, null, 'Saisie annulée : confirmation utilisateur refusée.');
+          return;
+        }
         // Animer le curseur vers le champ avant la saisie
         await moveCursorToElement(wv, detail.selector);
 
@@ -1387,8 +1429,16 @@ export function BrowserPanel({
         return;
       }
       try {
+        if (await inspectSensitiveField(wv, detail.selector)
+          && !confirmBrowserSensitiveAction('Leanna souhaite remplir un champ contenant une information sensible (mot de passe, jeton ou donnée de paiement).')) {
+          await postActionResult(detail.requestId, null, 'Remplissage annulé : confirmation utilisateur refusée.');
+          return;
+        }
         await moveCursorToElement(wv, detail.selector);
-      } catch {/* ignore animation errors */ }
+      } catch (error: any) {
+        await postActionResult(detail.requestId, null, error?.message ?? 'Impossible de vérifier le champ.');
+        return;
+      }
       const script = `(function(){
         var el = document.querySelector(${JSON.stringify(detail.selector)});
         if (!el) return JSON.stringify({ found: false });
@@ -1507,6 +1557,10 @@ export function BrowserPanel({
       const wv = webviewRef.current;
       if (!wv?.capturePage) {
         postActionResult(detail.requestId, null, 'Capture non disponible (webview absente).');
+        return;
+      }
+      if (!confirmBrowserSensitiveAction('Leanna souhaite capturer la page visible et transmettre cette image au modèle IA pour analyse. La page peut contenir des informations personnelles ou confidentielles.')) {
+        await postActionResult(detail.requestId, null, 'Capture annulée : confirmation utilisateur refusée.');
         return;
       }
       try {
