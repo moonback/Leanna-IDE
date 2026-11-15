@@ -475,7 +475,12 @@ export function BrowserPanel({
         }
         setAssistantNavActive(false);
       };
-      const onStop = () => { void finish(); };
+      const onStop = () => {
+        // Ignorer l'arrêt initial de about:blank si la webview n'a pas encore
+        // reçu dom-ready et conserve l'URL demandée en attente.
+        if (wv.getURL() === 'about:blank') return;
+        void finish();
+      };
       const onFail = (event: Event) => {
         const failure = event as WebviewFailLoadEvent;
         if (failure.isMainFrame === false || failure.errorCode === -3) return;
