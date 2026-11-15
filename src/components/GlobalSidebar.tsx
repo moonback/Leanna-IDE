@@ -505,14 +505,18 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               )}
             </div>
 
-            {/* Pied compact : actions en icônes sur une seule ligne, libellés accessibles via tooltip. */}
+            {/* En mode replié, seul l'accès aux paramètres reste visible. */}
             <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 items-center justify-center gap-2 px-2 py-2">
-              <IconButton label="Présence vocale" onClick={handleOpenOrbWindow}>
-                <Radio size={17} />
-              </IconButton>
-              <IconButton label="Changer de projet" onClick={handleSwitchWorkspace}>
-                <FolderInput size={17} />
-              </IconButton>
+              {!collapsed && (
+                <>
+                  <IconButton label="Présence vocale" onClick={handleOpenOrbWindow}>
+                    <Radio size={17} />
+                  </IconButton>
+                  <IconButton label="Changer de projet" onClick={handleSwitchWorkspace}>
+                    <FolderInput size={17} />
+                  </IconButton>
+                </>
+              )}
               <IconButton
                 label="Paramètres"
                 onClick={() => navigate('/ide?page=settings')}
@@ -898,36 +902,3 @@ function IdeAssistantBlock({
           {(['full', 'ask'] as const).map((m) => {
             const current = sessionMode === m;
             return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => { if (!current) onToggleMode?.(); }}
-                aria-pressed={current}
-                title={m === 'full' ? 'Mode complet' : 'Mode question'}
-                className={`relative rounded px-2 py-0.5 text-xs font-semibold ${FOCUS_RING}`}
-                style={{ color: current ? 'var(--text-primary)' : 'var(--text-dimmed)' }}
-              >
-                {current && (
-                  <motion.span
-                    layoutId="session-mode-pill"
-                    aria-hidden
-                    className="absolute inset-0 rounded"
-                    style={{ backgroundColor: 'var(--bg-active)' }}
-                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 40 }}
-                  />
-                )}
-                <span className="relative">{m === 'full' ? 'Full' : 'Ask'}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-1 p-2">
-        <Ctrl reduceMotion={reduceMotion} icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
-        <Ctrl reduceMotion={reduceMotion} icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
-        <Ctrl reduceMotion={reduceMotion} icon={Power} label="Déconnecter l'assistant" onClick={onDisconnect} tone="var(--color-error)" />
-      </div>
-    </motion.div>
-  );
-}
