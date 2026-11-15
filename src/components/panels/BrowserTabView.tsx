@@ -75,7 +75,7 @@ function loadUrlSafely(webview: WebviewElement, url: string): void {
     void Promise.resolve(webview.loadURL(url)).catch((error: unknown) => {
       const candidate = error as { code?: string; errno?: number; message?: string };
       if (candidate?.code === 'ERR_ABORTED' || candidate?.errno === -3 ||
-          /ERR_ABORTED|\\(-3\\)/i.test(candidate?.message ?? '')) {
+          /ERR_ABORTED|-3/i.test(candidate?.message ?? '')) {
         return;
       }
       console.warn('[BrowserTabView] Échec loadURL:', url, error);
@@ -83,7 +83,7 @@ function loadUrlSafely(webview: WebviewElement, url: string): void {
   } catch (error) {
     const candidate = error as { code?: string; errno?: number; message?: string };
     if (candidate?.code === 'ERR_ABORTED' || candidate?.errno === -3 ||
-        /ERR_ABORTED|\\(-3\\)/i.test(candidate?.message ?? '')) return;
+        /ERR_ABORTED|-3/i.test(candidate?.message ?? '')) return;
     console.warn('[BrowserTabView] Échec synchrone loadURL:', url, error);
   }
 }
