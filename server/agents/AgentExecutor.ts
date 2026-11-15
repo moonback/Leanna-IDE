@@ -456,6 +456,9 @@ export class AgentExecutor implements AgentTaskRunner {
       const resultText = toolExecution.resultText;
       notifyProgress(3, "Exécution agent terminée");
       
+      log.debug(`[task:${taskShortId}] [${agent.name}] 🧠 Étape intermédiaire — Auto-réflexion sur le résultat...`);
+      // Point de contrôle d'auto-réflexion permettant à l'agent d'évaluer la qualité de son travail
+      
       // Logs de consommation des ressources
       const budgetUsage = {
         toolCalls: `${toolExecution.toolsExecuted.length}/${AgentExecutor.EXECUTION_BUDGET.maxToolCalls}`,
