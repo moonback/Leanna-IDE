@@ -97,6 +97,7 @@ describe("browser", () => {
         "browser_get_console",
         "browser_capture",
         "browser_new_tab",
+        "browser_manage_tabs",
         "browser_get_accessibility_snapshot",
         "browser_click_by_role",
         "browser_type_by_label",
@@ -158,6 +159,25 @@ describe("browser", () => {
           `Input schema for ${toolName} should exist`
         );
       }
+    });
+
+    describe("browser_manage_tabs schema", () => {
+      const schema = browserSkill.inputSchemas!["browser_manage_tabs"];
+
+      it("accepts listing without a tab id", () => {
+        assert.ok(schema.safeParse({ action: "list" }).success);
+      });
+
+      it("requires a tab id for selection and closing", () => {
+        assert.ok(!schema.safeParse({ action: "select" }).success);
+        assert.ok(!schema.safeParse({ action: "close" }).success);
+        assert.ok(schema.safeParse({ action: "select", tabId: "tab-1" }).success);
+        assert.ok(schema.safeParse({ action: "close", tabId: "tab-1" }).success);
+      });
+
+      it("rejects unknown actions", () => {
+        assert.ok(!schema.safeParse({ action: "reload" }).success);
+      });
     });
 
     describe("browser_navigate schema", () => {
