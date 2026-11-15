@@ -31,7 +31,7 @@ const testCache = new Map<string, TestCacheEntry>();
 const TEST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 import { getProjectRoot, normalizeProjectPath } from "./codebaseHelpers.js";
-import { ensureSandboxNodeModules, isSandboxActive } from "../utils/sandbox.js";
+
 
 const TIMEOUT_MS = 60_000;
 /** tsc complet sur un gros projet dépasse souvent 60s (cf. timeouts des missions). */
@@ -513,14 +513,8 @@ async function runAllowed(cmd: "tsc" | "npm-test" | "npm-run", args: string[] = 
   const root = getProjectRoot();
   const isWin = process.platform === "win32";
 
-  // Dans le sandbox, les outils (tsc, next, vitest…) doivent trouver leurs
-  // dépendances sous la racine : on attend la copie de node_modules (no-op si à jour).
-  if (isSandboxActive()) {
-    const sync = await ensureSandboxNodeModules();
-    if (sync.status === "failed") {
-      console.warn(`[Verify] node_modules du sandbox indisponible : ${sync.reason}`);
-    }
-  }
+  // Le sandbox ne copie plus node_modules : les outils (tsc, vitest…) résolvent
+  // les dépendances du projet par remontée de dossiers (<projet>/.Leanna/sandbox).
 
   const npxBin = isWin ? "npx.cmd" : "npx";
   const npmBin = isWin ? "npm.cmd" : "npm";

@@ -45,8 +45,7 @@ export function getRealSandboxRoot(): string {
 
 // Dossiers/fichiers à exclure de la copie (trop volumineux ou inutiles dans le sandbox)
 const EXCLUDE_PATTERNS = [
-  // node_modules est copié à part (ensureSandboxNodeModules) : copie réelle
-  // requise, Turbopack refusant tout fichier hors de `turbopack.root`.
+  // node_modules n'est jamais copié (racine ici, niveaux imbriqués via EXCLUDE_ANY_DEPTH).
   "node_modules",
   ".git",
   ".next",
@@ -102,6 +101,8 @@ export function isExcludedFromDiff(relativePath: string): boolean {
   // Normaliser les séparateurs pour comparer des préfixes de dossier de façon
   // fiable sous Windows comme sous POSIX.
   const normalized = relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
+  // node_modules imbriqués (monorepo) : jamais dans le diff, à toute profondeur.
+  if (normalized.split("/").includes("node_modules")) return true;
   return DIFF_EXCLUDED_DIR_PREFIXES.some(
     prefix => normalized === prefix || normalized.startsWith(prefix + "/"),
   );
@@ -401,7 +402,6 @@ export async function initSandbox(): Promise<{ created: boolean; path: string; f
   lastSyncTimestamp = Date.now();
 
   console.log(`[Sandbox] ${existed ? 'Rafraîchi' : 'Initialisé'}: ${copied} fichiers copiés → ${sandboxBase}`);
-  prefetchSandboxNodeModules();
   return { created: !existed, path: sandboxBase, fileCount: copied };
 }
 
@@ -911,7 +911,6 @@ export async function resetSandbox(): Promise<{ created: boolean; path: string; 
   activateSandbox();
 
   console.log(`[Sandbox] Réinitialisé: ${copied} fichiers copiés → ${sandboxBase}`);
-  prefetchSandboxNodeModules();
   return { created: true, path: sandboxBase, filesCopied: copied };
 }
 
@@ -1119,12 +1118,6 @@ export function ensureSandboxNodeModules(): Promise<NodeModulesSyncResult> {
   return promise;
 }
 
-/** Lance la copie en arrière-plan (hors tests) sans bloquer l'initialisation. */
-function prefetchSandboxNodeModules(): void {
-  if (process.env.NODE_TEST_CONTEXT) return;
-  void ensureSandboxNodeModules();
-}
-
 async function syncSandboxNodeModules(projectRoot: string, sandboxRoot: string): Promise<NodeModulesSyncResult> {
   const started = Date.now();
   const done = (status: NodeModulesSyncResult["status"], reason?: string): NodeModulesSyncResult => {
@@ -1305,7 +1298,11 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
 
     if (entry.isDirectory()) {
       // Dépôts et caches de build imbriqués (sous-modules, apps/x/.next) : jamais utiles.
-      if (EXCLUDE_ANY_DEPTH.has(entry.name)) continue;
+      if (EXCLUDE_ANY_DEPTH.has(entry.name)) {
+        // Nettoie les node_modules imbriqués copiés par une version précédente.
+        if (entry.name === NODE_MODULES_DIR) await removeStaleNestedNodeModules(dstPath);
+        continue;
+      }
       await fs.promises.mkdir(dstPath, { recursive: true });
       count += await syncDirectory(srcPath, dstPath, base);
     } else if (entry.isFile()) {
@@ -1321,7 +1318,20 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
 }
 
 const COPY_CONCURRENCY = 16;
-const EXCLUDE_ANY_DEPTH = new Set([".git", ".next"]);
+// node_modules à toute profondeur (monorepos : apps/x/node_modules, packages/y/node_modules).
+const EXCLUDE_ANY_DEPTH = new Set([".git", ".next", "node_modules"]);
+
+/** Supprime un node_modules imbriqué déjà présent dans le sandbox (sans suivre les liens). */
+async function removeStaleNestedNodeModules(dstPath: string): Promise<void> {
+  try {
+    const stat = await fs.promises.lstat(dstPath).catch(() => null);
+    if (!stat) return;
+    if (stat.isSymbolicLink()) { await removeLinkOnly(dstPath); return; }
+    await fs.promises.rm(dstPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch (e: any) {
+    console.warn(`[Sandbox] Avertissement suppression ${dstPath}:`, e.message);
+  }
+}
 
 /**
  * Copie src → dst sauf si dst a déjà la même taille et la même date : rouvrir un
