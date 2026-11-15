@@ -1227,18 +1227,22 @@ export const browserSkill: Skill = {
     if (name === "browser_search") {
       const { query, engine } = validateArgs(browserSkill.inputSchemas!["browser_search"], args);
       const searchUrl = buildSearchUrl(engine, query);
-
-      return withEmit(emit, (fire) => {
-        fire({ type: "open-browser" });
-        fire({ type: "browser-navigate", url: searchUrl });
-        return {
-          status: "success",
-          url: searchUrl,
-          query,
-          engine,
-          message: `Recherche "${query}" en cours sur ${engine} dans le navigateur.`,
-        };
-      });
+      if (!emit) return { status: "error", message: "Le navigateur n'est pas disponible dans ce contexte." };
+      emit({ type: "open-browser" });
+      const navigation = await runBrowserAction<{ url?: string; title?: string }>(
+        { type: "browser-navigate", url: searchUrl }, 27_000
+      );
+      if (typeof navigation === "string") {
+        return { status: "error", url: searchUrl, query, engine, message: navigation };
+      }
+      return {
+        status: "success",
+        url: navigation.url || searchUrl,
+        title: navigation.title ?? "",
+        query,
+        engine,
+        message: "Recherche chargée sur " + engine + " : " + (navigation.title || navigation.url || searchUrl),
+      };
     }
 
     // ── browser_close ─────────────────────────────────────────────────────────
