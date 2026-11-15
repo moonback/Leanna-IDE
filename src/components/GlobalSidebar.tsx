@@ -56,8 +56,8 @@ interface ToolGroup { id: string; label: string; items: ToolItem[] }
 const COLLAPSE_KEY = 'leanna_global_sidebar_collapsed';
 const GROUPS_KEY = 'leanna_global_sidebar_closed_groups';
 // Doivent rester alignés sur --rail-w / --rail-w-open (styles/glass.css).
-const WIDTH_COLLAPSED = 64;
-const WIDTH_EXPANDED = 264;
+const WIDTH_COLLAPSED = 56;
+const WIDTH_EXPANDED = 240;
 const HOVER_IN_MS = 110;
 const HOVER_OUT_MS = 220;
 
