@@ -19,6 +19,7 @@ import { useBrowserExtensions } from './useBrowserExtensions.js';
 import type {
   BrowserPanelProps,
   WebviewElement,
+  WebviewFailLoadEvent,
 } from './browserTypes.js';
 
 /** Un onglet du navigateur : identité + état d'affichage dérivé de sa webview. */
