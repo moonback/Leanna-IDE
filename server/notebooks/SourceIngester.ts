@@ -112,7 +112,7 @@ const CHUNK_MIN_SIZE = 100;
 /** Chevauchement contextuel (phrases de contexte) */
 const CHUNK_OVERLAP_SENTENCES = 2;
 /** Nombre maximum de chunks par source */
-const MAX_CHUNKS = 300;
+const MAX_CHUNKS = 1500;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 

@@ -374,8 +374,30 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         ...EXCLUDED_DIRS,
         ".Leanna", ".aionrs", ".kiro", ".github", ".husky", ".vscode",
         "coverage", ".nyc_output", "tmp", "temp", ".cache",
+        // Dossiers générés / caches / artefacts de build
+        ".next", ".nuxt", ".turbo", ".vercel", ".parcel-cache", ".vite", ".svelte-kit",
+        ".ruff_cache", ".pytest_cache", "__pycache__", ".venv", "venv", ".mypy_cache",
+        "graphify-out", "release", "logs", "storybook-static", "target",
+        // Config d'outils / agents (pas du code applicatif)
+        ".agents", ".claude", ".gemini", ".superpowers", ".idea",
         ...excludeDirs.map((d: string) => d.toLowerCase()),
       ]);
+
+      // Fichiers générés, verrous, secrets et états locaux : jamais utiles au RAG
+      // (et les .env contiennent des secrets qui ne doivent pas être importés).
+      const EXCLUDED_FILE_RE = new RegExp(
+        [
+          "^(package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|bun\\.lockb?|composer\\.lock)$",
+          "^\\.env(?!\\.example$).*$",
+          "^\\.gemini-keys\\.json$",
+          "^\\.(leanna|project)-[\\w.-]*\\.json$",
+          "^marketplace-installs\\.json$",
+          "\\.(min\\.(js|css)|map|snap|tsbuildinfo|log)$",
+          "\\.d\\.ts$",
+          "\\.generated\\.\\w+$",
+        ].join("|"),
+        "i",
+      );
 
       // Normalise les dossiers à inclure (relatifs à la racine, séparateurs
       // unifiés, sans slash final). Si la liste est vide, tout le workspace
@@ -423,6 +445,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
             if (!dirMatchesInclude(relPath)) continue;
             walk(path.join(dir, entry.name), relPath);
           } else if (entry.isFile()) {
+            if (EXCLUDED_FILE_RE.test(entry.name)) continue;
             const ext = path.extname(entry.name).toLowerCase();
             const isConfig = includeConfig && configFiles.has(entry.name);
             const isTextFile = TEXT_FILE_EXT.test(entry.name);

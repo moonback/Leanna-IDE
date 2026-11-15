@@ -1222,7 +1222,7 @@ export function GitHubRepositoryImportModal({
                         <input
                           type="range"
                           min="10"
-                          max="200"
+                          max="300"
                           step="10"
                           value={maxFiles}
                           onChange={e => setMaxFiles(parseInt(e.target.value, 10))}

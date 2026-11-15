@@ -185,7 +185,7 @@ export function createGithubRouter(skillManager: SkillManager): Router {
         const { sourceIngester, notebookManager } = await import('../notebooks/index.js');
 
         const options: any = {
-          maxFiles: Math.min(max_files || 100, 200),
+          maxFiles: Math.min(max_files || 100, 300),
           fileExtensions: file_extensions || ['.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.hpp', '.md', '.txt', '.json', '.yaml', '.yml'],
           branch: branch || undefined,
         };
