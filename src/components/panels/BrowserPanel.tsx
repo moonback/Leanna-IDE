@@ -106,6 +106,10 @@ export function BrowserPanel({
   useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  // Ref synchronisée immédiatement pour que plusieurs popups reçus dans la même
+  // frame ne puissent pas dépasser le plafond avant le prochain rendu React.
+  const tabsRef = useRef(tabs);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   // L'input de la barre d'adresse est édité librement : état séparé, resynchronisé
   // sur l'URL de l'onglet actif via l'effet ci-dessous.
@@ -181,18 +185,20 @@ export function BrowserPanel({
 
   /** Ouvre un nouvel onglet (optionnellement en arrière-plan) et renvoie son id. */
   const openTab = useCallback((url: string = BROWSER_HOME_URL, activate = true): string => {
-    if (tabs.length >= MAX_BROWSER_TABS) {
+    if (tabsRef.current.length >= MAX_BROWSER_TABS) {
       console.warn(`[BrowserPanel] Limite de ${MAX_BROWSER_TABS} onglets atteinte.`);
       return '';
     }
     const id = newTabId();
     const normalized = (() => { try { return normalizeUrl(url); } catch { return BROWSER_HOME_URL; } })();
-    setTabs((prev) => [...prev, {
+    const tab: BrowserTab = {
       id, url: normalized, title: '', loading: false, canGoBack: false, canGoForward: false, loadError: null, faviconUrl: null,
-    }]);
+    };
+    tabsRef.current = [...tabsRef.current, tab];
+    setTabs((prev) => [...prev, tab]);
     if (activate) setActiveTabId(id);
     return id;
-  }, [tabs.length]);
+  }, []);
 
   const switchTab = useCallback((id: string) => {
     setActiveTabId((prev) => (prev === id ? prev : id));
