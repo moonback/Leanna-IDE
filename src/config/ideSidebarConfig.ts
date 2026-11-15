@@ -11,7 +11,7 @@
  * 4. GitHub            (accès direct)
  * 5. CI/CD & Aperçu    (sous-menu : Sandbox, Workflow, Prévisualisation)
  * 6. Données           (sous-menu : Knowledge, Notebooks, Santé système, PM2)
- * 7. Outils            (sous-menu : Agent Builder, Marketplace, Docs Skills, Caméra, Partage écran)
+ * 7. Outils            (sous-menu : Agent Builder, Marketplace, Caméra, Partage écran)
  * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar)
  */
 
@@ -22,7 +22,7 @@ import {
   Container, Database,
   Activity, Wrench,
   Wand2, Globe, Terminal, Store,
-  Brain, NotebookPen, BookMarked,
+  Brain, NotebookPen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -211,14 +211,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             stateKey: 'showPM2',
             actionKey: 'onTogglePM2',
           },
-          // {
-          //   id: 'mcp',
-          //   type: 'button',
-          //   icon: Cable,
-          //   label: 'Serveurs MCP',
-          //   stateKey: 'showMcp',
-          //   actionKey: 'onToggleMcp',
-          // },
         ],
       },
     ],
@@ -252,14 +244,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             actionKey: 'onToggleMarketplace',
           },
           {
-            id: 'skills-doc',
-            type: 'button',
-            icon: BookMarked,
-            label: 'Docs Skills',
-            stateKey: 'showSkillsDoc',
-            actionKey: 'onToggleSkillsDoc',
-          },
-          {
             id: 'vision',
             type: 'button',
             icon: Camera,
@@ -282,60 +266,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-
-  // ═══ IA — items exposés via le flyout du status agent (non compté dans les 5 icônes) ═══
-  // {
-  //   id: 'ai-agent',
-  //   label: 'Intelligence Artificielle',
-  //   items: [
-  //     // {
-  //     //   id: 'chat',
-  //     //   type: 'button',
-  //     //   icon: MessageCircle,
-  //     //   label: 'Chat',
-  //     //   shortcut: 'Ctrl+L',
-  //     //   stateKey: 'showChat',
-  //     //   actionKey: 'onToggleChat',
-  //     //   requiresAssistant: true,
-  //     // },
-  //     {
-  //       id: 'agents',
-  //       type: 'button',
-  //       icon: Bot,
-  //       label: 'Agents',
-  //       stateKey: 'showAgents',
-  //       actionKey: 'onToggleAgents',
-  //       requiresAssistant: true,
-  //     },
-  //     {
-  //       id: 'fleet',
-  //       type: 'button',
-  //       icon: Users,
-  //       label: 'Flotte',
-  //       stateKey: 'showFleet',
-  //       actionKey: 'onToggleFleet',
-  //       requiresAssistant: true,
-  //     },
-  //     {
-  //       id: 'missions',
-  //       type: 'button',
-  //       icon: Crosshair,
-  //       label: 'Missions',
-  //       stateKey: 'showMissions',
-  //       actionKey: 'onToggleMissions',
-  //       requiresAssistant: true,
-  //     },
-  //     {
-  //       id: 'skills-monitor',
-  //       type: 'button',
-  //       icon: ChartNoAxesColumnIncreasing,
-  //       label: 'Suivi Agent',
-  //       stateKey: 'showSkillsMonitor',
-  //       actionKey: 'onToggleSkillsMonitor',
-  //       requiresAssistant: true,
-  //     },
-  //   ],
-  // },
 ];
 
 // ─── Run Commands ────────────────────────────────────────────────────────────

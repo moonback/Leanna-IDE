@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GlobalSidebar — Navigation globale de Leanna.
  *
  * Expose des *capacités*, pas l'architecture interne. Barre verticale
@@ -27,7 +27,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import type { LucideIcon } from 'lucide-react';
 import {
   Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
-  Power, MessageCircle, Mic, MicOff, Bot, FolderInput, Radio, Search,
+  Power, MessageCircle, Mic, MicOff, Bot, FolderInput, Radio,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
@@ -284,8 +284,6 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
     }
   }, []);
 
-  const [navQuery, setNavQuery] = useState('');
-  const normalizedQuery = navQuery.trim().toLocaleLowerCase('fr');
   const visibleNavGroups = useMemo(
     () => NAV_GROUPS.map((group) => ({
       ...group,
@@ -293,19 +291,18 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
       // Il reste une destination globale hors IDE, mais ne doit pas être affiché
       // deux fois dans la sidebar IDE.
       items: group.items.filter((item) =>
-        !(mode === 'ide' && item.id === 'github') &&
-        item.label.toLocaleLowerCase('fr').includes(normalizedQuery),
+        !(mode === 'ide' && item.id === 'github'),
       ),
     })).filter((group) => group.items.length > 0),
-    [mode, normalizedQuery],
+    [mode],
   );
   const toolGroups = mode === 'ide' ? buildToolGroups(props) : [];
   const visibleToolGroups = useMemo(
     () => toolGroups.map((group) => ({
       ...group,
-      items: group.items.filter((item) => item.label.toLocaleLowerCase('fr').includes(normalizedQuery)),
+      items: group.items,
     })).filter((group) => group.items.length > 0),
-    [toolGroups, normalizedQuery],
+    [toolGroups],
   );
 
   const spring = reduceMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 420, damping: 40, mass: 0.9 };
@@ -401,25 +398,8 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
               />
             )}
 
-            {!collapsed && (
-              <div className="lea-sidebar__search mx-2 mb-1 flex h-8 flex-shrink-0 items-center gap-2 rounded-lg px-2.5">
-                <Search size={14} aria-hidden />
-                <input
-                  type="search"
-                  value={navQuery}
-                  onChange={(event) => setNavQuery(event.target.value)}
-                  placeholder="Rechercher une section…"
-                  aria-label="Rechercher dans la navigation"
-                  className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--text-dimmed)]"
-                />
-                {navQuery && (
-                  <button type="button" onClick={() => setNavQuery('')} className="text-xs" aria-label="Effacer la recherche">×</button>
-                )}
-              </div>
-            )}
-
             {/* Navigation groupée (routes) ou outils (IDE) */}
-            <div className={`min-h-0 flex-1 px-2 pb-2 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
+            <div className={`min-h-0 flex-1 px-2 pb-1 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto'} [scrollbar-width:thin]`}>
               {mode === 'ide' && (() => {
                 // Sépare le groupe "Espace de travail" (ide-essentials) des autres toolGroups
                 const workspaceGroup = visibleToolGroups.find((g) => g.id === 'ide-essentials');
@@ -427,7 +407,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
 
                 const renderNavGroup = (group: typeof visibleNavGroups[0], gi: number) => (
                   <Group key={group.id} id={group.id} label={group.label} first={gi === 0} collapsed={collapsed}
-                    open={Boolean(normalizedQuery) || !closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
+                    open={!closedGroups[group.id]} onToggle={toggleGroup} count={group.items.length}
                     hasActive={group.items.some((item) => isActive(item.path))}>
                     {group.items.map((item) => (
                       <li key={item.id}>
@@ -444,7 +424,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                     label={group.label}
                     first={gi === 0}
                     collapsed={collapsed}
-                    open={Boolean(normalizedQuery) || !closedGroups[group.id]}
+                    open={!closedGroups[group.id]}
                     onToggle={toggleGroup}
                     count={group.items.length}
                     hasActive={group.items.some((i) => i.active)}
@@ -485,7 +465,7 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                       label={group.label}
                       first={gi === 0}
                       collapsed={collapsed}
-                      open={Boolean(normalizedQuery) || !closedGroups[group.id]}
+                      open={!closedGroups[group.id]}
                       onToggle={toggleGroup}
                       count={group.items.length}
                       hasActive={group.items.some((i) => isActive(i.path))}
@@ -498,15 +478,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                     </Group>
                   ))
                 : null}
-              {normalizedQuery && visibleNavGroups.length === 0 && visibleToolGroups.length === 0 && !collapsed && (
-                <p className="px-3 py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Aucun élément ne correspond à « {navQuery} ».
-                </p>
-              )}
             </div>
 
             {/* Pied : présence vocale + changer de projet + paramètres */}
-            <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 flex-col gap-0.5 px-2 py-2">
+            <div className="lea-sidebar__footer mt-auto flex flex-shrink-0 flex-col gap-px px-2 py-1.5">
               <NavButton
                 item={{ id: 'orb-live', path: '', label: 'Présence vocale', icon: Radio }}
                 active={false}
@@ -604,15 +579,15 @@ function Group({
   const showItems = collapsed || open; // en mode icônes tout reste visible
 
   return (
-    <section className="mb-0.5" aria-label={label || undefined}>
+    <section className="mb-0" aria-label={label || undefined}>
       {collapsed ? (
-        !first && <div className="lea-sidebar__sep mx-3 my-2 h-px" aria-hidden />
+        !first && <div className="lea-sidebar__sep mx-3 my-1 h-px" aria-hidden />
       ) : label ? (
         <button
           type="button"
           onClick={() => onToggle(id)}
           aria-expanded={open}
-          className={`group/head flex w-full items-center justify-between rounded-md px-3 pb-1 pt-2.5 text-left ${FOCUS_RING}`}
+          className={`group/head flex w-full items-center justify-between rounded-md px-2.5 pb-0.5 pt-1.5 text-left ${FOCUS_RING}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wider transition-colors group-hover/head:text-[var(--text-secondary)]" style={{ color: 'var(--text-dimmed)' }}>
@@ -654,7 +629,7 @@ function Group({
       <AnimatePresence initial={false}>
         {showItems && (
           <motion.ul
-            className="flex flex-col gap-0.5 overflow-hidden"
+            className="flex flex-col gap-px overflow-hidden"
             initial={reduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -696,7 +671,7 @@ function NavButton({
         onFocus={() => { setHoverId(item.id); tip.show(); }}
         onBlur={() => { setHoverId(null); tip.hide(); }}
         whileTap={reduceMotion || disabled ? undefined : { scale: 0.97 }}
-        className={`relative flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
+        className={`relative flex w-full items-center gap-2 rounded-md px-2.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
         style={{ color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
       >
         {/* Halo de survol : un seul élément qui glisse d'un item à l'autre */}
@@ -794,7 +769,7 @@ function Ctrl({
         onBlur={tip.hide}
         whileHover={reduceMotion || disabled ? undefined : { y: -1 }}
         whileTap={reduceMotion || disabled ? undefined : { scale: 0.92 }}
-        className={`flex h-8 flex-1 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${FOCUS_RING}`}
+        className={`flex h-7 flex-1 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${FOCUS_RING}`}
         style={{
           backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)',
           color: tone ?? 'var(--text-secondary)',
@@ -831,7 +806,7 @@ function IdeAssistantBlock({
   if (!connected) {
     // Un seul appel à l'action : connecter l'assistant.
     return (
-      <div className="mx-2 mb-3 mt-0.5 flex-shrink-0">
+      <div className="mx-2 mb-1.5 mt-0.5 flex-shrink-0">
         <motion.button
           type="button"
           onClick={onConnect}
@@ -839,7 +814,7 @@ function IdeAssistantBlock({
           aria-label="Connecter l'assistant IA"
           whileHover={reduceMotion ? undefined : { scale: 1.02, y: -1 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          className={`group/cta relative flex h-9 w-full items-center justify-center gap-2 overflow-hidden rounded-lg px-3 text-xs font-semibold ${FOCUS_RING}`}
+          className={`group/cta relative flex h-8 w-full items-center justify-center gap-2 overflow-hidden rounded-lg px-3 text-xs font-semibold ${FOCUS_RING}`}
           style={{
             background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%)',
             color: 'var(--bg-base)',
@@ -875,10 +850,10 @@ function IdeAssistantBlock({
       initial={reduceMotion ? false : { opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="glass-card mx-2 mb-2 flex-shrink-0 overflow-hidden"
+      className="glass-card mx-2 mb-1.5 flex-shrink-0 overflow-hidden"
     >
       <div
-        className="flex items-center justify-between gap-2 border-b px-3 py-2"
+        className="flex items-center justify-between gap-2 border-b px-2.5 py-1.5"
         style={{ borderColor: 'var(--glass-stroke)' }}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -928,7 +903,7 @@ function IdeAssistantBlock({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 p-2">
+      <div className="grid grid-cols-3 gap-1 p-1.5">
         <Ctrl reduceMotion={reduceMotion} icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
         <Ctrl reduceMotion={reduceMotion} icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
         <Ctrl reduceMotion={reduceMotion} icon={Power} label="Déconnecter l'assistant" onClick={onDisconnect} tone="var(--color-error)" />

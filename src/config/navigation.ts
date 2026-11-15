@@ -59,7 +59,7 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
  */
 export const NAV_GROUPS: NavGroup[] = [
   { id: 'workspace', label: '', items: pick('ide') },
-  { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
+  { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'history') },
   { id: 'operations', label: 'Opérations', items: pick('automation', 'observability', 'contextIntelligence') },
   { id: 'integrations', label: 'Intégrations', items: pick('github') },
 ];

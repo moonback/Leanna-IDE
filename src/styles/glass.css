@@ -33,7 +33,7 @@
   --rail-w-open: 232px;        /* rail déplié */
   --control-h: 32px;           /* boutons / champs standard */
   --control-h-sm: 28px;        /* boutons compacts (headers, toolbars) */
-  --nav-item-h: 34px;
+  --nav-item-h: 28px;
 
   /* Rayons — hiérarchie par niveau */
   --r-control: 8px;            /* boutons, inputs, badges carrés */
