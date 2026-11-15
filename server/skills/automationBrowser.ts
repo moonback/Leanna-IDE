@@ -31,6 +31,11 @@ async function ensurePage(): Promise<any> {
     }
     if (!page || page.isClosed()) {
         page = await browser.newPage();
+        // Sans handler, un dialogue beforeunload laissé par une page précédente bloque
+        // tout goto() jusqu'au timeout. On quitte la page ; les autres dialogues sont refusés.
+        page.on('dialog', (d: any) => {
+            (d.type() === 'beforeunload' ? d.accept() : d.dismiss()).catch(() => {});
+        });
         await page.setViewport({ width: 1280, height: 800 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     }

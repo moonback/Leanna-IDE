@@ -73,6 +73,13 @@ export function useLiveAPI() {
   const [autoSummarizeThreshold, setAutoSummarizeThreshold] = useState(50);
   const [autoSummarizeKeepTurns, setAutoSummarizeKeepTurns] = useState(8);
 
+  // Buffer des chunks de raisonnement (flush une fois par frame)
+  const pendingReasoningRef = useRef<Array<Partial<ReasoningState>>>([]);
+  const reasoningRafRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (reasoningRafRef.current !== null) cancelAnimationFrame(reasoningRafRef.current);
+  }, []);
+
   // ── Logger ─────────────────────────────────────────────────────────────────
   const addLog = useCallback((msg: string, type: LogType = 'system') => {
     setLogs(prev => {
@@ -549,17 +556,31 @@ export function useLiveAPI() {
       setIsBusy(!!msg.busy);
     }
     if (msg.reasoning) {
-      setReasoning(prev => {
-        const incoming = msg.reasoning as Partial<ReasoningState>;
-        const startsNewReasoning = incoming.active === true && !prev.active;
-        const nextChunk = typeof incoming.chunk === 'string' ? incoming.chunk : '';
-        return {
-          ...prev,
-          ...incoming,
-          ...(startsNewReasoning ? { streamText: '' } : {}),
-          ...(nextChunk ? { streamText: startsNewReasoning ? nextChunk : `${prev.streamText ?? ''}${nextChunk}` } : {}),
-        };
-      });
+      // Les chunks de raisonnement arrivent en rafale : on les regroupe et on
+      // applique un seul setState par frame au lieu d'un par message WebSocket.
+      pendingReasoningRef.current.push(msg.reasoning as Partial<ReasoningState>);
+      if (reasoningRafRef.current === null) {
+        reasoningRafRef.current = requestAnimationFrame(() => {
+          reasoningRafRef.current = null;
+          const batch = pendingReasoningRef.current;
+          pendingReasoningRef.current = [];
+          if (batch.length === 0) return;
+          setReasoning(prev => {
+            let state = prev;
+            for (const incoming of batch) {
+              const startsNewReasoning = incoming.active === true && !state.active;
+              const nextChunk = typeof incoming.chunk === 'string' ? incoming.chunk : '';
+              state = {
+                ...state,
+                ...incoming,
+                ...(startsNewReasoning ? { streamText: '' } : {}),
+                ...(nextChunk ? { streamText: startsNewReasoning ? nextChunk : `${state.streamText ?? ''}${nextChunk}` } : {}),
+              };
+            }
+            return state;
+          });
+        });
+      }
       if (msg.reasoning.active) {
         addLog(`🧠 Raisonnement activé: ${msg.reasoning.strategyLabel || msg.reasoning.strategy}`, 'info');
       }

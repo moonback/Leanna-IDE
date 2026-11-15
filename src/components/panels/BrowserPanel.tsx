@@ -19,6 +19,7 @@ import { useBrowserExtensions } from './useBrowserExtensions.js';
 import type {
   BrowserPanelProps,
   WebviewElement,
+  WebviewFailLoadEvent,
 } from './browserTypes.js';
 
 /** Un onglet du navigateur : identité + état d'affichage dérivé de sa webview. */
@@ -42,6 +43,7 @@ function newTabId(): string {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export const BROWSER_HOME_URL = 'about:blank';
+const MAX_BROWSER_TABS = 12;
 
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -105,6 +107,10 @@ export function BrowserPanel({
   useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  // Ref synchronisée immédiatement pour que plusieurs popups reçus dans la même
+  // frame ne puissent pas dépasser le plafond avant le prochain rendu React.
+  const tabsRef = useRef(tabs);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   // L'input de la barre d'adresse est édité librement : état séparé, resynchronisé
   // sur l'URL de l'onglet actif via l'effet ci-dessous.
@@ -171,18 +177,26 @@ export function BrowserPanel({
     const url = normalizeUrl(raw);
     setInputValue(url);
     setTabs((prev) => prev.map((t) => (t.id === activeTabId ? { ...t, loadError: null } : t)));
-    tabHandlesRef.current.get(activeTabId)?.loadURL(url);
-  }, [activeTabId]);
+    const handle = tabHandlesRef.current.get(activeTabId);
+    if (activeTab.url === url) handle?.reload();
+    else handle?.loadURL(url);
+  }, [activeTabId, activeTab.url]);
 
   // ── Gestion des onglets ─────────────────────────────────────────────────────
 
   /** Ouvre un nouvel onglet (optionnellement en arrière-plan) et renvoie son id. */
   const openTab = useCallback((url: string = BROWSER_HOME_URL, activate = true): string => {
+    if (tabsRef.current.length >= MAX_BROWSER_TABS) {
+      console.warn(`[BrowserPanel] Limite de ${MAX_BROWSER_TABS} onglets atteinte.`);
+      return '';
+    }
     const id = newTabId();
     const normalized = (() => { try { return normalizeUrl(url); } catch { return BROWSER_HOME_URL; } })();
-    setTabs((prev) => [...prev, {
+    const tab: BrowserTab = {
       id, url: normalized, title: '', loading: false, canGoBack: false, canGoForward: false, loadError: null, faviconUrl: null,
-    }]);
+    };
+    tabsRef.current = [...tabsRef.current, tab];
+    setTabs((prev) => [...prev, tab]);
     if (activate) setActiveTabId(id);
     return id;
   }, []);
@@ -433,12 +447,55 @@ export function BrowserPanel({
   // ── Écoute des commandes directes via CustomEvent (fallback / scroll) ───────
 
   useEffect(() => {
-    const handleNav = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
+    const handleNav = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { url?: string; requestId?: string };
       if (!detail?.url) return;
       setAssistantNavActive(true);
+      const wv = webviewRef.current;
+      if (!wv) {
+        if (detail.requestId) await postActionResult(detail.requestId, null, 'Webview non disponible.');
+        setAssistantNavActive(false);
+        return;
+      }
+
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = () => {
+        if (timeout) clearTimeout(timeout);
+        wv.removeEventListener('did-stop-loading', onStop);
+        wv.removeEventListener('did-fail-load', onFail);
+      };
+      const finish = async (error?: string) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (detail.requestId) {
+          if (error) await postActionResult(detail.requestId, null, error);
+          else await postActionResult(detail.requestId, { url: wv.getURL(), title: wv.getTitle?.() ?? '' });
+        }
+        setAssistantNavActive(false);
+      };
+      const onStop = () => {
+        // Ignorer l'arrêt initial de about:blank si la webview n'a pas encore
+        // reçu dom-ready et conserve l'URL demandée en attente.
+        if (wv.getURL() === 'about:blank') return;
+        void finish();
+      };
+      const onFail = (event: Event) => {
+        const failure = event as WebviewFailLoadEvent;
+        if (failure.isMainFrame === false || failure.errorCode === -3) return;
+        void finish('Échec du chargement (' + failure.errorCode + ') : ' + (failure.errorDescription || 'erreur réseau'));
+      };
+
+      if (detail.requestId) {
+        wv.addEventListener('did-stop-loading', onStop);
+        wv.addEventListener('did-fail-load', onFail);
+        timeout = setTimeout(() => {
+          void finish('Délai dépassé : la page n’a pas terminé son chargement dans les 25 secondes.');
+        }, 25_000);
+      }
       navigateTo(detail.url);
-      setTimeout(() => setAssistantNavActive(false), 3000);
+      if (!detail.requestId) setTimeout(() => setAssistantNavActive(false), 3000);
     };
 
     // Ouvrir une URL dans un nouvel onglet (depuis browser_new_tab).
@@ -448,6 +505,44 @@ export function BrowserPanel({
       openTab(detail.url, detail.activate !== false);
       setAssistantNavActive(true);
       setTimeout(() => setAssistantNavActive(false), 3000);
+    };
+
+    const handleTabCommand = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; action: 'list' | 'select' | 'close'; tabId?: string };
+      if (!detail?.requestId) return;
+      if (detail.action === 'list') {
+        await postActionResult(detail.requestId, {
+          activeTabId: activeTabIdRef.current,
+          tabs: tabsRef.current.map((tab, index) => ({
+            id: tab.id, index, active: tab.id === activeTabIdRef.current,
+            url: tab.url, title: tab.title, loading: tab.loading, loadError: tab.loadError,
+          })),
+        });
+        return;
+      }
+      if (!detail.tabId || !tabsRef.current.some((tab) => tab.id === detail.tabId)) {
+        await postActionResult(detail.requestId, null, 'Onglet introuvable.');
+        return;
+      }
+      if (detail.action === 'select') {
+        setActiveTabId(detail.tabId);
+        await postActionResult(detail.requestId, { ok: true, activeTabId: detail.tabId });
+        return;
+      }
+      const current = tabsRef.current;
+      if (current.length === 1) {
+        await postActionResult(detail.requestId, null, 'Impossible de fermer le dernier onglet via cette action. Utilisez browser_close pour fermer le navigateur.');
+        return;
+      }
+      const index = current.findIndex((tab) => tab.id === detail.tabId);
+      const next = current.filter((tab) => tab.id !== detail.tabId);
+      tabsRef.current = next;
+      setTabs(next);
+      tabHandlesRef.current.delete(detail.tabId);
+      setActiveTabId((active) => active === detail.tabId
+        ? (next[Math.max(0, index - 1)] ?? next[0]).id
+        : active);
+      await postActionResult(detail.requestId, { ok: true, closedTabId: detail.tabId });
     };
 
     const handleScroll = (e: Event) => {
@@ -485,12 +580,23 @@ export function BrowserPanel({
     const handleReadRequest = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; selector: string | null };
       const wv = webviewRef.current;
-      if (!wv) return;
+      if (!wv) {
+        const token = localStorage.getItem('Leanna_api_token') || '';
+        await fetch('/api/browser/content-result', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'x-Leanna-token': token } : {}) },
+          body: JSON.stringify({ requestId: detail.requestId, result: null, error: 'Webview non disponible.' }),
+        }).catch(() => {/* canal indisponible */});
+        return;
+      }
 
       const extractScript = detail.selector
         ? `(function(){
             var el = document.querySelector(${JSON.stringify(detail.selector)});
-            return el ? el.innerText.substring(0, 8000) : '[sélecteur introuvable: ${detail.selector}]';
+            if (!el) return JSON.stringify({ text: ${JSON.stringify('[sélecteur introuvable]')}, truncated: false });
+            var text = el.innerText || '';
+            var truncated = text.length > 15000;
+            return JSON.stringify({ text: text.substring(0, 15000), truncated: truncated });
           })()`
         : `(function(){
             var title = document.title;
@@ -501,9 +607,10 @@ export function BrowserPanel({
             });
             var text = clone.innerText
               .replace(/[ \\t]{2,}/g, ' ')
-              .replace(/\\n{3,}/g, '\\n\\n')
-              .substring(0, 8000);
-            return JSON.stringify({ title: title, url: url, text: text });
+              .replace(/\\n{3,}/g, '\\n\\n');
+            var truncated = text.length > 15000;
+            text = text.substring(0, 15000);
+            return JSON.stringify({ title: title, url: url, text: text, truncated: truncated });
           })()`;
 
       try {
@@ -543,6 +650,30 @@ export function BrowserPanel({
           body: JSON.stringify({ requestId, result, error }),
         });
       } catch {/* silent */ }
+    };
+
+    // Confirmation explicite avant toute action pouvant exposer des données
+    // sensibles ou produire un effet externe. Cette boîte native est déclenchée
+    // dans l'interface utilisateur, jamais par le contenu de la page.
+    const confirmBrowserSensitiveAction = (message: string): boolean => {
+      try {
+        return window.confirm(message + '\n\nCette action a été demandée par Leanna. Voulez-vous continuer ?');
+      } catch {
+        return false;
+      }
+    };
+
+    const inspectSensitiveField = async (wv: WebviewElement, selector: string): Promise<boolean> => {
+      const script = `(function(){
+        var el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        var type = String(el.type || '').toLowerCase();
+        var autocomplete = String(el.autocomplete || el.getAttribute('autocomplete') || '').toLowerCase();
+        var identity = [el.name, el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder'), autocomplete].join(' ').toLowerCase();
+        return type === 'password' || /current-password|new-password|one-time-code/.test(autocomplete)
+          || /password|passwd|secret|token|api[_-]?key|credit.?card|cvv|cvc/.test(identity);
+      })()`;
+      return Boolean(await wv.executeJavaScript(script));
     };
 
     // ── Curseur simulé : injection + animation dans la webview ──────────────
@@ -627,12 +758,25 @@ export function BrowserPanel({
         return;
       }
       try {
+        const clickRisk = await wv.executeJavaScript(`(function(){
+          var el = document.querySelector(${JSON.stringify(detail.selector)});
+          if (!el) return { found: false };
+          var form = el.closest('form');
+          var label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+          var submit = (el.matches('button[type="submit"],input[type="submit"]') || (form && el.tagName === 'BUTTON' && el.type !== 'button'));
+          var destructive = /delete|remove|erase|purchase|buy|pay|checkout|send|publish|submit|confirm|supprimer|effacer|payer|acheter|commander|envoyer|publier|valider/.test(label);
+          return { found: true, sensitive: Boolean(submit || destructive), reason: submit ? 'soumission de formulaire' : 'action potentiellement irréversible' };
+        })()`);
+        if (clickRisk?.sensitive && !confirmBrowserSensitiveAction('Leanna souhaite effectuer une ' + clickRisk.reason + ' sur la page actuelle.')) {
+          await postActionResult(detail.requestId, null, 'Action annulée : confirmation utilisateur refusée.');
+          return;
+        }
         // Animer le curseur vers la cible avant le clic
         await moveCursorToElement(wv, detail.selector);
 
         const clickScript = `(function(){
           var el = document.querySelector(${JSON.stringify(detail.selector)});
-          if (!el) return JSON.stringify({ error: 'Sélecteur introuvable: ${detail.selector.replace(/'/g, "\\'")}' });
+          if (!el) return JSON.stringify({ error: ${JSON.stringify('Sélecteur introuvable: ')} + ${JSON.stringify(detail.selector)} });
           var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
           el.dispatchEvent(evt);
           return JSON.stringify({ ok: true });
@@ -671,6 +815,11 @@ export function BrowserPanel({
         return;
       }
       try {
+        if (await inspectSensitiveField(wv, detail.selector)
+          && !confirmBrowserSensitiveAction('Leanna souhaite saisir une information sensible (mot de passe, jeton ou donnée de paiement).')) {
+          await postActionResult(detail.requestId, null, 'Saisie annulée : confirmation utilisateur refusée.');
+          return;
+        }
         // Animer le curseur vers le champ avant la saisie
         await moveCursorToElement(wv, detail.selector);
 
@@ -1041,6 +1190,25 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Webview non disponible.');
         return;
       }
+      if (detail.role === 'button') {
+        const risk = await wv.executeJavaScript(`(function(name){
+          var wanted = String(name || '').toLowerCase();
+          var buttons = Array.from(document.querySelectorAll('button,input[type="submit"],input[type="button"],[role="button"]'));
+          var el = buttons.find(function(item) {
+            var text = (item.innerText || item.value || item.getAttribute('aria-label') || '').trim().toLowerCase();
+            return !wanted || text.includes(wanted);
+          });
+          if (!el) return false;
+          var text = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+          return el.matches('input[type="submit"],button[type="submit"]')
+            || Boolean(el.closest('form') && el.tagName === 'BUTTON' && el.type !== 'button')
+            || /delete|remove|erase|purchase|buy|pay|checkout|send|publish|submit|confirm|supprimer|effacer|payer|acheter|commander|envoyer|publier|valider/.test(text);
+        })(${JSON.stringify(detail.accessibleName)})`);
+        if (risk && !confirmBrowserSensitiveAction('Leanna souhaite cliquer sur un bouton pouvant soumettre un formulaire ou déclencher une action externe.')) {
+          await postActionResult(detail.requestId, null, 'Action annulée : confirmation utilisateur refusée.');
+          return;
+        }
+      }
       const clickByRoleScript = `(function(role, name){
         var getAccessibleName = function(el) {
           var label = el.getAttribute('aria-label');
@@ -1128,6 +1296,30 @@ export function BrowserPanel({
       const wv = webviewRef.current;
       if (!wv) {
         postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const sensitiveByLabel = await wv.executeJavaScript(`(function(label){
+        var wanted = String(label || '').toLowerCase();
+        var fields = Array.from(document.querySelectorAll('input,textarea,select,[contenteditable]'));
+        var field = fields.find(function(el) {
+          var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+          var placeholder = (el.getAttribute('placeholder') || el.getAttribute('aria-placeholder') || '').toLowerCase();
+          var id = el.id ? (document.querySelector('label[for="' + CSS.escape(el.id) + '"]')?.innerText || '').toLowerCase() : '';
+          return aria.includes(wanted) || placeholder.includes(wanted) || id.includes(wanted);
+        });
+        if (!field) {
+          var labelEl = Array.from(document.querySelectorAll('label')).find(function(el){ return el.innerText.toLowerCase().includes(wanted); });
+          field = labelEl ? (labelEl.querySelector('input,textarea,select') || document.getElementById(labelEl.htmlFor)) : null;
+        }
+        if (!field) return false;
+        var type = String(field.type || '').toLowerCase();
+        var autocomplete = String(field.autocomplete || field.getAttribute('autocomplete') || '').toLowerCase();
+        var identity = [field.name, field.id, field.getAttribute('aria-label'), field.getAttribute('placeholder'), autocomplete].join(' ').toLowerCase();
+        return type === 'password' || /current-password|new-password|one-time-code/.test(autocomplete)
+          || /password|passwd|secret|token|api[_-]?key|credit.?card|cvv|cvc/.test(identity);
+      })() `);
+      if (sensitiveByLabel && !confirmBrowserSensitiveAction('Leanna souhaite saisir une information sensible dans le champ « ' + detail.label + ' ».')) {
+        await postActionResult(detail.requestId, null, 'Saisie annulée : confirmation utilisateur refusée.');
         return;
       }
       const typeByLabelScript = `(function(label, text){
@@ -1318,8 +1510,16 @@ export function BrowserPanel({
         return;
       }
       try {
+        if (await inspectSensitiveField(wv, detail.selector)
+          && !confirmBrowserSensitiveAction('Leanna souhaite remplir un champ contenant une information sensible (mot de passe, jeton ou donnée de paiement).')) {
+          await postActionResult(detail.requestId, null, 'Remplissage annulé : confirmation utilisateur refusée.');
+          return;
+        }
         await moveCursorToElement(wv, detail.selector);
-      } catch {/* ignore animation errors */ }
+      } catch (error: any) {
+        await postActionResult(detail.requestId, null, error?.message ?? 'Impossible de vérifier le champ.');
+        return;
+      }
       const script = `(function(){
         var el = document.querySelector(${JSON.stringify(detail.selector)});
         if (!el) return JSON.stringify({ found: false });
@@ -1440,6 +1640,10 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Capture non disponible (webview absente).');
         return;
       }
+      if (!confirmBrowserSensitiveAction('Leanna souhaite capturer la page visible et transmettre cette image au modèle IA pour analyse. La page peut contenir des informations personnelles ou confidentielles.')) {
+        await postActionResult(detail.requestId, null, 'Capture annulée : confirmation utilisateur refusée.');
+        return;
+      }
       try {
         const image = await wv.capturePage();
         if (image.isEmpty()) {
@@ -1460,6 +1664,7 @@ export function BrowserPanel({
 
     window.addEventListener('Leanna-browser-navigate', handleNav);
     window.addEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
+    window.addEventListener('Leanna-browser-tab-command', handleTabCommand as EventListener);
     window.addEventListener('Leanna-browser-scroll', handleScroll);
     window.addEventListener('Leanna-browser-control', handleBrowserControl);
     window.addEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
@@ -1487,6 +1692,7 @@ export function BrowserPanel({
     return () => {
       window.removeEventListener('Leanna-browser-navigate', handleNav);
       window.removeEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
+      window.removeEventListener('Leanna-browser-tab-command', handleTabCommand as EventListener);
       window.removeEventListener('Leanna-browser-scroll', handleScroll);
       window.removeEventListener('Leanna-browser-control', handleBrowserControl);
       window.removeEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);

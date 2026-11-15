@@ -4,6 +4,69 @@ nativeTheme.themeSource = 'dark';
 const fs = require('fs');
 const path = require('path');
 
+const dns = require('dns').promises;
+const net = require('net');
+
+// Politique réseau du navigateur intégré : n'autoriser que les adresses IP
+// globalement routables. Les réponses DNS sont vérifiées avant chaque requête
+// (cache court), y compris les sous-ressources et les redirections.
+const browserDnsCache = new Map();
+const BROWSER_DNS_CACHE_TTL_MS = 15_000;
+const BROWSER_DNS_TIMEOUT_MS = 3_000;
+
+function isPublicBrowserIp(address) {
+  const family = net.isIP(address);
+  if (family === 4) {
+    const octets = address.split('.').map(Number);
+    const [a, b, c] = octets;
+    if (a === 0 || a === 10 || a === 127 || a >= 224 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && (b === 168 || (b === 0 && c === 0) || (b === 0 && c === 2) || (b === 88 && c === 99))) ||
+        (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+        (a === 203 && b === 0 && c === 113)) return false;
+    return true;
+  }
+  if (family === 6) {
+    const ip = address.toLowerCase().split('%')[0];
+    // IPv4-mapped, unspecified, loopback, ULA, link-local, multicast et
+    // plages de documentation/non globales sont refusées.
+    if (ip.startsWith('::ffff:') || ip === '::' || ip === '::1' ||
+        /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip) || ip.startsWith('ff') ||
+        ip.startsWith('2001:db8:')) return false;
+    // Les adresses globales unicast IPv6 appartiennent à 2000::/3.
+    const first = parseInt(ip.split(':')[0] || '0', 16);
+    return first >= 0x2000 && first <= 0x3fff;
+  }
+  return false;
+}
+
+async function hasOnlyPublicDnsAnswers(hostname) {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost') ||
+      host.endsWith('.local') || host.endsWith('.internal') ||
+      host === 'metadata.google.internal') return false;
+  if (net.isIP(host)) return isPublicBrowserIp(host);
+
+  const cached = browserDnsCache.get(host);
+  if (cached && cached.expiresAt > Date.now()) return cached.allowed;
+  try {
+    const answers = await Promise.race([
+      dns.lookup(host, { all: true, verbatim: true }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DNS lookup timeout')), BROWSER_DNS_TIMEOUT_MS)),
+    ]);
+    const allowed = Array.isArray(answers) && answers.length > 0 &&
+      answers.every((answer) => isPublicBrowserIp(answer.address));
+    browserDnsCache.set(host, { allowed, expiresAt: Date.now() + BROWSER_DNS_CACHE_TTL_MS });
+    return allowed;
+  } catch (error) {
+    log('[webview] Résolution DNS refusée:', host, error.message);
+    browserDnsCache.set(host, { allowed: false, expiresAt: Date.now() + 3_000 });
+    return false;
+  }
+}
+
 const DEBUG = process.env.ELECTRON_DEBUG === '1';
 const isPackaged = app.isPackaged;
 
@@ -310,10 +373,11 @@ function createWindow(splash, splashMinEnd) {
     permissionGuardedPartitions.add(partition);
     try {
       const ses = hardenSession.fromPartition(partition);
-      ses.setPermissionRequestHandler((_wc, permission, callback) => {
-        callback(!DENIED_WEBVIEW_PERMISSIONS.has(permission));
-      });
-      ses.setPermissionCheckHandler((_wc, permission) => !DENIED_WEBVIEW_PERMISSIONS.has(permission));
+      guardPartitionNetwork(partition, ses);
+      // Principe fail-closed : aucune permission web n'est accordée implicitement.
+      // Les permissions futures/inconnues restent refusées jusqu'à une décision explicite.
+      ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+      ses.setPermissionCheckHandler(() => false);
       // Téléchargements : refusés par défaut dans le navigateur intégré.
       ses.on('will-download', (event) => {
         log('[webview] Téléchargement bloqué (non supporté dans le navigateur intégré).');
@@ -322,6 +386,27 @@ function createWindow(splash, splashMinEnd) {
     } catch (e) {
       log('[webview] Échec de pose des gardes de permission:', e.message);
     }
+  }
+
+  // Vérifie les destinations réseau au niveau session : cette garde couvre
+  // les redirections et les sous-ressources, pas seulement la navigation top-level.
+  const networkGuardedPartitions = new Set();
+  function guardPartitionNetwork(partition, ses) {
+    if (!partition || networkGuardedPartitions.has(partition)) return;
+    networkGuardedPartitions.add(partition);
+    ses.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
+      let hostname = '';
+      try { hostname = new URL(details.url).hostname; } catch (_) {}
+      hasOnlyPublicDnsAnswers(hostname).then((allowed) => {
+        if (!allowed) {
+          log('[webview] Requête vers destination non publique bloquée:', String(details.url).slice(0, 180));
+        }
+        callback({ cancel: !allowed });
+      }).catch((error) => {
+        log('[webview] Vérification réseau échouée, requête bloquée:', error.message);
+        callback({ cancel: true });
+      });
+    });
   }
 
   // Verrouille les webPreferences de chaque <webview> au moment de son attache.
@@ -433,6 +518,38 @@ app.whenReady().then(() => {
         try { allowed = new URL(navUrl).origin === new URL(startBase).origin; } catch { /* URL invalide → refus */ }
         if (!allowed) navEvent.preventDefault();
       });
+    } else {
+      // Les webviews ne doivent jamais atteindre l'API locale, les réseaux privés
+      // ou les schémas non HTTP(S), y compris après un clic ou une redirection.
+      const isAllowedBrowserUrl = (rawUrl) => {
+        try {
+          const parsed = new URL(rawUrl);
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+          const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+          if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
+              host.endsWith('.internal') || host === 'metadata.google.internal') return false;
+          if (host.includes(':')) {
+            if (host === '::' || host === '::1' || /^f[cd]/.test(host) || /^fe[89ab]/.test(host)) return false;
+            if (/^::ffff:/.test(host)) return false;
+          }
+          const octets = host.split('.').map(Number);
+          if (octets.length === 4 && octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+            const [a, b] = octets;
+            if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
+                (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+                (a === 100 && b >= 64 && b <= 127)) return false;
+          }
+          return true;
+        } catch { return false; }
+      };
+      const blockUnsafeNavigation = (event, targetUrl) => {
+        if (!isAllowedBrowserUrl(targetUrl)) {
+          event.preventDefault();
+          log('[webview] Navigation privée/locale ou schéma interdit bloqué:', String(targetUrl).slice(0, 180));
+        }
+      };
+      contents.on('will-navigate', blockUnsafeNavigation);
+      contents.on('will-redirect', blockUnsafeNavigation);
     }
   }
   // La fenêtre principale et le splash existent déjà : `web-contents-created`

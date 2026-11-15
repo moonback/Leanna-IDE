@@ -89,6 +89,16 @@ export function ChatPanel({
     setToast({ message, icon });
   }, []);
 
+  // Callbacks stables pour ne pas casser le memo de ChatMessage.
+  const handleCopyToast = useCallback(
+    () => showToast('Copié dans le presse-papiers', <CheckCheck size={13} style={{ color: 'var(--color-success)' }} />),
+    [showToast],
+  );
+  const handleExcludeSource = useCallback(
+    (source: { path: string }) => sendRawMessage({ context_exclude: source.path }),
+    [sendRawMessage],
+  );
+
   // ── Refs ────────────────────────────────────────────────────────────────────
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<InputAreaHandle>(null);
@@ -175,12 +185,15 @@ export function ChatPanel({
   }, [connected, isBusy, enqueue, sendTextMessage, scrollToBottom, forceAutoScroll]);
 
   // Retry : renvoie le dernier message utilisateur.
+  // transcript lu via ref : garde handleRetry stable pendant le streaming.
+  const transcriptRef = useRef(transcript);
+  transcriptRef.current = transcript;
   const handleRetry = useCallback(() => {
-    const lastUser = [...transcript].reverse().find(e => e.role === 'user');
+    const lastUser = [...transcriptRef.current].reverse().find(e => e.role === 'user');
     if (!lastUser || !connected) return;
     handleSend(lastUser.text, lastUser.text);
     showToast('Régénération en cours…', <RefreshCw size={13} style={{ color: 'var(--accent-primary)' }} />);
-  }, [transcript, connected, handleSend, showToast]);
+  }, [connected, handleSend, showToast]);
 
   // Édition : préremplit la saisie avec le texte du message (sans l'envoyer).
   const handleEditMessage = useCallback((entry: TranscriptEntry) => {
@@ -543,8 +556,8 @@ export function ChatPanel({
               isPinned={isPinned}
               onTogglePin={togglePin}
               onEditMessage={handleEditMessage}
-              onExcludeSource={(source) => sendRawMessage({ context_exclude: source.path })}
-              onCopy={() => showToast('Copié dans le presse-papiers', <CheckCheck size={13} style={{ color: 'var(--color-success)' }} />)}
+              onExcludeSource={handleExcludeSource}
+              onCopy={handleCopyToast}
               onRetry={handleRetry}
               onDequeue={dequeue}
               sendRawMessage={sendRawMessage}

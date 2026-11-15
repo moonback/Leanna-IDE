@@ -37,7 +37,7 @@ const BLOCKED_SCHEMES = /^(javascript|data|file|vbscript|about):/i;
 export type BrowserNetworkPolicy = "PUBLIC_WEB" | "PUBLIC_WEB_AND_LOCALHOST";
 // Autorise les serveurs de développement locaux nommés localhost sans ouvrir
 // les IP loopback, les réseaux privés ou les endpoints de métadonnées.
-const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB_AND_LOCALHOST";
+const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB";
 
 // Domaines à exclure des résultats de recherche quand on extrait des liens
 // "à visiter" (pages de moteurs de recherche, trackers, etc.)
@@ -545,6 +545,15 @@ const newTabSchema = z.object({
   activate: z.boolean().optional().default(true),
 });
 
+const tabCommandSchema = z.object({
+  action: z.enum(["list", "select", "close"]),
+  tabId: z.string().min(1).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action !== "list" && !value.tabId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "tabId requis pour sélectionner ou fermer un onglet", path: ["tabId"] });
+  }
+});
+
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
 
 // J1 — Accessibilité
@@ -908,6 +917,19 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_manage_tabs",
+      description:
+        "Gère les onglets du navigateur intégré. action=list retourne les onglets avec leurs identifiants, URL, titre et état ; action=select active un onglet ; action=close ferme un onglet. Commence par list pour obtenir un tabId valide.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          action: { type: "STRING", enum: ["list", "select", "close"], description: "Opération à effectuer." },
+          tabId: { type: "STRING", description: "Identifiant retourné par action=list ; requis pour select et close." },
+        },
+        required: ["action"],
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -1109,6 +1131,7 @@ export const browserSkill: Skill = {
     browser_get_console: getConsoleSchema,
     browser_capture: captureSchema,
     browser_new_tab: newTabSchema,
+    browser_manage_tabs: tabCommandSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1125,6 +1148,10 @@ export const browserSkill: Skill = {
   handleToolCall: async (name: string, args: any, context?: any) => {
     const emit = context?.emitIdeAction as ((action: any) => void) | undefined;
     const signal: AbortSignal | undefined = context?.signal;
+    // Diagnostic : url/query seulement (jamais le texte saisi, potentiellement sensible).
+    console.log(`[Browser] ${name}`, args?.url ?? args?.query ?? "",
+      emit ? "" : "(emitIdeAction ABSENT)",
+      context?.browserActionPending ? "" : "(browserActionPending ABSENT)");
 
     // Helper générique pour les actions async (click/type/snapshot/inspect/get-links)
     // qui utilisent le registre browserActionPending de server.ts.
@@ -1138,6 +1165,7 @@ export const browserSkill: Skill = {
       if (!emit) return "[ERREUR] emitIdeAction non disponible.";
 
       const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const startedAt = Date.now();
       return await new Promise<any>((resolve, reject) => {
         const timer = setTimeout(() => {
           pending.delete(requestId);
@@ -1145,7 +1173,13 @@ export const browserSkill: Skill = {
         }, timeoutMs);
         pending.set(requestId, { resolve, reject, timer });
         emit({ requestId, ...action });
-      }).catch((err: Error) => `[ERREUR ACTION] ${err.message}`);
+      }).then((value) => {
+        console.log(`[Browser] ${action.type} ${requestId} ✓ ${Date.now() - startedAt}ms`);
+        return value;
+      }).catch((err: Error) => {
+        console.warn(`[Browser] ${action.type} ${requestId} ✗ ${Date.now() - startedAt}ms : ${err.message}`);
+        return `[ERREUR ACTION] ${err.message}`;
+      });
     };
 
     // Helper avec retry exponentiel (Sprint 1 — J2)
@@ -1194,17 +1228,24 @@ export const browserSkill: Skill = {
     // ── browser_navigate ──────────────────────────────────────────────────────
     if (name === "browser_navigate") {
       const { url } = validateArgs(browserSkill.inputSchemas!["browser_navigate"], args);
-
-      return withEmit(emit, (fire) => {
-        const normalized = normalizeUrl(url); // peut throw → capté par withEmit
-        fire({ type: "open-browser" });
-        fire({ type: "browser-navigate", url: normalized });
-        return {
-          status: "success",
-          url: normalized,
-          message: `Le navigateur intégré navigue vers : ${normalized}`,
-        };
-      });
+      let normalized: string;
+      try { normalized = normalizeUrl(url); } catch (err: any) {
+        return { status: "error", message: err?.message ?? "URL invalide." };
+      }
+      if (!emit) return { status: "error", message: "Le navigateur n'est pas disponible dans ce contexte." };
+      emit({ type: "open-browser" });
+      const navigation = await runBrowserAction<{ url?: string; title?: string }>(
+        { type: "browser-navigate", url: normalized }, 27_000
+      );
+      if (typeof navigation === "string") {
+        return { status: "error", url: normalized, message: navigation };
+      }
+      return {
+        status: "success",
+        url: navigation.url || normalized,
+        title: navigation.title ?? "",
+        message: "Page chargée : " + (navigation.title || navigation.url || normalized),
+      };
     }
 
     // ── browser_open ──────────────────────────────────────────────────────────
@@ -1220,18 +1261,22 @@ export const browserSkill: Skill = {
     if (name === "browser_search") {
       const { query, engine } = validateArgs(browserSkill.inputSchemas!["browser_search"], args);
       const searchUrl = buildSearchUrl(engine, query);
-
-      return withEmit(emit, (fire) => {
-        fire({ type: "open-browser" });
-        fire({ type: "browser-navigate", url: searchUrl });
-        return {
-          status: "success",
-          url: searchUrl,
-          query,
-          engine,
-          message: `Recherche "${query}" en cours sur ${engine} dans le navigateur.`,
-        };
-      });
+      if (!emit) return { status: "error", message: "Le navigateur n'est pas disponible dans ce contexte." };
+      emit({ type: "open-browser" });
+      const navigation = await runBrowserAction<{ url?: string; title?: string }>(
+        { type: "browser-navigate", url: searchUrl }, 27_000
+      );
+      if (typeof navigation === "string") {
+        return { status: "error", url: searchUrl, query, engine, message: navigation };
+      }
+      return {
+        status: "success",
+        url: navigation.url || searchUrl,
+        title: navigation.title ?? "",
+        query,
+        engine,
+        message: "Recherche chargée sur " + engine + " : " + (navigation.title || navigation.url || searchUrl),
+      };
     }
 
     // ── browser_close ─────────────────────────────────────────────────────────
@@ -1292,6 +1337,7 @@ export const browserSkill: Skill = {
       title?: string;
       content?: string;
       contentLength?: number;
+      truncated?: boolean;
       promptInjection?: ReturnType<typeof guardUntrustedContent>["promptInjection"];
       message: string;
     }> => {
@@ -1323,7 +1369,7 @@ export const browserSkill: Skill = {
       }).catch((err: Error) => `[ERREUR LECTURE] ${err.message}`);
 
       // Tenter de parser si le script a retourné un JSON {title, url, text}
-      let parsed: { title?: string; url?: string; text?: string } | null = null;
+      let parsed: { title?: string; url?: string; text?: string; truncated?: boolean } | null = null;
       if (typeof text === "string" && text.startsWith("{") && text.includes('"text"')) {
         try { parsed = JSON.parse(text); } catch { /* pas du JSON */ }
       }
@@ -1332,15 +1378,20 @@ export const browserSkill: Skill = {
         // Le contenu de page est une donnée externe non fiable : neutraliser
         // d'éventuelles instructions injectées avant de le renvoyer au modèle.
         const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
-        const { content, truncated } = truncateContent(guarded.text);
+        const { content, truncated: serverTruncated } = truncateContent(guarded.text);
+        const wasTruncated = Boolean(parsed.truncated || serverTruncated);
+        const visibleContent = wasTruncated
+          ? `${content}\n[Contenu tronqué : limite de lecture atteinte. Utilise un sélecteur plus précis pour poursuivre.]`
+          : content;
         return {
           status: "success",
           url: parsed.url ?? "",
           title: parsed.title ?? "",
-          content,
+          content: visibleContent,
           contentLength: content.length,
+          truncated: wasTruncated,
           promptInjection: guarded.promptInjection,
-          message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
+          message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${wasTruncated ? ", tronqué" : ""}).`,
         };
       }
 
@@ -1424,7 +1475,8 @@ export const browserSkill: Skill = {
         title: result.title ?? "",
         content: result.content ?? "",
         contentLength: result.contentLength ?? 0,
-        message: `Page "${result.title || normalized}" chargée et lue (${result.contentLength ?? 0} caractères).`,
+        truncated: result.truncated ?? false,
+        message: `Page "${result.title || normalized}" chargée et lue (${result.contentLength ?? 0} caractères)${result.truncated ? " — contenu tronqué" : ""}.`,
       };
     }
 
@@ -1447,6 +1499,7 @@ export const browserSkill: Skill = {
         title: result.title ?? "",
         content: result.content ?? "",
         contentLength: result.contentLength ?? 0,
+        truncated: result.truncated ?? false,
         message: result.message,
       };
     }
@@ -1863,6 +1916,18 @@ export const browserSkill: Skill = {
           message: `Nouvel onglet ${activate ? "actif" : "en arrière-plan"} ouvert sur : ${normalized}`,
         };
       });
+    }
+
+    // ── browser_manage_tabs ───────────────────────────────────────────────────
+    if (name === "browser_manage_tabs") {
+      const { action, tabId } = validateArgs(browserSkill.inputSchemas!["browser_manage_tabs"], args);
+      const result = await runBrowserAction<any>({
+        type: "browser-tab-command", action, tabId,
+      }, 10_000);
+      if (typeof result === "string") return { status: "error", message: result };
+      return { status: "success", ...result, message:
+        action === "list" ? "Liste des onglets du navigateur." :
+        action === "select" ? "Onglet activé." : "Onglet fermé." };
     }
 
     // ── browser_click ─────────────────────────────────────────────────────────

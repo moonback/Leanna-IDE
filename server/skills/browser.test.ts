@@ -4,11 +4,11 @@ import { browserSkill, normalizeUrl, rankLinkCandidates, classifyHost, isSponsor
 
 describe("browser", () => {
   describe("URL policy and link ranking", () => {
-    it("allows public URLs and localhost while rejecting private, loopback, and link-local destinations", () => {
+    it("allows public URLs while rejecting localhost, private, loopback, and link-local destinations", () => {
       assert.equal(normalizeUrl("https://example.com/docs"), "https://example.com/docs");
-      assert.equal(normalizeUrl("http://localhost:3000"), "http://localhost:3000");
-      assert.equal(normalizeUrl("http://app.localhost:4173"), "http://app.localhost:4173");
       for (const url of [
+        "http://localhost:3000",
+        "http://app.localhost:4173",
         "http://127.0.0.1",
         "http://10.0.0.1",
         "http://192.168.1.10",
@@ -97,6 +97,7 @@ describe("browser", () => {
         "browser_get_console",
         "browser_capture",
         "browser_new_tab",
+        "browser_manage_tabs",
         "browser_get_accessibility_snapshot",
         "browser_click_by_role",
         "browser_type_by_label",
@@ -158,6 +159,25 @@ describe("browser", () => {
           `Input schema for ${toolName} should exist`
         );
       }
+    });
+
+    describe("browser_manage_tabs schema", () => {
+      const schema = browserSkill.inputSchemas!["browser_manage_tabs"];
+
+      it("accepts listing without a tab id", () => {
+        assert.ok(schema.safeParse({ action: "list" }).success);
+      });
+
+      it("requires a tab id for selection and closing", () => {
+        assert.ok(!schema.safeParse({ action: "select" }).success);
+        assert.ok(!schema.safeParse({ action: "close" }).success);
+        assert.ok(schema.safeParse({ action: "select", tabId: "tab-1" }).success);
+        assert.ok(schema.safeParse({ action: "close", tabId: "tab-1" }).success);
+      });
+
+      it("rejects unknown actions", () => {
+        assert.ok(!schema.safeParse({ action: "reload" }).success);
+      });
     });
 
     describe("browser_navigate schema", () => {
