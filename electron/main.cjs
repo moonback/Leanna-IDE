@@ -43,7 +43,7 @@ function isPublicBrowserIp(address) {
 }
 
 async function hasOnlyPublicDnsAnswers(hostname) {
-  const host = hostname.toLowerCase().replace(/\\.$/, '');
+  const host = hostname.toLowerCase().replace(/\.$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') ||
       host.endsWith('.local') || host.endsWith('.internal') ||
       host === 'metadata.google.internal') return false;
