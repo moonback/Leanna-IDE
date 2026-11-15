@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap, FilePlus, Loader2, Check } from 'lucide-react';
+import { Sparkles, Trash2, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List, Brain, Target, BookOpen, Lightbulb, Zap, FilePlus, Loader2, Check, Rocket } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useToast } from '../ui/Toast.js';
 import { NbButton, NbIconButton, NbPanelHeader, NbEmptyState } from './ui/primitives.js';
@@ -49,6 +49,7 @@ const DOC_TYPES = [
   { key: 'swot', label: 'Analyse SWOT', icon: Target, color: 'var(--color-info)' },
   { key: 'glossary', label: 'Glossaire', icon: BookOpen, color: 'var(--color-accent-alt)' },
   { key: 'roadmap', label: 'Roadmap', icon: Zap, color: 'var(--color-warning)' },
+  { key: 'master-prompt', label: 'Prompt maître dev', icon: Rocket, color: 'var(--color-accent-alt)' },
 ];
 
 const REPORT_TYPES = [

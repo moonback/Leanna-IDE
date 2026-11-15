@@ -5,7 +5,7 @@
 
 import {
   FileBarChart, FileText, HelpCircle, GraduationCap, Briefcase, Clock, List,
-  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale,
+  Brain, Lightbulb, Target, BookOpen, Zap, Sparkles, GitCompare, Scale, Rocket,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -32,6 +32,7 @@ export const DOC_TYPES: DocTypeEntry[] = [
   { key: 'swot', label: 'Analyse SWOT', icon: Target, desc: 'Forces, Faiblesses, Opportunités, Menaces', color: 'var(--color-info)' },
   { key: 'glossary', label: 'Glossaire', icon: BookOpen, desc: 'Termes techniques définis', color: 'var(--color-accent-alt)' },
   { key: 'roadmap', label: 'Roadmap', icon: Zap, desc: 'Roadmap projet auto-générée (business plan, étude de marché)', color: 'var(--color-warning)' },
+  { key: 'master-prompt', label: 'Prompt maître dev', icon: Rocket, desc: 'Prompt d\'ingénierie logicielle autonome pré-rempli depuis vos sources', color: 'var(--color-accent-alt)', badge: 'Nouveau' },
 ];
 
 /** Types de RAPPORTS disponibles dans le modal */

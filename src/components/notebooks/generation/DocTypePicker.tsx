@@ -89,6 +89,7 @@ export function DocTypePicker({
     timeline: 'organize',
     outline: 'organize',
     roadmap: 'organize',
+    'master-prompt': 'organize',
   };
 
   const visibleTypes = DOC_TYPES.filter((type) => {

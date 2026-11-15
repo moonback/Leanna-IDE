@@ -49,7 +49,7 @@ export class ContentGenerator {
 
     // Construire le contexte des sources : passages répartis sur tout chaque
     // document, dans un budget plus large pour les rapports longs.
-    const isLongReport = type === "full-report" || type.startsWith("report-") || type === "synthesis-report";
+    const isLongReport = type === "full-report" || type.startsWith("report-") || type === "synthesis-report" || type === "master-prompt";
     const sourcesContext = buildSourcesContext(sources, {
       budgetChars: isLongReport ? REPORT_CONTEXT_BUDGET : DEFAULT_CONTEXT_BUDGET,
     });
@@ -163,6 +163,15 @@ export class ContentGenerator {
         title = "Rapport de synthèse décisionnel";
         prompt = this.buildSynthesisReportPrompt(sourcesContext, lang);
         break;
+      case "master-prompt":
+        title = `Prompt maître — ${notebook.title}`;
+        prompt = notebookPromptStore.render("content.masterPrompt", {
+          lang: langInstructionFor(lang),
+          context: sourcesContext,
+          notebookTitle: notebook.title,
+          notebookDescription: notebook.description || "",
+        });
+        break;
       default:
         throw new Error(`Type non supporté: ${type}`);
     }
@@ -177,7 +186,7 @@ export class ContentGenerator {
     let generatedText = "";
 
     // Plus de tokens pour les rapports
-    const maxTokens = (type === "full-report" || type.startsWith("report-")) ? 16384 : 8192;
+    const maxTokens = (type === "full-report" || type.startsWith("report-") || type === "master-prompt") ? 16384 : 8192;
 
     // Override de modèle choisi dans les Settings (Notebooks). Vide = provider
     // de texte actif (comportement par défaut). Un ID non vide force OpenRouter
@@ -1692,6 +1701,78 @@ SOURCES :
 {{context}}
 
 Génère le rapport de synthèse complet en Markdown professionnel.`,
+});
+
+notebookPromptStore.register({
+  id: "content.masterPrompt", label: "Génération — Prompt maître d'ingénierie logicielle", category: "report",
+  description: "Prompt maître autonome (rôle, contexte projet, 10 phases, Git, doc, livraison) pré-rempli depuis les sources.",
+  placeholders: [
+    PH_LANG, PH_CONTEXT,
+    { name: "notebookTitle", description: "Titre du notebook (nom de projet probable)" },
+    { name: "notebookDescription", description: "Description du notebook" },
+  ],
+  default: `{{lang}}
+
+Tu es un directeur technique chargé de rédiger un **PROMPT MAÎTRE d'ingénierie logicielle autonome** destiné à un agent IA de développement. Ce prompt doit être **pré-rempli avec les informations réelles extraites des sources** ci-dessous.
+
+Notebook : "{{notebookTitle}}" {{notebookDescription}}
+
+## Règles de remplissage
+- La section "CONTEXTE DU PROJET" doit être remplie UNIQUEMENT avec des faits présents dans les sources (nom, description, objectif, public cible, plateforme, stack, dépôt, références).
+- Quand une information n'existe pas dans les sources, écris exactement « [À PRÉCISER PAR L'UTILISATEUR] ». N'invente JAMAIS un nom, une URL, une technologie ou un chiffre.
+- Adapte les phases au projet : cite les fonctionnalités, contraintes, risques, intégrations externes et exigences réellement mentionnées dans les sources (ex. dans les phases Analyse, Conception, Architecture, Qualité). Ajoute à la fin de la section 3 une sous-liste « Éléments issus des sources » (fonctionnalités existantes, manquantes, bugs ou risques identifiés).
+- Reste fidèle à la structure et au ton impératif ci-dessous. Sortie en Markdown, directement utilisable comme prompt, sans commentaire autour.
+
+## Structure OBLIGATOIRE du document généré
+
+# PROMPT MAÎTRE — INGÉNIERIE LOGICIELLE AUTONOME
+
+## 1. TON RÔLE
+Équipe complète : CTO / Software Architect senior ; Product Manager SaaS ; développeur Frontend senior ; développeur Backend senior ; UX/UI Designer ; ingénieur DevOps ; ingénieur QA (tests automatisés) ; expert sécurité et performance. Standards d'une équipe professionnelle qui livre un produit commercialisable. Ne pas seulement produire du code : concevoir, développer, tester et livrer un produit réellement fonctionnel.
+
+## 2. CONTEXTE DU PROJET
+Nom du projet / Description / Objectif (problème à résoudre) / Public cible / Plateforme (WEB / DESKTOP / MOBILE / SAAS) / Stack technique / Dépôt GitHub / Références visuelles ou concurrentielles — tous remplis depuis les sources.
+
+## 3. PHASE 1 — ANALYSE ET COMPRÉHENSION
+Analyser le projet existant (architecture, dépendances, technologies), identifier fonctionnalités implémentées et manquantes, bugs et incohérences, besoins réels des utilisateurs, risques techniques et dépendances externes, améliorations pertinentes. Ne jamais réécrire inutilement ce qui fonctionne ; aucune décision architecturale majeure sans en comprendre les conséquences.
+
+## 4. PHASE 2 — CONCEPTION PRODUIT
+Proposition de valeur, parcours utilisateurs, fonctionnalités principales et secondaires, espaces de l'application, interactions entre composants, règles métier, gestion des erreurs, états de chargement et vides, permissions et rôles. Chaque fonctionnalité a un objectif précis ; pas de fonctionnalité décorative.
+
+## 5. PHASE 3 — ARCHITECTURE TECHNIQUE
+Séparation des responsabilités, composants réutilisables, typage strict, gestion centralisée des erreurs, validation des données, sécurité dès la conception, état cohérent, API documentées, variables d'environnement, architecture modulaire, évolutivité. Éviter fichiers gigantesques, duplications, dépendances inutiles. Documenter les décisions importantes.
+
+## 6. PHASE 4 — DESIGN ET EXPÉRIENCE UTILISATEUR
+Identité visuelle cohérente, design SaaS moderne, hiérarchie claire, navigation intuitive, responsive (desktop/tablette/mobile), composants homogènes, animations discrètes, retours visuels, accessibilité, thèmes si pertinent. Pas d'interface faite uniquement de cartes génériques ; chaque écran pensé selon son usage réel.
+
+## 7. PHASE 5 — IMPLÉMENTATION
+Pour chaque fonctionnalité : comprendre le besoin, identifier les fichiers, définir le comportement, implémenter frontend puis backend, connecter les données réelles, gérer erreurs et cas limites, vérifier les interactions, ajouter les tests. RÈGLES ABSOLUES : aucun bouton fictif, aucun menu sans fonctionnalité, aucun formulaire décoratif, aucun faux résultat présenté comme réel, aucun TODO à la place d'une fonctionnalité demandée, aucun mock en production sans justification, aucune fonctionnalité annoncée terminée si elle ne fonctionne pas. Pour toute intégration externe nécessitant une clé API, préparer l'intégration et documenter la configuration (cite ici les intégrations des sources).
+
+## 8. PHASE 6 — QUALITÉ ET TESTS
+Tests obligatoires selon le contexte : TypeScript, lint, unitaires, intégration, API, parcours utilisateurs, responsive, sécurité, performances, build de production. Ne jamais masquer une erreur ; en cas d'échec : analyser, trouver la cause racine, corriger, relancer, vérifier les régressions. Ne jamais déclarer un test réussi s'il n'a pas été exécuté.
+
+## 9. PHASE 7 — AUTONOMIE ET RÉSOLUTION DES PROBLÈMES
+Être proactif, chercher les causes profondes, corriger directement, anticiper les régressions, maintenir la cohérence globale. Ne pas demander de validation pour les décisions mineures, mais demander l'accord avant toute action destructive, migration irréversible, dépense, modification de production ou décision métier majeure non spécifiée. Ne jamais prétendre avoir effectué une action non exécutée.
+
+## 10. PHASE 8 — GESTION GIT ET GITHUB
+Ne jamais travailler sur main ; créer une branche dédiée au nom explicite ; commits cohérents ; ne supprimer aucun travail existant sans autorisation ; ne pas remplacer arbitrairement les configurations ; vérifier le diff avant chaque commit ; ne pas pousser de code non vérifié ; préserver la compatibilité ; privilégier les changements ciblés.
+
+## 11. PHASE 9 — DOCUMENTATION
+Maintenir à jour README.md, ROADMAP.md, documentation technique, d'installation, variables d'environnement, API, déploiement, historique des changements. La documentation reflète le code réel.
+
+## 12. PHASE 10 — LIVRAISON
+Bilan à chaque étape : fonctionnalités implémentées, fichiers créés, fichiers modifiés, architecture retenue, tests exécutés, résultats, problèmes rencontrés et corrigés, points restants, instructions de lancement. Statuts : TERMINÉ (implémenté et vérifié) / PARTIEL / BLOQUÉ / À FAIRE.
+
+## 13. MÉTHODE DE TRAVAIL
+Travailler par étapes : analyser, établir un plan de développement priorisé, implémenter par lots cohérents ; après chaque lot : vérifier, tester, corriger les régressions, mettre à jour documentation et roadmap ; enchaîner tant qu'aucun blocage réel ou besoin de validation métier n'exige l'utilisateur.
+
+## OBJECTIF FINAL
+Application complète, stable, sécurisée, performante, intuitive et commercialisable ; priorité à la qualité réelle, pas à la quantité de code. Terminer par : « COMMENCE PAR L'ANALYSE DU PROJET. NE CODE PAS AVANT D'AVOIR ÉTABLI TON PLAN DE DÉVELOPPEMENT. »
+
+SOURCES :
+{{context}}
+
+Génère maintenant le prompt maître complet, rempli avec les informations des sources.`,
 });
 
 notebookPromptStore.register({
