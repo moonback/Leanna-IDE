@@ -61,37 +61,22 @@ export function useChatScroll({
     setShowScrollBtn(dist > 80 && messageCount > 1);
   }, [messageCount]);
 
-  // Un seul scroll par frame : toutes les sources (rendu, streaming, resize)
-  // sont fusionnées, et la lecture de scrollHeight n'a lieu qu'après le layout.
-  const scrollRafRef = useRef<number | null>(null);
-  const scheduleScroll = useCallback(() => {
-    if (scrollRafRef.current !== null) return;
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      if (shouldAutoScrollRef.current) scrollToBottom(false);
-    });
-  }, [scrollToBottom]);
-
-  useEffect(() => () => {
-    if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
-  }, []);
-
   // Auto-scroll à chaque mise à jour du fil, si on est déjà près du bas.
   useLayoutEffect(() => {
-    if (shouldAutoScrollRef.current) scheduleScroll();
+    if (shouldAutoScrollRef.current) scrollToBottom(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messageCount, lastEntryId, lastEntryText, scheduleScroll, ...extraDeps]);
+  }, [messageCount, lastEntryId, lastEntryText, ...extraDeps]);
 
   // Observe le redimensionnement du contenu (streaming, images chargées).
   useEffect(() => {
     const inner = messagesInnerRef.current;
     if (!inner) return;
     const observer = new ResizeObserver(() => {
-      if (shouldAutoScrollRef.current) scheduleScroll();
+      if (shouldAutoScrollRef.current) scrollToBottom(false);
     });
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [scheduleScroll]);
+  }, [scrollToBottom]);
 
   const forceAutoScroll = useCallback(() => { shouldAutoScrollRef.current = true; }, []);
 
