@@ -394,7 +394,9 @@ export class RAGEngine {
         return this.applyRerankScores(candidates, indexScores);
       }
 
-      log.warn("Re-ranking: impossible de parser la réponse LLM, utilisation des scores originaux");
+      log.warn(
+        `Re-ranking: impossible de parser la réponse LLM, utilisation des scores originaux (réponse: ${JSON.stringify(text.slice(0, 200))})`,
+      );
       return candidates;
     }
 
