@@ -619,7 +619,7 @@ export function BrowserPanel({
     // dans l'interface utilisateur, jamais par le contenu de la page.
     const confirmBrowserSensitiveAction = (message: string): boolean => {
       try {
-        return window.confirm(message + '\\n\\nCette action a été demandée par Leanna. Voulez-vous continuer ?');
+        return window.confirm(message + '\n\nCette action a été demandée par Leanna. Voulez-vous continuer ?');
       } catch {
         return false;
       }
@@ -1152,6 +1152,25 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Webview non disponible.');
         return;
       }
+      if (detail.role === 'button') {
+        const risk = await wv.executeJavaScript(`(function(name){
+          var wanted = String(name || '').toLowerCase();
+          var buttons = Array.from(document.querySelectorAll('button,input[type="submit"],input[type="button"],[role="button"]'));
+          var el = buttons.find(function(item) {
+            var text = (item.innerText || item.value || item.getAttribute('aria-label') || '').trim().toLowerCase();
+            return !wanted || text.includes(wanted);
+          });
+          if (!el) return false;
+          var text = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+          return el.matches('input[type="submit"],button[type="submit"]')
+            || Boolean(el.closest('form') && el.tagName === 'BUTTON' && el.type !== 'button')
+            || /delete|remove|erase|purchase|buy|pay|checkout|send|publish|submit|confirm|supprimer|effacer|payer|acheter|commander|envoyer|publier|valider/.test(text);
+        })(${JSON.stringify(detail.accessibleName)})`);
+        if (risk && !confirmBrowserSensitiveAction('Leanna souhaite cliquer sur un bouton pouvant soumettre un formulaire ou déclencher une action externe.')) {
+          await postActionResult(detail.requestId, null, 'Action annulée : confirmation utilisateur refusée.');
+          return;
+        }
+      }
       const clickByRoleScript = `(function(role, name){
         var getAccessibleName = function(el) {
           var label = el.getAttribute('aria-label');
@@ -1239,6 +1258,30 @@ export function BrowserPanel({
       const wv = webviewRef.current;
       if (!wv) {
         postActionResult(detail.requestId, null, 'Webview non disponible.');
+        return;
+      }
+      const sensitiveByLabel = await wv.executeJavaScript(`(function(label){
+        var wanted = String(label || '').toLowerCase();
+        var fields = Array.from(document.querySelectorAll('input,textarea,select,[contenteditable]'));
+        var field = fields.find(function(el) {
+          var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+          var placeholder = (el.getAttribute('placeholder') || el.getAttribute('aria-placeholder') || '').toLowerCase();
+          var id = el.id ? (document.querySelector('label[for="' + CSS.escape(el.id) + '"]')?.innerText || '').toLowerCase() : '';
+          return aria.includes(wanted) || placeholder.includes(wanted) || id.includes(wanted);
+        });
+        if (!field) {
+          var labelEl = Array.from(document.querySelectorAll('label')).find(function(el){ return el.innerText.toLowerCase().includes(wanted); });
+          field = labelEl ? (labelEl.querySelector('input,textarea,select') || document.getElementById(labelEl.htmlFor)) : null;
+        }
+        if (!field) return false;
+        var type = String(field.type || '').toLowerCase();
+        var autocomplete = String(field.autocomplete || field.getAttribute('autocomplete') || '').toLowerCase();
+        var identity = [field.name, field.id, field.getAttribute('aria-label'), field.getAttribute('placeholder'), autocomplete].join(' ').toLowerCase();
+        return type === 'password' || /current-password|new-password|one-time-code/.test(autocomplete)
+          || /password|passwd|secret|token|api[_-]?key|credit.?card|cvv|cvc/.test(identity);
+      })() `);
+      if (sensitiveByLabel && !confirmBrowserSensitiveAction('Leanna souhaite saisir une information sensible dans le champ « ' + detail.label + ' ».')) {
+        await postActionResult(detail.requestId, null, 'Saisie annulée : confirmation utilisateur refusée.');
         return;
       }
       const typeByLabelScript = `(function(label, text){
