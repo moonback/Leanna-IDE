@@ -58,9 +58,13 @@ const pick = (...ids: NavId[]): NavItem[] => ids.map((id) => NAV_ITEMS[id]);
  * Chaque destination déclarée est accessible depuis la navigation globale.
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: 'workspace', label: '', items: pick('ide') },
-  { id: 'library', label: 'Connaissances', items: pick('memories', 'notebooks', 'documents', 'lists', 'history') },
-  { id: 'operations', label: 'Opérations', items: pick('automation', 'observability', 'contextIntelligence') },
+  // Accès principal : l'espace de travail reste toujours en tête.
+  { id: 'workspace', label: 'Espace de travail', items: pick('ide', 'documents', 'notebooks') },
+  // Intelligence et ressources personnelles.
+  { id: 'intelligence', label: 'Intelligence', items: pick('memories', 'contextIntelligence', 'history', 'lists') },
+  // Pilotage et suivi de l'activité.
+  { id: 'operations', label: 'Pilotage', items: pick('automation', 'observability') },
+  // Services connectés.
   { id: 'integrations', label: 'Intégrations', items: pick('github') },
 ];
 
