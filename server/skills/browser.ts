@@ -545,6 +545,15 @@ const newTabSchema = z.object({
   activate: z.boolean().optional().default(true),
 });
 
+const tabCommandSchema = z.object({
+  action: z.enum(["list", "select", "close"]),
+  tabId: z.string().min(1).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action !== "list" && !value.tabId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "tabId requis pour sélectionner ou fermer un onglet", path: ["tabId"] });
+  }
+});
+
 // ─── Sprint 1 — Nouveaux schemas ──────────────────────────────────────────────
 
 // J1 — Accessibilité
@@ -908,6 +917,19 @@ export const browserSkill: Skill = {
       },
     },
     {
+      name: "browser_manage_tabs",
+      description:
+        "Gère les onglets du navigateur intégré. action=list retourne les onglets avec leurs identifiants, URL, titre et état ; action=select active un onglet ; action=close ferme un onglet. Commence par list pour obtenir un tabId valide.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          action: { type: "STRING", enum: ["list", "select", "close"], description: "Opération à effectuer." },
+          tabId: { type: "STRING", description: "Identifiant retourné par action=list ; requis pour select et close." },
+        },
+        required: ["action"],
+      },
+    },
+    {
       name: "browser_inspect",
       description:
         "Inspecte les éléments d'un type précis sur la page (boutons, champs, liens, ou tous) et retourne leurs sélecteurs CSS. Alternative à browser_snapshot pour cibler un type d'élément spécifique.",
@@ -1109,6 +1131,7 @@ export const browserSkill: Skill = {
     browser_get_console: getConsoleSchema,
     browser_capture: captureSchema,
     browser_new_tab: newTabSchema,
+    browser_manage_tabs: tabCommandSchema,
     // Sprint 1 — J1
     browser_get_accessibility_snapshot: accessibilitySnapshotSchema,
     browser_click_by_role: clickByRoleSchema,
@@ -1882,6 +1905,18 @@ export const browserSkill: Skill = {
           message: `Nouvel onglet ${activate ? "actif" : "en arrière-plan"} ouvert sur : ${normalized}`,
         };
       });
+    }
+
+    // ── browser_manage_tabs ───────────────────────────────────────────────────
+    if (name === "browser_manage_tabs") {
+      const { action, tabId } = validateArgs(browserSkill.inputSchemas!["browser_manage_tabs"], args);
+      const result = await runBrowserAction<any>({
+        type: "browser-tab-command", action, tabId,
+      }, 10_000);
+      if (typeof result === "string") return { status: "error", message: result };
+      return { status: "success", ...result, message:
+        action === "list" ? "Liste des onglets du navigateur." :
+        action === "select" ? "Onglet activé." : "Onglet fermé." };
     }
 
     // ── browser_click ─────────────────────────────────────────────────────────
