@@ -1194,17 +1194,24 @@ export const browserSkill: Skill = {
     // ── browser_navigate ──────────────────────────────────────────────────────
     if (name === "browser_navigate") {
       const { url } = validateArgs(browserSkill.inputSchemas!["browser_navigate"], args);
-
-      return withEmit(emit, (fire) => {
-        const normalized = normalizeUrl(url); // peut throw → capté par withEmit
-        fire({ type: "open-browser" });
-        fire({ type: "browser-navigate", url: normalized });
-        return {
-          status: "success",
-          url: normalized,
-          message: `Le navigateur intégré navigue vers : ${normalized}`,
-        };
-      });
+      let normalized: string;
+      try { normalized = normalizeUrl(url); } catch (err: any) {
+        return { status: "error", message: err?.message ?? "URL invalide." };
+      }
+      if (!emit) return { status: "error", message: "Le navigateur n'est pas disponible dans ce contexte." };
+      emit({ type: "open-browser" });
+      const navigation = await runBrowserAction<{ url?: string; title?: string }>(
+        { type: "browser-navigate", url: normalized }, 27_000
+      );
+      if (typeof navigation === "string") {
+        return { status: "error", url: normalized, message: navigation };
+      }
+      return {
+        status: "success",
+        url: navigation.url || normalized,
+        title: navigation.title ?? "",
+        message: "Page chargée : " + (navigation.title || navigation.url || normalized),
+      };
     }
 
     // ── browser_open ──────────────────────────────────────────────────────────
