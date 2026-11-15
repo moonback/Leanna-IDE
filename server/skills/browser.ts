@@ -1323,7 +1323,7 @@ export const browserSkill: Skill = {
       }).catch((err: Error) => `[ERREUR LECTURE] ${err.message}`);
 
       // Tenter de parser si le script a retourné un JSON {title, url, text}
-      let parsed: { title?: string; url?: string; text?: string } | null = null;
+      let parsed: { title?: string; url?: string; text?: string; truncated?: boolean } | null = null;
       if (typeof text === "string" && text.startsWith("{") && text.includes('"text"')) {
         try { parsed = JSON.parse(text); } catch { /* pas du JSON */ }
       }
@@ -1332,15 +1332,20 @@ export const browserSkill: Skill = {
         // Le contenu de page est une donnée externe non fiable : neutraliser
         // d'éventuelles instructions injectées avant de le renvoyer au modèle.
         const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
-        const { content, truncated } = truncateContent(guarded.text);
+        const { content, truncated: serverTruncated } = truncateContent(guarded.text);
+        const wasTruncated = Boolean(parsed.truncated || serverTruncated);
+        const visibleContent = wasTruncated
+          ? `${content}\n[Contenu tronqué : limite de lecture atteinte. Utilise un sélecteur plus précis pour poursuivre.]`
+          : content;
         return {
           status: "success",
           url: parsed.url ?? "",
           title: parsed.title ?? "",
-          content,
+          content: visibleContent,
           contentLength: content.length,
+          truncated: wasTruncated,
           promptInjection: guarded.promptInjection,
-          message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${truncated ? ", tronqué" : ""}).`,
+          message: `Contenu extrait de "${parsed.title ?? parsed.url ?? "la page"}" (${content.length} caractères${wasTruncated ? ", tronqué" : ""}).`,
         };
       }
 
