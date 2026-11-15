@@ -1283,6 +1283,7 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
   //   sandbox/.Leanna/sandbox/.Leanna/sandbox/…
   const absDst = path.resolve(dst);
 
+  const files: Array<[string, string]> = [];
   const entries = await fs.promises.readdir(src, { withFileTypes: true });
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
@@ -1303,14 +1304,37 @@ async function syncDirectory(src: string, dst: string, relativeTo?: string): Pro
     const dstPath = path.join(dst, entry.name);
 
     if (entry.isDirectory()) {
+      // Dépôts et caches de build imbriqués (sous-modules, apps/x/.next) : jamais utiles.
+      if (EXCLUDE_ANY_DEPTH.has(entry.name)) continue;
       await fs.promises.mkdir(dstPath, { recursive: true });
       count += await syncDirectory(srcPath, dstPath, base);
     } else if (entry.isFile()) {
-      await fs.promises.mkdir(path.dirname(dstPath), { recursive: true });
-      await fs.promises.copyFile(srcPath, dstPath);
-      count++;
+      files.push([srcPath, dstPath]);
     }
   }
 
-  return count;
+  for (let i = 0; i < files.length; i += COPY_CONCURRENCY) {
+    await Promise.all(files.slice(i, i + COPY_CONCURRENCY).map(([s, d]) => copyIfChanged(s, d)));
+  }
+
+  return count + files.length;
+}
+
+const COPY_CONCURRENCY = 16;
+const EXCLUDE_ANY_DEPTH = new Set([".git", ".next"]);
+
+/**
+ * Copie src → dst sauf si dst a déjà la même taille et la même date : rouvrir un
+ * gros projet ne recopie alors que ce qui a changé. La date de src est reportée
+ * sur dst, donc un fichier modifié dans le sandbox (date différente) est bien écrasé.
+ * shortcut: sur FAT/exFAT (dates à 2 s près) tout est recopié à chaque fois, comparer un hash si ça gêne.
+ */
+async function copyIfChanged(srcPath: string, dstPath: string): Promise<void> {
+  const [s, d] = await Promise.all([
+    fs.promises.stat(srcPath),
+    fs.promises.stat(dstPath).catch(() => null),
+  ]);
+  if (d?.isFile() && d.size === s.size && Math.abs(d.mtimeMs - s.mtimeMs) <= 2) return;
+  await fs.promises.copyFile(srcPath, dstPath);
+  await fs.promises.utimes(dstPath, s.atime, s.mtime);
 }

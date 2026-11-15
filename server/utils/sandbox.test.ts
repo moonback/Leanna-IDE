@@ -116,6 +116,40 @@ test('sandbox: initSandbox ne se copie pas récursivement dans le dossier destin
   }
 });
 
+test('sandbox: initSandbox ne recopie que les fichiers changés', async () => {
+  const { initSandbox, getSandboxRoot } = await import('./sandbox.js');
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'leanna-sandbox-incr-'));
+
+  try {
+    fs.mkdirSync(path.join(tmpRoot, 'src'));
+    fs.mkdirSync(path.join(tmpRoot, 'apps', 'web', '.next'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'src', 'a.ts'), 'AAAA');
+    fs.writeFileSync(path.join(tmpRoot, 'src', 'b.ts'), 'BBBB');
+    fs.writeFileSync(path.join(tmpRoot, 'apps', 'web', '.next', 'cache.js'), 'x');
+    setSelfRoot(tmpRoot);
+    await initSandbox();
+
+    const sandbox = getSandboxRoot();
+    const a = path.join(sandbox, 'src', 'a.ts');
+    const b = path.join(sandbox, 'src', 'b.ts');
+    assert.ok(!fs.existsSync(path.join(sandbox, 'apps', 'web', '.next')), '.next imbriqué exclu');
+
+    // a : même taille et même date que la source → doit être laissé tel quel.
+    const aStat = fs.statSync(a);
+    fs.writeFileSync(a, 'ZZZZ');
+    fs.utimesSync(a, aStat.atime, aStat.mtime);
+    // b : modifié dans le sandbox (date différente) → doit être restauré.
+    fs.writeFileSync(b, 'YYYY');
+    fs.utimesSync(b, new Date(), new Date(Date.now() + 60_000));
+
+    await initSandbox();
+    assert.equal(fs.readFileSync(a, 'utf-8'), 'ZZZZ', 'fichier inchangé non recopié');
+    assert.equal(fs.readFileSync(b, 'utf-8'), 'BBBB', 'fichier modifié restauré');
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
 // ── Régression : les données internes .Leanna/core ne sont jamais des modifications ──
 //
 // Les fichiers internes de Leanna (checkpoints, evidence, …) sous .Leanna/
