@@ -204,6 +204,18 @@ export class ProjectIndexer {
     const root = this.getActiveProjectRoot();
     const force = options.force ?? false;
 
+    // Au plus toutes les 50 ms : notifie la progression puis rend la main à la
+    // boucle d'événements. Mesuré : sans cette pause, le serveur ne répond plus
+    // du tout pendant le scan (lectures et parsing synchrones), et un message
+    // de progression part pour chaque fichier.
+    let lastTick = 0;
+    const tick = async (p: Parameters<NonNullable<ScanAllOptions["onProgress"]>>[0]): Promise<void> => {
+      if (Date.now() - lastTick < 50) return;
+      options.onProgress?.(p);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      lastTick = Date.now();
+    };
+
     // 1. Lister tous les fichiers sur disque (opération rapide < 50ms)
     const files: string[] = [];
     await this.walkDirectory(root, files, root);
@@ -302,7 +314,7 @@ export class ProjectIndexer {
           for (let i = 0; i < changedFiles.length; i++) {
             if (options.signal?.aborted) throw new ScanCancelledError();
             const changedPath = changedFiles[i];
-            options.onProgress?.({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
+            await tick({ phase: 'incremental', current: i + 1, total: changedFiles.length, file: changedPath });
             await this.scanFile(changedPath, { skipRelationRefresh: true, batch });
           }
           knowledgeGraph.applyChanges(batch.upserts, batch.removals);
@@ -346,7 +358,7 @@ export class ProjectIndexer {
     for (let i = 0; i < files.length; i++) {
       if (options.signal?.aborted) throw new ScanCancelledError();
       const relativePath = files[i];
-      options.onProgress?.({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
+      await tick({ phase: 'parse', current: i + 1, total: files.length, file: relativePath });
       try {
         const absPath = path.join(root, relativePath);
         // Bug 3 : _readContent ouvre un unique fd, fait fstatSync (taille + mtime)
@@ -399,6 +411,9 @@ export class ProjectIndexer {
 
     // Construire le graphe d'appels AST en mémoire
     if (astResults.size > 0) {
+      // Scan complet = reconstruction : repartir de zéro évite les nœuds de
+      // fichiers disparus et le nettoyage par fichier (voir ASTCallGraph._removeFile).
+      astCallGraph.clear();
       for (const [, astResult] of astResults) {
         astCallGraph.updateFile(astResult, astResults);
       }
@@ -1633,6 +1648,9 @@ export class ProjectIndexer {
     if (!started) return false;
 
     this.watcherUnsubscribe = fileWatcher.onChange(async (events: FileChangeEvent[]) => {
+      // Le scan rend la main : un changement arrivé pendant un scan complet
+      // serait écrasé par son résultat, d'où un re-scan de rattrapage.
+      this.requestRescan();
       await this.handleFileChanges(events);
     });
 

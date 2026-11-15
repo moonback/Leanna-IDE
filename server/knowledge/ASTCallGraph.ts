@@ -78,6 +78,8 @@ export class ASTCallGraph {
   private inEdges = new Map<CallNodeId, CallEdge[]>();
   /** Map nom de fonction → node IDs possibles (pour résolution) */
   private nameIndex = new Map<string, CallNodeId[]>();
+  /** Fichiers déjà intégrés (ont pu créer des nœuds) */
+  private files = new Set<string>();
   private lastRootSeen: string = "";
 
   private syncToCurrentWorkspace(): void {
@@ -94,6 +96,7 @@ export class ASTCallGraph {
     this.outEdges.clear();
     this.inEdges.clear();
     this.nameIndex.clear();
+    this.files.clear();
   }
 
   // ─── Mise à jour du graphe ─────────────────────────────────────────────────
@@ -110,6 +113,7 @@ export class ASTCallGraph {
 
     // 1. Supprimer les anciens nœuds/arêtes de ce fichier
     this._removeFile(filePath);
+    this.files.add(filePath);
 
     // 2. Enregistrer les nœuds (fonctions connues)
     for (const fn of astResult.functions) {
@@ -395,6 +399,10 @@ export class ASTCallGraph {
   }
 
   private _removeFile(filePath: string): void {
+    // Fichier jamais intégré : rien à retirer. Sans cette sortie, chaque
+    // updateFile reparcourt tout le graphe — O(N²) sur un scan complet.
+    if (!this.files.delete(filePath)) return;
+
     // Supprimer les nœuds du fichier
     const idsToRemove = new Set<CallNodeId>();
     for (const [id, node] of this.nodes) {
