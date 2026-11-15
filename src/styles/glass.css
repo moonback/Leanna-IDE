@@ -30,7 +30,7 @@
   --shell-gap: 8px;            /* écart entre les vitres du shell */
   --header-h: 52px;            /* hauteur unique des en-têtes de page */
   --rail-w: 56px;              /* rail de navigation replié */
-  --rail-w-open: 232px;        /* rail déplié */
+  --rail-w-open: 240px;        /* rail déplié */
   --control-h: 32px;           /* boutons / champs standard */
   --control-h-sm: 28px;        /* boutons compacts (headers, toolbars) */
   --nav-item-h: 34px;
@@ -391,8 +391,8 @@ html, body { background: var(--atmo-base); }
   box-shadow: 0 18px 48px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255, 255, 255, .035);
 }
 .lea-sidebar__brand {
-  height: 68px;
-  padding-inline: 16px;
+  height: 54px;
+  padding-inline: 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-stroke) 72%, transparent);
   margin-bottom: 10px;
 }
@@ -400,16 +400,16 @@ html, body { background: var(--atmo-base); }
   filter: drop-shadow(0 4px 12px var(--accent-glow));
 }
 .lea-sidebar__search {
-  height: 38px;
-  margin-inline: 12px;
-  margin-bottom: 12px;
+  height: 30px;
+  margin-inline: 8px;
+  margin-bottom: 6px;
   border-radius: 11px;
   background: color-mix(in srgb, var(--glass-card) 88%, transparent);
 }
 .lea-sidebar [data-nav-item] {
-  min-height: 40px;
-  padding-inline: 12px;
-  border-radius: 10px;
+  min-height: 32px;
+  padding-inline: 9px;
+  border-radius: 8px;
   transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 .lea-sidebar [data-nav-item]:not(:disabled):hover {
@@ -426,10 +426,10 @@ html, body { background: var(--atmo-base); }
   border-radius: 0 4px 4px 0;
 }
 .lea-sidebar section > button[aria-expanded] {
-  min-height: 32px;
-  padding-inline: 12px;
-  padding-top: 10px;
-  padding-bottom: 6px;
+  min-height: 26px;
+  padding-inline: 9px;
+  padding-top: 5px;
+  padding-bottom: 3px;
 }
 .lea-sidebar section > button[aria-expanded] > span:first-child > span:first-child {
   font-size: 10px;
@@ -437,11 +437,11 @@ html, body { background: var(--atmo-base); }
 }
 .lea-sidebar__footer {
   gap: 4px;
-  padding: 12px 10px 10px;
+  padding: 8px 8px 7px;
   background: color-mix(in srgb, var(--glass-card) 40%, transparent);
 }
 .lea-sidebar__sep {
-  margin-block: 10px;
+  margin-block: 6px;
   opacity: .75;
 }
 .lea-sidebar [data-nav-item]:focus-visible,
