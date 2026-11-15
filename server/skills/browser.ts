@@ -37,7 +37,7 @@ const BLOCKED_SCHEMES = /^(javascript|data|file|vbscript|about):/i;
 export type BrowserNetworkPolicy = "PUBLIC_WEB" | "PUBLIC_WEB_AND_LOCALHOST";
 // Autorise les serveurs de développement locaux nommés localhost sans ouvrir
 // les IP loopback, les réseaux privés ou les endpoints de métadonnées.
-const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB_AND_LOCALHOST";
+const NETWORK_POLICY: BrowserNetworkPolicy = "PUBLIC_WEB";
 
 // Domaines à exclure des résultats de recherche quand on extrait des liens
 // "à visiter" (pages de moteurs de recherche, trackers, etc.)
