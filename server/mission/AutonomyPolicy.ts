@@ -61,7 +61,7 @@ export class AutonomyPolicy {
     /** Override explicite ; sinon lu depuis LEANNA_AUTO_ALLOW_DANGEROUS. */
     allowDangerousInAuto?: boolean;
   }) {
-    this.mode = params.mode ?? "ask";
+    this.mode = params.mode ?? "auto";
     const root = params.workspaceRoot;
     this.getRoot = typeof root === "function" ? root : () => root;
     this.allowDangerousInAuto =
