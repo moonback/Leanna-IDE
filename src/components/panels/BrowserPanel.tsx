@@ -42,6 +42,7 @@ function newTabId(): string {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export const BROWSER_HOME_URL = 'about:blank';
+const MAX_BROWSER_TABS = 12;
 
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -171,13 +172,19 @@ export function BrowserPanel({
     const url = normalizeUrl(raw);
     setInputValue(url);
     setTabs((prev) => prev.map((t) => (t.id === activeTabId ? { ...t, loadError: null } : t)));
-    tabHandlesRef.current.get(activeTabId)?.loadURL(url);
-  }, [activeTabId]);
+    const handle = tabHandlesRef.current.get(activeTabId);
+    if (activeTab.url === url) handle?.reload();
+    else handle?.loadURL(url);
+  }, [activeTabId, activeTab.url]);
 
   // ── Gestion des onglets ─────────────────────────────────────────────────────
 
   /** Ouvre un nouvel onglet (optionnellement en arrière-plan) et renvoie son id. */
   const openTab = useCallback((url: string = BROWSER_HOME_URL, activate = true): string => {
+    if (tabs.length >= MAX_BROWSER_TABS) {
+      console.warn(`[BrowserPanel] Limite de ${MAX_BROWSER_TABS} onglets atteinte.`);
+      return '';
+    }
     const id = newTabId();
     const normalized = (() => { try { return normalizeUrl(url); } catch { return BROWSER_HOME_URL; } })();
     setTabs((prev) => [...prev, {
@@ -185,7 +192,7 @@ export function BrowserPanel({
     }]);
     if (activate) setActiveTabId(id);
     return id;
-  }, []);
+  }, [tabs.length]);
 
   const switchTab = useCallback((id: string) => {
     setActiveTabId((prev) => (prev === id ? prev : id));
@@ -485,12 +492,23 @@ export function BrowserPanel({
     const handleReadRequest = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; selector: string | null };
       const wv = webviewRef.current;
-      if (!wv) return;
+      if (!wv) {
+        const token = localStorage.getItem('Leanna_api_token') || '';
+        await fetch('/api/browser/content-result', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'x-Leanna-token': token } : {}) },
+          body: JSON.stringify({ requestId: detail.requestId, result: null, error: 'Webview non disponible.' }),
+        }).catch(() => {/* canal indisponible */});
+        return;
+      }
 
       const extractScript = detail.selector
         ? `(function(){
             var el = document.querySelector(${JSON.stringify(detail.selector)});
-            return el ? el.innerText.substring(0, 8000) : '[sélecteur introuvable: ${detail.selector}]';
+            if (!el) return JSON.stringify({ text: ${JSON.stringify('[sélecteur introuvable]')}, truncated: false });
+            var text = el.innerText || '';
+            var truncated = text.length > 15000;
+            return JSON.stringify({ text: text.substring(0, 15000), truncated: truncated });
           })()`
         : `(function(){
             var title = document.title;
@@ -501,9 +519,10 @@ export function BrowserPanel({
             });
             var text = clone.innerText
               .replace(/[ \\t]{2,}/g, ' ')
-              .replace(/\\n{3,}/g, '\\n\\n')
-              .substring(0, 8000);
-            return JSON.stringify({ title: title, url: url, text: text });
+              .replace(/\\n{3,}/g, '\\n\\n');
+            var truncated = text.length > 15000;
+            text = text.substring(0, 15000);
+            return JSON.stringify({ title: title, url: url, text: text, truncated: truncated });
           })()`;
 
       try {
@@ -632,7 +651,7 @@ export function BrowserPanel({
 
         const clickScript = `(function(){
           var el = document.querySelector(${JSON.stringify(detail.selector)});
-          if (!el) return JSON.stringify({ error: 'Sélecteur introuvable: ${detail.selector.replace(/'/g, "\\'")}' });
+          if (!el) return JSON.stringify({ error: ${JSON.stringify('Sélecteur introuvable: ')} + ${JSON.stringify(detail.selector)} });
           var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
           el.dispatchEvent(evt);
           return JSON.stringify({ ok: true });
