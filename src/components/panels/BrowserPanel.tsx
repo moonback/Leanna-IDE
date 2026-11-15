@@ -507,6 +507,44 @@ export function BrowserPanel({
       setTimeout(() => setAssistantNavActive(false), 3000);
     };
 
+    const handleTabCommand = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { requestId: string; action: 'list' | 'select' | 'close'; tabId?: string };
+      if (!detail?.requestId) return;
+      if (detail.action === 'list') {
+        await postActionResult(detail.requestId, {
+          activeTabId: activeTabIdRef.current,
+          tabs: tabsRef.current.map((tab, index) => ({
+            id: tab.id, index, active: tab.id === activeTabIdRef.current,
+            url: tab.url, title: tab.title, loading: tab.loading, loadError: tab.loadError,
+          })),
+        });
+        return;
+      }
+      if (!detail.tabId || !tabsRef.current.some((tab) => tab.id === detail.tabId)) {
+        await postActionResult(detail.requestId, null, 'Onglet introuvable.');
+        return;
+      }
+      if (detail.action === 'select') {
+        setActiveTabId(detail.tabId);
+        await postActionResult(detail.requestId, { ok: true, activeTabId: detail.tabId });
+        return;
+      }
+      const current = tabsRef.current;
+      if (current.length === 1) {
+        await postActionResult(detail.requestId, null, 'Impossible de fermer le dernier onglet via cette action. Utilisez browser_close pour fermer le navigateur.');
+        return;
+      }
+      const index = current.findIndex((tab) => tab.id === detail.tabId);
+      const next = current.filter((tab) => tab.id !== detail.tabId);
+      tabsRef.current = next;
+      setTabs(next);
+      tabHandlesRef.current.delete(detail.tabId);
+      setActiveTabId((active) => active === detail.tabId
+        ? (next[Math.max(0, index - 1)] ?? next[0]).id
+        : active);
+      await postActionResult(detail.requestId, { ok: true, closedTabId: detail.tabId });
+    };
+
     const handleScroll = (e: Event) => {
       const detail = (e as CustomEvent).detail as { direction: string; amount: number };
       const wv = webviewRef.current;
@@ -1626,6 +1664,7 @@ export function BrowserPanel({
 
     window.addEventListener('Leanna-browser-navigate', handleNav);
     window.addEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
+    window.addEventListener('Leanna-browser-tab-command', handleTabCommand as EventListener);
     window.addEventListener('Leanna-browser-scroll', handleScroll);
     window.addEventListener('Leanna-browser-control', handleBrowserControl);
     window.addEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
@@ -1653,6 +1692,7 @@ export function BrowserPanel({
     return () => {
       window.removeEventListener('Leanna-browser-navigate', handleNav);
       window.removeEventListener('Leanna-browser-new-tab', handleNewTab as EventListener);
+      window.removeEventListener('Leanna-browser-tab-command', handleTabCommand as EventListener);
       window.removeEventListener('Leanna-browser-scroll', handleScroll);
       window.removeEventListener('Leanna-browser-control', handleBrowserControl);
       window.removeEventListener('Leanna-browser-read-request', handleReadRequest as EventListener);
