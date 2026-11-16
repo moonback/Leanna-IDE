@@ -164,6 +164,24 @@ export function StartupProjectModal() {
         }
         return data;
       }
+      // Compatibilité avec les serveurs qui ont retiré l'endpoint historique
+      // de liste : le statut reste disponible et permet de restaurer le projet actif.
+      if (res.status === 410) {
+        const statusRes = await fetch('/api/self-root/status');
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          const fallback = {
+            workspaces: [],
+            activeRoot: typeof status.rootPath === 'string' ? status.rootPath : null,
+            siteUrl: typeof status.siteUrl === 'string' ? status.siteUrl : '',
+          };
+          setWorkspaces([]);
+          setLastWorkspace(null);
+          setCurrentPath(fallback.activeRoot);
+          if (fallback.siteUrl) setInputSiteUrl(fallback.siteUrl);
+          return fallback;
+        }
+      }
     } catch { /* ignore */ }
     return null;
   }, []);
