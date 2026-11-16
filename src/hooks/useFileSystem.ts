@@ -3,6 +3,12 @@ import { ideApi, type TreeEntry } from '../services/ideApi.js';
 import { type OpenFile } from '../types/ide.js';
 import { getLanguage } from '../utils/fileUtils.js';
 
+/** Les données internes de Leanna ne font pas partie du workspace IDE exposé. */
+function isInternalLeannaPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\\\/g, '/').replace(/^\.\\/+/, '');
+  return normalized.split('/').some(segment => segment.toLowerCase() === '.leanna');
+}
+
 export type DiffInfo = {
   status: 'added' | 'modified' | 'deleted';
   additions?: number;
@@ -141,6 +147,8 @@ export function useFileSystem() {
   }, [openFiles, activePath]);
   // Open a file
   const openFile = useCallback(async (filePath: string) => {
+    // Défense UI en profondeur : le serveur refuse déjà ces chemins (403).
+    if (isInternalLeannaPath(filePath)) return;
     const existingFile = openFiles.find((f) => f.path === filePath);
     if (existingFile) {
       setActivePath(filePath);
@@ -215,6 +223,7 @@ export function useFileSystem() {
 
   // Reload file from disk (used when assistant modifies it) — returns new content
   const reloadFile = useCallback(async (filePath: string): Promise<string | null> => {
+    if (isInternalLeannaPath(filePath)) return null;
     // Don't try to reload browser tabs
     if (filePath.startsWith('__browser__:')) {
       return null;
@@ -236,6 +245,7 @@ export function useFileSystem() {
 
   // Force-reload: close the tab then reopen it fresh from disk
   const forceReloadFile = useCallback(async (filePath: string): Promise<void> => {
+    if (isInternalLeannaPath(filePath)) return;
     // Don't try to reload browser tabs
     if (filePath.startsWith('__browser__:')) {
       return;
