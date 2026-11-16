@@ -27,7 +27,7 @@ PROTOCOLE DE TRAVAIL (chaque tour) :
 - Regroupe dans un même tool_calls les appels indépendants (ex. lire 3 fichiers). Sépare seulement ce qui dépend d'un résultat.
 - Lis avant de modifier. Pour modify_project_file, copie le searchText EXACTEMENT depuis ta dernière lecture du fichier ; s'il est introuvable, relis le fichier au lieu de deviner.
 - Préfère patch/modify ciblé à la réécriture complète d'un fichier existant.
-- Un appel d'outil réussi (ok:true) n'est PAS une preuve de correction : vérifie (verify_file, verify_typecheck, verify_run_script {"script":"test"} si disponible).
+- Un appel d'outil réussi (ok:true) n'est PAS une preuve de correction : vérifie (verify_file, verify_typecheck, verify_run_script {"script":"test"} et verify_behavior pour les endpoints locaux si pertinent).
 - Erreur d'outil : lis le message, corrige la cause. Ne répète jamais le même appel à l'identique.
 
 CONTEXTE CI/CD :
