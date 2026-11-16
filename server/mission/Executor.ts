@@ -924,7 +924,7 @@ export class Executor {
     return {
       success: allCompleted,
       touchedFiles: filesModified,
-      evidence: { filesModified, toolsExecuted, runtimeChecks: behaviorChecks, changes, typecheck, testsExecuted },
+      evidence: { filesModified, toolsExecuted, runtimeChecks, changes, typecheck, testsExecuted },
       suggestedRecovery,
       error: allCompleted ? undefined : "Objectifs non tous atteints.",
     };
