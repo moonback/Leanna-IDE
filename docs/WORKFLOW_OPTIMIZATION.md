@@ -73,3 +73,11 @@ Appeler `finalize_mission` uniquement après validation réelle des quatre nivea
 | Contrôles CI | `.github/workflows/ci.yml` |
 
 Ce guide est une procédure d'utilisation et de vérification de ces mécanismes. Toute évolution de code doit préserver les contrats de sécurité et les comportements déjà couverts par les tests.
+
+## Garde-fou runtime de clôture
+
+`finalize_mission` ne considère plus les quatre booléens transmis par le modèle comme des preuves. Il exige `mission_id`, lit le bundle correspondant dans l'`EvidenceEngine` et refuse la clôture si le provider est absent, si la preuve ne correspond pas à la mission ou si un niveau manque.
+
+Le `Mission Executor` alimente ce bundle avec les résultats dédiés : `verify_file` pour les empreintes, `verify_typecheck` (ou le script `typecheck`) pour la compilation, et `verify_run_script` (`test` / `test:ui`) pour les tests. Les résultats des autres outils restent des observations d'exécution, pas une preuve de comportement.
+
+**Limite explicite :** le dépôt ne fournit pas encore de skill `verify_behavior` dédié. En conséquence, le niveau comportement reste volontairement non prouvé et `finalize_mission` refuse la clôture positive tant qu'un contrôle comportemental explicite n'est pas disponible. Ne pas remplacer ce contrôle par un succès générique d'outil.
