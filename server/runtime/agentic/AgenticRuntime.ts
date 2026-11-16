@@ -79,7 +79,7 @@ const WRITE_TOOLS = new Set([
 
 /** Outils de vérification exécutables pour valider une étape. */
 const VERIFY_TOOLS = ["verify_full", "verify_typecheck", "verify_lint", "verify_file", "verify_behavior"];
-const VERIFY_TOOL_SET = new Set([...VERIFY_TOOLS, "verify_format", "verify_run_script", "quality_loop", "run_project_command", "verify_behavior"]);
+const VERIFY_TOOL_SET = new Set([...VERIFY_TOOLS, "verify_format", "verify_run_script", "quality_loop", "run_project_command"]);
 
 /** Outils de lecture/exploration (comptabilisés en phase discovery). */
 const READ_TOOLS = new Set([
