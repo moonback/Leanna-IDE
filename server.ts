@@ -447,6 +447,7 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
         executor.setEvidenceEngine(evidenceEngine, evidenceEnabled);
         // La clôture lit le bundle persisté, jamais les booléens auto-déclarés par le LLM.
         setFinalizeMissionEvidenceProvider(async (missionId) => {
+          if (!evidenceEnabled) return null;
           const bundle = evidenceEngine.load(missionId);
           if (!bundle || !bundle.passed) return null;
           const integrity = bundle.changes.length > 0 && bundle.changes.every((change) => Boolean(change.hashAfter));
