@@ -15,7 +15,7 @@ export type FinalizationEvidenceProvider = (missionId: string) => Promise<Finali
 let evidenceProvider: FinalizationEvidenceProvider | null = null;
 
 /** Injecte le lecteur de preuves factuelles du runtime. Sans provider, la clôture est refusée. */
-export function setFinalizeMissionEvidenceProvider(provider: FinalizationEvidenceProvider): void {
+export function setFinalizeMissionEvidenceProvider(provider: FinalizationEvidenceProvider | null): void {
   evidenceProvider = provider;
 }
 
