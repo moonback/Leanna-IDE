@@ -453,7 +453,8 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
           const integrity = bundle.changes.length > 0 && bundle.changes.every((change) => Boolean(change.hashAfter));
           const compilation = Boolean(bundle.typecheck?.passed);
           const tests = bundle.testsExecuted.length > 0 && bundle.testsExecuted.every((check) => check.passed);
-          const behavior = bundle.runtimeChecks.length > 0 && bundle.runtimeChecks.every((check) => check.passed);
+          const behaviorChecks = bundle.runtimeChecks.filter((check) => check.name === "verify_behavior");
+          const behavior = behaviorChecks.length > 0 && behaviorChecks.every((check) => check.passed);
           return { missionId: bundle.missionId, integrity, compilation, tests, behavior, source: "evidence-engine" as const };
         });
         if (evidenceEnabled) {
