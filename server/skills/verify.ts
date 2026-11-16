@@ -781,6 +781,8 @@ export const verifySkill: Skill = {
       expectedStatus: z.number().int().min(100).max(599).default(200),
       expectedText: z.string().max(2000).optional(),
       timeoutMs: z.number().int().min(500).max(15000).default(5000),
+    }).refine((data) => data.method !== "HEAD" || data.expectedText === undefined, {
+      message: "expectedText ne peut pas être utilisé avec la méthode HEAD.",
     }),
     verify_typecheck: z.object({}),
     verify_file: z.object({ path: z.string().min(1) }),
