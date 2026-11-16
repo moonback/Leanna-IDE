@@ -439,7 +439,7 @@ export class SkillScorer {
       verify_file: { category: "verify", keywords: ["vérifier", "typescript", "compilation"] },
       verify_typecheck: { category: "verify", keywords: ["types", "typescript", "tsc"] },
       verify_run_script: { category: "test", keywords: ["test", "tester", "script"] },
-      verify_behavior: { category: "verify", keywords: ["comportement", "smoke", "http", "endpoint", "health", "api"] },
+      verify_behavior: { category: "verify", keywords: ["comportement", "smoke", "http", "endpoint", "health", "api", "navigateur", "browser", "interface", "sélecteur", "clic", "ui"] },
       save_memory: { category: "memory", keywords: ["mémoire", "sauvegarder", "retenir", "noter"] },
       search_memory: { category: "memory", keywords: ["rappeler", "mémoire", "souvenir"] },
       reasoning_think: { category: "analysis", keywords: ["réfléchir", "analyser", "comprendre", "planifier"] },
