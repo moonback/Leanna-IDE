@@ -700,8 +700,8 @@ export const verifySkill: Skill = {
   declarations: [
     {
       name: "verify_behavior",
-      description: "Smoke test HTTP sur un service local uniquement. Vérifie statut et texte attendu. GET/HEAD, sans redirections.",
-      parameters: { type: "OBJECT", properties: { url: { type: "STRING" }, method: { type: "STRING", enum: ["GET", "HEAD"] }, expectedStatus: { type: "NUMBER" }, expectedText: { type: "STRING" }, timeoutMs: { type: "NUMBER" } }, required: ["url"] },
+      description: "Vérifie un service local en HTTP ou dans un navigateur headless. Le mode browser contrôle titre, texte, visibilité de sélecteurs et clics simples. Navigation et ressources limitées à localhost.",
+      parameters: { type: "OBJECT", properties: { url: { type: "STRING" }, mode: { type: "STRING", enum: ["http", "browser"] }, method: { type: "STRING", enum: ["GET", "HEAD"] }, expectedStatus: { type: "NUMBER" }, expectedText: { type: "STRING" }, expectedTitle: { type: "STRING" }, visibleSelectors: { type: "ARRAY", items: { type: "STRING" } }, clickSelectors: { type: "ARRAY", items: { type: "STRING" } }, timeoutMs: { type: "NUMBER" } }, required: ["url"] },
     },
     {
       name: "verify_typecheck",
@@ -777,12 +777,18 @@ export const verifySkill: Skill = {
   inputSchemas: {
     verify_behavior: z.object({
       url: z.string().url(),
+      mode: z.enum(["http", "browser"]).default("http"),
       method: z.enum(["GET", "HEAD"]).default("GET"),
       expectedStatus: z.number().int().min(100).max(599).default(200),
       expectedText: z.string().max(2000).optional(),
-      timeoutMs: z.number().int().min(500).max(15000).default(5000),
-    }).refine((data) => data.method !== "HEAD" || data.expectedText === undefined, {
+      expectedTitle: z.string().max(300).optional(),
+      visibleSelectors: z.array(z.string().min(1).max(500)).max(20).default([]),
+      clickSelectors: z.array(z.string().min(1).max(500)).max(10).default([]),
+      timeoutMs: z.number().int().min(500).max(30000).default(5000),
+    }).refine((data) => data.mode !== "http" || (data.method !== "HEAD" || data.expectedText === undefined), {
       message: "expectedText ne peut pas être utilisé avec la méthode HEAD.",
+    }).refine((data) => data.mode !== "http" || (!data.expectedTitle && data.visibleSelectors.length === 0 && data.clickSelectors.length === 0), {
+      message: "Les assertions de navigateur nécessitent mode=browser.",
     }),
     verify_typecheck: z.object({}),
     verify_file: z.object({ path: z.string().min(1) }),
@@ -807,6 +813,49 @@ export const verifySkill: Skill = {
         if (!["http:", "https:"].includes(target.protocol) || !localHosts.has(target.hostname.toLowerCase()) || target.username || target.password) {
           return { status: "failed", ok: false, check: "verify_behavior", error: "URL refusée : seuls les services HTTP(S) locaux sont autorisés." };
         }
+        if (validated.mode === "browser") {
+          let browser: import("puppeteer").Browser | undefined;
+          try {
+            const puppeteer = await import("puppeteer");
+            browser = await puppeteer.default.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+            const page = await browser.newPage();
+            page.setDefaultTimeout(validated.timeoutMs);
+            page.setDefaultNavigationTimeout(validated.timeoutMs);
+            page.on("request", (request) => {
+              let requestUrl: URL | undefined;
+              try { requestUrl = new URL(request.url()); } catch { /* abort malformed URLs */ }
+              const allowed = requestUrl && (requestUrl.protocol === "data:" || requestUrl.protocol === "blob:" || (["http:", "https:"].includes(requestUrl.protocol) && localHosts.has(requestUrl.hostname.toLowerCase())));
+              if (allowed) void request.continue().catch(() => undefined);
+              else void request.abort("blockedbyclient").catch(() => undefined);
+            });
+            const response = await page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout: validated.timeoutMs });
+            if (!response) throw new Error("Aucune réponse de navigation reçue.");
+            const title = await page.title();
+            const visibleResults: Array<{ selector: string; visible: boolean }> = [];
+            for (const selector of validated.visibleSelectors) {
+              const element = await page.$(selector);
+              const visible = Boolean(element && await element.isVisible().catch(() => false));
+              visibleResults.push({ selector, visible });
+              if (!visible) throw new Error("Élément attendu absent ou invisible : " + selector);
+            }
+            const clicked: string[] = [];
+            for (const selector of validated.clickSelectors) {
+              await page.locator(selector).click({ timeout: validated.timeoutMs });
+              clicked.push(selector);
+            }
+            const bodyText = await page.locator("body").innerText().catch(() => "");
+            const titleOk = !validated.expectedTitle || title.includes(validated.expectedTitle);
+            const textOk = !validated.expectedText || bodyText.includes(validated.expectedText);
+            const statusOk = response.status() === validated.expectedStatus;
+            const ok = titleOk && textOk && statusOk;
+            return { status: ok ? "success" : "failed", ok, check: "verify_behavior", mode: "browser", url: target.toString(), httpStatus: response.status(), title, expectedTitle: validated.expectedTitle, titleMatched: titleOk, textMatched: textOk, visibleResults, clicked, message: ok ? "Parcours navigateur vérifié." : "Le statut, le titre ou le contenu observé ne correspond pas aux attentes." };
+          } catch (error) {
+            return { status: "failed", ok: false, check: "verify_behavior", mode: "browser", url: target.toString(), error: error instanceof Error ? error.message : String(error), message: "Le contrôle navigateur n’a pas pu confirmer le comportement attendu." };
+          } finally {
+            await browser?.close().catch(() => undefined);
+          }
+        }
+
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), validated.timeoutMs);
         try {
