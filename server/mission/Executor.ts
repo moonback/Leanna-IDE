@@ -879,6 +879,36 @@ export class Executor {
       )
     );
     const toolsExecuted = executed.map((a) => a.skillName);
+    // Les niveaux de preuve sont extraits des résultats réels des outils dédiés,
+    // jamais déduits du simple succès d’une lecture ou d’une écriture.
+    const verificationActions = executed.filter((a) => a.status === "completed");
+    const changes = verificationActions
+      .filter((a) => a.skillName === "verify_file")
+      .map((a) => {
+        const result = a.result as Record<string, any> | null;
+        const record = result?.verificationRecord as Record<string, unknown> | undefined;
+        return {
+          path: String(record?.file ?? result?.file ?? (a.args as Record<string, unknown>)?.path ?? ""),
+          ...(typeof record?.hashBefore === "string" ? { hashBefore: record.hashBefore } : {}),
+          ...(typeof record?.hashAfter === "string" ? { hashAfter: record.hashAfter } : {}),
+        };
+      })
+      .filter((change) => change.path.length > 0 && Boolean(change.hashAfter));
+    const typecheckAction = verificationActions.find((a) =>
+      a.skillName === "verify_typecheck" ||
+      (a.skillName === "verify_run_script" && (a.args as Record<string, unknown>)?.script === "typecheck")
+    );
+    const typecheck: CheckResult | undefined = typecheckAction ? {
+      name: typecheckAction.skillName,
+      passed: Executor.detectSkillFailure(typecheckAction.result) === null,
+    } : undefined;
+    const testsExecuted: CheckResult[] = verificationActions
+      .filter((a) => a.skillName === "verify_run_script" && ["test", "test:ui"].includes(String((a.args as Record<string, unknown>)?.script)))
+      .map((a) => ({ name: String((a.args as Record<string, unknown>).script), passed: Executor.detectSkillFailure(a.result) === null }));
+    // Un contrôle de comportement n’est validé que par un outil explicitement dédié.
+    const behaviorChecks: CheckResult[] = verificationActions
+      .filter((a) => a.skillName === "verify_behavior")
+      .map((a) => ({ name: a.skillName, passed: Executor.detectSkillFailure(a.result) === null }));
 
     // Décision de récupération suggérée (sinon le Supervisor décide seul) :
     //   - un objectif bloqué (escaladé) → escalate ;
@@ -894,7 +924,7 @@ export class Executor {
     return {
       success: allCompleted,
       touchedFiles: filesModified,
-      evidence: { filesModified, toolsExecuted, runtimeChecks },
+      evidence: { filesModified, toolsExecuted, runtimeChecks: behaviorChecks, changes, typecheck, testsExecuted },
       suggestedRecovery,
       error: allCompleted ? undefined : "Objectifs non tous atteints.",
     };
