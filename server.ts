@@ -450,7 +450,11 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
           if (!evidenceEnabled) return null;
           const bundle = evidenceEngine.load(missionId);
           if (!bundle || !bundle.passed) return null;
-          const integrity = bundle.changes.length > 0 && bundle.changes.every((change) => Boolean(change.hashAfter));
+          const fileChecks = bundle.runtimeChecks.filter((check) => check.name === "verify_file");
+          const integrity = bundle.changes.length > 0
+            && fileChecks.length > 0
+            && fileChecks.every((check) => check.passed)
+            && bundle.changes.every((change) => Boolean(change.hashBefore && change.hashAfter && change.hashBefore === change.hashAfter));
           const compilation = Boolean(bundle.typecheck?.passed);
           const tests = bundle.testsExecuted.length > 0 && bundle.testsExecuted.every((check) => check.passed);
           const behaviorChecks = bundle.runtimeChecks.filter((check) => check.name === "verify_behavior");
