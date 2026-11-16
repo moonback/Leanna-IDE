@@ -357,6 +357,10 @@ export default function IdeView() {
   // ── File operations helpers ────────────────────────────────────────────────
 
   const openFileAt = useCallback(async (filePath: string, line?: number, column?: number) => {
+    // .Leanna contient l'état privé/runtime (dont le sandbox), jamais des fichiers IDE.
+    const normalizedPath = filePath.replace(/\\\\/g, '/').replace(/^\.\\/+/, '');
+    if (normalizedPath.split('/').some(segment => segment.toLowerCase() === '.leanna')) return;
+
     // Fermer le sandbox et les autres vues plein-écran pour afficher l'éditeur
     setShowSandbox(false);
     setShowKnowledge(false);
