@@ -5,7 +5,7 @@ import { getLanguage } from '../utils/fileUtils.js';
 
 /** Les données internes de Leanna ne font pas partie du workspace IDE exposé. */
 function isInternalLeannaPath(filePath: string): boolean {
-  const normalized = filePath.replace(/\\\\/g, '/').replace(/^\.\\/+/, '');
+  const normalized = filePath.replace(/\\/g, '/');
   return normalized.split('/').some(segment => segment.toLowerCase() === '.leanna');
 }
 
