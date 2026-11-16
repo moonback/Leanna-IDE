@@ -695,8 +695,14 @@ export const verifySkill: Skill = {
     verify_syntax: ["read"],
     verify_full: ["exec"],
     verify_test_target: ["exec"],
+    verify_behavior: ["exec"],
   },
   declarations: [
+    {
+      name: "verify_behavior",
+      description: "Smoke test HTTP sur un service local uniquement. Vérifie statut et texte attendu. GET/HEAD, sans redirections.",
+      parameters: { type: "OBJECT", properties: { url: { type: "STRING" }, method: { type: "STRING", enum: ["GET", "HEAD"] }, expectedStatus: { type: "NUMBER" }, expectedText: { type: "STRING" }, timeoutMs: { type: "NUMBER" } }, required: ["url"] },
+    },
     {
       name: "verify_typecheck",
       description: "Vérifie la compilation TypeScript de tout le projet (tsc --noEmit --incremental). À exécuter après toute modification d'un fichier .ts/.tsx avant de considérer la tâche terminée.",
@@ -769,6 +775,13 @@ export const verifySkill: Skill = {
     },
   ],
   inputSchemas: {
+    verify_behavior: z.object({
+      url: z.string().url(),
+      method: z.enum(["GET", "HEAD"]).default("GET"),
+      expectedStatus: z.number().int().min(100).max(599).default(200),
+      expectedText: z.string().max(2000).optional(),
+      timeoutMs: z.number().int().min(500).max(15000).default(5000),
+    }),
     verify_typecheck: z.object({}),
     verify_file: z.object({ path: z.string().min(1) }),
     verify_format: z.object({ path: z.string().min(1) }),
@@ -784,6 +797,45 @@ export const verifySkill: Skill = {
   },
   handleToolCall: async (name, args) => {
     try {
+      if (name === "verify_behavior") {
+        const validated = validateArgs(verifySkill.inputSchemas!["verify_behavior"], args);
+        let target: URL;
+        try { target = new URL(validated.url); } catch { return { status: "failed", ok: false, check: "verify_behavior", error: "URL invalide." }; }
+        const localHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+        if (!["http:", "https:"].includes(target.protocol) || !localHosts.has(target.hostname.toLowerCase()) || target.username || target.password) {
+          return { status: "failed", ok: false, check: "verify_behavior", error: "URL refusée : seuls les services HTTP(S) locaux sont autorisés." };
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), validated.timeoutMs);
+        try {
+          const response = await fetch(target, { method: validated.method, redirect: "manual", signal: controller.signal });
+          let body = "";
+          if (validated.method !== "HEAD" && validated.expectedText) {
+            const reader = response.body?.getReader();
+            if (reader) {
+              const decoder = new TextDecoder();
+              let bytes = 0;
+              while (bytes < 65536) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                const slice = chunk.value.slice(0, 65536 - bytes);
+                bytes += slice.byteLength;
+                body += decoder.decode(slice, { stream: true });
+                if (bytes >= 65536) break;
+              }
+              await reader.cancel().catch(() => undefined);
+            }
+          }
+          const statusOk = response.status === validated.expectedStatus;
+          const textOk = !validated.expectedText || body.includes(validated.expectedText);
+          const ok = statusOk && textOk;
+          return { status: ok ? "success" : "failed", ok, check: "verify_behavior", url: target.toString(), method: validated.method, httpStatus: response.status, expectedStatus: validated.expectedStatus, textMatched: textOk, message: ok ? "Comportement HTTP vérifié." : "Le statut HTTP ou le contenu observé ne correspond pas au résultat attendu." };
+        } catch (error) {
+          const timedOut = controller.signal.aborted;
+          return { status: "failed", ok: false, check: "verify_behavior", url: target.toString(), error: timedOut ? "Timeout après " + validated.timeoutMs + " ms." : (error instanceof Error ? error.message : String(error)), message: "Le comportement attendu n’a pas pu être observé." };
+        } finally { clearTimeout(timeout); }
+      }
+
       if (name === "verify_typecheck") {
         validateArgs(verifySkill.inputSchemas!["verify_typecheck"], args);
         const result = await runAllowed("tsc");
