@@ -821,10 +821,11 @@ export const verifySkill: Skill = {
             const page = await browser.newPage();
             page.setDefaultTimeout(validated.timeoutMs);
             page.setDefaultNavigationTimeout(validated.timeoutMs);
+            await page.setRequestInterception(true);
             page.on("request", (request) => {
               let requestUrl: URL | undefined;
               try { requestUrl = new URL(request.url()); } catch { /* abort malformed URLs */ }
-              const allowed = requestUrl && (requestUrl.protocol === "data:" || requestUrl.protocol === "blob:" || (["http:", "https:"].includes(requestUrl.protocol) && localHosts.has(requestUrl.hostname.toLowerCase())));
+              const allowed = requestUrl && (requestUrl.protocol === "data:" || requestUrl.protocol === "blob:" || (requestUrl.origin === target.origin && ["http:", "https:"].includes(requestUrl.protocol)));
               if (allowed) void request.continue().catch(() => undefined);
               else void request.abort("blockedbyclient").catch(() => undefined);
             });
