@@ -4,6 +4,10 @@
 > Les audits datés sont des photographies du commit indiqué ; ils ne sont pas des preuves
 > automatiques de l'état courant. Les fichiers de code et les tests restent la source de vérité.
 
+## Procédures de développement
+
+- [WORKFLOW_OPTIMIZATION.md](WORKFLOW_OPTIMIZATION.md) — cycle PLAN → ACT → OBSERVE → VERIFY → RECOVER → COMPLETE, règles de parallélisation, contrôles et preuves de clôture.
+
 ## Références d'architecture actuelles
 
 | Document | Statut | Utilisation |
