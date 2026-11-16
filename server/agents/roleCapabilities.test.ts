@@ -39,6 +39,16 @@ describe("Cohérence capacités d'agents ↔ outils exécutables", () => {
     );
   });
 
+  it("verify_behavior est exécutable pour les agents qui le déclarent", () => {
+    assert.ok(EXECUTABLE_AGENT_TOOLS.has("verify_behavior"));
+    for (const role of ["coder", "debugger", "refactor", "reviewer", "tester"]) {
+      assert.ok(
+        STATIC_AGENT_REGISTRY[role]?.capabilities.includes("verify_behavior"),
+        `Le rôle "${role}" doit conserver verify_behavior dans ses capacités`
+      );
+    }
+  });
+
   it("l'agent vision peut exécuter ses outils automation_*", () => {
     const vision = STATIC_AGENT_REGISTRY["vision"];
     assert.ok(vision, "L'agent vision doit exister");
