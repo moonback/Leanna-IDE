@@ -44,6 +44,20 @@ test("verify_behavior refuses non-local URLs before making a request", async () 
   assert.match(result.error, /locaux/i);
 });
 
+test("verify_behavior refuses remote browser navigation before launching Puppeteer", async () => {
+  const result = await verifySkill.handleToolCall("verify_behavior", { url: "https://example.com/", mode: "browser" });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /locaux/i);
+});
+
+test("verify_behavior rejects browser assertions in HTTP mode", async () => {
+  const result = await verifySkill.handleToolCall("verify_behavior", {
+    url: "http://127.0.0.1:4000/",
+    expectedTitle: "Leanna",
+  });
+  assert.equal(result.ok, false);
+});
+
 test("verify_behavior checks a real local HTTP response and expected body text", async () => {
   const server = createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/plain" });
