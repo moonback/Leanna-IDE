@@ -93,6 +93,7 @@ export const EXECUTABLE_AGENT_TOOLS = new Set([
   "verify_format",
   "verify_full",
   "verify_run_script",
+  "verify_behavior",
   "run_project_command",
   "quality_loop",
   "knowledge_build_context",
@@ -189,6 +190,8 @@ export class AgentExecutor implements AgentTaskRunner {
     'verify_lint': 120_000,
     'verify_full': 320_000,
     'verify_run_script': 620_000,
+    // Vérification HTTP/browser locale : jusqu'à 30s côté skill + démarrage navigateur.
+    'verify_behavior': 45_000,
     'run_project_command': 120_000,
     
     // Outils d'écriture (30-60s)
