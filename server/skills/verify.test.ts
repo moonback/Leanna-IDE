@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "url";
 import path from "path";
+import { createServer } from "node:http";
 import { setSelfRoot } from "../utils/selfRoot.js";
 import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile, checkTypeScriptSyntax } from "./verify.js";
 
@@ -15,8 +16,9 @@ import { verifySkill, parseTsErrors, parseLintResults, findAssociatedTestFile, c
 // ─── Tests unitaires du skill verify ─────────────────────────────────────────
 
 test("verify skill exposes all tool declarations", () => {
-  assert.equal(verifySkill.declarations.length, 8);
+  assert.equal(verifySkill.declarations.length, 9);
   const names = verifySkill.declarations.map((d: any) => d.name);
+  assert.ok(names.includes("verify_behavior"));
   assert.ok(names.includes("verify_typecheck"));
   assert.ok(names.includes("verify_file"));
   assert.ok(names.includes("verify_run_script"));
@@ -27,12 +29,56 @@ test("verify skill exposes all tool declarations", () => {
 
 test("verify skill has input schemas for all tools", () => {
   assert.ok(verifySkill.inputSchemas, "inputSchemas should be defined");
+  assert.ok(verifySkill.inputSchemas!["verify_behavior"]);
   assert.ok(verifySkill.inputSchemas!["verify_typecheck"]);
   assert.ok(verifySkill.inputSchemas!["verify_file"]);
   assert.ok(verifySkill.inputSchemas!["verify_run_script"]);
   assert.ok(verifySkill.inputSchemas!["verify_lint"]);
   assert.ok(verifySkill.inputSchemas!["verify_format"]);
   assert.ok(verifySkill.inputSchemas!["verify_syntax"]);
+});
+
+test("verify_behavior refuses non-local URLs before making a request", async () => {
+  const result = await verifySkill.handleToolCall("verify_behavior", { url: "https://example.com/" });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /locaux/i);
+});
+
+test("verify_behavior checks a real local HTTP response and expected body text", async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/plain" });
+    response.end("Leanna health: ready");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const result = await verifySkill.handleToolCall("verify_behavior", {
+      url: `http://127.0.0.1:${address.port}/health`,
+      expectedStatus: 200,
+      expectedText: "health: ready",
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.check, "verify_behavior");
+    assert.equal(result.httpStatus, 200);
+    assert.equal(result.textMatched, true);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("verify_behavior reports mismatched HTTP status as a failed check", async () => {
+  const server = createServer((_request, response) => { response.writeHead(204).end(); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const result = await verifySkill.handleToolCall("verify_behavior", { url: `http://127.0.0.1:${address.port}/health`, expectedStatus: 200 });
+    assert.equal(result.ok, false);
+    assert.equal(result.httpStatus, 204);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 // ─── checkTypeScriptSyntax : syntaxe uniquement, pas de typage inter-fichiers ──
