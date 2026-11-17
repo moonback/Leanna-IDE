@@ -10,10 +10,15 @@ test("notebook source validation accepts supported text, PDF and raster image si
 });
 
 test("notebook source validation accepts supported video containers with matching MIME", () => {
-  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/mp4", Buffer.from("video")).valid, true);
-  assert.equal(validateNotebookSourceUpload("clip.webm", "video/webm", Buffer.from("video")).valid, true);
-  assert.equal(validateNotebookSourceUpload("clip.mov", "video/quicktime", Buffer.from("video")).valid, true);
-  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/webm", Buffer.from("video")).valid, false);
+  const isoBmff = Buffer.alloc(16);
+  isoBmff.write("ftyp", 4, "ascii");
+  isoBmff.write("isom", 8, "ascii");
+  const webm = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x00]);
+  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/mp4", isoBmff).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.webm", "video/webm", webm).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.mov", "video/quicktime", isoBmff).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/webm", isoBmff).valid, false);
+  assert.equal(validateNotebookSourceUpload("fake.mp4", "video/mp4", Buffer.from("not a video")).valid, false);
 });
 
 test("notebook source validation rejects mismatched extensions, MIME and signatures", () => {
