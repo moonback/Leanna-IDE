@@ -687,10 +687,25 @@ export class AgentBrain {
     return this.activePlans.get(planId);
   }
 
+  /** Retourne un plan uniquement à son workspace propriétaire (fail closed). */
+  getPlanForProject(planId: string, projectId: string): BrainPlan | undefined {
+    if (!projectId) return undefined;
+    const plan = this.activePlans.get(planId);
+    return plan?.projectId === projectId ? plan : undefined;
+  }
+
   /**
    * Récupère un résultat d'exécution
    */
   getResult(planId: string): BrainExecutionResult | undefined {
+    return this.results.get(planId);
+  }
+
+  /** Retourne un résultat uniquement si le plan appartient au workspace. */
+  getResultForProject(planId: string, projectId: string): BrainExecutionResult | undefined {
+    if (!projectId) return undefined;
+    const plan = this.activePlans.get(planId);
+    if (!plan || plan.projectId !== projectId) return undefined;
     return this.results.get(planId);
   }
 
