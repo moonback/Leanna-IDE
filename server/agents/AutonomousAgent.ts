@@ -382,6 +382,10 @@ export class AutonomousAgent {
   /** Traite une task_request reçue d'un autre agent */
   private async handleTaskRequest(message: AgentMessage): Promise<void> {
     const payload = message.payload as TaskRequestPayload;
+    if (!this.workspaceId || message.projectId !== this.workspaceId) {
+      log.warn(`[${this.agentName}] task_request refusée : workspace absent ou différent`);
+      return;
+    }
     const isAutonomous = (message.metadata?.autonomous === true);
 
     const viaNegotiation = message.metadata?.negotiated === true;
@@ -395,6 +399,7 @@ export class AutonomousAgent {
 
     const task: AgentTask = {
       id: payload.taskId,
+      projectId: message.projectId,
       role: this.role,
       title: payload.title,
       description: payload.description,
