@@ -863,7 +863,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_web_search",
       description:
-        "RECHERCHE WEB RAPIDE CÔTÉ SERVEUR. Effectue une recherche et lit les pages EN PARALLÈLE directement sur le serveur (fetch + extraction), SANS détourner le navigateur visible de l'utilisateur. Beaucoup plus rapide et robuste que browser_research pour collecter de l'information factuelle. Retourne des sources structurées (titre, url, extrait, contenu, fiabilité, fraîcheur) avec consensus/contradictions. Préfère cet outil à browser_research sauf si une session connectée ou une interaction (formulaire, SPA) est nécessaire.",
+        "RECHERCHE WEB CÔTÉ SERVEUR, INVISIBLE dans le navigateur. N'utilise cet outil que si l'utilisateur demande explicitement une recherche en arrière-plan/rapide ou si l'affichage dans le navigateur n'est pas nécessaire. Pour une navigation ou recherche que l'utilisateur doit voir, utilise browser_search puis browser_get_links et browser_navigate dans le navigateur Electron visible.",
       parameters: {
         type: "OBJECT",
         properties: {
