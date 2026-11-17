@@ -1247,7 +1247,8 @@ export function BrowserPanel({
           match = el;
           break;
         }
-        if (!match) return JSON.stringify({ error: 'Aucun élément [role="' + role + '"] avec le nom "' + name + '" trouvé.' });
+        // Not-found is an explicit no-op result, safe for a bounded re-observation retry.
+        if (!match) return JSON.stringify({ found: false });
         var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
         match.dispatchEvent(evt);
         return JSON.stringify({ ok: true });
@@ -1352,7 +1353,8 @@ export function BrowserPanel({
             return (el.placeholder || el.getAttribute('aria-placeholder') || '').toLowerCase().includes(labelLower);
           }) || null;
         }
-        if (!field) return JSON.stringify({ error: 'Champ avec le libellé "' + label + '" introuvable.' });
+        // Not-found is an explicit no-op result; the server may safely re-observe once.
+        if (!field) return JSON.stringify({ found: false });
         field.focus();
         // Effacer le contenu existant
         if (field.tagName.toLowerCase() !== 'select') {
