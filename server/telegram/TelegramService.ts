@@ -773,7 +773,6 @@ export class TelegramService {
           return;
         }
 
-        const projectId = getActiveProjectId();
         const cancelled = projectId && agentOrchestrator.getTaskForProject(task.id, projectId)
           ? agentOrchestrator.cancelTask(task.id)
           : false;
