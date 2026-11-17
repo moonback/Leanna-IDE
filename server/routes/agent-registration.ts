@@ -51,7 +51,11 @@ export function createAgentRegistrationRouter(): Router {
   // Les définitions dynamiques sont conservées dans un registre process-local
   // mono-workspace. Ne jamais exposer ses opérations sans contexte explicite.
   router.use((_req, res, next) => {
-    if (!getActiveProjectId()) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    const projectId = getActiveProjectId();
+    if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    if (!dynamicAgentRegistry.canAccessWorkspace(projectId)) {
+      return res.status(409).json({ error: 'Le registre dynamique appartient à un autre workspace ; redémarrage requis.' });
+    }
     next();
   });
 
