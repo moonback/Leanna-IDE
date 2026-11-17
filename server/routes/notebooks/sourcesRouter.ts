@@ -64,7 +64,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         "N'invente aucun passage. Marque [inaudible] lorsqu'un segment ne peut pas être compris.",
         "Détecte la langue parlée et rédige la transcription dans la langue originale.",
         "Retourne uniquement la transcription, avec des horodatages et des étiquettes d'intervenants si identifiables.",
-      ].join("\\n");
+      ].join("\n");
       const result = await runWithTelemetryContext({ toolName: "notebook_video_transcription" }, () =>
         generateText({
           prompt,
@@ -87,7 +87,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       const source = await enqueueSourceIngestion({
         notebookId,
         kind: "buffer",
-        buffer: Buffer.from("# Transcription vidéo : " + baseName + "\\n\\n" + transcript, "utf-8"),
+        buffer: Buffer.from("# Transcription vidéo : " + baseName + "\n\n" + transcript, "utf-8"),
         fileName: baseName + " - transcription.txt",
         mimeType: "text/plain",
       });
