@@ -642,9 +642,17 @@ export class AgentOrchestrator {
     return this.orchestrations.get(orchestrationId);
   }
 
-  /** Liste les orchestrations */
-  listOrchestrations(): OrchestrationPlan[] {
-    return Array.from(this.orchestrations.values()).sort(
+  /** Lookup strict d'une orchestration par workspace propriétaire. */
+  getOrchestrationForProject(orchestrationId: string, projectId: string): OrchestrationPlan | undefined {
+    if (!projectId) return undefined;
+    const plan = this.orchestrations.get(orchestrationId);
+    return plan?.projectId === projectId ? plan : undefined;
+  }
+
+  /** Liste les orchestrations du workspace demandé (fail closed sans workspace). */
+  listOrchestrations(projectId?: string): OrchestrationPlan[] {
+    if (!projectId) return [];
+    return Array.from(this.orchestrations.values()).filter((plan) => plan.projectId === projectId).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
@@ -764,6 +772,12 @@ export class AgentOrchestrator {
 
     log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
     return cancelledCount;
+  }
+
+  /** Annulation sécurisée d'une orchestration appartenant au workspace. */
+  cancelOrchestrationForProject(orchestrationId: string, projectId: string): number {
+    if (!this.getOrchestrationForProject(orchestrationId, projectId)) return -1;
+    return this.cancelOrchestration(orchestrationId);
   }
 
   /**
