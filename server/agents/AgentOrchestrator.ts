@@ -567,7 +567,8 @@ export class AgentOrchestrator {
     if (!this.registry.isReady) {
       return {
         initialized: false,
-        message: "Le registre d'agents n'est pas encore initialisé (setSkillHandler() pas encore appelé)",
+        workspaceActive: false,
+        message: "Le registre d'agents n'est pas encore initialisé (workspace absent ou setSkillHandler() pas encore appelé)",
       };
     }
     const fleet = this.registry.getFleetStatus(projectId);
