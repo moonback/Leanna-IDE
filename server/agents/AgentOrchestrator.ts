@@ -471,6 +471,7 @@ export class AgentOrchestrator {
 
     const plan: OrchestrationPlan = {
       id: orchestrationId,
+      projectId: agentTasks.find((task) => task.projectId)?.projectId ?? getActiveProjectId() ?? undefined,
       title: params.title,
       description: params.description,
       tasks: agentTasks,
@@ -770,15 +771,15 @@ export class AgentOrchestrator {
    * Les tâches "running" au moment du crash sont marquées "failed".
    * Les tâches "pending" sont rechargées en mémoire pour reprise éventuelle.
    */
-  async restoreFromPersistence(): Promise<{ tasks: number; orchestrations: number }> {
-    if (!agentPersistence.isAvailable) {
+  async restoreFromPersistence(projectId = getActiveProjectId()): Promise<{ tasks: number; orchestrations: number }> {
+    if (!agentPersistence.isAvailable || !projectId) {
       log.debug("restoreFromPersistence: Supabase non disponible — skip");
       return { tasks: 0, orchestrations: 0 };
     }
 
     try {
       // Charger les tâches récentes en mémoire (sans les ré-exécuter)
-      const recentTasks = await agentPersistence.loadRecentTasks(200);
+      const recentTasks = await agentPersistence.loadRecentTasks(200, projectId);
       for (const task of recentTasks) {
         // Les tâches "running" au moment du crash → failed
         if (task.status === "running") {
@@ -802,11 +803,12 @@ export class AgentOrchestrator {
       }
 
       // Charger les orchestrations récentes
-      const recentOrchs = await (agentPersistence as any).loadRecentOrchestrations(50);
+      const recentOrchs = await agentPersistence.loadRecentOrchestrations(50, projectId);
       for (const row of recentOrchs) {
         if (!this.orchestrations.has(row.id)) {
           this.orchestrations.set(row.id, {
             id: row.id,
+            projectId: row.project_id ?? undefined,
             title: row.title,
             description: row.description,
             status: row.status === "running" ? "failed" : row.status,
