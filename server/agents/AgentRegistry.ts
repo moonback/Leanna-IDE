@@ -88,7 +88,7 @@ export class AgentRegistry {
    * @returns `true` si la bascule a été appliquée, `false` si refusée.
    */
   setRunner(runner: AgentTaskRunner, options: { allowRestart?: boolean } = {}): boolean {
-    if (!this.workspaceId || getActiveProjectId() !== this.workspaceId) {
+    if (this.workspaceId ? getActiveProjectId() !== this.workspaceId : !!getActiveProjectId()) {
       log.warn("setRunner refusé : workspace actif différent de celui de la flotte");
       return false;
     }
@@ -139,8 +139,7 @@ export class AgentRegistry {
 
     this.workspaceId = getActiveProjectId() ?? undefined;
     if (!this.workspaceId) {
-      log.warn("AgentRegistry non initialisé : aucun workspace actif");
-      return;
+      log.warn("AgentRegistry initialisé sans workspace : les agents restent hors ligne jusqu'à un redémarrage dans un workspace.");
     }
     this.executor.setSkillHandler(skillHandler);
 
@@ -332,7 +331,7 @@ export class AgentRegistry {
     agents: ReturnType<AutonomousAgent["getStats"]>[];
     busMetrics: ReturnType<AgentMessageBus["getMetrics"]>;
   } {
-    const workspaceActive = !!projectId && projectId === this.workspaceId;
+    const workspaceActive = projectId ? projectId === this.workspaceId : !this.workspaceId;
     const agentStats = workspaceActive ? Array.from(this.agents.values()).map((a) => a.getStats()) : [];
 
     return {
