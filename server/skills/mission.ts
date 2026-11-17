@@ -323,6 +323,11 @@ export const missionSkill: Skill = {
   },
 
   handleToolCall: async (name: string, args: any, context?: SkillContext) => {
+    const hasBrowserUiContext =
+      typeof context?.emitIdeAction === "function" &&
+      context.browserReadPending instanceof Map &&
+      context.browserActionPending instanceof Map;
+
     if (!executor) {
       return {
         error: "Mission System non initialisé. Le serveur doit être redémarré.",
@@ -340,9 +345,9 @@ export const missionSkill: Skill = {
           title,
           description,
           priority,
-          availableSkills: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? [...new Set([...availableSkillNames, ...MISSION_BROWSER_TOOLS])] : availableSkillNames,
+          availableSkills: hasBrowserUiContext ? [...new Set([...availableSkillNames, ...MISSION_BROWSER_TOOLS])] : availableSkillNames,
           dryRun,
-          browserContext: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending, browserActionPending: context.browserActionPending } : undefined,
+          browserContext: hasBrowserUiContext ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending, browserActionPending: context.browserActionPending } : undefined,
         });
 
         return {
