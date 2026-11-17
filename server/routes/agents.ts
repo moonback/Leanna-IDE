@@ -502,9 +502,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/brain/status/:planId', async (req: Request, res: Response) => {
     try {
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
       const brain = await agentOrchestrator.getBrain();
-      const plan = brain.getPlan(req.params.planId);
-      const result = brain.getResult(req.params.planId);
+      const plan = brain.getPlanForProject(req.params.planId, projectId);
+      const result = brain.getResultForProject(req.params.planId, projectId);
       if (!plan) {
         return res.status(404).json({ error: `Plan ${req.params.planId} introuvable.` });
       }
