@@ -1210,12 +1210,14 @@ export const browserSkill: Skill = {
             if (settled) return;
             settled = true;
             cleanup();
+            console.info('[Browser][read]', { phase: 'response', requestId, elapsedMs: Date.now() - startedAt, responseType: typeof value, responseLength: typeof value === 'string' ? value.length : null, pendingCount: pending.size });
             resolve(value);
           },
           reject: (error) => {
             if (settled) return;
             settled = true;
             cleanup();
+            console.error('[Browser][read]', { phase: 'rejected', requestId, elapsedMs: Date.now() - startedAt, message: error.message });
             reject(error);
           },
           timer,
@@ -1232,7 +1234,9 @@ export const browserSkill: Skill = {
             settled = true;
             pending.delete(requestId);
             cleanup();
-            reject(error instanceof Error ? error : new Error(String(error)));
+            const emittedError = error instanceof Error ? error : new Error(String(error));
+          console.error('[Browser][read]', { phase: 'emit-failed', requestId, message: emittedError.message });
+          reject(emittedError);
           }
         }
       }).then((value) => {
@@ -1427,6 +1431,9 @@ export const browserSkill: Skill = {
       }
 
       const requestId = `br_${randomUUID()}`;
+      const startedAt = Date.now();
+      const pageContext = context?.browserContext ? 'ui-context-present' : 'ui-context-missing';
+      console.info('[Browser][read]', { phase: 'start', requestId, selector: selector ?? null, url: 'read-current-page', pendingCount: pending.size, pageContext, timeoutMs: 18_000 });
       const TIMEOUT_MS = 18_000;
       if (signal?.aborted) {
         return { status: "error", message: "Lecture navigateur annulée avant exécution." };
@@ -1439,7 +1446,9 @@ export const browserSkill: Skill = {
           settled = true;
           pending.delete(requestId);
           signal?.removeEventListener("abort", onAbort);
-          reject(new Error("Timeout (18s) : la webview n'a pas répondu. Le navigateur est peut-être fermé ou la page met trop de temps à charger."));
+          const error = new Error("Timeout (18s) : la webview n'a pas répondu. Le navigateur est peut-être fermé ou la page met trop de temps à charger.");
+          console.error('[Browser][read]', { phase: 'timeout', requestId, elapsedMs: Date.now() - startedAt, pendingCount: pending.size, message: error.message });
+          reject(error);
         }, TIMEOUT_MS);
         const cleanup = () => {
           clearTimeout(timer);
@@ -1473,6 +1482,7 @@ export const browserSkill: Skill = {
           return;
         }
         try {
+          console.info('[Browser][read]', { phase: 'emit', requestId, selector: selector ?? null });
           emit({ type: "browser-read-request", requestId, selector: selector ?? null });
         } catch (error) {
           if (!settled) {
@@ -1484,6 +1494,7 @@ export const browserSkill: Skill = {
         }
       }).catch((err: Error) => `[ERREUR LECTURE] ${err.message}`);
 
+      console.info('[Browser][read]', { phase: 'received', requestId, elapsedMs: Date.now() - startedAt, isError: typeof text === 'string' && text.startsWith('[ERREUR'), preview: typeof text === 'string' ? text.slice(0, 180) : typeof text });
       // Tenter de parser si le script a retourné un JSON {title, url, text}
       let parsed: { title?: string; url?: string; text?: string; truncated?: boolean } | null = null;
       if (typeof text === "string" && text.startsWith("{") && text.includes('"text"')) {
@@ -1493,6 +1504,7 @@ export const browserSkill: Skill = {
       if (parsed) {
         // Le contenu de page est une donnée externe non fiable : neutraliser
         // d'éventuelles instructions injectées avant de le renvoyer au modèle.
+        console.info('[Browser][read]', { phase: 'parsed', requestId, url: parsed.url, title: parsed.title, extractedLength: parsed.text?.length ?? 0, truncated: Boolean(parsed.truncated) });
         const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
         const { content, truncated: serverTruncated } = truncateContent(guarded.text);
         const wasTruncated = Boolean(parsed.truncated || serverTruncated);
@@ -1513,6 +1525,7 @@ export const browserSkill: Skill = {
 
       // Réponse en texte brut (pas de JSON)
       if (typeof text === "string" && text.startsWith("[ERREUR")) {
+        console.error('[Browser][read]', { phase: 'error-result', requestId, elapsedMs: Date.now() - startedAt, message: text });
         return { status: "error", message: text };
       }
 
