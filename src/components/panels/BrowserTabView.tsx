@@ -147,6 +147,12 @@ export function BrowserTabView({
       console[method]('[BrowserTabView]', { tabId, url: (() => { try { return wv.getURL(); } catch { return ''; } })(), message });
     };
 
+    const onDiagnostic = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { level?: string; message?: string; detail?: unknown; url?: string } | undefined;
+      if (!detail) return;
+      diagnostic(detail.level ?? 'info', `${detail.message ?? 'browser diagnostic'} | ${JSON.stringify(detail.detail ?? {})} | url=${detail.url ?? ''}`);
+    };
+
     const onDomReady = () => {
       domReadyRef.current = true;
       diagnostic('info', 'dom-ready: renderer DOM prêt');
@@ -211,6 +217,7 @@ export function BrowserTabView({
       }
     };
 
+    window.addEventListener('Leanna-browser-diagnostic', onDiagnostic as EventListener);
     wv.addEventListener('dom-ready', onDomReady);
     const onFrameFinish = (event: Event) => { const ev = event as Event & { isMainFrame?: boolean }; if (ev.isMainFrame !== false) diagnostic('info', 'did-frame-finish-load'); };
     const onRedirect = (event: Event) => { const ev = event as Event & { url?: string; isMainFrame?: boolean }; diagnostic('info', `did-redirect-navigation: ${ev.url ?? 'URL inconnue'} mainFrame=${ev.isMainFrame !== false}`); };
@@ -232,6 +239,7 @@ export function BrowserTabView({
     return () => {
       domReadyRef.current = false;
       onRegisterRef.current(tabId, null);
+      window.removeEventListener('Leanna-browser-diagnostic', onDiagnostic as EventListener);
       wv.removeEventListener('dom-ready', onDomReady);
       wv.removeEventListener('did-start-loading', onLoadStart);
       wv.removeEventListener('did-frame-finish-load', onFrameFinish);
