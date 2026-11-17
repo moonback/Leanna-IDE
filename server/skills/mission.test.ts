@@ -73,6 +73,8 @@ test('mission_create: transmet le pont navigateur uniquement avec un contexte UI
   assert.equal(captured.browserContext.emitIdeAction, context.emitIdeAction);
   assert.equal(captured.browserContext.browserReadPending, readPending);
   assert.equal(captured.browserContext.browserActionPending, actionPending);
+  captured.browserContext.emitIdeAction({ type: 'probe' });
+  assert.deepEqual(emitted, [{ type: 'probe' }]);
   assert.ok(captured.availableSkills.includes('browser_click'));
   assert.ok(captured.availableSkills.includes('browser_get_console'));
 
