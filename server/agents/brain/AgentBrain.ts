@@ -107,6 +107,9 @@ export class AgentBrain {
     // 4. Générer la visualisation Mermaid du DAG
     plan.mermaid = this.validator.toMermaid(plan);
 
+    // Capturer le propriétaire au démarrage, pas lors d'une lecture ultérieure :
+    // SELF_ROOT peut changer pendant qu'un run asynchrone est encore actif.
+    plan.projectId = getActiveProjectId();
     this.activePlans.set(plan.id, plan);
 
     // Émettre un événement pour la visibilité de l'interface
