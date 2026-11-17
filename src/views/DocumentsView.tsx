@@ -375,11 +375,11 @@ function DocumentsTab() {
   // Filtres locaux instantanés : ils couvrent les documents importés ET ceux extraits du workspace.
   const normalizedQuickFilter = quickFilter.trim().toLocaleLowerCase();
   const availableDocumentTypes = [...new Set([
-    ...documents.map(doc => doc.type?.toLowerCase()).filter(Boolean),
+    ...documents.map(doc => doc.type?.toLowerCase()).filter((type): type is string => Boolean(type)),
     ...workspaceDocuments.map(doc => {
       const fileName = String(doc.fileName || '');
-      return fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() : '';
-    }).filter(Boolean),
+      return fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() || '' : '';
+    }).filter((type): type is string => Boolean(type)),
   ])].sort();
 
   const filteredDocuments = documents
