@@ -53,9 +53,9 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
 
   const unsupportedVideoPlatform = (() => {
     const value = url.trim();
-    if (/^https?:\\/\\/(?:www\\.|m\\.|vm\\.|vt\\.)?tiktok\\.com\\//i.test(value)) return 'TikTok';
-    if (/^https?:\\/\\/(?:www\\.)?instagram\\.com\\//i.test(value) || /^https?:\\/\\/(?:www\\.)?instagr\\.am\\//i.test(value)) return 'Instagram';
-    if (/^https?:\\/\\/(?:www\\.|player\\.)?vimeo\\.com\\//i.test(value)) return 'Vimeo';
+    if (/^https?:\/\/(?:www\.|m\.|vm\.|vt\.)?tiktok\.com\//i.test(value)) return 'TikTok';
+    if (/^https?:\/\/(?:www\.)?instagram\.com\//i.test(value) || /^https?:\/\/(?:www\.)?instagr\.am\//i.test(value)) return 'Instagram';
+    if (/^https?:\/\/(?:www\.|player\.)?vimeo\.com\//i.test(value)) return 'Vimeo';
     return null;
   })();
 
