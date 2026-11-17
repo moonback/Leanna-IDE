@@ -62,6 +62,8 @@ export class AgentEventStream {
   }
 
   publish(event: AgentEvent): number {
+    // Aucun événement non attribué ne doit entrer dans le journal partagé.
+    if (!event.projectId) return 0;
     const id = this.nextId++;
     const entry: SequencedAgentEvent = { id, event: { ...event, eventId: id } };
     this.history.push(entry);
@@ -95,8 +97,11 @@ export class AgentEventStream {
     return this.nextId - 1;
   }
 
-  getHistory(): SequencedAgentEvent[] {
-    return this.history.map((entry) => ({ ...entry }));
+  getHistory(projectId?: string): SequencedAgentEvent[] {
+    if (!projectId) return [];
+    return this.history
+      .filter((entry) => entry.event.projectId === projectId)
+      .map((entry) => ({ ...entry }));
   }
 }
 
