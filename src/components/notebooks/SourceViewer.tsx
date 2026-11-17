@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import {
   FileText, Loader2, X, RefreshCw, Tag,
   FileType, FileCode, Globe, Youtube, Music, FileText as FileDoc,
-  Image as ImageIcon, Paperclip, Download, Bot,
+  Image as ImageIcon, Paperclip, Download, Bot, Video, Clock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -24,6 +24,12 @@ interface SourceData {
   wordCount: number;
   language: string;
   chunksCount: number;
+  metadata?: {
+    videoTranscript?: {
+      language: string;
+      segments: Array<{ startMs: number; endMs?: number; speaker?: string; text: string }>;
+    };
+  };
 }
 
 interface Props {
@@ -55,6 +61,7 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [imageData, setImageData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [htmlData, setHtmlData] = useState<string | null>(null);
+  const [videoTranscript, setVideoTranscript] = useState<NonNullable<SourceData['metadata']>['videoTranscript'] | null>(null);
   const [viewMode, setViewMode] = useState<'visual' | 'text'>('visual');
 
   const fetchContent = useCallback(async () => {
@@ -67,8 +74,11 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
         imageBase64?: string;
         imageMimeType?: string;
         rawHtml?: string;
+        type?: string;
+        metadata?: SourceData['metadata'];
       }>(`/api/notebooks/${notebookId}/sources/${sourceId}/content`);
       setContent(data.content || data.text || 'Contenu non disponible');
+      setVideoTranscript(data.type === 'video' ? data.metadata?.videoTranscript || null : null);
       // If it's an image source, store the image data
       if (data.type === 'image' && data.imageBase64) {
         setImageData({ base64: data.imageBase64, mimeType: data.imageMimeType || 'image/png' });
@@ -191,6 +201,8 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
               Réessayer
             </NbButton>
           </div>
+        ) : videoTranscript && videoTranscript.segments.length > 0 ? (
+          <VideoTranscript transcript={videoTranscript} />
         ) : imageData ? (
           <div className="space-y-4">
             {/* Image display */}
@@ -251,6 +263,54 @@ export function SourceViewer({ notebookId, sourceId, source, onClose }: Props) {
         )}
       </div>
     </motion.div>
+  );
+}
+
+/* ─── Video transcript viewer ──────────────────────────────────────────────── */
+function formatTranscriptTime(milliseconds: number): string {
+  const safeMs = Math.max(0, Math.floor(milliseconds));
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const centiseconds = Math.floor((safeMs % 1000) / 10);
+  const clock = hours > 0
+    ? [hours, String(minutes).padStart(2, '0'), String(seconds).padStart(2, '0')].join(':')
+    : [minutes, String(seconds).padStart(2, '0')].join(':');
+  return `${clock}.${String(centiseconds).padStart(2, '0')}`;
+}
+
+function VideoTranscript({ transcript }: { transcript: NonNullable<SourceData['metadata']>['videoTranscript'] }) {
+  if (!transcript) return null;
+  return (
+    <section className="mx-auto w-full max-w-4xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--notebook-accent-surface)] text-[var(--notebook-accent)]">
+            <Video size={19} aria-hidden />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Transcription vidéo</h3>
+            <p className="text-xs text-[var(--text-muted)]">Transcrite avec Gemini · {transcript.language.toUpperCase()}</p>
+          </div>
+        </div>
+        <span className="text-xs text-[var(--text-muted)]">{transcript.segments.length.toLocaleString()} segments</span>
+      </div>
+      <div className="space-y-2">
+        {transcript.segments.map((segment, index) => (
+          <article key={`${segment.startMs}-${index}`} className="flex gap-3 rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] p-3">
+            <div className="flex flex-shrink-0 items-start gap-1 pt-0.5 font-mono text-xs tabular-nums text-[var(--notebook-accent)]">
+              <Clock size={12} className="mt-0.5" aria-hidden />
+              {formatTranscriptTime(segment.startMs)}
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              {segment.speaker && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{segment.speaker}</p>}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{segment.text}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
