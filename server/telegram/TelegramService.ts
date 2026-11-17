@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { Leanna_APP_ROOT, SELF_ROOT, hasProject, setSelfRoot, listWorkspaces } from "../utils/selfRoot.js";
+import { Leanna_APP_ROOT, SELF_ROOT, hasProject, setSelfRoot, listWorkspaces, getActiveProjectId } from "../utils/selfRoot.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { resolveWorkspacePath } from "../security.js";
 import { generateText, getActiveProvider } from "../utils/textGeneration.js";
@@ -406,7 +406,8 @@ export class TelegramService {
 
       // /recent — Affiche les cinq dernières missions enregistrées.
       this.bot.command("recent", async (ctx) => {
-        const tasks = agentOrchestrator.listTasks({ limit: 5 });
+        const projectId = getActiveProjectId();
+        const tasks = projectId ? agentOrchestrator.listTasks({ limit: 5, projectId }) : [];
         if (!tasks.length) {
           await ctx.reply("📭 Aucune mission récente enregistrée.");
           return;
@@ -591,11 +592,12 @@ export class TelegramService {
           return;
         }
 
-        // Correspondance exacte, ou par préfixe court (8 premiers caractères)
-        let task = agentOrchestrator.getTask(taskIdInput);
-        if (!task) {
+        // Correspondance exacte, ou par préfixe court, limitée au workspace actif.
+        const projectId = getActiveProjectId();
+        let task = projectId ? agentOrchestrator.getTaskForProject(taskIdInput, projectId) : undefined;
+        if (!task && projectId) {
           const match = agentOrchestrator
-            .listTasks()
+            .listTasks({ projectId })
             .find((t) => t.id.startsWith(taskIdInput));
           task = match ?? undefined;
         }
@@ -770,7 +772,10 @@ export class TelegramService {
           return;
         }
 
-        const cancelled = agentOrchestrator.cancelTask(task.id);
+        const projectId = getActiveProjectId();
+        const cancelled = projectId && agentOrchestrator.getTaskForProject(task.id, projectId)
+          ? agentOrchestrator.cancelTask(task.id)
+          : false;
         if (cancelled) {
           await ctx.reply(
             `🚫 *Tâche annulée*\n\`${task.id.slice(0, 8)}\` — ${task.title}`,
