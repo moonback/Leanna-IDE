@@ -21,6 +21,7 @@ import { contractNetNegotiator } from "./ContractNetNegotiator.js";
 import { inferRequiredCapabilities } from "./capabilityInference.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 import { initCustomAgents } from "../routes/custom-agents.js";
 import { agentEventStream } from "./AgentEventStream.js";
 import type { AgentBrain as AgentBrainType } from "./brain/AgentBrain.js";
