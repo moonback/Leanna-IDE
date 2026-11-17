@@ -32,6 +32,7 @@ export interface AgentLeadOptions {
 function publishToEventStream(decision: LeadDecision, state: LeadRunState): void {
   agentEventStream.publish({
     type: "agent_event",
+    projectId: state.projectId,
     event: "task_progress",
     taskId: decision.stageId ?? state.planId,
     role: "planner",
@@ -64,7 +65,9 @@ export class AgentLead implements LeadPolicy {
   }
 
   begin(plan: BrainPlan, budget?: Partial<LeadBudget>): LeadRunState {
-    return createLeadRunState(plan.id, plan.goal, budget, this.now());
+    const state = createLeadRunState(plan.id, plan.goal, budget, this.now());
+    state.projectId = plan.projectId;
+    return state;
   }
 
   selectAgents(plan: BrainPlan, state: LeadRunState): void {
