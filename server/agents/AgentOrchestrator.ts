@@ -335,6 +335,7 @@ export class AgentOrchestrator {
       negotiatedTask.status = "running";
       negotiatedTask.startedAt = new Date().toISOString();
     }
+    negotiatedTask.projectId ??= getActiveProjectId();
     this.tasks.set(negotiatedTask.id, negotiatedTask);
     agentPersistence.saveTask(negotiatedTask).catch(() => {});
 
