@@ -402,9 +402,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // ── Agent Brain REST API ──────────────────────────────────────────────────
 
   const BrainPlanSchema = z.object({
-    goal: z.string().min(1, "goal requis").trim(),
-    contextFiles: z.array(z.string()).optional().default([]),
-    instructions: z.string().optional(),
+    goal: z.string().min(1, "goal requis").max(4000, "goal trop long").trim(),
+    contextFiles: z.array(z.string().max(500, "chemin trop long")).max(50, "50 fichiers de contexte maximum").optional().default([]),
+    instructions: z.string().max(12000, "instructions trop longues").optional(),
   });
 
   const BrainExecuteSchema = BrainPlanSchema.extend({
