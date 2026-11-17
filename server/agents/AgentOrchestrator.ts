@@ -611,9 +611,10 @@ export class AgentOrchestrator {
 
   // ─── Requêtes ─────────────────────────────────────────────────────────────
 
-  /** Récupère une tâche par son ID */
-  getTask(taskId: string): AgentTask | undefined {
-    return this.tasks.get(taskId);
+  /** Lookup historique conservé pour compatibilité, mais toujours propriétaire-scopé. */
+  getTask(taskId: string, projectId?: string): AgentTask | undefined {
+    if (!projectId) return undefined;
+    return this.getTaskForProject(taskId, projectId);
   }
 
   /** Lookup strict : une tâche legacy sans propriétaire est inaccessible. */
@@ -648,9 +649,10 @@ export class AgentOrchestrator {
     return results.slice(0, filters?.limit ?? 20);
   }
 
-  /** Récupère un plan d'orchestration */
-  getOrchestration(orchestrationId: string): OrchestrationPlan | undefined {
-    return this.orchestrations.get(orchestrationId);
+  /** Lookup historique conservé pour compatibilité, mais toujours propriétaire-scopé. */
+  getOrchestration(orchestrationId: string, projectId?: string): OrchestrationPlan | undefined {
+    if (!projectId) return undefined;
+    return this.getOrchestrationForProject(orchestrationId, projectId);
   }
 
   /** Lookup strict d'une orchestration par workspace propriétaire. */
