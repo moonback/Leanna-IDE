@@ -455,6 +455,7 @@ export class AgentOrchestrator {
         timeoutMs: agent.defaultTimeoutMs,
       };
 
+      task.projectId = getActiveProjectId();
       agentTasks.push(task);
       this.tasks.set(task.id, task);
 
