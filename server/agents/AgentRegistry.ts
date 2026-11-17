@@ -44,6 +44,10 @@ export class AgentRegistry {
   private negotiator: ContractNetNegotiator;
   private initialized = false;
   private workspaceId?: string;
+
+  private isCurrentWorkspace(): boolean {
+    return !!this.workspaceId && getActiveProjectId() === this.workspaceId;
+  }
   /** Config de boucle mémorisée par rôle, pour recréer à l'identique au swap de moteur. */
   private loopConfigByRole = new Map<AgentRole, Partial<LoopConfig>>();
 
@@ -65,6 +69,7 @@ export class AgentRegistry {
 
   /** Nombre de tâches actives (en cours + en file) sur toute la flotte. */
   private activeWorkCount(): number {
+    if (!this.isCurrentWorkspace()) return 0;
     let total = 0;
     for (const agent of this.agents.values()) {
       const stats = agent.getStats();
@@ -199,6 +204,7 @@ export class AgentRegistry {
    * @throws Si le registre n'est pas initialisé ou le rôle inconnu.
    */
   getAgent(role: AgentRole): AutonomousAgent {
+    if (!this.isCurrentWorkspace()) throw new Error("La flotte appartient à un autre workspace ou aucun workspace n'est actif.");
     const agent = this.agents.get(role);
     if (!agent) {
       throw new Error(
@@ -212,6 +218,7 @@ export class AgentRegistry {
    * Retourne tous les agents disponibles (non surchargés).
    */
   getAvailableAgents(): AutonomousAgent[] {
+    if (!this.isCurrentWorkspace()) return [];
     return Array.from(this.agents.values()).filter((a) => a.isAvailable);
   }
 
@@ -219,7 +226,7 @@ export class AgentRegistry {
    * Vérifie si un agent est disponible.
    */
   isAgentAvailable(role: AgentRole): boolean {
-    return this.agents.get(role)?.isAvailable ?? false;
+    return this.isCurrentWorkspace() && (this.agents.get(role)?.isAvailable ?? false);
   }
 
   // ─── Configuration ──────────────────────────────────────────────────────────
@@ -295,6 +302,7 @@ export class AgentRegistry {
    * Ne peut pas désenregistrer les agents statiques.
    */
   unregisterDynamicAgent(role: string): boolean {
+    if (!this.isCurrentWorkspace()) return false;
     const roleKey = role as AgentRole;
     
     // Ne pas supprimer les agents statiques
