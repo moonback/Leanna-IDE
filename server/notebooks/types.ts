@@ -7,7 +7,7 @@
 
 // ─── Source (document ingéré dans un notebook) ───────────────────────────────
 
-export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html' | 'image' | 'github-repo';
+export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'audio' | 'youtube' | 'docx' | 'html' | 'image' | 'video' | 'github-repo';
 
 export interface SourceChunk {
   id: string;
