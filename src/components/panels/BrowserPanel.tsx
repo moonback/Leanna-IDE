@@ -583,11 +583,19 @@ export function BrowserPanel({
       }
     };
 
+    const emitBrowserDiagnostic = (level: string, message: string, detail?: Record<string, unknown>) => {
+      const entry = { level, message, detail: detail ?? {}, ts: Date.now(), url: webviewRef.current?.getURL?.() ?? '' };
+      console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info']('[BrowserPanel]', entry);
+      window.dispatchEvent(new CustomEvent('Leanna-browser-diagnostic', { detail: entry }));
+    };
+
     // ── Canal retour : Leanna demande le contenu de la page ──────────────
     const handleReadRequest = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; selector: string | null };
       const wv = webviewRef.current;
+      emitBrowserDiagnostic('info', 'read-content: demande reçue', { requestId: detail.requestId, selector: detail.selector ?? null, webviewAvailable: Boolean(wv) });
       if (!wv) {
+        emitBrowserDiagnostic('error', 'read-content: webview absente', { requestId: detail.requestId });
         const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
@@ -621,9 +629,11 @@ export function BrowserPanel({
           })()`;
 
       try {
+        const pageMeta = await wv.executeJavaScript('({ url: location.href, title: document.title, readyState: document.readyState, bodyLength: document.body ? (document.body.innerText || "").length : 0 })');
+        emitBrowserDiagnostic('info', 'read-content: exécution JS terminée', { requestId: detail.requestId, pageMeta });
         const raw = await wv.executeJavaScript(extractScript);
         const token = localStorage.getItem('Leanna_api_token') || '';
-        await fetch('/api/browser/content-result', {
+        const response = await fetch('/api/browser/content-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -631,7 +641,9 @@ export function BrowserPanel({
           },
           body: JSON.stringify({ requestId: detail.requestId, result: raw, error: null }),
         });
+        emitBrowserDiagnostic(response.ok ? 'info' : 'error', 'read-content: résultat transmis au serveur', { requestId: detail.requestId, httpStatus: response.status, ok: response.ok, payloadType: typeof raw, payloadLength: typeof raw === 'string' ? raw.length : null });
       } catch (err: any) {
+        emitBrowserDiagnostic('error', 'read-content: exception', { requestId: detail.requestId, error: err?.message ?? String(err), stack: err?.stack ?? null });
         const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
@@ -647,8 +659,9 @@ export function BrowserPanel({
     // ── Helper générique : POST résultat d'action webview → backend
     const postActionResult = async (requestId: string, result: any, error: string | null = null) => {
       try {
+        emitBrowserDiagnostic('info', 'action-result: envoi', { requestId, hasResult: result !== null && result !== undefined, error });
         const token = localStorage.getItem('Leanna_api_token') || '';
-        await fetch('/api/browser/action-result', {
+        const response = await fetch('/api/browser/action-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -656,7 +669,8 @@ export function BrowserPanel({
           },
           body: JSON.stringify({ requestId, result, error }),
         });
-      } catch {/* silent */ }
+        emitBrowserDiagnostic(response.ok ? 'info' : 'error', 'action-result: réponse HTTP', { requestId, httpStatus: response.status, ok: response.ok });
+      } catch (err: any) { emitBrowserDiagnostic('error', 'action-result: échec réseau', { requestId, error: err?.message ?? String(err) }); }
     };
 
     // Confirmation explicite avant toute action pouvant exposer des données
