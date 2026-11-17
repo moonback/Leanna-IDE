@@ -65,6 +65,25 @@ interface BrowserTabViewProps {
 
 const MAX_CONSOLE_ENTRIES = 300;
 
+function formatDiagnosticValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return `${value.name}: ${value.message}${value.stack ? `\\n${value.stack}` : ''}`;
+  try {
+    const seen = new WeakSet<object>();
+    const serialized = JSON.stringify(value, (_key, item) => {
+      if (typeof item === 'bigint') return `${item}n`;
+      if (item && typeof item === 'object') {
+        if (seen.has(item)) return '[Circular]';
+        seen.add(item);
+      }
+      return item;
+    });
+    return serialized ?? String(value);
+  } catch {
+    try { return String(value); } catch { return '[Unserializable diagnostic value]'; }
+  }
+}
+
 /**
  * Electron rejects webview.loadURL() with ERR_ABORTED when a newer navigation
  * supersedes the current one. This is an expected lifecycle event, not a
@@ -144,13 +163,15 @@ export function BrowserTabView({
     const diagnostic = (level: string, message: string, source?: string) => {
       pushConsole({ level, message: message.slice(0, 4000), source: source ?? 'Leanna browser diagnostics' });
       const method = level === 'error' || level === 'network' ? 'error' : level === 'warn' ? 'warn' : 'info';
-      console[method]('[BrowserTabView]', { tabId, url: (() => { try { return wv.getURL(); } catch { return ''; } })(), message });
+      const url = (() => { try { return wv.getURL(); } catch { return ''; } })();
+      // The desktop log collector expects a string; object arguments became '[object Object]'.
+      console[method](`[BrowserTabView] ${formatDiagnosticValue({ tabId, url, message })}`);
     };
 
     const onDiagnostic = (event: Event) => {
       const detail = (event as CustomEvent).detail as { level?: string; message?: string; detail?: unknown; url?: string } | undefined;
       if (!detail) return;
-      diagnostic(detail.level ?? 'info', `${detail.message ?? 'browser diagnostic'} | ${JSON.stringify(detail.detail ?? {})} | url=${detail.url ?? ''}`);
+      diagnostic(detail.level ?? 'info', `${detail.message ?? 'browser diagnostic'} | detail=${formatDiagnosticValue(detail.detail ?? {})} | url=${detail.url ?? ''}`);
     };
 
     const onDomReady = () => {
@@ -182,7 +203,7 @@ export function BrowserTabView({
     const onConsoleMessage = (e: Event) => {
       const ev = e as unknown as { level: number; message: string; line: number; sourceId: string };
       const level = ev.level === 3 ? 'error' : ev.level === 2 ? 'warn' : ev.level === 1 ? 'info' : 'log';
-      diagnostic(level, `${String(ev.message ?? '')} (line=${ev.line ?? '?'} source=${ev.sourceId ?? '?'})`, ev.sourceId);
+      diagnostic(level, `${formatDiagnosticValue(ev.message ?? '')} (line=${ev.line ?? '?'} source=${ev.sourceId ?? '?'})`, ev.sourceId);
     };
     const onFailLoad = (e: Event) => {
       const ev = e as WebviewFailLoadEvent;
