@@ -176,6 +176,7 @@ export class AgentOrchestrator {
       try {
           publish({
           type: "agent_event",
+          projectId: msg.projectId,
           event: "task_started",
           taskId: msg.id,
           role: msg.from,
