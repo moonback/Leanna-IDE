@@ -228,7 +228,7 @@ export class SourceIngester {
 
     // YouTube : on utilise la transcription (sous-titres publics) quand elle
     // existe ; sinon on retombe sur l'extraction classique de la page.
-    if (url.match(/youtube\.com\/(watch|shorts\/)|youtu\.be\//)) {
+    if (videoReference?.platform === "youtube") {
       sourceType = "youtube";
       const transcript = await fetchYouTubeTranscript(url);
       if (transcript) {
