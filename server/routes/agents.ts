@@ -256,7 +256,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       if ((ids as string[]).some((id) => !agentOrchestrator.getTaskForProject(id, projectId))) {
         return res.status(404).json({ success: false, error: 'Une ou plusieurs tâches sont introuvables.' });
       }
-      const deleted = await agentOrchestrator.deleteTasks(ids as string[]);
+      const deleted = await agentOrchestrator.deleteTasks(ids as string[], projectId);
       return res.json({ success: true, deleted, requested: ids.length });
     } catch (e: any) {
       return res.status(500).json({ success: false, error: e.message });
