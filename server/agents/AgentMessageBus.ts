@@ -146,7 +146,7 @@ export class AgentMessageBus extends EventEmitter {
     log.debug(`📬 Agent "${agentRole}" abonné au type "${messageType}" (sub: ${subId.slice(0, 8)})`);
 
     // Re-livrer immédiatement les messages en attente pour ce rôle
-    this.flushDeadLetterQueue(agentRole).catch((err) => {
+    this.flushDeadLetterQueue(agentRole, projectId).catch((err) => {
       log.warn(`Échec flush dead-letter queue pour "${agentRole}": ${(err as Error).message}`);
     });
 
