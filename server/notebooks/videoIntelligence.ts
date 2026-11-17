@@ -22,7 +22,8 @@ const PLATFORM_HOSTS: Record<VideoPlatform, string[]> = {
 };
 
 function hostMatches(host: string, allowed: string): boolean {
-  return host === allowed || host.endsWith(`.${allowed}`);
+  // Exact allowlist only: arbitrary nested subdomains are not trusted.
+  return host === allowed;
 }
 
 /** Accept only public HTTP(S) URLs on supported platform hostnames. */
