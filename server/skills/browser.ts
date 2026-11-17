@@ -2095,12 +2095,16 @@ export const browserSkill: Skill = {
       if (typeof raw === "string") {
         return { status: "error", message: raw };
       }
+      const result = raw as { found?: boolean; ok?: boolean; changed?: Record<string, boolean> };
+      if (result.found === false || result.ok !== true) {
+        return { status: "error", message: `Aucun clic confirmé sur [role="${role}" name="${accessibleName}"]. La cible est absente ou l'action n'a pas été confirmée.` };
+      }
       return {
         status: "success",
         role,
         name: accessibleName,
-        changed: (raw as any)?.changed ?? {},
-        message: `Clic effectué sur l'élément [role="${role}" name="${accessibleName}"]${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+        changed: result.changed ?? {},
+        message: `Clic effectué et confirmé sur l'élément [role="${role}" name="${accessibleName}"]${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
       };
     }
 
@@ -2116,12 +2120,16 @@ export const browserSkill: Skill = {
       if (typeof raw === "string") {
         return { status: "error", message: raw };
       }
+      const result = raw as { found?: boolean; ok?: boolean; changed?: Record<string, boolean> };
+      if (result.found === false || result.ok !== true) {
+        return { status: "error", message: `Champ "${label}" introuvable ou saisie non confirmée. Aucun succès n'est déclaré.` };
+      }
       return {
         status: "success",
         label,
         pressEnter,
-        changed: (raw as any)?.changed ?? {},
-        message: `Saisie de "${text}" dans le champ "${label}"${pressEnter ? " + Entrée" : ""}${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+        changed: result.changed ?? {},
+        message: `Saisie confirmée dans le champ "${label}"${pressEnter ? " + Entrée" : ""}${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
       };
     }
 
@@ -2212,8 +2220,8 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const result = raw as { ok?: boolean; found?: boolean; changed?: any };
-      if (!result.found) {
-        return { status: "error", message: `Champ introuvable : ${selector}` };
+      if (!result.found || result.ok !== true) {
+        return { status: "error", message: `Champ introuvable ou remplissage non confirmé : ${selector}` };
       }
       return {
         status: "success",
