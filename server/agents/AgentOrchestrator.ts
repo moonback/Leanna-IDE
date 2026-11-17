@@ -208,6 +208,8 @@ export class AgentOrchestrator {
     priority?: TaskPriority;
     timeoutMs?: number;
   }): Promise<AgentTask> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : délégation refusée.");
     const agent = getAgentDefinitionOrThrow(params.role);
     const currentRunning = this.executor.getRunningCount(params.role);
 
@@ -235,7 +237,7 @@ export class AgentOrchestrator {
       timeoutMs: params.timeoutMs ?? agent.defaultTimeoutMs,
     };
 
-    task.projectId ??= getActiveProjectId();
+    task.projectId = projectId;
     this.tasks.set(task.id, task);
     log.debug(`Tâche créée: ${task.id.slice(0, 8)} — timeout: ${task.timeoutMs}ms`);
 
@@ -280,6 +282,8 @@ export class AgentOrchestrator {
     awarded: boolean;
     bids: Array<{ role: AgentRole; score: number; skillMatch: number; eligible: boolean }>;
   }> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : négociation refusée.");
     const taskId = randomUUID();
     const requiredCapabilities =
       params.requiredCapabilities && params.requiredCapabilities.length > 0
@@ -309,7 +313,7 @@ export class AgentOrchestrator {
       },
       createdAt: new Date().toISOString(),
     };
-    negotiatedTask.projectId ??= getActiveProjectId();
+    negotiatedTask.projectId = projectId;
     this.tasks.set(negotiatedTask.id, negotiatedTask);
     agentPersistence.saveTask(negotiatedTask).catch(() => {});
 
@@ -383,6 +387,8 @@ export class AgentOrchestrator {
       dependsOn?: string[];
     }>;
   }): Promise<OrchestrationPlan> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : orchestration refusée.");
     const orchestrationId = randomUUID();
 
     log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${[...new Set(params.tasks.map(t => t.role))].join(", ")}`);
@@ -455,7 +461,7 @@ export class AgentOrchestrator {
         timeoutMs: agent.defaultTimeoutMs,
       };
 
-      task.projectId = getActiveProjectId();
+      task.projectId = projectId;
       agentTasks.push(task);
       this.tasks.set(task.id, task);
 
@@ -471,7 +477,7 @@ export class AgentOrchestrator {
 
     const plan: OrchestrationPlan = {
       id: orchestrationId,
-      projectId: agentTasks.find((task) => task.projectId)?.projectId ?? getActiveProjectId() ?? undefined,
+      projectId,
       title: params.title,
       description: params.description,
       tasks: agentTasks,
@@ -515,6 +521,7 @@ export class AgentOrchestrator {
       instructions?: string;
     };
   }): Promise<OrchestrationPlan> {
+    if (!getActiveProjectId()) throw new Error("Aucun workspace actif : collaboration refusée.");
     const pattern = COLLABORATION_PATTERNS.find((p) => p.name === params.patternName);
     if (!pattern) {
       throw new Error(
@@ -913,6 +920,7 @@ export class AgentOrchestrator {
    * Planifie dynamiquement un objectif utilisateur via l'Agent Brain
    */
   async brainPlan(input: BrainGoalInput): Promise<BrainPlan> {
+    if (!(input.projectId ?? getActiveProjectId())) throw new Error("Aucun workspace actif : planification Brain refusée.");
     const brain = await this.getBrain();
     return brain.planGoal(input);
   }
@@ -921,6 +929,7 @@ export class AgentOrchestrator {
    * Exécute de bout en bout un objectif utilisateur via l'Agent Brain
    */
   async brainExecute(input: BrainGoalInput): Promise<BrainExecutionResult> {
+    if (!(input.projectId ?? getActiveProjectId())) throw new Error("Aucun workspace actif : exécution Brain refusée.");
     const brain = await this.getBrain();
     return brain.executeGoal(input);
   }
