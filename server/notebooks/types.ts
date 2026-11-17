@@ -76,6 +76,10 @@ export interface Source {
   /** Métadonnées spécifiques au type de source */
   metadata?: {
     /** Pour github-repo : informations sur le dépôt */
+    videoTranscript?: {
+      language: string;
+      segments: Array<{ startMs: number; endMs?: number; speaker?: string; text: string }>;
+    };
     githubRepo?: {
       owner: string;
       repo: string;
