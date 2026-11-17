@@ -26,7 +26,7 @@ import { estimateTokens, summarizeWithLLM } from '../utils/tokenOptimizer.js';
 import { recordModelCallUsage } from '../utils/textGeneration.js';
 import { knowledgeGraph, projectMemory, understandingEngine } from '../knowledge/index.js';
 import { Supervisor } from '../autonomy/index.js';
-import { WORKSPACE_SITE_URL, SELF_ROOT } from '../utils/selfRoot.js';
+import { WORKSPACE_SITE_URL, SELF_ROOT, getActiveProjectId } from '../utils/selfRoot.js';
 import { fetchStartupMemories, fetchStartupConversations } from './startupMemory.js';
 import { guardToolResponse } from '../utils/promptInjectionGuard.js';
 import type { BrowserPendingEntry, BrowserActionPendingEntry } from '../routes/browser.js';
@@ -179,6 +179,9 @@ export function attachLiveWebSocket(
 
   // ── Gemini Live WebSocket ────────────────────────────────────────────────
   wss.on('connection', async (clientWs: WebSocket, req: any) => {
+    // Lier la connexion au workspace observé à son ouverture : un client
+    // resté connecté après un changement de projet ne recevra pas ses événements.
+    (clientWs as WebSocket & { workspaceId?: string }).workspaceId = getActiveProjectId() ?? undefined;
     console.log('Client connected to WebSocket');
     const sessionSupervisor = new Supervisor();
     const contextGate: SessionContextGate = {
