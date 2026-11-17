@@ -109,7 +109,7 @@ export class AgentBrain {
 
     // Capturer le propriétaire au démarrage, pas lors d'une lecture ultérieure :
     // SELF_ROOT peut changer pendant qu'un run asynchrone est encore actif.
-    plan.projectId = getActiveProjectId();
+    plan.projectId = input.projectId ?? getActiveProjectId();
     this.activePlans.set(plan.id, plan);
 
     // Émettre un événement pour la visibilité de l'interface
