@@ -12,6 +12,9 @@ Cette branche introduit les primitives partagées de Video Intelligence :
 - transcription d'un buffer audio ou vidéo déjà obtenu, via Gemini multimodal ;
 - acceptation des fichiers vidéo MP4, WebM et MOV dans l'upload Notebook (limite upload existante de 10 Mio) ;
 - passage de ces fichiers par la queue commune, puis création d'une source de type `video` indexée dans le RAG ;
+- validation de la signature de conteneur MP4/MOV (ISO BMFF) et WebM (EBML), en plus de l'extension et du MIME ;
+- conservation des segments horodatés et des locuteurs dans `source.metadata.videoTranscript` (maximum 5 000 segments) ;
+- refus explicite des URL TikTok/Instagram/Vimeo non encore raccordées, avec indication du parcours upload au lieu d'une tentative d'extraction de page trompeuse ;
 - segments horodatés, langue, locuteur facultatif et texte concaténé ;
 - validation du MIME, de la taille, du format JSON et des timestamps.
 
