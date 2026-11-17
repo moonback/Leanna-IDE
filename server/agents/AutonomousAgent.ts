@@ -34,6 +34,7 @@ import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop.js";
 import { getAgentDefinitionOrThrow } from "./roles.js";
 import { contractNetNegotiator, type ContractNetNegotiator } from "./ContractNetNegotiator.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AutonomousAgent");
 
@@ -104,14 +105,22 @@ export class AutonomousAgent {
   start(): void {
     if (this.isOnline) return;
 
+    // Les handlers sont liés au workspace présent au démarrage ; le bus
+    // refusera toute livraison issue d'un autre workspace.
+    const projectId = getActiveProjectId() ?? undefined;
+    if (!projectId) {
+      log.warn(`Agent "${this.agentName}" non abonné : aucun workspace actif`);
+      return;
+    }
+
     // Abonnement aux messages directs
     this.subscriptionId = this.bus.subscribe(this.role, "*", (msg) =>
-      this.handleMessage(msg)
+      this.handleMessage(msg), projectId
     );
 
     // Abonnement aux broadcasts
     this.broadcastSubId = this.bus.subscribe(this.role, "broadcast", (msg) =>
-      this.handleBroadcast(msg)
+      this.handleBroadcast(msg), projectId
     );
 
     this.isOnline = true;
