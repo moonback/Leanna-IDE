@@ -9,6 +9,13 @@ test("notebook source validation accepts supported text, PDF and raster image si
   assert.equal(validateNotebookSourceUpload("photo.webp", "image/webp", Buffer.from("RIFF0000WEBP")).valid, true);
 });
 
+test("notebook source validation accepts supported video containers with matching MIME", () => {
+  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/mp4", Buffer.from("video")).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.webm", "video/webm", Buffer.from("video")).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.mov", "video/quicktime", Buffer.from("video")).valid, true);
+  assert.equal(validateNotebookSourceUpload("clip.mp4", "video/webm", Buffer.from("video")).valid, false);
+});
+
 test("notebook source validation rejects mismatched extensions, MIME and signatures", () => {
   assert.equal(validateNotebookSourceUpload("fake.pdf", "application/pdf", Buffer.from("plain text")).valid, false);
   assert.equal(validateNotebookSourceUpload("fake.png", "image/png", Buffer.from("not an image")).valid, false);
