@@ -1,4 +1,4 @@
-import { Skill, validateArgs } from "./base.js";
+import { Skill, validateArgs, type SkillContext } from "./base.js";
 import { z } from "zod";
 import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView, missionTimeTravel, type TimelineMissionView, selfEvaluationEngine, type SelfEvalMissionView } from "../mission/index.js";
 
@@ -17,6 +17,17 @@ import { Executor, reflectionEngine, MissionSimulator, type DryRunReportView, mi
  * Le système est conçu pour être utilisé quand une tâche est complexe
  * et nécessite une planification multi-étapes avec suivi.
  */
+
+/** Outils webview autorisés uniquement pour une mission lancée depuis une session UI active. */
+const MISSION_BROWSER_TOOLS = [
+  "browser_navigate", "browser_search", "browser_open", "browser_close", "browser_back",
+  "browser_forward", "browser_reload", "browser_scroll", "browser_new_tab", "browser_manage_tabs",
+  "browser_read_content", "browser_summarize_page", "browser_get_links", "browser_open_link",
+  "browser_research", "browser_web_search", "browser_click", "browser_type", "browser_fill_form",
+  "browser_select_option", "browser_click_by_role", "browser_type_by_label", "browser_snapshot",
+  "browser_inspect", "browser_get_accessibility_snapshot", "browser_get_element_text",
+  "browser_get_element_attribute", "browser_wait_for", "browser_capture",
+];
 
 /** Instance globale de l'Executor (initialisée par le SkillManager) */
 let executor: Executor | null = null;
@@ -311,7 +322,7 @@ export const missionSkill: Skill = {
     }),
   },
 
-  handleToolCall: async (name: string, args: any, context?: { emitIdeAction?: (action: any) => void; browserReadPending?: Map<string, any>; browserActionPending?: Map<string, any> }) => {
+  handleToolCall: async (name: string, args: any, context?: SkillContext) => {
     if (!executor) {
       return {
         error: "Mission System non initialisé. Le serveur doit être redémarré.",
@@ -329,9 +340,9 @@ export const missionSkill: Skill = {
           title,
           description,
           priority,
-          availableSkills: availableSkillNames,
+          availableSkills: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? [...new Set([...availableSkillNames, ...MISSION_BROWSER_TOOLS])] : availableSkillNames,
           dryRun,
-          browserContext: context ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending, browserActionPending: context.browserActionPending } : undefined,
+          browserContext: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending as unknown as Map<string, any>, browserActionPending: context.browserActionPending as unknown as Map<string, any> } : undefined,
         });
 
         return {
