@@ -1426,7 +1426,7 @@ export const browserSkill: Skill = {
         return { status: "error", message: "browserReadPending non disponible dans le contexte." };
       }
 
-      const requestId = `br_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const requestId = `br_${randomUUID()}`;
       const TIMEOUT_MS = 18_000;
       if (signal?.aborted) {
         return { status: "error", message: "Lecture navigateur annulée avant exécution." };
