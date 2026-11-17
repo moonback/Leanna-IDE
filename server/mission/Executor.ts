@@ -606,6 +606,10 @@ export class Executor {
    * n'avait ni timeout ni budget.
    */
   private launchMission(mission: Mission, availableSkills: string[]): void {
+    // Une reprise après redémarrage ou depuis une autre session ne doit jamais hériter d'un accès webview.
+    const missionSkills = this.missionBrowserContexts.has(mission.id)
+      ? availableSkills
+      : availableSkills.filter((name) => !name.startsWith("browser_") || name === "browser_web_search");
     // Lancer l'exécution en arrière-plan, tout en conservant une promesse
     // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
     // que déclarer une mission réussie juste après sa création.
@@ -618,8 +622,8 @@ export class Executor {
     const execute = () =>
       runWithTelemetryContext({ missionId: mission.id }, () =>
         this.requiresSupervision(mission)
-          ? this.runSupervised(mission, availableSkills)
-          : this.executeMission(mission, availableSkills)
+          ? this.runSupervised(mission, missionSkills)
+          : this.executeMission(mission, missionSkills)
       );
 
     // Une simulation n'écrit rien : elle part tout de suite. Une mission réelle
