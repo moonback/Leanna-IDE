@@ -664,7 +664,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       if (!agentPersistence.isAvailable) {
         return res.status(503).json({ error: 'Supabase non configuré' });
       }
-      const result = await agentOrchestrator.restoreFromPersistence();
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const result = await agentOrchestrator.restoreFromPersistence(projectId);
       return res.json({ success: true, ...result });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
