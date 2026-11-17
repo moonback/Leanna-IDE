@@ -135,11 +135,13 @@ export class SourceIngester {
     let imageBase64: string | undefined;
     let imageMimeType: string | undefined;
     let rawHtml: string | undefined;
+    let videoTranscript: Awaited<ReturnType<typeof transcribeAudioWithGemini>> | undefined;
 
     if (mimeType.startsWith("video/")) {
       sourceType = "video";
       onProgress?.(12, "video-transcription", "Transcription du média avec Gemini");
       const transcript = await transcribeAudioWithGemini(buffer, mimeType, { title: filename });
+      videoTranscript = transcript;
       rawText = [
         `# ${filename}`,
         `Transcription Gemini — langue : ${transcript.language}`,
@@ -182,6 +184,16 @@ export class SourceIngester {
     }
 
     const source = await this.buildSource(rawText, filename, sourceType, filename, notebookId, onProgress);
+
+    if (videoTranscript) {
+      source.metadata = {
+        ...source.metadata,
+        videoTranscript: {
+          language: videoTranscript.language,
+          segments: videoTranscript.segments.slice(0, 5000),
+        },
+      };
+    }
 
     // Attach image data to the source for rendering in the viewer
     if (imageBase64 && imageMimeType) {
