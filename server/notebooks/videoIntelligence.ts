@@ -77,7 +77,7 @@ export async function transcribeAudioWithGemini(
   const allowedMimeTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/webm", "audio/ogg", "audio/flac", "audio/aac", "video/mp4", "video/webm", "video/quicktime"]);
   if (!Buffer.isBuffer(audio) || audio.length === 0) throw new Error("Le fichier audio est vide.");
   if (audio.length > 20 * 1024 * 1024) throw new Error("Média trop volumineux pour l'ingestion directe Gemini (20 Mio maximum).");
-  if (!allowedMimeTypes.has(mimeType.toLowerCase())) throw new Error("Format audio non pris en charge.");
+  if (!allowedMimeTypes.has(mimeType.toLowerCase())) throw new Error("Format audio/vidéo non pris en charge.");
 
   const prompt = [
     "Transcris fidèlement le contenu parlé de ce média. Ne résume pas et n'invente aucun passage.",
@@ -109,7 +109,7 @@ export async function transcribeAudioWithGemini(
     segment.startMs >= 0,
   ).map(segment => ({
     startMs: Math.round(segment.startMs),
-    ...(Number.isFinite(segment.endMs) && segment.endMs! >= segment.startMs ? { endMs: Math.round(segment.endMs!) } : {}),
+    ...(typeof segment.endMs === "number" && Number.isFinite(segment.endMs) && segment.endMs >= segment.startMs ? { endMs: Math.round(segment.endMs) } : {}),
     ...(typeof segment.speaker === "string" && segment.speaker.trim() ? { speaker: segment.speaker.trim() } : {}),
     text: segment.text.trim(),
   })).filter(segment => segment.text);
