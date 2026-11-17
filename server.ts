@@ -12,7 +12,7 @@ import { loadScheduledTasks, stopAllScheduledTasks } from "./server/skills/autom
 import { loadWorkflows, stopAllWorkflowTimers } from "./server/skills/workflow.js";
 import fs from "fs";
 import { authenticateRequest, authenticateToken, ensureApiToken } from "./server/security.js";
-import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject } from "./server/utils/selfRoot.js";
+import { SELF_ROOT, Leanna_APP_ROOT, initSelfRoot, hasProject, getActiveProjectId } from "./server/utils/selfRoot.js";
 import { isSandboxActive, getSandboxRoot } from "./server/utils/sandbox.js";
 import { supervisionModeFromEnv } from "./server/core/supervisionConfig.js";
 
