@@ -91,7 +91,9 @@ test('export routes: POST /pdf returns 400 when markdown is missing', async () =
 
 test('export routes: rejects invalid metadata and oversized markdown', async () => {
   const app = express();
-  app.use(express.json());
+  // Comme en production (server/config/rateLimits.ts) : limite 10mb pour que
+  // la validation 2 Mio de la route soit atteinte (et pas le 413 du parser).
+  app.use(express.json({ limit: '10mb' }));
   app.use('/api/export', createExportRouter());
   const server: Server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -106,7 +108,7 @@ test('export routes: rejects invalid metadata and oversized markdown', async () 
 
     const invalidFilename = await fetch(`http://127.0.0.1:${port}/api/export/pdf`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ markdown: '# Test', filename: 'bad\\r\\nInjected: yes' }),
+      body: JSON.stringify({ markdown: '# Test', filename: 'bad\r\nInjected: yes' }),
     });
     assert.equal(invalidFilename.status, 400);
 
