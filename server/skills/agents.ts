@@ -771,7 +771,7 @@ export const agentsSkill: Skill = {
         const { taskId } = validateArgs(z.object({ taskId: z.string().min(1) }), args);
         const projectId = getActiveProjectId();
         if (!projectId || !agentOrchestrator.getTaskForProject(taskId, projectId)) throw new Error(`Tâche "${taskId}" introuvable.`);
-        const ok = agentOrchestrator.cancelTask(taskId);
+        const ok = agentOrchestrator.cancelTask(taskId, projectId);
         if (!ok) throw new Error(`Impossible d'annuler "${taskId}" — inexistante ou déjà terminée.`);
         return { success: true, message: `Tâche "${taskId}" annulée (interruption prise en compte si elle était en cours).` };
       }
