@@ -227,6 +227,8 @@ export interface AgentPermissions {
 /** Tâche déléguée à un agent */
 export interface AgentTask {
   id: string;
+  /** Workspace propriétaire ; absent sur les anciennes tâches non migrées. */
+  projectId?: string;
   /** ID du workflow parent (si orchestration multi-agents) */
   orchestrationId?: string;
   role: AgentRole;
