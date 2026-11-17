@@ -110,6 +110,8 @@ export interface GenerateTextOptions {
   thinkingBudget?: number;
   /** For Gemini: if you need to pass multimodal parts directly */
   geminiParts?: any[];
+  /** OpenRouter video data URL for multimodal video-capable models. */
+  openrouterVideoDataUrl?: string;
   /** Force a specific provider for this call, ignoring profile setting */
   forceProvider?: 'gemini' | 'openrouter';
   /**
@@ -1008,7 +1010,17 @@ async function generateWithOpenRouter(options: GenerateTextOptions, meta: Attemp
     if (options.systemPrompt) {
       messages.push({ role: 'system', content: options.systemPrompt });
     }
-    messages.push({ role: 'user', content: options.prompt });
+    if (options.openrouterVideoDataUrl) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: options.prompt },
+          { type: 'video_url', video_url: { url: options.openrouterVideoDataUrl } },
+        ],
+      });
+    } else {
+      messages.push({ role: 'user', content: options.prompt });
+    }
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
