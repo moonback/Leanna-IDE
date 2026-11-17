@@ -780,7 +780,7 @@ export class AgentOrchestrator {
     if (plan.status === "pending" || plan.status === "running") {
       plan.status = "cancelled";
       plan.completedAt = new Date().toISOString();
-      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt).catch(() => {});
+      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt, plan.projectId).catch(() => {});
     }
 
     log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
