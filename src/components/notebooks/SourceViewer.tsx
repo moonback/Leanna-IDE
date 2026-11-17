@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import {
   FileText, Loader2, X, RefreshCw, Tag,
   FileType, FileCode, Globe, Youtube, Music, FileText as FileDoc,
-  Image as ImageIcon, Paperclip, Download, Bot, Video, Clock,
+  Image as ImageIcon, Paperclip, Download, Bot, Video, Clock, Search, Copy,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeMarkdownHtml.js';
@@ -41,7 +41,7 @@ interface Props {
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   pdf: FileType, text: FileText, markdown: FileCode, url: Globe,
-  html: Globe, youtube: Youtube, audio: Music, docx: FileDoc, image: ImageIcon,
+  html: Globe, youtube: Youtube, audio: Music, docx: FileDoc, image: ImageIcon, video: Video,
 };
 
 function TypeIcon({ type, size = 20 }: { type: string; size?: number }) {
@@ -281,7 +281,30 @@ function formatTranscriptTime(milliseconds: number): string {
 }
 
 function VideoTranscript({ transcript }: { transcript: NonNullable<SourceData['metadata']>['videoTranscript'] }) {
+  const [query, setQuery] = useState('');
+  const [copied, setCopied] = useState(false);
   if (!transcript) return null;
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleSegments = transcript.segments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => !normalizedQuery
+      || segment.text.toLocaleLowerCase().includes(normalizedQuery)
+      || (segment.speaker || '').toLocaleLowerCase().includes(normalizedQuery));
+  const fullTranscript = transcript.segments.map(segment =>
+    `[${formatTranscriptTime(segment.startMs)}]${segment.speaker ? ` ${segment.speaker}:` : ''} ${segment.text}`
+  ).join('\n');
+
+  const copyTranscript = async () => {
+    try {
+      await navigator.clipboard.writeText(fullTranscript);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   return (
     <section className="mx-auto w-full max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--notebook-border)] bg-[var(--notebook-surface)] p-4">
@@ -294,22 +317,46 @@ function VideoTranscript({ transcript }: { transcript: NonNullable<SourceData['m
             <p className="text-xs text-[var(--text-muted)]">Transcrite avec Gemini · {transcript.language.toUpperCase()}</p>
           </div>
         </div>
-        <span className="text-xs text-[var(--text-muted)]">{transcript.segments.length.toLocaleString()} segments</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--text-muted)]">{visibleSegments.length.toLocaleString()} / {transcript.segments.length.toLocaleString()} segments</span>
+          <NbButton variant="secondary" size="sm" icon={Copy} onClick={copyTranscript}>
+            {copied ? 'Copié' : 'Copier'}
+          </NbButton>
+        </div>
       </div>
-      <div className="space-y-2">
-        {transcript.segments.map((segment, index) => (
-          <article key={`${segment.startMs}-${index}`} className="flex gap-3 rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] p-3">
-            <div className="flex flex-shrink-0 items-start gap-1 pt-0.5 font-mono text-xs tabular-nums text-[var(--notebook-accent)]">
-              <Clock size={12} className="mt-0.5" aria-hidden />
-              {formatTranscriptTime(segment.startMs)}
-            </div>
-            <div className="min-w-0 flex-1 space-y-1">
-              {segment.speaker && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{segment.speaker}</p>}
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{segment.text}</p>
-            </div>
-          </article>
-        ))}
-      </div>
+      <label className="notebook-search-field" aria-label="Rechercher dans la transcription">
+        <Search className="h-4 w-4 flex-shrink-0" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Rechercher un mot ou un intervenant…"
+          aria-label="Rechercher dans la transcription"
+        />
+      </label>
+      {visibleSegments.length === 0 ? (
+        <p className="rounded-lg border border-[var(--notebook-border)] p-5 text-center text-sm text-[var(--text-muted)]">
+          Aucun segment ne correspond à cette recherche.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {visibleSegments.map(({ segment, index }) => (
+            <article key={`${segment.startMs}-${index}`} className="flex gap-3 rounded-lg border border-[var(--notebook-border)] bg-[var(--notebook-canvas)] p-3">
+              <div className="flex flex-shrink-0 items-start gap-1 pt-0.5 font-mono text-xs tabular-nums text-[var(--notebook-accent)]">
+                <Clock size={12} className="mt-0.5" aria-hidden />
+                {formatTranscriptTime(segment.startMs)}
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                {segment.speaker && <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{segment.speaker}</p>}
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">{segment.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-[var(--text-dimmed)]">
+        Les horodatages repèrent chaque passage dans la vidéo. Le lecteur synchronisé sera disponible lorsque le fichier vidéo original sera conservé avec la source.
+      </p>
     </section>
   );
 }
