@@ -47,8 +47,8 @@ export function initMissionSystem(exec: Executor, skills: string[]): void {
   availableSkillNames = skills;
   // NB : `skills` n'est PAS un inventaire de skills, mais la liste des NOMS
   // D'OUTILS autorisés en mission autonome (outils exécutables moins les outils
-  // `browser_*` pilotés par la webview, cf. MISSION_WEB_TOOL_ALLOWLIST dans
-  // server.ts). Le libellé le dit explicitement pour ne plus laisser croire à
+  // `browser_*` pilotés par la webview, sauf pour les missions créées depuis
+  // une session UI active (pont éphémère, non persisté). Le libellé le dit pour
   // une 3e population de « skills » incohérente avec les compteurs d'outils.
   console.log(`[MissionSkill] ✓ Mission System initialisé (${skills.length} outils autorisés en mission)`);
 }
