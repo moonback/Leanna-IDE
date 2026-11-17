@@ -88,6 +88,10 @@ export class AgentRegistry {
    * @returns `true` si la bascule a été appliquée, `false` si refusée.
    */
   setRunner(runner: AgentTaskRunner, options: { allowRestart?: boolean } = {}): boolean {
+    if (!this.workspaceId || getActiveProjectId() !== this.workspaceId) {
+      log.warn("setRunner refusé : workspace actif différent de celui de la flotte");
+      return false;
+    }
     // Aucun agent démarré encore → simple affectation (chemin bootstrap idéal).
     if (this.agents.size === 0) {
       this.runner = runner;
@@ -245,6 +249,10 @@ export class AgentRegistry {
     role: string,
     loopConfig?: { maxIterations: number; minConfidenceScore: number }
   ): boolean {
+    if (!this.workspaceId || getActiveProjectId() !== this.workspaceId) {
+      log.warn(`Enregistrement dynamique refusé pour "${role}" : workspace de flotte différent ou absent`);
+      return false;
+    }
     // Vérifier si l'agent existe déjà (statique ou dynamique)
     if (this.agents.has(role as AgentRole)) {
       log.warn(`Agent "${role}" déjà démarré — skip`);
