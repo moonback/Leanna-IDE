@@ -181,7 +181,8 @@ export function attachLiveWebSocket(
   wss.on('connection', async (clientWs: WebSocket, req: any) => {
     // Lier la connexion au workspace observé à son ouverture : un client
     // resté connecté après un changement de projet ne recevra pas ses événements.
-    (clientWs as WebSocket & { workspaceId?: string }).workspaceId = getActiveProjectId() ?? undefined;
+    const connectionProjectId = getActiveProjectId() ?? undefined;
+    (clientWs as WebSocket & { workspaceId?: string }).workspaceId = connectionProjectId;
     console.log('Client connected to WebSocket');
     const sessionSupervisor = new Supervisor();
     const contextGate: SessionContextGate = {
@@ -1573,7 +1574,7 @@ export function attachLiveWebSocket(
         } catch (e) {
           console.error('[AgentEvents→Live] Injection échouée:', e);
         }
-      });
+      }, undefined, connectionProjectId);
 
       clientWs.on('close', () => {
         toolTracker.close('client_disconnected');
