@@ -228,6 +228,10 @@ function DocumentsTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultItem[] | null>(null);
   const [filterCollection, setFilterCollection] = useState<string>('');
+  const [quickFilter, setQuickFilter] = useState('');
+  const [filterSource, setFilterSource] = useState<'all' | 'uploaded' | 'workspace'>('all');
+  const [filterType, setFilterType] = useState('');
+  const [sortDocuments, setSortDocuments] = useState<'recent' | 'oldest' | 'name-asc' | 'name-desc'>('recent');
   const [collections, setCollections] = useState<{ name: string; documentCount: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -368,6 +372,60 @@ function DocumentsTab() {
     }
   }, [urlInput, success, toastError, loadDocuments, loadCollections, filterCollection]);
 
+  // Filtres locaux instantanés : ils couvrent les documents importés ET ceux extraits du workspace.
+  const normalizedQuickFilter = quickFilter.trim().toLocaleLowerCase();
+  const availableDocumentTypes = [...new Set([
+    ...documents.map(doc => doc.type?.toLowerCase()).filter(Boolean),
+    ...workspaceDocuments.map(doc => {
+      const fileName = String(doc.fileName || '');
+      return fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() : '';
+    }).filter(Boolean),
+  ])].sort();
+
+  const filteredDocuments = documents
+    .filter(doc => filterSource !== 'workspace')
+    .filter(doc => !filterType || doc.type?.toLowerCase() === filterType)
+    .filter(doc => {
+      if (!normalizedQuickFilter) return true;
+      const haystack = [doc.title, doc.type, doc.source, doc.summary, doc.collection, ...(doc.keywords || []), ...(doc.tags || [])]
+        .filter(Boolean).join(' ').toLocaleLowerCase();
+      return haystack.includes(normalizedQuickFilter);
+    })
+    .sort((a, b) => {
+      if (sortDocuments === 'name-asc') return a.title.localeCompare(b.title, 'fr');
+      if (sortDocuments === 'name-desc') return b.title.localeCompare(a.title, 'fr');
+      const delta = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime();
+      return sortDocuments === 'oldest' ? delta : -delta;
+    });
+
+  const filteredWorkspaceDocuments = workspaceDocuments
+    .filter(() => filterSource !== 'uploaded')
+    .filter(doc => {
+      const fileName = String(doc.fileName || '');
+      const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() || '' : '';
+      return !filterType || extension === filterType;
+    })
+    .filter(doc => {
+      if (!normalizedQuickFilter) return true;
+      const haystack = [doc.fileName, doc.mimeType, doc.summary, ...(doc.keywords || []), ...(doc.tags || [])]
+        .filter(Boolean).join(' ').toLocaleLowerCase();
+      return haystack.includes(normalizedQuickFilter);
+    })
+    .sort((a, b) => {
+      if (sortDocuments === 'name-asc') return String(a.fileName).localeCompare(String(b.fileName), 'fr');
+      if (sortDocuments === 'name-desc') return String(b.fileName).localeCompare(String(a.fileName), 'fr');
+      const delta = new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime();
+      return sortDocuments === 'oldest' ? delta : -delta;
+    });
+
+  const hasActiveFilters = Boolean(quickFilter || filterSource !== 'all' || filterType);
+  const clearDocumentFilters = () => {
+    setQuickFilter('');
+    setFilterSource('all');
+    setFilterType('');
+    setSortDocuments('recent');
+  };
+
   return (
     <div className="p-5 lg:p-7 space-y-4">
       {/* Actions bar */}
@@ -505,6 +563,77 @@ function DocumentsTab() {
         )}
       </AnimatePresence>
 
+      {/* Quick filters */}
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input
+            type="search"
+            value={quickFilter}
+            onChange={e => setQuickFilter(e.target.value)}
+            placeholder="Filtrer par nom, contenu, mot-clé ou tag…"
+            aria-label="Filtrer les documents affichés"
+            className="w-full pl-9 pr-10 py-2.5 rounded-xl text-sm outline-none"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-primary)',
+            }}
+          />
+          {quickFilter && (
+            <button type="button" onClick={() => setQuickFilter('')} aria-label="Effacer le filtre texte"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1">
+              <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={filterSource}
+            onChange={e => setFilterSource(e.target.value as 'all' | 'uploaded' | 'workspace')}
+            aria-label="Filtrer par origine"
+            className="px-3 py-2 rounded-xl text-xs border outline-none"
+            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          >
+            <option value="all">Toutes les origines</option>
+            <option value="uploaded">Documents importés</option>
+            <option value="workspace">Documents du workspace</option>
+          </select>
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            aria-label="Filtrer par type de fichier"
+            className="px-3 py-2 rounded-xl text-xs border outline-none"
+            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Tous les types</option>
+            {availableDocumentTypes.map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+          </select>
+          <select
+            value={sortDocuments}
+            onChange={e => setSortDocuments(e.target.value as 'recent' | 'oldest' | 'name-asc' | 'name-desc')}
+            aria-label="Trier les documents"
+            className="px-3 py-2 rounded-xl text-xs border outline-none"
+            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+          >
+            <option value="recent">Plus récents</option>
+            <option value="oldest">Plus anciens</option>
+            <option value="name-asc">Nom A → Z</option>
+            <option value="name-desc">Nom Z → A</option>
+          </select>
+          {hasActiveFilters && (
+            <button type="button" onClick={clearDocumentFilters}
+              className="px-3 py-2 rounded-xl text-xs border hover:bg-[var(--bg-hover)]"
+              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+              Réinitialiser
+            </button>
+          )}
+          <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
+            {filteredDocuments.length + filteredWorkspaceDocuments.length} / {documents.length + workspaceDocuments.length} affiché(s)
+          </span>
+        </div>
+      </div>
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -588,13 +717,21 @@ function DocumentsTab() {
               Les documents du workspace (.md, .txt, .rst, etc.) seront extraits automatiquement au démarrage.
             </p>
           </div>
+        ) : filteredDocuments.length === 0 && filteredWorkspaceDocuments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Search className="w-7 h-7" style={{ color: 'var(--text-dimmed)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Aucun document ne correspond aux filtres</p>
+            <button type="button" onClick={clearDocumentFilters} className="text-xs underline" style={{ color: 'var(--accent-primary)' }}>
+              Réinitialiser les filtres
+            </button>
+          </div>
         ) : (
           <div className="space-y-4">
             {/* Uploaded documents */}
-            {documents.length > 0 && (
+            {filteredDocuments.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 <AnimatePresence initial={false}>
-                  {documents.map((doc, i) => (
+                  {filteredDocuments.map((doc, i) => (
                 <motion.div
                   key={doc.id}
                   layout
@@ -672,17 +809,17 @@ function DocumentsTab() {
             )}
 
             {/* Workspace documents (auto-extracted) */}
-            {workspaceDocuments.length > 0 && (
+            {filteredWorkspaceDocuments.length > 0 && (
               <>
                 <div className="flex items-center gap-2 pt-2">
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
                   <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                    <FileText size={12} /> Documents du Workspace ({workspaceDocuments.length})
+                    <FileText size={12} /> Documents du Workspace ({filteredWorkspaceDocuments.length})
                   </span>
                   <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-base)' }} />
                 </div>
                 <div className="lea-stagger grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {workspaceDocuments.map((doc: any) => (
+                  {filteredWorkspaceDocuments.map((doc: any) => (
                     <div
                       key={doc.id}
                       data-spotlight
