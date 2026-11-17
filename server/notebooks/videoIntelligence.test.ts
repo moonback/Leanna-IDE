@@ -24,5 +24,7 @@ test("parseVideoUrl rejects unsupported hosts, credentials and unsafe protocols"
   assert.equal(parseVideoUrl("javascript:alert(1)"), null);
   assert.equal(parseVideoUrl("https://user:pass@tiktok.com/@x/video/123"), null);
   assert.equal(parseVideoUrl("https://tiktok.com.evil.example/@x/video/123"), null);
+  assert.equal(parseVideoUrl("https://evil.tiktok.com/@x/video/123"), null);
+  assert.equal(parseVideoUrl("https://nested.youtube.com/watch?v=abcdefghijk"), null);
   assert.equal(parseVideoUrl("x".repeat(2049)), null);
 });
