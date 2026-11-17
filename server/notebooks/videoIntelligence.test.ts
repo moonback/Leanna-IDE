@@ -9,6 +9,7 @@ test("parseVideoUrl detects supported platforms and stable identifiers", () => {
     videoId: "7351234567890123456",
   });
   assert.equal(parseVideoUrl("https://www.youtube.com/watch?v=abcdefghijk")?.platform, "youtube");
+  assert.equal(parseVideoUrl("https://m.youtube.com/shorts/abcdefghijk")?.videoId, "abcdefghijk");
   assert.equal(parseVideoUrl("https://www.instagram.com/reel/ABC123/")?.videoId, "ABC123");
   assert.equal(parseVideoUrl("https://vimeo.com/123456789")?.videoId, "123456789");
 });
