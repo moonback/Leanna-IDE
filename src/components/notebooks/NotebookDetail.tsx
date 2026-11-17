@@ -4,8 +4,10 @@
  * Layout 3 panneaux flottants, chacun repliable en rail d'icônes :
  * - Gauche : Sources (liste compacte + « Ajouter des sources »)
  * - Centre : Discussion (titre + résumé IA en accueil) ou SourceViewer /
- *   document généré / éditeur de note / gestionnaire d'ajout de sources
+ *   document généré / éditeur de note
  * - Droite : Studio (Générer, Notes, Historique, Audio)
+ *
+ * « Ajouter des sources » s'ouvre en modale (NbModal) au-dessus du workspace.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -29,7 +31,7 @@ import { GeneratedDocsPanel } from './GeneratedDocsPanel.js';
 import { AudioOverviewPanel } from './AudioOverviewPanel.js';
 import { IndexingMonitor } from './IndexingMonitor.js';
 import { SourcesPanelSkeleton } from '../ui/Skeleton.js';
-import { NbButton, NbIconButton } from './ui/primitives.js';
+import { NbButton, NbIconButton, NbModal } from './ui/primitives.js';
 import { ViewHeader } from '../ui/ViewHeader.js';
 
 interface NotebookData {
@@ -47,7 +49,7 @@ interface NotebookData {
   updatedAt: string;
 }
 
-type Tab = 'sources' | 'chat' | 'notes' | 'generate' | 'audio';
+type Tab = 'chat' | 'notes' | 'generate' | 'audio';
 type StudioTab = 'generate' | 'audio' | 'history';
 
 interface Props {
@@ -197,9 +199,10 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   const [notebook, setNotebook] = useState<NotebookData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Centre = discussion par défaut (comme NotebookLM) ; 'sources' ouvre le
-  // gestionnaire d'ajout de sources (upload, URL, texte, GitHub, codebase).
+  // Centre = discussion par défaut (comme NotebookLM) ; « Ajouter des sources »
+  // s'ouvre en modale (upload, URL, texte, GitHub, codebase).
   const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const [showAddSources, setShowAddSources] = useState(false);
   const [studioTab, setStudioTab] = useState<StudioTab>('generate');
   const [studioOpen, setStudioOpen] = useState(true);
   const [sourceRailOpen, setSourceRailOpen] = useState(true);
@@ -420,14 +423,9 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
   // Signal de rafraîchissement du résumé : change quand l'ensemble des sources change
   const sourcesHash = notebook.sources.map((s: any) => s.id).sort().join('|');
 
-  /** Ouvre le gestionnaire d'ajout de sources dans la colonne centrale */
+  /** Ouvre le gestionnaire d'ajout de sources en modale */
   const openSourceManager = () => {
-    setActiveTab('sources');
-    setSelectedSourceId(null);
-    setViewingGeneratedDoc(null);
-    setNoteEditorData(null);
-    setNotesOpen(false);
-    setShowIndexing(false);
+    setShowAddSources(true);
   };
 
   /** Ouvre le moniteur d'indexation dans la colonne centrale */
@@ -556,18 +554,6 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
             />
           </div>
         </div>
-      );
-    }
-
-    if (activeTab === 'sources') {
-      return (
-        <SourcePanel
-          notebookId={notebookId}
-          sources={notebook.sources}
-          onRefresh={loadNotebook}
-          onUploadProgress={setIndexingProgress}
-          onClose={() => setActiveTab('chat')}
-        />
       );
     }
 
@@ -887,6 +873,24 @@ export function NotebookDetail({ notebookId, onBack }: Props) {
           )}
         </aside>
       </div>
+
+      {/* ─── Modale « Ajouter des sources » ────────────────── */}
+      <NbModal
+        open={showAddSources}
+        onClose={() => setShowAddSources(false)}
+        size="xl"
+        hideClose
+      >
+        <div className="h-[78dvh] w-full overflow-hidden">
+          <SourcePanel
+            notebookId={notebookId}
+            sources={notebook.sources}
+            onRefresh={loadNotebook}
+            onUploadProgress={setIndexingProgress}
+            onClose={() => setShowAddSources(false)}
+          />
+        </div>
+      </NbModal>
     </div>
     </NotebookLiveProvider>
   );
