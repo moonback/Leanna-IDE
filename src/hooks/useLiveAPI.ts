@@ -379,6 +379,9 @@ export function useLiveAPI() {
       const a = msg.action;
       window.dispatchEvent(new CustomEvent('Leanna-action', { detail: a }));
       switch (a.type) {
+        case 'browser-navigate':
+          window.dispatchEvent(new CustomEvent('Leanna-browser-navigate', { detail: a }));
+          break;
         case 'browser-scroll':
           window.dispatchEvent(new CustomEvent('Leanna-browser-scroll', { detail: a }));
           break;
