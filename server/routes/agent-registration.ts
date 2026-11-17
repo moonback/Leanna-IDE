@@ -11,6 +11,7 @@ import { agentRegistry } from '../agents/AgentRegistry.js';
 import { getAgentDefinition, STATIC_AGENT_REGISTRY, listAgentDefinitions } from '../agents/roles.js';
 import type { AgentRole } from '../agents/types.js';
 import { createLogger } from '../utils/logger.js';
+import { getActiveProjectId } from '../utils/selfRoot.js';
 
 const log = createLogger("AgentRegistrationAPI");
 
@@ -46,6 +47,13 @@ interface RegisterAgentRequest {
 
 export function createAgentRegistrationRouter(): Router {
   const router = Router();
+
+  // Les définitions dynamiques sont conservées dans un registre process-local
+  // mono-workspace. Ne jamais exposer ses opérations sans contexte explicite.
+  router.use((_req, res, next) => {
+    if (!getActiveProjectId()) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    next();
+  });
 
   /**
    * POST /api/agent-registration/register
