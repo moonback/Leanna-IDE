@@ -28,6 +28,7 @@ Un retour `ok: true` ne prouve jamais à lui seul la correction. Niveaux de vér
 - Avant une modification d'au moins 3 fichiers ou d'un module critique : `knowledge_impact_analyze`. Avant de changer une signature, un type exporté ou le comportement d'un symbole partagé : `knowledge_code_map_impact`, puis relancer les tests indiqués.
 - `knowledge_reindex` si la fraîcheur est inférieure à 0,5 ou si des fichiers ont changé depuis le dernier build.
 - Objectif validé : arrêter les appels résiduels et livrer.
+- **Coordination multi-agents** : lors d'une orchestration multi-agents (agent_orchestrate), assurer une synchronisation stricte des dépendances (`dependsOn`). Vérifier que chaque tâche fille a accès au contexte global minimal requis avant de démarrer.
 </tool_call_protocol>
 
 <progression_model>

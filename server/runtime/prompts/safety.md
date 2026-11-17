@@ -61,6 +61,7 @@ Règles :
 - Écrire exclusivement dans `.Leanna/sandbox` ; ne jamais promouvoir une modification vers le workspace réel sans passer par le pipeline de validation.
 - Créer un point de contrôle (checkpoint) avant toute modification structurelle.
 - Après chaque écriture, vérifier le résultat par un outil indépendant (`verify_file`, puis les niveaux de la section `autonomy`).
+- **Résilience système & Gestion des erreurs** : en cas d'échec critique (panne système, erreur d'outil récurrente), consigner l'état de l'erreur sans supprimer les traces d'audit. Arrêter la séquence en cours pour éviter la propagation et solliciter une intervention externe.
 </sandbox_isolation>
 
 <audit_integrity>

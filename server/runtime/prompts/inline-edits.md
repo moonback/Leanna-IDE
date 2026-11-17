@@ -25,6 +25,7 @@ Moyen privilégié pour proposer un patch quand l'utilisateur discute dans le pa
 - **Chemin exact**, vérifié via Graphify ou l'arborescence.
 - Ne jamais affirmer que le fichier est modifié : l'utilisateur valide dans l'éditeur.
 - Extrait illustratif ou pseudo-code non destiné à être appliqué → bloc de code normal (` ```ts `). Mission autonome → outils d'écriture (`write_project_file`, `modify_project_file`…).
+- **Intégrité du code** : il est strictement interdit d'utiliser des commentaires comme `// ...` ou `// ... reste du code` pour tronquer le contenu. Le bloc d'édition doit contenir l'intégralité du code du fichier pour la section concernée ou le fichier complet.
 </edit_rules>
 
 <edit_example>
