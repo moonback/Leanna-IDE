@@ -14,7 +14,7 @@ import {
   FileText, Upload, Search, Brain, Link2, BarChart3,
   Trash2, RefreshCw, Plus, Clock,
   Loader2, X, Globe, FileType, CheckCircle2,
-  FileCode, Image as ImageIcon, Paperclip, Package, Eye,
+  FileCode, Image as ImageIcon, Paperclip, Package, Eye, SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '../components/ui/Toast.js';
@@ -232,6 +232,7 @@ function DocumentsTab() {
   const [filterSource, setFilterSource] = useState<'all' | 'uploaded' | 'workspace'>('all');
   const [filterType, setFilterType] = useState('');
   const [sortDocuments, setSortDocuments] = useState<'recent' | 'oldest' | 'name-asc' | 'name-desc'>('recent');
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [collections, setCollections] = useState<{ name: string; documentCount: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -418,12 +419,16 @@ function DocumentsTab() {
       return sortDocuments === 'oldest' ? delta : -delta;
     });
 
-  const hasActiveFilters = Boolean(quickFilter || filterSource !== 'all' || filterType);
+  const hasActiveFilters = Boolean(quickFilter || filterSource !== 'all' || filterType || filterCollection || searchQuery);
+  const activeFilterCount = [quickFilter, filterSource !== 'all', filterType, filterCollection, searchQuery].filter(Boolean).length;
   const clearDocumentFilters = () => {
     setQuickFilter('');
     setFilterSource('all');
     setFilterType('');
+    setFilterCollection('');
     setSortDocuments('recent');
+    setSearchQuery('');
+    setSearchResults(null);
   };
 
   return (
@@ -459,25 +464,6 @@ function DocumentsTab() {
           <Globe className="w-3.5 h-3.5" />
           Depuis URL
         </button>
-
-        {/* Collection filter */}
-        {collections.length > 0 && (
-          <select
-            value={filterCollection}
-            onChange={e => setFilterCollection(e.target.value)}
-            className="px-3 py-2 rounded-xl text-xs border outline-none"
-            style={{
-              backgroundColor: 'var(--bg-input)',
-              borderColor: 'var(--border-base)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            <option value="">Toutes les collections</option>
-            {collections.map(c => (
-              <option key={c.name} value={c.name}>{c.name} ({c.documentCount})</option>
-            ))}
-          </select>
-        )}
 
         {/* Refresh */}
         <button
@@ -563,137 +549,207 @@ function DocumentsTab() {
         )}
       </AnimatePresence>
 
-      {/* Quick filters */}
-      <div className="space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-          <input
-            type="search"
-            value={quickFilter}
-            onChange={e => setQuickFilter(e.target.value)}
-            placeholder="Filtrer par nom, contenu, mot-clé ou tag…"
-            aria-label="Filtrer les documents affichés"
-            className="w-full pl-9 pr-10 py-2.5 rounded-xl text-sm outline-none"
-            style={{
-              backgroundColor: 'var(--bg-input)',
-              border: '1px solid var(--border-base)',
-              color: 'var(--text-primary)',
-            }}
-          />
-          {quickFilter && (
-            <button type="button" onClick={() => setQuickFilter('')} aria-label="Effacer le filtre texte"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1">
-              <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-            </button>
+      {/* Recherche et filtres : panneau regroupé dans une modale */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setShowFilterModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition hover:bg-[var(--bg-hover)]"
+          style={{ borderColor: 'var(--border-base)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}
+          aria-haspopup="dialog"
+          aria-expanded={showFilterModal}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          Rechercher et filtrer
+          {activeFilterCount > 0 && (
+            <span className="min-w-5 h-5 px-1 rounded-full text-xs flex items-center justify-center"
+              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+              {activeFilterCount}
+            </span>
           )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={filterSource}
-            onChange={e => setFilterSource(e.target.value as 'all' | 'uploaded' | 'workspace')}
-            aria-label="Filtrer par origine"
-            className="px-3 py-2 rounded-xl text-xs border outline-none"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          >
-            <option value="all">Toutes les origines</option>
-            <option value="uploaded">Documents importés</option>
-            <option value="workspace">Documents du workspace</option>
-          </select>
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            aria-label="Filtrer par type de fichier"
-            className="px-3 py-2 rounded-xl text-xs border outline-none"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Tous les types</option>
-            {availableDocumentTypes.map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
-          </select>
-          <select
-            value={sortDocuments}
-            onChange={e => setSortDocuments(e.target.value as 'recent' | 'oldest' | 'name-asc' | 'name-desc')}
-            aria-label="Trier les documents"
-            className="px-3 py-2 rounded-xl text-xs border outline-none"
-            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          >
-            <option value="recent">Plus récents</option>
-            <option value="oldest">Plus anciens</option>
-            <option value="name-asc">Nom A → Z</option>
-            <option value="name-desc">Nom Z → A</option>
-          </select>
-          {hasActiveFilters && (
-            <button type="button" onClick={clearDocumentFilters}
-              className="px-3 py-2 rounded-xl text-xs border hover:bg-[var(--bg-hover)]"
-              style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
-              Réinitialiser
-            </button>
-          )}
-          <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
-            {filteredDocuments.length + filteredWorkspaceDocuments.length} / {documents.length + workspaceDocuments.length} affiché(s)
+        </button>
+        {hasActiveFilters && (
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Filtres actifs · {filteredDocuments.length + filteredWorkspaceDocuments.length} résultat(s)
           </span>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          placeholder="Rechercher dans les documents (Entrée pour lancer)..."
-          className="w-full pl-9 pr-10 py-2.5 rounded-xl text-sm outline-none"
-          style={{
-            backgroundColor: 'var(--bg-input)',
-            border: '1px solid var(--border-base)',
-            color: 'var(--text-primary)',
-          }}
-        />
-        {searchResults && (
-          <button
-            onClick={() => { setSearchResults(null); setSearchQuery(''); }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
-          >
-            <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
-          </button>
         )}
+        <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
+          {filteredDocuments.length + filteredWorkspaceDocuments.length} / {documents.length + workspaceDocuments.length} affiché(s)
+        </span>
       </div>
 
-      {/* Search results */}
-      {searchResults && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            {searchResults.length} résultat{searchResults.length !== 1 ? 's' : ''} pour "{searchQuery}"
-          </p>
-          {searchResults.map(r => (
-            <div
-              key={r.id}
-              className="p-3 rounded-xl border"
+      <AnimatePresence>
+        {showFilterModal && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={e => { if (e.target === e.currentTarget) setShowFilterModal(false); }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(5px)' }}
+          >
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="documents-filter-modal-title"
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border shadow-2xl"
               style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                  style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
-                  {r.resultType}
-                </span>
-                <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                  {r.title}
-                </span>
-                <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>
-                  {(r.relevance * 100).toFixed(0)}%
-                </span>
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 border-b"
+                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+                <div>
+                  <h2 id="documents-filter-modal-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Rechercher et filtrer les documents
+                  </h2>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Recherche dans le contenu, les noms, les tags et les métadonnées.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setShowFilterModal(false)}
+                  className="p-2 rounded-lg hover:bg-[var(--bg-hover)]" aria-label="Fermer la fenêtre">
+                  <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                </button>
               </div>
-              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                {r.snippet}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Document list */}
-      {!searchResults && (
+              <div className="p-5 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Filtre instantané</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                    <input
+                      type="search"
+                      value={quickFilter}
+                      onChange={e => setQuickFilter(e.target.value)}
+                      placeholder="Nom, contenu, mot-clé, tag…"
+                      aria-label="Filtrer les documents affichés"
+                      autoFocus
+                      className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+                      style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-base)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Filtres</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="space-y-1.5">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Origine</span>
+                      <select value={filterSource} onChange={e => setFilterSource(e.target.value as 'all' | 'uploaded' | 'workspace')}
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                        style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+                        <option value="all">Toutes les origines</option>
+                        <option value="uploaded">Documents importés</option>
+                        <option value="workspace">Documents du workspace</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Type de fichier</span>
+                      <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                        style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+                        <option value="">Tous les types</option>
+                        {availableDocumentTypes.map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Collection</span>
+                      <select value={filterCollection} onChange={e => setFilterCollection(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                        style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+                        <option value="">Toutes les collections</option>
+                        {collections.map(collection => (
+                          <option key={collection.name} value={collection.name}>{collection.name} ({collection.documentCount})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Trier par</span>
+                      <select value={sortDocuments} onChange={e => setSortDocuments(e.target.value as 'recent' | 'oldest' | 'name-asc' | 'name-desc')}
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                        style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
+                        <option value="recent">Plus récents</option>
+                        <option value="oldest">Plus anciens</option>
+                        <option value="name-asc">Nom A → Z</option>
+                        <option value="name-desc">Nom Z → A</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Recherche dans la base documentaire</label>
+                  <form onSubmit={e => { e.preventDefault(); handleSearch(); }} className="flex gap-2">
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Rechercher dans le contenu indexé…"
+                      className="min-w-0 flex-1 px-3 py-2.5 rounded-xl text-sm outline-none border"
+                      style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                    />
+                    <button type="submit" disabled={!searchQuery.trim()}
+                      className="px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
+                      style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+                      <Search className="w-4 h-4" />
+                    </button>
+                  </form>
+                  {searchResults && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                          {searchResults.length} résultat(s) pour « {searchQuery} »
+                        </p>
+                        <button type="button" onClick={() => setSearchResults(null)} className="text-xs underline"
+                          style={{ color: 'var(--text-muted)' }}>Effacer les résultats</button>
+                      </div>
+                      {searchResults.length === 0 ? (
+                        <p className="text-xs py-3" style={{ color: 'var(--text-muted)' }}>Aucun résultat trouvé.</p>
+                      ) : searchResults.map(result => (
+                        <div key={result.id} className="p-3 rounded-xl border"
+                          style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-base)' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{result.resultType}</span>
+                            <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{result.title}</span>
+                            <span className="ml-auto text-xs" style={{ color: 'var(--text-dimmed)' }}>{(result.relevance * 100).toFixed(0)}%</span>
+                          </div>
+                          <p className="text-xs mt-1 line-clamp-3" style={{ color: 'var(--text-muted)' }}>{result.snippet}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 flex items-center justify-between gap-3 px-5 py-4 border-t"
+                style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}>
+                <button type="button" onClick={clearDocumentFilters}
+                  className="px-3 py-2 rounded-xl text-xs border hover:bg-[var(--bg-hover)]"
+                  style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
+                  Réinitialiser
+                </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {filteredDocuments.length + filteredWorkspaceDocuments.length} document(s) correspondant(s)
+                  </span>
+                  <button type="button" onClick={() => setShowFilterModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold"
+                    style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+                    Afficher les résultats
+                  </button>
+                </div>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+            {/* Document list */}
+      {(
         loadError ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3" role="alert">
             <p className="text-sm" style={{ color: 'var(--color-error)' }}>{loadError}</p>
