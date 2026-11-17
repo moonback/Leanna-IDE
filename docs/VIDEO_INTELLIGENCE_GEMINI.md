@@ -9,11 +9,13 @@
 Cette branche introduit les primitives partagées de Video Intelligence :
 - reconnaissance stricte des domaines et normalisation des URL des quatre plateformes ;
 - extraction d'identifiants quand le format d'URL en expose un ;
-- transcription d'un buffer audio déjà obtenu, via Gemini multimodal ;
+- transcription d'un buffer audio ou vidéo déjà obtenu, via Gemini multimodal ;
+- acceptation des fichiers vidéo MP4, WebM et MOV dans l'upload Notebook (limite upload existante de 10 Mio) ;
+- passage de ces fichiers par la queue commune, puis création d'une source de type `video` indexée dans le RAG ;
 - segments horodatés, langue, locuteur facultatif et texte concaténé ;
 - validation du MIME, de la taille, du format JSON et des timestamps.
 
-Cette première passe **ne prétend pas télécharger l'audio des plateformes**. Une URL publique, un oEmbed ou une page HTML ne garantit pas l'accès au flux média. Il ne faut pas contourner les contrôles d'accès, les contenus privés, les protections techniques ou les conditions des plateformes.
+L'import d'un fichier vidéo fourni par l'utilisateur est maintenant raccordé au pipeline Notebook. Cette passe **ne prétend toujours pas télécharger l'audio des plateformes depuis une URL**. Une URL publique, un oEmbed ou une page HTML ne garantit pas l'accès au flux média. Il ne faut pas contourner les contrôles d'accès, les contenus privés, les protections techniques ou les conditions des plateformes.
 
 ## Architecture cible
 
@@ -42,10 +44,10 @@ Notebook SourcePanel
 
 ## Étapes restantes
 
-1. Adapter YouTube pour conserver les timestamps de `json3` (le parseur actuel aplatit le texte).
+1. Ajouter l'adaptateur URL TikTok basé uniquement sur des sous-titres publics/accès autorisé ; sinon proposer explicitement l'import du fichier vidéo.
 2. Implémenter les adaptateurs metadata/oEmbed pour TikTok, Instagram et Vimeo, sans considérer oEmbed comme un accès média.
 3. Choisir un mécanisme de récupération autorisé par plateforme et définir les limites de durée/taille.
-4. Ajouter le parcours upload vidéo et extraction audio FFmpeg avec détection de disponibilité du binaire.
+4. Étendre le parcours upload vidéo (durée/taille) et vérifier le support natif vidéo Gemini ; basculer vers extraction audio FFmpeg uniquement si nécessaire.
 5. Étendre `Source` avec les métadonnées vidéo/segments et le type `video`.
 6. Ajouter route URL + queue, progression par étapes, annulation et erreurs récupérables.
 7. Ajouter l'UI d'import multi-plateforme et le lecteur/transcript synchronisé.
