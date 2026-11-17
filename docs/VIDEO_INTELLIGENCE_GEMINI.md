@@ -75,3 +75,8 @@ Notebook SourcePanel
 - `npm run lint:eslint -- server/notebooks/videoIntelligence.ts server/notebooks/videoIntelligence.test.ts`
 
 Les exécutions locales ne sont pas disponibles via l'édition distante GitHub ; les résultats doivent être confirmés avant merge.
+
+
+## Affichage de la transcription dans Notebook
+
+La route de contenu d'une source vidéo expose maintenant `metadata.videoTranscript` au panneau SourceViewer. Celui-ci affiche la langue, le nombre de segments, les locuteurs lorsqu'ils sont fournis et chaque segment avec son timestamp formaté. Les timestamps sont consultables visuellement, mais ne pilotent pas encore un lecteur : le fichier vidéo original n'est pas conservé dans le modèle de source.
