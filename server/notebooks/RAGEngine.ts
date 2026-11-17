@@ -511,7 +511,7 @@ export class RAGEngine {
     citations: Citation[],
   ): CitationAudit {
     const referenceMatches = Array.from(
-      response.matchAll(/\\[(?:SOURCE\\s*)?(\\d+)\\]/gi),
+      response.matchAll(/\[(?:SOURCE\s*)?(\d+)\]/gi),
     );
     const validReferences = referenceMatches.filter((match) => {
       const index = Number.parseInt(match[1], 10) - 1;

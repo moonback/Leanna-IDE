@@ -251,7 +251,10 @@ test("a runner that exceeds the timeout counts as a failed attempt", async () =>
 
   const result = await sup.runMission({ missionId: "m-timeout", goal: "slow", runner: slowRunner });
 
-  assert.equal(result.finalState, "ESCALATED", "timeout → failed attempt → escalate at maxAttempts");
+  // Un runner qui ne se résout pas pendant la période de grâce après l'abort
+  // est indiscernable d'un runner qui écrit encore : quarantaine, pas d'escalade.
+  assert.equal(result.finalState, "RECOVERY_REQUIRED", "timeout sans settle → mission en quarantaine");
+  assert.equal(result.recoveryRequired, true, "le checkpoint reste ouvert pour réconciliation");
   assert.equal(aborted, true, "the runner received the abort signal on timeout");
 
   fs.rmSync(dir, { recursive: true, force: true });
@@ -282,7 +285,8 @@ test("a runner that ignores AbortSignal is quarantined and never raced with roll
     plannedFiles: ["a.ts"],
   });
 
-  assert.equal(result.finalState, "ESCALATED");
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
   assert.equal(result.rollbackComplete, false);
   assert.match(result.residualFiles?.[0] ?? "", /runner encore actif/);
   assert.equal(gw.store.get("a.ts"), "original", "rollback must be withheld while runner is active");
@@ -394,7 +398,10 @@ test("supervisor reports residual files when rollback cannot restore a locked fi
     runner,
     plannedFiles: ["a.ts"],
   });
-  assert.equal(result.finalState, "FAILED");
+  // Un rollback incomplet laisse le contexte transactionnel incertain :
+  // la mission exige une réconciliation explicite (pas un FAILED banal).
+  assert.equal(result.finalState, "RECOVERY_REQUIRED");
+  assert.equal(result.recoveryRequired, true);
   assert.equal(result.rollbackComplete, false);
   assert.deepEqual(result.residualFiles, ["a.ts"]);
   assert.equal(gw.store.get("a.ts"), "changed");

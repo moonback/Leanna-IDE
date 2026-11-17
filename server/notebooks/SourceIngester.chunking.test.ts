@@ -17,7 +17,7 @@ const chunkText: Chunker = (sourceIngester as unknown as { chunkText: Chunker })
 
 // Constantes miroir de SourceIngester (gardées synchronisées manuellement).
 const CHUNK_MAX_SIZE = 2000;
-const MAX_CHUNKS = 300;
+const MAX_CHUNKS = 1500;
 
 test('chunking: texte vide ne produit aucun chunk', () => {
   assert.deepEqual(chunkText('', 'src-empty', 'text'), []);
@@ -69,12 +69,14 @@ test('chunking: aucun chunk ne dépasse grossièrement la taille max (avec overl
 });
 
 test('chunking: le nombre de chunks est plafonné à MAX_CHUNKS', () => {
-  // Beaucoup de petits paragraphes distincts → potentiellement > 300 chunks.
-  const text = Array.from({ length: 5000 }, (_, i) =>
+  // Beaucoup de petits paragraphes distincts → potentiellement > 1500 chunks
+  // (~1 900 000 caractères ≈ 1 500 chunks de taille cible 1200).
+  const text = Array.from({ length: 15000 }, (_, i) =>
     `Section numéro ${i} avec un contenu distinct et suffisamment long pour tenir seul dans un chunk séparé afin de multiplier les blocs.`,
   ).join('\n\n');
 
   const chunks = chunkText(text, 'src-cap', 'text');
+  assert.ok(chunks.length > 1000, `attendu > 1000 chunks avant plafonnement, obtenu ${chunks.length}`);
   assert.ok(chunks.length <= MAX_CHUNKS, `attendu <= ${MAX_CHUNKS}, obtenu ${chunks.length}`);
 });
 
