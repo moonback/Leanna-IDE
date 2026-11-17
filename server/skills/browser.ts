@@ -22,6 +22,7 @@
  */
 
 import { Skill, validateArgs } from "./base.js";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import net from "node:net";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
@@ -1181,7 +1182,7 @@ export const browserSkill: Skill = {
       if (!pending) return "[ERREUR] browserActionPending non disponible dans le contexte.";
       if (!emit) return "[ERREUR] emitIdeAction non disponible.";
 
-      const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const requestId = `ba_${randomUUID()}`;
       const startedAt = Date.now();
       if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée avant exécution.";
       return await new Promise<any>((resolve, reject) => {
