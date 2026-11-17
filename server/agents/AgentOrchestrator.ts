@@ -695,7 +695,7 @@ export class AgentOrchestrator {
         error: "cancelled_by_user",
         durationMs: 0,
       };
-      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt, task.projectId).catch(() => {});
       log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
       // Émettre un événement terminal pour que l'UI ET l'assistant soient informés.
       this.notifier.notify(task, "cancelled");
@@ -821,7 +821,8 @@ export class AgentOrchestrator {
             "failed",
             task.result,
             task.startedAt,
-            new Date().toISOString()
+            new Date().toISOString(),
+            task.projectId
           );
         }
         this.tasks.set(task.id, task);
