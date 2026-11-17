@@ -536,7 +536,12 @@ export class TelegramService {
         const statusFilter = ctx.match?.trim().toLowerCase();
         const validStatuses = ["pending", "running", "completed", "incomplete", "failed", "cancelled"];
 
-        const filters: { status?: any; limit: number } = { limit: 15 };
+        const projectId = getActiveProjectId();
+        if (!projectId) {
+          await ctx.reply("Aucun workspace actif.");
+          return;
+        }
+        const filters: { status?: any; limit: number; projectId: string } = { limit: 15, projectId };
         if (statusFilter) {
           if (!validStatuses.includes(statusFilter)) {
             await ctx.reply(
