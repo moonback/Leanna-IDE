@@ -679,8 +679,9 @@ export class AgentOrchestrator {
    * @returns `true` si l'annulation a été prise en compte, `false` si la tâche
    *          est introuvable ou déjà terminée.
    */
-  cancelTask(taskId: string): boolean {
-    const task = this.tasks.get(taskId);
+  cancelTask(taskId: string, projectId?: string): boolean {
+    if (!projectId) return false;
+    const task = this.getTaskForProject(taskId, projectId);
     if (!task) return false;
 
     if (task.status === "pending") {
@@ -747,7 +748,7 @@ export class AgentOrchestrator {
       if (!task) continue;
       // Annuler proprement si la tâche tourne encore avant de la jeter.
       if (task.status === "pending" || task.status === "running") {
-        this.cancelTask(id);
+        this.cancelTask(id, projectId);
       }
       if (this.tasks.delete(id)) removed++;
     }
@@ -766,21 +767,22 @@ export class AgentOrchestrator {
    * @returns le nombre de tâches pour lesquelles l'annulation a été prise en
    *          compte, ou `-1` si l'orchestration est introuvable.
    */
-  cancelOrchestration(orchestrationId: string): number {
-    const plan = this.orchestrations.get(orchestrationId);
+  cancelOrchestration(orchestrationId: string, projectId?: string): number {
+    if (!projectId) return -1;
+    const plan = this.getOrchestrationForProject(orchestrationId, projectId);
     if (!plan) return -1;
 
     let cancelledCount = 0;
     for (const task of plan.tasks) {
       if (task.status === "pending" || task.status === "running") {
-        if (this.cancelTask(task.id)) cancelledCount++;
+        if (this.cancelTask(task.id, projectId)) cancelledCount++;
       }
     }
 
     if (plan.status === "pending" || plan.status === "running") {
       plan.status = "cancelled";
       plan.completedAt = new Date().toISOString();
-      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt, plan.projectId).catch(() => {});
+      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt, projectId).catch(() => {});
     }
 
     log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
@@ -790,7 +792,7 @@ export class AgentOrchestrator {
   /** Annulation sécurisée d'une orchestration appartenant au workspace. */
   cancelOrchestrationForProject(orchestrationId: string, projectId: string): number {
     if (!this.getOrchestrationForProject(orchestrationId, projectId)) return -1;
-    return this.cancelOrchestration(orchestrationId);
+    return this.cancelOrchestration(orchestrationId, projectId);
   }
 
   /**
