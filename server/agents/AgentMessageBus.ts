@@ -267,6 +267,7 @@ export class AgentMessageBus extends EventEmitter {
       timestamp: new Date().toISOString(),
       payload,
       correlationId: originalMessage.correlationId,
+      projectId: originalMessage.projectId,
     };
 
     if (!this.addToHistory(response)) return;
@@ -894,9 +895,10 @@ export class AgentMessageBus extends EventEmitter {
 
   private addToHistory(message: AgentMessage): boolean {
     // Capture au moment de l'émission : ne jamais relire le workspace après un await.
-    const projectId = getActiveProjectId();
-    if (!projectId) {
-      log.warn(`Message inter-agents ignoré sans workspace actif: ${message.id.slice(0, 8)}`);
+    const activeProjectId = getActiveProjectId();
+    const projectId = message.projectId ?? activeProjectId;
+    if (!projectId || projectId !== activeProjectId) {
+      log.warn(`Message inter-agents ignoré hors workspace actif: ${message.id.slice(0, 8)}`);
       return false;
     }
     message.projectId = projectId;
