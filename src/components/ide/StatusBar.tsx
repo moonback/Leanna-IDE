@@ -25,6 +25,7 @@ import {
   ListChecks,
   Activity,
   Boxes,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 import { StartupTasksPill } from './StartupTasksPill.js';
@@ -69,6 +70,8 @@ interface StatusBarProps {
   onToggleImpact?: () => void;
   onToggleSystemHealth?: () => void;
   onTogglePM2?: () => void;
+  showTerminal?: boolean;
+  onToggleTerminal?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -359,6 +362,8 @@ export const StatusBar = memo(function StatusBar({
   onToggleImpact,
   onToggleSystemHealth,
   onTogglePM2,
+  showTerminal,
+  onToggleTerminal,
 }: StatusBarProps) {
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -1002,6 +1007,21 @@ export const StatusBar = memo(function StatusBar({
               </span>
             </button>
           )}
+          {/* Terminal — accès direct au panneau terminal intégré */}
+          <button
+            type="button"
+            onClick={() => onToggleTerminal?.()}
+            className={PILL}
+            title={showTerminal ? 'Masquer le terminal (Ctrl+`)' : 'Afficher le terminal (Ctrl+`)'}>
+            <Terminal
+              size={13}
+              style={{ color: showTerminal ? 'var(--color-success)' : 'var(--text-muted)' }}
+            />
+            <span style={{ color: showTerminal ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+              Terminal
+            </span>
+          </button>
+
           {/* Sandbox — dot + label */}
           <button
             type="button"

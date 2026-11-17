@@ -1442,6 +1442,8 @@ export default function IdeView() {
           onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
           onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
           onTogglePM2={() => setShowPM2(v => !v)}
+          showTerminal={showTerminal}
+          onToggleTerminal={toggleTerminal}
         />
       </div>
 

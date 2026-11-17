@@ -7,11 +7,10 @@
  * Icônes visibles :
  * 1. Explorateur       (accès direct)
  * 2. Recherche         (accès direct)
- * 3. Terminal          (accès direct)
- * 4. GitHub            (accès direct)
- * 5. CI/CD & Aperçu    (Navigateur)
- * 6. Données           (sous-menu : Knowledge, Notebooks)
- * 7. Outils            (sous-menu : Agent Builder, Marketplace)
+ * 3. GitHub            (accès direct)
+ * 4. CI/CD & Aperçu    (Navigateur)
+ * 5. Données           (sous-menu : Knowledge, Notebooks)
+ * 6. Outils            (sous-menu : Agent Builder, Marketplace)
  * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar.
  *  Caméra et Partage écran : icônes du bloc « Leanna » connecté.)
  */
@@ -22,7 +21,7 @@ import {
   FolderTree,
   Database,
   Wrench,
-  Wand2, Globe, Terminal, Store,
+  Wand2, Globe, Store,
   Brain, NotebookPen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -93,24 +92,7 @@ export const sidebarSections: SidebarSectionConfig[] = [
     ],
   },
 
-  // ═══ 3. TERMINAL — accès direct (usage quotidien) ═══
-  {
-    id: 'terminal',
-    label: 'Terminal',
-    items: [
-      {
-        id: 'terminal',
-        type: 'button',
-        icon: Terminal,
-        label: 'Terminal',
-        shortcut: 'Ctrl+`',
-        stateKey: 'showTerminal',
-        actionKey: 'onToggleTerminal',
-      },
-    ],
-  },
-
-  // ═══ 4. GIT — accès direct (usage quotidien) ═══
+  // ═══ 3. GIT — accès direct (usage quotidien) ═══
   {
     id: 'git',
     label: 'GitHub',
