@@ -51,7 +51,13 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
     handleCodebaseImport, handleClipboardPaste,
   } = upload;
 
-  const isTikTokUrl = /^https?:\\/\\/(?:www\\.|m\\.|vm\\.|vt\\.)?tiktok\\.com\\//i.test(url.trim());
+  const unsupportedVideoPlatform = (() => {
+    const value = url.trim();
+    if (/^https?:\\/\\/(?:www\\.|m\\.|vm\\.|vt\\.)?tiktok\\.com\\//i.test(value)) return 'TikTok';
+    if (/^https?:\\/\\/(?:www\\.)?instagram\\.com\\//i.test(value) || /^https?:\\/\\/(?:www\\.)?instagr\\.am\\//i.test(value)) return 'Instagram';
+    if (/^https?:\\/\\/(?:www\\.|player\\.)?vimeo\\.com\\//i.test(value)) return 'Vimeo';
+    return null;
+  })();
 
   return (
     <>
@@ -156,9 +162,9 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
               />
-              {isTikTokUrl && (
+              {unsupportedVideoPlatform && (
                 <p className="text-xs leading-relaxed text-[var(--text-secondary)]" role="status">
-                  Lien TikTok détecté. Notebook ne peut pas récupérer automatiquement la piste audio depuis ce lien pour le moment. Téléchargez la vidéo depuis TikTok si vous y êtes autorisé, puis utilisez « Uploader » (MP4, WebM ou MOV) pour la transcrire avec Gemini.
+                  Lien {unsupportedVideoPlatform} détecté. L'import direct de cette plateforme n'est pas encore disponible. Si vous êtes autorisé à utiliser cette vidéo, récupérez le fichier puis utilisez « Uploader » (MP4, WebM ou MOV) pour la transcrire avec Gemini.
                 </p>
               )}
               <div className="flex gap-2">
@@ -167,10 +173,10 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                   variant="primary"
                   size="sm"
                   onClick={handleUrlIngest}
-                  disabled={!url.trim()}
+                  disabled={!url.trim() || Boolean(unsupportedVideoPlatform)}
                   loading={uploading}
                 >
-                  {uploading ? 'Ingestion…' : 'Importer'}
+                  {uploading ? 'Ingestion…' : unsupportedVideoPlatform ? 'Import URL indisponible' : 'Importer'}
                 </MotionButton>
                 <NbButton
                   variant="ghost"
