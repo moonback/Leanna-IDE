@@ -21,6 +21,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTask, TaskResult, OrchestrationPlan, TaskStatus } from "./types.js";
 import type { AgentMessage } from "./AgentCommunication.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentPersistence");
 
@@ -30,6 +31,7 @@ const log = createLogger("AgentPersistence");
 
 interface AgentTaskRow {
   id: string;
+  project_id: string | null;
   orchestration_id: string | null;
   role: string;
   title: string;
@@ -48,6 +50,7 @@ interface AgentTaskRow {
 
 interface AgentOrchestrationRow {
   id: string;
+  project_id: string | null;
   title: string;
   description: string;
   status: string;
@@ -58,6 +61,7 @@ interface AgentOrchestrationRow {
 
 interface AgentMessageRow {
   id: string;
+  project_id: string | null;
   type: string;
   from_role: string;
   to_role: string;
@@ -101,10 +105,11 @@ export class AgentPersistence {
 
   /** Insère une nouvelle tâche en base */
   async saveTask(task: AgentTask): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !task.projectId) return;
     try {
       const row: AgentTaskRow = {
         id: task.id,
+        project_id: task.projectId,
         orchestration_id: task.orchestrationId ?? null,
         role: task.role,
         title: task.title,
@@ -222,13 +227,14 @@ export class AgentPersistence {
   }
 
   /** Charge toutes les tâches non terminées (recovery au redémarrage) */
-  async loadPendingTasks(): Promise<AgentTask[]> {
-    if (!this.client) return [];
+  async loadPendingTasks(projectId = getActiveProjectId()): Promise<AgentTask[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_tasks")
         .select("*")
         .in("status", ["pending", "running"])
+        .eq("project_id", projectId)
         .order("created_at", { ascending: true });
 
       if (error) {
@@ -244,12 +250,13 @@ export class AgentPersistence {
   }
 
   /** Charge les N dernières tâches (pour restaurer l'état en mémoire) */
-  async loadRecentTasks(limit = 100): Promise<AgentTask[]> {
-    if (!this.client) return [];
+  async loadRecentTasks(limit = 100, projectId = getActiveProjectId()): Promise<AgentTask[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_tasks")
         .select("*")
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -269,10 +276,12 @@ export class AgentPersistence {
 
   /** Insère un plan d'orchestration */
   async saveOrchestration(plan: OrchestrationPlan): Promise<void> {
-    if (!this.client) return;
+    const projectId = plan.projectId ?? plan.tasks.find((task) => task.projectId)?.projectId;
+    if (!this.client || !projectId) return;
     try {
       const row: AgentOrchestrationRow = {
         id: plan.id,
+        project_id: projectId,
         title: plan.title,
         description: plan.description,
         status: plan.status,
@@ -320,12 +329,13 @@ export class AgentPersistence {
   }
 
   /** Charge les N dernières orchestrations */
-  async loadRecentOrchestrations(limit = 20): Promise<AgentOrchestrationRow[]> {
-    if (!this.client) return [];
+  async loadRecentOrchestrations(limit = 20, projectId = getActiveProjectId()): Promise<AgentOrchestrationRow[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_orchestrations")
         .select("*")
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -345,12 +355,13 @@ export class AgentPersistence {
 
   /** Persiste un message du bus inter-agents (optionnel, best-effort) */
   async saveMessage(message: AgentMessage): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !message.projectId) return;
     // Ne persister que les task_request et task_response (pas les broadcasts légers)
     if (message.type === "broadcast" || message.type === "status_query") return;
     try {
       const row: AgentMessageRow = {
         id: message.id,
+        project_id: message.projectId,
         type: message.type,
         from_role: message.from,
         to_role: String(message.to),
@@ -473,6 +484,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_created_at ON agent_messages(creat
   private rowToTask(row: AgentTaskRow): AgentTask {
     return {
       id: row.id,
+      projectId: row.project_id ?? undefined,
       orchestrationId: row.orchestration_id ?? undefined,
       role: row.role as AgentTask["role"],
       title: row.title,
