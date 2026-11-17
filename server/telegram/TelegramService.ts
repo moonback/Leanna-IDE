@@ -750,10 +750,11 @@ export class TelegramService {
           return;
         }
 
-        // Correspondance exacte, ou par préfixe court (comme /task)
-        let task = agentOrchestrator.getTask(taskIdInput);
-        if (!task) {
-          const match = agentOrchestrator.listTasks().find((t) => t.id.startsWith(taskIdInput));
+        // Correspondance exacte, ou par préfixe court, limitée au workspace actif.
+        const projectId = getActiveProjectId();
+        let task = projectId ? agentOrchestrator.getTaskForProject(taskIdInput, projectId) : undefined;
+        if (!task && projectId) {
+          const match = agentOrchestrator.listTasks({ projectId }).find((t) => t.id.startsWith(taskIdInput));
           task = match ?? undefined;
         }
 
