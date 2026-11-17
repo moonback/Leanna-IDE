@@ -21,6 +21,8 @@ export type ComplexityLevel = "simple" | "moderate" | "complex" | "critical";
 /** Contexte initial fourni au Brain */
 export interface BrainGoalInput {
   goal: string;
+  /** Identifiant interne du workspace capturé par la route serveur. Jamais fourni par le client. */
+  projectId?: string;
   contextFiles?: string[];
   instructions?: string;
   mode?: "auto" | "plan_first";
