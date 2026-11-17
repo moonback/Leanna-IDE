@@ -147,7 +147,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // GET /api/agents/status
   router.get('/status', async (_req: Request, res: Response) => {
     try {
-      const stats = agentOrchestrator.getStats();
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const stats = agentOrchestrator.getStats(projectId);
       const declarations = skillManager.getToolDeclarations();
       const agentTools = declarations.filter((d: any) => d.name.startsWith('agent_'));
       res.json({
