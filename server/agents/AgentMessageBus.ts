@@ -347,24 +347,31 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne les métriques de routage détaillées
    */
-  getRoutingMetrics(): {
+  getRoutingMetrics(projectId?: string): {
     agentMessageCount: Record<string, number>;
     agentActiveMessages: Record<string, number>;
     agentAvgProcessingTime: Record<string, number>;
     agentLastProcessingTime: Record<string, number>;
   } {
-    return {
-      agentMessageCount: Object.fromEntries(this.routingMetrics.agentMessageCount),
-      agentActiveMessages: Object.fromEntries(this.routingMetrics.agentActiveMessages),
-      agentAvgProcessingTime: Object.fromEntries(this.routingMetrics.agentAvgProcessingTime),
-      agentLastProcessingTime: Object.fromEntries(this.routingMetrics.agentLastProcessingTime),
-    };
+    const scoped = projectId ? this.metrics.filter((metric) => metric.projectId === projectId) : [];
+    const counts: Record<string, number> = {};
+    const averages: Record<string, number> = {};
+    const last: Record<string, number> = {};
+    for (const metric of scoped) {
+      const role = typeof metric.to === "string" && metric.to !== "broadcast" ? metric.to : metric.from;
+      counts[role] = (counts[role] ?? 0) + 1;
+      if (metric.processingMs !== undefined) {
+        averages[role] = ((averages[role] ?? 0) * (counts[role] - 1) + metric.processingMs) / counts[role];
+        last[role] = metric.processingMs;
+      }
+    }
+    return { agentMessageCount: counts, agentActiveMessages: {}, agentAvgProcessingTime: averages, agentLastProcessingTime: last };
   }
 
   /**
    * Retourne les statistiques de charge par agent
    */
-  getAgentLoad(): Record<AgentRole, {
+  getAgentLoad(projectId?: string): Record<AgentRole, {
     messageCount: number;
     activeMessages: number;
     avgProcessingTime: number;
@@ -377,16 +384,20 @@ export class AgentMessageBus extends EventEmitter {
       loadScore: number;
     }> = {};
 
-    // Collecter tous les rôles
+    // Ne compter que les rôles abonnés au workspace et ses métriques.
+    if (!projectId) return load;
     const allRoles = new Set<AgentRole>();
     for (const sub of this.subscriptions.values()) {
-      allRoles.add(sub.agentRole);
+      if (sub.projectId === projectId) allRoles.add(sub.agentRole);
     }
+    const scopedMetrics = this.metrics.filter((metric) => metric.projectId === projectId);
 
     for (const role of allRoles) {
-      const messageCount = this.routingMetrics.agentMessageCount.get(role) ?? 0;
-      const activeMessages = this.routingMetrics.agentActiveMessages.get(role) ?? 0;
-      const avgProcessingTime = this.routingMetrics.agentAvgProcessingTime.get(role) ?? 0;
+      const roleMetrics = scopedMetrics.filter((metric) => metric.to === role);
+      const messageCount = roleMetrics.length;
+      const activeMessages = 0;
+      const timed = roleMetrics.map((metric) => metric.processingMs).filter((value): value is number => value !== undefined);
+      const avgProcessingTime = timed.length ? timed.reduce((sum, value) => sum + value, 0) / timed.length : 0;
       
       // Score de charge = messages actifs * temps moyen
       const loadScore = activeMessages * (avgProcessingTime > 0 ? avgProcessingTime : 100);
@@ -405,18 +416,18 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne l'état actuel du round-robin
    */
-  getRoundRobinState(): Record<AgentRole, {
+  getRoundRobinState(projectId?: string): Record<AgentRole, {
     currentIndex: number;
     subscriberCount: number;
   }> {
     const state: Record<AgentRole, { currentIndex: number; subscriberCount: number }> = {};
 
-    for (const [role, subIds] of this.roundRobinState.subscribers) {
-      state[role] = {
-        currentIndex: this.roundRobinState.index.get(role) ?? 0,
-        subscriberCount: subIds.length
-      };
+    if (!projectId) return state;
+    const scoped = new Map<AgentRole, number>();
+    for (const sub of this.subscriptions.values()) {
+      if (sub.projectId === projectId) scoped.set(sub.agentRole, (scoped.get(sub.agentRole) ?? 0) + 1);
     }
+    for (const [role, count] of scoped) state[role] = { currentIndex: 0, subscriberCount: count };
 
     return state;
   }
@@ -458,8 +469,8 @@ export class AgentMessageBus extends EventEmitter {
     timestamp: string;
   } {
     const metrics = this.getMetrics(projectId);
-    const load = this.getAgentLoad();
-    const rrState = this.getRoundRobinState();
+    const load = this.getAgentLoad(projectId);
+    const rrState = this.getRoundRobinState(projectId);
 
     // Compter l'utilisation des stratégies
     const strategyUsage: Record<RoutingStrategy, number> = {
@@ -528,7 +539,9 @@ export class AgentMessageBus extends EventEmitter {
       byAgentRole,
       byMessageType,
       pendingRequests: Array.from(this.pendingRequests.values()).filter((request) => request.projectId === projectId).length,
-      activeSubscriptions: projectId ? this.subscriptions.size : 0,
+      activeSubscriptions: projectId
+        ? Array.from(this.subscriptions.values()).filter((subscription) => subscription.projectId === projectId).length
+        : 0,
       deadLetterQueue,
     };
   }
