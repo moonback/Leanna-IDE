@@ -128,7 +128,7 @@ export class AgentPersistence {
 
       const { error } = await this.client
         .from("agent_tasks")
-        .upsert(row, { onConflict: "id" });
+        .insert(row);
 
       if (error) {
         log.error(`saveTask ${task.id.slice(0, 8)}: ${error.message}`);
@@ -145,7 +145,12 @@ export class AgentPersistence {
    */
   scheduleUpdate(taskId: string, update: Partial<AgentTaskRow>): void {
     if (!update.project_id) return;
-    this.pendingUpdates.set(taskId, { ...this.pendingUpdates.get(taskId), ...update });
+    const pending = this.pendingUpdates.get(taskId);
+    if (pending?.project_id && pending.project_id !== update.project_id) {
+      log.warn(`scheduleUpdate ${taskId.slice(0, 8)} ignorée : conflit de workspace`);
+      return;
+    }
+    this.pendingUpdates.set(taskId, { ...pending, ...update });
     if (!this.flushTimeout) {
       this.flushTimeout = setTimeout(() => this.flushUpdates(), 5000);
     }
@@ -300,7 +305,7 @@ export class AgentPersistence {
 
       const { error } = await this.client
         .from("agent_orchestrations")
-        .upsert(row, { onConflict: "id" });
+        .insert(row);
 
       if (error) {
         log.error(`saveOrchestration ${plan.id.slice(0, 8)}: ${error.message}`);
