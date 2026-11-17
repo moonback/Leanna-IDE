@@ -22,7 +22,7 @@ export function VideoTranscriptionImport({ notebookId, onImported, onError }: Pr
       return;
     }
     setBusy(true);
-    setStatus("Transcription avec Gemini…");
+    setStatus("Transcription via OpenRouter…");
     try {
       const body = new FormData();
       body.append("file", file);
@@ -59,7 +59,7 @@ export function VideoTranscriptionImport({ notebookId, onImported, onError }: Pr
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         className="notebook-chip inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-        title="Importer une vidéo locale et transcrire son contenu parlé avec Gemini"
+        title="Importer une vidéo locale et transcrire son contenu parlé via OpenRouter"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Film className="h-3.5 w-3.5" aria-hidden />}
         {busy ? "Transcription…" : "Vidéo + transcription"}
