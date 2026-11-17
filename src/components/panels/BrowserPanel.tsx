@@ -1264,6 +1264,10 @@ export function BrowserPanel({
           postActionResult(detail.requestId, null, parsed.error);
           return;
         }
+        if (parsed?.found === false) {
+          postActionResult(detail.requestId, { found: false });
+          return;
+        }
         // Attendre la condition waitFor si fournie
         let changed: Record<string, boolean> = {};
         if (detail.waitFor) {
@@ -1388,6 +1392,10 @@ export function BrowserPanel({
         }
         if (parsed?.error) {
           postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        if (parsed?.found === false) {
+          postActionResult(detail.requestId, { found: false });
           return;
         }
         // pressEnter
