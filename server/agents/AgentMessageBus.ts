@@ -41,6 +41,7 @@ interface PendingRequest {
 
 interface MessageMetric {
   messageId: string;
+  projectId?: string;
   from: AgentRole;
   to: AgentRole | "broadcast";
   type: string;
@@ -491,7 +492,7 @@ export class AgentMessageBus extends EventEmitter {
   }
 
   /** Retourne les métriques d'utilisation du bus */
-  getMetrics(): {
+  getMetrics(projectId?: string): {
     totalMessages: number;
     successRate: number;
     byAgentRole: Record<string, number>;
@@ -500,25 +501,26 @@ export class AgentMessageBus extends EventEmitter {
     activeSubscriptions: number;
     deadLetterQueue: Record<string, number>;
   } {
+    const scopedMetrics = projectId ? this.metrics.filter((metric) => metric.projectId === projectId) : [];
     const byAgentRole: Record<string, number> = {};
     const byMessageType: Record<string, number> = {};
 
-    for (const m of this.metrics) {
+    for (const m of scopedMetrics) {
       byAgentRole[m.from] = (byAgentRole[m.from] ?? 0) + 1;
       byMessageType[m.type] = (byMessageType[m.type] ?? 0) + 1;
     }
 
-    const successful = this.metrics.filter((m) => m.success).length;
+    const successful = scopedMetrics.filter((m) => m.success).length;
 
     const deadLetterQueue: Record<string, number> = {};
     for (const [role, entries] of this.deadLetterQueue) {
-      const active = entries.filter((e) => Date.now() - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+      const active = entries.filter((e) => e.message.projectId === projectId && Date.now() - e.enqueuedAt < DEAD_LETTER_TTL_MS);
       if (active.length > 0) deadLetterQueue[role] = active.length;
     }
 
     return {
-      totalMessages: this.metrics.length,
-      successRate: this.metrics.length > 0 ? successful / this.metrics.length : 1,
+      totalMessages: scopedMetrics.length,
+      successRate: scopedMetrics.length > 0 ? successful / scopedMetrics.length : 1,
       byAgentRole,
       byMessageType,
       pendingRequests: this.pendingRequests.size,
@@ -672,6 +674,7 @@ export class AgentMessageBus extends EventEmitter {
 
       this.metrics.push({
         messageId: message.id,
+        projectId: message.projectId,
         from: message.from,
         to: message.to,
         type: message.type,
