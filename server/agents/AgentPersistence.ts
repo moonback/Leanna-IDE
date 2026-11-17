@@ -213,13 +213,14 @@ export class AgentPersistence {
    * @returns le nombre d'ids demandés (best-effort — Supabase ne renvoie pas
    *          toujours le compte réel de lignes supprimées).
    */
-  async deleteTasks(taskIds: string[]): Promise<number> {
-    if (!this.client || taskIds.length === 0) return 0;
+  async deleteTasks(taskIds: string[], projectId?: string): Promise<number> {
+    if (!this.client || taskIds.length === 0 || !projectId) return 0;
     try {
       const { error } = await this.client
         .from("agent_tasks")
         .delete()
-        .in("id", taskIds);
+        .in("id", taskIds)
+        .eq("project_id", projectId);
 
       if (error) {
         log.error(`deleteTasks: ${error.message}`);
