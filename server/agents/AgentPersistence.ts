@@ -316,9 +316,10 @@ export class AgentPersistence {
   async updateOrchestrationStatus(
     orchestrationId: string,
     status: TaskStatus,
-    completedAt?: string
+    completedAt?: string,
+    projectId?: string
   ): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !projectId) return;
     try {
       const update: Partial<AgentOrchestrationRow> = { status };
       if (completedAt) update.completed_at = completedAt;
@@ -326,7 +327,8 @@ export class AgentPersistence {
       const { error } = await this.client
         .from("agent_orchestrations")
         .update(update)
-        .eq("id", orchestrationId);
+        .eq("id", orchestrationId)
+        .eq("project_id", projectId);
 
       if (error) {
         log.error(`updateOrchestrationStatus ${orchestrationId.slice(0, 8)}: ${error.message}`);
