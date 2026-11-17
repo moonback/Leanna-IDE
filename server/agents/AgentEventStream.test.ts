@@ -10,9 +10,10 @@ test("agent event stream notifies subscribers and supports unsubscribe", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-agent-events-"));
   const stream = new AgentEventStream({ filePath: path.join(dir, "events.jsonl") });
   const received: AgentEvent[] = [];
-  const unsubscribe = stream.subscribe(({ event }) => received.push(event));
+  const unsubscribe = stream.subscribe(({ event }) => received.push(event), undefined, "workspace-a");
   const event = {
     type: "agent_event",
+    projectId: "workspace-a",
     event: "task_started",
     taskId: "task-test",
     role: "coder",
@@ -34,6 +35,7 @@ test("agent event stream notifies subscribers and supports unsubscribe", () => {
 function makeEvent(taskId: string): AgentEvent {
   return {
     type: "agent_event",
+    projectId: "workspace-a",
     event: "task_started",
     taskId,
     role: "coder",
@@ -53,7 +55,7 @@ test("replays events after a cursor across stream instances (server restart)", (
 
   const restarted = new AgentEventStream({ filePath });
   const replayed: number[] = [];
-  const unsubscribe = restarted.subscribe((entry) => replayed.push(entry.id), 1);
+  const unsubscribe = restarted.subscribe((entry) => replayed.push(entry.id), 1, "workspace-a");
   assert.deepEqual(replayed, [2]);
 
   assert.equal(restarted.publish(makeEvent("task-3")), 3);
@@ -70,9 +72,9 @@ test("bounds replay history while preserving a monotonic event cursor", () => {
   stream.publish(makeEvent("task-2"));
   stream.publish(makeEvent("task-3"));
 
-  assert.deepEqual(stream.getHistory().map((entry) => entry.id), [2, 3]);
+  assert.deepEqual(stream.getHistory("workspace-a").map((entry) => entry.id), [2, 3]);
   const restarted = new AgentEventStream({ filePath, maxHistory: 2 });
   assert.equal(restarted.getLatestId(), 3);
-  assert.deepEqual(restarted.getHistory().map((entry) => entry.id), [2, 3]);
+  assert.deepEqual(restarted.getHistory("workspace-a").map((entry) => entry.id), [2, 3]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
