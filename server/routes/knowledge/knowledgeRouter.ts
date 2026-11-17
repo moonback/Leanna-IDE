@@ -249,7 +249,9 @@ router.get('/dashboard', (_req: Request, res: Response) => {
 router.post('/reindex', async (_req: Request, res: Response) => {
   try {
     const { broadcastKnowledgeProgress } = await import('../../utils/knowledgeBroadcaster.js');
-    const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
+    // WorkspaceIndexer extrait toujours depuis SELF_ROOT, même lorsque le Sandbox est actif.
+    // Le store et la détection des liens doivent donc utiliser cette même racine.
+    const root = SELF_ROOT;
 
     const stats = await projectIndexer.scanAll({
       force: true,
@@ -365,7 +367,9 @@ router.get('/documents', async (_req: Request, res: Response) => {
   try {
     const { getDocumentStore } = await import('../../knowledge/DocumentStore.js');
     const { workspaceIndexer } = await import('../../knowledge/WorkspaceIndexer.js');
-    const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
+    // Lire le même store que WorkspaceIndexer : les documents sont persistés sous SELF_ROOT,
+    // pas sous la racine temporaire du Sandbox.
+    const root = SELF_ROOT;
     const store = getDocumentStore(root);
     const docs = store.getAllDocuments();
     const extractorStats = workspaceIndexer.getStats();
@@ -476,7 +480,8 @@ router.get('/documents/search', async (req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'Le paramètre "q" est requis.' });
       return;
     }
-    const root = isSandboxActive() ? getSandboxRoot() : SELF_ROOT;
+    // La recherche doit cibler le store alimenté par WorkspaceIndexer (SELF_ROOT).
+    const root = SELF_ROOT;
     const { getDocumentStore } = await importModule<{ getDocumentStore: any }>('../knowledge/DocumentStore.js');
     const store = getDocumentStore(root);
     const results = store.searchDocuments(query, 20);
