@@ -1623,7 +1623,7 @@ server/skills/webSearchProvider.ts  recherche + lecture de pages 100 % serveur
 ### Catalogue d'outils agent (`browser_*`) — 29 outils
 
 > Le README précédent annonçait « 28 outils ». Le fichier `server/skills/browser.ts`
-> en expose en réalité **29** (déclarations et schémas d'entrée alignés).
+> expose **30 outils** (déclarations et schémas d'entrée alignés).
 
 | Catégorie | Outils |
 |---|---|
