@@ -15,6 +15,7 @@ import { BrainScheduler } from "./BrainScheduler.js";
 import { agentOrchestrator, type AgentOrchestrator } from "../AgentOrchestrator.js";
 import { agentEventStream } from "../AgentEventStream.js";
 import { createLogger } from "../../utils/logger.js";
+import { getActiveProjectId } from "../../utils/selfRoot.js";
 import type { AgentTask } from "../types.js";
 import { AgentLead } from "../lead/AgentLead.js";
 import type { ArbitrationVerdict, DelegationKind, LeadPolicy, LeadRunState, LeadStop, StopDecision } from "../lead/types.js";
