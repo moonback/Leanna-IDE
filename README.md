@@ -117,7 +117,7 @@ Les actions locales et les intégrations externes sont encadrées par les permis
 | 🧠 | [Anticipation](#moteur-danticipation-anticipationengine) | 📚 | [Connaissance & raisonnement](#-connaissance-et-compréhension) |
 | 🧪 | [Smart Skills](#smart-skills--boucles-intégrées) | ✅ | [Vérification & récupération](#-vérification-et-récupération) |
 | 🔐 | [Architecture de sécurité](#-architecture-de-sécurité) | 🤝 | [Boucle humaine (approbation)](#boucle-humaine-approbation-interactive) |
-| 🌐 | [Navigateur intégré (29 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
+| 🌐 | [Navigateur intégré (30 outils)](#-navigateur-intégré) | 🛒 | [Marketplace](#marketplace-de-compétences) |
 | 📓 | [Notebooks & RAG hybride](#-notebooks-et-rag) | 🎙️ | [Assistant vocal notebook](#-assistant-vocal-du-notebook) • [Veille & réveil](#-veille-et-réveil-vocal) |
 | 🔌 | [MCP](#-mcp) • [Telegram](#-telegram) • [E-mail](#-e-mail-et-messagerie) • [TTS](#-synthèse-vocale-tts) | 👁️ | [Observabilité](#observabilité) |
 | 🚀 | [Installation & configuration](#-installation) | 🧪 | [Tests & validation](#tests) • [Contribuer](#contribuer) |
@@ -237,7 +237,7 @@ critères de vérification, un comportement de récupération, un **état durabl
 | **Autonomie proactive** | Anticipation (observe→détecte→propose), Computer Use, Smart Skills, heartbeat adaptatif | ✅ |
 | **Connaissance** | Graphe de connaissances, AST (tree-sitter), call-graph, dépendances, impact, mémoire de stratégie | ✅ |
 | **Productivité** | Notebooks, RAG hybride, embeddings, génération de documents, génération d'images, export PDF/DOCX/HTML | ✅ |
-| **Navigateur intégré** | 29 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
+| **Navigateur intégré** | 30 outils `browser_*`, multi-onglets, profils, extensions, recherche serveur, vision | ✅ |
 | **Boucle humaine (HITL)** | Approbation interactive des actions à risque + contrôle de mission (pause/reprise/annulation), relais Telegram | ✅ |
 | **Intégrations** | Gemini, OpenRouter, Supabase, GitHub, Telegram (messages, photos et documents sortants), E-mail (IMAP/SMTP générique pour Leanna, Gmail personnel), MCP (stdio/HTTP/SSE), Puppeteer | ✅ |
 | **Marketplace** | Registre de compétences (backend local + UI : recherche, publication avec analyse de sécurité, notes, installation) | ✅ |
@@ -1601,7 +1601,7 @@ src/components/panels/useBrowserHistory.ts
 src/components/panels/useBrowserProfiles.ts
 src/components/panels/useBrowserExtensions.ts
 
-server/skills/browser.ts            29 outils browser_* exposés à l'agent
+server/skills/browser.ts            30 outils browser_* exposés à l'agent
 server/skills/webSearchProvider.ts  recherche + lecture de pages 100 % serveur
 ```
 
@@ -1620,14 +1620,14 @@ server/skills/webSearchProvider.ts  recherche + lecture de pages 100 % serveur
   persistées dans `userData/browser-extensions.json`. (Electron ne gère qu'un
   sous-ensemble de l'API Chrome Extensions.)
 
-### Catalogue d'outils agent (`browser_*`) — 29 outils
+### Catalogue d'outils agent (`browser_*`) — 30 outils
 
 > Le README précédent annonçait « 28 outils ». Le fichier `server/skills/browser.ts`
 > expose **30 outils** (déclarations et schémas d'entrée alignés).
 
 | Catégorie | Outils |
 |---|---|
-| Navigation | `browser_navigate` · `browser_open` · `browser_close` · `browser_back` · `browser_forward` · `browser_reload` · `browser_scroll` · `browser_new_tab` |
+| Navigation | `browser_navigate` · `browser_open` · `browser_close` · `browser_back` · `browser_forward` · `browser_reload` · `browser_scroll` · `browser_new_tab` · `browser_manage_tabs` |
 | Lecture / recherche | `browser_read_content` · `browser_summarize_page` · `browser_get_links` · `browser_open_link` · `browser_search` · `browser_research` · `browser_web_search` |
 | Interaction | `browser_click` · `browser_type` · `browser_fill_form` · `browser_select_option` · `browser_click_by_role` · `browser_type_by_label` |
 | Inspection | `browser_snapshot` · `browser_inspect` · `browser_get_accessibility_snapshot` · `browser_get_element_text` · `browser_get_element_attribute` · `browser_wait_for` |
@@ -2073,7 +2073,7 @@ Leanna/
 │   ├── runtime/              AgentRuntime · ToolRegistry · PermissionPolicy · DryRun
 │   │   │                     SkillWorker · AgentLoader · Observability
 │   │   └── agentic/          AgenticRuntime · ToolPromptBuilder · types (budget 8/3/9/6/4)
-│   ├── skills/               codebase · browser (29 outils) · git · github · knowledge …
+│   ├── skills/               codebase · browser (30 outils) · git · github · knowledge …
 │   ├── notebooks/            RAGEngine · EmbeddingStore · SourceIngester · GroundedChat
 │   ├── live/                 NotebookLiveSocketHandler · toolExecution
 │   ├── mcp/                  McpClient · McpBridge · mcpConfig
