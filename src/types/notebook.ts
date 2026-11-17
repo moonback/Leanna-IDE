@@ -30,7 +30,7 @@ export interface SourceItem {
   }>;
 }
 
-export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'html' | 'youtube' | 'audio' | 'docx';
+export type SourceType = 'pdf' | 'text' | 'markdown' | 'url' | 'html' | 'youtube' | 'audio' | 'video' | 'docx';
 
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
