@@ -835,13 +835,15 @@ export class AgentOrchestrator {
   }
 
   /** Retourne les statistiques globales des agents */
-  getStats(): {
+  getStats(projectId?: string): {
     totalTasks: number;
     byStatus: Record<TaskStatus, number>;
     byRole: Record<AgentRole, number>;
     activeOrchestrations: number;
   } {
-    const allTasks = Array.from(this.tasks.values());
+    const allTasks = projectId
+      ? Array.from(this.tasks.values()).filter((task) => task.projectId === projectId)
+      : [];
     const byStatus: Record<TaskStatus, number> = {
       pending: 0, running: 0, completed: 0, incomplete: 0, failed: 0, cancelled: 0,
     };
@@ -869,8 +871,9 @@ export class AgentOrchestrator {
       byRole[task.role] = (byRole[task.role] ?? 0) + 1;
     }
 
-    const activeOrchestrations = Array.from(this.orchestrations.values())
-      .filter((o) => o.status === "running" || o.status === "pending").length;
+    const activeOrchestrations = projectId
+      ? Array.from(this.orchestrations.values()).filter((o) => o.projectId === projectId && (o.status === "running" || o.status === "pending")).length
+      : 0;
 
     return { totalTasks: allTasks.length, byStatus, byRole: byRole as Record<AgentRole, number>, activeOrchestrations };
   }
