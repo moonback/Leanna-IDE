@@ -132,11 +132,13 @@ export class AgentMessageBus extends EventEmitter {
   subscribe(
     agentRole: AgentRole,
     messageType: AgentMessage["type"] | "*",
-    handler: MessageHandler
+    handler: MessageHandler,
+    projectId = getActiveProjectId() ?? undefined
   ): string {
     const subId = randomUUID();
     this.subscriptions.set(subId, {
       id: subId,
+      projectId,
       agentRole,
       messageType,
       handler,
@@ -711,6 +713,7 @@ export class AgentMessageBus extends EventEmitter {
 
     for (const sub of this.subscriptions.values()) {
       if (
+        sub.projectId === message.projectId && !!sub.projectId &&
         sub.agentRole === targetRole &&
         (sub.messageType === "*" || sub.messageType === message.type)
       ) {
@@ -819,13 +822,15 @@ export class AgentMessageBus extends EventEmitter {
    * Re-livre les messages en dead-letter queue pour un rôle donné.
    * Appelé automatiquement quand un agent s'abonne.
    */
-  private async flushDeadLetterQueue(role: AgentRole): Promise<void> {
+  private async flushDeadLetterQueue(role: AgentRole, projectId?: string): Promise<void> {
     const queue = this.deadLetterQueue.get(role);
-    if (!queue || queue.length === 0) return;
+    if (!queue || queue.length === 0 || !projectId) return;
 
     const now = Date.now();
-    const toDeliver = queue.filter((e) => now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
-    this.deadLetterQueue.delete(role);
+    const toDeliver = queue.filter((e) => e.message.projectId === projectId && now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+    const retained = queue.filter((e) => e.message.projectId !== projectId && now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+    if (retained.length > 0) this.deadLetterQueue.set(role, retained);
+    else this.deadLetterQueue.delete(role);
 
     if (toDeliver.length === 0) return;
 
@@ -846,7 +851,9 @@ export class AgentMessageBus extends EventEmitter {
     const seen = new Set<AgentRole>();
 
     for (const sub of this.subscriptions.values()) {
+      if (!sub.projectId || sub.projectId !== message.projectId) continue;
       // Éviter de diffuser à l'émetteur lui-même
+      if (!sub.projectId || sub.projectId !== message.projectId) continue;
       if (sub.agentRole === message.from) continue;
       // Un seul handler par rôle pour le broadcast
       if (seen.has(sub.agentRole)) continue;
