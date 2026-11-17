@@ -50,10 +50,11 @@ export interface DynamicAgentDefinition extends AgentDefinition {
 export class DynamicAgentRegistry {
   private agents: Map<AgentRole, DynamicAgentDefinition> = new Map();
   /** Le registre est mono-workspace jusqu'à un redémarrage explicite. */
-  private workspaceId?: string;
+  private workspaceId: string | null = null;
+  private workspaceBound = false;
 
   private isCurrentWorkspace(): boolean {
-    return !!this.workspaceId && getActiveProjectId() === this.workspaceId;
+    return this.workspaceBound && this.workspaceId === (getActiveProjectId() || null);
   }
   private static instance: DynamicAgentRegistry;
 
@@ -86,12 +87,12 @@ export class DynamicAgentRegistry {
     definition: DynamicAgentDefinition,
     override: boolean = false
   ): AgentRole {
-    const projectId = getActiveProjectId();
-    if (!projectId) throw new Error("Enregistrement d'agent refusé : aucun workspace actif.");
-    if (this.workspaceId && this.workspaceId !== projectId) {
+    const projectId = getActiveProjectId() || null;
+    if (this.workspaceBound && this.workspaceId !== projectId) {
       throw new Error("Registre d'agents dynamiques lié à un autre workspace ; redémarrage requis.");
     }
     this.workspaceId = projectId;
+    this.workspaceBound = true;
     // ── Étape 1 : Validation sécurité (Zod + HMAC) ──────────────────────────
     // validateAgentDefinition lève AgentSecurityError si la définition est
     // invalide structurellement ou si la signature HMAC est absente/incorrecte
@@ -307,7 +308,8 @@ export class DynamicAgentRegistry {
     if (!this.isCurrentWorkspace()) return;
     const count = this.agents.size;
     this.agents.clear();
-    this.workspaceId = undefined;
+    this.workspaceId = null;
+    this.workspaceBound = false;
     log.warn(`🧹 Registre dynamique nettoyé (${count} agent(s) supprimé(s))`);
   }
 
