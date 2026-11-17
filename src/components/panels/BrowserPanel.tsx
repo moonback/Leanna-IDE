@@ -699,10 +699,11 @@ export function BrowserPanel({
         'transition:top 0.25s cubic-bezier(.4,0,.2,1),left 0.25s cubic-bezier(.4,0,.2,1)',
         'will-change:top,left',
         'display:block',
+        'filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))',
       ].join(';');
       cur.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
         + '<filter id="cs"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.4"/></filter>'
-        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="var(--text-muted)" stroke-width="1" filter="url(#cs)"/>'
+        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="#ffffff" stroke="#202124" stroke-width="1.2" filter="url(#cs)"/>'
         + '</svg>';
       document.body.appendChild(cur);
     })()`;
@@ -711,10 +712,18 @@ export function BrowserPanel({
       try {
         await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
         await wv.executeJavaScript(`(function(x,y){
+          x = Math.max(0, Math.min(window.innerWidth - 1, Number(x) || 0));
+          y = Math.max(0, Math.min(window.innerHeight - 1, Number(y) || 0));
           var cur = document.getElementById('__Leanna_cursor');
-          if (!cur) return;
-          cur.style.left = Math.max(0, Math.min(window.innerWidth - 22, x - 4)) + 'px';
-          cur.style.top = Math.max(0, Math.min(window.innerHeight - 22, y - 2)) + 'px';
+          if (cur) {
+            cur.style.left = Math.max(0, x - 4) + 'px';
+            cur.style.top = Math.max(0, y - 2) + 'px';
+          }
+          var target = document.elementFromPoint(x, y);
+          if (target) {
+            target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y, view: window }));
+            target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: x, clientY: y, view: window }));
+          }
         })(${Number(x) || 0},${Number(y) || 0})`);
         await new Promise<void>((resolve) => setTimeout(resolve, 380));
       } catch {/* le curseur reste indicatif et ne doit pas bloquer l'action */ }
