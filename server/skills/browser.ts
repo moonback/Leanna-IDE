@@ -1426,16 +1426,61 @@ export const browserSkill: Skill = {
       }
 
       const requestId = `br_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      // Timeout plus long pour laisser le temps à la page de charger
       const TIMEOUT_MS = 18_000;
+      if (signal?.aborted) {
+        return { status: "error", message: "Lecture navigateur annulée avant exécution." };
+      }
 
       const text = await new Promise<string>((resolve, reject) => {
+        let settled = false;
         const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
           pending.delete(requestId);
+          signal?.removeEventListener("abort", onAbort);
           reject(new Error("Timeout (18s) : la webview n'a pas répondu. Le navigateur est peut-être fermé ou la page met trop de temps à charger."));
         }, TIMEOUT_MS);
-        pending.set(requestId, { resolve, reject, timer });
-        emit({ type: "browser-read-request", requestId, selector: selector ?? null });
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+        };
+        const onAbort = () => {
+          if (settled) return;
+          settled = true;
+          pending.delete(requestId);
+          cleanup();
+          reject(new Error("Lecture navigateur annulée par le signal d'arrêt."));
+        };
+        pending.set(requestId, {
+          resolve: (value) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+          },
+          reject: (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(error);
+          },
+          timer,
+        });
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+          return;
+        }
+        try {
+          emit({ type: "browser-read-request", requestId, selector: selector ?? null });
+        } catch (error) {
+          if (!settled) {
+            settled = true;
+            pending.delete(requestId);
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        }
       }).catch((err: Error) => `[ERREUR LECTURE] ${err.message}`);
 
       // Tenter de parser si le script a retourné un JSON {title, url, text}
