@@ -105,7 +105,8 @@ export class ProgressNotifier {
         task.status,
         task.result,
         task.startedAt,
-        task.completedAt
+        task.completedAt,
+        task.projectId
       ).catch(() => {});
     }
 
