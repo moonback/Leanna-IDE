@@ -11,6 +11,7 @@
 import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { fetchYouTubeTranscript } from "./youtubeTranscript.js";
+import { transcribeAudioWithGemini } from "./videoIntelligence.js";
 import { generateText } from "../utils/textGeneration.js";
 import path from "path";
 import type { Source, SourceChunk, SourceType } from "./types.js";
@@ -135,7 +136,19 @@ export class SourceIngester {
     let imageMimeType: string | undefined;
     let rawHtml: string | undefined;
 
-    if (mimeType === "application/pdf") {
+    if (mimeType.startsWith("video/")) {
+      sourceType = "video";
+      onProgress?.(12, "video-transcription", "Transcription du média avec Gemini");
+      const transcript = await transcribeAudioWithGemini(buffer, mimeType, { title: filename });
+      rawText = [
+        `# ${filename}`,
+        `Transcription Gemini — langue : ${transcript.language}`,
+        "",
+        transcript.fullText,
+      ].join("\n");
+      if (!rawText.trim()) throw new Error("Aucune parole exploitable détectée dans la vidéo.");
+      onProgress?.(35, "video-transcription", `Transcription terminée — ${transcript.segments.length} segment(s)`);
+    } else if (mimeType === "application/pdf") {
       onProgress?.(12, "pdf-extraction", "Lecture et extraction des pages PDF");
       rawText = await this.extractPDF(buffer, onProgress);
       sourceType = "pdf";
