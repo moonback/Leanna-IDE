@@ -21,7 +21,6 @@ import {
   Wifi,
   MoreHorizontal,
   Power,
-  Network,
   ListChecks,
   Activity,
   Boxes,
@@ -67,7 +66,6 @@ interface StatusBarProps {
   onToggleEmail?: () => void;
   onToggleModelPicker?: () => void;
   onToggleTokenDetail?: () => void;
-  onToggleImpact?: () => void;
   onToggleSystemHealth?: () => void;
   onTogglePM2?: () => void;
   showTerminal?: boolean;
@@ -204,37 +202,37 @@ interface ToolsMenuItem {
   trailing?: React.ReactNode;
 }
 
-function ToolsMenuRow({ item }: { item: ToolsMenuItem }) {
+function ToolsMenuTile({ item }: { item: ToolsMenuItem }) {
   const { icon: Icon, label, description, onClick, iconColor, iconBg, count, countColor, trailing } = item;
   return (
-    <div className="group flex items-center gap-3 px-2.5 py-2 rounded-xl transition-colors duration-150 hover:bg-[var(--bg-hover)]">
+    <div className="flex flex-col items-center">
       <button
         type="button"
         onClick={onClick}
-        className="flex items-center gap-3 flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        title={description ?? label}
+        aria-label={description ?? label}
+        className="group flex w-[92px] flex-col items-center gap-1.5 px-1 py-2 rounded-xl transition-colors duration-150 hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={!onClick}
       >
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          className="relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105"
           style={{ backgroundColor: iconBg ?? 'var(--bg-hover)' }}
         >
-          <Icon size={16} style={{ color: iconColor ?? 'var(--text-muted)' }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-            {label}
-          </div>
-          {description && (
-            <div className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
-              {description}
-            </div>
+          <Icon size={18} style={{ color: iconColor ?? 'var(--text-muted)' }} />
+          {typeof count === 'number' && count > 0 && (
+            <span
+              className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+              style={{ backgroundColor: countColor ?? 'var(--accent-primary)', color: 'var(--bg-base)' }}
+            >
+              {count > 99 ? '99+' : count}
+            </span>
           )}
         </div>
+        <span className="w-full truncate text-center text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+          {label}
+        </span>
       </button>
-      {typeof count === 'number' && count > 0 && (
-        <CountBadge value={count} color={countColor ?? 'var(--accent-primary)'} />
-      )}
-      {trailing}
+      {trailing && <div className="mt-0.5">{trailing}</div>}
     </div>
   );
 }
@@ -304,8 +302,8 @@ function ToolsMenuModal({ items, onClose }: { items: (ToolsMenuItem | 'divider')
         ref={dialogRef}
         id="ide-tools-menu-dialog"
         tabIndex={-1}
-        className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden flex flex-col outline-none"
-        style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)', maxHeight: '80vh' }}
+        className="w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden outline-none"
+        style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-base)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -326,12 +324,13 @@ function ToolsMenuModal({ items, onClose }: { items: (ToolsMenuItem | 'divider')
           </button>
         </div>
 
-        <div className="p-2 overflow-y-auto min-h-0">
+        {/* Lanceur horizontal : tuiles côte à côte, retour à la ligne sur fenêtre étroite */}
+        <div className="flex flex-row flex-wrap items-center justify-center gap-1 p-3" role="list">
           {items.map((item, i) =>
             item === 'divider' ? (
-              <div key={`div-${i}`} className="my-1.5 mx-2 h-px" style={{ backgroundColor: 'var(--border-base)', opacity: 0.6 }} />
+              <div key={`div-${i}`} className="w-px self-stretch min-h-[52px] mx-1 flex-shrink-0" role="presentation" style={{ backgroundColor: 'var(--border-base)', opacity: 0.6 }} />
             ) : (
-              <ToolsMenuRow key={item.key} item={item} />
+              <ToolsMenuTile key={item.key} item={item} />
             )
           )}
         </div>
@@ -359,7 +358,6 @@ export const StatusBar = memo(function StatusBar({
   onToggleEmail,
   onToggleModelPicker,
   onToggleTokenDetail,
-  onToggleImpact,
   onToggleSystemHealth,
   onTogglePM2,
   showTerminal,
@@ -864,14 +862,6 @@ export const StatusBar = memo(function StatusBar({
       iconColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
       count: pendingApprovalCount > 0 ? pendingApprovalCount : activeMissionCount,
       countColor: pendingApprovalCount > 0 ? 'var(--color-warning)' : 'var(--color-info)',
-    },
-    {
-      key: 'impact',
-      icon: Network,
-      label: 'Impact',
-      description: 'Ce qu’une modification du fichier actif risque de casser',
-      onClick: () => { onToggleImpact?.(); setShowToolsMenu(false); },
-      iconColor: 'var(--color-warning)',
     },
     'divider',
     {

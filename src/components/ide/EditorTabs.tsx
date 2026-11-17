@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe, MoreHorizontal } from 'lucide-react';
+import { X, Save, Map, WrapText, AlignJustify, Eye, Code, Sparkles, Globe, MoreHorizontal, Network } from 'lucide-react';
 import { FileIcon } from './FileIcon.js';
 import { fileName } from '../../utils/fileUtils.js';
 import type { OpenFile } from '../../types/ide.js';
@@ -33,6 +33,8 @@ type EditorTabsProps = {
   onToggleMarkdownPreview: () => void;
   onToggleHtmlPreview: () => void;
   onOpenTemplates?: () => void;
+  showImpact?: boolean;
+  onToggleImpact?: () => void;
 };
 
 export function EditorTabs({
@@ -52,6 +54,8 @@ export function EditorTabs({
   onToggleMarkdownPreview,
   onToggleHtmlPreview,
   onOpenTemplates,
+  showImpact,
+  onToggleImpact,
 }: EditorTabsProps) {
   const [showMore, setShowMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -299,6 +303,19 @@ export function EditorTabs({
               >
                 <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
                 <span className="flex-1">Bibliothèque de modèles</span>
+              </button>
+            )}
+            {onToggleImpact && (
+              <button
+                type="button"
+                aria-pressed={showImpact}
+                onClick={() => { onToggleImpact(); closeMore(); }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-[var(--bg-hover)]"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <Network size={14} style={{ color: showImpact ? 'var(--color-warning)' : 'var(--text-muted)' }} />
+                <span className="flex-1">Impact</span>
+                <span style={{ color: 'var(--text-muted)' }}>{showImpact ? 'Affiché' : 'Masqué'}</span>
               </button>
             )}
           </div>,

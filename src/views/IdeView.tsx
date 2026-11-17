@@ -1166,6 +1166,8 @@ export default function IdeView() {
             onToggleMarkdownPreview={() => setMarkdownPreview(v => !v)}
             onToggleHtmlPreview={() => setHtmlPreview(v => !v)}
             onOpenTemplates={() => setShowTemplateModal(true)}
+            showImpact={showImpact || impactPin !== null}
+            onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
           />
         )}
 
@@ -1439,7 +1441,6 @@ export default function IdeView() {
           onToggleEmail={() => toggleRightPanel('email', showEmail)}
           onToggleModelPicker={() => toggleRightPanel('modelPicker', showModelPicker)}
           onToggleTokenDetail={() => toggleRightPanel('tokenDetail', showTokenDetail)}
-          onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
           onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
           onTogglePM2={() => setShowPM2(v => !v)}
           showTerminal={showTerminal}
