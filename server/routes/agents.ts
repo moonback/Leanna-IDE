@@ -185,10 +185,10 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // GET /api/agents/tasks
   router.get('/tasks', async (_req: Request, res: Response) => {
     try {
-      const result = await skillManager.handleToolCall('agent_list_tasks', {
-        limit: 50,
-      });
-      res.json(result);
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const tasks = agentOrchestrator.listTasks({ limit: 50, projectId });
+      res.json({ tasks: tasks.map(serializeTaskDetail) });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
