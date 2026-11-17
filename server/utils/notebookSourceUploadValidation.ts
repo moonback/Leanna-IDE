@@ -34,8 +34,14 @@ export function validateNotebookSourceUpload(fileName: string, mimeType: string,
 
   const videoMime = VIDEO_TYPES[extension];
   if (videoMime) {
-    if (mimeType.toLowerCase() !== videoMime) {
-      return { valid: false, fileName: safeName, mimeType, error: "Le type MIME de la vidéo ne correspond pas à son extension." };
+    const isMp4OrMov = extension === ".mp4" || extension === ".mov";
+    const hasIsoBmffSignature = buffer.length >= 12
+      && buffer.toString("ascii", 4, 8) === "ftyp";
+    const hasWebmSignature = buffer.length >= 4
+      && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+    const signatureValid = isMp4OrMov ? hasIsoBmffSignature : hasWebmSignature;
+    if (mimeType.toLowerCase() !== videoMime || !signatureValid) {
+      return { valid: false, fileName: safeName, mimeType, error: "Le contenu vidéo ne correspond pas à son extension ou à son type MIME." };
     }
     return { valid: true, fileName: safeName, mimeType: videoMime };
   }
