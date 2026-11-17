@@ -75,6 +75,8 @@ export class AutonomousAgent {
   private subscriptionId: string | null = null;
   private broadcastSubId: string | null = null;
   private isOnline = false;
+  /** Workspace fixe de cette instance ; un changement nécessite un redémarrage contrôlé. */
+  private workspaceId?: string;
 
   constructor(
     role: AgentRole,
@@ -112,6 +114,7 @@ export class AutonomousAgent {
       log.warn(`Agent "${this.agentName}" non abonné : aucun workspace actif`);
       return;
     }
+    this.workspaceId = projectId;
 
     // Abonnement aux messages directs
     this.subscriptionId = this.bus.subscribe(this.role, "*", (msg) =>
@@ -142,6 +145,7 @@ export class AutonomousAgent {
     if (this.broadcastSubId) this.bus.unsubscribe(this.broadcastSubId);
 
     this.isOnline = false;
+    this.workspaceId = undefined;
     log.info(`🔴 Agent "${this.agentName}" hors ligne`);
   }
 
@@ -152,6 +156,9 @@ export class AutonomousAgent {
    * Retourne le résultat quand la tâche est terminée.
    */
   async submitTask(task: AgentTask): Promise<TaskResult> {
+    if (!this.workspaceId || task.projectId !== this.workspaceId) {
+      throw new Error(`Tâche refusée par ${this.agentName} : workspace absent ou différent de celui de l'agent.`);
+    }
     return new Promise<TaskResult>((resolve, reject) => {
       this.taskQueue.push({
         task,
