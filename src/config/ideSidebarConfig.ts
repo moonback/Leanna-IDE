@@ -9,18 +9,18 @@
  * 2. Recherche         (accès direct)
  * 3. Terminal          (accès direct)
  * 4. GitHub            (accès direct)
- * 5. CI/CD & Aperçu    (sous-menu : Sandbox, Workflow, Prévisualisation)
- * 6. Données           (sous-menu : Knowledge, Notebooks, Santé système, PM2)
+ * 5. CI/CD & Aperçu    (Navigateur)
+ * 6. Données           (sous-menu : Knowledge, Notebooks)
  * 7. Outils            (sous-menu : Agent Builder, Marketplace, Caméra, Partage écran)
  * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar)
  */
 
 import {
   Search,
-  GitBranch, Github, Camera, Monitor, Boxes,
-  FolderTree, Workflow,
-  Container, Database,
-  Activity, Wrench,
+  GitBranch, Github, Camera, Monitor,
+  FolderTree,
+  Database,
+  Wrench,
   Wand2, Globe, Terminal, Store,
   Brain, NotebookPen,
 } from 'lucide-react';
@@ -126,8 +126,8 @@ export const sidebarSections: SidebarSectionConfig[] = [
   },
 
   // ═══ 5. CI/CD — sous-menu pour les usages occasionnels ═══
-  //  (Sandbox, Workflow, Prévisualisation restent à un clic de flyout ;
-  //   ils sont aussi tous accessibles via la Command Palette.)
+  //  (Prévisualisation reste à un clic de flyout ;
+  //   aussi accessible via la Command Palette.)
   {
     id: 'cicd',
     label: 'CI/CD & Aperçu',
@@ -138,22 +138,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
         icon: GitBranch,
         label: 'CI/CD & Aperçu',
         children: [
-          {
-            id: 'sandbox',
-            type: 'button',
-            icon: Container,
-            label: 'Sandbox',
-            stateKey: 'showSandbox',
-            actionKey: 'onToggleSandbox',
-          },
-          {
-            id: 'workflow',
-            type: 'button',
-            icon: Workflow,
-            label: 'Workflow CI/CD',
-            stateKey: 'showWorkflow',
-            actionKey: 'onToggleWorkflow',
-          },
           {
             id: 'browser',
             type: 'button',
@@ -194,22 +178,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Notebooks',
             stateKey: 'showNotebooks',
             actionKey: 'onToggleNotebooks',
-          },
-          {
-            id: 'system-health',
-            type: 'button',
-            icon: Activity,
-            label: 'Santé système',
-            stateKey: 'showSystemHealth',
-            actionKey: 'onToggleSystemHealth',
-          },
-          {
-            id: 'pm2-monitor',
-            type: 'button',
-            icon: Boxes,
-            label: 'PM2 · Processus',
-            stateKey: 'showPM2',
-            actionKey: 'onTogglePM2',
           },
         ],
       },

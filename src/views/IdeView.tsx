@@ -1440,6 +1440,8 @@ export default function IdeView() {
           onToggleModelPicker={() => toggleRightPanel('modelPicker', showModelPicker)}
           onToggleTokenDetail={() => toggleRightPanel('tokenDetail', showTokenDetail)}
           onToggleImpact={() => { setImpactPin(null); toggleRightPanel('impact', showImpact); }}
+          onToggleSystemHealth={() => setShowSystemHealth(v => !v)}
+          onTogglePM2={() => setShowPM2(v => !v)}
         />
       </div>
 

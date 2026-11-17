@@ -23,6 +23,8 @@ import {
   Power,
   Network,
   ListChecks,
+  Activity,
+  Boxes,
   type LucideIcon,
 } from 'lucide-react';
 import { StartupTasksPill } from './StartupTasksPill.js';
@@ -65,6 +67,8 @@ interface StatusBarProps {
   onToggleModelPicker?: () => void;
   onToggleTokenDetail?: () => void;
   onToggleImpact?: () => void;
+  onToggleSystemHealth?: () => void;
+  onTogglePM2?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -353,6 +357,8 @@ export const StatusBar = memo(function StatusBar({
   onToggleModelPicker,
   onToggleTokenDetail,
   onToggleImpact,
+  onToggleSystemHealth,
+  onTogglePM2,
 }: StatusBarProps) {
   const { status, tokenUsage, promptContext } = useLiveAPIContext();
   const { profile } = useProfile();
@@ -888,6 +894,22 @@ export const StatusBar = memo(function StatusBar({
       description: 'Scanner le projet et les documents',
       onClick: (reindexing || indexing.active) ? undefined : () => { handleReindex(); setShowToolsMenu(false); },
       iconColor: 'var(--accent-primary)',
+    },
+    {
+      key: 'system-health',
+      icon: Activity,
+      label: 'Santé système',
+      description: 'CPU, mémoire et services en temps réel',
+      onClick: () => { onToggleSystemHealth?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--color-success)',
+    },
+    {
+      key: 'pm2-monitor',
+      icon: Boxes,
+      label: 'PM2 · Processus',
+      description: 'Processus PM2 et redémarrage',
+      onClick: () => { onTogglePM2?.(); setShowToolsMenu(false); },
+      iconColor: 'var(--color-info)',
     },
   ];
 
