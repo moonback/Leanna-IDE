@@ -436,6 +436,23 @@ export function rankLinkCandidates(
 // Petit wrapper pour garantir qu'on ne renvoie jamais "success" si l'IPC
 // n'est pas disponible (context.emitIdeAction manquant), et pour uniformiser
 // la forme des erreurs renvoyées au modèle.
+/**
+ * Les actions interactives ne sont rejouables que lorsque le renderer confirme
+ * explicitement que la cible était absente. Un timeout/IPC perdu est ambigu :
+ * l'action peut déjà avoir produit son effet, donc la rejouer serait dangereux.
+ */
+export function isRetryableBrowserActionResult(actionType: string, result: unknown): boolean {
+  const retryableActions = new Set([
+    "browser-click-by-role",
+    "browser-type-by-label",
+    "browser-fill-form",
+  ]);
+  if (!retryableActions.has(actionType) || typeof result !== "object" || result === null) {
+    return false;
+  }
+  return (result as { found?: unknown }).found === false;
+}
+
 function withEmit<T>(
   emit: ((action: any) => void) | undefined,
   fn: (emit: (action: any) => void) => T
@@ -1166,13 +1183,57 @@ export const browserSkill: Skill = {
 
       const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const startedAt = Date.now();
+      if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée avant exécution.";
       return await new Promise<any>((resolve, reject) => {
+        let settled = false;
         const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
           pending.delete(requestId);
+          signal?.removeEventListener("abort", onAbort);
           reject(new Error(`Timeout (${(timeoutMs / 1000).toFixed(0)}s) — navigateur non disponible ou en chargement.`));
         }, timeoutMs);
-        pending.set(requestId, { resolve, reject, timer });
-        emit({ requestId, ...action });
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+        };
+        const onAbort = () => {
+          if (settled) return;
+          settled = true;
+          pending.delete(requestId);
+          cleanup();
+          reject(new Error("Action navigateur annulée par le signal d'arrêt."));
+        };
+        pending.set(requestId, {
+          resolve: (value) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+          },
+          reject: (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(error);
+          },
+          timer,
+        });
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+          return;
+        }
+        try {
+          emit({ requestId, ...action });
+        } catch (error) {
+          if (!settled) {
+            settled = true;
+            pending.delete(requestId);
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        }
       }).then((value) => {
         console.log(`[Browser] ${action.type} ${requestId} ✓ ${Date.now() - startedAt}ms`);
         return value;
@@ -1193,20 +1254,29 @@ export const browserSkill: Skill = {
       const delays = [0, 1_000, 3_000];
       let lastResult: T | string = "[ERREUR] Aucune tentative effectuée.";
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée.";
         if (delays[attempt] > 0) {
-          await new Promise<void>((r) => setTimeout(r, delays[attempt]));
+          await new Promise<void>((resolve) => {
+            const onAbort = () => {
+              clearTimeout(timer);
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            };
+            const timer = setTimeout(() => {
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            }, delays[attempt]);
+            signal?.addEventListener("abort", onAbort, { once: true });
+          });
         }
+        if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée.";
         lastResult = await runBrowserAction<T>(action, timeoutMs);
-        // Succès si ce n'est pas une chaîne d'erreur et que found/ok n'est pas false
-        if (typeof lastResult !== "string") {
-          const r = lastResult as any;
-          if (r?.found === false) {
-            // Élément pas encore dans le DOM — retenter
-            continue;
-          }
-          return lastResult;
-        }
-        // Timeout ou erreur réseau — retenter
+        // Un timeout/erreur est ambigu : l'action peut déjà avoir été exécutée.
+        // Ne jamais rejouer une action interactive dans ce cas.
+        if (typeof lastResult === "string") return lastResult;
+        if (!isRetryableBrowserActionResult(action.type, lastResult)) return lastResult;
+        // Le renderer confirme explicitement que la cible n'existait pas :
+        // aucune interaction n'a eu lieu, une nouvelle observation peut aider.
       }
       return lastResult;
     };
