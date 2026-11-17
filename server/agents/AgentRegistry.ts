@@ -20,6 +20,7 @@ import { ProgressNotifier } from "./ProgressNotifier.js";
 import { STATIC_AGENT_REGISTRY, listAgentRoles } from "./roles.js";
 import { dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentRegistry");
 
@@ -42,6 +43,7 @@ export class AgentRegistry {
   /** Négociateur contract-net partagé, injecté dans chaque agent autonome. */
   private negotiator: ContractNetNegotiator;
   private initialized = false;
+  private workspaceId?: string;
   /** Config de boucle mémorisée par rôle, pour recréer à l'identique au swap de moteur. */
   private loopConfigByRole = new Map<AgentRole, Partial<LoopConfig>>();
 
@@ -131,6 +133,11 @@ export class AgentRegistry {
       return;
     }
 
+    this.workspaceId = getActiveProjectId() ?? undefined;
+    if (!this.workspaceId) {
+      log.warn("AgentRegistry non initialisé : aucun workspace actif");
+      return;
+    }
     this.executor.setSkillHandler(skillHandler);
 
     // Config de boucle autonome par rôle (les agents read-only itèrent moins)
@@ -178,6 +185,7 @@ export class AgentRegistry {
     }
     this.agents.clear();
     this.initialized = false;
+    this.workspaceId = undefined;
     log.info("AgentRegistry arrêté");
   }
 
@@ -306,7 +314,8 @@ export class AgentRegistry {
   // ─── Monitoring ────────────────────────────────────────────────────────────
 
   /** Snapshot d'état de la flotte d'agents */
-  getFleetStatus(): {
+  getFleetStatus(projectId?: string): {
+    workspaceActive: boolean;
     totalAgents: number;
     onlineAgents: number;
     idleAgents: number;
@@ -315,16 +324,18 @@ export class AgentRegistry {
     agents: ReturnType<AutonomousAgent["getStats"]>[];
     busMetrics: ReturnType<AgentMessageBus["getMetrics"]>;
   } {
-    const agentStats = Array.from(this.agents.values()).map((a) => a.getStats());
+    const workspaceActive = !!projectId && projectId === this.workspaceId;
+    const agentStats = workspaceActive ? Array.from(this.agents.values()).map((a) => a.getStats()) : [];
 
     return {
+      workspaceActive,
       totalAgents: agentStats.length,
       onlineAgents: agentStats.filter((a) => a.isOnline).length,
       idleAgents: agentStats.filter((a) => a.status === "idle").length,
       busyAgents: agentStats.filter((a) => a.status === "busy").length,
       overloadedAgents: agentStats.filter((a) => a.status === "overloaded").length,
       agents: agentStats,
-      busMetrics: this.bus.getMetrics(),
+      busMetrics: this.bus.getMetrics(workspaceActive ? projectId : undefined),
     };
   }
 
