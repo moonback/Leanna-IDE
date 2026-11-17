@@ -847,7 +847,7 @@ export class AgentOrchestrator {
           });
           // Marquer les orchestrations "running" comme failed
           if (row.status === "running") {
-            await agentPersistence.updateOrchestrationStatus(row.id, "failed", new Date().toISOString());
+            await agentPersistence.updateOrchestrationStatus(row.id, "failed", new Date().toISOString(), projectId);
           }
         }
       }
