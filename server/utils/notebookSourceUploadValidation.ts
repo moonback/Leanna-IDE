@@ -3,6 +3,12 @@ import path from "node:path";
 export const MAX_NOTEBOOK_SOURCE_BYTES = 10 * 1024 * 1024;
 export const MAX_NOTEBOOK_BATCH_BYTES = 50 * 1024 * 1024;
 
+const VIDEO_TYPES: Record<string, string> = {
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+};
+
 const IMAGE_TYPES: Record<string, { mime: string; signature: (buffer: Buffer) => boolean }> = {
   ".jpg": { mime: "image/jpeg", signature: b => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   ".jpeg": { mime: "image/jpeg", signature: b => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
@@ -26,6 +32,14 @@ export function validateNotebookSourceUpload(fileName: string, mimeType: string,
   if (!buffer.length) return { valid: false, fileName: safeName, mimeType, error: "Le fichier est vide." };
   if (buffer.length > MAX_NOTEBOOK_SOURCE_BYTES) return { valid: false, fileName: safeName, mimeType, error: "Fichier trop volumineux (10 Mio maximum par fichier)." };
 
+  const videoMime = VIDEO_TYPES[extension];
+  if (videoMime) {
+    if (mimeType.toLowerCase() !== videoMime) {
+      return { valid: false, fileName: safeName, mimeType, error: "Le type MIME de la vidéo ne correspond pas à son extension." };
+    }
+    return { valid: true, fileName: safeName, mimeType: videoMime };
+  }
+
   if (imageType) {
     if (mimeType.toLowerCase() !== imageType.mime || !imageType.signature(buffer)) {
       return { valid: false, fileName: safeName, mimeType, error: "Le contenu de l'image ne correspond pas à son extension ou à son type MIME." };
@@ -43,7 +57,7 @@ export function validateNotebookSourceUpload(fileName: string, mimeType: string,
   };
   const type = textTypes[extension];
   if (!type || !type.accepted.includes(mimeType.toLowerCase())) {
-    return { valid: false, fileName: safeName, mimeType, error: "Format non pris en charge. Utilisez PDF, TXT, Markdown, HTML, PNG, JPEG ou WebP." };
+    return { valid: false, fileName: safeName, mimeType, error: "Format non pris en charge. Utilisez PDF, TXT, Markdown, HTML, PNG, JPEG, WebP ou une vidéo MP4, WebM ou MOV." };
   }
   if (extension === ".pdf" && !buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
     return { valid: false, fileName: safeName, mimeType, error: "Signature PDF invalide." };
