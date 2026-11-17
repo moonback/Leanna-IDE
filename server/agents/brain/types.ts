@@ -75,6 +75,8 @@ export interface BrainStage {
 /** Graphe de plan d'action dynamique (DAG) */
 export interface BrainPlan {
   id: string;
+  /** Workspace propriétaire ; les plans sans propriétaire ne sont jamais exposés par l'API. */
+  projectId?: string;
   goal: string;
   understanding: GoalUnderstanding;
   stages: BrainStage[];
