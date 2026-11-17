@@ -1091,15 +1091,20 @@ async function startServer() {
 
   // ── Agent Orchestrator: broadcaster d'événements vers les clients WebSocket ──
   agentOrchestrator.setEventBroadcaster((event: any) => {
+    // Les événements d'agents doivent être attribués et ne sont envoyés
+    // qu'aux connexions ouvertes dans le même workspace.
+    const eventProjectId = typeof event?.projectId === 'string' ? event.projectId : undefined;
+    if (!eventProjectId) return;
     const payload = JSON.stringify(event);
     for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) {
+      const clientProjectId = (client as WebSocket & { workspaceId?: string }).workspaceId;
+      if (clientProjectId === eventProjectId && client.readyState === WebSocket.OPEN) {
         try { client.send(payload); } catch { /* ignore */ }
       }
     }
 
     // Notification Telegram si activée
-    if (event?.event === "task_completed" || event?.event === "task_incomplete" || event?.event === "task_failed") {
+    if (eventProjectId === getActiveProjectId() && (event?.event === "task_completed" || event?.event === "task_incomplete" || event?.event === "task_failed")) {
       const statusIcon = event.event === "task_completed" ? "✅" : event.event === "task_incomplete" ? "⚠️" : "❌";
       telegramService.notify(
         `Agent *${event.agentName || event.role || "système"}* : Tâche ${statusIcon}\n` +
