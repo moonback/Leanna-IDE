@@ -829,8 +829,10 @@ export const agentsSkill: Skill = {
       }
 
       case "agent_fleet_status": {
-        const fleet = agentOrchestrator.getFleetStatus() as any;
-        if (!fleet?.initialized) {
+        const projectId = getActiveProjectId();
+        if (!projectId) return { initialized: false, message: "Aucun workspace actif." };
+        const fleet = agentOrchestrator.getFleetStatus(projectId) as any;
+        if (!fleet?.initialized || !fleet.workspaceActive) {
           return {
             initialized: false,
             message: "Flotte non initialisée — elle démarre à la première délégation.",
