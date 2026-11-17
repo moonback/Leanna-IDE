@@ -1810,7 +1810,8 @@ async function handleToolCall(
       try { session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: `[BACKGROUND TASK UPDATE] ${message}` }] }] }); } catch (e) { console.error('Failed to notify Live API:', e); }
     },
     emitIdeAction: (action: any) => {
-      try { clientWs.send(JSON.stringify({ type: 'ide-action', action })); } catch (e) { console.error('Failed to emit IDE action:', e); }
+      if (clientWs.readyState !== WebSocket.OPEN) throw new Error("La session UI ayant lancé cette mission n'est plus connectée.");
+      clientWs.send(JSON.stringify({ type: 'ide-action', action }));
     },
     emitToClient: (data: any) => {
       try { clientWs.send(JSON.stringify(data)); } catch (e) { console.error('Failed to emit to client:', e); }
