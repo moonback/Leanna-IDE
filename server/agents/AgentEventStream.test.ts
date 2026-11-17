@@ -78,3 +78,30 @@ test("bounds replay history while preserving a monotonic event cursor", () => {
   assert.deepEqual(restarted.getHistory("workspace-a").map((entry) => entry.id), [2, 3]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+
+test("isolates live events and history between workspaces; rejects unowned events", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leanna-agent-events-scope-"));
+  const stream = new AgentEventStream({ filePath: path.join(dir, "events.jsonl") });
+  const receivedA: string[] = [];
+  const receivedB: string[] = [];
+  const stopA = stream.subscribe(({ event }) => receivedA.push(event.taskId), undefined, "workspace-a");
+  const stopB = stream.subscribe(({ event }) => receivedB.push(event.taskId), undefined, "workspace-b");
+
+  const eventA = { ...makeEvent("task-a"), projectId: "workspace-a" };
+  const eventB = { ...makeEvent("task-b"), projectId: "workspace-b" };
+  const unowned = { ...makeEvent("task-unowned"), projectId: undefined };
+
+  assert.equal(stream.publish(eventA), 1);
+  assert.equal(stream.publish(eventB), 2);
+  assert.equal(stream.publish(unowned), 0);
+  assert.deepEqual(receivedA, ["task-a"]);
+  assert.deepEqual(receivedB, ["task-b"]);
+  assert.deepEqual(stream.getHistory("workspace-a").map(({ event }) => event.taskId), ["task-a"]);
+  assert.deepEqual(stream.getHistory("workspace-b").map(({ event }) => event.taskId), ["task-b"]);
+  assert.deepEqual(stream.getHistory(), []);
+
+  stopA();
+  stopB();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
