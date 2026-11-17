@@ -56,6 +56,9 @@ export function createAgentRegistrationRouter(): Router {
     if (!dynamicAgentRegistry.canAccessWorkspace(projectId)) {
       return res.status(409).json({ error: 'Le registre dynamique appartient à un autre workspace ; redémarrage requis.' });
     }
+    if (agentRegistry.isReady && !agentRegistry.canAccessWorkspace(projectId)) {
+      return res.status(409).json({ error: 'La flotte appartient à un autre workspace ; redémarrage requis.' });
+    }
     next();
   });
 
