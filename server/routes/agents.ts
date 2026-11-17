@@ -18,6 +18,7 @@ import {
 import { AgentPersistence } from '../agents/AgentPersistence.js';
 import { agentEventStream } from '../agents/AgentEventStream.js';
 import { leadOptionsShape } from '../agents/lead/types.js';
+import { getActiveProjectId } from '../utils/selfRoot.js';
 
 // ── Schémas de validation ────────────────────────────────────────────────────
 
@@ -146,7 +147,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // GET /api/agents/status
   router.get('/status', async (_req: Request, res: Response) => {
     try {
-      const stats = agentOrchestrator.getStats();
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const stats = agentOrchestrator.getStats(projectId);
       const declarations = skillManager.getToolDeclarations();
       const agentTools = declarations.filter((d: any) => d.name.startsWith('agent_'));
       res.json({
@@ -184,10 +187,10 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // GET /api/agents/tasks
   router.get('/tasks', async (_req: Request, res: Response) => {
     try {
-      const result = await skillManager.handleToolCall('agent_list_tasks', {
-        limit: 50,
-      });
-      res.json(result);
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const tasks = agentOrchestrator.listTasks({ limit: 50, projectId });
+      res.json({ tasks: tasks.map(serializeTaskDetail) });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -202,7 +205,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       return res.status(400).json({ error: "Paramètre 'taskId' requis." });
     }
     try {
-      const task = agentOrchestrator.getTask(taskId);
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const task = agentOrchestrator.getTaskForProject(taskId, projectId);
       if (!task) {
         return res.status(404).json({ error: 'Tâche introuvable (purgée ou issue d’une session précédente).' });
       }
@@ -219,7 +224,12 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       return res.status(400).json({ error: "Paramètre 'taskId' requis." });
     }
     try {
-      const cancelled = agentOrchestrator.cancelTask(taskId);
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      if (!agentOrchestrator.getTaskForProject(taskId, projectId)) {
+        return res.status(404).json({ success: false, error: 'Tâche introuvable.' });
+      }
+      const cancelled = agentOrchestrator.cancelTask(taskId, projectId);
       if (!cancelled) {
         return res.status(404).json({
           success: false,
@@ -240,7 +250,13 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       return res.status(400).json({ error: "Champ 'taskIds' (string[]) non vide requis." });
     }
     try {
-      const deleted = await agentOrchestrator.deleteTasks(ids as string[]);
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      // Validation atomique de propriété avant toute annulation/suppression.
+      if ((ids as string[]).some((id) => !agentOrchestrator.getTaskForProject(id, projectId))) {
+        return res.status(404).json({ success: false, error: 'Une ou plusieurs tâches sont introuvables.' });
+      }
+      const deleted = await agentOrchestrator.deleteTasks(ids as string[], projectId);
       return res.json({ success: true, deleted, requested: ids.length });
     } catch (e: any) {
       return res.status(500).json({ success: false, error: e.message });
@@ -265,7 +281,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/fleet', (_req: Request, res: Response) => {
     try {
-      res.json(agentOrchestrator.getFleetStatus());
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const fleet = agentOrchestrator.getFleetStatus(projectId);
+      if (fleet.initialized && !fleet.workspaceActive) return res.status(409).json(fleet);
+      res.json(fleet);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -277,7 +297,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/bus/metrics', (_req: Request, res: Response) => {
     try {
-      res.json(agentMessageBus.getMetrics());
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      res.json(agentMessageBus.getMetrics(projectId));
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -289,8 +311,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/bus/history', (req: Request, res: Response) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string ?? '50', 10), 200);
-      res.json({ messages: agentMessageBus.getHistory(limit) });
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const requestedLimit = Number.parseInt(String(req.query.limit ?? '50'), 10);
+      const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 200)) : 50;
+      res.json({ messages: agentMessageBus.getHistory(limit, projectId) });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -401,9 +426,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
   // ── Agent Brain REST API ──────────────────────────────────────────────────
 
   const BrainPlanSchema = z.object({
-    goal: z.string().min(1, "goal requis").trim(),
-    contextFiles: z.array(z.string()).optional().default([]),
-    instructions: z.string().optional(),
+    goal: z.string().min(1, "goal requis").max(4000, "goal trop long").trim(),
+    contextFiles: z.array(z.string().max(500, "chemin trop long")).max(50, "50 fichiers de contexte maximum").optional().default([]),
+    instructions: z.string().max(12000, "instructions trop longues").optional(),
   });
 
   const BrainExecuteSchema = BrainPlanSchema.extend({
@@ -430,7 +455,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
           details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
         });
       }
-      const plan = await agentOrchestrator.brainPlan({ ...parsed.data, mode: 'plan_first' });
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const plan = await agentOrchestrator.brainPlan({ ...parsed.data, projectId, mode: 'plan_first' });
       return res.status(200).json({
         planId: plan.id,
         goal: plan.goal,
@@ -468,7 +495,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
           details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
         });
       }
-      const result = await agentOrchestrator.brainExecute({ ...parsed.data, mode: 'auto' });
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const result = await agentOrchestrator.brainExecute({ ...parsed.data, projectId, mode: 'auto' });
       return res.status(result.success ? 200 : 207).json({
         planId: result.planId,
         success: result.success,
@@ -497,9 +526,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/brain/status/:planId', async (req: Request, res: Response) => {
     try {
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
       const brain = await agentOrchestrator.getBrain();
-      const plan = brain.getPlan(req.params.planId);
-      const result = brain.getResult(req.params.planId);
+      const plan = brain.getPlanForProject(req.params.planId, projectId);
+      const result = brain.getResultForProject(req.params.planId, projectId);
       if (!plan) {
         return res.status(404).json({ error: `Plan ${req.params.planId} introuvable.` });
       }
@@ -528,6 +559,8 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    * Flux SSE des événements de progression des agents.
    */
   router.get('/events', (req: Request, res: Response) => {
+    const projectId = getActiveProjectId();
+    if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
     const rawCursor = req.get('Last-Event-ID') ?? req.query.lastEventId;
     const parsedCursor = typeof rawCursor === 'string' ? Number(rawCursor) : Number.NaN;
     const afterId = Number.isSafeInteger(parsedCursor) && parsedCursor >= 0 ? parsedCursor : undefined;
@@ -546,7 +579,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     const unsubscribe = agentEventStream.subscribe(({ id, event }) => {
       if (res.destroyed) return;
       res.write(`id: ${id}\nevent: agent_event\ndata: ${JSON.stringify(event)}\n\n`);
-    }, afterId);
+    }, afterId, projectId);
 
     res.on('close', () => {
       clearInterval(keepAlive);
@@ -639,7 +672,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       if (!agentPersistence.isAvailable) {
         return res.status(503).json({ error: 'Supabase non configuré' });
       }
-      const result = await agentOrchestrator.restoreFromPersistence();
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const result = await agentOrchestrator.restoreFromPersistence(projectId);
       return res.json({ success: true, ...result });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });

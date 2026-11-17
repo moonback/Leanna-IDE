@@ -17,6 +17,7 @@ import type { AgentRole } from "../agents/index.js";
 import { createLogger, getLogEntries } from "../utils/logger.js";
 import { createCustomAgent, AgentRoleConflictError } from "../routes/custom-agents.js";
 import { leadOptionsShape } from "../agents/lead/types.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("Assistant");
 
@@ -614,7 +615,9 @@ export const agentsSkill: Skill = {
 
       case "agent_status": {
         const { taskId } = validateArgs(z.object({ taskId: z.string().min(1) }), args);
-        const task = agentOrchestrator.getTask(taskId);
+        const projectId = getActiveProjectId();
+        if (!projectId) throw new Error("Aucun workspace actif.");
+        const task = agentOrchestrator.getTaskForProject(taskId, projectId);
         if (task) {
           return withStatusGuard({
             type: "task", id: task.id, role: task.role, title: task.title,
@@ -623,7 +626,7 @@ export const agentsSkill: Skill = {
             result: task.result ?? null,
           });
         }
-        const orch = agentOrchestrator.getOrchestration(taskId);
+        const orch = agentOrchestrator.getOrchestrationForProject(taskId, projectId);
         if (orch) {
           return withStatusGuard({
             type: "orchestration", id: orch.id, title: orch.title,
@@ -636,7 +639,7 @@ export const agentsSkill: Skill = {
         }
 
         // Fuzzy match: recherche par préfixe d'ID ou par titre
-        const allOrchs = agentOrchestrator.listOrchestrations();
+        const allOrchs = agentOrchestrator.listOrchestrations(projectId);
         const query = taskId.toLowerCase();
         const matchedOrch = allOrchs.find((o) =>
           o.id.toLowerCase().startsWith(query) ||
@@ -654,7 +657,7 @@ export const agentsSkill: Skill = {
           });
         }
 
-        const allTasks = agentOrchestrator.listTasks({ limit: 50 });
+        const allTasks = agentOrchestrator.listTasks({ limit: 50, projectId });
         const matchedTask = allTasks.find((t) =>
           t.id.toLowerCase().startsWith(query) ||
           t.title.toLowerCase().includes(query) ||
@@ -688,7 +691,8 @@ export const agentsSkill: Skill = {
 
       case "agent_list_tasks": {
         const v = validateArgs(listAgentTasksSchema, args);
-        const tasks = agentOrchestrator.listTasks({ ...v, role: v.role as AgentRole | undefined });
+        const projectId = getActiveProjectId();
+        const tasks = agentOrchestrator.listTasks({ ...v, role: v.role as AgentRole | undefined, projectId: projectId || undefined });
         return {
           count: tasks.length,
           tasks: tasks.map((t) => ({
@@ -765,14 +769,18 @@ export const agentsSkill: Skill = {
 
       case "agent_cancel": {
         const { taskId } = validateArgs(z.object({ taskId: z.string().min(1) }), args);
-        const ok = agentOrchestrator.cancelTask(taskId);
+        const projectId = getActiveProjectId();
+        if (!projectId || !agentOrchestrator.getTaskForProject(taskId, projectId)) throw new Error(`Tâche "${taskId}" introuvable.`);
+        const ok = agentOrchestrator.cancelTask(taskId, projectId);
         if (!ok) throw new Error(`Impossible d'annuler "${taskId}" — inexistante ou déjà terminée.`);
         return { success: true, message: `Tâche "${taskId}" annulée (interruption prise en compte si elle était en cours).` };
       }
 
       case "agent_cancel_orchestration": {
         const { orchestrationId } = validateArgs(z.object({ orchestrationId: z.string().min(1) }), args);
-        const count = agentOrchestrator.cancelOrchestration(orchestrationId);
+        const projectId = getActiveProjectId();
+        if (!projectId) throw new Error("Aucun workspace actif.");
+        const count = agentOrchestrator.cancelOrchestrationForProject(orchestrationId, projectId);
         if (count === -1) throw new Error(`Orchestration "${orchestrationId}" introuvable.`);
         return {
           success: true,
@@ -782,7 +790,7 @@ export const agentsSkill: Skill = {
       }
 
       case "agent_stats": {
-        const stats = agentOrchestrator.getStats();
+        const stats = agentOrchestrator.getStats(getActiveProjectId() || undefined);
         console.log(`[AgentsSkill]   Total: ${stats.totalTasks} | Running: ${stats.byStatus.running} | Done: ${stats.byStatus.completed}`);
         return stats;
       }
@@ -821,8 +829,10 @@ export const agentsSkill: Skill = {
       }
 
       case "agent_fleet_status": {
-        const fleet = agentOrchestrator.getFleetStatus() as any;
-        if (!fleet?.initialized) {
+        const projectId = getActiveProjectId();
+        if (!projectId) return { initialized: false, message: "Aucun workspace actif." };
+        const fleet = agentOrchestrator.getFleetStatus(projectId) as any;
+        if (!fleet?.initialized || !fleet.workspaceActive) {
           return {
             initialized: false,
             message: "Flotte non initialisée — elle démarre à la première délégation.",
@@ -886,7 +896,9 @@ export const agentsSkill: Skill = {
       }
 
       case "agent_bus_metrics": {
-        const m = agentMessageBus.getMetrics();
+        const projectId = getActiveProjectId();
+        if (!projectId) throw new Error("Aucun workspace actif.");
+        const m = agentMessageBus.getMetrics(projectId);
         return {
           ...m,
           successRatePercent: Math.round(m.successRate * 100),
@@ -934,7 +946,8 @@ export const agentsSkill: Skill = {
           z.object({ limit: z.number().int().min(1).max(100).optional().default(20) }),
           args
         );
-        const messages = agentMessageBus.getHistory(limit);
+        const projectId = getActiveProjectId();
+        const messages = agentMessageBus.getHistory(limit, projectId);
         return {
           count: messages.length,
           messages: messages.map((m) => ({

@@ -21,6 +21,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTask, TaskResult, OrchestrationPlan, TaskStatus } from "./types.js";
 import type { AgentMessage } from "./AgentCommunication.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentPersistence");
 
@@ -30,6 +31,7 @@ const log = createLogger("AgentPersistence");
 
 interface AgentTaskRow {
   id: string;
+  project_id: string | null;
   orchestration_id: string | null;
   role: string;
   title: string;
@@ -48,6 +50,7 @@ interface AgentTaskRow {
 
 interface AgentOrchestrationRow {
   id: string;
+  project_id: string | null;
   title: string;
   description: string;
   status: string;
@@ -58,6 +61,7 @@ interface AgentOrchestrationRow {
 
 interface AgentMessageRow {
   id: string;
+  project_id: string | null;
   type: string;
   from_role: string;
   to_role: string;
@@ -101,10 +105,11 @@ export class AgentPersistence {
 
   /** Insère une nouvelle tâche en base */
   async saveTask(task: AgentTask): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !task.projectId) return;
     try {
       const row: AgentTaskRow = {
         id: task.id,
+        project_id: task.projectId,
         orchestration_id: task.orchestrationId ?? null,
         role: task.role,
         title: task.title,
@@ -123,7 +128,7 @@ export class AgentPersistence {
 
       const { error } = await this.client
         .from("agent_tasks")
-        .upsert(row, { onConflict: "id" });
+        .insert(row);
 
       if (error) {
         log.error(`saveTask ${task.id.slice(0, 8)}: ${error.message}`);
@@ -139,7 +144,13 @@ export class AgentPersistence {
    * Planifie une mise à jour de statut pour batching.
    */
   scheduleUpdate(taskId: string, update: Partial<AgentTaskRow>): void {
-    this.pendingUpdates.set(taskId, { ...this.pendingUpdates.get(taskId), ...update });
+    if (!update.project_id) return;
+    const pending = this.pendingUpdates.get(taskId);
+    if (pending?.project_id && pending.project_id !== update.project_id) {
+      log.warn(`scheduleUpdate ${taskId.slice(0, 8)} ignorée : conflit de workspace`);
+      return;
+    }
+    this.pendingUpdates.set(taskId, { ...pending, ...update });
     if (!this.flushTimeout) {
       this.flushTimeout = setTimeout(() => this.flushUpdates(), 5000);
     }
@@ -157,10 +168,15 @@ export class AgentPersistence {
       // Batch update - Supabase supporte les updates batch via RPC ou multiple requêtes
       // Pour simplifier, on fait des updates individuelles mais groupées
       for (const [taskId, update] of updates) {
+        if (!update.project_id) {
+          log.warn(`flushUpdates ${taskId.slice(0, 8)} ignorée : project_id absent`);
+          continue;
+        }
         const { error } = await this.client
           .from("agent_tasks")
           .update(update)
-          .eq("id", taskId);
+          .eq("id", taskId)
+          .eq("project_id", update.project_id);
         
         if (error) {
           log.error(`flushUpdates ${taskId.slice(0, 8)}: ${error.message}`);
@@ -181,11 +197,12 @@ export class AgentPersistence {
     status: TaskStatus,
     result?: TaskResult,
     startedAt?: string,
-    completedAt?: string
+    completedAt?: string,
+    projectId?: string
   ): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !projectId) return;
     
-    const update: Partial<AgentTaskRow> = { status };
+    const update: Partial<AgentTaskRow> = { status, project_id: projectId };
     if (result !== undefined)     update.result       = result;
     if (startedAt !== undefined)  update.started_at   = startedAt;
     if (completedAt !== undefined) update.completed_at = completedAt;
@@ -201,13 +218,14 @@ export class AgentPersistence {
    * @returns le nombre d'ids demandés (best-effort — Supabase ne renvoie pas
    *          toujours le compte réel de lignes supprimées).
    */
-  async deleteTasks(taskIds: string[]): Promise<number> {
-    if (!this.client || taskIds.length === 0) return 0;
+  async deleteTasks(taskIds: string[], projectId?: string): Promise<number> {
+    if (!this.client || taskIds.length === 0 || !projectId) return 0;
     try {
       const { error } = await this.client
         .from("agent_tasks")
         .delete()
-        .in("id", taskIds);
+        .in("id", taskIds)
+        .eq("project_id", projectId);
 
       if (error) {
         log.error(`deleteTasks: ${error.message}`);
@@ -222,13 +240,14 @@ export class AgentPersistence {
   }
 
   /** Charge toutes les tâches non terminées (recovery au redémarrage) */
-  async loadPendingTasks(): Promise<AgentTask[]> {
-    if (!this.client) return [];
+  async loadPendingTasks(projectId = getActiveProjectId()): Promise<AgentTask[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_tasks")
         .select("*")
         .in("status", ["pending", "running"])
+        .eq("project_id", projectId)
         .order("created_at", { ascending: true });
 
       if (error) {
@@ -244,12 +263,13 @@ export class AgentPersistence {
   }
 
   /** Charge les N dernières tâches (pour restaurer l'état en mémoire) */
-  async loadRecentTasks(limit = 100): Promise<AgentTask[]> {
-    if (!this.client) return [];
+  async loadRecentTasks(limit = 100, projectId = getActiveProjectId()): Promise<AgentTask[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_tasks")
         .select("*")
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -269,10 +289,12 @@ export class AgentPersistence {
 
   /** Insère un plan d'orchestration */
   async saveOrchestration(plan: OrchestrationPlan): Promise<void> {
-    if (!this.client) return;
+    const projectId = plan.projectId ?? plan.tasks.find((task) => task.projectId)?.projectId;
+    if (!this.client || !projectId) return;
     try {
       const row: AgentOrchestrationRow = {
         id: plan.id,
+        project_id: projectId,
         title: plan.title,
         description: plan.description,
         status: plan.status,
@@ -283,7 +305,7 @@ export class AgentPersistence {
 
       const { error } = await this.client
         .from("agent_orchestrations")
-        .upsert(row, { onConflict: "id" });
+        .insert(row);
 
       if (error) {
         log.error(`saveOrchestration ${plan.id.slice(0, 8)}: ${error.message}`);
@@ -299,9 +321,10 @@ export class AgentPersistence {
   async updateOrchestrationStatus(
     orchestrationId: string,
     status: TaskStatus,
-    completedAt?: string
+    completedAt?: string,
+    projectId?: string
   ): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !projectId) return;
     try {
       const update: Partial<AgentOrchestrationRow> = { status };
       if (completedAt) update.completed_at = completedAt;
@@ -309,7 +332,8 @@ export class AgentPersistence {
       const { error } = await this.client
         .from("agent_orchestrations")
         .update(update)
-        .eq("id", orchestrationId);
+        .eq("id", orchestrationId)
+        .eq("project_id", projectId);
 
       if (error) {
         log.error(`updateOrchestrationStatus ${orchestrationId.slice(0, 8)}: ${error.message}`);
@@ -320,12 +344,13 @@ export class AgentPersistence {
   }
 
   /** Charge les N dernières orchestrations */
-  async loadRecentOrchestrations(limit = 20): Promise<AgentOrchestrationRow[]> {
-    if (!this.client) return [];
+  async loadRecentOrchestrations(limit = 20, projectId = getActiveProjectId()): Promise<AgentOrchestrationRow[]> {
+    if (!this.client || !projectId) return [];
     try {
       const { data, error } = await this.client
         .from("agent_orchestrations")
         .select("*")
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -345,12 +370,13 @@ export class AgentPersistence {
 
   /** Persiste un message du bus inter-agents (optionnel, best-effort) */
   async saveMessage(message: AgentMessage): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !message.projectId) return;
     // Ne persister que les task_request et task_response (pas les broadcasts légers)
     if (message.type === "broadcast" || message.type === "status_query") return;
     try {
       const row: AgentMessageRow = {
         id: message.id,
+        project_id: message.projectId,
         type: message.type,
         from_role: message.from,
         to_role: String(message.to),
@@ -461,6 +487,14 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_type       ON agent_messages(type)
 CREATE INDEX IF NOT EXISTS idx_agent_messages_from_role  ON agent_messages(from_role);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_created_at ON agent_messages(created_at DESC);
 
+-- Workspace isolation: legacy rows remain NULL and are hidden (fail closed).
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS project_id TEXT;
+ALTER TABLE agent_orchestrations ADD COLUMN IF NOT EXISTS project_id TEXT;
+ALTER TABLE agent_messages ADD COLUMN IF NOT EXISTS project_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_project_created ON agent_tasks(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_orchestrations_project_created ON agent_orchestrations(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_project_created ON agent_messages(project_id, created_at DESC);
+
 -- Row Level Security (optionnel — activer si multi-tenant)
 -- ALTER TABLE agent_tasks          ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE agent_orchestrations ENABLE ROW LEVEL SECURITY;
@@ -473,6 +507,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_created_at ON agent_messages(creat
   private rowToTask(row: AgentTaskRow): AgentTask {
     return {
       id: row.id,
+      projectId: row.project_id ?? undefined,
       orchestrationId: row.orchestration_id ?? undefined,
       role: row.role as AgentTask["role"],
       title: row.title,

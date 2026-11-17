@@ -29,6 +29,8 @@ export type MessagePriority = "low" | "medium" | "high" | "critical";
 /** Message échangé entre agents */
 export interface AgentMessage {
   id: string;
+  /** Workspace propriétaire, ajouté côté serveur au moment de la publication. */
+  projectId?: string;
   type: AgentMessageType;
   from: AgentRole;
   to: AgentRole | "broadcast";
@@ -221,6 +223,8 @@ export type MessageHandler = (message: AgentMessage) => Promise<void>;
 /** Subscription à un type de message */
 export interface MessageSubscription {
   id: string;
+  /** Workspace autorisé pour cette souscription ; undefined = aucune livraison. */
+  projectId?: string;
   agentRole: AgentRole;
   messageType: AgentMessageType | "*";
   handler: MessageHandler;

@@ -21,6 +21,7 @@ import { contractNetNegotiator } from "./ContractNetNegotiator.js";
 import { inferRequiredCapabilities } from "./capabilityInference.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 import { initCustomAgents } from "../routes/custom-agents.js";
 import { agentEventStream } from "./AgentEventStream.js";
 import type { AgentBrain as AgentBrainType } from "./brain/AgentBrain.js";
@@ -175,6 +176,7 @@ export class AgentOrchestrator {
       try {
           publish({
           type: "agent_event",
+          projectId: msg.projectId,
           event: "task_started",
           taskId: msg.id,
           role: msg.from,
@@ -207,6 +209,8 @@ export class AgentOrchestrator {
     priority?: TaskPriority;
     timeoutMs?: number;
   }): Promise<AgentTask> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : délégation refusée.");
     const agent = getAgentDefinitionOrThrow(params.role);
     const currentRunning = this.executor.getRunningCount(params.role);
 
@@ -234,6 +238,7 @@ export class AgentOrchestrator {
       timeoutMs: params.timeoutMs ?? agent.defaultTimeoutMs,
     };
 
+    task.projectId = projectId;
     this.tasks.set(task.id, task);
     log.debug(`Tâche créée: ${task.id.slice(0, 8)} — timeout: ${task.timeoutMs}ms`);
 
@@ -278,6 +283,8 @@ export class AgentOrchestrator {
     awarded: boolean;
     bids: Array<{ role: AgentRole; score: number; skillMatch: number; eligible: boolean }>;
   }> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : négociation refusée.");
     const taskId = randomUUID();
     const requiredCapabilities =
       params.requiredCapabilities && params.requiredCapabilities.length > 0
@@ -307,6 +314,7 @@ export class AgentOrchestrator {
       },
       createdAt: new Date().toISOString(),
     };
+    negotiatedTask.projectId = projectId;
     this.tasks.set(negotiatedTask.id, negotiatedTask);
     agentPersistence.saveTask(negotiatedTask).catch(() => {});
 
@@ -332,6 +340,7 @@ export class AgentOrchestrator {
       negotiatedTask.status = "running";
       negotiatedTask.startedAt = new Date().toISOString();
     }
+    negotiatedTask.projectId = projectId;
     this.tasks.set(negotiatedTask.id, negotiatedTask);
     agentPersistence.saveTask(negotiatedTask).catch(() => {});
 
@@ -379,6 +388,8 @@ export class AgentOrchestrator {
       dependsOn?: string[];
     }>;
   }): Promise<OrchestrationPlan> {
+    const projectId = getActiveProjectId();
+    if (!projectId) throw new Error("Aucun workspace actif : orchestration refusée.");
     const orchestrationId = randomUUID();
 
     log.info(`🎯 Orchestration "${params.title}" — ${params.tasks.length} tâche(s), agents: ${[...new Set(params.tasks.map(t => t.role))].join(", ")}`);
@@ -451,6 +462,7 @@ export class AgentOrchestrator {
         timeoutMs: agent.defaultTimeoutMs,
       };
 
+      task.projectId = projectId;
       agentTasks.push(task);
       this.tasks.set(task.id, task);
 
@@ -466,6 +478,7 @@ export class AgentOrchestrator {
 
     const plan: OrchestrationPlan = {
       id: orchestrationId,
+      projectId,
       title: params.title,
       description: params.description,
       tasks: agentTasks,
@@ -509,6 +522,7 @@ export class AgentOrchestrator {
       instructions?: string;
     };
   }): Promise<OrchestrationPlan> {
+    if (!getActiveProjectId()) throw new Error("Aucun workspace actif : collaboration refusée.");
     const pattern = COLLABORATION_PATTERNS.find((p) => p.name === params.patternName);
     if (!pattern) {
       throw new Error(
@@ -550,16 +564,19 @@ export class AgentOrchestrator {
   /**
    * Retourne l'état de santé complet de la flotte d'agents autonomes.
    */
-  getFleetStatus() {
+  getFleetStatus(projectId?: string) {
     if (!this.registry.isReady) {
       return {
         initialized: false,
-        message: "Le registre d'agents n'est pas encore initialisé (setSkillHandler() pas encore appelé)",
+        workspaceActive: false,
+        message: "Le registre d'agents n'est pas encore initialisé (workspace absent ou setSkillHandler() pas encore appelé)",
       };
     }
+    const fleet = this.registry.getFleetStatus(projectId);
     return {
       initialized: true,
-      ...this.registry.getFleetStatus(),
+      ...fleet,
+      ...(fleet.workspaceActive ? {} : { message: "La flotte n'est pas initialisée pour ce workspace ; redémarrage contrôlé requis." }),
     };
   }
 
@@ -594,9 +611,17 @@ export class AgentOrchestrator {
 
   // ─── Requêtes ─────────────────────────────────────────────────────────────
 
-  /** Récupère une tâche par son ID */
-  getTask(taskId: string): AgentTask | undefined {
-    return this.tasks.get(taskId);
+  /** Lookup historique conservé pour compatibilité, mais toujours propriétaire-scopé. */
+  getTask(taskId: string, projectId?: string): AgentTask | undefined {
+    if (!projectId) return undefined;
+    return this.getTaskForProject(taskId, projectId);
+  }
+
+  /** Lookup strict : une tâche legacy sans propriétaire est inaccessible. */
+  getTaskForProject(taskId: string, projectId: string): AgentTask | undefined {
+    if (!projectId) return undefined;
+    const task = this.tasks.get(taskId);
+    return task?.projectId === projectId ? task : undefined;
   }
 
   /** Nombre de tâches en cours pour un rôle (lu par l'Agent Lead pour la capacité). */
@@ -605,8 +630,11 @@ export class AgentOrchestrator {
   }
 
   /** Liste les tâches avec filtres optionnels */
-  listTasks(filters?: { role?: AgentRole; status?: TaskStatus; limit?: number }): AgentTask[] {
-    let results = Array.from(this.tasks.values());
+  listTasks(filters?: { role?: AgentRole; status?: TaskStatus; limit?: number; projectId?: string }): AgentTask[] {
+    // Les tâches historiques sans projectId restent masquées (fail closed).
+    let results = filters?.projectId
+      ? Array.from(this.tasks.values()).filter((task) => task.projectId === filters.projectId)
+      : [];
 
     if (filters?.role) {
       results = results.filter((t) => t.role === filters.role);
@@ -621,14 +649,23 @@ export class AgentOrchestrator {
     return results.slice(0, filters?.limit ?? 20);
   }
 
-  /** Récupère un plan d'orchestration */
-  getOrchestration(orchestrationId: string): OrchestrationPlan | undefined {
-    return this.orchestrations.get(orchestrationId);
+  /** Lookup historique conservé pour compatibilité, mais toujours propriétaire-scopé. */
+  getOrchestration(orchestrationId: string, projectId?: string): OrchestrationPlan | undefined {
+    if (!projectId) return undefined;
+    return this.getOrchestrationForProject(orchestrationId, projectId);
   }
 
-  /** Liste les orchestrations */
-  listOrchestrations(): OrchestrationPlan[] {
-    return Array.from(this.orchestrations.values()).sort(
+  /** Lookup strict d'une orchestration par workspace propriétaire. */
+  getOrchestrationForProject(orchestrationId: string, projectId: string): OrchestrationPlan | undefined {
+    if (!projectId) return undefined;
+    const plan = this.orchestrations.get(orchestrationId);
+    return plan?.projectId === projectId ? plan : undefined;
+  }
+
+  /** Liste les orchestrations du workspace demandé (fail closed sans workspace). */
+  listOrchestrations(projectId?: string): OrchestrationPlan[] {
+    if (!projectId) return [];
+    return Array.from(this.orchestrations.values()).filter((plan) => plan.projectId === projectId).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
@@ -644,8 +681,9 @@ export class AgentOrchestrator {
    * @returns `true` si l'annulation a été prise en compte, `false` si la tâche
    *          est introuvable ou déjà terminée.
    */
-  cancelTask(taskId: string): boolean {
-    const task = this.tasks.get(taskId);
+  cancelTask(taskId: string, projectId?: string): boolean {
+    if (!projectId || getActiveProjectId() !== projectId) return false;
+    const task = this.getTaskForProject(taskId, projectId);
     if (!task) return false;
 
     if (task.status === "pending") {
@@ -660,7 +698,7 @@ export class AgentOrchestrator {
         error: "cancelled_by_user",
         durationMs: 0,
       };
-      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+      agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt, task.projectId).catch(() => {});
       log.info(`🛑 Tâche ${taskId.slice(0, 8)} (pending) annulée`);
       // Émettre un événement terminal pour que l'UI ET l'assistant soient informés.
       this.notifier.notify(task, "cancelled");
@@ -684,7 +722,7 @@ export class AgentOrchestrator {
         error: "cancelled_by_user",
           durationMs: 0,
         };
-        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt, task.projectId).catch(() => {});
         this.notifier.notify(task, "cancelled");
       }
       return true;
@@ -701,22 +739,24 @@ export class AgentOrchestrator {
    *
    * @returns le nombre de tâches effectivement retirées de la mémoire.
    */
-  async deleteTasks(taskIds: string[]): Promise<number> {
-    if (taskIds.length === 0) return 0;
+  async deleteTasks(taskIds: string[], projectId?: string): Promise<number> {
+    if (taskIds.length === 0 || !projectId || getActiveProjectId() !== projectId) return 0;
+    // Vérifier tous les propriétaires avant toute mutation (atomicité fail-closed).
+    if (taskIds.some((id) => this.getTaskForProject(id, projectId) === undefined)) return 0;
 
     let removed = 0;
     for (const id of taskIds) {
-      const task = this.tasks.get(id);
+      const task = this.getTaskForProject(id, projectId);
       if (!task) continue;
       // Annuler proprement si la tâche tourne encore avant de la jeter.
       if (task.status === "pending" || task.status === "running") {
-        this.cancelTask(id);
+        this.cancelTask(id, projectId);
       }
       if (this.tasks.delete(id)) removed++;
     }
 
     // Purge persistante (best-effort, non bloquant pour l'appelant).
-    agentPersistence.deleteTasks(taskIds).catch(() => {});
+    agentPersistence.deleteTasks(taskIds, projectId).catch(() => {});
 
     log.info(`🗑️ ${removed} tâche(s) supprimée(s) définitivement`);
     return removed;
@@ -729,25 +769,32 @@ export class AgentOrchestrator {
    * @returns le nombre de tâches pour lesquelles l'annulation a été prise en
    *          compte, ou `-1` si l'orchestration est introuvable.
    */
-  cancelOrchestration(orchestrationId: string): number {
-    const plan = this.orchestrations.get(orchestrationId);
+  cancelOrchestration(orchestrationId: string, projectId?: string): number {
+    if (!projectId || getActiveProjectId() !== projectId) return -1;
+    const plan = this.getOrchestrationForProject(orchestrationId, projectId);
     if (!plan) return -1;
 
     let cancelledCount = 0;
     for (const task of plan.tasks) {
       if (task.status === "pending" || task.status === "running") {
-        if (this.cancelTask(task.id)) cancelledCount++;
+        if (this.cancelTask(task.id, projectId)) cancelledCount++;
       }
     }
 
     if (plan.status === "pending" || plan.status === "running") {
       plan.status = "cancelled";
       plan.completedAt = new Date().toISOString();
-      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt).catch(() => {});
+      agentPersistence.updateOrchestrationStatus(orchestrationId, "cancelled", plan.completedAt, projectId).catch(() => {});
     }
 
     log.info(`🛑 Orchestration ${orchestrationId.slice(0, 8)} annulée — ${cancelledCount} tâche(s) concernée(s)`);
     return cancelledCount;
+  }
+
+  /** Annulation sécurisée d'une orchestration appartenant au workspace. */
+  cancelOrchestrationForProject(orchestrationId: string, projectId: string): number {
+    if (!this.getOrchestrationForProject(orchestrationId, projectId)) return -1;
+    return this.cancelOrchestration(orchestrationId, projectId);
   }
 
   /**
@@ -755,15 +802,15 @@ export class AgentOrchestrator {
    * Les tâches "running" au moment du crash sont marquées "failed".
    * Les tâches "pending" sont rechargées en mémoire pour reprise éventuelle.
    */
-  async restoreFromPersistence(): Promise<{ tasks: number; orchestrations: number }> {
-    if (!agentPersistence.isAvailable) {
+  async restoreFromPersistence(projectId = getActiveProjectId()): Promise<{ tasks: number; orchestrations: number }> {
+    if (!agentPersistence.isAvailable || !projectId) {
       log.debug("restoreFromPersistence: Supabase non disponible — skip");
       return { tasks: 0, orchestrations: 0 };
     }
 
     try {
       // Charger les tâches récentes en mémoire (sans les ré-exécuter)
-      const recentTasks = await agentPersistence.loadRecentTasks(200);
+      const recentTasks = await agentPersistence.loadRecentTasks(200, projectId);
       for (const task of recentTasks) {
         // Les tâches "running" au moment du crash → failed
         if (task.status === "running") {
@@ -780,18 +827,20 @@ export class AgentOrchestrator {
             "failed",
             task.result,
             task.startedAt,
-            new Date().toISOString()
+            new Date().toISOString(),
+            task.projectId
           );
         }
         this.tasks.set(task.id, task);
       }
 
       // Charger les orchestrations récentes
-      const recentOrchs = await (agentPersistence as any).loadRecentOrchestrations(50);
+      const recentOrchs = await agentPersistence.loadRecentOrchestrations(50, projectId);
       for (const row of recentOrchs) {
         if (!this.orchestrations.has(row.id)) {
           this.orchestrations.set(row.id, {
             id: row.id,
+            projectId: row.project_id ?? undefined,
             title: row.title,
             description: row.description,
             status: row.status === "running" ? "failed" : row.status,
@@ -802,7 +851,7 @@ export class AgentOrchestrator {
           });
           // Marquer les orchestrations "running" comme failed
           if (row.status === "running") {
-            await agentPersistence.updateOrchestrationStatus(row.id, "failed", new Date().toISOString());
+            await agentPersistence.updateOrchestrationStatus(row.id, "failed", new Date().toISOString(), projectId);
           }
         }
       }
@@ -818,13 +867,15 @@ export class AgentOrchestrator {
   }
 
   /** Retourne les statistiques globales des agents */
-  getStats(): {
+  getStats(projectId?: string): {
     totalTasks: number;
     byStatus: Record<TaskStatus, number>;
     byRole: Record<AgentRole, number>;
     activeOrchestrations: number;
   } {
-    const allTasks = Array.from(this.tasks.values());
+    const allTasks = projectId
+      ? Array.from(this.tasks.values()).filter((task) => task.projectId === projectId)
+      : [];
     const byStatus: Record<TaskStatus, number> = {
       pending: 0, running: 0, completed: 0, incomplete: 0, failed: 0, cancelled: 0,
     };
@@ -852,8 +903,9 @@ export class AgentOrchestrator {
       byRole[task.role] = (byRole[task.role] ?? 0) + 1;
     }
 
-    const activeOrchestrations = Array.from(this.orchestrations.values())
-      .filter((o) => o.status === "running" || o.status === "pending").length;
+    const activeOrchestrations = projectId
+      ? Array.from(this.orchestrations.values()).filter((o) => o.projectId === projectId && (o.status === "running" || o.status === "pending")).length
+      : 0;
 
     return { totalTasks: allTasks.length, byStatus, byRole: byRole as Record<AgentRole, number>, activeOrchestrations };
   }
@@ -879,6 +931,7 @@ export class AgentOrchestrator {
    * Planifie dynamiquement un objectif utilisateur via l'Agent Brain
    */
   async brainPlan(input: BrainGoalInput): Promise<BrainPlan> {
+    if (!(input.projectId ?? getActiveProjectId())) throw new Error("Aucun workspace actif : planification Brain refusée.");
     const brain = await this.getBrain();
     return brain.planGoal(input);
   }
@@ -887,6 +940,7 @@ export class AgentOrchestrator {
    * Exécute de bout en bout un objectif utilisateur via l'Agent Brain
    */
   async brainExecute(input: BrainGoalInput): Promise<BrainExecutionResult> {
+    if (!(input.projectId ?? getActiveProjectId())) throw new Error("Aucun workspace actif : exécution Brain refusée.");
     const brain = await this.getBrain();
     return brain.executeGoal(input);
   }

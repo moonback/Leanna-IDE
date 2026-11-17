@@ -44,6 +44,7 @@ export interface LeadDecision {
 
 export interface LeadRunState {
   planId: string;
+  projectId?: string;
   goal: string;
   startedAt: number;
   budget: LeadBudget;

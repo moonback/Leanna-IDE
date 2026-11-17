@@ -21,6 +21,8 @@ export type ComplexityLevel = "simple" | "moderate" | "complex" | "critical";
 /** Contexte initial fourni au Brain */
 export interface BrainGoalInput {
   goal: string;
+  /** Identifiant interne du workspace capturé par la route serveur. Jamais fourni par le client. */
+  projectId?: string;
   contextFiles?: string[];
   instructions?: string;
   mode?: "auto" | "plan_first";
@@ -75,6 +77,8 @@ export interface BrainStage {
 /** Graphe de plan d'action dynamique (DAG) */
 export interface BrainPlan {
   id: string;
+  /** Workspace propriétaire ; les plans sans propriétaire ne sont jamais exposés par l'API. */
+  projectId?: string;
   goal: string;
   understanding: GoalUnderstanding;
   stages: BrainStage[];

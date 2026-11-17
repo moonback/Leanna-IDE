@@ -9,6 +9,7 @@
  */
 import type { AgentDefinition, AgentRole } from "./types.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 import {
   validateAgentDefinition,
   AgentSecurityError,
@@ -48,6 +49,18 @@ export interface DynamicAgentDefinition extends AgentDefinition {
  */
 export class DynamicAgentRegistry {
   private agents: Map<AgentRole, DynamicAgentDefinition> = new Map();
+  /** Le registre est mono-workspace jusqu'à un redémarrage explicite. */
+  private workspaceId: string | null = null;
+  private workspaceBound = false;
+
+  private isCurrentWorkspace(): boolean {
+    return this.workspaceBound && this.workspaceId === (getActiveProjectId() || null);
+  }
+
+  /** Indique si le registre peut être utilisé sans changer son propriétaire. */
+  canAccessWorkspace(projectId: string): boolean {
+    return !!projectId && (!this.workspaceBound || this.workspaceId === projectId);
+  }
   private static instance: DynamicAgentRegistry;
 
   private constructor() {}
@@ -79,6 +92,12 @@ export class DynamicAgentRegistry {
     definition: DynamicAgentDefinition,
     override: boolean = false
   ): AgentRole {
+    const projectId = getActiveProjectId() || null;
+    if (this.workspaceBound && this.workspaceId !== projectId) {
+      throw new Error("Registre d'agents dynamiques lié à un autre workspace ; redémarrage requis.");
+    }
+    this.workspaceId = projectId;
+    this.workspaceBound = true;
     // ── Étape 1 : Validation sécurité (Zod + HMAC) ──────────────────────────
     // validateAgentDefinition lève AgentSecurityError si la définition est
     // invalide structurellement ou si la signature HMAC est absente/incorrecte
@@ -142,6 +161,7 @@ export class DynamicAgentRegistry {
    * @returns La définition de l'agent ou undefined si non trouvé
    */
   getAgent(role: string): DynamicAgentDefinition | undefined {
+    if (!this.isCurrentWorkspace()) return undefined;
     return this.agents.get(role as AgentRole);
   }
 
@@ -149,21 +169,21 @@ export class DynamicAgentRegistry {
    * Vérifie si un agent est enregistré dans le registre dynamique.
    */
   hasAgent(role: string): boolean {
-    return this.agents.has(role as AgentRole);
+    return this.isCurrentWorkspace() && this.agents.has(role as AgentRole);
   }
 
   /**
    * Récupère tous les agents dynamiques enregistrés.
    */
   getAllAgents(): DynamicAgentDefinition[] {
-    return Array.from(this.agents.values());
+    return this.isCurrentWorkspace() ? Array.from(this.agents.values()) : [];
   }
 
   /**
    * Récupère tous les rôles des agents dynamiques.
    */
   getAllRoles(): AgentRole[] {
-    return Array.from(this.agents.keys());
+    return this.isCurrentWorkspace() ? Array.from(this.agents.keys()) : [];
   }
 
   /**
@@ -172,6 +192,7 @@ export class DynamicAgentRegistry {
    * @returns true si l'agent a été supprimé, false sinon
    */
   unregisterAgent(role: string): boolean {
+    if (!this.isCurrentWorkspace()) return false;
     const deleted = this.agents.delete(role as AgentRole);
     if (deleted) {
       log.info(`🗑️ Agent dynamique "${role}" supprimé du registre`);
@@ -195,6 +216,7 @@ export class DynamicAgentRegistry {
     role: string,
     updates: Partial<DynamicAgentDefinition>
   ): boolean {
+    if (!this.isCurrentWorkspace()) return false;
     const existing = this.agents.get(role as AgentRole);
     if (!existing) {
       return false;
@@ -263,6 +285,7 @@ export class DynamicAgentRegistry {
    * Récupère les agents par tags.
    */
   getAgentsByTag(tag: string): DynamicAgentDefinition[] {
+    if (!this.isCurrentWorkspace()) return [];
     return Array.from(this.agents.values()).filter(
       (a) => a.tags && a.tags.includes(tag)
     );
@@ -272,6 +295,7 @@ export class DynamicAgentRegistry {
    * Recherche des agents par nom ou description (recherche partielle).
    */
   searchAgents(query: string): DynamicAgentDefinition[] {
+    if (!this.isCurrentWorkspace()) return [];
     const q = query.toLowerCase();
     return Array.from(this.agents.values()).filter(
       (a) =>
@@ -286,8 +310,11 @@ export class DynamicAgentRegistry {
    * Utile pour les tests ou un reset complet.
    */
   clear(): void {
+    if (!this.isCurrentWorkspace()) return;
     const count = this.agents.size;
     this.agents.clear();
+    this.workspaceId = null;
+    this.workspaceBound = false;
     log.warn(`🧹 Registre dynamique nettoyé (${count} agent(s) supprimé(s))`);
   }
 
@@ -300,7 +327,7 @@ export class DynamicAgentRegistry {
     inactive: number;
     roles: string[];
   } {
-    const all = Array.from(this.agents.values());
+    const all = this.isCurrentWorkspace() ? Array.from(this.agents.values()) : [];
     return {
       total: all.length,
       active: all.filter((a) => a.isActive !== false).length,

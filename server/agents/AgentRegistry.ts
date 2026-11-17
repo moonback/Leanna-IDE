@@ -20,6 +20,7 @@ import { ProgressNotifier } from "./ProgressNotifier.js";
 import { STATIC_AGENT_REGISTRY, listAgentRoles } from "./roles.js";
 import { dynamicAgentRegistry } from "./DynamicAgentRegistry.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentRegistry");
 
@@ -42,6 +43,15 @@ export class AgentRegistry {
   /** Négociateur contract-net partagé, injecté dans chaque agent autonome. */
   private negotiator: ContractNetNegotiator;
   private initialized = false;
+  private workspaceId?: string;
+
+  private isCurrentWorkspace(): boolean {
+    return !!this.workspaceId && getActiveProjectId() === this.workspaceId;
+  }
+
+  canAccessWorkspace(projectId: string): boolean {
+    return !!projectId && this.workspaceId === projectId;
+  }
   /** Config de boucle mémorisée par rôle, pour recréer à l'identique au swap de moteur. */
   private loopConfigByRole = new Map<AgentRole, Partial<LoopConfig>>();
 
@@ -63,6 +73,7 @@ export class AgentRegistry {
 
   /** Nombre de tâches actives (en cours + en file) sur toute la flotte. */
   private activeWorkCount(): number {
+    if (!this.isCurrentWorkspace()) return 0;
     let total = 0;
     for (const agent of this.agents.values()) {
       const stats = agent.getStats();
@@ -86,6 +97,10 @@ export class AgentRegistry {
    * @returns `true` si la bascule a été appliquée, `false` si refusée.
    */
   setRunner(runner: AgentTaskRunner, options: { allowRestart?: boolean } = {}): boolean {
+    if (this.workspaceId ? getActiveProjectId() !== this.workspaceId : !!getActiveProjectId()) {
+      log.warn("setRunner refusé : workspace actif différent de celui de la flotte");
+      return false;
+    }
     // Aucun agent démarré encore → simple affectation (chemin bootstrap idéal).
     if (this.agents.size === 0) {
       this.runner = runner;
@@ -131,6 +146,10 @@ export class AgentRegistry {
       return;
     }
 
+    this.workspaceId = getActiveProjectId() ?? undefined;
+    if (!this.workspaceId) {
+      log.warn("AgentRegistry initialisé sans workspace : les agents restent hors ligne jusqu'à un redémarrage dans un workspace.");
+    }
     this.executor.setSkillHandler(skillHandler);
 
     // Config de boucle autonome par rôle (les agents read-only itèrent moins)
@@ -178,6 +197,7 @@ export class AgentRegistry {
     }
     this.agents.clear();
     this.initialized = false;
+    this.workspaceId = undefined;
     log.info("AgentRegistry arrêté");
   }
 
@@ -188,6 +208,7 @@ export class AgentRegistry {
    * @throws Si le registre n'est pas initialisé ou le rôle inconnu.
    */
   getAgent(role: AgentRole): AutonomousAgent {
+    if (!this.isCurrentWorkspace()) throw new Error("La flotte appartient à un autre workspace ou aucun workspace n'est actif.");
     const agent = this.agents.get(role);
     if (!agent) {
       throw new Error(
@@ -201,6 +222,7 @@ export class AgentRegistry {
    * Retourne tous les agents disponibles (non surchargés).
    */
   getAvailableAgents(): AutonomousAgent[] {
+    if (!this.isCurrentWorkspace()) return [];
     return Array.from(this.agents.values()).filter((a) => a.isAvailable);
   }
 
@@ -208,7 +230,7 @@ export class AgentRegistry {
    * Vérifie si un agent est disponible.
    */
   isAgentAvailable(role: AgentRole): boolean {
-    return this.agents.get(role)?.isAvailable ?? false;
+    return this.isCurrentWorkspace() && (this.agents.get(role)?.isAvailable ?? false);
   }
 
   // ─── Configuration ──────────────────────────────────────────────────────────
@@ -237,6 +259,10 @@ export class AgentRegistry {
     role: string,
     loopConfig?: { maxIterations: number; minConfidenceScore: number }
   ): boolean {
+    if (!this.workspaceId || getActiveProjectId() !== this.workspaceId) {
+      log.warn(`Enregistrement dynamique refusé pour "${role}" : workspace de flotte différent ou absent`);
+      return false;
+    }
     // Vérifier si l'agent existe déjà (statique ou dynamique)
     if (this.agents.has(role as AgentRole)) {
       log.warn(`Agent "${role}" déjà démarré — skip`);
@@ -280,6 +306,7 @@ export class AgentRegistry {
    * Ne peut pas désenregistrer les agents statiques.
    */
   unregisterDynamicAgent(role: string): boolean {
+    if (!this.isCurrentWorkspace()) return false;
     const roleKey = role as AgentRole;
     
     // Ne pas supprimer les agents statiques
@@ -306,7 +333,8 @@ export class AgentRegistry {
   // ─── Monitoring ────────────────────────────────────────────────────────────
 
   /** Snapshot d'état de la flotte d'agents */
-  getFleetStatus(): {
+  getFleetStatus(projectId?: string): {
+    workspaceActive: boolean;
     totalAgents: number;
     onlineAgents: number;
     idleAgents: number;
@@ -315,16 +343,18 @@ export class AgentRegistry {
     agents: ReturnType<AutonomousAgent["getStats"]>[];
     busMetrics: ReturnType<AgentMessageBus["getMetrics"]>;
   } {
-    const agentStats = Array.from(this.agents.values()).map((a) => a.getStats());
+    const workspaceActive = projectId ? projectId === this.workspaceId : !this.workspaceId;
+    const agentStats = workspaceActive ? Array.from(this.agents.values()).map((a) => a.getStats()) : [];
 
     return {
+      workspaceActive,
       totalAgents: agentStats.length,
       onlineAgents: agentStats.filter((a) => a.isOnline).length,
       idleAgents: agentStats.filter((a) => a.status === "idle").length,
       busyAgents: agentStats.filter((a) => a.status === "busy").length,
       overloadedAgents: agentStats.filter((a) => a.status === "overloaded").length,
       agents: agentStats,
-      busMetrics: this.bus.getMetrics(),
+      busMetrics: this.bus.getMetrics(workspaceActive ? projectId : undefined),
     };
   }
 

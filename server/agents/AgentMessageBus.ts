@@ -27,12 +27,14 @@ import type {
 } from "./AgentCommunication.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentMessageBus");
 
 // ─── Types internes ───────────────────────────────────────────────────────────
 
 interface PendingRequest {
+  projectId?: string;
   resolve: (message: AgentMessage) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
@@ -40,6 +42,7 @@ interface PendingRequest {
 
 interface MessageMetric {
   messageId: string;
+  projectId?: string;
   from: AgentRole;
   to: AgentRole | "broadcast";
   type: string;
@@ -129,11 +132,13 @@ export class AgentMessageBus extends EventEmitter {
   subscribe(
     agentRole: AgentRole,
     messageType: AgentMessage["type"] | "*",
-    handler: MessageHandler
+    handler: MessageHandler,
+    projectId = getActiveProjectId() ?? undefined
   ): string {
     const subId = randomUUID();
     this.subscriptions.set(subId, {
       id: subId,
+      projectId,
       agentRole,
       messageType,
       handler,
@@ -141,7 +146,7 @@ export class AgentMessageBus extends EventEmitter {
     log.debug(`📬 Agent "${agentRole}" abonné au type "${messageType}" (sub: ${subId.slice(0, 8)})`);
 
     // Re-livrer immédiatement les messages en attente pour ce rôle
-    this.flushDeadLetterQueue(agentRole).catch((err) => {
+    this.flushDeadLetterQueue(agentRole, projectId).catch((err) => {
       log.warn(`Échec flush dead-letter queue pour "${agentRole}": ${(err as Error).message}`);
     });
 
@@ -175,7 +180,7 @@ export class AgentMessageBus extends EventEmitter {
    * Publie un message sur le bus (sans attendre de réponse).
    */
   async publish(message: AgentMessage, options: PublishOptions = {}): Promise<void> {
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) return;
     log.debug(
       `📤 [${message.from}] → [${message.to}] type="${message.type}" id=${message.id.slice(0, 8)}`
     );
@@ -199,7 +204,7 @@ export class AgentMessageBus extends EventEmitter {
     const correlationId = randomUUID();
     message.correlationId = correlationId;
 
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) throw new Error("Aucun workspace actif pour publier ce message.");
     log.debug(
       `📤 [${message.from}] → [${message.to}] request id=${message.id.slice(0, 8)} correl=${correlationId.slice(0, 8)}`
     );
@@ -214,7 +219,7 @@ export class AgentMessageBus extends EventEmitter {
         );
       }, timeoutMs);
 
-      this.pendingRequests.set(correlationId, { resolve, reject, timeout });
+      this.pendingRequests.set(correlationId, { projectId: message.projectId, resolve, reject, timeout });
       this.deliver(message, {}).catch(reject);
     });
   }
@@ -237,7 +242,7 @@ export class AgentMessageBus extends EventEmitter {
       payload: { type: "broadcast", message: eventType, data },
     };
 
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) return;
     // Pas de trace pour les annonces de présence (agent_online) : bruit au démarrage.
     if (eventType !== "agent_online") {
       log.debug(`📢 [${from}] broadcast: "${eventType}"`);
@@ -264,11 +269,12 @@ export class AgentMessageBus extends EventEmitter {
       timestamp: new Date().toISOString(),
       payload,
       correlationId: originalMessage.correlationId,
+      projectId: originalMessage.projectId,
     };
 
-    this.addToHistory(response);
+    if (!this.addToHistory(response)) return;
     const pending = this.pendingRequests.get(originalMessage.correlationId);
-    if (pending) {
+    if (pending && pending.projectId === originalMessage.projectId && !!pending.projectId) {
       clearTimeout(pending.timeout);
       this.pendingRequests.delete(originalMessage.correlationId);
       pending.resolve(response);
@@ -308,8 +314,10 @@ export class AgentMessageBus extends EventEmitter {
   // ─── Métriques & historique ───────────────────────────────────────────────
 
   /** Retourne les N derniers messages de l'historique */
-  getHistory(limit = 50): AgentMessage[] {
-    return this.messageHistory.slice(-limit);
+  getHistory(limit = 50, projectId?: string): AgentMessage[] {
+    // L'historique global ou les messages legacy sans propriétaire ne sont jamais exposés.
+    if (!projectId) return [];
+    return this.messageHistory.filter((message) => message.projectId === projectId).slice(-limit);
   }
 
   // ─── Traçage et Surveillance ────────────────────────────────────────────────
@@ -339,24 +347,31 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne les métriques de routage détaillées
    */
-  getRoutingMetrics(): {
+  getRoutingMetrics(projectId?: string): {
     agentMessageCount: Record<string, number>;
     agentActiveMessages: Record<string, number>;
     agentAvgProcessingTime: Record<string, number>;
     agentLastProcessingTime: Record<string, number>;
   } {
-    return {
-      agentMessageCount: Object.fromEntries(this.routingMetrics.agentMessageCount),
-      agentActiveMessages: Object.fromEntries(this.routingMetrics.agentActiveMessages),
-      agentAvgProcessingTime: Object.fromEntries(this.routingMetrics.agentAvgProcessingTime),
-      agentLastProcessingTime: Object.fromEntries(this.routingMetrics.agentLastProcessingTime),
-    };
+    const scoped = projectId ? this.metrics.filter((metric) => metric.projectId === projectId) : [];
+    const counts: Record<string, number> = {};
+    const averages: Record<string, number> = {};
+    const last: Record<string, number> = {};
+    for (const metric of scoped) {
+      const role = typeof metric.to === "string" && metric.to !== "broadcast" ? metric.to : metric.from;
+      counts[role] = (counts[role] ?? 0) + 1;
+      if (metric.processingMs !== undefined) {
+        averages[role] = ((averages[role] ?? 0) * (counts[role] - 1) + metric.processingMs) / counts[role];
+        last[role] = metric.processingMs;
+      }
+    }
+    return { agentMessageCount: counts, agentActiveMessages: {}, agentAvgProcessingTime: averages, agentLastProcessingTime: last };
   }
 
   /**
    * Retourne les statistiques de charge par agent
    */
-  getAgentLoad(): Record<AgentRole, {
+  getAgentLoad(projectId?: string): Record<AgentRole, {
     messageCount: number;
     activeMessages: number;
     avgProcessingTime: number;
@@ -369,16 +384,20 @@ export class AgentMessageBus extends EventEmitter {
       loadScore: number;
     }> = {};
 
-    // Collecter tous les rôles
+    // Ne compter que les rôles abonnés au workspace et ses métriques.
+    if (!projectId) return load;
     const allRoles = new Set<AgentRole>();
     for (const sub of this.subscriptions.values()) {
-      allRoles.add(sub.agentRole);
+      if (sub.projectId === projectId) allRoles.add(sub.agentRole);
     }
+    const scopedMetrics = this.metrics.filter((metric) => metric.projectId === projectId);
 
     for (const role of allRoles) {
-      const messageCount = this.routingMetrics.agentMessageCount.get(role) ?? 0;
-      const activeMessages = this.routingMetrics.agentActiveMessages.get(role) ?? 0;
-      const avgProcessingTime = this.routingMetrics.agentAvgProcessingTime.get(role) ?? 0;
+      const roleMetrics = scopedMetrics.filter((metric) => metric.to === role);
+      const messageCount = roleMetrics.length;
+      const activeMessages = 0;
+      const timed = roleMetrics.map((metric) => metric.processingMs).filter((value): value is number => value !== undefined);
+      const avgProcessingTime = timed.length ? timed.reduce((sum, value) => sum + value, 0) / timed.length : 0;
       
       // Score de charge = messages actifs * temps moyen
       const loadScore = activeMessages * (avgProcessingTime > 0 ? avgProcessingTime : 100);
@@ -397,18 +416,18 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne l'état actuel du round-robin
    */
-  getRoundRobinState(): Record<AgentRole, {
+  getRoundRobinState(projectId?: string): Record<AgentRole, {
     currentIndex: number;
     subscriberCount: number;
   }> {
     const state: Record<AgentRole, { currentIndex: number; subscriberCount: number }> = {};
 
-    for (const [role, subIds] of this.roundRobinState.subscribers) {
-      state[role] = {
-        currentIndex: this.roundRobinState.index.get(role) ?? 0,
-        subscriberCount: subIds.length
-      };
+    if (!projectId) return state;
+    const scoped = new Map<AgentRole, number>();
+    for (const sub of this.subscriptions.values()) {
+      if (sub.projectId === projectId) scoped.set(sub.agentRole, (scoped.get(sub.agentRole) ?? 0) + 1);
     }
+    for (const [role, count] of scoped) state[role] = { currentIndex: 0, subscriberCount: count };
 
     return state;
   }
@@ -427,7 +446,7 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne un rapport complet de surveillance
    */
-  getMonitoringReport(): {
+  getMonitoringReport(projectId?: string): {
     bus: {
       totalMessages: number;
       successRate: number;
@@ -449,9 +468,9 @@ export class AgentMessageBus extends EventEmitter {
     traceEnabled: boolean;
     timestamp: string;
   } {
-    const metrics = this.getMetrics();
-    const load = this.getAgentLoad();
-    const rrState = this.getRoundRobinState();
+    const metrics = this.getMetrics(projectId);
+    const load = this.getAgentLoad(projectId);
+    const rrState = this.getRoundRobinState(projectId);
 
     // Compter l'utilisation des stratégies
     const strategyUsage: Record<RoutingStrategy, number> = {
@@ -460,7 +479,7 @@ export class AgentMessageBus extends EventEmitter {
       "round-robin": 0,
       "load-balanced": 0
     };
-    for (const m of this.metrics) {
+    for (const m of this.metrics.filter((metric) => metric.projectId === projectId)) {
       if (m.strategy) {
         strategyUsage[m.strategy] = (strategyUsage[m.strategy] ?? 0) + 1;
       } else {
@@ -488,7 +507,7 @@ export class AgentMessageBus extends EventEmitter {
   }
 
   /** Retourne les métriques d'utilisation du bus */
-  getMetrics(): {
+  getMetrics(projectId?: string): {
     totalMessages: number;
     successRate: number;
     byAgentRole: Record<string, number>;
@@ -497,29 +516,32 @@ export class AgentMessageBus extends EventEmitter {
     activeSubscriptions: number;
     deadLetterQueue: Record<string, number>;
   } {
+    const scopedMetrics = projectId ? this.metrics.filter((metric) => metric.projectId === projectId) : [];
     const byAgentRole: Record<string, number> = {};
     const byMessageType: Record<string, number> = {};
 
-    for (const m of this.metrics) {
+    for (const m of scopedMetrics) {
       byAgentRole[m.from] = (byAgentRole[m.from] ?? 0) + 1;
       byMessageType[m.type] = (byMessageType[m.type] ?? 0) + 1;
     }
 
-    const successful = this.metrics.filter((m) => m.success).length;
+    const successful = scopedMetrics.filter((m) => m.success).length;
 
     const deadLetterQueue: Record<string, number> = {};
     for (const [role, entries] of this.deadLetterQueue) {
-      const active = entries.filter((e) => Date.now() - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+      const active = entries.filter((e) => e.message.projectId === projectId && Date.now() - e.enqueuedAt < DEAD_LETTER_TTL_MS);
       if (active.length > 0) deadLetterQueue[role] = active.length;
     }
 
     return {
-      totalMessages: this.metrics.length,
-      successRate: this.metrics.length > 0 ? successful / this.metrics.length : 1,
+      totalMessages: scopedMetrics.length,
+      successRate: scopedMetrics.length > 0 ? successful / scopedMetrics.length : 1,
       byAgentRole,
       byMessageType,
-      pendingRequests: this.pendingRequests.size,
-      activeSubscriptions: this.subscriptions.size,
+      pendingRequests: Array.from(this.pendingRequests.values()).filter((request) => request.projectId === projectId).length,
+      activeSubscriptions: projectId
+        ? Array.from(this.subscriptions.values()).filter((subscription) => subscription.projectId === projectId).length
+        : 0,
       deadLetterQueue,
     };
   }
@@ -669,6 +691,7 @@ export class AgentMessageBus extends EventEmitter {
 
       this.metrics.push({
         messageId: message.id,
+        projectId: message.projectId,
         from: message.from,
         to: message.to,
         type: message.type,
@@ -703,6 +726,7 @@ export class AgentMessageBus extends EventEmitter {
 
     for (const sub of this.subscriptions.values()) {
       if (
+        sub.projectId === message.projectId && !!sub.projectId &&
         sub.agentRole === targetRole &&
         (sub.messageType === "*" || sub.messageType === message.type)
       ) {
@@ -770,18 +794,16 @@ export class AgentMessageBus extends EventEmitter {
     strategy: RoutingStrategy
   ): Array<{ handler: MessageHandler; subId: string }> {
     switch (strategy) {
-      case "round-robin":
-        // Sélectionner un seul handler en round-robin
-        const nextSubId = this.getNextRoundRobinSubscriber(targetRole);
-        if (nextSubId) {
-          const handler = handlers.find(h => h.subId === nextSubId);
-          if (handler) {
-            log.debug(`🔄 Round-robin : sélectionné ${nextSubId.slice(0, 8)} pour [${targetRole}]`);
-            return [handler];
-          }
-        }
-        // Fallback : retourner tous les handlers
-        return handlers;
+      case "round-robin": {
+        // Le tourniquet est calculé sur les seuls handlers déjà filtrés par workspace.
+        if (handlers.length === 0) return [];
+        const currentIndex = this.roundRobinState.index.get(targetRole) ?? 0;
+        const selectedIndex = currentIndex % handlers.length;
+        this.roundRobinState.index.set(targetRole, (selectedIndex + 1) % handlers.length);
+        const selected = handlers[selectedIndex];
+        log.debug(`🔄 Round-robin : sélectionné ${selected.subId.slice(0, 8)} pour [${targetRole}]`);
+        return [selected];
+      }
 
       case "load-balanced":
         // Sélectionner le handler avec la plus faible charge
@@ -811,13 +833,15 @@ export class AgentMessageBus extends EventEmitter {
    * Re-livre les messages en dead-letter queue pour un rôle donné.
    * Appelé automatiquement quand un agent s'abonne.
    */
-  private async flushDeadLetterQueue(role: AgentRole): Promise<void> {
+  private async flushDeadLetterQueue(role: AgentRole, projectId?: string): Promise<void> {
     const queue = this.deadLetterQueue.get(role);
-    if (!queue || queue.length === 0) return;
+    if (!queue || queue.length === 0 || !projectId) return;
 
     const now = Date.now();
-    const toDeliver = queue.filter((e) => now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
-    this.deadLetterQueue.delete(role);
+    const toDeliver = queue.filter((e) => e.message.projectId === projectId && now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+    const retained = queue.filter((e) => e.message.projectId !== projectId && now - e.enqueuedAt < DEAD_LETTER_TTL_MS);
+    if (retained.length > 0) this.deadLetterQueue.set(role, retained);
+    else this.deadLetterQueue.delete(role);
 
     if (toDeliver.length === 0) return;
 
@@ -838,7 +862,9 @@ export class AgentMessageBus extends EventEmitter {
     const seen = new Set<AgentRole>();
 
     for (const sub of this.subscriptions.values()) {
+      if (!sub.projectId || sub.projectId !== message.projectId) continue;
       // Éviter de diffuser à l'émetteur lui-même
+      if (!sub.projectId || sub.projectId !== message.projectId) continue;
       if (sub.agentRole === message.from) continue;
       // Un seul handler par rôle pour le broadcast
       if (seen.has(sub.agentRole)) continue;
@@ -885,7 +911,15 @@ export class AgentMessageBus extends EventEmitter {
     throw lastError!;
   }
 
-  private addToHistory(message: AgentMessage): void {
+  private addToHistory(message: AgentMessage): boolean {
+    // Capture au moment de l'émission : ne jamais relire le workspace après un await.
+    const activeProjectId = getActiveProjectId();
+    const projectId = message.projectId ?? activeProjectId;
+    if (!projectId || projectId !== activeProjectId) {
+      log.warn(`Message inter-agents ignoré hors workspace actif: ${message.id.slice(0, 8)}`);
+      return false;
+    }
+    message.projectId = projectId;
     this.messageHistory.push(message);
     if (this.messageHistory.length > this.maxHistorySize) {
       this.messageHistory.splice(0, 50);
@@ -894,6 +928,7 @@ export class AgentMessageBus extends EventEmitter {
     agentPersistence.saveMessage(message).catch(() => {});
     // Émettre l'événement pour les listeners externes (ex: WebSocket)
     this.emit("message", message);
+    return true;
   }
 }
 

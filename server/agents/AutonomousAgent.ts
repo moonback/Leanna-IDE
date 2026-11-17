@@ -34,6 +34,7 @@ import { AutonomousLoop, type LoopConfig } from "./AutonomousLoop.js";
 import { getAgentDefinitionOrThrow } from "./roles.js";
 import { contractNetNegotiator, type ContractNetNegotiator } from "./ContractNetNegotiator.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AutonomousAgent");
 
@@ -74,6 +75,8 @@ export class AutonomousAgent {
   private subscriptionId: string | null = null;
   private broadcastSubId: string | null = null;
   private isOnline = false;
+  /** Workspace fixe de cette instance ; un changement nécessite un redémarrage contrôlé. */
+  private workspaceId?: string;
 
   constructor(
     role: AgentRole,
@@ -104,14 +107,23 @@ export class AutonomousAgent {
   start(): void {
     if (this.isOnline) return;
 
+    // Les handlers sont liés au workspace présent au démarrage ; le bus
+    // refusera toute livraison issue d'un autre workspace.
+    const projectId = getActiveProjectId() ?? undefined;
+    if (!projectId) {
+      log.warn(`Agent "${this.agentName}" non abonné : aucun workspace actif`);
+      return;
+    }
+    this.workspaceId = projectId;
+
     // Abonnement aux messages directs
     this.subscriptionId = this.bus.subscribe(this.role, "*", (msg) =>
-      this.handleMessage(msg)
+      this.handleMessage(msg), projectId
     );
 
     // Abonnement aux broadcasts
     this.broadcastSubId = this.bus.subscribe(this.role, "broadcast", (msg) =>
-      this.handleBroadcast(msg)
+      this.handleBroadcast(msg), projectId
     );
 
     this.isOnline = true;
@@ -133,6 +145,7 @@ export class AutonomousAgent {
     if (this.broadcastSubId) this.bus.unsubscribe(this.broadcastSubId);
 
     this.isOnline = false;
+    this.workspaceId = undefined;
     log.info(`🔴 Agent "${this.agentName}" hors ligne`);
   }
 
@@ -143,6 +156,9 @@ export class AutonomousAgent {
    * Retourne le résultat quand la tâche est terminée.
    */
   async submitTask(task: AgentTask): Promise<TaskResult> {
+    if (!this.workspaceId || task.projectId !== this.workspaceId) {
+      throw new Error(`Tâche refusée par ${this.agentName} : workspace absent ou différent de celui de l'agent.`);
+    }
     return new Promise<TaskResult>((resolve, reject) => {
       this.taskQueue.push({
         task,
@@ -366,6 +382,10 @@ export class AutonomousAgent {
   /** Traite une task_request reçue d'un autre agent */
   private async handleTaskRequest(message: AgentMessage): Promise<void> {
     const payload = message.payload as TaskRequestPayload;
+    if (!this.workspaceId || message.projectId !== this.workspaceId) {
+      log.warn(`[${this.agentName}] task_request refusée : workspace absent ou différent`);
+      return;
+    }
     const isAutonomous = (message.metadata?.autonomous === true);
 
     const viaNegotiation = message.metadata?.negotiated === true;
@@ -379,6 +399,7 @@ export class AutonomousAgent {
 
     const task: AgentTask = {
       id: payload.taskId,
+      projectId: message.projectId,
       role: this.role,
       title: payload.title,
       description: payload.description,

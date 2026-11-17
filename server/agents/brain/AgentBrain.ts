@@ -15,6 +15,7 @@ import { BrainScheduler } from "./BrainScheduler.js";
 import { agentOrchestrator, type AgentOrchestrator } from "../AgentOrchestrator.js";
 import { agentEventStream } from "../AgentEventStream.js";
 import { createLogger } from "../../utils/logger.js";
+import { getActiveProjectId } from "../../utils/selfRoot.js";
 import type { AgentTask } from "../types.js";
 import { AgentLead } from "../lead/AgentLead.js";
 import type { ArbitrationVerdict, DelegationKind, LeadPolicy, LeadRunState, LeadStop, StopDecision } from "../lead/types.js";
@@ -106,11 +107,15 @@ export class AgentBrain {
     // 4. Générer la visualisation Mermaid du DAG
     plan.mermaid = this.validator.toMermaid(plan);
 
+    // Capturer le propriétaire au démarrage, pas lors d'une lecture ultérieure :
+    // SELF_ROOT peut changer pendant qu'un run asynchrone est encore actif.
+    plan.projectId = input.projectId ?? getActiveProjectId();
     this.activePlans.set(plan.id, plan);
 
     // Émettre un événement pour la visibilité de l'interface
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "orchestration_started",
       taskId: plan.id,
       role: "planner",
@@ -233,6 +238,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "orchestration_completed",
       taskId: plan.id,
       role: "planner",
@@ -268,6 +274,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "task_started",
       taskId: stage.id,
       role: stage.agentRole,
@@ -328,7 +335,7 @@ export class AgentBrain {
       if (verdict.action === "reassign") {
         verification = await this.reassignStage(stage, ctx, verdict.toRole, verdict.rationale);
       } else {
-        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole, verdict.rationale);
+        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole, verdict.rationale, plan.projectId);
         if (!corrected) break;
         verification = corrected;
       }
@@ -359,7 +366,8 @@ export class AgentBrain {
     verification: StageVerification,
     attempt: number,
     targetRole?: string,
-    rationale?: string
+    rationale?: string,
+    projectId?: string
   ): Promise<StageVerification | null> {
     log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
     // Vérification passée mais rejetée par le Lead : sans issue, le diagnostic
@@ -374,6 +382,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId,
       event: "task_progress",
       taskId: stage.id,
       role: correction.targetRole,
@@ -467,6 +476,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: verification.passed ? "task_completed" : "task_failed",
       taskId: stage.id,
       role: stage.agentRole,
@@ -606,6 +616,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "task_progress",
       taskId: plan.id,
       role: "planner",
@@ -683,10 +694,25 @@ export class AgentBrain {
     return this.activePlans.get(planId);
   }
 
+  /** Retourne un plan uniquement à son workspace propriétaire (fail closed). */
+  getPlanForProject(planId: string, projectId: string): BrainPlan | undefined {
+    if (!projectId) return undefined;
+    const plan = this.activePlans.get(planId);
+    return plan?.projectId === projectId ? plan : undefined;
+  }
+
   /**
    * Récupère un résultat d'exécution
    */
   getResult(planId: string): BrainExecutionResult | undefined {
+    return this.results.get(planId);
+  }
+
+  /** Retourne un résultat uniquement si le plan appartient au workspace. */
+  getResultForProject(planId: string, projectId: string): BrainExecutionResult | undefined {
+    if (!projectId) return undefined;
+    const plan = this.activePlans.get(planId);
+    if (!plan || plan.projectId !== projectId) return undefined;
     return this.results.get(planId);
   }
 
