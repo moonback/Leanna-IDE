@@ -44,11 +44,16 @@ export class AgentEventStream {
    * Subscribe to live events and optionally replay everything after the cursor.
    * Registration and replay are synchronous, so no event falls into a gap.
    */
-  subscribe(listener: AgentEventListener, afterId?: number): () => void {
-    this.listeners.add(listener);
+  subscribe(listener: AgentEventListener, afterId?: number, projectId?: string): () => void {
+    // Sans workspace explicite, aucune donnée historique ou live n'est diffusée.
+    if (!projectId) return () => {};
+    const scopedListener: AgentEventListener = (entry) => {
+      if (entry.event.projectId === projectId) listener(entry);
+    };
+    this.listeners.add(scopedListener);
     if (afterId !== undefined && Number.isSafeInteger(afterId) && afterId >= 0) {
       for (const entry of this.history) {
-        if (entry.id > afterId) {
+        if (entry.id > afterId && entry.event.projectId === projectId) {
           try { listener(entry); } catch { /* Replay consumers are isolated. */ }
         }
       }
