@@ -309,6 +309,7 @@ export class AgentOrchestrator {
       },
       createdAt: new Date().toISOString(),
     };
+    negotiatedTask.projectId ??= getActiveProjectId();
     this.tasks.set(negotiatedTask.id, negotiatedTask);
     agentPersistence.saveTask(negotiatedTask).catch(() => {});
 
