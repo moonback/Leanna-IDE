@@ -56,6 +56,11 @@ export class DynamicAgentRegistry {
   private isCurrentWorkspace(): boolean {
     return this.workspaceBound && this.workspaceId === (getActiveProjectId() || null);
   }
+
+  /** Indique si le registre peut être utilisé sans changer son propriétaire. */
+  canAccessWorkspace(projectId: string): boolean {
+    return !!projectId && (!this.workspaceBound || this.workspaceId === projectId);
+  }
   private static instance: DynamicAgentRegistry;
 
   private constructor() {}
