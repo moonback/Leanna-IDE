@@ -291,7 +291,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/bus/metrics', (_req: Request, res: Response) => {
     try {
-      res.json(agentMessageBus.getMetrics());
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      res.json(agentMessageBus.getMetrics(projectId));
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
