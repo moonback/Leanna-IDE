@@ -11,7 +11,7 @@
 import { randomUUID } from "crypto";
 import { createLogger } from "../utils/logger.js";
 import { fetchYouTubeTranscript } from "./youtubeTranscript.js";
-import { transcribeAudioWithGemini } from "./videoIntelligence.js";
+import { parseVideoUrl, transcribeAudioWithGemini } from "./videoIntelligence.js";
 import { generateText } from "../utils/textGeneration.js";
 import path from "path";
 import type { Source, SourceChunk, SourceType } from "./types.js";
@@ -217,6 +217,14 @@ export class SourceIngester {
     let rawText = "";
     let title = url;
     let sourceType: SourceType = "url";
+
+    const videoReference = parseVideoUrl(url);
+    if (videoReference && videoReference.platform !== "youtube") {
+      const platformName = videoReference.platform === "tiktok" ? "TikTok" : videoReference.platform === "instagram" ? "Instagram" : "Vimeo";
+      throw new Error(
+        `Lien ${platformName} reconnu, mais la récupération automatique de sa piste audio n'est pas disponible. Si vous êtes autorisé à utiliser cette vidéo, importez le fichier MP4, WebM ou MOV avec le bouton « Uploader » pour lancer sa transcription Gemini.`,
+      );
+    }
 
     // YouTube : on utilise la transcription (sous-titres publics) quand elle
     // existe ; sinon on retombe sur l'extraction classique de la page.
