@@ -535,6 +535,8 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    * Flux SSE des événements de progression des agents.
    */
   router.get('/events', (req: Request, res: Response) => {
+    const projectId = getActiveProjectId();
+    if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
     const rawCursor = req.get('Last-Event-ID') ?? req.query.lastEventId;
     const parsedCursor = typeof rawCursor === 'string' ? Number(rawCursor) : Number.NaN;
     const afterId = Number.isSafeInteger(parsedCursor) && parsedCursor >= 0 ? parsedCursor : undefined;
