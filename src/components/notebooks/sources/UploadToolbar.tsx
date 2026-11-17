@@ -51,6 +51,8 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
     handleCodebaseImport, handleClipboardPaste,
   } = upload;
 
+  const isTikTokUrl = /^https?:\\/\\/(?:www\\.|m\\.|vm\\.|vt\\.)?tiktok\\.com\\//i.test(url.trim());
+
   return (
     <>
       {/* Actions row */}
@@ -154,6 +156,11 @@ export function UploadToolbar({ upload, onOpenGitHub, spring, tapScale }: Props)
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
               />
+              {isTikTokUrl && (
+                <p className="text-xs leading-relaxed text-[var(--text-secondary)]" role="status">
+                  Lien TikTok détecté. Notebook ne peut pas récupérer automatiquement la piste audio depuis ce lien pour le moment. Téléchargez la vidéo depuis TikTok si vous y êtes autorisé, puis utilisez « Uploader » (MP4, WebM ou MOV) pour la transcrire avec Gemini.
+                </p>
+              )}
               <div className="flex gap-2">
                 <MotionButton
                   {...tapScale}
