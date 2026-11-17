@@ -281,7 +281,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/fleet', (_req: Request, res: Response) => {
     try {
-      res.json(agentOrchestrator.getFleetStatus());
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const fleet = agentOrchestrator.getFleetStatus(projectId);
+      if (fleet.initialized && !fleet.workspaceActive) return res.status(409).json(fleet);
+      res.json(fleet);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
