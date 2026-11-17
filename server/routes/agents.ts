@@ -431,7 +431,9 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
           details: parsed.error.errors.map((e) => ({ field: e.path.join('.') || '(root)', message: e.message })),
         });
       }
-      const plan = await agentOrchestrator.brainPlan({ ...parsed.data, mode: 'plan_first' });
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const plan = await agentOrchestrator.brainPlan({ ...parsed.data, projectId, mode: 'plan_first' });
       return res.status(200).json({
         planId: plan.id,
         goal: plan.goal,
