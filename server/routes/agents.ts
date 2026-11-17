@@ -555,7 +555,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
     const unsubscribe = agentEventStream.subscribe(({ id, event }) => {
       if (res.destroyed) return;
       res.write(`id: ${id}\nevent: agent_event\ndata: ${JSON.stringify(event)}\n\n`);
-    }, afterId);
+    }, afterId, projectId);
 
     res.on('close', () => {
       clearInterval(keepAlive);
