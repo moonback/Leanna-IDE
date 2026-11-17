@@ -65,6 +65,25 @@ interface BrowserTabViewProps {
 
 const MAX_CONSOLE_ENTRIES = 300;
 
+function formatDiagnosticValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return `${value.name}: ${value.message}${value.stack ? `\\n${value.stack}` : ''}`;
+  try {
+    const seen = new WeakSet<object>();
+    const serialized = JSON.stringify(value, (_key, item) => {
+      if (typeof item === 'bigint') return `${item}n`;
+      if (item && typeof item === 'object') {
+        if (seen.has(item)) return '[Circular]';
+        seen.add(item);
+      }
+      return item;
+    });
+    return serialized ?? String(value);
+  } catch {
+    try { return String(value); } catch { return '[Unserializable diagnostic value]'; }
+  }
+}
+
 /**
  * Electron rejects webview.loadURL() with ERR_ABORTED when a newer navigation
  * supersedes the current one. This is an expected lifecycle event, not a
@@ -141,16 +160,32 @@ export function BrowserTabView({
     };
     onRegisterRef.current(tabId, handle);
 
+    const diagnostic = (level: string, message: string, source?: string) => {
+      pushConsole({ level, message: message.slice(0, 4000), source: source ?? 'Leanna browser diagnostics' });
+      const method = level === 'error' || level === 'network' ? 'error' : level === 'warn' ? 'warn' : 'info';
+      const url = (() => { try { return wv.getURL(); } catch { return ''; } })();
+      // The desktop log collector expects a string; object arguments became '[object Object]'.
+      console[method](`[BrowserTabView] ${formatDiagnosticValue({ tabId, url, message })}`);
+    };
+
+    const onDiagnostic = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { level?: string; message?: string; detail?: unknown; url?: string } | undefined;
+      if (!detail) return;
+      diagnostic(detail.level ?? 'info', `${detail.message ?? 'browser diagnostic'} | detail=${formatDiagnosticValue(detail.detail ?? {})} | url=${detail.url ?? ''}`);
+    };
+
     const onDomReady = () => {
       domReadyRef.current = true;
+      diagnostic('info', 'dom-ready: renderer DOM prêt');
       if (pendingUrlRef.current) {
         loadUrlSafely(wv, pendingUrlRef.current);
         pendingUrlRef.current = null;
       }
     };
-    const onLoadStart = () => onStateRef.current(tabId, { loading: true, loadError: null });
+    const onLoadStart = () => { diagnostic('info', 'did-start-loading'); onStateRef.current(tabId, { loading: true, loadError: null }); };
     const onLoadStop = () => {
       const url = wv.getURL();
+      diagnostic('info', `did-stop-loading: ${url} | title=${wv.getTitle?.() ?? ''}`);
       onStateRef.current(tabId, {
         loading: false,
         url,
@@ -168,21 +203,19 @@ export function BrowserTabView({
     const onConsoleMessage = (e: Event) => {
       const ev = e as unknown as { level: number; message: string; line: number; sourceId: string };
       const level = ev.level === 3 ? 'error' : ev.level === 2 ? 'warn' : ev.level === 1 ? 'info' : 'log';
-      pushConsole({ level, message: String(ev.message ?? ''), source: ev.sourceId, line: ev.line });
+      diagnostic(level, `${formatDiagnosticValue(ev.message ?? '')} (line=${ev.line ?? '?'} source=${ev.sourceId ?? '?'})`, ev.sourceId);
     };
     const onFailLoad = (e: Event) => {
       const ev = e as WebviewFailLoadEvent;
       if (ev.isMainFrame === false) {
-        if (ev.errorCode !== -3) {
-          pushConsole({ level: 'network', message: `Échec ressource (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
-        }
+        if (ev.errorCode !== -3) diagnostic('network', `Échec sous-ressource: code=${ev.errorCode} (${ev.errorDescription}) url=${ev.validatedURL ?? ''}`);
         return;
       }
       if (ev.errorCode === -3) {
         onStateRef.current(tabId, { loading: false });
         return;
       }
-      pushConsole({ level: 'network', message: `Échec chargement page (${ev.errorCode} ${ev.errorDescription}) : ${ev.validatedURL ?? ''}` });
+      diagnostic('network', `Échec frame principale: code=${ev.errorCode} (${ev.errorDescription}) url=${ev.validatedURL ?? ''}`);
       onStateRef.current(tabId, { loading: false, loadError: `Impossible de charger cette page (${ev.errorDescription})` });
     };
     const onNavigate = (e: Event) => {
@@ -205,8 +238,14 @@ export function BrowserTabView({
       }
     };
 
+    window.addEventListener('Leanna-browser-diagnostic', onDiagnostic as EventListener);
     wv.addEventListener('dom-ready', onDomReady);
+    const onFrameFinish = (event: Event) => { const ev = event as Event & { isMainFrame?: boolean }; if (ev.isMainFrame !== false) diagnostic('info', 'did-frame-finish-load'); };
+    const onRedirect = (event: Event) => { const ev = event as Event & { url?: string; isMainFrame?: boolean }; diagnostic('info', `did-redirect-navigation: ${ev.url ?? 'URL inconnue'} mainFrame=${ev.isMainFrame !== false}`); };
+
     wv.addEventListener('did-start-loading', onLoadStart);
+    wv.addEventListener('did-frame-finish-load', onFrameFinish);
+    wv.addEventListener('did-redirect-navigation', onRedirect);
     wv.addEventListener('did-stop-loading', onLoadStop);
     wv.addEventListener('page-title-updated', onTitleUpdate);
     wv.addEventListener('did-fail-load', onFailLoad);
@@ -221,8 +260,11 @@ export function BrowserTabView({
     return () => {
       domReadyRef.current = false;
       onRegisterRef.current(tabId, null);
+      window.removeEventListener('Leanna-browser-diagnostic', onDiagnostic as EventListener);
       wv.removeEventListener('dom-ready', onDomReady);
       wv.removeEventListener('did-start-loading', onLoadStart);
+      wv.removeEventListener('did-frame-finish-load', onFrameFinish);
+      wv.removeEventListener('did-redirect-navigation', onRedirect);
       wv.removeEventListener('did-stop-loading', onLoadStop);
       wv.removeEventListener('page-title-updated', onTitleUpdate);
       wv.removeEventListener('did-fail-load', onFailLoad);

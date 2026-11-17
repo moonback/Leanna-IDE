@@ -22,6 +22,7 @@
  */
 
 import { Skill, validateArgs } from "./base.js";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import net from "node:net";
 import { guardUntrustedContent } from "../utils/promptInjectionGuard.js";
@@ -436,6 +437,23 @@ export function rankLinkCandidates(
 // Petit wrapper pour garantir qu'on ne renvoie jamais "success" si l'IPC
 // n'est pas disponible (context.emitIdeAction manquant), et pour uniformiser
 // la forme des erreurs renvoyées au modèle.
+/**
+ * Les actions interactives ne sont rejouables que lorsque le renderer confirme
+ * explicitement que la cible était absente. Un timeout/IPC perdu est ambigu :
+ * l'action peut déjà avoir produit son effet, donc la rejouer serait dangereux.
+ */
+export function isRetryableBrowserActionResult(actionType: string, result: unknown): boolean {
+  const retryableActions = new Set([
+    "browser-click-by-role",
+    "browser-type-by-label",
+    "browser-fill-form",
+  ]);
+  if (!retryableActions.has(actionType) || typeof result !== "object" || result === null) {
+    return false;
+  }
+  return (result as { found?: unknown }).found === false;
+}
+
 function withEmit<T>(
   emit: ((action: any) => void) | undefined,
   fn: (emit: (action: any) => void) => T
@@ -845,7 +863,7 @@ export const browserSkill: Skill = {
     {
       name: "browser_web_search",
       description:
-        "RECHERCHE WEB RAPIDE CÔTÉ SERVEUR. Effectue une recherche et lit les pages EN PARALLÈLE directement sur le serveur (fetch + extraction), SANS détourner le navigateur visible de l'utilisateur. Beaucoup plus rapide et robuste que browser_research pour collecter de l'information factuelle. Retourne des sources structurées (titre, url, extrait, contenu, fiabilité, fraîcheur) avec consensus/contradictions. Préfère cet outil à browser_research sauf si une session connectée ou une interaction (formulaire, SPA) est nécessaire.",
+        "RECHERCHE WEB CÔTÉ SERVEUR, INVISIBLE dans le navigateur. N'utilise cet outil que si l'utilisateur demande explicitement une recherche en arrière-plan/rapide ou si l'affichage dans le navigateur n'est pas nécessaire. Pour une navigation ou recherche que l'utilisateur doit voir, utilise browser_search puis browser_get_links et browser_navigate dans le navigateur Electron visible.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -1164,15 +1182,63 @@ export const browserSkill: Skill = {
       if (!pending) return "[ERREUR] browserActionPending non disponible dans le contexte.";
       if (!emit) return "[ERREUR] emitIdeAction non disponible.";
 
-      const requestId = `ba_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const requestId = `ba_${randomUUID()}`;
       const startedAt = Date.now();
+      if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée avant exécution.";
       return await new Promise<any>((resolve, reject) => {
+        let settled = false;
         const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
           pending.delete(requestId);
+          signal?.removeEventListener("abort", onAbort);
           reject(new Error(`Timeout (${(timeoutMs / 1000).toFixed(0)}s) — navigateur non disponible ou en chargement.`));
         }, timeoutMs);
-        pending.set(requestId, { resolve, reject, timer });
-        emit({ requestId, ...action });
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+        };
+        const onAbort = () => {
+          if (settled) return;
+          settled = true;
+          pending.delete(requestId);
+          cleanup();
+          reject(new Error("Action navigateur annulée par le signal d'arrêt."));
+        };
+        pending.set(requestId, {
+          resolve: (value) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            console.info('[Browser][read]', { phase: 'response', requestId, elapsedMs: Date.now() - startedAt, responseType: typeof value, responseLength: typeof value === 'string' ? value.length : null, pendingCount: pending.size });
+            resolve(value);
+          },
+          reject: (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            console.error('[Browser][read]', { phase: 'rejected', requestId, elapsedMs: Date.now() - startedAt, message: error.message });
+            reject(error);
+          },
+          timer,
+        });
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+          return;
+        }
+        try {
+          emit({ requestId, ...action });
+        } catch (error) {
+          if (!settled) {
+            settled = true;
+            pending.delete(requestId);
+            cleanup();
+            const emittedError = error instanceof Error ? error : new Error(String(error));
+          console.error('[Browser][read]', { phase: 'emit-failed', requestId, message: emittedError.message });
+          reject(emittedError);
+          }
+        }
       }).then((value) => {
         console.log(`[Browser] ${action.type} ${requestId} ✓ ${Date.now() - startedAt}ms`);
         return value;
@@ -1193,20 +1259,29 @@ export const browserSkill: Skill = {
       const delays = [0, 1_000, 3_000];
       let lastResult: T | string = "[ERREUR] Aucune tentative effectuée.";
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée.";
         if (delays[attempt] > 0) {
-          await new Promise<void>((r) => setTimeout(r, delays[attempt]));
+          await new Promise<void>((resolve) => {
+            const onAbort = () => {
+              clearTimeout(timer);
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            };
+            const timer = setTimeout(() => {
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            }, delays[attempt]);
+            signal?.addEventListener("abort", onAbort, { once: true });
+          });
         }
+        if (signal?.aborted) return "[ERREUR ACTION] Action navigateur annulée.";
         lastResult = await runBrowserAction<T>(action, timeoutMs);
-        // Succès si ce n'est pas une chaîne d'erreur et que found/ok n'est pas false
-        if (typeof lastResult !== "string") {
-          const r = lastResult as any;
-          if (r?.found === false) {
-            // Élément pas encore dans le DOM — retenter
-            continue;
-          }
-          return lastResult;
-        }
-        // Timeout ou erreur réseau — retenter
+        // Un timeout/erreur est ambigu : l'action peut déjà avoir été exécutée.
+        // Ne jamais rejouer une action interactive dans ce cas.
+        if (typeof lastResult === "string") return lastResult;
+        if (!isRetryableBrowserActionResult(action.type, lastResult)) return lastResult;
+        // Le renderer confirme explicitement que la cible n'existait pas :
+        // aucune interaction n'a eu lieu, une nouvelle observation peut aider.
       }
       return lastResult;
     };
@@ -1355,19 +1430,71 @@ export const browserSkill: Skill = {
         return { status: "error", message: "browserReadPending non disponible dans le contexte." };
       }
 
-      const requestId = `br_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      // Timeout plus long pour laisser le temps à la page de charger
+      const requestId = `br_${randomUUID()}`;
+      const startedAt = Date.now();
+      const pageContext = context?.browserContext ? 'ui-context-present' : 'ui-context-missing';
+      console.info('[Browser][read]', { phase: 'start', requestId, selector: selector ?? null, url: 'read-current-page', pendingCount: pending.size, pageContext, timeoutMs: 18_000 });
       const TIMEOUT_MS = 18_000;
+      if (signal?.aborted) {
+        return { status: "error", message: "Lecture navigateur annulée avant exécution." };
+      }
 
       const text = await new Promise<string>((resolve, reject) => {
+        let settled = false;
         const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
           pending.delete(requestId);
-          reject(new Error("Timeout (18s) : la webview n'a pas répondu. Le navigateur est peut-être fermé ou la page met trop de temps à charger."));
+          signal?.removeEventListener("abort", onAbort);
+          const error = new Error("Timeout (18s) : la webview n'a pas répondu. Le navigateur est peut-être fermé ou la page met trop de temps à charger.");
+          console.error('[Browser][read]', { phase: 'timeout', requestId, elapsedMs: Date.now() - startedAt, pendingCount: pending.size, message: error.message });
+          reject(error);
         }, TIMEOUT_MS);
-        pending.set(requestId, { resolve, reject, timer });
-        emit({ type: "browser-read-request", requestId, selector: selector ?? null });
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+        };
+        const onAbort = () => {
+          if (settled) return;
+          settled = true;
+          pending.delete(requestId);
+          cleanup();
+          reject(new Error("Lecture navigateur annulée par le signal d'arrêt."));
+        };
+        pending.set(requestId, {
+          resolve: (value) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+          },
+          reject: (error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(error);
+          },
+          timer,
+        });
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+          return;
+        }
+        try {
+          console.info('[Browser][read]', { phase: 'emit', requestId, selector: selector ?? null });
+          emit({ type: "browser-read-request", requestId, selector: selector ?? null });
+        } catch (error) {
+          if (!settled) {
+            settled = true;
+            pending.delete(requestId);
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        }
       }).catch((err: Error) => `[ERREUR LECTURE] ${err.message}`);
 
+      console.info('[Browser][read]', { phase: 'received', requestId, elapsedMs: Date.now() - startedAt, isError: typeof text === 'string' && text.startsWith('[ERREUR'), preview: typeof text === 'string' ? text.slice(0, 180) : typeof text });
       // Tenter de parser si le script a retourné un JSON {title, url, text}
       let parsed: { title?: string; url?: string; text?: string; truncated?: boolean } | null = null;
       if (typeof text === "string" && text.startsWith("{") && text.includes('"text"')) {
@@ -1377,6 +1504,7 @@ export const browserSkill: Skill = {
       if (parsed) {
         // Le contenu de page est une donnée externe non fiable : neutraliser
         // d'éventuelles instructions injectées avant de le renvoyer au modèle.
+        console.info('[Browser][read]', { phase: 'parsed', requestId, url: parsed.url, title: parsed.title, extractedLength: parsed.text?.length ?? 0, truncated: Boolean(parsed.truncated) });
         const guarded = guardUntrustedContent(parsed.text ?? "", "browser");
         const { content, truncated: serverTruncated } = truncateContent(guarded.text);
         const wasTruncated = Boolean(parsed.truncated || serverTruncated);
@@ -1397,6 +1525,7 @@ export const browserSkill: Skill = {
 
       // Réponse en texte brut (pas de JSON)
       if (typeof text === "string" && text.startsWith("[ERREUR")) {
+        console.error('[Browser][read]', { phase: 'error-result', requestId, elapsedMs: Date.now() - startedAt, message: text });
         return { status: "error", message: text };
       }
 
@@ -2025,12 +2154,16 @@ export const browserSkill: Skill = {
       if (typeof raw === "string") {
         return { status: "error", message: raw };
       }
+      const result = raw as { found?: boolean; ok?: boolean; changed?: Record<string, boolean> };
+      if (result.found === false || result.ok !== true) {
+        return { status: "error", message: `Aucun clic confirmé sur [role="${role}" name="${accessibleName}"]. La cible est absente ou l'action n'a pas été confirmée.` };
+      }
       return {
         status: "success",
         role,
         name: accessibleName,
-        changed: (raw as any)?.changed ?? {},
-        message: `Clic effectué sur l'élément [role="${role}" name="${accessibleName}"]${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+        changed: result.changed ?? {},
+        message: `Clic effectué et confirmé sur l'élément [role="${role}" name="${accessibleName}"]${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
       };
     }
 
@@ -2046,12 +2179,16 @@ export const browserSkill: Skill = {
       if (typeof raw === "string") {
         return { status: "error", message: raw };
       }
+      const result = raw as { found?: boolean; ok?: boolean; changed?: Record<string, boolean> };
+      if (result.found === false || result.ok !== true) {
+        return { status: "error", message: `Champ "${label}" introuvable ou saisie non confirmée. Aucun succès n'est déclaré.` };
+      }
       return {
         status: "success",
         label,
         pressEnter,
-        changed: (raw as any)?.changed ?? {},
-        message: `Saisie de "${text}" dans le champ "${label}"${pressEnter ? " + Entrée" : ""}${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
+        changed: result.changed ?? {},
+        message: `Saisie confirmée dans le champ "${label}"${pressEnter ? " + Entrée" : ""}${waitFor ? ` — attente de "${waitFor}" effectuée` : ""}.`,
       };
     }
 
@@ -2142,8 +2279,8 @@ export const browserSkill: Skill = {
         return { status: "error", message: raw };
       }
       const result = raw as { ok?: boolean; found?: boolean; changed?: any };
-      if (!result.found) {
-        return { status: "error", message: `Champ introuvable : ${selector}` };
+      if (!result.found || result.ok !== true) {
+        return { status: "error", message: `Champ introuvable ou remplissage non confirmé : ${selector}` };
       }
       return {
         status: "success",

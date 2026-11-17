@@ -61,9 +61,9 @@ export interface SkillContext {
   notifyLiveAPI?: (message: string) => void;
   /** Callback pour émettre une action IDE vers le client */
   emitIdeAction?: (action: any) => void;
-  /** Drapeaux d'attente d'action / lecture navigateur */
-  browserReadPending?: boolean;
-  browserActionPending?: boolean;
+  /** Files de corrélation des réponses navigateur de la session UI active. */
+  browserReadPending?: Map<string, any>;
+  browserActionPending?: Map<string, any>;
   /**
    * Signal d'annulation temps-réel (kill-switch). Propagé par le ToolRegistry
    * jusqu'aux handlers coopératifs : un outil long-running (ex.

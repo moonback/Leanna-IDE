@@ -41,3 +41,47 @@ test('missionSkill: metadata and skills update', () => {
     updateMissionSkills(['skill1', 'skill2']);
   });
 });
+
+test('mission_create: transmet le pont navigateur uniquement avec un contexte UI complet', async () => {
+  const readPending = new Map<string, any>();
+  const actionPending = new Map<string, any>();
+  const emitted: any[] = [];
+  let captured: any;
+  const fakeExecutor: any = {
+    startMission: async (params: any) => {
+      captured = params;
+      return {
+        id: 'mission-ui',
+        status: 'running',
+        getState: () => ({ title: params.title }),
+      };
+    },
+  };
+  initMissionSystem(fakeExecutor, ['read_project_file']);
+
+  const context: any = {
+    emitIdeAction: (action: any) => emitted.push(action),
+    browserReadPending: readPending,
+    browserActionPending: actionPending,
+  };
+  const result: any = await missionSkill.handleToolCall!('mission_create', {
+    title: 'Parcourir la page',
+    description: 'Ouvrir la page et vérifier son contenu',
+  }, context);
+
+  assert.equal(result.missionId, 'mission-ui');
+  assert.equal(captured.browserContext.emitIdeAction, context.emitIdeAction);
+  assert.equal(captured.browserContext.browserReadPending, readPending);
+  assert.equal(captured.browserContext.browserActionPending, actionPending);
+  captured.browserContext.emitIdeAction({ type: 'probe' });
+  assert.deepEqual(emitted, [{ type: 'probe' }]);
+  assert.ok(captured.availableSkills.includes('browser_click'));
+  assert.ok(captured.availableSkills.includes('browser_get_console'));
+
+  await missionSkill.handleToolCall!('mission_create', {
+    title: 'Mission autonome',
+    description: 'Lire un fichier du projet',
+  });
+  assert.equal(captured.browserContext, undefined);
+  assert.deepEqual(captured.availableSkills, ['read_project_file']);
+});

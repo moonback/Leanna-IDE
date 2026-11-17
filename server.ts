@@ -386,9 +386,9 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
       const { Executor, MissionStore, LocalMissionStore, CompositeMissionStore, AutonomyPolicy } = missionModule;
       const { initMissionSystem, setDryRunReportProvider } = await import("./server/skills/mission.js");
       const executor = new Executor();
-      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string }; beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void> }) =>
+      executor.setSkillHandler((name: string, args: any, opts?: { dryRun?: boolean; signal?: AbortSignal; idempotencyScope?: { missionId: string; stepId: string }; beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void>; browserContext?: { emitIdeAction?: (action: any) => void; browserReadPending?: Map<string, any>; browserActionPending?: Map<string, any> } }) =>
         // L'Executor applique lui-même le curseur d'autonomie et obtient l'approbation.
-        sm.handleToolCall(name, args, undefined, { ...opts, autonomyApproved: true }));
+        sm.handleToolCall(name, args, opts?.browserContext, { ...opts, autonomyApproved: true }));
 
       // Brancher le LLM sur les missions : décomposition, réflexion,
       // génération d'arguments et validation des critères de succès.
@@ -412,12 +412,9 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
         }))
       );
 
-      // Liste des outils proposés aux missions autonomes. On EXCLUT les outils
-      // navigateur pilotés par la webview Electron (browser_navigate,
-      // browser_research, browser_read_content, browser_capture, …) : ils
-      // dépendent du contexte UI (emitIdeAction) absent en mission et échouent
-      // systématiquement, gaspillant des tours. On conserve browser_web_search,
-      // qui est 100 % côté serveur (fetch + extraction) et donc utilisable.
+      // Liste de base des outils proposés aux missions autonomes. Les outils webview
+      // restent exclus ici ; missionSkill ne les ajoute que si la création vient
+      // d’une session UI active et transmet son pont éphémère à l’Executor.
       const MISSION_WEB_TOOL_ALLOWLIST = new Set<string>(["browser_web_search"]);
       const skillNames = declarations
         .map((d: any) => d.name)

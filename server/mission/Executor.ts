@@ -149,6 +149,7 @@ export class Executor {
 
   /** Missions actives */
   private activeMissions: Map<string, Mission> = new Map();
+  private readonly missionBrowserContexts = new Map<string, NonNullable<SkillHandlerOptions['browserContext']>>();
   /**
    * File des missions réelles (hors dry-run) : une seule s'exécute à la fois,
    * pour que deux missions n'écrivent jamais en parallèle dans le workspace
@@ -528,6 +529,7 @@ export class Executor {
     budget?: { maxTokens?: number; maxCostUsd?: number };
     /** Exécuter la mission entière en simulation, sans effet de bord. */
     dryRun?: boolean;
+    browserContext?: SkillHandlerOptions['browserContext'];
   }): Promise<Mission> {
     if (!this.skillHandler) {
       throw new Error("SkillHandler not configured. Call setSkillHandler first.");
@@ -575,6 +577,7 @@ export class Executor {
       this.preparePlan(mission, params.availableSkills)
     );
     this.missionPlans.set(mission.id, plan);
+    if (params.browserContext?.emitIdeAction && params.browserContext.browserActionPending && params.browserContext.browserReadPending) this.missionBrowserContexts.set(mission.id, params.browserContext);
 
     this.activeMissions.set(mission.id, mission);
     await this.persist(mission);
@@ -603,6 +606,10 @@ export class Executor {
    * n'avait ni timeout ni budget.
    */
   private launchMission(mission: Mission, availableSkills: string[]): void {
+    // Une reprise après redémarrage ou depuis une autre session ne doit jamais hériter d'un accès webview.
+    const missionSkills = this.missionBrowserContexts.has(mission.id)
+      ? availableSkills
+      : availableSkills.filter((name) => !name.startsWith("browser_") || name === "browser_web_search");
     // Lancer l'exécution en arrière-plan, tout en conservant une promesse
     // observable. Le runtime autonome doit attendre le résultat vérifié plutôt
     // que déclarer une mission réussie juste après sa création.
@@ -615,8 +622,8 @@ export class Executor {
     const execute = () =>
       runWithTelemetryContext({ missionId: mission.id }, () =>
         this.requiresSupervision(mission)
-          ? this.runSupervised(mission, availableSkills)
-          : this.executeMission(mission, availableSkills)
+          ? this.runSupervised(mission, missionSkills)
+          : this.executeMission(mission, missionSkills)
       );
 
     // Une simulation n'écrit rien : elle part tout de suite. Une mission réelle
@@ -649,7 +656,7 @@ export class Executor {
       this.emit("mission_failed", { missionId: mission.id, error: String(err) });
     });
     this.missionRuns.set(mission.id, run);
-    void run.finally(() => this.missionRuns.delete(mission.id));
+    void run.finally(() => { this.missionRuns.delete(mission.id); this.missionBrowserContexts.delete(mission.id); });
 
     // Watchdog : arrêt forcé si la mission dépasse le timeout global configuré.
     //
@@ -1950,6 +1957,7 @@ export class Executor {
       const signal = this.getAbortController(mission.id).signal;
       result = await this.skillHandler!(action.skillName, action.args, {
         dryRun,
+        browserContext: this.missionBrowserContexts.get(mission.id),
         signal,
         beforeExecute: this.supervisorWriteHooks.has(mission.id)
           ? async (toolName, args) => {
@@ -3145,6 +3153,7 @@ export interface SkillHandlerOptions {
   idempotencyScope?: { missionId: string; stepId: string };
   /** Called by ToolRegistry after guards and immediately before a side effect. */
   beforeExecute?: (toolName: string, args: Record<string, unknown>) => Promise<void>;
+  browserContext?: { emitIdeAction?: (action: any) => void; browserReadPending?: Map<string, any>; browserActionPending?: Map<string, any> };
 }
 
 /** Handler pour exécuter un skill */

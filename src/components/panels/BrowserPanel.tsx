@@ -450,9 +450,16 @@ export function BrowserPanel({
     const handleNav = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { url?: string; requestId?: string };
       if (!detail?.url) return;
+      emitBrowserDiagnostic('info', 'navigate: requête renderer reçue', {
+        requestId: detail.requestId ?? null,
+        targetUrl: detail.url,
+        activeTabId: activeTabIdRef.current,
+        hasWebview: Boolean(webviewRef.current),
+      });
       setAssistantNavActive(true);
       const wv = webviewRef.current;
       if (!wv) {
+        emitBrowserDiagnostic('error', 'navigate: webview absente', { requestId: detail.requestId ?? null, targetUrl: detail.url });
         if (detail.requestId) await postActionResult(detail.requestId, null, 'Webview non disponible.');
         setAssistantNavActive(false);
         return;
@@ -468,21 +475,48 @@ export function BrowserPanel({
       const finish = async (error?: string) => {
         if (settled) return;
         settled = true;
+        const finalUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
+        const finalTitle = (() => { try { return wv.getTitle?.() ?? ''; } catch { return ''; } })();
+        emitBrowserDiagnostic(error ? 'error' : 'info', 'navigate: résolution renderer', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          finalUrl,
+          finalTitle,
+          error: error ?? null,
+          elapsedMs: Date.now() - startedAt,
+        });
         cleanup();
         if (detail.requestId) {
           if (error) await postActionResult(detail.requestId, null, error);
-          else await postActionResult(detail.requestId, { url: wv.getURL(), title: wv.getTitle?.() ?? '' });
+          else await postActionResult(detail.requestId, { url: finalUrl, title: finalTitle });
         }
         setAssistantNavActive(false);
       };
+      const startedAt = Date.now();
       const onStop = () => {
+        const currentUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
+        emitBrowserDiagnostic('info', 'navigate: did-stop-loading reçu', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          currentUrl,
+          elapsedMs: Date.now() - startedAt,
+        });
         // Ignorer l'arrêt initial de about:blank si la webview n'a pas encore
         // reçu dom-ready et conserve l'URL demandée en attente.
-        if (wv.getURL() === 'about:blank') return;
+        if (currentUrl === 'about:blank') return;
         void finish();
       };
       const onFail = (event: Event) => {
         const failure = event as WebviewFailLoadEvent;
+        emitBrowserDiagnostic('warn', 'navigate: did-fail-load reçu', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          failedUrl: failure.validatedURL ?? '',
+          errorCode: failure.errorCode,
+          errorDescription: failure.errorDescription,
+          isMainFrame: failure.isMainFrame,
+          elapsedMs: Date.now() - startedAt,
+        });
         if (failure.isMainFrame === false || failure.errorCode === -3) return;
         void finish('Échec du chargement (' + failure.errorCode + ') : ' + (failure.errorDescription || 'erreur réseau'));
       };
@@ -491,9 +525,22 @@ export function BrowserPanel({
         wv.addEventListener('did-stop-loading', onStop);
         wv.addEventListener('did-fail-load', onFail);
         timeout = setTimeout(() => {
+          const currentUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
           void finish('Délai dépassé : la page n’a pas terminé son chargement dans les 25 secondes.');
+          emitBrowserDiagnostic('error', 'navigate: timeout renderer', {
+            requestId: detail.requestId,
+            targetUrl: detail.url,
+            currentUrl,
+            elapsedMs: Date.now() - startedAt,
+          });
         }, 25_000);
       }
+      emitBrowserDiagnostic('info', 'navigate: déclenchement navigateTo', {
+        requestId: detail.requestId ?? null,
+        targetUrl: detail.url,
+        webviewUrlBefore: (() => { try { return wv.getURL(); } catch { return ''; } })(),
+        activeTabId: activeTabIdRef.current,
+      });
       navigateTo(detail.url);
       if (!detail.requestId) setTimeout(() => setAssistantNavActive(false), 3000);
     };
@@ -545,10 +592,17 @@ export function BrowserPanel({
       await postActionResult(detail.requestId, { ok: true, closedTabId: detail.tabId });
     };
 
-    const handleScroll = (e: Event) => {
+    const handleScroll = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { direction: string; amount: number };
       const wv = webviewRef.current;
       if (!wv) return;
+
+      try {
+        const viewport = await wv.executeJavaScript(
+          '({ x: Math.max(24, window.innerWidth * 0.82), y: Math.max(24, window.innerHeight * 0.78) })'
+        ) as { x: number; y: number };
+        await moveCursorToPoint(wv, viewport.x, viewport.y);
+      } catch {/* la visibilité du curseur ne doit pas bloquer le scroll */ }
 
       let js = '';
       if (detail.direction === 'top') {
@@ -560,7 +614,7 @@ export function BrowserPanel({
       } else {
         js = `window.scrollBy({ top: ${detail.amount ?? 300}, behavior: "smooth" })`;
       }
-      wv.executeJavaScript(js).catch(() => {/* ignore */});
+      await wv.executeJavaScript(js).catch(() => {/* ignore */});
     };
 
     const handleBrowserControl = (e: Event) => {
@@ -576,11 +630,19 @@ export function BrowserPanel({
       }
     };
 
+    const emitBrowserDiagnostic = (level: string, message: string, detail?: Record<string, unknown>) => {
+      const entry = { level, message, detail: detail ?? {}, ts: Date.now(), url: webviewRef.current?.getURL?.() ?? '' };
+      console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info']('[BrowserPanel]', entry);
+      window.dispatchEvent(new CustomEvent('Leanna-browser-diagnostic', { detail: entry }));
+    };
+
     // ── Canal retour : Leanna demande le contenu de la page ──────────────
     const handleReadRequest = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { requestId: string; selector: string | null };
       const wv = webviewRef.current;
+      emitBrowserDiagnostic('info', 'read-content: demande reçue', { requestId: detail.requestId, selector: detail.selector ?? null, webviewAvailable: Boolean(wv) });
       if (!wv) {
+        emitBrowserDiagnostic('error', 'read-content: webview absente', { requestId: detail.requestId });
         const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
@@ -614,9 +676,11 @@ export function BrowserPanel({
           })()`;
 
       try {
+        const pageMeta = await wv.executeJavaScript('({ url: location.href, title: document.title, readyState: document.readyState, bodyLength: document.body ? (document.body.innerText || "").length : 0 })');
+        emitBrowserDiagnostic('info', 'read-content: exécution JS terminée', { requestId: detail.requestId, pageMeta });
         const raw = await wv.executeJavaScript(extractScript);
         const token = localStorage.getItem('Leanna_api_token') || '';
-        await fetch('/api/browser/content-result', {
+        const response = await fetch('/api/browser/content-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -624,7 +688,9 @@ export function BrowserPanel({
           },
           body: JSON.stringify({ requestId: detail.requestId, result: raw, error: null }),
         });
+        emitBrowserDiagnostic(response.ok ? 'info' : 'error', 'read-content: résultat transmis au serveur', { requestId: detail.requestId, httpStatus: response.status, ok: response.ok, payloadType: typeof raw, payloadLength: typeof raw === 'string' ? raw.length : null });
       } catch (err: any) {
+        emitBrowserDiagnostic('error', 'read-content: exception', { requestId: detail.requestId, error: err?.message ?? String(err), stack: err?.stack ?? null });
         const token = localStorage.getItem('Leanna_api_token') || '';
         await fetch('/api/browser/content-result', {
           method: 'POST',
@@ -640,8 +706,9 @@ export function BrowserPanel({
     // ── Helper générique : POST résultat d'action webview → backend
     const postActionResult = async (requestId: string, result: any, error: string | null = null) => {
       try {
+        emitBrowserDiagnostic('info', 'action-result: envoi', { requestId, hasResult: result !== null && result !== undefined, error });
         const token = localStorage.getItem('Leanna_api_token') || '';
-        await fetch('/api/browser/action-result', {
+        const response = await fetch('/api/browser/action-result', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -649,7 +716,8 @@ export function BrowserPanel({
           },
           body: JSON.stringify({ requestId, result, error }),
         });
-      } catch {/* silent */ }
+        emitBrowserDiagnostic(response.ok ? 'info' : 'error', 'action-result: réponse HTTP', { requestId, httpStatus: response.status, ok: response.ok });
+      } catch (err: any) { emitBrowserDiagnostic('error', 'action-result: échec réseau', { requestId, error: err?.message ?? String(err) }); }
     };
 
     // Confirmation explicite avant toute action pouvant exposer des données
@@ -692,59 +760,61 @@ export function BrowserPanel({
         'transition:top 0.25s cubic-bezier(.4,0,.2,1),left 0.25s cubic-bezier(.4,0,.2,1)',
         'will-change:top,left',
         'display:block',
+        'filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))',
       ].join(';');
       cur.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
         + '<filter id="cs"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.4"/></filter>'
-        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="white" stroke="var(--text-muted)" stroke-width="1" filter="url(#cs)"/>'
+        + '<polygon points="4,2 4,18 8,14 11,20 13,19 10,13 16,13" fill="#ffffff" stroke="#202124" stroke-width="1.2" filter="url(#cs)"/>'
         + '</svg>';
       document.body.appendChild(cur);
     })()`;
 
+    const moveCursorToPoint = async (wv: WebviewElement, x: number, y: number): Promise<void> => {
+      try {
+        await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
+        await wv.executeJavaScript(`(function(x,y){
+          x = Math.max(0, Math.min(window.innerWidth - 1, Number(x) || 0));
+          y = Math.max(0, Math.min(window.innerHeight - 1, Number(y) || 0));
+          var cur = document.getElementById('__Leanna_cursor');
+          if (cur) {
+            cur.style.left = Math.max(0, x - 4) + 'px';
+            cur.style.top = Math.max(0, y - 2) + 'px';
+          }
+          var target = document.elementFromPoint(x, y);
+          if (target) {
+            target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y, view: window }));
+            target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: x, clientY: y, view: window }));
+          }
+        })(${Number(x) || 0},${Number(y) || 0})`);
+        await new Promise<void>((resolve) => setTimeout(resolve, 380));
+      } catch {/* le curseur reste indicatif et ne doit pas bloquer l'action */ }
+    };
+
     const moveCursorToElement = async (wv: WebviewElement, selector: string): Promise<void> => {
       try {
-        // Injecter le curseur si absent
-        await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
-        // Déplacer vers le centre de l'élément cible
-        const moveScript = `(function(){
+        const point = await wv.executeJavaScript(`(function(){
           var el = document.querySelector(${JSON.stringify(selector)});
-          if (!el) return;
+          if (!el) return null;
           var r = el.getBoundingClientRect();
-          var cur = document.getElementById('__Leanna_cursor');
-          if (!cur) return;
-          cur.style.left = (r.left + r.width / 2 - 4) + 'px';
-          cur.style.top  = (r.top  + r.height / 2 - 2) + 'px';
-        })()`;
-        await wv.executeJavaScript(moveScript);
-        // Laisser l'animation CSS se jouer (250 ms transition + 100 ms pause)
-        await new Promise<void>((r) => setTimeout(r, 380));
-        // Effet ripple au clic
-        const rippleScript = `(function(){
-          var el = document.querySelector(${JSON.stringify(selector)});
-          if (!el) return;
-          var r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        })()`) as { x: number; y: number } | null;
+        if (!point) return;
+        await moveCursorToPoint(wv, point.x, point.y);
+        const rippleScript = `(function(x,y){
           var rip = document.createElement('div');
           rip.style.cssText = [
-            'position:fixed',
-            'pointer-events:none',
-            'z-index:2147483646',
-            'border-radius:50%',
-            'border:2px solid rgba(139,92,246,0.8)',
-            'width:8px','height:8px',
-            'left:' + (r.left + r.width/2 - 4) + 'px',
-            'top:' + (r.top + r.height/2 - 4) + 'px',
-            'transition:all 0.35s ease-out',
-            'opacity:1',
+            'position:fixed','pointer-events:none','z-index:2147483646',
+            'border-radius:50%','border:2px solid rgba(139,92,246,0.8)',
+            'width:8px','height:8px','left:' + (x - 4) + 'px',
+            'top:' + (y - 4) + 'px','transition:all 0.35s ease-out','opacity:1'
           ].join(';');
           document.body.appendChild(rip);
           requestAnimationFrame(function(){
-            rip.style.width  = '36px';
-            rip.style.height = '36px';
-            rip.style.left   = (r.left + r.width/2 - 18) + 'px';
-            rip.style.top    = (r.top + r.height/2 - 18) + 'px';
-            rip.style.opacity = '0';
+            rip.style.width='36px'; rip.style.height='36px';
+            rip.style.left=(x - 18)+'px'; rip.style.top=(y - 18)+'px'; rip.style.opacity='0';
           });
           setTimeout(function(){ rip.remove(); }, 400);
-        })()`;
+        })(${point.x},${point.y})`;
         await wv.executeJavaScript(rippleScript);
       } catch {/* ne bloque pas l'action si l'animation échoue */ }
     };
@@ -1247,7 +1317,8 @@ export function BrowserPanel({
           match = el;
           break;
         }
-        if (!match) return JSON.stringify({ error: 'Aucun élément [role="' + role + '"] avec le nom "' + name + '" trouvé.' });
+        // Not-found is an explicit no-op result, safe for a bounded re-observation retry.
+        if (!match) return JSON.stringify({ found: false });
         var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
         match.dispatchEvent(evt);
         return JSON.stringify({ ok: true });
@@ -1261,6 +1332,10 @@ export function BrowserPanel({
         }
         if (parsed?.error) {
           postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        if (parsed?.found === false) {
+          postActionResult(detail.requestId, { found: false });
           return;
         }
         // Attendre la condition waitFor si fournie
@@ -1352,7 +1427,8 @@ export function BrowserPanel({
             return (el.placeholder || el.getAttribute('aria-placeholder') || '').toLowerCase().includes(labelLower);
           }) || null;
         }
-        if (!field) return JSON.stringify({ error: 'Champ avec le libellé "' + label + '" introuvable.' });
+        // Not-found is an explicit no-op result; the server may safely re-observe once.
+        if (!field) return JSON.stringify({ found: false });
         field.focus();
         // Effacer le contenu existant
         if (field.tagName.toLowerCase() !== 'select') {
@@ -1386,6 +1462,10 @@ export function BrowserPanel({
         }
         if (parsed?.error) {
           postActionResult(detail.requestId, null, parsed.error);
+          return;
+        }
+        if (parsed?.found === false) {
+          postActionResult(detail.requestId, { found: false });
           return;
         }
         // pressEnter
@@ -1581,6 +1661,9 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Webview non disponible.');
         return;
       }
+      try {
+        await moveCursorToElement(wv, detail.selector);
+      } catch {/* l'action peut continuer si l'animation échoue */ }
       const script = `(function(){
         var el = document.querySelector(${JSON.stringify(detail.selector)});
         if (!el || el.tagName.toLowerCase() !== 'select') return JSON.stringify({ found: false });
