@@ -24,6 +24,7 @@ import { SourceListFull } from './sources/SourceListFull.js';
 import { SourceListCompact } from './sources/SourceListCompact.js';
 import type { SourceItem } from './sources/constants.js';
 import { NbIconButton } from './ui/primitives.js';
+import { VideoTranscriptionImport } from './sources/VideoTranscriptionImport.js';
 
 interface Props {
   notebookId: string;
@@ -172,7 +173,7 @@ export function SourcePanel({ notebookId, sources, onRefresh, onUploadProgress, 
 
         <UploadQueue uploadQueue={uploadQueue} uploadDone={uploadDone} uploadErrors={uploadErrors} spring={spring} />
 
-        <UploadToolbar upload={upload} onOpenGitHub={() => setShowGitHubImport(true)} spring={spring} tapScale={tapScale} />
+        <UploadToolbar upload={upload} onOpenGitHub={() => setShowGitHubImport(true)} spring={spring} tapScale={tapScale} />\n        <VideoTranscriptionImport notebookId={notebookId} onImported={() => { success("Transcription vidéo ajoutée au Notebook."); onRefresh(); }} onError={toastError} />
 
         {/* Search (when >3 sources) */}
         {sources.length > 3 && (

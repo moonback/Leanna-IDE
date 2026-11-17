@@ -8,9 +8,12 @@ import { enqueueSourceIngestion } from "../../notebooks/queueSourceIngestion.js"
 import { getSandboxRoot } from "../../utils/sandbox.js";
 import { validateNotebookSourceUpload, MAX_NOTEBOOK_BATCH_BYTES } from "../../utils/notebookSourceUploadValidation.js";
 import { SELF_ROOT } from "../../utils/selfRoot.js";
+import { generateText, runWithTelemetryContext } from "../../utils/textGeneration.js";
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();
+  // Vidéos locales uniquement : aucun téléchargement depuis une plateforme.
+  const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 18 * 1024 * 1024, files: 1 } });
 
   // Refuser les identifiants appartenant à un autre workspace avant toute
   // lecture, mutation, génération, export ou réindexation.
@@ -25,6 +28,80 @@ export function createSourcesRouter(upload: multer.Multer): Router {
       return;
     }
     next();
+  });
+
+  router.post("/:id/sources/video-transcribe", videoUpload.single("file"), async (req: Request, res: Response): Promise<void> => {
+    try {
+      const notebookId = req.params.id;
+      if (!notebookManager.getNotebook(notebookId)) {
+        res.status(404).json({ error: "Notebook introuvable." });
+        return;
+      }
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "Aucune vidéo fournie." });
+        return;
+      }
+
+      const safeName = path.basename(file.originalname.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 160);
+      const extension = path.extname(safeName).toLowerCase();
+      const supported: Record<string, string[]> = {
+        ".mp4": ["video/mp4"], ".webm": ["video/webm"], ".mov": ["video/quicktime"],
+        ".mkv": ["video/x-matroska", "video/mkv"], ".mpeg": ["video/mpeg"], ".mpg": ["video/mpeg"],
+      };
+      if (!safeName || !supported[extension] || !supported[extension].includes(file.mimetype.toLowerCase())) {
+        res.status(400).json({ error: "Format vidéo invalide. Formats acceptés : MP4, WebM, MOV, MKV et MPEG." });
+        return;
+      }
+      if (!file.size || file.size > 18 * 1024 * 1024) {
+        res.status(413).json({ error: "La vidéo doit peser au maximum 18 Mio." });
+        return;
+      }
+
+      const prompt = [
+        "Transcris fidèlement tout le contenu parlé de cette vidéo.",
+        "Conserve l'ordre chronologique, les changements d'intervenant et les horodatages approximatifs toutes les 30 secondes lorsque cela est possible.",
+        "N'invente aucun passage. Marque [inaudible] lorsqu'un segment ne peut pas être compris.",
+        "Détecte la langue parlée et rédige la transcription dans la langue originale.",
+        "Retourne uniquement la transcription, avec des horodatages et des étiquettes d'intervenants si identifiables.",
+      ].join("\n");
+      const videoDataUrl = "data:" + file.mimetype + ";base64," + file.buffer.toString("base64");
+      const result = await runWithTelemetryContext({ toolName: "notebook_video_transcription" }, () =>
+        generateText({
+          prompt,
+          openrouterVideoDataUrl: videoDataUrl,
+          openrouterModel: "qwen/qwen4-max",
+          forceProvider: "openrouter",
+          maxTokens: 8192,
+        })
+      );
+      const transcript = result.text?.trim();
+      if (!transcript) {
+        res.status(502).json({ error: "OpenRouter n'a renvoyé aucune transcription exploitable." });
+        return;
+      }
+
+      const baseName = path.basename(safeName, extension);
+      const source = await enqueueSourceIngestion({
+        notebookId,
+        kind: "buffer",
+        buffer: Buffer.from("# Transcription vidéo : " + baseName + "\n\n" + transcript, "utf-8"),
+        fileName: baseName + " - transcription.txt",
+        mimeType: "text/plain",
+      });
+      res.json({
+        status: "success",
+        source: {
+          id: source.sourceId, title: source.title, type: source.type, summary: source.summary,
+          keywords: source.keywords, wordCount: source.wordCount, chunksCount: source.chunksCount,
+          language: source.language,
+        },
+        transcript,
+        model: result.model,
+      });
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json({ error: error.message || "Échec de la transcription vidéo." });
+    }
   });
 
   router.post("/:id/sources/upload", upload.single("file"), async (req: Request, res: Response): Promise<void> => {
