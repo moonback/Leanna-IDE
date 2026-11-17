@@ -450,9 +450,16 @@ export function BrowserPanel({
     const handleNav = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { url?: string; requestId?: string };
       if (!detail?.url) return;
+      emitBrowserDiagnostic('info', 'navigate: requête renderer reçue', {
+        requestId: detail.requestId ?? null,
+        targetUrl: detail.url,
+        activeTabId: activeTabIdRef.current,
+        hasWebview: Boolean(webviewRef.current),
+      });
       setAssistantNavActive(true);
       const wv = webviewRef.current;
       if (!wv) {
+        emitBrowserDiagnostic('error', 'navigate: webview absente', { requestId: detail.requestId ?? null, targetUrl: detail.url });
         if (detail.requestId) await postActionResult(detail.requestId, null, 'Webview non disponible.');
         setAssistantNavActive(false);
         return;
@@ -468,21 +475,48 @@ export function BrowserPanel({
       const finish = async (error?: string) => {
         if (settled) return;
         settled = true;
+        const finalUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
+        const finalTitle = (() => { try { return wv.getTitle?.() ?? ''; } catch { return ''; } })();
+        emitBrowserDiagnostic(error ? 'error' : 'info', 'navigate: résolution renderer', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          finalUrl,
+          finalTitle,
+          error: error ?? null,
+          elapsedMs: Date.now() - startedAt,
+        });
         cleanup();
         if (detail.requestId) {
           if (error) await postActionResult(detail.requestId, null, error);
-          else await postActionResult(detail.requestId, { url: wv.getURL(), title: wv.getTitle?.() ?? '' });
+          else await postActionResult(detail.requestId, { url: finalUrl, title: finalTitle });
         }
         setAssistantNavActive(false);
       };
+      const startedAt = Date.now();
       const onStop = () => {
+        const currentUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
+        emitBrowserDiagnostic('info', 'navigate: did-stop-loading reçu', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          currentUrl,
+          elapsedMs: Date.now() - startedAt,
+        });
         // Ignorer l'arrêt initial de about:blank si la webview n'a pas encore
         // reçu dom-ready et conserve l'URL demandée en attente.
-        if (wv.getURL() === 'about:blank') return;
+        if (currentUrl === 'about:blank') return;
         void finish();
       };
       const onFail = (event: Event) => {
         const failure = event as WebviewFailLoadEvent;
+        emitBrowserDiagnostic('warn', 'navigate: did-fail-load reçu', {
+          requestId: detail.requestId ?? null,
+          targetUrl: detail.url,
+          failedUrl: failure.validatedURL ?? '',
+          errorCode: failure.errorCode,
+          errorDescription: failure.errorDescription,
+          isMainFrame: failure.isMainFrame,
+          elapsedMs: Date.now() - startedAt,
+        });
         if (failure.isMainFrame === false || failure.errorCode === -3) return;
         void finish('Échec du chargement (' + failure.errorCode + ') : ' + (failure.errorDescription || 'erreur réseau'));
       };
@@ -491,9 +525,22 @@ export function BrowserPanel({
         wv.addEventListener('did-stop-loading', onStop);
         wv.addEventListener('did-fail-load', onFail);
         timeout = setTimeout(() => {
+          const currentUrl = (() => { try { return wv.getURL(); } catch { return ''; } })();
           void finish('Délai dépassé : la page n’a pas terminé son chargement dans les 25 secondes.');
+          emitBrowserDiagnostic('error', 'navigate: timeout renderer', {
+            requestId: detail.requestId,
+            targetUrl: detail.url,
+            currentUrl,
+            elapsedMs: Date.now() - startedAt,
+          });
         }, 25_000);
       }
+      emitBrowserDiagnostic('info', 'navigate: déclenchement navigateTo', {
+        requestId: detail.requestId ?? null,
+        targetUrl: detail.url,
+        webviewUrlBefore: (() => { try { return wv.getURL(); } catch { return ''; } })(),
+        activeTabId: activeTabIdRef.current,
+      });
       navigateTo(detail.url);
       if (!detail.requestId) setTimeout(() => setAssistantNavActive(false), 3000);
     };
