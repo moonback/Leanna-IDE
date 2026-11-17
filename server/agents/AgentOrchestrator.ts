@@ -235,6 +235,7 @@ export class AgentOrchestrator {
       timeoutMs: params.timeoutMs ?? agent.defaultTimeoutMs,
     };
 
+    task.projectId ??= getActiveProjectId();
     this.tasks.set(task.id, task);
     log.debug(`Tâche créée: ${task.id.slice(0, 8)} — timeout: ${task.timeoutMs}ms`);
 
