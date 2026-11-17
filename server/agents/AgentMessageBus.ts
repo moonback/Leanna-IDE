@@ -34,6 +34,7 @@ const log = createLogger("AgentMessageBus");
 // ─── Types internes ───────────────────────────────────────────────────────────
 
 interface PendingRequest {
+  projectId?: string;
   resolve: (message: AgentMessage) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
@@ -216,7 +217,7 @@ export class AgentMessageBus extends EventEmitter {
         );
       }, timeoutMs);
 
-      this.pendingRequests.set(correlationId, { resolve, reject, timeout });
+      this.pendingRequests.set(correlationId, { projectId: message.projectId, resolve, reject, timeout });
       this.deliver(message, {}).catch(reject);
     });
   }
@@ -523,8 +524,8 @@ export class AgentMessageBus extends EventEmitter {
       successRate: scopedMetrics.length > 0 ? successful / scopedMetrics.length : 1,
       byAgentRole,
       byMessageType,
-      pendingRequests: this.pendingRequests.size,
-      activeSubscriptions: this.subscriptions.size,
+      pendingRequests: Array.from(this.pendingRequests.values()).filter((request) => request.projectId === projectId).length,
+      activeSubscriptions: projectId ? this.subscriptions.size : 0,
       deadLetterQueue,
     };
   }
