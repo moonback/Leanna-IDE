@@ -115,6 +115,7 @@ export class AgentBrain {
     // Émettre un événement pour la visibilité de l'interface
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "orchestration_started",
       taskId: plan.id,
       role: "planner",
@@ -237,6 +238,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "orchestration_completed",
       taskId: plan.id,
       role: "planner",
@@ -272,6 +274,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "task_started",
       taskId: stage.id,
       role: stage.agentRole,
@@ -332,7 +335,7 @@ export class AgentBrain {
       if (verdict.action === "reassign") {
         verification = await this.reassignStage(stage, ctx, verdict.toRole, verdict.rationale);
       } else {
-        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole, verdict.rationale);
+        const corrected = await this.runCorrection(stage, ctx, verification, attempt, verdict.targetRole, verdict.rationale, plan.projectId);
         if (!corrected) break;
         verification = corrected;
       }
@@ -363,7 +366,8 @@ export class AgentBrain {
     verification: StageVerification,
     attempt: number,
     targetRole?: string,
-    rationale?: string
+    rationale?: string,
+    projectId?: string
   ): Promise<StageVerification | null> {
     log.warn(`⚠️ Correction autonome pour ${stage.id} (tentative ${attempt})`);
     // Vérification passée mais rejetée par le Lead : sans issue, le diagnostic
@@ -378,6 +382,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId,
       event: "task_progress",
       taskId: stage.id,
       role: correction.targetRole,
@@ -471,6 +476,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: verification.passed ? "task_completed" : "task_failed",
       taskId: stage.id,
       role: stage.agentRole,
@@ -610,6 +616,7 @@ export class AgentBrain {
 
     agentEventStream.publish({
       type: "agent_event",
+      projectId: plan.projectId,
       event: "task_progress",
       taskId: plan.id,
       role: "planner",
