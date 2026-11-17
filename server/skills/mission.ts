@@ -311,7 +311,7 @@ export const missionSkill: Skill = {
     }),
   },
 
-  handleToolCall: async (name: string, args: any) => {
+  handleToolCall: async (name: string, args: any, context?: { emitIdeAction?: (action: any) => void; browserReadPending?: Map<string, any>; browserActionPending?: Map<string, any> }) => {
     if (!executor) {
       return {
         error: "Mission System non initialisé. Le serveur doit être redémarré.",
@@ -331,6 +331,7 @@ export const missionSkill: Skill = {
           priority,
           availableSkills: availableSkillNames,
           dryRun,
+          browserContext: context ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending, browserActionPending: context.browserActionPending } : undefined,
         });
 
         return {
