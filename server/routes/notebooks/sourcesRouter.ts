@@ -638,7 +638,12 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         || (source.chunks && source.chunks.length > 0
           ? source.chunks.sort((a, b) => a.index - b.index).map(c => c.content).join("\n\n")
           : source.summary || "Contenu non disponible.");
-      res.json({ status: "success", content });
+      res.json({
+        status: "success",
+        content,
+        type: source.type,
+        metadata: source.type === "video" ? { videoTranscript: source.metadata?.videoTranscript } : undefined,
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
