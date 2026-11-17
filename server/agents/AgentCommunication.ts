@@ -223,6 +223,8 @@ export type MessageHandler = (message: AgentMessage) => Promise<void>;
 /** Subscription à un type de message */
 export interface MessageSubscription {
   id: string;
+  /** Workspace autorisé pour cette souscription ; undefined = aucune livraison. */
+  projectId?: string;
   agentRole: AgentRole;
   messageType: AgentMessageType | "*";
   handler: MessageHandler;
