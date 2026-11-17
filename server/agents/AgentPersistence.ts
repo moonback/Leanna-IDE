@@ -144,6 +144,7 @@ export class AgentPersistence {
    * Planifie une mise à jour de statut pour batching.
    */
   scheduleUpdate(taskId: string, update: Partial<AgentTaskRow>): void {
+    if (!update.project_id) return;
     this.pendingUpdates.set(taskId, { ...this.pendingUpdates.get(taskId), ...update });
     if (!this.flushTimeout) {
       this.flushTimeout = setTimeout(() => this.flushUpdates(), 5000);
@@ -162,10 +163,15 @@ export class AgentPersistence {
       // Batch update - Supabase supporte les updates batch via RPC ou multiple requêtes
       // Pour simplifier, on fait des updates individuelles mais groupées
       for (const [taskId, update] of updates) {
+        if (!update.project_id) {
+          log.warn(`flushUpdates ${taskId.slice(0, 8)} ignorée : project_id absent`);
+          continue;
+        }
         const { error } = await this.client
           .from("agent_tasks")
           .update(update)
-          .eq("id", taskId);
+          .eq("id", taskId)
+          .eq("project_id", update.project_id);
         
         if (error) {
           log.error(`flushUpdates ${taskId.slice(0, 8)}: ${error.message}`);
@@ -186,11 +192,12 @@ export class AgentPersistence {
     status: TaskStatus,
     result?: TaskResult,
     startedAt?: string,
-    completedAt?: string
+    completedAt?: string,
+    projectId?: string
   ): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || !projectId) return;
     
-    const update: Partial<AgentTaskRow> = { status };
+    const update: Partial<AgentTaskRow> = { status, project_id: projectId };
     if (result !== undefined)     update.result       = result;
     if (startedAt !== undefined)  update.started_at   = startedAt;
     if (completedAt !== undefined) update.completed_at = completedAt;
