@@ -545,10 +545,17 @@ export function BrowserPanel({
       await postActionResult(detail.requestId, { ok: true, closedTabId: detail.tabId });
     };
 
-    const handleScroll = (e: Event) => {
+    const handleScroll = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { direction: string; amount: number };
       const wv = webviewRef.current;
       if (!wv) return;
+
+      try {
+        const viewport = await wv.executeJavaScript(
+          '({ x: Math.max(24, window.innerWidth * 0.82), y: Math.max(24, window.innerHeight * 0.78) })'
+        ) as { x: number; y: number };
+        await moveCursorToPoint(wv, viewport.x, viewport.y);
+      } catch {/* la visibilité du curseur ne doit pas bloquer le scroll */ }
 
       let js = '';
       if (detail.direction === 'top') {
@@ -560,7 +567,7 @@ export function BrowserPanel({
       } else {
         js = `window.scrollBy({ top: ${detail.amount ?? 300}, behavior: "smooth" })`;
       }
-      wv.executeJavaScript(js).catch(() => {/* ignore */});
+      await wv.executeJavaScript(js).catch(() => {/* ignore */});
     };
 
     const handleBrowserControl = (e: Event) => {
@@ -700,51 +707,44 @@ export function BrowserPanel({
       document.body.appendChild(cur);
     })()`;
 
-    const moveCursorToElement = async (wv: WebviewElement, selector: string): Promise<void> => {
+    const moveCursorToPoint = async (wv: WebviewElement, x: number, y: number): Promise<void> => {
       try {
-        // Injecter le curseur si absent
         await wv.executeJavaScript(CURSOR_INJECT_SCRIPT);
-        // Déplacer vers le centre de l'élément cible
-        const moveScript = `(function(){
-          var el = document.querySelector(${JSON.stringify(selector)});
-          if (!el) return;
-          var r = el.getBoundingClientRect();
+        await wv.executeJavaScript(`(function(x,y){
           var cur = document.getElementById('__Leanna_cursor');
           if (!cur) return;
-          cur.style.left = (r.left + r.width / 2 - 4) + 'px';
-          cur.style.top  = (r.top  + r.height / 2 - 2) + 'px';
-        })()`;
-        await wv.executeJavaScript(moveScript);
-        // Laisser l'animation CSS se jouer (250 ms transition + 100 ms pause)
-        await new Promise<void>((r) => setTimeout(r, 380));
-        // Effet ripple au clic
-        const rippleScript = `(function(){
+          cur.style.left = Math.max(0, Math.min(window.innerWidth - 22, x - 4)) + 'px';
+          cur.style.top = Math.max(0, Math.min(window.innerHeight - 22, y - 2)) + 'px';
+        })(${Number(x) || 0},${Number(y) || 0})`);
+        await new Promise<void>((resolve) => setTimeout(resolve, 380));
+      } catch {/* le curseur reste indicatif et ne doit pas bloquer l'action */ }
+    };
+
+    const moveCursorToElement = async (wv: WebviewElement, selector: string): Promise<void> => {
+      try {
+        const point = await wv.executeJavaScript(`(function(){
           var el = document.querySelector(${JSON.stringify(selector)});
-          if (!el) return;
+          if (!el) return null;
           var r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        })()`) as { x: number; y: number } | null;
+        if (!point) return;
+        await moveCursorToPoint(wv, point.x, point.y);
+        const rippleScript = `(function(x,y){
           var rip = document.createElement('div');
           rip.style.cssText = [
-            'position:fixed',
-            'pointer-events:none',
-            'z-index:2147483646',
-            'border-radius:50%',
-            'border:2px solid rgba(139,92,246,0.8)',
-            'width:8px','height:8px',
-            'left:' + (r.left + r.width/2 - 4) + 'px',
-            'top:' + (r.top + r.height/2 - 4) + 'px',
-            'transition:all 0.35s ease-out',
-            'opacity:1',
+            'position:fixed','pointer-events:none','z-index:2147483646',
+            'border-radius:50%','border:2px solid rgba(139,92,246,0.8)',
+            'width:8px','height:8px','left:' + (x - 4) + 'px',
+            'top:' + (y - 4) + 'px','transition:all 0.35s ease-out','opacity:1'
           ].join(';');
           document.body.appendChild(rip);
           requestAnimationFrame(function(){
-            rip.style.width  = '36px';
-            rip.style.height = '36px';
-            rip.style.left   = (r.left + r.width/2 - 18) + 'px';
-            rip.style.top    = (r.top + r.height/2 - 18) + 'px';
-            rip.style.opacity = '0';
+            rip.style.width='36px'; rip.style.height='36px';
+            rip.style.left=(x - 18)+'px'; rip.style.top=(y - 18)+'px'; rip.style.opacity='0';
           });
           setTimeout(function(){ rip.remove(); }, 400);
-        })()`;
+        })(${point.x},${point.y})`;
         await wv.executeJavaScript(rippleScript);
       } catch {/* ne bloque pas l'action si l'animation échoue */ }
     };
@@ -1591,6 +1591,9 @@ export function BrowserPanel({
         postActionResult(detail.requestId, null, 'Webview non disponible.');
         return;
       }
+      try {
+        await moveCursorToElement(wv, detail.selector);
+      } catch {/* l'action peut continuer si l'animation échoue */ }
       const script = `(function(){
         var el = document.querySelector(${JSON.stringify(detail.selector)});
         if (!el || el.tagName.toLowerCase() !== 'select') return JSON.stringify({ found: false });
