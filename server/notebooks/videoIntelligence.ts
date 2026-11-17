@@ -100,7 +100,7 @@ export async function transcribeAudioWithGemini(
     ],
   });
 
-  const raw = result.text.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
+  const raw = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   const parsed = JSON.parse(raw) as { language?: string; segments?: VideoTranscriptSegment[] };
   if (!Array.isArray(parsed.segments)) throw new Error("Gemini a renvoyé une transcription au format inattendu.");
   const segments = parsed.segments.filter(segment =>
