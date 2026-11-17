@@ -48,6 +48,10 @@ export class AgentRegistry {
   private isCurrentWorkspace(): boolean {
     return !!this.workspaceId && getActiveProjectId() === this.workspaceId;
   }
+
+  canAccessWorkspace(projectId: string): boolean {
+    return !!projectId && this.workspaceId === projectId;
+  }
   /** Config de boucle mémorisée par rôle, pour recréer à l'identique au swap de moteur. */
   private loopConfigByRole = new Map<AgentRole, Partial<LoopConfig>>();
 
