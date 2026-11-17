@@ -472,6 +472,14 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_type       ON agent_messages(type)
 CREATE INDEX IF NOT EXISTS idx_agent_messages_from_role  ON agent_messages(from_role);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_created_at ON agent_messages(created_at DESC);
 
+-- Workspace isolation: legacy rows remain NULL and are hidden (fail closed).
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS project_id TEXT;
+ALTER TABLE agent_orchestrations ADD COLUMN IF NOT EXISTS project_id TEXT;
+ALTER TABLE agent_messages ADD COLUMN IF NOT EXISTS project_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_project_created ON agent_tasks(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_orchestrations_project_created ON agent_orchestrations(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_project_created ON agent_messages(project_id, created_at DESC);
+
 -- Row Level Security (optionnel — activer si multi-tenant)
 -- ALTER TABLE agent_tasks          ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE agent_orchestrations ENABLE ROW LEVEL SECURITY;
