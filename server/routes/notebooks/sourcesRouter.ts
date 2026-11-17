@@ -12,6 +12,8 @@ import { generateText, runWithTelemetryContext } from "../../utils/textGeneratio
 
 export function createSourcesRouter(upload: multer.Multer): Router {
   const router = Router();
+  // Vidéos locales uniquement : aucun téléchargement depuis une plateforme.
+  const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 18 * 1024 * 1024, files: 1 } });
 
   // Refuser les identifiants appartenant à un autre workspace avant toute
   // lecture, mutation, génération, export ou réindexation.
@@ -41,7 +43,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         return;
       }
 
-      const safeName = path.basename(file.originalname.replace(/\\\\/g, "/")).replace(/[\\u0000-\\u001f\\u007f]/g, "").slice(0, 160);
+      const safeName = path.basename(file.originalname.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 160);
       const extension = path.extname(safeName).toLowerCase();
       const supported: Record<string, string[]> = {
         ".mp4": ["video/mp4"], ".webm": ["video/webm"], ".mov": ["video/quicktime"],
