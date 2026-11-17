@@ -27,6 +27,7 @@ import type {
 } from "./AgentCommunication.js";
 import { agentPersistence } from "./AgentPersistence.js";
 import { createLogger } from "../utils/logger.js";
+import { getActiveProjectId } from "../utils/selfRoot.js";
 
 const log = createLogger("AgentMessageBus");
 
@@ -308,8 +309,10 @@ export class AgentMessageBus extends EventEmitter {
   // ─── Métriques & historique ───────────────────────────────────────────────
 
   /** Retourne les N derniers messages de l'historique */
-  getHistory(limit = 50): AgentMessage[] {
-    return this.messageHistory.slice(-limit);
+  getHistory(limit = 50, projectId?: string): AgentMessage[] {
+    // L'historique global ou les messages legacy sans propriétaire ne sont jamais exposés.
+    if (!projectId) return [];
+    return this.messageHistory.filter((message) => message.projectId === projectId).slice(-limit);
   }
 
   // ─── Traçage et Surveillance ────────────────────────────────────────────────
@@ -886,6 +889,13 @@ export class AgentMessageBus extends EventEmitter {
   }
 
   private addToHistory(message: AgentMessage): void {
+    // Capture au moment de l'émission : ne jamais relire le workspace après un await.
+    const projectId = getActiveProjectId();
+    if (!projectId) {
+      log.warn(`Message inter-agents ignoré sans workspace actif: ${message.id.slice(0, 8)}`);
+      return;
+    }
+    message.projectId = projectId;
     this.messageHistory.push(message);
     if (this.messageHistory.length > this.maxHistorySize) {
       this.messageHistory.splice(0, 50);
