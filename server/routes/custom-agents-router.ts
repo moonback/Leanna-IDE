@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import { getActiveProjectId } from '../utils/selfRoot.js';
+import { dynamicAgentRegistry } from '../agents/DynamicAgentRegistry.js';
 import {
   handleListAgents,
   handleCreateAgent,
@@ -19,7 +20,11 @@ export function createCustomAgentsRouter(): Router {
   const router = Router();
 
   router.use((_req, res, next) => {
-    if (!getActiveProjectId()) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    const projectId = getActiveProjectId();
+    if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    if (!dynamicAgentRegistry.canAccessWorkspace(projectId)) {
+      return res.status(409).json({ error: 'Le registre dynamique appartient à un autre workspace ; redémarrage requis.' });
+    }
     next();
   });
 
