@@ -432,7 +432,7 @@ export class AgentMessageBus extends EventEmitter {
   /**
    * Retourne un rapport complet de surveillance
    */
-  getMonitoringReport(): {
+  getMonitoringReport(projectId?: string): {
     bus: {
       totalMessages: number;
       successRate: number;
@@ -454,7 +454,7 @@ export class AgentMessageBus extends EventEmitter {
     traceEnabled: boolean;
     timestamp: string;
   } {
-    const metrics = this.getMetrics();
+    const metrics = this.getMetrics(projectId);
     const load = this.getAgentLoad();
     const rrState = this.getRoundRobinState();
 
@@ -465,7 +465,7 @@ export class AgentMessageBus extends EventEmitter {
       "round-robin": 0,
       "load-balanced": 0
     };
-    for (const m of this.metrics) {
+    for (const m of this.metrics.filter((metric) => metric.projectId === projectId)) {
       if (m.strategy) {
         strategyUsage[m.strategy] = (strategyUsage[m.strategy] ?? 0) + 1;
       } else {
