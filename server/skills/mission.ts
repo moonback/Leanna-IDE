@@ -342,7 +342,7 @@ export const missionSkill: Skill = {
           priority,
           availableSkills: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? [...new Set([...availableSkillNames, ...MISSION_BROWSER_TOOLS])] : availableSkillNames,
           dryRun,
-          browserContext: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending as unknown as Map<string, any>, browserActionPending: context.browserActionPending as unknown as Map<string, any> } : undefined,
+          browserContext: context?.emitIdeAction && context.browserReadPending && context.browserActionPending ? { emitIdeAction: context.emitIdeAction, browserReadPending: context.browserReadPending, browserActionPending: context.browserActionPending } : undefined,
         });
 
         return {
