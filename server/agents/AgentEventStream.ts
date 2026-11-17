@@ -58,7 +58,7 @@ export class AgentEventStream {
         }
       }
     }
-    return () => this.listeners.delete(listener);
+    return () => this.listeners.delete(scopedListener);
   }
 
   publish(event: AgentEvent): number {
