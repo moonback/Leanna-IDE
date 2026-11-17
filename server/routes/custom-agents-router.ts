@@ -6,6 +6,7 @@
  */
 
 import { Router } from 'express';
+import { getActiveProjectId } from '../utils/selfRoot.js';
 import {
   handleListAgents,
   handleCreateAgent,
@@ -16,6 +17,11 @@ import {
 
 export function createCustomAgentsRouter(): Router {
   const router = Router();
+
+  router.use((_req, res, next) => {
+    if (!getActiveProjectId()) return res.status(409).json({ error: 'Aucun workspace actif.' });
+    next();
+  });
 
   router.get('/',         handleListAgents);
   router.post('/',        handleCreateAgent);
