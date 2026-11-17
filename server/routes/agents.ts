@@ -248,6 +248,12 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       return res.status(400).json({ error: "Champ 'taskIds' (string[]) non vide requis." });
     }
     try {
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      // Validation atomique de propriété avant toute annulation/suppression.
+      if ((ids as string[]).some((id) => !agentOrchestrator.getTaskForProject(id, projectId))) {
+        return res.status(404).json({ success: false, error: 'Une ou plusieurs tâches sont introuvables.' });
+      }
       const deleted = await agentOrchestrator.deleteTasks(ids as string[]);
       return res.json({ success: true, deleted, requested: ids.length });
     } catch (e: any) {
