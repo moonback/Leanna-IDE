@@ -602,6 +602,13 @@ export class AgentOrchestrator {
     return this.tasks.get(taskId);
   }
 
+  /** Lookup strict : une tâche legacy sans propriétaire est inaccessible. */
+  getTaskForProject(taskId: string, projectId: string): AgentTask | undefined {
+    if (!projectId) return undefined;
+    const task = this.tasks.get(taskId);
+    return task?.projectId === projectId ? task : undefined;
+  }
+
   /** Nombre de tâches en cours pour un rôle (lu par l'Agent Lead pour la capacité). */
   getRunningCount(role: AgentRole): number {
     return this.executor.getRunningCount(role);
