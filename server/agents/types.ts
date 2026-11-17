@@ -333,6 +333,8 @@ export interface TaskEvidence {
 /** Plan d'orchestration multi-agents */
 export interface OrchestrationPlan {
   id: string;
+  /** Workspace propriétaire du plan et de ses tâches. */
+  projectId?: string;
   title: string;
   description: string;
   /** Tâches ordonnées (certaines peuvent être parallèles) */
