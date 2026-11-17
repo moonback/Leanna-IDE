@@ -16,7 +16,7 @@ import { DynamicPlanner } from "./DynamicPlanner.js";
 import { BrainVerifier } from "./BrainVerifier.js";
 import { BrainCorrectionLoop } from "./BrainCorrectionLoop.js";
 import { AgentBrain } from "./AgentBrain.js";
-import type { BrainGoalInput, BrainStage, StageVerification, GoalUnderstanding, BrainPlan } from "./types.js";
+import type { BrainGoalInput, BrainStage, StageVerification, GoalUnderstanding, BrainPlan, BrainExecutionResult } from "./types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
