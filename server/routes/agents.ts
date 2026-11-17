@@ -222,6 +222,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       return res.status(400).json({ error: "Paramètre 'taskId' requis." });
     }
     try {
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      if (!agentOrchestrator.getTaskForProject(taskId, projectId)) {
+        return res.status(404).json({ success: false, error: 'Tâche introuvable.' });
+      }
       const cancelled = agentOrchestrator.cancelTask(taskId);
       if (!cancelled) {
         return res.status(404).json({
