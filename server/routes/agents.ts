@@ -229,7 +229,7 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
       if (!agentOrchestrator.getTaskForProject(taskId, projectId)) {
         return res.status(404).json({ success: false, error: 'Tâche introuvable.' });
       }
-      const cancelled = agentOrchestrator.cancelTask(taskId);
+      const cancelled = agentOrchestrator.cancelTask(taskId, projectId);
       if (!cancelled) {
         return res.status(404).json({
           success: false,
