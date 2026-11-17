@@ -70,6 +70,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         generateText({
           prompt,
           openrouterVideoDataUrl: videoDataUrl,
+          openrouterModel: "qwen/qwen4-max",
           forceProvider: "openrouter",
           maxTokens: 8192,
         })
