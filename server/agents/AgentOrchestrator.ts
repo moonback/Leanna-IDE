@@ -682,7 +682,7 @@ export class AgentOrchestrator {
    *          est introuvable ou déjà terminée.
    */
   cancelTask(taskId: string, projectId?: string): boolean {
-    if (!projectId) return false;
+    if (!projectId || getActiveProjectId() !== projectId) return false;
     const task = this.getTaskForProject(taskId, projectId);
     if (!task) return false;
 
@@ -740,7 +740,7 @@ export class AgentOrchestrator {
    * @returns le nombre de tâches effectivement retirées de la mémoire.
    */
   async deleteTasks(taskIds: string[], projectId?: string): Promise<number> {
-    if (taskIds.length === 0 || !projectId) return 0;
+    if (taskIds.length === 0 || !projectId || getActiveProjectId() !== projectId) return 0;
     // Vérifier tous les propriétaires avant toute mutation (atomicité fail-closed).
     if (taskIds.some((id) => this.getTaskForProject(id, projectId) === undefined)) return 0;
 
@@ -770,7 +770,7 @@ export class AgentOrchestrator {
    *          compte, ou `-1` si l'orchestration est introuvable.
    */
   cancelOrchestration(orchestrationId: string, projectId?: string): number {
-    if (!projectId) return -1;
+    if (!projectId || getActiveProjectId() !== projectId) return -1;
     const plan = this.getOrchestrationForProject(orchestrationId, projectId);
     if (!plan) return -1;
 
