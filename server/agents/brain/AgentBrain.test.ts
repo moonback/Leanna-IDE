@@ -674,3 +674,44 @@ describe("AgentBrain.executeGoal (intégration bout-en-bout)", () => {
     assert.ok(result.totalDurationMs >= 0);
   });
 });
+
+
+describe("AgentBrain workspace ownership", () => {
+  it("exposes a plan and result only to their owning workspace", () => {
+    const brain = new AgentBrain({} as any);
+    const plan = {
+      id: "plan-a",
+      projectId: "workspace-a",
+      goal: "test",
+      understanding: makeUnderstanding("general"),
+      stages: [],
+      estimatedDurationMs: 0,
+      architectureRationale: "",
+      createdAt: new Date().toISOString(),
+      status: "completed" as const,
+    } satisfies BrainPlan;
+    const result = {
+      planId: "plan-a",
+      goal: "test",
+      success: true,
+      understanding: plan.understanding,
+      stages: [],
+      filesModified: [],
+      verifications: [],
+      corrections: [],
+      totalDurationMs: 1,
+      summary: "ok",
+      deliverables: [],
+    } as BrainExecutionResult;
+
+    (brain as any).activePlans.set(plan.id, plan);
+    (brain as any).results.set(plan.id, result);
+
+    assert.equal(brain.getPlanForProject("plan-a", "workspace-a"), plan);
+    assert.equal(brain.getResultForProject("plan-a", "workspace-a"), result);
+    assert.equal(brain.getPlanForProject("plan-a", "workspace-b"), undefined);
+    assert.equal(brain.getResultForProject("plan-a", "workspace-b"), undefined);
+    assert.equal(brain.getPlanForProject("plan-a", ""), undefined);
+    assert.equal(brain.getResultForProject("plan-a", ""), undefined);
+  });
+});
