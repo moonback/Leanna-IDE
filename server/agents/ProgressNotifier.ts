@@ -25,6 +25,8 @@ export type EventBroadcaster = (event: AgentEvent) => void;
 /** Événement agent envoyé au frontend pour la visibilité */
 export interface AgentEvent {
   type: "agent_event";
+  /** Workspace propriétaire de la tâche émettrice. */
+  projectId?: string;
   /** Monotonic ID assigned by AgentEventStream for replay-safe UI deduplication. */
   eventId?: number;
   event: "task_started" | "task_progress" | "task_completed" | "task_incomplete" | "task_failed" | "task_cancelled" | "orchestration_started" | "orchestration_completed" | "orchestration_cancelled";
