@@ -114,6 +114,7 @@ export class ProgressNotifier {
       try {
         const agentEvent: AgentEvent = {
           type: "agent_event",
+          projectId: task.projectId,
           event: `task_${event}` as AgentEvent["event"],
           taskId: task.id,
           role: task.role,
