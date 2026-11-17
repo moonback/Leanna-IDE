@@ -113,6 +113,7 @@ export async function transcribeAudioWithGemini(
     ...(typeof segment.speaker === "string" && segment.speaker.trim() ? { speaker: segment.speaker.trim() } : {}),
     text: segment.text.trim(),
   })).filter(segment => segment.text);
+  if (segments.length === 0) throw new Error("Aucune parole exploitable détectée dans le média.");
   return {
     language: typeof parsed.language === "string" ? parsed.language : "und",
     segments,
