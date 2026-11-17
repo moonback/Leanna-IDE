@@ -412,12 +412,9 @@ const { runtime, skillManager, agentic, kernel } = bootstrapRuntimeSync({
         }))
       );
 
-      // Liste des outils proposés aux missions autonomes. On EXCLUT les outils
-      // navigateur pilotés par la webview Electron (browser_navigate,
-      // browser_research, browser_read_content, browser_capture, …) : ils
-      // dépendent du contexte UI (emitIdeAction) absent en mission et échouent
-      // systématiquement, gaspillant des tours. On conserve browser_web_search,
-      // qui est 100 % côté serveur (fetch + extraction) et donc utilisable.
+      // Liste de base des outils proposés aux missions autonomes. Les outils webview
+      // restent exclus ici ; missionSkill ne les ajoute que si la création vient
+      // d’une session UI active et transmet son pont éphémère à l’Executor.
       const MISSION_WEB_TOOL_ALLOWLIST = new Set<string>(["browser_web_search"]);
       const skillNames = declarations
         .map((d: any) => d.name)
