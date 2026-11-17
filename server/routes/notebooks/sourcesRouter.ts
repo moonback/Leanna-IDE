@@ -65,21 +65,18 @@ export function createSourcesRouter(upload: multer.Multer): Router {
         "Détecte la langue parlée et rédige la transcription dans la langue originale.",
         "Retourne uniquement la transcription, avec des horodatages et des étiquettes d'intervenants si identifiables.",
       ].join("\n");
+      const videoDataUrl = "data:" + file.mimetype + ";base64," + file.buffer.toString("base64");
       const result = await runWithTelemetryContext({ toolName: "notebook_video_transcription" }, () =>
         generateText({
           prompt,
-          geminiParts: [
-            { inlineData: { data: file.buffer.toString("base64"), mimeType: file.mimetype } },
-            { text: prompt },
-          ],
-          geminiModel: "gemini-3.8-flash",
-          forceProvider: "gemini",
-          maxOutputTokens: 8192,
+          openrouterVideoDataUrl: videoDataUrl,
+          forceProvider: "openrouter",
+          maxTokens: 8192,
         })
       );
       const transcript = result.text?.trim();
       if (!transcript) {
-        res.status(502).json({ error: "Gemini n'a renvoyé aucune transcription exploitable." });
+        res.status(502).json({ error: "OpenRouter n'a renvoyé aucune transcription exploitable." });
         return;
       }
 
@@ -99,7 +96,7 @@ export function createSourcesRouter(upload: multer.Multer): Router {
           language: source.language,
         },
         transcript,
-        model: "gemini-3.8-flash",
+        model: result.model,
       });
     } catch (error: any) {
       res.status(error.statusCode || 500).json({ error: error.message || "Échec de la transcription vidéo." });
