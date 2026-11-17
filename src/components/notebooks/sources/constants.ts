@@ -45,13 +45,13 @@ export interface UploadFileStatus {
 export const TYPE_ICONS: Record<string, string> = {
   pdf: '📕', text: '📄', markdown: '📝', url: '🌐',
   html: '🌍', youtube: '📺', audio: '🎵', docx: '📘', image: '🖼️',
-  'github-repo': '💻',
+  'github-repo': '💻', video: '🎬',
 };
 
 export const TYPE_COLORS: Record<string, string> = {
   pdf: 'var(--color-error)', text: 'var(--text-muted)', markdown: 'var(--color-accent-alt)', url: 'var(--notebook-accent)',
   html: 'var(--accent-secondary)', youtube: 'var(--color-error)', audio: 'var(--color-warning)', docx: 'var(--notebook-accent)', image: 'var(--color-success)',
-  'github-repo': 'var(--notebook-accent)',
+  'github-repo': 'var(--notebook-accent)', video: 'var(--color-error)',
 };
 
-export const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg';
+export const ACCEPTED_EXTENSIONS = '.pdf,.txt,.md,.html,.docx,.doc,.rtf,.csv,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.mp4,.webm,.mov';
