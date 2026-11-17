@@ -303,8 +303,11 @@ export function createAgentsRouter(skillManager: SkillManager): Router {
    */
   router.get('/bus/history', (req: Request, res: Response) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string ?? '50', 10), 200);
-      res.json({ messages: agentMessageBus.getHistory(limit) });
+      const projectId = getActiveProjectId();
+      if (!projectId) return res.status(409).json({ error: 'Aucun workspace actif.' });
+      const requestedLimit = Number.parseInt(String(req.query.limit ?? '50'), 10);
+      const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 200)) : 50;
+      res.json({ messages: agentMessageBus.getHistory(limit, projectId) });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
