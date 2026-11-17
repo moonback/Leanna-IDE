@@ -65,7 +65,7 @@ export interface VideoTranscription {
 }
 
 /**
- * Transcribe an already-authorized audio payload with Gemini multimodal input.
+ * Transcribe an already-authorized audio or video payload with Gemini multimodal input.
  * Acquisition/downloading is intentionally not done here; callers must obtain
  * media through a platform-approved path or an explicit user upload.
  */
@@ -74,13 +74,13 @@ export async function transcribeAudioWithGemini(
   mimeType: string,
   options: { language?: string; title?: string } = {},
 ): Promise<VideoTranscription> {
-  const allowedMimeTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/webm", "audio/ogg", "audio/flac", "audio/aac"]);
+  const allowedMimeTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/webm", "audio/ogg", "audio/flac", "audio/aac", "video/mp4", "video/webm", "video/quicktime"]);
   if (!Buffer.isBuffer(audio) || audio.length === 0) throw new Error("Le fichier audio est vide.");
-  if (audio.length > 20 * 1024 * 1024) throw new Error("Audio trop volumineux pour l'ingestion directe Gemini (20 Mio maximum).");
+  if (audio.length > 20 * 1024 * 1024) throw new Error("Média trop volumineux pour l'ingestion directe Gemini (20 Mio maximum).");
   if (!allowedMimeTypes.has(mimeType.toLowerCase())) throw new Error("Format audio non pris en charge.");
 
   const prompt = [
-    "Transcris fidèlement cet audio. Ne résume pas et n'invente aucun passage.",
+    "Transcris fidèlement le contenu parlé de ce média. Ne résume pas et n'invente aucun passage.",
     `Langue demandée : ${options.language || "détection automatique"}.`,
     `Titre de la source : ${options.title || "Vidéo importée"}.`,
     "Retourne uniquement un JSON valide avec cette forme :",
