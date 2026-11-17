@@ -563,16 +563,18 @@ export class AgentOrchestrator {
   /**
    * Retourne l'état de santé complet de la flotte d'agents autonomes.
    */
-  getFleetStatus() {
+  getFleetStatus(projectId?: string) {
     if (!this.registry.isReady) {
       return {
         initialized: false,
         message: "Le registre d'agents n'est pas encore initialisé (setSkillHandler() pas encore appelé)",
       };
     }
+    const fleet = this.registry.getFleetStatus(projectId);
     return {
       initialized: true,
-      ...this.registry.getFleetStatus(),
+      ...fleet,
+      ...(fleet.workspaceActive ? {} : { message: "La flotte n'est pas initialisée pour ce workspace ; redémarrage contrôlé requis." }),
     };
   }
 
