@@ -176,7 +176,7 @@ export class AgentMessageBus extends EventEmitter {
    * Publie un message sur le bus (sans attendre de réponse).
    */
   async publish(message: AgentMessage, options: PublishOptions = {}): Promise<void> {
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) return;
     log.debug(
       `📤 [${message.from}] → [${message.to}] type="${message.type}" id=${message.id.slice(0, 8)}`
     );
@@ -200,7 +200,7 @@ export class AgentMessageBus extends EventEmitter {
     const correlationId = randomUUID();
     message.correlationId = correlationId;
 
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) throw new Error("Aucun workspace actif pour publier ce message.");
     log.debug(
       `📤 [${message.from}] → [${message.to}] request id=${message.id.slice(0, 8)} correl=${correlationId.slice(0, 8)}`
     );
@@ -238,7 +238,7 @@ export class AgentMessageBus extends EventEmitter {
       payload: { type: "broadcast", message: eventType, data },
     };
 
-    this.addToHistory(message);
+    if (!this.addToHistory(message)) return;
     // Pas de trace pour les annonces de présence (agent_online) : bruit au démarrage.
     if (eventType !== "agent_online") {
       log.debug(`📢 [${from}] broadcast: "${eventType}"`);
@@ -267,7 +267,7 @@ export class AgentMessageBus extends EventEmitter {
       correlationId: originalMessage.correlationId,
     };
 
-    this.addToHistory(response);
+    if (!this.addToHistory(response)) return;
     const pending = this.pendingRequests.get(originalMessage.correlationId);
     if (pending) {
       clearTimeout(pending.timeout);
@@ -888,12 +888,12 @@ export class AgentMessageBus extends EventEmitter {
     throw lastError!;
   }
 
-  private addToHistory(message: AgentMessage): void {
+  private addToHistory(message: AgentMessage): boolean {
     // Capture au moment de l'émission : ne jamais relire le workspace après un await.
     const projectId = getActiveProjectId();
     if (!projectId) {
       log.warn(`Message inter-agents ignoré sans workspace actif: ${message.id.slice(0, 8)}`);
-      return;
+      return false;
     }
     message.projectId = projectId;
     this.messageHistory.push(message);
@@ -904,6 +904,7 @@ export class AgentMessageBus extends EventEmitter {
     agentPersistence.saveMessage(message).catch(() => {});
     // Émettre l'événement pour les listeners externes (ex: WebSocket)
     this.emit("message", message);
+    return true;
   }
 }
 
