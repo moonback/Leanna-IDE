@@ -274,7 +274,7 @@ export class AgentMessageBus extends EventEmitter {
 
     if (!this.addToHistory(response)) return;
     const pending = this.pendingRequests.get(originalMessage.correlationId);
-    if (pending) {
+    if (pending && pending.projectId === originalMessage.projectId && !!pending.projectId) {
       clearTimeout(pending.timeout);
       this.pendingRequests.delete(originalMessage.correlationId);
       pending.resolve(response);
@@ -781,18 +781,16 @@ export class AgentMessageBus extends EventEmitter {
     strategy: RoutingStrategy
   ): Array<{ handler: MessageHandler; subId: string }> {
     switch (strategy) {
-      case "round-robin":
-        // Sélectionner un seul handler en round-robin
-        const nextSubId = this.getNextRoundRobinSubscriber(targetRole);
-        if (nextSubId) {
-          const handler = handlers.find(h => h.subId === nextSubId);
-          if (handler) {
-            log.debug(`🔄 Round-robin : sélectionné ${nextSubId.slice(0, 8)} pour [${targetRole}]`);
-            return [handler];
-          }
-        }
-        // Fallback : retourner tous les handlers
-        return handlers;
+      case "round-robin": {
+        // Le tourniquet est calculé sur les seuls handlers déjà filtrés par workspace.
+        if (handlers.length === 0) return [];
+        const currentIndex = this.roundRobinState.index.get(targetRole) ?? 0;
+        const selectedIndex = currentIndex % handlers.length;
+        this.roundRobinState.index.set(targetRole, (selectedIndex + 1) % handlers.length);
+        const selected = handlers[selectedIndex];
+        log.debug(`🔄 Round-robin : sélectionné ${selected.subId.slice(0, 8)} pour [${targetRole}]`);
+        return [selected];
+      }
 
       case "load-balanced":
         // Sélectionner le handler avec la plus faible charge
