@@ -719,7 +719,7 @@ export class AgentOrchestrator {
         error: "cancelled_by_user",
           durationMs: 0,
         };
-        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt).catch(() => {});
+        agentPersistence.updateTaskStatus(taskId, "cancelled", task.result, task.startedAt, task.completedAt, task.projectId).catch(() => {});
         this.notifier.notify(task, "cancelled");
       }
       return true;
@@ -736,12 +736,14 @@ export class AgentOrchestrator {
    *
    * @returns le nombre de tâches effectivement retirées de la mémoire.
    */
-  async deleteTasks(taskIds: string[]): Promise<number> {
-    if (taskIds.length === 0) return 0;
+  async deleteTasks(taskIds: string[], projectId?: string): Promise<number> {
+    if (taskIds.length === 0 || !projectId) return 0;
+    // Vérifier tous les propriétaires avant toute mutation (atomicité fail-closed).
+    if (taskIds.some((id) => this.getTaskForProject(id, projectId) === undefined)) return 0;
 
     let removed = 0;
     for (const id of taskIds) {
-      const task = this.tasks.get(id);
+      const task = this.getTaskForProject(id, projectId);
       if (!task) continue;
       // Annuler proprement si la tâche tourne encore avant de la jeter.
       if (task.status === "pending" || task.status === "running") {
@@ -751,7 +753,7 @@ export class AgentOrchestrator {
     }
 
     // Purge persistante (best-effort, non bloquant pour l'appelant).
-    agentPersistence.deleteTasks(taskIds).catch(() => {});
+    agentPersistence.deleteTasks(taskIds, projectId).catch(() => {});
 
     log.info(`🗑️ ${removed} tâche(s) supprimée(s) définitivement`);
     return removed;
