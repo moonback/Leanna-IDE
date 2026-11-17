@@ -615,8 +615,11 @@ export class AgentOrchestrator {
   }
 
   /** Liste les tâches avec filtres optionnels */
-  listTasks(filters?: { role?: AgentRole; status?: TaskStatus; limit?: number }): AgentTask[] {
-    let results = Array.from(this.tasks.values());
+  listTasks(filters?: { role?: AgentRole; status?: TaskStatus; limit?: number; projectId?: string }): AgentTask[] {
+    // Les tâches historiques sans projectId restent masquées (fail closed).
+    let results = filters?.projectId
+      ? Array.from(this.tasks.values()).filter((task) => task.projectId === filters.projectId)
+      : [];
 
     if (filters?.role) {
       results = results.filter((t) => t.role === filters.role);
