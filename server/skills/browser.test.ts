@@ -1,8 +1,22 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { browserSkill, normalizeUrl, rankLinkCandidates, classifyHost, isSponsoredLink, condenseSearchQuery } from "./browser.js";
+import { browserSkill, normalizeUrl, rankLinkCandidates, classifyHost, isSponsoredLink, condenseSearchQuery, isRetryableBrowserActionResult } from "./browser.js";
 
 describe("browser", () => {
+  describe("interactive action retry safety", () => {
+    it("retries only explicit not-found results for known interactive actions", () => {
+      assert.equal(isRetryableBrowserActionResult("browser-click-by-role", { found: false }), true);
+      assert.equal(isRetryableBrowserActionResult("browser-type-by-label", { found: false }), true);
+      assert.equal(isRetryableBrowserActionResult("browser-fill-form", { found: false }), true);
+    });
+
+    it("never retries timeouts, transport errors, successful actions, or unknown actions", () => {
+      assert.equal(isRetryableBrowserActionResult("browser-click-by-role", "[ERREUR ACTION] Timeout"), false);
+      assert.equal(isRetryableBrowserActionResult("browser-click-by-role", { ok: true }), false);
+      assert.equal(isRetryableBrowserActionResult("browser-navigate", { found: false }), false);
+      assert.equal(isRetryableBrowserActionResult("browser-fill-form", { found: true, ok: false }), false);
+    });
+  });
   describe("URL policy and link ranking", () => {
     it("allows public URLs while rejecting localhost, private, loopback, and link-local destinations", () => {
       assert.equal(normalizeUrl("https://example.com/docs"), "https://example.com/docs");
