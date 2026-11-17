@@ -26,7 +26,7 @@ const MISSION_BROWSER_TOOLS = [
   "browser_research", "browser_web_search", "browser_click", "browser_type", "browser_fill_form",
   "browser_select_option", "browser_click_by_role", "browser_type_by_label", "browser_snapshot",
   "browser_inspect", "browser_get_accessibility_snapshot", "browser_get_element_text",
-  "browser_get_element_attribute", "browser_wait_for", "browser_capture",
+  "browser_get_element_attribute", "browser_wait_for", "browser_get_console", "browser_capture",
 ];
 
 /** Instance globale de l'Executor (initialisée par le SkillManager) */
