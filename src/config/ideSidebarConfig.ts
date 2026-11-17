@@ -11,13 +11,14 @@
  * 4. GitHub            (accès direct)
  * 5. CI/CD & Aperçu    (Navigateur)
  * 6. Données           (sous-menu : Knowledge, Notebooks)
- * 7. Outils            (sous-menu : Agent Builder, Marketplace, Caméra, Partage écran)
- * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar)
+ * 7. Outils            (sous-menu : Agent Builder, Marketplace)
+ * (Agents en accès direct ; IA via le flyout du statut agent — GlobalSidebar.
+ *  Caméra et Partage écran : icônes du bloc « Leanna » connecté.)
  */
 
 import {
   Search,
-  GitBranch, Github, Camera, Monitor,
+  GitBranch, Github,
   FolderTree,
   Database,
   Wrench,
@@ -210,24 +211,6 @@ export const sidebarSections: SidebarSectionConfig[] = [
             label: 'Marketplace',
             stateKey: 'showMarketplace',
             actionKey: 'onToggleMarketplace',
-          },
-          {
-            id: 'vision',
-            type: 'button',
-            icon: Camera,
-            label: 'Caméra',
-            stateKey: 'visionEnabled',
-            actionKey: 'onToggleVision',
-            requiresAssistant: true,
-          },
-          {
-            id: 'screen-share',
-            type: 'button',
-            icon: Monitor,
-            label: 'Partage écran',
-            stateKey: 'screenShareEnabled',
-            actionKey: 'onToggleScreenShare',
-            requiresAssistant: true,
           },
         ],
       },

@@ -28,6 +28,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Settings, PanelLeftClose, PanelLeftOpen, ChevronDown,
   Power, MessageCircle, Mic, MicOff, Bot, FolderInput, Radio,
+  Camera, Monitor,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.js';
 import { useConfirm } from './ui/ConfirmDialog.js';
@@ -395,6 +396,10 @@ export function GlobalSidebar(props: GlobalSidebarProps = {}) {
                 onToggleChat={props.onToggleChat}
                 onMuteToggle={props.onMuteToggle}
                 onToggleMode={props.onToggleMode}
+                visionEnabled={Boolean(props.visionEnabled)}
+                screenShareEnabled={Boolean(props.screenShareEnabled)}
+                onToggleVision={props.onToggleVision}
+                onToggleScreenShare={props.onToggleScreenShare}
               />
             )}
 
@@ -786,6 +791,7 @@ function Ctrl({
 function IdeAssistantBlock({
   collapsed, reduceMotion, connected, working, muted, sessionMode,
   onConnect, onDisconnect, onToggleChat, onMuteToggle, onToggleMode,
+  visionEnabled, screenShareEnabled, onToggleVision, onToggleScreenShare,
 }: {
   collapsed: boolean;
   reduceMotion: boolean;
@@ -798,6 +804,10 @@ function IdeAssistantBlock({
   onToggleChat?: () => void;
   onMuteToggle?: () => void;
   onToggleMode?: () => void;
+  visionEnabled?: boolean;
+  screenShareEnabled?: boolean;
+  onToggleVision?: () => void;
+  onToggleScreenShare?: () => void;
 }) {
   const dotColor = !connected
     ? 'var(--text-dimmed)'
@@ -903,9 +913,11 @@ function IdeAssistantBlock({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 p-1.5">
+      <div className="grid grid-cols-5 gap-1 p-1.5">
         <Ctrl reduceMotion={reduceMotion} icon={MessageCircle} label="Chat IA" onClick={onToggleChat} active={working} tone="var(--accent-primary)" />
         <Ctrl reduceMotion={reduceMotion} icon={muted ? MicOff : Mic} label={muted ? 'Réactiver le micro' : 'Couper le micro'} onClick={onMuteToggle} tone={muted ? 'var(--color-warning)' : undefined} />
+        <Ctrl reduceMotion={reduceMotion} icon={Camera} label="Caméra" onClick={onToggleVision} active={visionEnabled} tone={visionEnabled ? 'var(--color-success)' : undefined} />
+        <Ctrl reduceMotion={reduceMotion} icon={Monitor} label="Partage écran" onClick={onToggleScreenShare} active={screenShareEnabled} tone={screenShareEnabled ? 'var(--color-success)' : undefined} />
         <Ctrl reduceMotion={reduceMotion} icon={Power} label="Déconnecter l'assistant" onClick={onDisconnect} tone="var(--color-error)" />
       </div>
     </motion.div>
