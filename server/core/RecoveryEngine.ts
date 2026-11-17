@@ -85,8 +85,23 @@ export function classifyFailure(outcome: RunnerOutcome): FailureCategory {
 export class RecoveryEngine {
   assess(outcome: RunnerOutcome, attempt: number, maxAttempts: number): RecoveryAssessment {
     const category = classifyFailure(outcome);
+    if (!outcome.success && outcome.alreadyFinalized) {
+      return {
+        category,
+        decision: "escalate",
+        reason: "The domain mission is already finalized; replaying attempts would fake progress.",
+        retryable: false,
+      };
+    }
     if (attempt >= maxAttempts) {
       return { category, decision: "escalate", reason: "Recovery attempt budget exhausted.", retryable: false };
+    }
+
+    // The runner knows facts the classifier cannot see (mission already
+    // finalized, operator decision…). An explicit escalation request
+    // short-circuits retries; safety-critical categories escalate anyway.
+    if (outcome.suggestedRecovery === "escalate") {
+      return { category, decision: "escalate", reason: "Runner explicitly requested escalation.", retryable: false };
     }
 
     switch (category) {
@@ -109,12 +124,6 @@ export class RecoveryEngine {
       case "planning":
         return { category, decision: "replan", reason: "The current plan is invalid; construct a new plan.", retryable: true };
       case "unknown":
-        if (outcome.suggestedRecovery === "escalate") {
-          return { category, decision: "escalate", reason: "Runner explicitly requested escalation.", retryable: false };
-        }
-        if (outcome.suggestedRecovery) {
-          return { category, decision: outcome.suggestedRecovery, reason: "Using the runner's explicit recovery hint.", retryable: true };
-        }
         return attempt === 1
           ? { category, decision: "retry", reason: "One bounded retry for an unclassified failure.", retryable: true }
           : { category, decision: "replan", reason: "Unclassified failure persisted after retry.", retryable: true };

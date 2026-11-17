@@ -52,6 +52,12 @@ export interface RunnerOutcome {
   evidence?: Omit<EvidenceInput, "missionId" | "goal">;
   /** Décision de récupération suggérée en cas d'échec (sinon le Supervisor décide). */
   suggestedRecovery?: RecoveryDecision;
+  /**
+   * True quand la mission du domaine est déjà en état terminal (failed /
+   * cancelled / completed) : rejouer une tentative ne peut produire que des
+   * progrès factices — seule l'escalade reste licite.
+   */
+  alreadyFinalized?: boolean;
   /** Message d'erreur éventuel. */
   error?: string;
   /** False when a timed-out runner did not stop within the abort grace period. */

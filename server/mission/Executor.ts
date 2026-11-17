@@ -898,11 +898,17 @@ export class Executor {
       else if (anyFailed) suggestedRecovery = "replan";
     }
 
+    // La boucle d'objectifs ferme la racine dès la fin naturelle : la mission
+    // du domaine est alors terminale. Le Supervisor ne doit surtout pas
+    // rejouer des tentatives sur une mission déjà finalisée (progrès factices).
+    const alreadyFinalized = !allCompleted && mission.isCompleted();
+
     return {
       success: allCompleted,
       touchedFiles: filesModified,
       evidence: { filesModified, toolsExecuted, runtimeChecks },
       suggestedRecovery,
+      alreadyFinalized,
       error: allCompleted ? undefined : "Objectifs non tous atteints.",
     };
   }
