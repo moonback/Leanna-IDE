@@ -18,6 +18,7 @@ import {
 import { AgentPersistence } from '../agents/AgentPersistence.js';
 import { agentEventStream } from '../agents/AgentEventStream.js';
 import { leadOptionsShape } from '../agents/lead/types.js';
+import { getActiveProjectId } from '../utils/selfRoot.js';
 
 // ── Schémas de validation ────────────────────────────────────────────────────
 
